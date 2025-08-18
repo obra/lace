@@ -30,14 +30,25 @@ vi.mock('@/components/providers/AgentProvider', () => ({
   useAgentContext: vi.fn(),
 }));
 
+vi.mock('@/hooks/useProviders', () => ({
+  useProviders: vi.fn(),
+}));
+
+vi.mock('@/components/config/ProjectEditModal', () => ({
+  ProjectEditModal: ({ isOpen }: { isOpen: boolean }) =>
+    isOpen ? <div data-testid="project-edit-modal">Project Edit Modal</div> : null,
+}));
+
 // Import mocked hooks
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useProviders } from '@/hooks/useProviders';
 
 const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseAgentContext = vi.mocked(useAgentContext);
+const mockUseProviders = vi.mocked(useProviders);
 
 // Helper functions for test data
 const createMockSessionsForProject = () => [
@@ -95,6 +106,8 @@ describe('ProjectSection', () => {
         foundProject: createMockProject(),
         projects: [createMockProject()],
         projectsForSidebar: [createMockProject()],
+        updateProject: vi.fn(),
+        loadProjectConfiguration: vi.fn().mockResolvedValue({}),
       })
     );
     mockUseSessionContext.mockReturnValue(
@@ -110,6 +123,12 @@ describe('ProjectSection', () => {
         currentAgent: createMockAgent('agent-1', 'Agent 1'),
       })
     );
+    mockUseProviders.mockReturnValue({
+      providers: [],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
   });
 
   describe('Basic Structure', () => {
@@ -144,12 +163,12 @@ describe('ProjectSection', () => {
       expect(screen.queryByText('A test project for development')).not.toBeInTheDocument();
     });
 
-    it('renders switch project button', () => {
+    it('renders workspace settings button', () => {
       render(<ProjectSection {...defaultProps} />);
 
-      const switchButton = screen.getByTestId('switch-project-button');
-      expect(switchButton).toBeInTheDocument();
-      expect(switchButton).toHaveAttribute('title', 'Switch project');
+      const settingsButton = screen.getByTestId('workspace-settings-button');
+      expect(settingsButton).toBeInTheDocument();
+      expect(settingsButton).toHaveAttribute('title', 'Workspace settings');
     });
   });
 
@@ -275,10 +294,10 @@ describe('ProjectSection', () => {
   });
 
   describe('Switch Project Functionality', () => {
-    it('calls onSwitchProject when switch project button is clicked', () => {
+    it('calls onSwitchProject when header navigation icon is clicked', () => {
       render(<ProjectSection {...defaultProps} />);
 
-      fireEvent.click(screen.getByTestId('switch-project-button'));
+      fireEvent.click(screen.getByTestId('workspace-switch-header-button'));
 
       expect(mockOnSwitchProject).toHaveBeenCalledTimes(1);
     });
@@ -286,7 +305,7 @@ describe('ProjectSection', () => {
     it('does not call onCloseMobileNav in desktop mode', () => {
       render(<ProjectSection {...defaultProps} isMobile={false} />);
 
-      fireEvent.click(screen.getByTestId('switch-project-button'));
+      fireEvent.click(screen.getByTestId('workspace-switch-header-button'));
 
       expect(mockOnSwitchProject).toHaveBeenCalledTimes(1);
       expect(mockOnCloseMobileNav).not.toHaveBeenCalled();
@@ -295,7 +314,7 @@ describe('ProjectSection', () => {
     it('calls onCloseMobileNav when switching project in mobile mode', () => {
       render(<ProjectSection {...defaultProps} isMobile={true} />);
 
-      fireEvent.click(screen.getByTestId('switch-project-button'));
+      fireEvent.click(screen.getByTestId('workspace-switch-header-button'));
 
       expect(mockOnSwitchProject).toHaveBeenCalledTimes(1);
       expect(mockOnCloseMobileNav).toHaveBeenCalledTimes(1);
@@ -305,7 +324,7 @@ describe('ProjectSection', () => {
       render(<ProjectSection {...defaultProps} isMobile={true} onCloseMobileNav={undefined} />);
 
       // Should not throw when clicking
-      fireEvent.click(screen.getByTestId('switch-project-button'));
+      fireEvent.click(screen.getByTestId('workspace-switch-header-button'));
       expect(mockOnSwitchProject).toHaveBeenCalledTimes(1);
     });
   });
@@ -406,11 +425,11 @@ describe('ProjectSection', () => {
   });
 
   describe('Accessibility', () => {
-    it('has proper button title for switch project', () => {
+    it('has proper button title for workspace settings', () => {
       render(<ProjectSection {...defaultProps} />);
 
-      const switchButton = screen.getByTestId('switch-project-button');
-      expect(switchButton).toHaveAttribute('title', 'Switch project');
+      const settingsButton = screen.getByTestId('workspace-settings-button');
+      expect(settingsButton).toHaveAttribute('title', 'Workspace settings');
     });
 
     it('maintains proper heading hierarchy', () => {
@@ -418,6 +437,34 @@ describe('ProjectSection', () => {
 
       const projectName = screen.getByTestId('current-project-name-desktop');
       expect(projectName.tagName).toBe('H3');
+    });
+  });
+
+  describe('Workspace Navigation', () => {
+    it('renders stacked navigation arrows as single icon in header that opens project selector', () => {
+      render(<ProjectSection {...defaultProps} />);
+
+      // Single stacked navigation icon should be present and clickable
+      const switchButton = screen.getByTestId('workspace-switch-header-button');
+
+      expect(switchButton).toBeInTheDocument();
+      expect(switchButton).toHaveAttribute('title', 'Switch workspace');
+      expect(switchButton).not.toBeDisabled();
+    });
+
+    it('workspace settings button opens the project edit modal', () => {
+      render(<ProjectSection {...defaultProps} />);
+
+      const settingsButton = screen.getByTestId('workspace-settings-button');
+
+      // Modal should not be visible initially
+      expect(screen.queryByTestId('project-edit-modal')).not.toBeInTheDocument();
+
+      // Click settings button
+      fireEvent.click(settingsButton);
+
+      // Modal should now be visible
+      expect(screen.getByTestId('project-edit-modal')).toBeInTheDocument();
     });
   });
 

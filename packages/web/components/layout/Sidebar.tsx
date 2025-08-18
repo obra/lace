@@ -22,6 +22,7 @@ interface SidebarSectionProps {
   children: React.ReactNode;
   collapsible?: boolean;
   defaultCollapsed?: boolean;
+  headerActions?: React.ReactNode;
 }
 
 interface SidebarItemProps {
@@ -136,6 +137,7 @@ export function SidebarSection({
   children,
   collapsible = true,
   defaultCollapsed = false,
+  headerActions,
 }: SidebarSectionProps) {
   const [collapsed, setCollapsed] = React.useState(defaultCollapsed);
 
@@ -146,22 +148,30 @@ export function SidebarSection({
 
   return (
     <div className="px-6 py-4">
-      <button
-        onClick={() => collapsible && setCollapsed(!collapsed)}
-        className={`w-full flex items-center justify-between text-sm font-medium text-base-content/60 mb-3 hover:text-base-content/80 transition-all duration-200 ${
-          collapsible ? 'cursor-pointer' : 'cursor-default'
-        }`}
-      >
-        <div className="flex items-center gap-2">
+      <div className="w-full flex items-center justify-between text-sm font-medium text-base-content/60 mb-3">
+        <button
+          onClick={() => collapsible && setCollapsed(!collapsed)}
+          className={`flex items-center gap-2 hover:text-base-content/80 transition-all duration-200 ${
+            collapsible ? 'cursor-pointer' : 'cursor-default'
+          }`}
+        >
           {icon && <FontAwesomeIcon icon={icon} className="w-4 h-4" />}
           <span className="uppercase tracking-wider text-xs font-semibold">{title}</span>
+        </button>
+        <div className="flex items-center gap-2">
+          {headerActions}
+          {collapsible && (
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="hover:text-base-content/80 transition-colors"
+            >
+              <ChevronRightIcon
+                className={`w-4 h-4 transition-transform ${collapsed ? 'rotate-0' : 'rotate-90'}`}
+              />
+            </button>
+          )}
         </div>
-        {collapsible && (
-          <ChevronRightIcon
-            className={`w-4 h-4 transition-transform ${collapsed ? 'rotate-0' : 'rotate-90'}`}
-          />
-        )}
-      </button>
+      </div>
 
       {!collapsed && <div className="space-y-2 ml-1">{children}</div>}
     </div>
