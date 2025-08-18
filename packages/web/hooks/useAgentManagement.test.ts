@@ -44,19 +44,25 @@ describe('useAgentManagement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default parseResponse behavior - safely handle response
-    mockParseResponse.mockImplementation((res: Response) => {
-      if (!res || typeof res.json !== 'function') {
+    mockParseResponse.mockImplementation(async (res: Response) => {
+      if (!res || typeof res.text !== 'function') {
         return Promise.resolve(null);
       }
-      return res.json();
+      const text = await res.text();
+      return JSON.parse(text);
     });
   });
 
   it('loads session details when session is selected', async () => {
-    mockFetch.mockResolvedValueOnce({
+    const mockResponse = {
       ok: true,
-      json: () => Promise.resolve(mockSessionWithAgents),
-    });
+      text: () => Promise.resolve(JSON.stringify(mockSessionWithAgents)),
+      clone: function () {
+        return this;
+      },
+    } as Response;
+    mockFetch.mockResolvedValueOnce(mockResponse);
+    mockParseResponse.mockResolvedValueOnce(mockSessionWithAgents);
 
     const { result } = renderHook(() => useAgentManagement('session-1'));
 
@@ -88,26 +94,41 @@ describe('useAgentManagement', () => {
   });
 
   it('creates a new agent', async () => {
+    const mockSessionResponse = {
+      ok: true,
+      text: () => Promise.resolve(JSON.stringify(mockSessionWithAgents)),
+      clone: function () {
+        return this;
+      },
+    } as Response;
+    const mockCreateResponse = {
+      ok: true,
+      text: () => Promise.resolve(JSON.stringify({ threadId: 'new-agent' })),
+      clone: function () {
+        return this;
+      },
+    } as Response;
+    const updatedSession = {
+      ...mockSessionWithAgents,
+      agents: [...mockSessionWithAgents.agents!, { threadId: 'new-agent', name: 'New Agent' }],
+    };
+    const mockUpdatedResponse = {
+      ok: true,
+      text: () => Promise.resolve(JSON.stringify(updatedSession)),
+      clone: function () {
+        return this;
+      },
+    } as Response;
+
     mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockSessionWithAgents),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ threadId: 'new-agent' }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            ...mockSessionWithAgents,
-            agents: [
-              ...mockSessionWithAgents.agents!,
-              { threadId: 'new-agent', name: 'New Agent' },
-            ],
-          }),
-      });
+      .mockResolvedValueOnce(mockSessionResponse)
+      .mockResolvedValueOnce(mockCreateResponse)
+      .mockResolvedValueOnce(mockUpdatedResponse);
+
+    mockParseResponse
+      .mockResolvedValueOnce(mockSessionWithAgents)
+      .mockResolvedValueOnce({ threadId: 'new-agent' })
+      .mockResolvedValueOnce(updatedSession);
 
     const { result } = renderHook(() => useAgentManagement('session-1'));
 
@@ -138,10 +159,15 @@ describe('useAgentManagement', () => {
   });
 
   it('updates agent state', async () => {
-    mockFetch.mockResolvedValueOnce({
+    const mockResponse = {
       ok: true,
-      json: () => Promise.resolve(mockSessionWithAgents),
-    });
+      text: () => Promise.resolve(JSON.stringify(mockSessionWithAgents)),
+      clone: function () {
+        return this;
+      },
+    } as Response;
+    mockFetch.mockResolvedValueOnce(mockResponse);
+    mockParseResponse.mockResolvedValueOnce(mockSessionWithAgents);
 
     const { result } = renderHook(() => useAgentManagement('session-1'));
 
@@ -150,17 +176,22 @@ describe('useAgentManagement', () => {
     });
 
     act(() => {
-      result.current.updateAgentState('agent-1', 'idle', 'thinking');
+      result.current.updateAgentState('agent-1', 'thinking');
     });
 
     expect(result.current.sessionDetails?.agents?.[0]?.status).toBe('thinking');
   });
 
   it('handles agent state changes when session details exist', async () => {
-    mockFetch.mockResolvedValueOnce({
+    const mockResponse = {
       ok: true,
-      json: () => Promise.resolve(mockSessionWithAgents),
-    });
+      text: () => Promise.resolve(JSON.stringify(mockSessionWithAgents)),
+      clone: function () {
+        return this;
+      },
+    } as Response;
+    mockFetch.mockResolvedValueOnce(mockResponse);
+    mockParseResponse.mockResolvedValueOnce(mockSessionWithAgents);
 
     const { result } = renderHook(() => useAgentManagement('session-1'));
 
@@ -170,7 +201,7 @@ describe('useAgentManagement', () => {
 
     // Update agent state
     act(() => {
-      result.current.updateAgentState('agent-1', 'idle', 'streaming');
+      result.current.updateAgentState('agent-1', 'streaming');
     });
 
     expect(result.current.sessionDetails?.agents?.[0]?.status).toBe('streaming');
@@ -200,9 +231,14 @@ describe('useAgentManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockSessionWithAgents),
-      })
+        text: () => Promise.resolve(JSON.stringify(mockSessionWithAgents)),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockRejectedValueOnce(createError);
+
+    mockParseResponse.mockResolvedValueOnce(mockSessionWithAgents);
 
     const { result } = renderHook(() => useAgentManagement('session-1'));
 
@@ -228,12 +264,22 @@ describe('useAgentManagement', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockSessionWithAgents),
-      })
+        text: () => Promise.resolve(JSON.stringify(mockSessionWithAgents)),
+        clone: function () {
+          return this;
+        },
+      } as Response)
       .mockResolvedValueOnce({
         ok: false,
-        json: () => Promise.resolve({ error: 'Agent creation failed' }),
-      });
+        text: () => Promise.resolve(JSON.stringify({ error: 'Agent creation failed' })),
+        clone: function () {
+          return this;
+        },
+      } as Response);
+
+    mockParseResponse
+      .mockResolvedValueOnce(mockSessionWithAgents)
+      .mockResolvedValueOnce({ error: 'Agent creation failed' });
 
     const { result } = renderHook(() => useAgentManagement('session-1'));
 
@@ -257,12 +303,15 @@ describe('useAgentManagement', () => {
   it('handles load agent configuration errors gracefully', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const configError = new Error('Config load failed');
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockSessionWithAgents),
-      })
-      .mockRejectedValueOnce(configError);
+    const mockSessionResponse = {
+      ok: true,
+      text: () => Promise.resolve(JSON.stringify(mockSessionWithAgents)),
+      clone: function () {
+        return this;
+      },
+    } as Response;
+    mockFetch.mockResolvedValueOnce(mockSessionResponse).mockRejectedValueOnce(configError);
+    mockParseResponse.mockResolvedValueOnce(mockSessionWithAgents);
 
     const { result } = renderHook(() => useAgentManagement('session-1'));
 
@@ -287,12 +336,15 @@ describe('useAgentManagement', () => {
   it('handles update agent errors gracefully', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const updateError = new Error('Update failed');
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockSessionWithAgents),
-      })
-      .mockRejectedValueOnce(updateError);
+    const mockSessionResponse = {
+      ok: true,
+      text: () => Promise.resolve(JSON.stringify(mockSessionWithAgents)),
+      clone: function () {
+        return this;
+      },
+    } as Response;
+    mockFetch.mockResolvedValueOnce(mockSessionResponse).mockRejectedValueOnce(updateError);
+    mockParseResponse.mockResolvedValueOnce(mockSessionWithAgents);
 
     const { result } = renderHook(() => useAgentManagement('session-1'));
 

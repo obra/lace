@@ -72,7 +72,13 @@ describe('useProviders', () => {
     });
 
     it('loads providers successfully', async () => {
-      const mockResponse = { ok: true };
+      const mockResponse = {
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify(mockProviders)),
+        clone: function () {
+          return this;
+        },
+      } as Response;
       mockFetch.mockResolvedValue(mockResponse);
       mockParseResponse.mockResolvedValue(mockProviders);
 
@@ -90,11 +96,16 @@ describe('useProviders', () => {
 
     it('handles API errors from parseResponse', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const mockResponse = { ok: false };
-      const apiError = { error: 'Provider service unavailable' };
+      const mockResponse = {
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        clone: function () {
+          return this;
+        },
+      } as Response;
 
       mockFetch.mockResolvedValue(mockResponse);
-      mockParseResponse.mockResolvedValue(apiError);
 
       const { result } = renderHook(() => useProviders());
 
@@ -103,9 +114,11 @@ describe('useProviders', () => {
       });
 
       expect(result.current.providers).toEqual([]);
-      expect(result.current.error).toBe('Failed to load providers: HTTP undefined: undefined');
+      expect(result.current.error).toBe(
+        'Failed to load providers: HTTP 500: Internal Server Error'
+      );
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to load providers: HTTP undefined: undefined'
+        'Failed to load providers: HTTP 500: Internal Server Error'
       );
 
       consoleSpy.mockRestore();
@@ -163,7 +176,13 @@ describe('useProviders', () => {
       expect(consoleSpy).toHaveBeenCalledWith('Failed to load providers: Network error');
 
       // Refetch succeeds
-      const mockResponse = { ok: true };
+      const mockResponse = {
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify(mockProviders)),
+        clone: function () {
+          return this;
+        },
+      } as Response;
       mockFetch.mockResolvedValue(mockResponse);
       mockParseResponse.mockResolvedValue(mockProviders);
 
@@ -184,7 +203,13 @@ describe('useProviders', () => {
 
     it('sets loading state during refetch', async () => {
       // Initial successful load
-      const mockResponse = { ok: true };
+      const mockResponse = {
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify(mockProviders)),
+        clone: function () {
+          return this;
+        },
+      } as Response;
       mockFetch.mockResolvedValue(mockResponse);
       mockParseResponse.mockResolvedValue(mockProviders);
 
@@ -224,7 +249,13 @@ describe('useProviders', () => {
 
   describe('Data Handling', () => {
     it('handles empty providers array', async () => {
-      const mockResponse = { ok: true };
+      const mockResponse = {
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify([])),
+        clone: function () {
+          return this;
+        },
+      } as Response;
       mockFetch.mockResolvedValue(mockResponse);
       mockParseResponse.mockResolvedValue([]);
 
@@ -239,7 +270,13 @@ describe('useProviders', () => {
     });
 
     it('handles null/undefined providers response', async () => {
-      const mockResponse = { ok: true };
+      const mockResponse = {
+        ok: true,
+        text: () => Promise.resolve('null'),
+        clone: function () {
+          return this;
+        },
+      } as Response;
       mockFetch.mockResolvedValue(mockResponse);
       mockParseResponse.mockResolvedValue(null);
 
@@ -257,7 +294,13 @@ describe('useProviders', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       // Initial successful load
-      const mockResponse = { ok: true };
+      const mockResponse = {
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify(mockProviders)),
+        clone: function () {
+          return this;
+        },
+      } as Response;
       mockFetch.mockResolvedValue(mockResponse);
       mockParseResponse.mockResolvedValue(mockProviders);
 
@@ -317,7 +360,13 @@ describe('useProviders', () => {
       expect(consoleSpy).toHaveBeenCalledWith('Failed to load providers: Network error');
 
       // Refetch succeeds
-      const mockResponse = { ok: true };
+      const mockResponse = {
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify(mockProviders)),
+        clone: function () {
+          return this;
+        },
+      } as Response;
       mockFetch.mockResolvedValue(mockResponse);
       mockParseResponse.mockResolvedValue(mockProviders);
 

@@ -93,7 +93,7 @@ function ContextConsumer() {
         Create Agent
       </button>
       <button
-        onClick={() => updateAgentState('agent-1', 'idle', 'active')}
+        onClick={() => updateAgentState('agent-1', 'active')}
         data-testid="update-agent-state"
       >
         Update Agent State
@@ -342,7 +342,7 @@ describe('AgentProvider', () => {
 
       fireEvent.click(screen.getByTestId('update-agent-state'));
 
-      expect(mockUpdateAgentState).toHaveBeenCalledWith('agent-1', 'idle', 'active');
+      expect(mockUpdateAgentState).toHaveBeenCalledWith('agent-1', 'active');
     });
 
     it('calls reloadSessionDetails when requested', async () => {

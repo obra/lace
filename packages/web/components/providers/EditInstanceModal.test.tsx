@@ -88,6 +88,9 @@ describe('EditInstanceModal', () => {
         url: url,
         text: () => Promise.resolve(''),
         json: () => Promise.resolve({}),
+        clone: function () {
+          return this;
+        },
       } as Response);
     });
   });
@@ -125,13 +128,19 @@ describe('EditInstanceModal', () => {
           status: 200,
           text: () => Promise.resolve(response),
           json: () => Promise.resolve({ instances: [] }),
-        });
+          clone: function () {
+            return this;
+          },
+        } as Response);
       }
       return Promise.resolve({
         ok: true,
         status: 200,
         text: () => Promise.resolve(stringify({})),
-      });
+        clone: function () {
+          return this;
+        },
+      } as Response);
     });
     global.fetch = mockFetch;
 
@@ -181,13 +190,19 @@ describe('EditInstanceModal', () => {
           status: 200,
           text: () => Promise.resolve(response),
           json: () => Promise.resolve({ instances: [] }),
-        });
+          clone: function () {
+            return this;
+          },
+        } as Response);
       }
       return Promise.resolve({
         ok: true,
         status: 200,
         text: () => Promise.resolve(stringify({})),
-      });
+        clone: function () {
+          return this;
+        },
+      } as Response);
     });
 
     await renderWithProvider();
@@ -251,13 +266,19 @@ describe('EditInstanceModal', () => {
           status: 200,
           text: () => Promise.resolve(response),
           json: () => Promise.resolve({ instances: [] }),
-        });
+          clone: function () {
+            return this;
+          },
+        } as Response);
       }
       return Promise.resolve({
         ok: false,
         status: 400,
         text: () => Promise.resolve(''),
-      });
+        clone: function () {
+          return this;
+        },
+      } as Response);
     });
 
     await renderWithProvider();
@@ -311,7 +332,10 @@ describe('EditInstanceModal', () => {
           status: 200,
           text: () => Promise.resolve(response),
           json: () => Promise.resolve({ instances: [] }),
-        });
+          clone: function () {
+            return this;
+          },
+        } as Response);
       }
       return new Promise((resolve) =>
         setTimeout(
@@ -320,7 +344,10 @@ describe('EditInstanceModal', () => {
               ok: true,
               status: 200,
               text: () => Promise.resolve(stringify({})),
-            }),
+              clone: function () {
+                return this;
+              },
+            } as Response),
           100
         )
       );

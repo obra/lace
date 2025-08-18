@@ -140,6 +140,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(
@@ -189,6 +192,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(
@@ -214,6 +220,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       const { rerender } = render(
@@ -244,6 +253,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('[]'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(
@@ -262,6 +274,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('null'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(
@@ -282,6 +297,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(
@@ -315,6 +333,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       function TestApprovalResponse() {
@@ -363,6 +384,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(
@@ -387,6 +411,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('[]'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(
@@ -405,6 +432,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-with-approvals'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       // Trigger refresh
@@ -438,6 +468,9 @@ describe('ToolApprovalProvider', () => {
       resolvePromise!({
         ok: true,
         text: () => Promise.resolve('[]'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       await waitFor(() => {
@@ -482,6 +515,9 @@ describe('ToolApprovalProvider', () => {
         ok: false,
         status: 404,
         text: () => Promise.resolve('Agent not found'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -515,6 +551,9 @@ describe('ToolApprovalProvider', () => {
         ok: true,
         status: 200,
         text: () => Promise.resolve('{"error": "Agent not found"}'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -546,6 +585,9 @@ describe('ToolApprovalProvider', () => {
         ok: false,
         status: 500,
         text: () => Promise.resolve('Internal server error'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -602,6 +644,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       const { rerender } = render(
@@ -649,6 +694,9 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('mock-response'),
+        clone: function () {
+          return this;
+        },
       } as Response);
 
       render(

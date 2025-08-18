@@ -65,6 +65,9 @@ describe('EventStreamProvider', () => {
           status: 200,
           text: () => Promise.resolve(response),
           json: () => Promise.resolve([]),
+          clone: function () {
+            return this;
+          },
         } as Response);
       }
 
@@ -74,6 +77,9 @@ describe('EventStreamProvider', () => {
         status: 200,
         text: () => Promise.resolve(stringify({})),
         json: () => Promise.resolve({}),
+        clone: function () {
+          return this;
+        },
       } as Response);
     });
 

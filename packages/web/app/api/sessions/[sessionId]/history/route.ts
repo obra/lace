@@ -49,6 +49,6 @@ export async function GET(
     return createSuperjsonResponse(events, { status: 200 });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR', error });
+    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }

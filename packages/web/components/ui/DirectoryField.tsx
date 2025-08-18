@@ -48,6 +48,7 @@ export function DirectoryField({
   const hasInitializedRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const requestAbortRef = useRef<AbortController | null>(null);
 
   // Add click outside handler
   const handleClickOutside = useCallback((event: MouseEvent) => {
@@ -69,13 +70,18 @@ export function DirectoryField({
     setApiError(null);
     setShowMore(false);
 
+    // Abort any in-flight request before starting a new one
+    requestAbortRef.current?.abort();
+    const controller = new AbortController();
+    requestAbortRef.current = controller;
+
     try {
       // If path is empty, don't include it in the query - let server use home directory
       const url = path
         ? `/api/filesystem/list?path=${encodeURIComponent(path)}`
         : '/api/filesystem/list';
 
-      const data = await api.get<ListDirectoryResponse>(url);
+      const data = await api.get<ListDirectoryResponse>(url, { signal: controller.signal });
       setDirectories(data.entries);
       setCurrentPath(data.currentPath);
       setParentPath(data.parentPath);
@@ -85,6 +91,8 @@ export function DirectoryField({
       setBreadcrumbs(data.breadcrumbNames);
       setBreadcrumbPaths(data.breadcrumbPaths);
     } catch (err) {
+      // Treat user-initiated cancels as non-errors
+      if (err instanceof Error && err.name === 'AbortError') return;
       setApiError(err instanceof Error ? err.message : 'Failed to load directories');
       setDirectories([]);
     } finally {

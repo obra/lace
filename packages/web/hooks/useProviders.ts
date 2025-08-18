@@ -34,11 +34,10 @@ export function useProviders(): UseProvidersResult {
     }
   }, []);
 
-  // Load providers on mount only - dependency on loadProviders would cause infinite re-render loop
-  // since loadProviders is recreated on every render despite useCallback
+  // Load providers on mount only
   useEffect(() => {
     void loadProviders();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadProviders]);
 
   return {
     providers,

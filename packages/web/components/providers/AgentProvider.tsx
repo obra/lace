@@ -29,7 +29,7 @@ export interface AgentContextType {
 
   // Data operations (passed through from hook)
   createAgent: (sessionId: string, request: CreateAgentRequest) => Promise<void>;
-  updateAgentState: (agentId: string, fromState: string, toState: string) => void;
+  updateAgentState: (agentId: string, toState: string) => void;
   reloadSessionDetails: () => Promise<void>;
   loadAgentConfiguration: (
     agentId: string

@@ -22,13 +22,10 @@ export async function GET(
     // Validate parameters
     const paramsResult = ParamsSchema.safeParse(await params);
     if (!paramsResult.success) {
-      return createSuperjsonResponse(
-        {
-          error: 'Invalid parameters',
-          details: paramsResult.error.format(),
-        },
-        { status: 400 }
-      );
+      return createErrorResponse('Invalid parameters', 400, {
+        code: 'VALIDATION_ERROR',
+        details: paramsResult.error.format(),
+      });
     }
 
     const { threadId } = paramsResult.data;

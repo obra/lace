@@ -18,12 +18,23 @@ export async function GET(request: NextRequest) {
     // Validate input
     const { path } = ListDirectoryRequestSchema.parse({ path: rawPath });
 
-    // Security: Ensure path is within user's home directory
+    // Security: Ensure path is within user's home directory (follow symlinks)
     const homeDir = homedir();
     const absolutePath = resolve(path);
-    const relativePath = relative(homeDir, absolutePath);
+    const [realHomeDir, realAbsolutePath] = await Promise.all([
+      fs.realpath(homeDir).catch(() => homeDir),
+      fs.realpath(absolutePath).catch(() => absolutePath),
+    ]);
 
-    if (relativePath.startsWith('..') || resolve(homeDir, relativePath) !== absolutePath) {
+    // Allow exact home or any descendant. Use separator-aware prefix check.
+    const isInsideHome =
+      realAbsolutePath === realHomeDir ||
+      (realAbsolutePath.startsWith(realHomeDir) &&
+        (realAbsolutePath[realHomeDir.length] === sep ||
+          realHomeDir.endsWith(sep) ||
+          realHomeDir === sep));
+
+    if (!isInsideHome) {
       return createErrorResponse('Access denied: path outside home directory', 403, {
         code: 'PATH_ACCESS_DENIED',
       });
@@ -45,6 +56,21 @@ export async function GET(request: NextRequest) {
       try {
         const entryPath = join(absolutePath, dirent.name);
         const entryStats = await fs.stat(entryPath);
+
+        // Exclude entries resolving outside of home directory (symlink escape)
+        const realEntryPath = await fs.realpath(entryPath).catch(() => null);
+        if (!realEntryPath) {
+          continue;
+        }
+        const entryInsideHome =
+          realEntryPath === realHomeDir ||
+          (realEntryPath.startsWith(realHomeDir) &&
+            (realEntryPath[realHomeDir.length] === sep ||
+              realHomeDir.endsWith(sep) ||
+              realHomeDir === sep));
+        if (!entryInsideHome) {
+          continue;
+        }
 
         // Check read permissions
         await fs.access(entryPath, fsConstants.R_OK);

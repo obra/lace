@@ -170,16 +170,23 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
       try {
         // Generate instanceId from displayName and catalogProviderId
         const generateInstanceId = (displayName: string, providerId: string): string => {
-          const baseName = `${displayName.toLowerCase()}-${providerId}`;
+          const baseName = `${displayName.toLowerCase()}-${providerId.toLowerCase()}`;
           const cleanName = baseName
-            .replace(/[^a-z0-9\s]/g, '') // Remove special chars except spaces
-            .replace(/\s+/g, '-') // Replace spaces with hyphens
-            .replace(/-+/g, '-') // Replace multiple hyphens with single
-            .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+            .replace(/[^a-z0-9\s-]/g, '') // keep hyphens
+            .replace(/\s+/g, '-') // spaces -> hyphens
+            .replace(/-+/g, '-') // collapse hyphens
+            .replace(/^-|-$/g, ''); // trim hyphens
 
-          // Add timestamp suffix to ensure uniqueness
-          const timestamp = Date.now().toString().slice(-4);
-          return `${cleanName}-${timestamp}`;
+          // Ensure uniqueness by checking existing instances
+          let candidate = cleanName;
+          let counter = 1;
+
+          while (instances.some((instance) => instance.id === candidate)) {
+            candidate = `${cleanName}-${counter}`;
+            counter++;
+          }
+
+          return candidate;
         };
 
         const instanceId = generateInstanceId(formData.displayName, catalogProviderId);
@@ -205,7 +212,7 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
         throw err; // Re-throw so the modal can handle the error
       }
     },
-    [loadInstances]
+    [loadInstances, instances]
   );
 
   // Update provider instance
@@ -337,11 +344,10 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
     [testResults, getInstanceById]
   );
 
-  // Load instances on mount only - dependency on loadInstances would cause infinite re-render loop
-  // since loadInstances is recreated on every render despite useCallback
+  // Load instances on mount only
   useEffect(() => {
     void loadInstances();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadInstances]);
 
   // Context value
   const contextValue = useMemo<ProviderInstanceContextValue>(

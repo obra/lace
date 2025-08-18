@@ -172,11 +172,15 @@ describe('LaceApp agent state handling', () => {
 
     // Mock fetch to return projects and sessions with proper superjson serialization
     mockFetch.mockImplementation((url: string) => {
-      const mockResponse = (data: unknown) => ({
-        ok: true,
-        json: () => Promise.resolve(data),
-        text: () => Promise.resolve(stringify(data)),
-      });
+      const mockResponse = (data: unknown) =>
+        ({
+          ok: true,
+          json: () => Promise.resolve(data),
+          text: () => Promise.resolve(stringify(data)),
+          clone: function () {
+            return this;
+          },
+        }) as Response;
 
       if (url.includes('/api/projects')) {
         return Promise.resolve(mockResponse([]));

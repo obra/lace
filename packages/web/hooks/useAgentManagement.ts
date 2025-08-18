@@ -10,7 +10,7 @@ interface UseAgentManagementResult {
   sessionDetails: SessionInfo | null;
   loading: boolean;
   createAgent: (sessionId: string, agentData: CreateAgentRequest) => Promise<void>;
-  updateAgentState: (agentId: string, from: string, to: string) => void;
+  updateAgentState: (agentId: string, to: string) => void;
   reloadSessionDetails: () => Promise<void>;
   loadAgentConfiguration: (
     agentId: string
@@ -59,7 +59,7 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
     [loadSessionDetails]
   );
 
-  const updateAgentState = useCallback((agentId: string, from: string, to: string) => {
+  const updateAgentState = useCallback((agentId: string, to: string) => {
     setSessionDetails((prevSession) => {
       if (!prevSession?.agents) return prevSession;
 

@@ -2,7 +2,7 @@
 // ABOUTME: Handles project configuration retrieval and updates with validation and error handling
 
 import { NextRequest } from 'next/server';
-import { Project } from '@/lib/server/lace-imports';
+import { Project, ProviderRegistry } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
@@ -58,7 +58,6 @@ export async function PUT(
 
     // Validate provider instance if provided
     if (validatedData.providerInstanceId) {
-      const { ProviderRegistry } = await import('@/lib/server/lace-imports');
       const registry = ProviderRegistry.getInstance();
 
       const configuredInstances = await registry.getConfiguredInstances();
