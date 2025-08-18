@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 import type { SessionContextType } from '@/components/providers/SessionProvider';
 import type { AgentContextType } from '@/components/providers/AgentProvider';
 import type { ProjectContextType } from '@/components/providers/ProjectProvider';
+import type { UseUIStateResult } from '@/hooks/useUIState';
 import type { ThreadId } from '@/types/core';
 
 /**
@@ -116,6 +117,32 @@ export function createMockProjectContext(
     createProject: vi.fn(),
     loadProjectConfiguration: vi.fn(),
     reloadProjects: vi.fn(),
+
+    // Apply any overrides
+    ...overrides,
+  };
+}
+
+/**
+ * Creates a mock UseUIStateResult with all required methods
+ * @param overrides - Partial object to override default mock values
+ */
+export function createMockUIContext(overrides?: Partial<UseUIStateResult>): UseUIStateResult {
+  return {
+    // Navigation state
+    showMobileNav: false,
+    showDesktopSidebar: true,
+    setShowMobileNav: vi.fn(),
+    setShowDesktopSidebar: vi.fn(),
+    toggleDesktopSidebar: vi.fn(),
+
+    // Modal state
+    autoOpenCreateProject: false,
+    setAutoOpenCreateProject: vi.fn(),
+
+    // Loading state
+    loading: false,
+    setLoading: vi.fn(),
 
     // Apply any overrides
     ...overrides,

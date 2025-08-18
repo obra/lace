@@ -12,6 +12,7 @@ import {
 } from './EventStreamProvider';
 import { ToolApprovalProvider } from './ToolApprovalProvider';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { createMockResponse } from '@/test-utils/mock-fetch';
 import type { ThreadId } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
 
@@ -22,10 +23,7 @@ vi.mock('@/hooks/useSessionAPI');
 
 // Mock global fetch for ToolApprovalProvider
 beforeEach(() => {
-  global.fetch = vi.fn().mockResolvedValue({
-    ok: true,
-    text: () => Promise.resolve('[]'),
-  } as Response);
+  global.fetch = vi.fn().mockResolvedValue(createMockResponse([]));
 });
 
 import { useSessionEvents as useSessionEventsHook } from '@/hooks/useSessionEvents';

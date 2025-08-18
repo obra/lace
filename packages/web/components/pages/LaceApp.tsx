@@ -194,7 +194,6 @@ function LaceAppMain() {
       // Load actual session configuration
       try {
         const config = await loadSessionConfiguration(selectedSessionDetails.id);
-        console.log('Loaded session configuration:', config);
         setSessionConfig(config as SessionConfiguration);
       } catch (error) {
         console.error('Failed to load session configuration:', error);
