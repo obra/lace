@@ -1138,8 +1138,8 @@ export class Agent extends EventEmitter {
       const permission = await this._toolExecutor.requestToolPermission(toolCall, toolContext);
 
       if (permission === 'granted') {
-        // Execute immediately if allowed
-        const result = await this._toolExecutor.executeTool(toolCall, toolContext);
+        // Permission already checked and granted - execute without checking again
+        const result = await this._toolExecutor.executeApprovedTool(toolCall, toolContext);
 
         // Only add events if thread still exists
         if (this._threadManager.getThread(this._threadId)) {

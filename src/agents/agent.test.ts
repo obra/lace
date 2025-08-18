@@ -971,8 +971,8 @@ describe('Enhanced Agent', () => {
       };
       toolExecutor.setApprovalCallback(autoApprovalCallback);
 
-      // Mock ToolExecutor.executeTool to track calls
-      const executeToolSpy = vi.spyOn(toolExecutor, 'executeTool');
+      // Mock ToolExecutor.executeApprovedTool to track calls (since agent now uses this for granted permissions)
+      const executeToolSpy = vi.spyOn(toolExecutor, 'executeApprovedTool');
 
       const mockProvider = createOneTimeToolProvider(
         [{ id: 'call_immediate', name: 'mock_tool', input: { action: 'test' } }],
@@ -988,7 +988,7 @@ describe('Enhanced Agent', () => {
       // Add delay to allow async tool execution to complete
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // Verify ToolExecutor.executeTool was called immediately
+      // Verify ToolExecutor.executeApprovedTool was called immediately
       expect(executeToolSpy).toHaveBeenCalledTimes(1);
       expect(executeToolSpy).toHaveBeenCalledWith(
         {
