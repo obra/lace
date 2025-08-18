@@ -253,6 +253,24 @@ export class ToolExecutor {
     return this.executeToolDirect(tool, call, context);
   }
 
+  /**
+   * Execute a tool that has already been approved.
+   * This method bypasses permission checks but ensures proper context setup
+   * (temp directory, environment variables, etc.)
+   *
+   * Used by Agent._executeApprovedTool() when handling TOOL_APPROVAL_RESPONSE events.
+   */
+  async executeApprovedTool(call: ToolCall, context: ToolContext): Promise<ToolResult> {
+    // 1. Check if tool exists
+    const tool = this.tools.get(call.name);
+    if (!tool) {
+      return createErrorResult(`Tool '${call.name}' not found`, call.id);
+    }
+
+    // 2. Execute directly without permission check (already approved)
+    return this.executeToolDirect(tool, call, context);
+  }
+
   private async executeToolDirect(
     tool: Tool,
     call: ToolCall,

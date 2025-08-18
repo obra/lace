@@ -1194,6 +1194,116 @@ describe('Enhanced Agent', () => {
 
       executeToolSpy.mockRestore();
     });
+
+    it('should provide temp directory when executing approved bash tool', async () => {
+      // This test verifies that approved tools get proper temp directory setup
+      // Bug: _executeApprovedTool calls tool.execute() directly, bypassing temp dir setup
+
+      const bashTool = new BashTool();
+      toolExecutor.registerTool('bash', bashTool);
+
+      const mockProvider = createOneTimeToolProvider(
+        [{ id: 'bash_call_1', name: 'bash', input: { command: 'echo "test"' } }],
+        'I will run the bash command.'
+      );
+
+      agent = createAgent({ provider: mockProvider, tools: [bashTool] });
+
+      // Set up EventApprovalCallback for approval workflow
+      const approvalCallback = new EventApprovalCallback(agent);
+      toolExecutor.setApprovalCallback(approvalCallback);
+
+      await agent.start();
+      await agent.sendMessage('Run a command');
+
+      // Wait for approval request
+      await vi.waitFor(() => {
+        const events = threadManager.getEvents(agent.threadId);
+        const approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+        expect(approvalRequests).toHaveLength(1);
+      });
+
+      // Approve the tool call
+      const approvalEvent = expectEventAdded(
+        threadManager.addEvent({
+          type: 'TOOL_APPROVAL_RESPONSE',
+          threadId: agent.threadId,
+          data: {
+            toolCallId: 'bash_call_1',
+            decision: ApprovalDecision.ALLOW_ONCE,
+          },
+        })
+      );
+      agent.emit('thread_event_added', { event: approvalEvent, threadId: agent.threadId });
+
+      // Wait for tool execution
+      await vi.waitFor(() => {
+        const events = threadManager.getEvents(agent.threadId);
+        const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
+        expect(toolResults).toHaveLength(1);
+      });
+
+      // Check the result
+      const events = threadManager.getEvents(agent.threadId);
+      const toolResult = events.find((e) => e.type === 'TOOL_RESULT');
+      expect(toolResult).toBeDefined();
+
+      const result = toolResult!.data;
+
+      // This test verifies the fix: _executeApprovedTool now uses ToolExecutor
+      // which properly sets up the temp directory for bash tool execution
+
+      // The key fix verification: temp directory is now provided
+      // Before fix: "Tool temp directory not provided by ToolExecutor"
+      // After fix: Tool gets temp directory and can create output files
+
+      if (
+        result.status === 'failed' &&
+        result.content[0]?.type === 'text' &&
+        result.content[0].text
+      ) {
+        const errorOutput = JSON.parse(result.content[0].text) as {
+          stderrPreview?: string;
+          outputFiles?: {
+            stdout: string;
+            stderr: string;
+            combined: string;
+          };
+        };
+
+        // In test environment, bash might not be available (ENOENT error)
+        // But the important thing is we got past the temp directory error
+        // and the tool created output files, proving temp dir was provided
+        if (errorOutput.stderrPreview?.includes('ENOENT')) {
+          // Verify temp directory was created (output files exist)
+          expect(errorOutput.outputFiles).toBeDefined();
+          expect(errorOutput.outputFiles?.stdout).toContain('/tool-call-bash_call_1/stdout.txt');
+          expect(errorOutput.outputFiles?.stderr).toContain('/tool-call-bash_call_1/stderr.txt');
+          expect(errorOutput.outputFiles?.combined).toContain(
+            '/tool-call-bash_call_1/combined.txt'
+          );
+
+          // This is a success - we fixed the temp directory issue
+          return;
+        }
+
+        // If it's a different error, that's unexpected
+        console.log('Unexpected error:', result.content[0].text);
+        throw new Error('Unexpected error: ' + (errorOutput.stderrPreview || 'unknown'));
+      } else if (
+        result.status === 'completed' &&
+        result.content[0]?.type === 'text' &&
+        result.content[0].text
+      ) {
+        // If bash is available and command executed successfully
+        const output = JSON.parse(result.content[0].text) as {
+          exitCode: number;
+          stdoutPreview: string;
+        };
+        expect(output.exitCode).toBe(0);
+        expect(output.stdoutPreview).toContain('test');
+      }
+    });
   });
 
   describe('error handling', () => {

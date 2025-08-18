@@ -1262,18 +1262,9 @@ export class Agent extends EventEmitter {
         agent: this,
       };
 
-      // Find the tool and execute directly (permission already granted via approval)
-      const tool = this._toolExecutor.getTool(toolCall.name);
-      if (!tool) {
-        throw new Error(`Tool '${toolCall.name}' not found`);
-      }
-
-      const result = await tool.execute(toolCall.arguments, toolContext);
-
-      // Ensure the result has the call ID if it wasn't set by the tool
-      if (!result.id && toolCall.id) {
-        result.id = toolCall.id;
-      }
+      // Execute through ToolExecutor's approved tool method
+      // This bypasses permission checks (already approved) but ensures proper context setup
+      const result = await this._toolExecutor.executeApprovedTool(toolCall, toolContext);
 
       // Only add events if thread still exists
       if (this._threadManager.getThread(this._threadId)) {
