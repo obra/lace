@@ -67,7 +67,7 @@ export function Sidebar({ isOpen, onToggle, onSettingsClick, children }: Sidebar
 
           <button
             onClick={onToggle}
-            className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-lg z-[200] group"
+            className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-lg z-[9999] group"
           >
             <ChevronRightIcon className="w-4 h-4 text-base-content/60 group-hover:text-base-content transition-colors" />
           </button>
@@ -120,7 +120,7 @@ export function Sidebar({ isOpen, onToggle, onSettingsClick, children }: Sidebar
           {/* Toggle Button */}
           <button
             onClick={onToggle}
-            className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-lg z-[200] group"
+            className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-lg z-[9999] group"
           >
             <ChevronRightIcon className="w-4 h-4 text-base-content/60 group-hover:text-base-content transition-colors rotate-180" />
           </button>
