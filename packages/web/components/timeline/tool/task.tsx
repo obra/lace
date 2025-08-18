@@ -21,9 +21,7 @@ import {
 import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
 import type { ToolAggregatedEventData } from '@/types/web-events';
 import type { Task } from '@/types/core';
-import Badge from '@/components/ui/Badge';
-import { Alert } from '@/components/ui/Alert';
-import InlineCode from '@/components/ui/InlineCode';
+import { Badge, Alert, InlineCode } from '@/components/ui';
 
 /**
  * Priority badge component using design system Badge
