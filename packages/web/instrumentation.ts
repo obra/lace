@@ -3,11 +3,12 @@
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    // Initialize Sentry first, then logging
+    // Initialize Sentry first, then logging, then LACE_DIR
     await import('./sentry.server.config');
     await import('./lib/server/logging-init');
+    await import('./lib/server/data-dir-init');
   }
-  
+
   if (process.env.NEXT_RUNTIME === 'edge') {
     await import('./sentry.edge.config');
   }
