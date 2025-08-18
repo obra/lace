@@ -36,4 +36,5 @@ export {
 export { TestProvider } from '~/test-utils/test-provider';
 export { ApprovalPendingError, ApprovalDecision } from '~/tools/approval-types';
 
-// Database
+// Database and configuration
+export { ensureLaceDir } from '~/config/lace-dir';
