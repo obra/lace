@@ -73,9 +73,34 @@ async function makeRequest<T>(
       ...(combinedSignal && { signal: combinedSignal }),
     });
 
-    // Check HTTP status first - never parse error pages
+    // Check HTTP status and try to extract error message
     if (!response.ok) {
-      throw new HttpError(response.status, response.statusText, url);
+      // Try to parse the error response body for a meaningful message
+      let errorMessage = response.statusText;
+      try {
+        const errorData = await parseResponse(response.clone());
+        if (errorData && typeof errorData === 'object') {
+          // Check for various error message formats
+          if ('message' in errorData && typeof errorData.message === 'string') {
+            errorMessage = errorData.message;
+          } else if ('error' in errorData && typeof errorData.error === 'string') {
+            errorMessage = errorData.error;
+          } else if (
+            'details' in errorData &&
+            errorData.details &&
+            typeof errorData.details === 'object'
+          ) {
+            // Handle detailed validation errors
+            const details = errorData.details as Record<string, unknown>;
+            if ('summary' in details && typeof details.summary === 'string') {
+              errorMessage = details.summary;
+            }
+          }
+        }
+      } catch {
+        // If we can't parse the error response, use the default status text
+      }
+      throw new HttpError(response.status, errorMessage, url);
     }
 
     // Only parse when we know it's a successful response

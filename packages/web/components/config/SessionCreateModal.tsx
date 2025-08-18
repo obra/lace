@@ -5,9 +5,10 @@
 
 import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTrash } from '@/lib/fontawesome';
+import { faPlus, faTrash, faExclamationTriangle } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { ModelSelectionForm } from './ModelSelectionForm';
+import { Alert } from '@/components/ui/Alert';
 import type { ProviderInfo, SessionConfiguration } from '@/types/api';
 import type { ProjectInfo } from '@/types/core';
 
@@ -61,6 +62,8 @@ export const SessionCreateModal = memo(function SessionCreateModal({
 }: SessionCreateModalProps) {
   const [newEnvKey, setNewEnvKey] = useState('');
   const [newEnvValue, setNewEnvValue] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAddEnvironmentVariable = () => {
     if (!newEnvKey.trim() || !newEnvValue.trim()) return;
@@ -96,16 +99,61 @@ export const SessionCreateModal = memo(function SessionCreateModal({
     });
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      await onSubmit(e);
+    } catch (error) {
+      // Extract meaningful error message
+      let errorMessage = 'Failed to create session';
+
+      if (error && typeof error === 'object') {
+        // Check for API error response structure
+        if ('json' in error && error.json && typeof error.json === 'object') {
+          const json = error.json as Record<string, unknown>;
+          if ('message' in json && typeof json.message === 'string') {
+            errorMessage = json.message;
+          }
+        } else if ('message' in error && typeof error.message === 'string') {
+          errorMessage = error.message;
+        }
+      }
+
+      setError(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleClose = () => {
+    setError(null);
+    setNewEnvKey('');
+    setNewEnvValue('');
+    onClose();
+  };
+
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title="Create New Session"
       size="xl"
       className="max-h-[90vh] flex flex-col"
     >
-      <form onSubmit={onSubmit} className="flex flex-col max-h-[80vh]">
+      <form onSubmit={handleSubmit} className="flex flex-col max-h-[80vh]">
         <div className="flex-1 overflow-y-auto px-1 space-y-6">
+          {/* Error Message */}
+          {error && (
+            <Alert
+              variant="error"
+              title="Session creation failed"
+              description={error}
+              onDismiss={() => setError(null)}
+            />
+          )}
           {/* Basic Information */}
           <div className="grid md:grid-cols-2 gap-4">
             <div>
@@ -256,15 +304,15 @@ export const SessionCreateModal = memo(function SessionCreateModal({
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-4 border-t border-base-300">
-          <button type="button" onClick={onClose} className="btn btn-ghost">
+          <button type="button" onClick={handleClose} className="btn btn-ghost">
             Cancel
           </button>
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={!sessionName.trim() || loading}
+            disabled={!sessionName.trim() || loading || isSubmitting}
           >
-            {loading ? (
+            {isSubmitting ? (
               <>
                 <div className="loading loading-spinner loading-sm"></div>
                 Creating...

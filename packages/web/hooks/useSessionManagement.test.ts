@@ -278,8 +278,7 @@ describe('useSessionManagement', () => {
     consoleSpy.mockRestore();
   });
 
-  it('handles create session errors gracefully', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('handles create session errors by throwing them', async () => {
     const createError = new Error('Create failed');
     mockFetch
       .mockResolvedValueOnce({
@@ -309,20 +308,18 @@ describe('useSessionManagement', () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
-    await act(async () => {
-      await result.current.createSession({
-        name: 'New Session',
-        description: 'A new session',
-      });
-    });
-
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to create session:', expect.any(Error));
-
-    consoleSpy.mockRestore();
+    // Expect the error to be thrown
+    await expect(
+      act(async () => {
+        await result.current.createSession({
+          name: 'New Session',
+          description: 'A new session',
+        });
+      })
+    ).rejects.toThrow('Create failed');
   });
 
-  it('handles create session HTTP errors gracefully', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('handles create session HTTP errors by throwing them', async () => {
     const errorResponse = {
       ok: false,
       text: () => Promise.resolve(JSON.stringify({ error: 'Session creation failed' })),
@@ -360,16 +357,15 @@ describe('useSessionManagement', () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
-    await act(async () => {
-      await result.current.createSession({
-        name: 'New Session',
-        description: 'A new session',
-      });
-    });
-
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to create session:', expect.any(Error));
-
-    consoleSpy.mockRestore();
+    // Expect the error to be thrown
+    await expect(
+      act(async () => {
+        await result.current.createSession({
+          name: 'New Session',
+          description: 'A new session',
+        });
+      })
+    ).rejects.toThrow();
   });
 
   it('handles load session configuration errors gracefully', async () => {

@@ -56,7 +56,7 @@ describe('useSessionAPI', () => {
 
       // Verify error handling behavior
       expect(session).toBe(null);
-      expect(result.current.error).toBe('HTTP 400: Bad Request');
+      expect(result.current.error).toBe('HTTP 400: Failed to create session');
     });
 
     it('should handle network errors gracefully', async () => {
@@ -121,7 +121,7 @@ describe('useSessionAPI', () => {
 
       // Verify error handling behavior
       expect(session).toBe(null);
-      expect(result.current.error).toBe('HTTP 400: Bad Request');
+      expect(result.current.error).toBe('HTTP 400: Session not found');
     });
   });
 
@@ -182,7 +182,7 @@ describe('useSessionAPI', () => {
       });
 
       expect(agent).toBe(null);
-      expect(result.current.error).toBe('HTTP 400: Bad Request');
+      expect(result.current.error).toBe('HTTP 400: Failed to spawn agent');
     });
   });
 
@@ -257,7 +257,7 @@ describe('useSessionAPI', () => {
         await result.current.createSession({ name: 'Test Session 2' });
       });
 
-      expect(result.current.error).toBe('HTTP 400: Bad Request');
+      expect(result.current.error).toBe('HTTP 400: API Error');
     });
 
     it('should clear error state when starting new operations', async () => {
@@ -270,7 +270,7 @@ describe('useSessionAPI', () => {
         await result.current.createSession({ name: 'Test Session' });
       });
 
-      expect(result.current.error).toBe('HTTP 400: Bad Request');
+      expect(result.current.error).toBe('HTTP 400: First error');
 
       // Second operation succeeds - error should be cleared
       const mockSession = {
