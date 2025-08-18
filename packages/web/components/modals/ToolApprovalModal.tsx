@@ -2,6 +2,7 @@
 // ABOUTME: Updated to support multiple approvals per spec Phase 3.4
 
 import React, { useEffect, useState } from 'react';
+import { Modal } from '@/components/ui/Modal';
 import type { PendingApproval } from '@/types/api';
 import { ApprovalDecision } from '@/types/core';
 import { safeStringify } from '@/lib/utils/safeStringify';
@@ -96,31 +97,41 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
     return safeStringify(input);
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-base-100 rounded-lg shadow-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] min-h-0 flex flex-col">
-        {/* Header */}
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h2 className="text-xl font-bold text-base-content mb-1">Tool Approval Required</h2>
-            <div className="flex items-center gap-2">
-              <span className={`text-sm font-medium ${getRiskClasses().split(' ')[0]}`}>
-                {getRiskEmoji()} {riskLevel.toUpperCase()}
-              </span>
-              <span className="text-base-content/40">•</span>
-              <span className="text-sm text-base-content/60">
-                {isReadOnly ? 'Read-only' : 'May modify data'}
-              </span>
-            </div>
-          </div>
-          {/* Approval Counter - spec Phase 3.4 */}
-          {approvals.length > 1 && (
-            <div className="text-sm font-medium text-base-content/60 bg-base-200 px-3 py-1 rounded">
-              {currentIndex + 1} of {approvals.length}
-            </div>
-          )}
+  const modalTitle = (
+    <div className="flex justify-between items-start w-full">
+      <div>
+        <h2 className="text-xl font-bold text-base-content">Tool Approval Required</h2>
+        <div className="flex items-center gap-2 mt-1">
+          <span className={`text-sm font-medium ${getRiskClasses().split(' ')[0]}`}>
+            {getRiskEmoji()} {riskLevel.toUpperCase()}
+          </span>
+          <span className="text-base-content/40">•</span>
+          <span className="text-sm text-base-content/60">
+            {isReadOnly ? 'Read-only' : 'May modify data'}
+          </span>
         </div>
+      </div>
+      {/* Approval Counter - spec Phase 3.4 */}
+      {approvals.length > 1 && (
+        <div className="text-sm font-medium text-base-content/60 bg-base-200 px-3 py-1 rounded">
+          {currentIndex + 1} of {approvals.length}
+        </div>
+      )}
+    </div>
+  );
 
+  return (
+    <Modal
+      isOpen={true}
+      onClose={() => onDecision(currentApproval.toolCallId, ApprovalDecision.DENY)}
+      title={modalTitle}
+      size="lg"
+      className="max-h-[90vh] flex flex-col"
+      closeOnBackdropClick={false}
+      closeOnEscape={false}
+      showCloseButton={false}
+    >
+      <div className="flex flex-col max-h-[75vh]">
         {/* Tool Info */}
         <div className={`border-2 rounded-lg p-4 mb-4 ${getRiskClasses()}`}>
           <div className="flex items-start justify-between mb-2">
@@ -157,7 +168,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
         </div>
 
         {/* Parameters */}
-        <div className="flex-1 overflow-auto mb-4 min-h-0">
+        <div className="flex-1 overflow-auto mb-4 min-h-[100px]">
           <h4 className="text-sm font-semibold text-base-content/70 mb-2">Parameters:</h4>
           <div className="mockup-code">
             <pre className="text-sm">
@@ -226,6 +237,6 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
