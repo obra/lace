@@ -7,7 +7,6 @@ import { ensureLaceDir } from '@/lib/server/lace-imports';
 // Initialize LACE_DIR at startup
 try {
   const laceDir = ensureLaceDir();
-  console.log(`LACE_DIR initialized: ${laceDir}`);
 } catch (error) {
   console.error('Failed to initialize LACE_DIR:', error);
   // Don't throw - let the app start but log the error
