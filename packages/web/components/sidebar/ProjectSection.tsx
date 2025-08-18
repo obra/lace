@@ -3,13 +3,22 @@
 
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFolder, faComments, faRobot } from '@/lib/fontawesome';
+import {
+  faFolder,
+  faComments,
+  faRobot,
+  faChevronUp,
+  faChevronDown,
+  faCog,
+} from '@/lib/fontawesome';
 import { SidebarSection } from '@/components/layout/Sidebar';
+import { ProjectEditModal } from '@/components/config/ProjectEditModal';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useProviders } from '@/hooks/useProviders';
 
 interface ProjectSectionProps {
   isMobile?: boolean;
@@ -22,14 +31,42 @@ export const ProjectSection = memo(function ProjectSection({
   onCloseMobileNav,
   onSwitchProject,
 }: ProjectSectionProps) {
+  // Modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editConfig, setEditConfig] = useState({});
+  const [loading, setLoading] = useState(false);
+
   // Get project data from ProjectProvider
-  const { selectedProject, foundProject } = useProjectContext();
+  const { selectedProject, foundProject, updateProject, loadProjectConfiguration } =
+    useProjectContext();
 
   // Get session data from SessionProvider
   const { sessions } = useSessionContext();
 
   // Get agent data from AgentProvider
   const { sessionDetails } = useAgentContext();
+
+  // Get providers data
+  const { providers } = useProviders();
+
+  // Load project configuration when modal opens
+  useEffect(() => {
+    if (showEditModal && selectedProject) {
+      const loadConfig = async () => {
+        setLoading(true);
+        try {
+          const config = await loadProjectConfiguration(selectedProject);
+          setEditConfig(config);
+        } catch (error) {
+          console.error('Failed to load project configuration:', error);
+          setEditConfig({});
+        } finally {
+          setLoading(false);
+        }
+      };
+      void loadConfig();
+    }
+  }, [showEditModal, selectedProject, loadProjectConfiguration]);
 
   // Don't render if no project is selected
   if (!selectedProject || !foundProject) {
@@ -44,10 +81,74 @@ export const ProjectSection = memo(function ProjectSection({
     }
   };
 
+  // Handle opening the settings modal
+  const handleOpenSettings = () => {
+    setShowEditModal(true);
+  };
+
+  // Handle closing the settings modal
+  const handleCloseSettings = () => {
+    setShowEditModal(false);
+    setEditConfig({});
+  };
+
+  // Handle project update
+  const handleUpdateProject = async (
+    projectId: string,
+    updates: {
+      name: string;
+      description?: string;
+      workingDirectory: string;
+      configuration: Record<string, unknown>;
+    }
+  ) => {
+    setLoading(true);
+    try {
+      await updateProject(projectId, updates);
+      setShowEditModal(false);
+      setEditConfig({});
+    } catch (error) {
+      console.error('Failed to update project:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const testId = isMobile ? 'current-project-name' : 'current-project-name-desktop';
 
+  // Header actions for workspace navigation (stacked left/right arrows as single icon)
+  const headerActions = (
+    <button
+      onClick={handleSwitchProject}
+      className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 flex-shrink-0 border border-transparent hover:border-base-300/30"
+      title="Switch workspace"
+      data-testid="workspace-switch-header-button"
+    >
+      <svg
+        className="w-3.5 h-3.5 text-base-content/50 hover:text-base-content/70 transition-colors"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+        />
+      </svg>
+    </button>
+  );
+
   return (
-    <SidebarSection title="Workspace" icon={faFolder} defaultCollapsed={false} collapsible={false}>
+    <SidebarSection
+      title="Workspace"
+      icon={faFolder}
+      defaultCollapsed={false}
+      collapsible={false}
+      headerActions={headerActions}
+    >
       {/* Project Overview Card */}
       <div className="bg-base-100/80 backdrop-blur-sm border border-base-300/30 rounded-xl p-4 mb-3 shadow-sm -ml-1">
         <div className="flex items-start justify-between mb-3">
@@ -65,24 +166,15 @@ export const ProjectSection = memo(function ProjectSection({
             )}
           </div>
           <button
-            onClick={handleSwitchProject}
+            onClick={handleOpenSettings}
             className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 flex-shrink-0 border border-transparent hover:border-base-300/30"
-            title="Switch project"
-            data-testid="switch-project-button"
+            title="Workspace settings"
+            data-testid="workspace-settings-button"
           >
-            <svg
+            <FontAwesomeIcon
+              icon={faCog}
               className="w-3.5 h-3.5 text-base-content/50 hover:text-base-content/70 transition-colors"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-              />
-            </svg>
+            />
           </button>
         </div>
 
@@ -105,6 +197,17 @@ export const ProjectSection = memo(function ProjectSection({
           )}
         </div>
       </div>
+
+      {/* Project Settings Modal */}
+      <ProjectEditModal
+        isOpen={showEditModal}
+        project={foundProject}
+        providers={providers}
+        loading={loading}
+        onClose={handleCloseSettings}
+        onSubmit={handleUpdateProject}
+        initialConfig={editConfig}
+      />
     </SidebarSection>
   );
 });
