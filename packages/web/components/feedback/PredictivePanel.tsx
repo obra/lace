@@ -70,7 +70,7 @@ export function PredictivePanel({ insights }: PredictivePanelProps) {
     <div className="predictive-panel space-y-4">
       {insights.map((insight, index) => (
         <div
-          key={index}
+          key={`${insight.prediction}-${insight.timeframe}-${index}`}
           className="bg-base-100 border border-base-300 rounded-lg p-4 hover:shadow-md transition-shadow"
         >
           {/* Header */}
@@ -105,7 +105,7 @@ export function PredictivePanel({ insights }: PredictivePanelProps) {
             <div className="flex flex-wrap gap-2">
               {insight.factors.map((factor, factorIndex) => (
                 <span
-                  key={factorIndex}
+                  key={`factor-${factorIndex}-${factor.slice(0, 10)}`}
                   className="px-2 py-1 text-xs bg-base-200 text-base-content/80 rounded-full"
                 >
                   {factor}
@@ -122,7 +122,10 @@ export function PredictivePanel({ insights }: PredictivePanelProps) {
               </h4>
               <ul className="text-sm text-base-content/80 space-y-1">
                 {insight.preventionSuggestions.map((suggestion, suggestionIndex) => (
-                  <li key={suggestionIndex} className="flex items-start space-x-2">
+                  <li
+                    key={`suggestion-${suggestionIndex}-${suggestion.slice(0, 20)}`}
+                    className="flex items-start space-x-2"
+                  >
                     <span className="text-info mt-1">→</span>
                     <span>{suggestion}</span>
                   </li>
