@@ -44,13 +44,13 @@ function LaceAppMain() {
   // App state from context (now only hash router selections)
   const {
     selections: { selectedSession, selectedProject, selectedAgent, urlStateHydrated },
+    actions: { setSelectedAgent, setSelectedSession },
   } = useAppState();
 
   // Agent state from AgentProvider
   const {
     sessionDetails: selectedSessionDetails,
     loading: agentLoading,
-    selectAgent: setSelectedAgent,
     loadAgentConfiguration,
     updateAgent,
     reloadSessionDetails,
