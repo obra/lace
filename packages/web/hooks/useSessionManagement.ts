@@ -84,6 +84,8 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
         await loadSessions();
       } catch (error) {
         console.error('Failed to create session:', error);
+        // Re-throw the error so the UI can handle it
+        throw error;
       }
     },
     [projectId, loadSessions]

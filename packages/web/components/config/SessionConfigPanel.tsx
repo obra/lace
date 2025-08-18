@@ -173,18 +173,24 @@ export function SessionConfigPanel(): React.JSX.Element {
     setSelectedModelId(modelId);
   };
 
-  const handleCreateSession = (e: React.FormEvent) => {
+  const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSessionName.trim()) return;
 
-    createSession({
-      name: newSessionName.trim(),
-      description: newSessionDescription.trim() || undefined,
-      configuration: sessionConfig,
-    });
+    try {
+      await createSession({
+        name: newSessionName.trim(),
+        description: newSessionDescription.trim() || undefined,
+        configuration: sessionConfig,
+      });
 
-    resetSessionForm();
-    setShowCreateSession(false);
+      resetSessionForm();
+      setShowCreateSession(false);
+    } catch (error) {
+      // Error will be handled in the modal
+      console.error('Failed to create session:', error);
+      throw error;
+    }
   };
 
   const handleCreateAgent = (e: React.FormEvent) => {
