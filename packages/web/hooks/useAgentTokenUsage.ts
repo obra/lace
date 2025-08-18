@@ -35,23 +35,19 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
       setLoading(true);
       setError(null);
 
-      console.log('[useAgentTokenUsage] Fetching token usage for agent:', agentId);
       const data = await api.get<AgentWithTokenUsage>(`/api/agents/${agentId}`, {
         signal: controller.signal,
       });
-      console.log('[useAgentTokenUsage] API response:', {
-        hasTokenUsage: !!data.tokenUsage,
-        tokenUsage: data.tokenUsage,
-      });
 
       if (data.tokenUsage) {
-        console.log('[useAgentTokenUsage] Setting initial token usage:', data.tokenUsage);
         setTokenUsage(data.tokenUsage);
-      } else {
-        console.log('[useAgentTokenUsage] No token usage data in API response');
       }
     } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // Abort is intentional when component unmounts or agentId changes
+        // Don't log or set error state
+        return;
+      }
       console.error('[useAgentTokenUsage] Error fetching token usage:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch token usage');
     } finally {
@@ -62,19 +58,6 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
   // Listen for AGENT_MESSAGE events that include token usage updates
   const handleAgentMessage = useCallback(
     (event: LaceEvent) => {
-      console.log('[useAgentTokenUsage] Received event:', {
-        eventType: event.type,
-        eventThreadId: event.threadId,
-        targetAgentId: agentId,
-        eventData: event.data,
-        hasTokenUsage: !!(
-          event.data &&
-          typeof event.data === 'object' &&
-          'tokenUsage' in event.data &&
-          (event.data as { tokenUsage?: unknown }).tokenUsage
-        ),
-      });
-
       // Check if this event is for our agent, is AGENT_MESSAGE type, and has token usage data
       // Note: TokenUsage is now directly at event.data.tokenUsage (no more double nesting)
       if (
@@ -85,7 +68,6 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
         'tokenUsage' in event.data
       ) {
         const tokenUsageData = (event.data as { tokenUsage: CombinedTokenUsage }).tokenUsage;
-        console.log('[useAgentTokenUsage] Processing token usage data:', tokenUsageData);
 
         // Transform CombinedTokenUsage to AgentTokenUsage by extracting thread-level data
         const threadData = tokenUsageData?.thread;
@@ -104,7 +86,6 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
             nearLimit: !!safeThreadData.nearLimit,
           };
 
-          console.log('[useAgentTokenUsage] Setting token usage:', completeTokenUsage);
           setTokenUsage(completeTokenUsage);
         }
       }
@@ -121,6 +102,11 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
   // Initial load on mount or agentId change
   useEffect(() => {
     void fetchTokenUsage();
+
+    // Cleanup function to abort request on unmount
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, [fetchTokenUsage]);
 
   return {
