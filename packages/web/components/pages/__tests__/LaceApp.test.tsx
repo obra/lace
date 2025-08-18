@@ -144,7 +144,9 @@ describe('LaceApp', () => {
     renderWithProviders(<LaceApp />);
 
     // Should have a mobile navigation button (hamburger menu)
-    const mobileNavButton = screen.getByRole('button');
+    // Use getAllByRole to handle multiple buttons and find the mobile nav one
+    const buttons = screen.getAllByRole('button');
+    const mobileNavButton = buttons.find((button) => button.className.includes('lg:hidden'));
     expect(mobileNavButton).toBeInTheDocument();
   });
 

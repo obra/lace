@@ -15,8 +15,8 @@ function isValidThreadId(sessionId: string): sessionId is ThreadId {
 }
 
 const ConfigurationSchema = z.object({
-  providerInstanceId: z.string(),
-  modelId: z.string(),
+  providerInstanceId: z.string().optional(),
+  modelId: z.string().optional(),
   maxTokens: z.number().positive().optional(),
   tools: z.array(z.string()).optional(),
   toolPolicies: z.record(z.enum(['allow', 'require-approval', 'deny'])).optional(),

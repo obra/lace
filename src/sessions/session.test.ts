@@ -232,6 +232,7 @@ describe('Session', () => {
         id: session.getId(),
         name: 'Test Session',
         createdAt: expect.any(Date) as Date,
+        description: '',
         agents: expect.arrayContaining([
           expect.objectContaining({
             threadId: session.getId(),

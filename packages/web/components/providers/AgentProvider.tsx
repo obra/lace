@@ -3,7 +3,15 @@
 
 'use client';
 
-import React, { createContext, useContext, useMemo, useCallback, type ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+  type ReactNode,
+} from 'react';
 import { useAgentManagement } from '@/hooks/useAgentManagement';
 import { useHashRouter } from '@/hooks/useHashRouter';
 import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
@@ -63,6 +71,9 @@ export function AgentProvider({ children, sessionId, onAgentChange }: AgentProvi
   // Get selection state from hash router
   const { agent: selectedAgent, setAgent: setSelectedAgent } = useHashRouter();
 
+  // Track whether auto-selection has been performed for this session
+  const hasAutoSelectedRef = useRef<string | null>(null);
+
   // Compute derived state based on data + selection
   const foundAgent = useMemo(() => {
     return selectedAgent && sessionDetails
@@ -107,6 +118,27 @@ export function AgentProvider({ children, sessionId, onAgentChange }: AgentProvi
     },
     [selectAgent]
   );
+
+  // Auto-select coordinator agent when entering a session (only once per session)
+  useEffect(() => {
+    if (sessionId && sessionDetails && !selectedAgent && hasAutoSelectedRef.current !== sessionId) {
+      // Coordinator agent has the same threadId as the sessionId
+      const coordinatorAgent = sessionDetails.agents?.find((agent) => agent.threadId === sessionId);
+      if (coordinatorAgent) {
+        selectAgent(coordinatorAgent.threadId);
+        hasAutoSelectedRef.current = sessionId;
+      }
+    }
+
+    // Reset auto-selection tracking when session changes
+    if (
+      sessionId !== hasAutoSelectedRef.current &&
+      hasAutoSelectedRef.current !== null &&
+      !selectedAgent
+    ) {
+      hasAutoSelectedRef.current = null;
+    }
+  }, [sessionId, sessionDetails, selectedAgent, selectAgent]);
 
   const value: AgentContextType = useMemo(
     () => ({

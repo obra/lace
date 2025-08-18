@@ -9,6 +9,7 @@ import { createMockResponse } from '@/test-utils/mock-fetch';
 import {
   createMockProjectContext,
   createMockSessionContext,
+  createMockUIContext,
 } from '@/__tests__/utils/provider-mocks';
 
 // Mock all the providers
@@ -20,8 +21,8 @@ vi.mock('@/components/providers/SessionProvider', () => ({
   useSessionContext: vi.fn(),
 }));
 
-vi.mock('@/hooks/useUIState', () => ({
-  useUIState: vi.fn(),
+vi.mock('@/components/providers/UIProvider', () => ({
+  useUIContext: vi.fn(),
 }));
 
 vi.mock('@/hooks/useOnboarding', () => ({
@@ -35,13 +36,13 @@ vi.mock('@/hooks/useProviders', () => ({
 // Import mocked hooks
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useUIState } from '@/hooks/useUIState';
+import { useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useProviders } from '@/hooks/useProviders';
 
 const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
-const mockUseUIState = vi.mocked(useUIState);
+const mockUseUIContext = vi.mocked(useUIContext);
 const mockUseOnboarding = vi.mocked(useOnboarding);
 const mockUseProviders = vi.mocked(useProviders);
 
@@ -101,17 +102,12 @@ describe('ProjectSelectorPanel', () => {
       })
     );
 
-    mockUseUIState.mockReturnValue({
-      showMobileNav: false,
-      showDesktopSidebar: true,
-      setShowMobileNav: vi.fn(),
-      setShowDesktopSidebar: vi.fn(),
-      toggleDesktopSidebar: vi.fn(),
-      autoOpenCreateProject: false,
-      setAutoOpenCreateProject: mockHandlers.setAutoOpenCreateProject,
-      loading: false,
-      setLoading: vi.fn(),
-    });
+    mockUseUIContext.mockReturnValue(
+      createMockUIContext({
+        autoOpenCreateProject: false,
+        setAutoOpenCreateProject: mockHandlers.setAutoOpenCreateProject,
+      })
+    );
 
     mockUseOnboarding.mockReturnValue({
       handleOnboardingComplete: mockHandlers.handleOnboardingComplete,
@@ -128,17 +124,12 @@ describe('ProjectSelectorPanel', () => {
 
   it('should show wizard and proceed to directory step in auto-open mode', async () => {
     // Override to enable auto-open mode
-    mockUseUIState.mockReturnValue({
-      showMobileNav: false,
-      showDesktopSidebar: true,
-      setShowMobileNav: vi.fn(),
-      setShowDesktopSidebar: vi.fn(),
-      toggleDesktopSidebar: vi.fn(),
-      autoOpenCreateProject: true,
-      setAutoOpenCreateProject: mockHandlers.setAutoOpenCreateProject,
-      loading: false,
-      setLoading: vi.fn(),
-    });
+    mockUseUIContext.mockReturnValue(
+      createMockUIContext({
+        autoOpenCreateProject: true,
+        setAutoOpenCreateProject: mockHandlers.setAutoOpenCreateProject,
+      })
+    );
 
     render(<ProjectSelectorPanel />);
 
@@ -154,17 +145,12 @@ describe('ProjectSelectorPanel', () => {
 
   it('should auto-populate project name from directory', async () => {
     // Override to enable auto-open mode
-    mockUseUIState.mockReturnValue({
-      showMobileNav: false,
-      showDesktopSidebar: true,
-      setShowMobileNav: vi.fn(),
-      setShowDesktopSidebar: vi.fn(),
-      toggleDesktopSidebar: vi.fn(),
-      autoOpenCreateProject: true,
-      setAutoOpenCreateProject: mockHandlers.setAutoOpenCreateProject,
-      loading: false,
-      setLoading: vi.fn(),
-    });
+    mockUseUIContext.mockReturnValue(
+      createMockUIContext({
+        autoOpenCreateProject: true,
+        setAutoOpenCreateProject: mockHandlers.setAutoOpenCreateProject,
+      })
+    );
 
     render(<ProjectSelectorPanel />);
 
@@ -183,17 +169,12 @@ describe('ProjectSelectorPanel', () => {
 
   it('should allow switching to advanced setup', async () => {
     // Override to enable auto-open mode
-    mockUseUIState.mockReturnValue({
-      showMobileNav: false,
-      showDesktopSidebar: true,
-      setShowMobileNav: vi.fn(),
-      setShowDesktopSidebar: vi.fn(),
-      toggleDesktopSidebar: vi.fn(),
-      autoOpenCreateProject: true,
-      setAutoOpenCreateProject: mockHandlers.setAutoOpenCreateProject,
-      loading: false,
-      setLoading: vi.fn(),
-    });
+    mockUseUIContext.mockReturnValue(
+      createMockUIContext({
+        autoOpenCreateProject: true,
+        setAutoOpenCreateProject: mockHandlers.setAutoOpenCreateProject,
+      })
+    );
 
     render(<ProjectSelectorPanel />);
 

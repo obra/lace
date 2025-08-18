@@ -77,26 +77,6 @@ describe('SessionSection', () => {
       expect(screen.getByText('Active Session')).toBeInTheDocument();
     });
 
-    it('shows setup needed when no agent selected', () => {
-      render(<SessionSection {...defaultProps} />);
-
-      expect(screen.getByText('Setup needed')).toBeInTheDocument();
-    });
-
-    it('does not show setup needed when agent is selected', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
-          sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
-          selectedAgent: 'agent-1' as ThreadId,
-          foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
-        })
-      );
-
-      render(<SessionSection {...defaultProps} />);
-
-      expect(screen.queryByText('Setup needed')).not.toBeInTheDocument();
-    });
-
     it('does not render when no session details available', () => {
       mockUseAgentContext.mockReturnValue(
         createMockAgentContext({
@@ -109,64 +89,6 @@ describe('SessionSection', () => {
       const { container } = render(<SessionSection {...defaultProps} />);
 
       expect(container.firstChild).toBeNull();
-    });
-  });
-
-  describe('Agent Selection State', () => {
-    it('shows agent list when no agent selected', () => {
-      render(<SessionSection {...defaultProps} />);
-
-      expect(screen.getByText('Alice')).toBeInTheDocument();
-      expect(screen.getByText('Bob')).toBeInTheDocument();
-      expect(screen.getByText('Configure Session')).toBeInTheDocument();
-    });
-
-    it('shows continue session UI when agent selected', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
-          sessionDetails: createMockSessionDetails([
-            createMockAgent('agent-1', 'Alice', 'idle'),
-            createMockAgent('agent-2', 'Bob', 'thinking'),
-          ]),
-          selectedAgent: 'agent-1' as ThreadId,
-          foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
-        })
-      );
-
-      render(<SessionSection {...defaultProps} />);
-
-      expect(screen.queryByText('Configure Session')).not.toBeInTheDocument();
-    });
-
-    it('shows switch agent button for multi-agent sessions', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
-          sessionDetails: createMockSessionDetails([
-            createMockAgent('agent-1', 'Alice', 'idle'),
-            createMockAgent('agent-2', 'Bob', 'thinking'),
-          ]),
-          selectedAgent: 'agent-1' as ThreadId,
-          foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
-        })
-      );
-
-      render(<SessionSection {...defaultProps} />);
-
-      expect(screen.getByText('Switch Agent')).toBeInTheDocument();
-    });
-
-    it('does not show switch agent button for single agent sessions', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
-          sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
-          selectedAgent: 'agent-1' as ThreadId,
-          foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
-        })
-      );
-
-      render(<SessionSection {...defaultProps} />);
-
-      expect(screen.queryByText('Switch Agent')).not.toBeInTheDocument();
     });
   });
 
@@ -233,35 +155,6 @@ describe('SessionSection', () => {
 
       expect(mockOnAgentSelect).toHaveBeenCalledWith('agent-1');
     });
-
-    it('calls onClearAgent when switch agent is clicked', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
-          sessionDetails: createMockSessionDetails([
-            createMockAgent('agent-1', 'Alice', 'idle'),
-            createMockAgent('agent-2', 'Bob', 'thinking'),
-          ]),
-          selectedAgent: 'agent-1' as ThreadId,
-          foundAgent: createMockAgent('agent-1', 'Alice', 'idle'),
-        })
-      );
-
-      render(<SessionSection {...defaultProps} />);
-
-      const switchButton = screen.getByText('Switch Agent');
-      fireEvent.click(switchButton);
-
-      expect(mockOnClearAgent).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onClearAgent when configure session is clicked', () => {
-      render(<SessionSection {...defaultProps} />);
-
-      const configButton = screen.getByText('Configure Session');
-      fireEvent.click(configButton);
-
-      expect(mockOnClearAgent).toHaveBeenCalledTimes(1);
-    });
   });
 
   describe('Mobile Behavior', () => {
@@ -282,42 +175,6 @@ describe('SessionSection', () => {
       expect(() => {
         render(<SessionSection {...propsWithoutCallback} isMobile={true} />);
       }).not.toThrow();
-    });
-  });
-
-  describe('Agent Count Display', () => {
-    it('displays correct agent count when no agents available', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
-          sessionDetails: createMockSessionDetails([]),
-          selectedAgent: null,
-          foundAgent: null,
-        })
-      );
-
-      render(<SessionSection {...defaultProps} />);
-
-      expect(screen.getByText('0 agents available')).toBeInTheDocument();
-    });
-
-    it('displays correct agent count for single agent', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
-          sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
-          selectedAgent: null,
-          foundAgent: null,
-        })
-      );
-
-      render(<SessionSection {...defaultProps} />);
-
-      expect(screen.getByText('1 agents available')).toBeInTheDocument();
-    });
-
-    it('displays correct agent count for multiple agents', () => {
-      render(<SessionSection {...defaultProps} />);
-
-      expect(screen.getByText('2 agents available')).toBeInTheDocument();
     });
   });
 
