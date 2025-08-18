@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComments, faRobot, faCog } from '@/lib/fontawesome';
 import { SidebarSection, SidebarButton, SidebarItem } from '@/components/layout/Sidebar';
@@ -16,6 +16,7 @@ interface SessionSectionProps {
   onAgentSelect: (agentId: string) => void;
   onClearAgent: () => void;
   onConfigureAgent?: (agentId: string) => void;
+  onConfigureSession?: () => void;
 }
 
 export const SessionSection = memo(function SessionSection({
@@ -24,8 +25,9 @@ export const SessionSection = memo(function SessionSection({
   onAgentSelect,
   onClearAgent,
   onConfigureAgent,
+  onConfigureSession,
 }: SessionSectionProps) {
-  // Get agent data from AgentProvider
+  // Get context data
   const { sessionDetails, selectedAgent } = useAgentContext();
 
   // Don't render if no session is selected
@@ -48,10 +50,7 @@ export const SessionSection = memo(function SessionSection({
   };
 
   const handleConfigureSession = () => {
-    onClearAgent();
-    if (isMobile) {
-      onCloseMobileNav?.();
-    }
+    onConfigureSession?.();
   };
 
   const getAgentStatusBadgeClass = (status: AgentInfo['status']) => {
@@ -81,84 +80,51 @@ export const SessionSection = memo(function SessionSection({
     >
       {/* Session Header */}
       <div className="bg-base-200/40 backdrop-blur-md border border-base-300/20 rounded-xl p-3 mb-3 shadow-sm -ml-1">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <h4 className="font-medium text-sm text-base-content truncate">{sessionDetails.name}</h4>
-          {!selectedAgent && <span className="text-xs text-warning font-medium">Setup needed</span>}
+          <button
+            onClick={handleConfigureSession}
+            className="btn btn-ghost btn-xs p-1 min-h-0 h-auto flex-shrink-0"
+            title="Configure session"
+          >
+            <FontAwesomeIcon icon={faCog} className="w-3 h-3" />
+          </button>
         </div>
-
-        {/* Agent Status or Selection */}
-        {selectedAgent && currentAgent ? (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <FontAwesomeIcon
-                icon={faRobot}
-                className="w-3.5 h-3.5 text-base-content/60 flex-shrink-0"
-              />
-              <span className="text-xs text-base-content/80 truncate">{currentAgent.name}</span>
-            </div>
-            <span
-              className={`text-xs badge badge-xs ${getAgentStatusBadgeClass(currentAgent.status)}`}
-            >
-              {currentAgent.status}
-            </span>
-          </div>
-        ) : (
-          <div className="text-xs text-base-content/60">
-            {sessionDetails.agents?.length || 0} agents available
-          </div>
-        )}
       </div>
 
-      {/* Primary Actions */}
-      {selectedAgent && currentAgent ? (
-        <div className="space-y-2">
-          {sessionDetails.agents && sessionDetails.agents.length > 1 && (
-            <SidebarButton onClick={handleSwitchAgent} variant="ghost" size="sm">
-              <FontAwesomeIcon icon={faRobot} className="w-3.5 h-3.5" />
-              Switch Agent
-            </SidebarButton>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {/* Agent Selection */}
-          {sessionDetails.agents?.map((agent) => (
-            <div key={agent.threadId} className="flex items-center gap-1">
-              <SidebarItem
-                active={selectedAgent === agent.threadId}
-                onClick={() => handleAgentSelect(agent.threadId)}
-                className="text-sm flex-1"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <FontAwesomeIcon icon={faRobot} className="w-3.5 h-3.5 text-base-content/60" />
-                    <span className="font-medium truncate">{agent.name}</span>
-                  </div>
-                  <span
-                    className={`text-xs badge badge-xs ${getAgentStatusBadgeClass(agent.status)}`}
-                  >
-                    {agent.status}
-                  </span>
+      {/* Agent List */}
+      <div className="space-y-2">
+        {sessionDetails.agents?.map((agent) => (
+          <div key={agent.threadId} className="flex items-center gap-1">
+            <SidebarItem
+              active={selectedAgent === agent.threadId}
+              onClick={() => handleAgentSelect(agent.threadId)}
+              className="text-sm flex-1"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <FontAwesomeIcon icon={faRobot} className="w-3.5 h-3.5 text-base-content/60" />
+                  <span className="font-medium truncate">{agent.name}</span>
                 </div>
-              </SidebarItem>
-              {onConfigureAgent && (
-                <button
-                  onClick={() => onConfigureAgent(agent.threadId)}
-                  className="btn btn-ghost btn-xs p-1 min-h-0 h-auto flex-shrink-0"
-                  title="Configure agent"
+                <span
+                  className={`text-xs badge badge-xs ${getAgentStatusBadgeClass(agent.status)}`}
                 >
-                  <FontAwesomeIcon icon={faCog} className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          )) || []}
-
-          <SidebarButton onClick={handleConfigureSession} variant="ghost" size="sm">
-            <FontAwesomeIcon icon={faCog} className="w-3.5 h-3.5" />
-            Configure Session
-          </SidebarButton>
-        </div>
-      )}
+                  {agent.status}
+                </span>
+              </div>
+            </SidebarItem>
+            {onConfigureAgent && (
+              <button
+                onClick={() => onConfigureAgent(agent.threadId)}
+                className="btn btn-ghost btn-xs p-1 min-h-0 h-auto flex-shrink-0"
+                title="Configure agent"
+              >
+                <FontAwesomeIcon icon={faCog} className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        )) || []}
+      </div>
     </SidebarSection>
   );
 });

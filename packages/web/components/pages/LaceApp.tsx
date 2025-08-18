@@ -15,9 +15,11 @@ import { Chat } from '@/components/chat/Chat';
 import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { AgentEditModal } from '@/components/config/AgentEditModal';
+import { SessionEditModal } from '@/components/config/SessionEditModal';
 import { FirstProjectHero } from '@/components/onboarding/FirstProjectHero';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
 import type { ThreadId } from '@/types/core';
+import type { SessionConfiguration } from '@/types/api';
 import { asThreadId } from '@/types/core';
 import { UIProvider, useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
@@ -51,10 +53,16 @@ function LaceAppMain() {
     selectAgent: setSelectedAgent,
     loadAgentConfiguration,
     updateAgent,
+    reloadSessionDetails,
   } = useAgentContext();
 
-  // Get enableAgentAutoSelection for onboarding
-  const { enableAgentAutoSelection } = useSessionContext();
+  // Get session context functions for onboarding and configuration
+  const {
+    enableAgentAutoSelection,
+    loadSessionConfiguration,
+    updateSessionConfiguration,
+    updateSession,
+  } = useSessionContext();
 
   // Project state from ProjectProvider
   const {
@@ -89,6 +97,20 @@ function LaceAppMain() {
     providerInstanceId: string;
     modelId: string;
   } | null>(null);
+
+  // Session config modal state
+  const [showSessionEditModal, setShowSessionEditModal] = useState(false);
+  const [sessionConfig, setSessionConfig] = useState<SessionConfiguration>({
+    providerInstanceId: undefined,
+    modelId: undefined,
+    maxTokens: 4096,
+    tools: [],
+    toolPolicies: {},
+    workingDirectory: undefined,
+    environmentVariables: {},
+  });
+  const [sessionName, setSessionName] = useState('');
+  const [sessionDescription, setSessionDescription] = useState('');
 
   // Onboarding flow management
   const { handleOnboardingComplete, handleAutoOpenProjectCreation } = useOnboarding(
@@ -163,6 +185,73 @@ function LaceAppMain() {
     setEditingAgent(null);
   }, []);
 
+  // Session configuration handlers
+  const handleConfigureSession = useCallback(async () => {
+    if (selectedSessionDetails) {
+      setSessionName(selectedSessionDetails.name);
+      setSessionDescription(selectedSessionDetails.description || '');
+
+      // Load actual session configuration
+      try {
+        const config = await loadSessionConfiguration(selectedSessionDetails.id);
+        console.log('Loaded session configuration:', config);
+        setSessionConfig(config as SessionConfiguration);
+      } catch (error) {
+        console.error('Failed to load session configuration:', error);
+        // Don't set a default config - let the modal show loading or error state
+        // The API requires providerInstanceId and modelId, so we can't use undefined
+        return;
+      }
+
+      setShowSessionEditModal(true);
+    }
+  }, [selectedSessionDetails, loadSessionConfiguration]);
+
+  const handleCloseSessionEditModal = useCallback(() => {
+    setShowSessionEditModal(false);
+  }, []);
+
+  const handleSessionEditSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedSessionDetails || !sessionName.trim()) return;
+
+      try {
+        // Update session configuration
+        await updateSessionConfiguration(selectedSessionDetails.id, sessionConfig);
+
+        // Update session name/description if changed
+        const nameChanged = sessionName.trim() !== selectedSessionDetails.name;
+        const descChanged =
+          (sessionDescription.trim() || undefined) !== selectedSessionDetails.description;
+
+        if (nameChanged || descChanged) {
+          await updateSession(selectedSessionDetails.id, {
+            name: sessionName.trim(),
+            description: sessionDescription.trim() || undefined,
+          });
+        }
+
+        setShowSessionEditModal(false);
+
+        // Reload session details to reflect changes in the UI
+        await reloadSessionDetails();
+      } catch (error) {
+        console.error('Failed to update session:', error);
+        // TODO: Show error toast/notification
+      }
+    },
+    [
+      selectedSessionDetails,
+      sessionName,
+      sessionDescription,
+      sessionConfig,
+      updateSessionConfiguration,
+      updateSession,
+      reloadSessionDetails,
+    ]
+  );
+
   // Wait for URL state hydration before rendering to avoid hydration mismatches
   if (!urlStateHydrated) {
     return (
@@ -202,6 +291,7 @@ function LaceAppMain() {
                     onAgentSelect={handleAgentSelect}
                     onClearAgent={() => setSelectedAgent(null)}
                     onConfigureAgent={handleConfigureAgent}
+                    onConfigureSession={handleConfigureSession}
                   />
                 </MobileSidebar>
               )}
@@ -225,6 +315,7 @@ function LaceAppMain() {
                 onAgentSelect={handleAgentSelect}
                 onClearAgent={() => setSelectedAgent(null)}
                 onConfigureAgent={handleConfigureAgent}
+                onConfigureSession={handleConfigureSession}
               />
             </Sidebar>
           )}
@@ -308,6 +399,25 @@ function LaceAppMain() {
         onSubmit={handleEditAgentSubmit}
         onAgentChange={setEditingAgent}
       />
+
+      {/* Session Edit Modal */}
+      {currentProject && (
+        <SessionEditModal
+          isOpen={showSessionEditModal}
+          currentProject={currentProject}
+          selectedSession={selectedSessionDetails}
+          providers={providers}
+          sessionConfig={sessionConfig}
+          sessionName={sessionName}
+          sessionDescription={sessionDescription}
+          loading={false}
+          onClose={handleCloseSessionEditModal}
+          onSubmit={handleSessionEditSubmit}
+          onSessionNameChange={setSessionName}
+          onSessionDescriptionChange={setSessionDescription}
+          onSessionConfigChange={setSessionConfig}
+        />
+      )}
     </motion.div>
   );
 }
