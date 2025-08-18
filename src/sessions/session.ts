@@ -43,6 +43,7 @@ import { join } from 'path';
 export interface SessionInfo {
   id: ThreadId;
   name: string;
+  description?: string;
   createdAt: Date;
   agents: AgentInfo[];
 }
@@ -706,6 +707,7 @@ export class Session {
     return {
       id: this._sessionId,
       name: sessionData?.name || 'Session ' + this._sessionId,
+      description: sessionData?.description,
       createdAt: this.getCoordinatorAgent()?.getThreadCreatedAt() || new Date(),
       agents,
     };
