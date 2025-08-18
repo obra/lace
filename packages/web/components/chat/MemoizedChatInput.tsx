@@ -93,10 +93,10 @@ const CustomChatInput = memo(function CustomChatInput({
       {/* Bottom Status Area */}
       <div className="flex justify-between items-center text-xs text-base-content/40 min-h-[16px]">
         {/* Left side - Status messages */}
-        <div className="flex-1">
+        <div className="flex-1" aria-live="polite" aria-atomic="true">
           {speechError ? (
-            <div className="flex items-center gap-2 text-red-600">
-              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+            <div className="flex items-center gap-2 text-error">
+              <div className="w-2 h-2 bg-error rounded-full"></div>
               <span>Speech error</span>
             </div>
           ) : isListening ? (

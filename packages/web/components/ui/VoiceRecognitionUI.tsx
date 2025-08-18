@@ -123,7 +123,7 @@ export function VoiceRecognitionUI({
           </div>
 
           {/* Status text */}
-          <div className="text-center">
+          <div className="text-center" aria-live="polite">
             <div className="text-sm font-medium text-base-content animate-pulse">Listening...</div>
             <div className="text-xs text-base-content/60 mt-1">Tap the microphone to stop</div>
           </div>
@@ -163,7 +163,11 @@ export function VoiceRecognitionUI({
 
       {/* Error display */}
       {error && (
-        <div className="bg-error/10 border border-error/20 rounded-lg p-3">
+        <div
+          className="bg-error/10 border border-error/20 rounded-lg p-3"
+          aria-live="assertive"
+          role="alert"
+        >
           <div className="text-sm text-error">
             <strong>Voice Recognition Error:</strong> {error}
           </div>
