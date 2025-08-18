@@ -8,7 +8,7 @@ import {
   EventStreamProvider,
   useEventStream,
   useSessionEvents,
-  useSessionAPI,
+  useAgentAPI,
 } from './EventStreamProvider';
 import { ToolApprovalProvider } from './ToolApprovalProvider';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
@@ -20,6 +20,7 @@ import type { LaceEvent } from '~/threads/types';
 vi.mock('@/hooks/useAgentEvents');
 vi.mock('@/hooks/useEventStream');
 vi.mock('@/hooks/useSessionAPI');
+vi.mock('@/hooks/useAgentAPI');
 
 // Mock global fetch for ToolApprovalProvider
 beforeEach(() => {
@@ -29,6 +30,7 @@ beforeEach(() => {
 import { useAgentEvents as useAgentEventsHook } from '@/hooks/useAgentEvents';
 import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
 import { useSessionAPI as useSessionAPIHook } from '@/hooks/useSessionAPI';
+import { useAgentAPI as useAgentAPIHook } from '@/hooks/useAgentAPI';
 import type { PendingApproval } from '@/types/api';
 import type { StreamConnection } from '@/types/stream-events';
 
@@ -36,7 +38,7 @@ import type { StreamConnection } from '@/types/stream-events';
 function TestEventStreamConsumer() {
   const { connection } = useEventStream();
   const { events, loadingHistory } = useSessionEvents();
-  const { sendMessage, stopAgent } = useSessionAPI();
+  const { sendMessage, stopAgent } = useAgentAPI();
 
   return (
     <div>
@@ -73,8 +75,7 @@ describe('EventStreamProvider Integration', () => {
 
     // Setup default mock implementations
     vi.mocked(useAgentEventsHook).mockReturnValue({
-      allEvents: [],
-      filteredEvents: [],
+      events: [],
       loadingHistory: false,
       connected: false,
       addAgentEvent: mockAddAgentEvent,
@@ -98,6 +99,10 @@ describe('EventStreamProvider Integration', () => {
       getSession: vi.fn(),
       spawnAgent: vi.fn(),
       listAgents: vi.fn(),
+    });
+
+    vi.mocked(useAgentAPIHook).mockReturnValue({
+      error: null,
       sendMessage: mockSendMessage,
       stopAgent: mockStopAgent,
     });
@@ -154,8 +159,7 @@ describe('EventStreamProvider Integration', () => {
     });
 
     vi.mocked(useAgentEventsHook).mockReturnValue({
-      allEvents: mockEvents,
-      filteredEvents: mockEvents,
+      events: mockEvents,
       loadingHistory: true,
       connected: true,
       addAgentEvent: mockAddAgentEvent,

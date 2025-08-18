@@ -7,6 +7,7 @@ import React, { createContext, useContext, useCallback, useMemo, type ReactNode 
 import { useAgentEvents as useAgentEventsHook } from '@/hooks/useAgentEvents';
 import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
 import { useSessionAPI as useSessionAPIHook } from '@/hooks/useSessionAPI';
+import { useAgentAPI as useAgentAPIHook } from '@/hooks/useAgentAPI';
 import { useToolApprovalContext } from './ToolApprovalProvider';
 import type { ThreadId } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
@@ -28,7 +29,7 @@ interface AgentEventsState {
   addAgentEvent: (event: LaceEvent) => void;
 }
 
-interface SessionAPIActions {
+interface AgentAPIActions {
   sendMessage: (agentId: ThreadId, message: string) => Promise<boolean>;
   stopAgent: (agentId: ThreadId) => Promise<boolean>;
 }
@@ -40,8 +41,8 @@ interface EventStreamContextType {
   // Agent events
   agentEvents: AgentEventsState;
 
-  // Session API
-  sessionAPI: SessionAPIActions;
+  // Agent API
+  agentAPI: AgentAPIActions;
 
   // Agent state handling
   onAgentStateChange?: (agentId: string, fromState: string, toState: string) => void;
@@ -70,8 +71,9 @@ export function EventStreamProvider({
   // Agent events hook (no longer manages approvals internally)
   const { events, loadingHistory, addAgentEvent } = useAgentEventsHook(agentId, false);
 
-  // Session API hook
+  // API hooks
   const sessionAPI = useSessionAPIHook();
+  const agentAPI = useAgentAPIHook();
 
   // Agent state change handler
   const handleAgentStateChangeCallback = useCallback(
@@ -124,9 +126,9 @@ export function EventStreamProvider({
         addAgentEvent,
       },
 
-      sessionAPI: {
-        sendMessage: sessionAPI.sendMessage,
-        stopAgent: sessionAPI.stopAgent,
+      agentAPI: {
+        sendMessage: agentAPI.sendMessage,
+        stopAgent: agentAPI.stopAgent,
       },
 
       onAgentStateChange: handleAgentStateChangeCallback,
@@ -140,8 +142,8 @@ export function EventStreamProvider({
       events,
       loadingHistory,
       addAgentEvent,
-      sessionAPI.sendMessage,
-      sessionAPI.stopAgent,
+      agentAPI.sendMessage,
+      agentAPI.stopAgent,
       handleAgentStateChangeCallback,
     ]
   );
@@ -187,14 +189,14 @@ export function useSessionEvents() {
   return context.agentEvents;
 }
 
-export function useSessionAPI() {
+export function useAgentAPI() {
   const context = useContext(EventStreamContext);
 
   if (!context) {
-    throw new Error('useSessionAPI must be used within EventStreamProvider');
+    throw new Error('useAgentAPI must be used within EventStreamProvider');
   }
 
-  return context.sessionAPI;
+  return context.agentAPI;
 }
 
 // Note: useToolApprovals is now provided by ToolApprovalProvider

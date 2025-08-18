@@ -9,7 +9,7 @@ import {
   EventStreamProvider,
   useEventStream,
   useSessionEvents,
-  useSessionAPI,
+  useAgentAPI,
 } from './EventStreamProvider';
 import { ToolApprovalProvider } from './ToolApprovalProvider';
 import type { ReactNode } from 'react';
@@ -20,20 +20,24 @@ import type { StreamConnection } from '@/types/stream-events';
 import type { UseAgentEventsReturn } from '@/hooks/useAgentEvents';
 import type { UseEventStreamResult } from '@/hooks/useEventStream';
 import type { UseSessionAPIReturn } from '@/hooks/useSessionAPI';
+import type { UseAgentAPIReturn } from '@/hooks/useAgentAPI';
 
 // Mock all dependencies
 vi.mock('@/hooks/useAgentEvents');
 vi.mock('@/hooks/useEventStream');
 vi.mock('@/hooks/useSessionAPI');
+vi.mock('@/hooks/useAgentAPI');
 
 // Import and type the mocked hooks
 import { useAgentEvents as useAgentEventsHook } from '@/hooks/useAgentEvents';
 import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
 import { useSessionAPI as useSessionAPIHook } from '@/hooks/useSessionAPI';
+import { useAgentAPI as useAgentAPIHook } from '@/hooks/useAgentAPI';
 
 const mockUseAgentEvents = useAgentEventsHook as MockedFunction<() => UseAgentEventsReturn>;
 const mockUseEventStream = useEventStreamHook as MockedFunction<() => UseEventStreamResult>;
 const mockUseSessionAPI = useSessionAPIHook as MockedFunction<() => UseSessionAPIReturn>;
+const mockUseAgentAPI = useAgentAPIHook as MockedFunction<() => UseAgentAPIReturn>;
 
 describe('EventStreamProvider', () => {
   // Mock fetch globally
@@ -109,6 +113,10 @@ describe('EventStreamProvider', () => {
       getSession: vi.fn(),
       spawnAgent: vi.fn(),
       listAgents: vi.fn(),
+    };
+
+    const mockAgentAPIReturn: UseAgentAPIReturn = {
+      error: null,
       sendMessage: vi.fn(),
       stopAgent: vi.fn(),
     };
@@ -116,6 +124,7 @@ describe('EventStreamProvider', () => {
     mockUseAgentEvents.mockReturnValue(mockAgentEventsReturn);
     mockUseEventStream.mockReturnValue(mockEventStreamReturn);
     mockUseSessionAPI.mockReturnValue(mockSessionAPIReturn);
+    mockUseAgentAPI.mockReturnValue(mockAgentAPIReturn);
   });
 
   it('provides event stream context to children', async () => {
@@ -146,8 +155,8 @@ describe('EventStreamProvider', () => {
     expect(result.current.addAgentEvent).toBeDefined();
   });
 
-  it('provides session API context to children', async () => {
-    const { result } = renderHook(() => useSessionAPI(), { wrapper });
+  it('provides agent API context to children', async () => {
+    const { result } = renderHook(() => useAgentAPI(), { wrapper });
 
     await act(async () => {
       // Wait for any async effects to complete
@@ -217,23 +226,19 @@ describe('EventStreamProvider', () => {
     expect(result.current.sendCount).toBe(5);
   });
 
-  it('exposes session API methods', async () => {
+  it('exposes agent API methods', async () => {
     const mockSendMessage = vi.fn();
     const mockStopAgent = vi.fn();
 
-    const mockSessionAPIWithMethods: UseSessionAPIReturn = {
+    const mockAgentAPIWithMethods: UseAgentAPIReturn = {
       error: null,
-      createSession: vi.fn(),
-      getSession: vi.fn(),
-      spawnAgent: vi.fn(),
-      listAgents: vi.fn(),
       sendMessage: mockSendMessage,
       stopAgent: mockStopAgent,
     };
 
-    mockUseSessionAPI.mockReturnValue(mockSessionAPIWithMethods);
+    mockUseAgentAPI.mockReturnValue(mockAgentAPIWithMethods);
 
-    const { result } = renderHook(() => useSessionAPI(), { wrapper });
+    const { result } = renderHook(() => useAgentAPI(), { wrapper });
 
     await act(async () => {
       // Wait for any async effects to complete
@@ -280,8 +285,8 @@ describe('EventStreamProvider', () => {
     }).toThrow('useSessionEvents must be used within EventStreamProvider');
 
     expect(() => {
-      renderHook(() => useSessionAPI());
-    }).toThrow('useSessionAPI must be used within EventStreamProvider');
+      renderHook(() => useAgentAPI());
+    }).toThrow('useAgentAPI must be used within EventStreamProvider');
 
     // Verify React error boundary logging occurred (these are expected)
     expect(consoleSpy).toHaveBeenCalled();

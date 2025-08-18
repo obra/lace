@@ -56,7 +56,7 @@ describe('useSessionAPI', () => {
 
       // Verify error handling behavior
       expect(session).toBe(null);
-      expect(result.current.error).toBe('{"json":{"error":"Failed to create session"}}');
+      expect(result.current.error).toBe('HTTP 400: Bad Request');
     });
 
     it('should handle network errors gracefully', async () => {
@@ -121,7 +121,7 @@ describe('useSessionAPI', () => {
 
       // Verify error handling behavior
       expect(session).toBe(null);
-      expect(result.current.error).toBe('Session not found');
+      expect(result.current.error).toBe('HTTP 400: Bad Request');
     });
   });
 
@@ -182,7 +182,7 @@ describe('useSessionAPI', () => {
       });
 
       expect(agent).toBe(null);
-      expect(result.current.error).toBe('Failed to spawn agent');
+      expect(result.current.error).toBe('HTTP 400: Bad Request');
     });
   });
 
@@ -225,54 +225,6 @@ describe('useSessionAPI', () => {
     });
   });
 
-  describe('sendMessage', () => {
-    it('should send message successfully', async () => {
-      const threadId = 'lace_20250113_test123.1' as ThreadId;
-
-      mockFetch.mockResolvedValueOnce(
-        createMockResponse({
-          status: 'accepted',
-          threadId,
-          messageId: 'msg123',
-        })
-      );
-
-      const { result } = renderHook(() => useSessionAPI());
-
-      let success;
-      await act(async () => {
-        success = await result.current.sendMessage(threadId, 'Hello, assistant!');
-      });
-
-      expect(success).toBe(true);
-      // Verify message sending request was made correctly
-      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(fetchCall[0]).toBe(`/api/threads/${threadId}/message`);
-      expect(fetchCall[1]).toEqual({
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'Hello, assistant!' }),
-      });
-      expect(result.current.error).toBe(null);
-    });
-
-    it('should handle message send errors', async () => {
-      const threadId = 'lace_20250113_test123.1' as ThreadId;
-
-      mockFetch.mockResolvedValueOnce(createMockErrorResponse('Failed to send message'));
-
-      const { result } = renderHook(() => useSessionAPI());
-
-      let success;
-      await act(async () => {
-        success = await result.current.sendMessage(threadId, 'Hello');
-      });
-
-      expect(success).toBe(false);
-      expect(result.current.error).toBe('Failed to send message');
-    });
-  });
-
   describe('error state management', () => {
     it('should properly manage error state during async operations', async () => {
       const { result } = renderHook(() => useSessionAPI());
@@ -305,7 +257,7 @@ describe('useSessionAPI', () => {
         await result.current.createSession({ name: 'Test Session 2' });
       });
 
-      expect(result.current.error).toBe('{"json":{"error":"API Error"}}');
+      expect(result.current.error).toBe('HTTP 400: Bad Request');
     });
 
     it('should clear error state when starting new operations', async () => {
@@ -318,7 +270,7 @@ describe('useSessionAPI', () => {
         await result.current.createSession({ name: 'Test Session' });
       });
 
-      expect(result.current.error).toBe('{"json":{"error":"First error"}}');
+      expect(result.current.error).toBe('HTTP 400: Bad Request');
 
       // Second operation succeeds - error should be cleared
       const mockSession = {

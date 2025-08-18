@@ -81,7 +81,7 @@ vi.mock('@/components/chat/MemoizedChatInput', () => ({
 // Mock providers
 vi.mock('@/components/providers/EventStreamProvider', () => ({
   useSessionEvents: vi.fn(),
-  useSessionAPI: vi.fn(),
+  useAgentAPI: vi.fn(),
 }));
 
 vi.mock('@/components/providers/AgentProvider', () => ({
@@ -89,11 +89,11 @@ vi.mock('@/components/providers/AgentProvider', () => ({
 }));
 
 // Import mocked hooks
-import { useSessionEvents, useSessionAPI } from '@/components/providers/EventStreamProvider';
+import { useSessionEvents, useAgentAPI } from '@/components/providers/EventStreamProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 
 const mockUseSessionEvents = vi.mocked(useSessionEvents);
-const mockUseSessionAPI = vi.mocked(useSessionAPI);
+const mockUseAgentAPI = vi.mocked(useAgentAPI);
 const mockUseAgentContext = vi.mocked(useAgentContext);
 
 // Test data factories
@@ -127,7 +127,7 @@ describe('Chat', () => {
       addAgentEvent: vi.fn(),
     });
 
-    mockUseSessionAPI.mockReturnValue({
+    mockUseAgentAPI.mockReturnValue({
       sendMessage: mockSendMessage,
       stopAgent: mockStopAgent,
     });
