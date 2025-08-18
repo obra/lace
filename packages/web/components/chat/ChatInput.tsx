@@ -113,6 +113,25 @@ export function ChatInput({
     }
   }, [speechError, clearError]);
 
+  // Focus the textarea when window regains focus
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      if (textareaRef.current && !disabled && !isListening) {
+        // Don't autofocus when a modal is open
+        // This works because Modal component (components/ui/Modal.tsx:55-65)
+        // sets document.body.style.overflow = 'hidden' when any modal is open
+        const hasOpenModal = document.body.style.overflow === 'hidden';
+
+        if (!hasOpenModal) {
+          textareaRef.current.focus();
+        }
+      }
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    return () => window.removeEventListener('focus', handleWindowFocus);
+  }, [disabled, isListening]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
