@@ -2,7 +2,7 @@
 // ABOUTME: Outputs forwarded console messages to server terminal with proper formatting
 
 import { NextRequest, NextResponse } from 'next/server';
-import superjson from 'superjson';
+import { deserialize, stringify } from '@/lib/serialization';
 import type { ConsoleLogEntry } from '@/lib/console-forward';
 
 /**
@@ -49,9 +49,7 @@ export async function POST(request: NextRequest) {
 
         if (isSuperJSONFormat(argsData)) {
           // This is superjson format - deserialize it
-          deserializedArgs = superjson.deserialize(
-            argsData as Parameters<typeof superjson.deserialize>[0]
-          );
+          deserializedArgs = deserialize(argsData as Parameters<typeof deserialize>[0]);
         } else if (isArgsArray(argsData)) {
           // This is already an array
           deserializedArgs = argsData;
@@ -64,19 +62,34 @@ export async function POST(request: NextRequest) {
           formattedArgs = deserializedArgs
             .map((arg) => {
               if (typeof arg === 'object' && arg !== null) {
-                return superjson.stringify(arg);
+                return stringify(arg);
               }
               return String(arg);
             })
             .join(' ');
         } else {
-          formattedArgs = superjson.stringify(deserializedArgs);
+          formattedArgs = stringify(deserializedArgs);
         }
-      } catch (error) {
-        // Fallback: handle raw args data
-        console.error('[CONSOLE-FORWARD] Deserialization failed:', error);
+      } catch (_error) {
+        // Fallback: handle raw args data gracefully
+        // This can happen with branded types or other custom values
+        // Just extract the json part and stringify it normally
 
-        if (isArgsArray(entry.args)) {
+        if (isSuperJSONFormat(entry.args)) {
+          // If it's superjson format but failed to deserialize (e.g., branded types),
+          // just use the json part directly
+          const { json } = entry.args as { json: unknown; meta?: unknown };
+          if (Array.isArray(json)) {
+            formattedArgs = json
+              .map((arg) =>
+                typeof arg === 'object' && arg !== null ? JSON.stringify(arg) : String(arg)
+              )
+              .join(' ');
+          } else {
+            formattedArgs =
+              typeof json === 'object' && json !== null ? JSON.stringify(json) : String(json);
+          }
+        } else if (isArgsArray(entry.args)) {
           // Handle array of args
           formattedArgs = entry.args
             .map((arg) => {
@@ -91,7 +104,7 @@ export async function POST(request: NextRequest) {
                   };
                   return `[Serialization Error: ${errorInfo.type}] ${errorInfo.string_representation}`;
                 }
-                return superjson.stringify(arg);
+                return JSON.stringify(arg);
               }
               return String(arg);
             })
@@ -100,7 +113,7 @@ export async function POST(request: NextRequest) {
           // Handle single arg or unknown format
           formattedArgs =
             typeof entry.args === 'object' && entry.args !== null
-              ? superjson.stringify(entry.args)
+              ? JSON.stringify(entry.args)
               : String(entry.args);
         }
       }
