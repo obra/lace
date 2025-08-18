@@ -4,7 +4,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Modal, Badge, Alert } from '@/components/ui';
+import { Badge } from '@/components/ui';
+import { Modal } from '@/components/ui/Modal';
+import { Alert } from '@/components/ui/Alert';
 import { useProviderInstances, type CatalogProvider } from './ProviderInstanceProvider';
 
 interface AddInstanceModalProps {
