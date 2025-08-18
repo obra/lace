@@ -221,6 +221,17 @@ export class ToolExecutor {
     }
   }
 
+  /**
+   * @deprecated This method performs redundant permission checks and should be removed.
+   * Production code should use: requestToolPermission() followed by executeApprovedTool()
+   *
+   * Currently kept for backward compatibility with test suite only.
+   * TODO: Update all tests to use the proper flow:
+   *   1. Call requestToolPermission() to check permissions
+   *   2. Call executeApprovedTool() if permission granted
+   *
+   * No production code uses this method - only tests rely on it.
+   */
   async executeTool(call: ToolCall, context: ToolContext): Promise<ToolResult> {
     // 1. Check if tool exists
     const tool = this.tools.get(call.name);
@@ -228,9 +239,8 @@ export class ToolExecutor {
       return createErrorResult(`Tool '${call.name}' not found`, call.id);
     }
 
-    // 2. Backward compatibility: check permissions if not called through new flow
-    // The new flow should call requestToolPermission() first, then executeTool()
-    // But old integration tests and direct calls should still work
+    // 2. DEPRECATED: This permission check is redundant and exists only for test compatibility
+    // Tests should be updated to call requestToolPermission() explicitly
     try {
       const permission = await this.requestToolPermission(call, context);
 
@@ -249,7 +259,7 @@ export class ToolExecutor {
       return createErrorResult(error instanceof Error ? error.message : String(error), call.id);
     }
 
-    // 3. Execute the tool (permissions already checked)
+    // 3. Execute the tool (permissions already checked by the redundant check above)
     return this.executeToolDirect(tool, call, context);
   }
 
