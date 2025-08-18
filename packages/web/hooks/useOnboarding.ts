@@ -49,9 +49,9 @@ export function useOnboarding(
   // Auto-open project creation modal when no projects exist
   const handleAutoOpenProjectCreation = useCallback(
     (projectCount: number) => {
-      if (projectCount === 0) {
-        setAutoOpenCreateProject(true);
-      } else {
+      // Only automatically close the modal if there are projects
+      // Don't automatically open it - let manual triggers handle that
+      if (projectCount > 0) {
         setAutoOpenCreateProject(false);
       }
     },
