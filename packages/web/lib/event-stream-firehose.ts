@@ -2,6 +2,7 @@
 // ABOUTME: Replaces per-component EventSource connections with shared firehose pattern
 
 import type { LaceEvent } from '@/types/core';
+import { parseTyped } from '@/lib/serialization';
 
 interface EventFilter {
   threadIds?: string[];
@@ -56,6 +57,7 @@ class EventStreamFirehose {
 
     // Start connection if this is the first subscription
     if (this.subscriptions.size === 1 && this.connectionState === 'disconnected') {
+      console.warn('[FIREHOSE] First subscription - connecting...');
       this.connect();
     }
 
@@ -67,12 +69,13 @@ class EventStreamFirehose {
 
     // Disconnect if no subscriptions remain
     if (this.subscriptions.size === 0 && this.connectionState !== 'disconnected') {
+      console.warn('[FIREHOSE] No subscriptions remaining, disconnecting...');
       this.disconnect();
     }
   }
 
   private generateSubscriptionId(): string {
-    return `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `sub_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   getSubscriptions(): ReadonlyMap<string, Subscription> {
@@ -91,20 +94,22 @@ class EventStreamFirehose {
 
   private connect(): void {
     if (this.connectionState !== 'disconnected') {
+      console.warn(
+        '[FIREHOSE] Connect called but already connecting/connected:',
+        this.connectionState
+      );
       return; // Already connecting or connected
     }
 
+    console.warn('[FIREHOSE] Connecting to event stream...');
     this.connectionState = 'connecting';
 
     // Firehose approach - no query parameters needed
     const url = '/api/events/stream';
+    console.warn('[FIREHOSE] Creating EventSource for:', url);
     this.eventSource = new EventSource(url);
 
     this.setupEventSourceHandlers();
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[EVENT_STREAM_FIREHOSE] Connecting to firehose:', url);
-    }
   }
 
   private disconnect(): void {
@@ -116,7 +121,7 @@ class EventStreamFirehose {
     this.connectionState = 'disconnected';
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('[EVENT_STREAM_FIREHOSE] Disconnected');
+      // Development debug info
     }
   }
 
@@ -125,22 +130,21 @@ class EventStreamFirehose {
 
     this.eventSource.onopen = () => {
       this.connectionState = 'connected';
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[EVENT_STREAM_FIREHOSE] Connected to firehose');
-      }
     };
 
     this.eventSource.onmessage = (event) => {
       try {
+        // Too verbose - comment out
+        // console.log('[FIREHOSE] Received raw event:', event.data);
         this.handleIncomingEvent(event);
       } catch (error) {
-        console.error('[EVENT_STREAM_FIREHOSE] Error handling event:', error);
+        console.error('[FIREHOSE] Error handling event:', error);
       }
     };
 
     this.eventSource.onerror = (error) => {
       if (this.connectionState === 'connected') {
-        console.warn('[EVENT_STREAM_FIREHOSE] Connection error:', error);
+        console.warn('[FIREHOSE] Connection lost');
       }
       this.connectionState = 'disconnected';
     };
@@ -150,26 +154,32 @@ class EventStreamFirehose {
     this.eventsReceived++;
 
     try {
-      // Parse the SSE event data
-      const laceEvent = JSON.parse(event.data) as LaceEvent;
+      // Parse the SuperJSON-serialized SSE event data
+      const laceEvent = parseTyped<LaceEvent>(event.data as string);
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[EVENT_STREAM_FIREHOSE] Received event:', {
-          id: laceEvent.id,
-          type: laceEvent.type,
-          threadId: laceEvent.threadId,
-          subscriptions: this.subscriptions.size,
-        });
+      // Less verbose - only log important events
+      if (laceEvent.type !== 'AGENT_TOKEN') {
+        console.warn('[FIREHOSE] Parsed:', laceEvent.type, laceEvent.threadId);
       }
 
       this.routeEvent(laceEvent);
     } catch (error) {
-      console.error('[EVENT_STREAM_FIREHOSE] Failed to parse event:', error, event.data);
+      console.error('[FIREHOSE] Failed to parse event:', error, event.data);
     }
   }
 
   private routeEvent(event: LaceEvent): void {
     let routedCount = 0;
+    // Only log routing for non-token events
+    if (event.type !== 'AGENT_TOKEN' && process.env.NODE_ENV === 'development') {
+      console.warn(
+        '[FIREHOSE] Routing',
+        event.type,
+        'to',
+        this.subscriptions.size,
+        'subscriptions'
+      );
+    }
 
     for (const subscription of this.subscriptions.values()) {
       if (this.eventMatchesFilter(event, subscription.filter)) {
@@ -177,7 +187,7 @@ class EventStreamFirehose {
           subscription.callback(event);
           routedCount++;
         } catch (error) {
-          console.error('[EVENT_STREAM_FIREHOSE] Error in subscription callback:', error, {
+          console.error('[FIREHOSE] Error in subscription callback:', error, {
             subscriptionId: subscription.id,
             eventId: event.id,
           });
@@ -186,8 +196,13 @@ class EventStreamFirehose {
       }
     }
 
+    // Only log routing results for important events
+    if (event.type !== 'AGENT_TOKEN' && process.env.NODE_ENV === 'development') {
+      console.warn('[FIREHOSE] Event routed to', routedCount, 'subscriptions');
+    }
+
     if (process.env.NODE_ENV === 'development' && routedCount > 0) {
-      console.log(`[EVENT_STREAM_FIREHOSE] Routed event to ${routedCount} subscriptions`);
+      // Development debug info for routing
     }
   }
 

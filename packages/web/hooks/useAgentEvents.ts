@@ -68,16 +68,13 @@ export function useAgentEvents(
 
   // Load historical events when agent changes
   useEffect(() => {
-    console.warn('[AGENT_EVENTS] useEffect triggered with agentId:', agentId);
     if (!agentId) {
-      console.warn('[AGENT_EVENTS] No agentId, clearing events');
       seenEvents.current.clear();
       setEvents([]);
       setLoadingHistory(false);
       return;
     }
 
-    console.warn('[AGENT_EVENTS] Loading history for agent:', agentId);
     setLoadingHistory(true);
     const controller = new AbortController();
 
@@ -87,7 +84,6 @@ export function useAgentEvents(
         // Events are already properly typed LaceEvents from superjson
         // Filter out internal workflow events (they're handled separately)
         const timelineEvents = data.filter((event) => !isInternalWorkflowEvent(event.type));
-        console.warn(`[AGENT_EVENTS] Loaded ${timelineEvents.length} timeline events for agent:`, agentId);
 
         // Merge history with existing streamed events using dedup guard
         setEvents((prev) => {

@@ -1,9 +1,10 @@
 // ABOUTME: Test suite for useEventStream hook with firehose singleton architecture
 // ABOUTME: Tests event routing and handler dispatch, not connection management
 
-import { describe, test, expect, beforeEach, vi } from 'vitest';
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, cleanup } from '@testing-library/react';
 import { useEventStream } from './useEventStream';
+import type { UseEventStreamOptions } from './useEventStream';
 import { EventStreamFirehose } from '@/lib/event-stream-firehose';
 
 // Mock the firehose
@@ -88,7 +89,8 @@ describe('useEventStream', () => {
       timestamp: new Date(),
     };
 
-    capturedCallback?.(agentStateChangeEvent);
+    expect(capturedCallback).toBeDefined();
+    capturedCallback!(agentStateChangeEvent);
 
     expect(mockOnAgentStateChange).toHaveBeenCalledTimes(1);
     expect(mockOnAgentStateChange).toHaveBeenCalledWith('agent-123', 'idle', 'thinking');
@@ -114,7 +116,8 @@ describe('useEventStream', () => {
     );
 
     // Test USER_MESSAGE
-    capturedCallback?.({
+    expect(capturedCallback).toBeDefined();
+    capturedCallback!({
       id: 'event-1',
       type: 'USER_MESSAGE',
       threadId: 'thread-1',
@@ -123,7 +126,8 @@ describe('useEventStream', () => {
     });
 
     // Test AGENT_MESSAGE
-    capturedCallback?.({
+    expect(capturedCallback).toBeDefined();
+    capturedCallback!({
       id: 'event-2',
       type: 'AGENT_MESSAGE',
       threadId: 'thread-1',
@@ -132,7 +136,8 @@ describe('useEventStream', () => {
     });
 
     // Test TOOL_CALL
-    capturedCallback?.({
+    expect(capturedCallback).toBeDefined();
+    capturedCallback!({
       id: 'event-3',
       type: 'TOOL_CALL',
       threadId: 'thread-1',
@@ -161,7 +166,8 @@ describe('useEventStream', () => {
     );
 
     // Send malformed event
-    capturedCallback?.({
+    expect(capturedCallback).toBeDefined();
+    capturedCallback!({
       id: 'event-1',
       type: 'AGENT_STATE_CHANGE',
       threadId: 'thread-1',
@@ -192,7 +198,7 @@ describe('useEventStream', () => {
   test('should resubscribe when filter changes', () => {
     mockFirehose.subscribe.mockReturnValue('subscription-id-1');
 
-    const { rerender } = renderHook((props) => useEventStream(props), {
+    const { rerender } = renderHook((props: UseEventStreamOptions) => useEventStream(props), {
       initialProps: { threadIds: ['thread-1'], onUserMessage: vi.fn() },
     });
 

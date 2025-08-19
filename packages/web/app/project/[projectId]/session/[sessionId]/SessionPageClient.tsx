@@ -15,22 +15,29 @@ interface SessionPageClientProps {
   sessionId: string;
 }
 
+// Define stable callback functions outside component to prevent re-renders
+const noOpCallback = () => {};
+
 // Client component that handles auto-redirect to coordinator agent
 function SessionRedirect({ projectId, sessionId }: { projectId: string; sessionId: string }) {
   const router = useRouter();
   const { sessionDetails } = useAgentContext();
-  
+
   useEffect(() => {
     if (sessionDetails && sessionDetails.agents && sessionDetails.agents.length > 0) {
       // Find coordinator agent (has same threadId as sessionId)
-      const coordinatorAgent = sessionDetails.agents.find(agent => agent.threadId === sessionId);
-      
+      const coordinatorAgent = sessionDetails.agents.find((agent) => agent.threadId === sessionId);
+
       if (coordinatorAgent) {
         // Redirect to coordinator agent
-        router.push(`/project/${projectId}/session/${sessionId}/agent/${coordinatorAgent.threadId}`);
+        router.push(
+          `/project/${projectId}/session/${sessionId}/agent/${coordinatorAgent.threadId}`
+        );
       } else if (sessionDetails.agents.length === 1) {
         // If only one agent, use it
-        router.push(`/project/${projectId}/session/${sessionId}/agent/${sessionDetails.agents[0].threadId}`);
+        router.push(
+          `/project/${projectId}/session/${sessionId}/agent/${sessionDetails.agents[0].threadId}`
+        );
       }
     }
   }, [sessionDetails, projectId, sessionId, router]);
@@ -50,15 +57,11 @@ export function SessionPageClient({ projectId, sessionId }: SessionPageClientPro
     <UIProvider>
       <ProjectProvider
         selectedProject={projectId}
-        onProjectSelect={() => {}}
-        onProjectChange={() => {}}
+        onProjectSelect={noOpCallback}
+        onProjectChange={noOpCallback}
       >
         <SessionProvider projectId={projectId} selectedSessionId={sessionId}>
-          <AgentProvider 
-            sessionId={sessionId}
-            selectedAgentId={null}
-            onAgentChange={() => {}}
-          >
+          <AgentProvider sessionId={sessionId} selectedAgentId={null} onAgentChange={noOpCallback}>
             <SessionRedirect projectId={projectId} sessionId={sessionId} />
           </AgentProvider>
         </SessionProvider>

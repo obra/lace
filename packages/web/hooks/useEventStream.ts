@@ -3,13 +3,13 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { EventStreamFirehose } from '@/lib/event-stream-firehose';
-import type { LaceEvent } from '@/types/core';
+import type { LaceEvent, Task } from '@/types/core';
 import type { PendingApproval } from '@/types/api';
 
 // Re-export types from original for compatibility
 export interface TaskEvent {
   type: 'task:created' | 'task:updated' | 'task:deleted' | 'task:note_added';
-  task?: any;
+  task?: Task;
   taskId?: string;
   context: {
     actor: string;
@@ -102,7 +102,7 @@ interface EventHandlers {
   onError?: (error: Error) => void;
 }
 
-interface UseEventStreamOptions extends EventHandlers {
+export interface UseEventStreamOptions extends EventHandlers {
   projectId?: string;
   sessionId?: string;
   threadIds?: string[];
@@ -129,112 +129,118 @@ export interface UseEventStreamResult {
 export function useEventStream(options: UseEventStreamOptions): UseEventStreamResult {
   const [lastEvent, setLastEvent] = useState<LaceEvent>();
   const subscriptionIdRef = useRef<string | null>(null);
+  const optionsRef = useRef(options);
+
+  // Update options ref on every render to capture fresh handlers
+  optionsRef.current = options;
 
   // Build filter from options (memoized for performance)
-  const filter = useMemo(
-    () => ({
+  // Use JSON.stringify for deep comparison to prevent array reference issues
+  const filter = useMemo(() => {
+    return {
       projectIds: options.projectId ? [options.projectId] : undefined,
       sessionIds: options.sessionId ? [options.sessionId] : undefined,
       threadIds: options.threadIds,
       eventTypes: undefined, // Could be added later
-    }),
-    [
-      options.projectId,
-      options.sessionId,
-      options.threadIds?.join(','), // Stable array comparison
-    ]
-  );
+    };
+  }, [
+    options.projectId,
+    options.sessionId,
+    JSON.stringify(options.threadIds), // Deep comparison for arrays
+  ]);
 
-  // Event router that dispatches to specific handlers
-  const handleEvent = useCallback(
-    (event: LaceEvent) => {
-      setLastEvent(event);
-
-      // Call general handler first
-      options.onSessionEvent?.(event);
-
-      // Route to specific handlers based on event type
-      switch (event.type) {
-        case 'USER_MESSAGE':
-          options.onUserMessage?.(event);
-          break;
-        case 'AGENT_MESSAGE':
-          options.onAgentMessage?.(event);
-          break;
-        case 'AGENT_TOKEN':
-          options.onAgentToken?.(event);
-          break;
-        case 'TOOL_CALL':
-          options.onToolCall?.(event);
-          break;
-        case 'TOOL_RESULT':
-          options.onToolResult?.(event);
-          break;
-        case 'LOCAL_SYSTEM_MESSAGE':
-          options.onSystemMessage?.(event);
-          break;
-        case 'AGENT_STATE_CHANGE':
-          if (event.data && typeof event.data === 'object') {
-            const data = event.data as { agentId: string; from: string; to: string };
-            if (data.agentId && data.from !== undefined && data.to !== undefined) {
-              options.onAgentStateChange?.(data.agentId, data.from, data.to);
-            }
-          }
-          break;
-        case 'TASK_CREATED':
-          {
-            const taskEvent = event.data as TaskEvent;
-            options.onTaskEvent?.(taskEvent);
-            options.onTaskCreated?.(taskEvent);
-          }
-          break;
-        case 'TASK_UPDATED':
-          {
-            const taskEvent = event.data as TaskEvent;
-            options.onTaskEvent?.(taskEvent);
-            options.onTaskUpdated?.(taskEvent);
-          }
-          break;
-        case 'TASK_DELETED':
-          {
-            const taskEvent = event.data as TaskEvent;
-            options.onTaskEvent?.(taskEvent);
-            options.onTaskDeleted?.(taskEvent);
-          }
-          break;
-        case 'TASK_NOTE_ADDED':
-          {
-            const taskEvent = event.data as TaskEvent;
-            options.onTaskEvent?.(taskEvent);
-            options.onTaskNoteAdded?.(taskEvent);
-          }
-          break;
-        case 'TOOL_APPROVAL_REQUEST':
-          {
-            const approvalData = event.data as { toolCallId: string };
-            options.onApprovalRequest?.({
-              toolCallId: approvalData.toolCallId,
-              requestedAt: event.timestamp || new Date(),
-            } as PendingApproval);
-          }
-          break;
-        case 'TOOL_APPROVAL_RESPONSE':
-          {
-            const responseData = event.data as { toolCallId: string };
-            options.onApprovalResponse?.(responseData.toolCallId);
-          }
-          break;
-        // Add other event type cases as needed
-      }
-    },
-    [options]
-  );
-
-  // Subscribe/unsubscribe effect
+  // Subscribe/unsubscribe effect - only runs when filter changes
   useEffect(() => {
     const firehose = EventStreamFirehose.getInstance();
 
-    subscriptionIdRef.current = firehose.subscribe(filter, handleEvent);
+    // Pass current options directly to avoid stale closure - handlers are resolved at call-time
+    subscriptionIdRef.current = firehose.subscribe(filter, (event) => {
+      // Get fresh handlers at the moment the event arrives
+      const currentOptions = optionsRef.current;
+
+      try {
+        setLastEvent(event);
+
+        // Call general handler first
+        currentOptions.onSessionEvent?.(event);
+
+        // Route to specific handlers based on event type
+        switch (event.type) {
+          case 'USER_MESSAGE':
+            currentOptions.onUserMessage?.(event);
+            break;
+          case 'AGENT_MESSAGE':
+            currentOptions.onAgentMessage?.(event);
+            break;
+          case 'AGENT_TOKEN':
+            currentOptions.onAgentToken?.(event);
+            break;
+          case 'TOOL_CALL':
+            currentOptions.onToolCall?.(event);
+            break;
+          case 'TOOL_RESULT':
+            currentOptions.onToolResult?.(event);
+            break;
+          case 'LOCAL_SYSTEM_MESSAGE':
+            currentOptions.onSystemMessage?.(event);
+            break;
+          case 'AGENT_STATE_CHANGE':
+            if (event.data && typeof event.data === 'object') {
+              const data = event.data as { agentId: string; from: string; to: string };
+              if (data.agentId && data.from !== undefined && data.to !== undefined) {
+                currentOptions.onAgentStateChange?.(data.agentId, data.from, data.to);
+              }
+            }
+            break;
+          case 'TASK_CREATED':
+            {
+              const taskEvent = event.data as TaskEvent;
+              currentOptions.onTaskEvent?.(taskEvent);
+              currentOptions.onTaskCreated?.(taskEvent);
+            }
+            break;
+          case 'TASK_UPDATED':
+            {
+              const taskEvent = event.data as TaskEvent;
+              currentOptions.onTaskEvent?.(taskEvent);
+              currentOptions.onTaskUpdated?.(taskEvent);
+            }
+            break;
+          case 'TASK_DELETED':
+            {
+              const taskEvent = event.data as TaskEvent;
+              currentOptions.onTaskEvent?.(taskEvent);
+              currentOptions.onTaskDeleted?.(taskEvent);
+            }
+            break;
+          case 'TASK_NOTE_ADDED':
+            {
+              const taskEvent = event.data as TaskEvent;
+              currentOptions.onTaskEvent?.(taskEvent);
+              currentOptions.onTaskNoteAdded?.(taskEvent);
+            }
+            break;
+          case 'TOOL_APPROVAL_REQUEST':
+            {
+              const approvalData = event.data as { toolCallId: string };
+              currentOptions.onApprovalRequest?.({
+                toolCallId: approvalData.toolCallId,
+                requestedAt: event.timestamp || new Date(),
+              } as PendingApproval);
+            }
+            break;
+          case 'TOOL_APPROVAL_RESPONSE':
+            {
+              const responseData = event.data as { toolCallId: string };
+              currentOptions.onApprovalResponse?.(responseData.toolCallId);
+            }
+            break;
+          // Add other event type cases as needed
+        }
+      } catch (error) {
+        console.error('[useEventStream] Error in event handler:', error);
+      }
+    });
 
     return () => {
       if (subscriptionIdRef.current) {
@@ -242,13 +248,13 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
         subscriptionIdRef.current = null;
       }
     };
-  }, [filter, handleEvent]);
+  }, [filter]); // Only depend on filter
 
   // Get current stats from firehose (handle case where getInstance might not be mocked properly)
   const stats = useMemo(() => {
     try {
       return EventStreamFirehose.getInstance().getStats();
-    } catch (error) {
+    } catch (_error) {
       // Fallback for test environments where mock might not be set up
       return {
         isConnected: true, // Assume connected for compatibility

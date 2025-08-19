@@ -23,6 +23,9 @@ interface ProjectPageClientProps {
   projectId: string;
 }
 
+// Define stable callback functions outside component to prevent re-renders
+const noOpCallback = () => {};
+
 function ProjectPageContent({ projectId }: { projectId: string }) {
   const { showMobileNav, setShowMobileNav, showDesktopSidebar, toggleDesktopSidebar } =
     useUIContext();
@@ -123,11 +126,11 @@ export function ProjectPageClient({ projectId }: ProjectPageClientProps) {
     <UIProvider>
       <ProjectProvider
         selectedProject={projectId}
-        onProjectSelect={() => {}} // No-op for individual project page
-        onProjectChange={() => {}} // No-op for individual project page
+        onProjectSelect={noOpCallback} // No-op for individual project page
+        onProjectChange={noOpCallback} // No-op for individual project page
       >
         <SessionProvider projectId={projectId} selectedSessionId={null}>
-          <AgentProvider sessionId={null} selectedAgentId={null} onAgentChange={() => {}}>
+          <AgentProvider sessionId={null} selectedAgentId={null} onAgentChange={noOpCallback}>
             <TaskProvider
               projectId={projectId}
               sessionId={null}
