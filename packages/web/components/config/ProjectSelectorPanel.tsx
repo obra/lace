@@ -92,6 +92,8 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
   // Project deletion state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingProject, setDeletingProject] = useState<ProjectInfo | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Provider setup state
   const [showAddProvider, setShowAddProvider] = useState(false);
@@ -250,22 +252,34 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
 
   // Handle delete project confirmation
   const handleDeleteProject = async () => {
-    if (!deletingProject) return;
+    if (!deletingProject || isDeleting) return;
+
+    setIsDeleting(true);
+    setDeleteError(null);
 
     try {
       await deleteProject(deletingProject.id);
+      // Only close modal and clear state on success
       setShowDeleteConfirm(false);
       setDeletingProject(null);
+      setIsDeleting(false);
+      setDeleteError(null);
     } catch (error) {
       console.error('Project delete error:', { projectId: deletingProject.id, error });
-      throw error;
+      setIsDeleting(false);
+      setDeleteError(
+        error instanceof Error ? error.message : 'Failed to delete project. Please try again.'
+      );
+      // Don't close modal or clear deletingProject - let user retry
     }
   };
 
   // Cancel delete project
   const handleCancelDelete = () => {
+    if (isDeleting) return; // Don't allow cancel during deletion
     setShowDeleteConfirm(false);
     setDeletingProject(null);
+    setDeleteError(null);
   };
 
   // Load project configuration using provider method
@@ -602,33 +616,48 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
         />
 
         {/* Delete Confirmation Modal */}
-        <AnimatedModal
-          isOpen={showDeleteConfirm}
-          onClose={handleCancelDelete}
-          title="Delete Project"
-        >
-          <div className="space-y-4">
-            <p className="text-base-content">
-              Are you sure you want to delete the project <strong>{deletingProject?.name}</strong>?
-            </p>
-            <p className="text-base-content/60 text-sm">
-              This will permanently delete the project and all its sessions and conversations. This
-              action cannot be undone.
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button onClick={handleCancelDelete} className="btn btn-ghost" type="button">
-                Cancel
-              </button>
-              <button
-                onClick={() => void handleDeleteProject()}
-                className="btn btn-error"
-                type="button"
-              >
-                Delete Project
-              </button>
+        {deletingProject && (
+          <AnimatedModal
+            isOpen={showDeleteConfirm}
+            onClose={handleCancelDelete}
+            title="Delete Project"
+          >
+            <div className="space-y-4">
+              <p className="text-base-content">
+                Are you sure you want to delete the project <strong>{deletingProject.name}</strong>?
+              </p>
+              <p className="text-base-content/60 text-sm">
+                This will permanently delete the project and all its sessions and conversations.
+                This action cannot be undone.
+              </p>
+
+              {deleteError && (
+                <div className="alert alert-error">
+                  <span>{deleteError}</span>
+                </div>
+              )}
+
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={handleCancelDelete}
+                  className="btn btn-ghost"
+                  type="button"
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => void handleDeleteProject()}
+                  className={`btn btn-error ${isDeleting ? 'loading' : ''}`}
+                  type="button"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete Project'}
+                </button>
+              </div>
             </div>
-          </div>
-        </AnimatedModal>
+          </AnimatedModal>
+        )}
       </div>
     </ProviderInstanceProvider>
   );

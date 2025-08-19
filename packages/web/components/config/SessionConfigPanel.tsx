@@ -85,6 +85,8 @@ export function SessionConfigPanel(): React.JSX.Element {
   const [showEditAgent, setShowEditAgent] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<SessionInfo | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [editingAgent, setEditingAgent] = useState<{
     threadId: string;
     name: string;
@@ -378,12 +380,18 @@ export function SessionConfigPanel(): React.JSX.Element {
   );
 
   const handleDeleteSession = useCallback(async () => {
-    if (!sessionToDelete) return;
+    if (!sessionToDelete || isDeleting) return;
+
+    setIsDeleting(true);
+    setDeleteError(null);
 
     try {
       await deleteSession(sessionToDelete.id);
+      // Only close modal and clear state on success
       setShowDeleteConfirm(false);
       setSessionToDelete(null);
+      setIsDeleting(false);
+      setDeleteError(null);
 
       // Navigate back to project page if we deleted the currently selected session
       if (selectedSession?.id === sessionToDelete.id && project) {
@@ -391,14 +399,20 @@ export function SessionConfigPanel(): React.JSX.Element {
       }
     } catch (error) {
       console.error('Session delete error:', { sessionId: sessionToDelete.id, error });
-      // Handle error locally - don't rethrow since this is called with void
+      setIsDeleting(false);
+      setDeleteError(
+        error instanceof Error ? error.message : 'Failed to delete session. Please try again.'
+      );
+      // Don't close modal or clear sessionToDelete - let user retry
     }
-  }, [sessionToDelete, deleteSession, selectedSession, project, navigateToProject]);
+  }, [sessionToDelete, deleteSession, selectedSession, project, navigateToProject, isDeleting]);
 
   const handleCancelDelete = useCallback(() => {
+    if (isDeleting) return; // Don't allow cancel during deletion
     setShowDeleteConfirm(false);
     setSessionToDelete(null);
-  }, []);
+    setDeleteError(null);
+  }, [isDeleting]);
 
   // Session creation modal handlers
   const handleSessionNameChange = useCallback((name: string) => {
@@ -523,29 +537,48 @@ export function SessionConfigPanel(): React.JSX.Element {
       />
 
       {/* Delete Confirmation Modal */}
-      <AnimatedModal isOpen={showDeleteConfirm} onClose={handleCancelDelete} title="Delete Session">
-        <div className="space-y-4">
-          <p className="text-base-content">
-            Are you sure you want to delete the session <strong>{sessionToDelete?.name}</strong>?
-          </p>
-          <p className="text-base-content/60 text-sm">
-            This will permanently delete the session and all its conversations and agents. This
-            action cannot be undone.
-          </p>
-          <div className="flex gap-2 justify-end">
-            <button onClick={handleCancelDelete} className="btn btn-ghost" type="button">
-              Cancel
-            </button>
-            <button
-              onClick={() => void handleDeleteSession()}
-              className="btn btn-error"
-              type="button"
-            >
-              Delete Session
-            </button>
+      {sessionToDelete && (
+        <AnimatedModal
+          isOpen={showDeleteConfirm}
+          onClose={handleCancelDelete}
+          title="Delete Session"
+        >
+          <div className="space-y-4">
+            <p className="text-base-content">
+              Are you sure you want to delete the session <strong>{sessionToDelete.name}</strong>?
+            </p>
+            <p className="text-base-content/60 text-sm">
+              This will permanently delete the session and all its conversations and agents. This
+              action cannot be undone.
+            </p>
+
+            {deleteError && (
+              <div className="alert alert-error">
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={handleCancelDelete}
+                className="btn btn-ghost"
+                type="button"
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleDeleteSession()}
+                className={`btn btn-error ${isDeleting ? 'loading' : ''}`}
+                type="button"
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Session'}
+              </button>
+            </div>
           </div>
-        </div>
-      </AnimatedModal>
+        </AnimatedModal>
+      )}
     </div>
   );
 }
