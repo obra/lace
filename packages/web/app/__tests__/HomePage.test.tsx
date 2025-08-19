@@ -89,6 +89,7 @@ describe('HomePage', () => {
       onProjectSelect: vi.fn(),
       updateProject: vi.fn(),
       createProject: vi.fn(),
+      deleteProject: vi.fn(),
       loadProjectConfiguration: vi.fn(),
       reloadProjects: vi.fn(),
     });
@@ -120,6 +121,7 @@ describe('HomePage', () => {
       onProjectSelect: vi.fn(),
       updateProject: vi.fn(),
       createProject: vi.fn(),
+      deleteProject: vi.fn(),
       loadProjectConfiguration: vi.fn(),
       reloadProjects: vi.fn(),
     });
@@ -155,6 +157,7 @@ describe('HomePage', () => {
       onProjectSelect: vi.fn(),
       updateProject: vi.fn(),
       createProject: vi.fn(),
+      deleteProject: vi.fn(),
       loadProjectConfiguration: vi.fn(),
       reloadProjects: vi.fn(),
     });
@@ -203,6 +206,7 @@ describe('HomePage', () => {
       onProjectSelect: vi.fn(),
       updateProject: vi.fn(),
       createProject: vi.fn(),
+      deleteProject: vi.fn(),
       loadProjectConfiguration: vi.fn(),
       reloadProjects: vi.fn(),
     });

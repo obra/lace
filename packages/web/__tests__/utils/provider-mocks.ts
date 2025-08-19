@@ -115,6 +115,7 @@ export function createMockProjectContext(
     // Data operations
     updateProject: vi.fn(),
     createProject: vi.fn(),
+    deleteProject: vi.fn(),
     loadProjectConfiguration: vi.fn(),
     reloadProjects: vi.fn(),
 
