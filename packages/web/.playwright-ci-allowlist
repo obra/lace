@@ -1,0 +1,5 @@
+# Allow-listed Playwright tests for CI
+# Add one test file path per line
+# Lines starting with # are comments and will be ignored
+
+e2e/console-forward.e2e.ts
