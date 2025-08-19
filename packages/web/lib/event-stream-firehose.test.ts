@@ -130,3 +130,107 @@ describe('Connection Management', () => {
     expect(mockClose).toHaveBeenCalled();
   });
 });
+
+describe('Event Filtering and Routing', () => {
+  beforeEach(() => {
+    // Reset singleton between tests
+    (EventStreamFirehose as any).instance = null;
+  });
+
+  test('should route event to matching subscriptions only', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const callback1 = vi.fn();
+    const callback2 = vi.fn();
+    const callback3 = vi.fn();
+
+    // Different filters
+    firehose.subscribe({ threadIds: ['thread-1'] }, callback1);
+    firehose.subscribe({ threadIds: ['thread-2'] }, callback2);
+    firehose.subscribe({ sessionIds: ['session-1'] }, callback3);
+
+    const testEvent: any = {
+      id: 'event-1',
+      type: 'USER_MESSAGE',
+      threadId: 'thread-1',
+      data: 'test message',
+      timestamp: new Date(),
+      context: { sessionId: 'session-1' },
+    };
+
+    // Simulate receiving event
+    firehose['routeEvent'](testEvent);
+
+    expect(callback1).toHaveBeenCalledWith(testEvent); // Matches threadId
+    expect(callback2).not.toHaveBeenCalled(); // Wrong threadId
+    expect(callback3).toHaveBeenCalledWith(testEvent); // Matches sessionId
+  });
+
+  test('should handle events with missing context fields', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const callback = vi.fn();
+
+    firehose.subscribe({ sessionIds: ['session-1'] }, callback);
+
+    const eventWithoutContext: any = {
+      id: 'event-2',
+      type: 'SYSTEM_MESSAGE',
+      threadId: 'system',
+      data: 'system event',
+      timestamp: new Date(),
+      // No context field
+    };
+
+    firehose['routeEvent'](eventWithoutContext);
+
+    expect(callback).not.toHaveBeenCalled(); // No session context to match
+  });
+
+  test('should route to all subscriptions with empty filters', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const callback1 = vi.fn();
+    const callback2 = vi.fn();
+
+    // Empty filters should match everything
+    firehose.subscribe({}, callback1);
+    firehose.subscribe({}, callback2);
+
+    const testEvent: any = {
+      id: 'event-3',
+      type: 'AGENT_MESSAGE',
+      threadId: 'any-thread',
+      data: 'any message',
+      timestamp: new Date(),
+    };
+
+    firehose['routeEvent'](testEvent);
+
+    expect(callback1).toHaveBeenCalledWith(testEvent);
+    expect(callback2).toHaveBeenCalledWith(testEvent);
+  });
+
+  test('should handle callback errors without breaking other callbacks', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const errorCallback = vi.fn().mockImplementation(() => {
+      throw new Error('Callback error');
+    });
+    const goodCallback = vi.fn();
+
+    firehose.subscribe({}, errorCallback);
+    firehose.subscribe({}, goodCallback);
+
+    const testEvent: any = {
+      id: 'event-4',
+      type: 'USER_MESSAGE',
+      threadId: 'thread',
+      data: 'test',
+      timestamp: new Date(),
+    };
+
+    expect(() => {
+      firehose['routeEvent'](testEvent);
+    }).not.toThrow();
+
+    expect(errorCallback).toHaveBeenCalled();
+    expect(goodCallback).toHaveBeenCalledWith(testEvent);
+  });
+});
