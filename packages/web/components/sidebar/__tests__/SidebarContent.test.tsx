@@ -27,7 +27,6 @@ vi.mock('@/components/providers/SessionProvider', () => ({
 }));
 
 vi.mock('@/components/providers/AgentProvider', () => ({
-  useAgentContext: vi.fn(),
   useOptionalAgentContext: vi.fn(),
 }));
 
@@ -100,11 +99,10 @@ vi.mock('@/components/sidebar/TaskSidebarSection', () => ({
 // Import mocked hooks
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useAgentContext, useOptionalAgentContext } from '@/components/providers/AgentProvider';
+import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
 
 const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
-const mockUseAgentContext = vi.mocked(useAgentContext);
 const mockUseOptionalAgentContext = vi.mocked(useOptionalAgentContext);
 
 // Test data factories
@@ -171,7 +169,6 @@ describe('SidebarContent', () => {
       foundAgent: createMockAgent('agent-1', 'Agent 1'),
     });
 
-    mockUseAgentContext.mockReturnValue(mockAgentContext);
     mockUseOptionalAgentContext.mockReturnValue(mockAgentContext);
   });
 

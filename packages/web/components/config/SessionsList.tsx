@@ -54,7 +54,7 @@ export const SessionsList = memo(function SessionsList({
         </div>
       ) : (
         <div className="space-y-3">
-          {sessions
+          {[...sessions]
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
             .map((session) => (
               <div
@@ -94,7 +94,21 @@ export const SessionsList = memo(function SessionsList({
 
                       {/* Context Menu Dropdown */}
                       {showContextMenu === session.id && (
-                        <div className="absolute right-0 top-8 bg-base-100 border border-base-300 rounded-lg shadow-lg py-2 min-w-40 z-10">
+                        <div
+                          className="absolute right-0 top-8 bg-base-100 border border-base-300 rounded-lg shadow-lg py-2 min-w-40 z-10"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditSession(session.id);
+                              setShowContextMenu(null);
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2"
+                          >
+                            <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
+                            Edit
+                          </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();

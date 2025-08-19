@@ -365,15 +365,13 @@ export function SessionConfigPanel(): React.JSX.Element {
 
   const handleDeleteSessionClick = useCallback(
     (sessionId?: string) => {
-      // Store the sessionId for deletion or use selected session
       const targetSessionId = sessionId || selectedSession?.id;
       if (!targetSessionId) return;
 
-      // Find the session to delete for display in confirmation
-      const sessionToDelete = sessions.find((s) => s.id === targetSessionId) || selectedSession;
-      if (!sessionToDelete) return;
+      const targetSession = sessions.find((s) => s.id === targetSessionId) || selectedSession;
+      if (!targetSession) return;
 
-      setSessionToDelete(sessionToDelete);
+      setSessionToDelete(targetSession);
       setShowDeleteConfirm(true);
     },
     [sessions, selectedSession]
@@ -393,7 +391,7 @@ export function SessionConfigPanel(): React.JSX.Element {
       }
     } catch (error) {
       console.error('Session delete error:', { sessionId: sessionToDelete.id, error });
-      throw error;
+      // Handle error locally - don't rethrow since this is called with void
     }
   }, [sessionToDelete, deleteSession, selectedSession, project, navigateToProject]);
 

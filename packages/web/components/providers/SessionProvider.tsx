@@ -173,6 +173,11 @@ export function SessionProvider({
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
+// Optional hook - returns null if not within provider
+export function useOptionalSessionContext(): SessionContextType | null {
+  return useContext(SessionContext);
+}
+
 // Hook to use session context
 export function useSessionContext(): SessionContextType {
   const context = useContext(SessionContext);

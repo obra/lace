@@ -36,7 +36,7 @@ export function createMockSessionContext(
     loadSessionConfiguration: vi.fn(),
     updateSessionConfiguration: vi.fn(),
     updateSession: vi.fn(),
-    deleteSession: vi.fn(),
+    deleteSession: vi.fn<(sessionId: string) => Promise<void>>(),
     loadSessionsForProject: vi.fn(),
 
     // Agent auto-selection control
@@ -116,7 +116,7 @@ export function createMockProjectContext(
     // Data operations
     updateProject: vi.fn(),
     createProject: vi.fn(),
-    deleteProject: vi.fn(),
+    deleteProject: vi.fn<(projectId: string) => Promise<void>>(),
     loadProjectConfiguration: vi.fn(),
     reloadProjects: vi.fn(),
 

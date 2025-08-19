@@ -43,21 +43,24 @@ vi.mock('@/components/providers/ProjectProvider', () => ({
 
 vi.mock('@/components/providers/SessionProvider', () => ({
   useSessionContext: vi.fn(),
+  useOptionalSessionContext: vi.fn(),
 }));
 
 vi.mock('@/components/providers/AgentProvider', () => ({
-  useAgentContext: vi.fn(),
   useOptionalAgentContext: vi.fn(),
 }));
 
 // Import mocked hooks
 import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useAgentContext, useOptionalAgentContext } from '@/components/providers/AgentProvider';
+import {
+  useSessionContext,
+  useOptionalSessionContext,
+} from '@/components/providers/SessionProvider';
+import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
 
 const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
-const mockUseAgentContext = vi.mocked(useAgentContext);
+const mockUseOptionalSessionContext = vi.mocked(useOptionalSessionContext);
 const mockUseOptionalAgentContext = vi.mocked(useOptionalAgentContext);
 
 // Mock child components
@@ -181,18 +184,18 @@ describe('TaskSidebarSection', () => {
       })
     );
 
-    mockUseSessionContext.mockReturnValue(
-      createMockSessionContext({
-        selectedSession: 'test-session' as ThreadId,
-      })
-    );
+    const mockSessionContext = createMockSessionContext({
+      selectedSession: 'test-session' as ThreadId,
+    });
+
+    mockUseSessionContext.mockReturnValue(mockSessionContext);
+    mockUseOptionalSessionContext.mockReturnValue(mockSessionContext);
 
     const mockAgentContext = createMockAgentContext({
       sessionDetails: createMockSessionDetails(),
       selectedAgent: 'test-agent' as ThreadId,
     });
 
-    mockUseAgentContext.mockReturnValue(mockAgentContext);
     mockUseOptionalAgentContext.mockReturnValue(mockAgentContext);
   });
 
@@ -233,11 +236,11 @@ describe('TaskSidebarSection', () => {
 
     it('returns null when selectedSession is null', () => {
       mockTaskContext.taskManager = createMockTaskManager();
-      mockUseSessionContext.mockReturnValue(
-        createMockSessionContext({
-          selectedSession: null,
-        })
-      );
+      const nullSessionContext = createMockSessionContext({
+        selectedSession: null,
+      });
+      mockUseSessionContext.mockReturnValue(nullSessionContext);
+      mockUseOptionalSessionContext.mockReturnValue(nullSessionContext);
 
       const { container } = render(<TaskSidebarSection {...defaultProps} />);
       expect(container.firstChild).toBeNull();

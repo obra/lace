@@ -19,8 +19,8 @@ import type { ProjectInfo } from '@/types/core';
 import type { ProviderInfo } from '@/types/api';
 import { AddInstanceModal } from '@/components/providers/AddInstanceModal';
 import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
-import { ProjectEditModal } from './ProjectEditModal';
-import { ProjectCreateModal } from './ProjectCreateModal';
+import { ProjectEditModal } from '@/components/config/ProjectEditModal';
+import { ProjectCreateModal } from '@/components/config/ProjectCreateModal';
 import { AnimatedModal } from '@/components/ui/AnimatedModal';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
@@ -189,29 +189,33 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
   };
 
   // Handle context menu actions
-  const handleContextMenuAction = (
+  const handleContextMenuAction = async (
     projectId: string,
     action: 'archive' | 'unarchive' | 'edit' | 'delete'
   ) => {
     const project = projects.find((p) => p.id === projectId);
     if (!project) return;
 
-    switch (action) {
-      case 'archive':
-        updateProject(projectId, { isArchived: true });
-        break;
-      case 'unarchive':
-        updateProject(projectId, { isArchived: false });
-        break;
-      case 'edit':
-        setEditingProject(project);
-        // Load actual project configuration using provider
-        void loadProjectConfig(project.id);
-        break;
-      case 'delete':
-        setDeletingProject(project);
-        setShowDeleteConfirm(true);
-        break;
+    try {
+      switch (action) {
+        case 'archive':
+          await updateProject(projectId, { isArchived: true });
+          break;
+        case 'unarchive':
+          await updateProject(projectId, { isArchived: false });
+          break;
+        case 'edit':
+          setEditingProject(project);
+          // Load actual project configuration using provider
+          await loadProjectConfig(project.id);
+          break;
+        case 'delete':
+          setDeletingProject(project);
+          setShowDeleteConfirm(true);
+          break;
+      }
+    } catch (error) {
+      console.error('Project action failed:', { projectId, action, error });
     }
 
     setShowContextMenu(null);
@@ -502,7 +506,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleContextMenuAction(project.id, 'edit');
+                                void handleContextMenuAction(project.id, 'edit');
                               }}
                               className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2"
                             >
@@ -513,7 +517,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleContextMenuAction(
+                                void handleContextMenuAction(
                                   project.id,
                                   project.isArchived ? 'unarchive' : 'archive'
                                 );
@@ -530,7 +534,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleContextMenuAction(project.id, 'delete');
+                                void handleContextMenuAction(project.id, 'delete');
                               }}
                               className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2 text-error"
                             >
