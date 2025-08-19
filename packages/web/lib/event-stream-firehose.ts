@@ -57,7 +57,6 @@ class EventStreamFirehose {
 
     // Start connection if this is the first subscription
     if (this.subscriptions.size === 1 && this.connectionState === 'disconnected') {
-      console.warn('[FIREHOSE] First subscription - connecting...');
       this.connect();
     }
 
