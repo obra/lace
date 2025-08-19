@@ -8,15 +8,17 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrash } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { DirectoryField } from '@/components/ui';
+import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
 import type { ProjectInfo } from '@/types/core';
 import type { ProviderInfo } from '@/types/api';
+import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 
 interface ProjectConfiguration {
   providerInstanceId?: string;
   modelId?: string;
   maxTokens?: number;
   tools?: string[];
-  toolPolicies?: Record<string, 'allow' | 'require-approval' | 'deny'>;
+  toolPolicies?: Record<string, ToolPolicy>;
   workingDirectory?: string;
   environmentVariables?: Record<string, string>;
   [key: string]: unknown;
@@ -126,7 +128,7 @@ export function ProjectEditModal({
   };
 
   // Handle tool policy changes
-  const handleToolPolicyChange = (tool: string, policy: 'allow' | 'require-approval' | 'deny') => {
+  const handleToolPolicyChange = (tool: string, policy: ToolPolicy) => {
     setEditConfig((prev) => ({
       ...prev,
       toolPolicies: {
@@ -332,20 +334,11 @@ export function ProjectEditModal({
                   className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
                 >
                   <span className="font-medium text-sm">{tool}</span>
-                  <select
-                    value={editConfig.toolPolicies?.[tool] || 'require-approval'}
-                    onChange={(e) =>
-                      handleToolPolicyChange(
-                        tool,
-                        e.target.value as 'allow' | 'require-approval' | 'deny'
-                      )
-                    }
-                    className="select select-bordered select-sm w-40"
-                  >
-                    <option value="allow">Allow</option>
-                    <option value="require-approval">Require Approval</option>
-                    <option value="deny">Deny</option>
-                  </select>
+                  <ToolPolicyToggle
+                    value={(editConfig.toolPolicies?.[tool] || 'require-approval') as ToolPolicy}
+                    onChange={(policy) => handleToolPolicyChange(tool, policy)}
+                    size="sm"
+                  />
                 </div>
               ))}
             </div>

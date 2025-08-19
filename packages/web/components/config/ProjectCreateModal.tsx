@@ -10,14 +10,16 @@ import { Modal } from '@/components/ui/Modal';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { AccentButton } from '@/components/ui/AccentButton';
 import { DirectoryField } from '@/components/ui';
+import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
 import type { ProviderInfo } from '@/types/api';
+import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 
 interface ProjectConfiguration {
   providerInstanceId?: string;
   modelId?: string;
   maxTokens?: number;
   tools?: string[];
-  toolPolicies?: Record<string, 'allow' | 'require-approval' | 'deny'>;
+  toolPolicies?: Record<string, ToolPolicy>;
   workingDirectory?: string;
   environmentVariables?: Record<string, string>;
   [key: string]: unknown;
@@ -173,10 +175,7 @@ export function ProjectCreateModal({
   };
 
   // Handle create project tool policy changes
-  const handleCreateToolPolicyChange = (
-    tool: string,
-    policy: 'allow' | 'require-approval' | 'deny'
-  ) => {
+  const handleCreateToolPolicyChange = (tool: string, policy: ToolPolicy) => {
     setCreateConfig((prev) => ({
       ...prev,
       toolPolicies: {
@@ -688,20 +687,13 @@ export function ProjectCreateModal({
                       className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
                     >
                       <span className="font-medium text-sm">{tool}</span>
-                      <select
-                        value={createConfig.toolPolicies?.[tool] || 'require-approval'}
-                        onChange={(e) =>
-                          handleCreateToolPolicyChange(
-                            tool,
-                            e.target.value as 'allow' | 'require-approval' | 'deny'
-                          )
+                      <ToolPolicyToggle
+                        value={
+                          (createConfig.toolPolicies?.[tool] || 'require-approval') as ToolPolicy
                         }
-                        className="select select-bordered select-sm w-40"
-                      >
-                        <option value="allow">Allow</option>
-                        <option value="require-approval">Require Approval</option>
-                        <option value="deny">Deny</option>
-                      </select>
+                        onChange={(policy) => handleCreateToolPolicyChange(tool, policy)}
+                        size="sm"
+                      />
                     </div>
                   ))}
                 </div>
