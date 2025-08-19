@@ -16,7 +16,8 @@ export default defineConfig({
   // Enhanced reporting and debugging
   reporter: [
     ['html', { outputFolder: 'playwright-report' }],
-    ['list']
+    ['list'],
+    ['junit', { outputFile: 'playwright-report/junit.xml' }],
   ],
 
   use: {
@@ -32,10 +33,14 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
     // WebKit disabled in CI due to timing issues, available for local development
-    ...(process.env.CI ? [] : [{
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    }]),
+    ...(process.env.CI
+      ? []
+      : [
+          {
+            name: 'webkit',
+            use: { ...devices['Desktop Safari'] },
+          },
+        ]),
   ],
 
   webServer: {
