@@ -34,6 +34,10 @@ vi.mock('@/hooks/useProviders', () => ({
   useProviders: vi.fn(),
 }));
 
+vi.mock('@/hooks/useURLState', () => ({
+  useURLState: vi.fn(),
+}));
+
 vi.mock('@/components/config/ProjectEditModal', () => ({
   ProjectEditModal: ({ isOpen }: { isOpen: boolean }) =>
     isOpen ? <div data-testid="project-edit-modal">Project Edit Modal</div> : null,
@@ -44,11 +48,13 @@ import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useProviders } from '@/hooks/useProviders';
+import { useURLState } from '@/hooks/useURLState';
 
 const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseAgentContext = vi.mocked(useAgentContext);
 const mockUseProviders = vi.mocked(useProviders);
+const mockUseURLState = vi.mocked(useURLState);
 
 // Helper functions for test data
 const createMockSessionsForProject = () => [
@@ -128,6 +134,15 @@ describe('ProjectSection', () => {
       loading: false,
       error: null,
       refetch: vi.fn(),
+    });
+    mockUseURLState.mockReturnValue({
+      project: 'test-project',
+      session: null,
+      agent: null,
+      navigateToProject: vi.fn(),
+      navigateToSession: vi.fn(),
+      navigateToAgent: vi.fn(),
+      navigateToRoot: vi.fn(),
     });
   });
 
@@ -326,6 +341,45 @@ describe('ProjectSection', () => {
       // Should not throw when clicking
       fireEvent.click(screen.getByTestId('workspace-switch-header-button'));
       expect(mockOnSwitchProject).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls navigateToProject when sessions count is clicked', () => {
+      const mockNavigateToProject = vi.fn();
+      mockUseURLState.mockReturnValue({
+        project: 'test-project',
+        session: null,
+        agent: null,
+        navigateToProject: mockNavigateToProject,
+        navigateToSession: vi.fn(),
+        navigateToAgent: vi.fn(),
+        navigateToRoot: vi.fn(),
+      });
+
+      render(<ProjectSection {...defaultProps} />);
+
+      fireEvent.click(screen.getByTestId('sessions-count'));
+
+      expect(mockNavigateToProject).toHaveBeenCalledWith('test-project');
+    });
+
+    it('calls navigateToProject and onCloseMobileNav when sessions count is clicked in mobile mode', () => {
+      const mockNavigateToProject = vi.fn();
+      mockUseURLState.mockReturnValue({
+        project: 'test-project',
+        session: null,
+        agent: null,
+        navigateToProject: mockNavigateToProject,
+        navigateToSession: vi.fn(),
+        navigateToAgent: vi.fn(),
+        navigateToRoot: vi.fn(),
+      });
+
+      render(<ProjectSection {...defaultProps} isMobile={true} />);
+
+      fireEvent.click(screen.getByTestId('sessions-count'));
+
+      expect(mockNavigateToProject).toHaveBeenCalledWith('test-project');
+      expect(mockOnCloseMobileNav).toHaveBeenCalledTimes(1);
     });
   });
 

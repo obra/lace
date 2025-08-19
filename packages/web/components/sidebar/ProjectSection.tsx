@@ -19,6 +19,7 @@ import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useProviders } from '@/hooks/useProviders';
+import { useURLState } from '@/hooks/useURLState';
 
 interface ProjectSectionProps {
   isMobile?: boolean;
@@ -49,6 +50,9 @@ export const ProjectSection = memo(function ProjectSection({
   // Get providers data
   const { providers } = useProviders();
 
+  // Get navigation functions
+  const { navigateToProject } = useURLState();
+
   // Load project configuration when modal opens
   useEffect(() => {
     if (showEditModal && selectedProject) {
@@ -76,6 +80,13 @@ export const ProjectSection = memo(function ProjectSection({
   const sessionsCount = sessions?.length || 0;
   const handleSwitchProject = () => {
     onSwitchProject();
+    if (isMobile) {
+      onCloseMobileNav?.();
+    }
+  };
+
+  const handleViewSessions = () => {
+    navigateToProject(selectedProject);
     if (isMobile) {
       onCloseMobileNav?.();
     }
@@ -180,12 +191,16 @@ export const ProjectSection = memo(function ProjectSection({
 
         {/* Project Stats */}
         <div className="flex items-center gap-4 text-xs text-base-content/60">
-          <div className="flex items-center gap-1.5">
+          <button
+            onClick={handleViewSessions}
+            className="flex items-center gap-1.5 hover:text-base-content transition-colors cursor-pointer"
+            data-testid="sessions-count"
+          >
             <FontAwesomeIcon icon={faComments} className="w-3 h-3" />
-            <span data-testid="sessions-count">
+            <span>
               {sessionsCount} session{sessionsCount !== 1 ? 's' : ''}
             </span>
-          </div>
+          </button>
           {sessionDetails && (
             <div className="flex items-center gap-1.5">
               <FontAwesomeIcon icon={faRobot} className="w-3 h-3" />
