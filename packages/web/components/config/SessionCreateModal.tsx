@@ -7,10 +7,12 @@ import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrash, faExclamationTriangle } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
+import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
 import { ModelSelectionForm } from './ModelSelectionForm';
 import { Alert } from '@/components/ui/Alert';
 import type { ProviderInfo, SessionConfiguration } from '@/types/api';
 import type { ProjectInfo } from '@/types/core';
+import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 
 interface SessionCreateModalProps {
   isOpen: boolean;
@@ -89,7 +91,7 @@ export const SessionCreateModal = memo(function SessionCreateModal({
     });
   };
 
-  const handleToolPolicyChange = (tool: string, policy: 'allow' | 'require-approval' | 'deny') => {
+  const handleToolPolicyChange = (tool: string, policy: ToolPolicy) => {
     onSessionConfigChange({
       ...sessionConfig,
       toolPolicies: {
@@ -282,20 +284,11 @@ export const SessionCreateModal = memo(function SessionCreateModal({
                   className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
                 >
                   <span className="font-medium text-sm">{tool}</span>
-                  <select
-                    value={sessionConfig.toolPolicies?.[tool] || 'require-approval'}
-                    onChange={(e) =>
-                      handleToolPolicyChange(
-                        tool,
-                        e.target.value as 'allow' | 'require-approval' | 'deny'
-                      )
-                    }
-                    className="select select-bordered select-sm w-40"
-                  >
-                    <option value="allow">Allow</option>
-                    <option value="require-approval">Require Approval</option>
-                    <option value="deny">Deny</option>
-                  </select>
+                  <ToolPolicyToggle
+                    value={(sessionConfig.toolPolicies?.[tool] || 'require-approval') as ToolPolicy}
+                    onChange={(policy) => handleToolPolicyChange(tool, policy)}
+                    size="sm"
+                  />
                 </div>
               ))}
             </div>
