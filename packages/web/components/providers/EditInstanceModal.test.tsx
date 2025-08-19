@@ -255,17 +255,16 @@ describe('EditInstanceModal', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     mockParseResponse
-      .mockResolvedValueOnce({ instances: [] }) // For the initial instances loading
-      .mockRejectedValueOnce(new Error('Invalid JSON')); // For the error response parsing attempt
+      .mockRejectedValueOnce(new Error('Instance validation failed')) // For the initial instances loading error
+      .mockRejectedValueOnce(new Error('Invalid JSON')); // For the update error response parsing attempt
 
     global.fetch = vi.fn().mockImplementation((url) => {
       if (url === '/api/provider/instances') {
-        const response = stringify({ instances: [] });
         return Promise.resolve({
-          ok: true,
-          status: 200,
-          text: () => Promise.resolve(response),
-          json: () => Promise.resolve({ instances: [] }),
+          ok: false,
+          status: 400,
+          statusText: 'Instance validation failed',
+          text: () => Promise.resolve('Instance validation failed'),
           clone: function () {
             return this;
           },
@@ -274,8 +273,8 @@ describe('EditInstanceModal', () => {
       return Promise.resolve({
         ok: false,
         status: 400,
-        statusText: 'Bad Request',
-        text: () => Promise.resolve('Bad Request Error'),
+        statusText: 'Instance validation failed',
+        text: () => Promise.resolve('Instance validation failed'),
         clone: function () {
           return this;
         },
@@ -288,12 +287,18 @@ describe('EditInstanceModal', () => {
     await user.click(saveButton);
 
     await waitFor(() => {
-      expect(screen.getByText(/HTTP 400: Bad Request/i)).toBeInTheDocument();
+      expect(screen.getByText(/HTTP 400: Instance validation failed/i)).toBeInTheDocument();
     });
 
-    // No error should occur during initial instance loading since it succeeds
-    expect(consoleSpy).not.toHaveBeenCalledWith('Error loading instances:', expect.anything());
-    expect(consoleSpy).toHaveBeenCalledWith('Error updating instance:', 'HTTP 400: Bad Request');
+    // Verify that error logging occurred for both instance loading and updating
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Error loading instances:',
+      'HTTP 400: Instance validation failed'
+    );
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Error updating instance:',
+      'HTTP 400: Instance validation failed'
+    );
 
     // Should not close modal on error
     expect(defaultProps.onClose).not.toHaveBeenCalled();

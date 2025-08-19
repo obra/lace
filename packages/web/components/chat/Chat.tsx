@@ -15,6 +15,9 @@ export const Chat = memo(function Chat(): React.JSX.Element {
   const { events } = useSessionEvents();
   const { sessionDetails, selectedAgent, agentBusy } = useAgentContext();
   const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useAgentAPI();
+  
+  // Debug logging for events
+  console.warn('[CHAT] Rendered with events:', events.length, 'Selected agent:', selectedAgent);
 
   const agents = sessionDetails?.agents;
 

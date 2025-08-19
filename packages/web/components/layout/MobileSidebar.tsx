@@ -17,8 +17,6 @@ interface MobileSidebarProps {
 }
 
 export function MobileSidebar({ isOpen, onClose, onSettingsClick, children }: MobileSidebarProps) {
-  if (!isOpen) return null;
-
   return (
     <>
       {/* Backdrop */}

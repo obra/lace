@@ -18,19 +18,15 @@ vi.mock('@/hooks/useAgentManagement', () => ({
   useAgentManagement: vi.fn(),
 }));
 
-vi.mock('@/hooks/useHashRouter', () => ({
-  useHashRouter: vi.fn(),
-}));
+// AgentProvider now uses selectedAgentId prop instead of hash router
 
 import { useAgentManagement } from '@/hooks/useAgentManagement';
-import { useHashRouter } from '@/hooks/useHashRouter';
 
 const mockUseAgentManagement = vi.mocked(useAgentManagement);
-const mockUseHashRouter = vi.mocked(useHashRouter);
 
 // Test data factories
 const createMockAgent = (overrides?: Partial<AgentInfo>): AgentInfo => ({
-  threadId: 'agent-1' as ThreadId,
+  threadId: 'lace_20240101_agent1' as ThreadId,
   name: 'Test Agent',
   providerInstanceId: 'test-provider',
   modelId: 'test-model',
@@ -39,13 +35,13 @@ const createMockAgent = (overrides?: Partial<AgentInfo>): AgentInfo => ({
 });
 
 const createMockSession = (overrides?: Partial<SessionInfo>): SessionInfo => ({
-  id: 'session-1' as ThreadId,
+  id: 'lace_20240101_sess01' as ThreadId,
   name: 'Test Session',
   createdAt: new Date('2024-01-01'),
   agents: [
-    createMockAgent({ threadId: 'agent-1' as ThreadId, name: 'Agent One' }),
-    createMockAgent({ threadId: 'agent-2' as ThreadId, name: 'Agent Two' }),
-    createMockAgent({ threadId: 'agent-3' as ThreadId, name: 'Agent Three' }),
+    createMockAgent({ threadId: 'lace_20240101_agent1' as ThreadId, name: 'Agent One' }),
+    createMockAgent({ threadId: 'lace_20240101_agent2' as ThreadId, name: 'Agent Two' }),
+    createMockAgent({ threadId: 'lace_20240101_agent3' as ThreadId, name: 'Agent Three' }),
   ],
   ...overrides,
 });
@@ -74,10 +70,13 @@ function ContextConsumer() {
       <div data-testid="selected-agent">{selectedAgent || 'none'}</div>
       <div data-testid="found-agent">{foundAgent?.name || 'none'}</div>
 
-      <button onClick={() => selectAgent('agent-2')} data-testid="select-agent-2">
+      <button onClick={() => selectAgent('lace_20240101_agent2')} data-testid="select-agent-2">
         Select Agent 2
       </button>
-      <button onClick={() => onAgentSelect({ id: 'agent-3' })} data-testid="select-agent-3">
+      <button
+        onClick={() => onAgentSelect({ id: 'lace_20240101_agent3' })}
+        data-testid="select-agent-3"
+      >
         Select Agent 3
       </button>
       <button
@@ -93,7 +92,7 @@ function ContextConsumer() {
         Create Agent
       </button>
       <button
-        onClick={() => updateAgentState('agent-1', 'active')}
+        onClick={() => updateAgentState('lace_20240101_agent1', 'active')}
         data-testid="update-agent-state"
       >
         Update Agent State
@@ -110,7 +109,8 @@ describe('AgentProvider', () => {
   const mockUpdateAgentState = vi.fn();
   const mockReloadSessionDetails = vi.fn();
   const mockSetSelectedAgent = vi.fn();
-  const mockOnAgentChange = vi.fn();
+  // Mock for onAgentChange callback
+  const mockOnAgentChangeCallback = vi.fn();
 
   const defaultAgentManagement = {
     sessionDetails: mockSessionDetails,
@@ -122,30 +122,15 @@ describe('AgentProvider', () => {
     updateAgent: vi.fn(),
   };
 
-  const defaultHashRouter = {
-    agent: 'agent-1' as ThreadId,
-    setAgent: mockSetSelectedAgent,
-    // Add other required properties with minimal implementations
-    project: null,
-    session: null,
-    isHydrated: true,
-    setProject: vi.fn(),
-    setSession: vi.fn(),
-    updateState: vi.fn(),
-    clearAll: vi.fn(),
-    state: { agent: 'agent-1' },
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseAgentManagement.mockReturnValue(defaultAgentManagement);
-    mockUseHashRouter.mockReturnValue(defaultHashRouter);
   });
 
   describe('Context Provision', () => {
     it('provides agent context to children', () => {
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider sessionId="test-session" selectedAgentId="lace_20240101_agent1">
           <ContextConsumer />
         </AgentProvider>
       );
@@ -153,7 +138,7 @@ describe('AgentProvider', () => {
       expect(screen.getByTestId('session-name')).toHaveTextContent('Test Session');
       expect(screen.getByTestId('agent-count')).toHaveTextContent('3');
       expect(screen.getByTestId('loading')).toHaveTextContent('false');
-      expect(screen.getByTestId('selected-agent')).toHaveTextContent('agent-1');
+      expect(screen.getByTestId('selected-agent')).toHaveTextContent('lace_20240101_agent1');
       expect(screen.getByTestId('found-agent')).toHaveTextContent('Agent One');
     });
 
@@ -183,7 +168,7 @@ describe('AgentProvider', () => {
   describe('Agent Data Management', () => {
     it('provides found agent data when agent is selected', () => {
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider sessionId="test-session" selectedAgentId="lace_20240101_agent1">
           <ContextConsumer />
         </AgentProvider>
       );
@@ -192,14 +177,8 @@ describe('AgentProvider', () => {
     });
 
     it('provides null found agent when no agent is selected', () => {
-      mockUseHashRouter.mockReturnValue({
-        ...defaultHashRouter,
-        agent: null,
-        state: { agent: undefined },
-      });
-
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </AgentProvider>
       );
@@ -208,14 +187,8 @@ describe('AgentProvider', () => {
     });
 
     it('provides null found agent when selected agent not found', () => {
-      mockUseHashRouter.mockReturnValue({
-        ...defaultHashRouter,
-        agent: 'nonexistent-agent' as ThreadId,
-        state: { agent: 'nonexistent-agent' },
-      });
-
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider sessionId="test-session" selectedAgentId="lace_20240101_notfnd">
           <ContextConsumer />
         </AgentProvider>
       );
@@ -230,7 +203,7 @@ describe('AgentProvider', () => {
       });
 
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </AgentProvider>
       );
@@ -241,7 +214,7 @@ describe('AgentProvider', () => {
 
     it('displays session details when available', () => {
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </AgentProvider>
       );
@@ -252,40 +225,48 @@ describe('AgentProvider', () => {
   });
 
   describe('Agent Selection', () => {
-    it('calls setSelectedAgent when selectAgent is called', () => {
+    it('calls onAgentChange when selectAgent is called', () => {
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider
+          sessionId="test-session"
+          selectedAgentId={null}
+          onAgentChange={mockOnAgentChangeCallback}
+        >
           <ContextConsumer />
         </AgentProvider>
       );
 
       fireEvent.click(screen.getByTestId('select-agent-2'));
 
-      expect(mockSetSelectedAgent).toHaveBeenCalledWith('agent-2');
+      expect(mockOnAgentChangeCallback).toHaveBeenCalledWith('lace_20240101_agent2');
     });
 
     it('calls selectAgent when onAgentSelect is called', () => {
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider
+          sessionId="test-session"
+          selectedAgentId={null}
+          onAgentChange={mockOnAgentChangeCallback}
+        >
           <ContextConsumer />
         </AgentProvider>
       );
 
       fireEvent.click(screen.getByTestId('select-agent-3'));
 
-      expect(mockSetSelectedAgent).toHaveBeenCalledWith('agent-3');
+      expect(mockOnAgentChangeCallback).toHaveBeenCalledWith('lace_20240101_agent3');
     });
 
     it('calls onAgentChange callback when agent selection changes', () => {
       render(
-        <AgentProvider sessionId="test-session" onAgentChange={mockOnAgentChange}>
+        <AgentProvider sessionId="test-session" onAgentChange={mockOnAgentChangeCallback}>
           <ContextConsumer />
         </AgentProvider>
       );
 
       fireEvent.click(screen.getByTestId('select-agent-2'));
 
-      expect(mockOnAgentChange).toHaveBeenCalledWith('agent-2');
+      expect(mockOnAgentChangeCallback).toHaveBeenCalledWith('lace_20240101_agent2');
     });
 
     it('handles empty string agent selection as null', () => {
@@ -300,7 +281,7 @@ describe('AgentProvider', () => {
       }
 
       render(
-        <AgentProvider sessionId="test-session" onAgentChange={mockOnAgentChange}>
+        <AgentProvider sessionId="test-session" onAgentChange={mockOnAgentChangeCallback}>
           <TestComponent />
         </AgentProvider>
       );
@@ -308,9 +289,8 @@ describe('AgentProvider', () => {
       // Click the button that calls onAgentSelect with empty string
       fireEvent.click(screen.getByTestId('clear-selection'));
 
-      // Verify that setAgent was called with null (empty string converted)
-      expect(mockSetSelectedAgent).toHaveBeenCalledWith(null);
-      expect(mockOnAgentChange).toHaveBeenCalledWith(null);
+      // Verify that onAgentChange was called with null (empty string converted)
+      expect(mockOnAgentChangeCallback).toHaveBeenCalledWith(null);
     });
   });
 
@@ -319,7 +299,7 @@ describe('AgentProvider', () => {
       mockCreateAgent.mockResolvedValue(undefined);
 
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </AgentProvider>
       );
@@ -335,21 +315,21 @@ describe('AgentProvider', () => {
 
     it('calls updateAgentState with correct parameters', () => {
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </AgentProvider>
       );
 
       fireEvent.click(screen.getByTestId('update-agent-state'));
 
-      expect(mockUpdateAgentState).toHaveBeenCalledWith('agent-1', 'active');
+      expect(mockUpdateAgentState).toHaveBeenCalledWith('lace_20240101_agent1', 'active');
     });
 
     it('calls reloadSessionDetails when requested', async () => {
       mockReloadSessionDetails.mockResolvedValue(undefined);
 
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </AgentProvider>
       );
@@ -364,7 +344,7 @@ describe('AgentProvider', () => {
       mockCreateAgent.mockRejectedValue(testError);
 
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </AgentProvider>
       );
@@ -394,7 +374,7 @@ describe('AgentProvider', () => {
       });
 
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </AgentProvider>
       );
@@ -409,7 +389,7 @@ describe('AgentProvider', () => {
       });
 
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </AgentProvider>
       );
@@ -444,7 +424,7 @@ describe('AgentProvider', () => {
     it('handles agents with missing optional fields', () => {
       const incompleteAgents = [
         createMockAgent({
-          threadId: 'incomplete' as ThreadId,
+          threadId: 'lace_20240101_incomp' as ThreadId,
           name: 'Incomplete Agent',
         }),
       ];
@@ -458,14 +438,8 @@ describe('AgentProvider', () => {
         sessionDetails: sessionWithIncompleteAgents,
       });
 
-      mockUseHashRouter.mockReturnValue({
-        ...defaultHashRouter,
-        agent: 'incomplete' as ThreadId,
-        state: { agent: 'incomplete' },
-      });
-
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider sessionId="test-session" selectedAgentId="lace_20240101_incomp">
           <ContextConsumer />
         </AgentProvider>
       );
@@ -485,7 +459,7 @@ describe('AgentProvider', () => {
       });
 
       render(
-        <AgentProvider sessionId="test-session">
+        <AgentProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </AgentProvider>
       );

@@ -36,6 +36,28 @@ vi.mock('@/hooks/useProviders', () => ({
   useProviders: vi.fn(),
 }));
 
+// Mock Next.js App Router
+const mockPush = vi.fn();
+const mockReplace = vi.fn();
+const mockRefresh = vi.fn();
+const mockBack = vi.fn();
+const mockForward = vi.fn();
+const mockPrefetch = vi.fn();
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+    refresh: mockRefresh,
+    back: mockBack,
+    forward: mockForward,
+    prefetch: mockPrefetch,
+  }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+}));
+
 // Import mocked hooks
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
@@ -85,6 +107,14 @@ describe('ProjectSelectorPanel', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Clear router mocks
+    mockPush.mockClear();
+    mockReplace.mockClear();
+    mockRefresh.mockClear();
+    mockBack.mockClear();
+    mockForward.mockClear();
+    mockPrefetch.mockClear();
 
     // Mock fetch API for ProviderInstanceProvider
     global.fetch = vi.fn().mockImplementation((url: string) => {
@@ -183,13 +213,20 @@ describe('ProjectSelectorPanel', () => {
     expect(screen.getByText('Second test project')).toBeInTheDocument();
   });
 
-  it('should call onProjectSelect when project is clicked', async () => {
+  it('should navigate to project page when project is clicked', async () => {
     await act(async () => {
       render(<ProjectSelectorPanel />);
     });
 
-    await user.click(screen.getByText('Test Project 1'));
-    expect(mockHandlers.onProjectSelect).toHaveBeenCalledWith(mockProjects[0]);
+    // Find the clickable project card (parent of the project name)
+    const projectCard =
+      screen.getByText('Test Project 1').closest('div[role="button"]') ||
+      screen.getByText('Test Project 1').closest('div[class*="cursor-pointer"]');
+
+    expect(projectCard).toBeInTheDocument();
+
+    await user.click(projectCard!);
+    expect(mockPush).toHaveBeenCalledWith('/project/project-1');
   });
 
   it('should show selected project as active', async () => {

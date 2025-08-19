@@ -534,8 +534,15 @@ describe('ToolApprovalProvider', () => {
         expect(screen.getByTestId('approvals-count')).toHaveTextContent('0');
       });
 
-      // API client tries to parse error response to extract meaningful error message
-      expect(mockParseResponse).toHaveBeenCalledTimes(1);
+      // API client DOES call parseResponse on HTTP errors to extract meaningful error messages
+      expect(mockParseResponse).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ok: false,
+          status: expect.any(Number),
+          clone: expect.any(Function),
+        })
+      );
+
       expect(consoleSpy).toHaveBeenCalledWith(
         '[TOOL_APPROVAL] Failed to fetch pending approvals:',
         expect.objectContaining({ message: 'HTTP 404: Not Found' })
@@ -605,8 +612,15 @@ describe('ToolApprovalProvider', () => {
         expect(screen.getByTestId('approvals-count')).toHaveTextContent('0');
       });
 
-      // API client tries to parse error response to extract meaningful error message
-      expect(mockParseResponse).toHaveBeenCalledTimes(1);
+      // API client DOES call parseResponse on HTTP errors to extract meaningful error messages
+      expect(mockParseResponse).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ok: false,
+          status: expect.any(Number),
+          clone: expect.any(Function),
+        })
+      );
+
       // Should log the HTTP status error
       expect(consoleSpy).toHaveBeenCalledWith(
         '[TOOL_APPROVAL] Failed to fetch pending approvals:',

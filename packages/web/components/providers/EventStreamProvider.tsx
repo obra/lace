@@ -65,6 +65,8 @@ export function EventStreamProvider({
   agentId,
   onAgentStateChange,
 }: EventStreamProviderProps) {
+  console.warn('[EVENT_STREAM_PROVIDER] Rendered with agentId:', agentId);
+  
   // Get tool approval handlers from ToolApprovalProvider
   const { handleApprovalRequest, handleApprovalResponse } = useToolApprovalContext();
 
