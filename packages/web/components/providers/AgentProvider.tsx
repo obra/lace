@@ -14,6 +14,7 @@ import React, {
 } from 'react';
 import { useAgentManagement } from '@/hooks/useAgentManagement';
 import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
+import { asThreadId } from '@/types/core';
 import type { CreateAgentRequest } from '@/types/api';
 
 // Types for agent context
@@ -56,9 +57,14 @@ interface AgentProviderProps {
   onAgentChange?: (agentId: string | null) => void;
 }
 
-export function AgentProvider({ children, sessionId, selectedAgentId, onAgentChange }: AgentProviderProps) {
+export function AgentProvider({
+  children,
+  sessionId,
+  selectedAgentId,
+  onAgentChange,
+}: AgentProviderProps) {
   console.warn('[AGENT_PROVIDER] Initialized with sessionId:', sessionId);
-  
+
   // Get agent data from pure data hook
   const {
     sessionDetails,
@@ -71,7 +77,7 @@ export function AgentProvider({ children, sessionId, selectedAgentId, onAgentCha
   } = useAgentManagement(sessionId);
 
   // Use agent from URL params, not hash router
-  const selectedAgent = selectedAgentId;
+  const selectedAgent = selectedAgentId ? asThreadId(selectedAgentId) : null;
 
   // Compute derived state based on data + selection
   const foundAgent = useMemo(() => {

@@ -287,7 +287,7 @@ describe('EditInstanceModal', () => {
     await user.click(saveButton);
 
     await waitFor(() => {
-      expect(screen.getByText(/HTTP 400: undefined/i)).toBeInTheDocument();
+      expect(screen.getByText(/HTTP 400: Instance validation failed/i)).toBeInTheDocument();
     });
 
     // Verify that error logging occurred for both instance loading and updating
@@ -295,7 +295,10 @@ describe('EditInstanceModal', () => {
       'Error loading instances:',
       'Instance validation failed'
     );
-    expect(consoleSpy).toHaveBeenCalledWith('Error updating instance:', 'HTTP 400: undefined');
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Error updating instance:',
+      'HTTP 400: Instance validation failed'
+    );
 
     // Should not close modal on error
     expect(defaultProps.onClose).not.toHaveBeenCalled();

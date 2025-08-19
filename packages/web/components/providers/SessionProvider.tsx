@@ -70,7 +70,12 @@ function useAgentAutoSelection() {
   };
 }
 
-export function SessionProvider({ children, projectId, selectedSessionId, onSessionChange }: SessionProviderProps) {
+export function SessionProvider({
+  children,
+  projectId,
+  selectedSessionId,
+  onSessionChange,
+}: SessionProviderProps) {
   // Get session data from pure data hook
   const {
     sessions,
@@ -86,7 +91,7 @@ export function SessionProvider({ children, projectId, selectedSessionId, onSess
   } = useSessionManagement(projectId);
 
   // Use session from URL params, not hash router
-  const selectedSession = selectedSessionId;
+  const selectedSession = selectedSessionId || null;
 
   // Compute derived state based on data + selection
   const foundSession = useMemo(() => {
