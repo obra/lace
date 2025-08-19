@@ -6,7 +6,7 @@
 import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComments, faRobot, faCog } from '@/lib/fontawesome';
-import { SidebarSection, SidebarButton, SidebarItem } from '@/components/layout/Sidebar';
+import { SidebarSection, SidebarItem } from '@/components/layout/Sidebar';
 import { SwitchIcon } from '@/components/ui/SwitchIcon';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
@@ -16,9 +16,9 @@ import type { ThreadId, AgentInfo } from '@/types/core';
 interface SessionSectionProps {
   isMobile?: boolean;
   onCloseMobileNav?: () => void;
-  onAgentSelect: (agentId: string) => void;
+  onAgentSelect: (agentId: ThreadId) => void;
   onClearAgent: () => void;
-  onConfigureAgent?: (agentId: string) => void;
+  onConfigureAgent?: (agentId: ThreadId) => void;
   onConfigureSession?: () => void;
 }
 
@@ -49,14 +49,7 @@ export const SessionSection = memo(function SessionSection({
     }
   };
 
-  const handleSwitchAgent = () => {
-    onClearAgent();
-    if (isMobile) {
-      onCloseMobileNav?.();
-    }
-  };
-
-  const handleAgentSelect = (agentId: string) => {
+  const handleAgentSelect = (agentId: ThreadId) => {
     onAgentSelect(agentId);
     if (isMobile) {
       onCloseMobileNav?.();
@@ -90,6 +83,7 @@ export const SessionSection = memo(function SessionSection({
     <SwitchIcon
       onClick={handleViewSessions}
       title="Switch to sessions"
+      aria-label="Switch to sessions view"
       size="sm"
       data-testid="session-switch-button"
     />
@@ -140,7 +134,7 @@ export const SessionSection = memo(function SessionSection({
             </SidebarItem>
             {onConfigureAgent && (
               <button
-                onClick={() => onConfigureAgent(agent.threadId)}
+                onClick={() => onConfigureAgent?.(agent.threadId)}
                 className="btn btn-ghost btn-xs p-1 min-h-0 h-auto flex-shrink-0"
                 title="Configure agent"
               >

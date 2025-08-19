@@ -107,6 +107,7 @@ export const ProjectSection = memo(function ProjectSection({
     <SwitchIcon
       onClick={handleSwitchProject}
       title="Switch workspace"
+      aria-label="Switch to workspace selector"
       data-testid="workspace-switch-header-button"
     />
   );
