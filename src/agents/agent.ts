@@ -237,6 +237,11 @@ export class Agent extends EventEmitter {
       currentState: this._state,
     });
 
+    // CRITICAL: Regenerate system prompt with current project context before each message
+    // This ensures that agents working on different projects get the correct context,
+    // even when sharing the same cached provider instance
+    await this._refreshSystemPrompt();
+
     // Check for slash commands
     if (content.startsWith('/compact')) {
       await this._handleCompactCommand();
@@ -274,6 +279,9 @@ export class Agent extends EventEmitter {
     if (!this._initialized) {
       await this.initialize();
     }
+
+    // Ensure system prompt is current before continuing conversation
+    await this._refreshSystemPrompt();
 
     await this._processConversation();
   }
@@ -345,6 +353,60 @@ export class Agent extends EventEmitter {
       threadId: this._threadId,
       data: promptConfig.userInstructions,
     });
+  }
+
+  /**
+   * Refresh system prompt with current project context
+   * This is critical for multi-project scenarios where provider instances are shared
+   */
+  private async _refreshSystemPrompt(): Promise<void> {
+    if (!this.providerInstance) {
+      return;
+    }
+
+    try {
+      // Always regenerate system prompt with current project/session context
+      const session = this._getSession();
+      const project = this._getProject();
+
+      logger.debug(
+        'Agent._refreshSystemPrompt() - regenerating system prompt with current context',
+        {
+          threadId: this._threadId,
+          hasSession: !!session,
+          hasProject: !!project,
+          sessionWorkingDir: session?.getWorkingDirectory(),
+          projectWorkingDir: project?.getWorkingDirectory(),
+        }
+      );
+
+      const promptConfig = await loadPromptConfig({
+        tools: this._tools.map((tool) => ({ name: tool.name, description: tool.description })),
+        session: session,
+        project: project,
+      });
+
+      // Always set the freshly generated system prompt on the provider
+      this.providerInstance.setSystemPrompt(promptConfig.systemPrompt);
+
+      // Update cached config for consistency
+      this._promptConfig = promptConfig;
+
+      logger.debug('Agent._refreshSystemPrompt() - system prompt refreshed successfully', {
+        threadId: this._threadId,
+        promptLength: promptConfig.systemPrompt.length,
+      });
+    } catch (error) {
+      logger.error('Failed to refresh system prompt, using cached version', {
+        threadId: this._threadId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      // Fallback to cached prompt if available
+      if (this._promptConfig && this.providerInstance) {
+        this.providerInstance.setSystemPrompt(this._promptConfig.systemPrompt);
+      }
+    }
   }
 
   // Control methods
