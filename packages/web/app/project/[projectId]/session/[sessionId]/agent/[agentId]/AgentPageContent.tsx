@@ -18,6 +18,7 @@ import { AgentEditModal } from '@/components/config/AgentEditModal';
 import { SessionEditModal } from '@/components/config/SessionEditModal';
 
 import { useUIContext } from '@/components/providers/UIProvider';
+import { asThreadId } from '@/types/core';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
@@ -35,28 +36,21 @@ interface AgentPageContentProps {
 
 export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageContentProps) {
   const { navigateToAgent } = useURLState();
-  
+
   // UI State
-  const {
-    showMobileNav,
-    setShowMobileNav,
-    showDesktopSidebar,
-    toggleDesktopSidebar,
-  } = useUIContext();
+  const { showMobileNav, setShowMobileNav, showDesktopSidebar, toggleDesktopSidebar } =
+    useUIContext();
 
   // Context data
   const { currentProject } = useProjectContext();
-  const { 
+  const {
     sessionDetails: selectedSessionDetails,
     loadAgentConfiguration,
     updateAgent,
     reloadSessionDetails,
   } = useAgentContext();
-  const {
-    loadSessionConfiguration,
-    updateSessionConfiguration,
-    updateSession,
-  } = useSessionContext();
+  const { loadSessionConfiguration, updateSessionConfiguration, updateSession } =
+    useSessionContext();
   const { pendingApprovals, handleApprovalDecision } = useToolApprovalContext();
   const { providers } = useProviders();
 
@@ -85,7 +79,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   // Event handlers
   const handleAgentSelect = useCallback(
     (agentThreadId: string) => {
-      navigateToAgent(projectId, sessionId, agentThreadId);
+      navigateToAgent(projectId, asThreadId(sessionId), asThreadId(agentThreadId));
     },
     [navigateToAgent, projectId, sessionId]
   );
@@ -157,7 +151,8 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
         await updateSessionConfiguration(selectedSessionDetails.id, sessionConfig);
 
         const nameChanged = sessionName.trim() !== selectedSessionDetails.name;
-        const descChanged = (sessionDescription.trim() || undefined) !== selectedSessionDetails.description;
+        const descChanged =
+          (sessionDescription.trim() || undefined) !== selectedSessionDetails.description;
 
         if (nameChanged || descChanged) {
           await updateSession(selectedSessionDetails.id, {
@@ -172,11 +167,19 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
         console.error('Failed to update session:', error);
       }
     },
-    [selectedSessionDetails, sessionName, sessionDescription, sessionConfig, updateSessionConfiguration, updateSession, reloadSessionDetails]
+    [
+      selectedSessionDetails,
+      sessionName,
+      sessionDescription,
+      sessionConfig,
+      updateSessionConfiguration,
+      updateSession,
+      reloadSessionDetails,
+    ]
   );
 
   // Get current agent info for display
-  const currentAgent = selectedSessionDetails?.agents?.find(a => a.threadId === agentId);
+  const currentAgent = selectedSessionDetails?.agents?.find((a) => a.threadId === agentId);
 
   return (
     <motion.div
@@ -185,56 +188,54 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
-      {/* Mobile Sidebar */}
-      <AnimatePresence>
-        {showMobileNav && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 lg:hidden"
-          >
-            <SettingsContainer>
-              {({ onOpenSettings }) => (
-                <MobileSidebar
-                  isOpen={showMobileNav}
-                  onClose={() => setShowMobileNav(false)}
+      {/* Unified Sidebar */}
+      <div data-testid="sidebar" className="flex-shrink-0 h-full">
+        <SettingsContainer>
+          {({ onOpenSettings }) => (
+            <>
+              {/* Mobile Sidebar */}
+              <AnimatePresence>
+                {showMobileNav && (
+                  <MobileSidebar
+                    isOpen={showMobileNav}
+                    onClose={() => setShowMobileNav(false)}
+                    onSettingsClick={onOpenSettings}
+                  >
+                    <SidebarContent
+                      isMobile={true}
+                      onCloseMobileNav={() => setShowMobileNav(false)}
+                      onSwitchProject={handleSwitchProject}
+                      onAgentSelect={handleAgentSelect}
+                      onClearAgent={() =>
+                        (window.location.href = `/project/${projectId}/session/${sessionId}`)
+                      }
+                      onConfigureAgent={handleConfigureAgent}
+                      onConfigureSession={handleConfigureSession}
+                    />
+                  </MobileSidebar>
+                )}
+              </AnimatePresence>
+
+              {/* Desktop Sidebar */}
+              <div className="hidden lg:block h-full">
+                <Sidebar
+                  isOpen={showDesktopSidebar}
+                  onToggle={toggleDesktopSidebar}
                   onSettingsClick={onOpenSettings}
                 >
                   <SidebarContent
-                    isMobile={true}
-                    onCloseMobileNav={() => setShowMobileNav(false)}
+                    isMobile={false}
                     onSwitchProject={handleSwitchProject}
                     onAgentSelect={handleAgentSelect}
-                    onClearAgent={() => window.location.href = `/project/${projectId}/session/${sessionId}`}
+                    onClearAgent={() =>
+                      (window.location.href = `/project/${projectId}/session/${sessionId}`)
+                    }
                     onConfigureAgent={handleConfigureAgent}
                     onConfigureSession={handleConfigureSession}
                   />
-                </MobileSidebar>
-              )}
-            </SettingsContainer>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:block flex-shrink-0">
-        <SettingsContainer>
-          {({ onOpenSettings }) => (
-            <Sidebar
-              isOpen={showDesktopSidebar}
-              onToggle={toggleDesktopSidebar}
-              onSettingsClick={onOpenSettings}
-            >
-              <SidebarContent
-                isMobile={false}
-                onSwitchProject={handleSwitchProject}
-                onAgentSelect={handleAgentSelect}
-                onClearAgent={() => window.location.href = `/project/${projectId}/session/${sessionId}`}
-                onConfigureAgent={handleConfigureAgent}
-                onConfigureSession={handleConfigureSession}
-              />
-            </Sidebar>
+                </Sidebar>
+              </div>
+            </>
           )}
         </SettingsContainer>
       </div>
@@ -268,7 +269,9 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
 
       {/* Tool Approval Modal */}
       {pendingApprovals && pendingApprovals.length > 0 && (
-        <ToolApprovalModal approvals={pendingApprovals} onDecision={handleApprovalDecision} />
+        <div data-testid="tool-approval-modal">
+          <ToolApprovalModal approvals={pendingApprovals} onDecision={handleApprovalDecision} />
+        </div>
       )}
 
       {/* Agent Edit Modal */}
