@@ -176,9 +176,7 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
         case 'AGENT_STATE_CHANGE':
           if (event.data && typeof event.data === 'object') {
             const data = event.data as { agentId: string; from: string; to: string };
-            if (data.agentId && data.from !== undefined && data.to !== undefined) {
-              options.onAgentStateChange?.(data.agentId, data.from, data.to);
-            }
+            options.onAgentStateChange?.(data.agentId, data.from, data.to);
           }
           break;
         case 'TASK_CREATED':
@@ -244,21 +242,8 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
     };
   }, [filter, handleEvent]);
 
-  // Get current stats from firehose (handle case where getInstance might not be mocked properly)
-  const stats = useMemo(() => {
-    try {
-      return EventStreamFirehose.getInstance().getStats();
-    } catch (error) {
-      // Fallback for test environments where mock might not be set up
-      return {
-        isConnected: true, // Assume connected for compatibility
-        subscriptionCount: 1,
-        eventsReceived: 0,
-        connectionUrl: null,
-        connectedAt: null,
-      };
-    }
-  }, []);
+  // Get current stats from firehose
+  const stats = EventStreamFirehose.getInstance().getStats();
 
   // Backward-compatible close function (no-op for firehose)
   const close = useCallback(() => {
