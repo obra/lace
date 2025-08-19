@@ -282,35 +282,14 @@ export class Agent extends EventEmitter {
   async initialize(): Promise<void> {
     if (this._initialized) return; // idempotent
 
-    // Load prompts (expensive, happens once)
-    const session = this._getSession();
-    const project = this._getProject();
-
-    logger.debug('Agent._initialize() - loading prompt config with session/project context', {
-      threadId: this._threadId,
-      hasSession: !!session,
-      hasProject: !!project,
-      sessionWorkingDir: session?.getWorkingDirectory(),
-      projectWorkingDir: project?.getWorkingDirectory(),
-    });
-
-    const promptConfig = await loadPromptConfig({
-      tools: this._tools.map((tool) => ({ name: tool.name, description: tool.description })),
-      session: session,
-      project: project,
-    });
-
-    // Cache the prompt config
-    this._promptConfig = promptConfig;
+    // CRITICAL: Always regenerate system prompt with current project context
+    // This ensures that agents working on different projects get the correct context,
+    // even when sharing the same cached provider instance
+    await this._refreshSystemPrompt();
 
     // Record initial events (happens once) - only for new conversations
-    if (!this._hasInitialEvents() && !this._hasConversationStarted()) {
-      this._addInitialEvents(promptConfig);
-    }
-
-    // Configure provider with loaded system prompt (happens every time)
-    if (this.providerInstance) {
-      this.providerInstance.setSystemPrompt(promptConfig.systemPrompt);
+    if (!this._hasInitialEvents() && !this._hasConversationStarted() && this._promptConfig) {
+      this._addInitialEvents(this._promptConfig);
     }
 
     this._initialized = true;
@@ -345,6 +324,61 @@ export class Agent extends EventEmitter {
       threadId: this._threadId,
       data: promptConfig.userInstructions,
     });
+  }
+
+  /**
+   * Generate system prompt with current project context and set it on the provider
+   * This is critical for multi-project scenarios where provider instances are shared.
+   * Called during initialization to ensure each agent gets the correct project context.
+   */
+  private async _refreshSystemPrompt(): Promise<void> {
+    if (!this.providerInstance) {
+      return;
+    }
+
+    try {
+      // Always regenerate system prompt with current project/session context
+      const session = this._getSession();
+      const project = this._getProject();
+
+      logger.debug(
+        'Agent._refreshSystemPrompt() - regenerating system prompt with current context',
+        {
+          threadId: this._threadId,
+          hasSession: !!session,
+          hasProject: !!project,
+          sessionWorkingDir: session?.getWorkingDirectory(),
+          projectWorkingDir: project?.getWorkingDirectory(),
+        }
+      );
+
+      const promptConfig = await loadPromptConfig({
+        tools: this._tools.map((tool) => ({ name: tool.name, description: tool.description })),
+        session: session,
+        project: project,
+      });
+
+      // Always set the freshly generated system prompt on the provider
+      this.providerInstance.setSystemPrompt(promptConfig.systemPrompt);
+
+      // Update cached config for consistency
+      this._promptConfig = promptConfig;
+
+      logger.debug('Agent._refreshSystemPrompt() - system prompt refreshed successfully', {
+        threadId: this._threadId,
+        promptLength: promptConfig.systemPrompt.length,
+      });
+    } catch (error) {
+      logger.error('Failed to refresh system prompt, using cached version', {
+        threadId: this._threadId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      // Fallback to cached prompt if available
+      if (this._promptConfig && this.providerInstance) {
+        this.providerInstance.setSystemPrompt(this._promptConfig.systemPrompt);
+      }
+    }
   }
 
   // Control methods
