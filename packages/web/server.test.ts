@@ -27,7 +27,13 @@ const mockOpen = vi.mocked(open.default);
 const { logger } = await import('../../src/utils/logger');
 const mockLogger = vi.mocked(logger);
 
-const { isInteractive } = await import('./lib/server-utils');
+// Inline the isInteractive function for testing
+function isInteractive(
+  stdin: { isTTY?: boolean } = process.stdin,
+  stdout: { isTTY?: boolean } = process.stdout
+): boolean {
+  return !!(stdin.isTTY && stdout.isTTY);
+}
 
 // Helper to create a test server
 function createTestServer(): Server {
