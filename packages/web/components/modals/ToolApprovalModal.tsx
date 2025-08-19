@@ -2,10 +2,11 @@
 // ABOUTME: Updated to support multiple approvals per spec Phase 3.4
 
 import React, { useEffect, useState } from 'react';
-import { Modal } from '@/components/ui/Modal';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { PendingApproval } from '@/types/api';
 import { ApprovalDecision } from '@/types/core';
-import { safeStringify } from '@/lib/utils/safeStringify';
+import { getToolRenderer } from '@/components/timeline/tool';
+import { getToolIcon, createDefaultToolSummary } from '@/components/ui/ToolCallDisplay';
 
 interface ToolApprovalModalProps {
   approvals: PendingApproval[];
@@ -14,6 +15,7 @@ interface ToolApprovalModalProps {
 
 export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const currentApproval = approvals[currentIndex];
   const request = currentApproval?.requestData;
 
@@ -59,184 +61,163 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
   // Early return after hooks to satisfy React rules
   if (!currentApproval || !request) return null;
 
-  // Default values for missing fields (handle incomplete data)
-  const riskLevel = request.riskLevel || 'moderate';
+  // Extract tool information
   const isReadOnly = request.isReadOnly ?? false;
   const toolName = request.toolName || currentApproval.toolCall?.name || 'Unknown Tool';
-  const toolDescription = request.toolDescription;
-  const input = request.input || currentApproval.toolCall?.arguments;
+  const args = request.input || currentApproval.toolCall?.arguments;
 
-  const getRiskClasses = () => {
-    switch (riskLevel) {
-      case 'safe':
-        return 'text-success border-success';
-      case 'moderate':
-        return 'text-warning border-warning';
-      case 'destructive':
-        return 'text-error border-error';
-      default:
-        return 'text-warning border-warning';
-    }
-  };
-
-  const getRiskEmoji = () => {
-    switch (riskLevel) {
-      case 'safe':
-        return '🟢';
-      case 'moderate':
-        return '🟡';
-      case 'destructive':
-        return '🔴';
-      default:
-        return '🟡';
-    }
-  };
-
-  const formatInput = (input: unknown): string => {
-    if (typeof input === 'string') return input;
-    return safeStringify(input);
-  };
+  // Get tool display information using the same logic as ToolCallDisplay
+  const renderer = getToolRenderer(toolName);
+  const toolIcon = renderer.getIcon?.() ?? getToolIcon(toolName);
+  const toolSummary = renderer.getSummary?.(args) ?? createDefaultToolSummary(toolName, args);
+  const hasArgs = Boolean(
+    args && typeof args === 'object' && args !== null && Object.keys(args).length > 0
+  );
 
   const modalTitle = (
     <div className="flex justify-between items-start w-full">
       <div>
-        <h2 className="text-xl font-bold text-base-content">Tool Approval Required</h2>
+        <h2 className="text-xl font-bold text-base-content">Approve: {toolName}</h2>
         <div className="flex items-center gap-2 mt-1">
-          <span className={`text-sm font-medium ${getRiskClasses().split(' ')[0]}`}>
-            {getRiskEmoji()} {riskLevel.toUpperCase()}
-          </span>
-          <span className="text-base-content/40">•</span>
           <span className="text-sm text-base-content/60">
             {isReadOnly ? 'Read-only' : 'May modify data'}
           </span>
         </div>
       </div>
-      {/* Approval Counter - spec Phase 3.4 */}
+      {/* Approval Counter with Navigation */}
       {approvals.length > 1 && (
-        <div className="text-sm font-medium text-base-content/60 bg-base-200 px-3 py-1 rounded">
-          {currentIndex + 1} of {approvals.length}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
+            disabled={currentIndex === 0}
+            className="btn btn-xs btn-ghost"
+          >
+            ←
+          </button>
+          <div className="text-sm font-medium text-base-content/60 bg-base-200 px-3 py-1 rounded">
+            {currentIndex + 1} of {approvals.length}
+          </div>
+          <button
+            onClick={() => setCurrentIndex(Math.min(approvals.length - 1, currentIndex + 1))}
+            disabled={currentIndex === approvals.length - 1}
+            className="btn btn-xs btn-ghost"
+          >
+            →
+          </button>
         </div>
       )}
     </div>
   );
 
   return (
-    <Modal
-      isOpen={true}
-      onClose={() => onDecision(currentApproval.toolCallId, ApprovalDecision.DENY)}
-      title={modalTitle}
-      size="lg"
-      className="max-h-[90vh] flex flex-col"
-      closeOnBackdropClick={false}
-      closeOnEscape={false}
-      showCloseButton={false}
-    >
-      <div className="flex flex-col max-h-[75vh]">
-        {/* Tool Info */}
-        <div className={`border-2 rounded-lg p-4 mb-4 ${getRiskClasses()}`}>
-          <div className="flex items-start justify-between mb-2">
-            <div>
-              <h3 className="text-lg font-mono font-semibold text-base-content">{toolName}</h3>
-              {request.toolAnnotations?.title && (
-                <div className="text-sm text-base-content/60 mt-1">
-                  {request.toolAnnotations.title}
+    <div className="fixed inset-0 z-50 pointer-events-none">
+      {/* Transparent backdrop - only for modal isolation */}
+      <div
+        className="absolute inset-0 pointer-events-auto"
+        onClick={() => onDecision(currentApproval.toolCallId, ApprovalDecision.DENY)}
+      />
+
+      {/* Modal anchored to bottom */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 pointer-events-none">
+        <div className="max-w-2xl mx-auto pointer-events-auto">
+          <div className="bg-base-100/95 backdrop-blur-md rounded-lg shadow-xl border border-base-300">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-base-300">
+              {modalTitle}
+            </div>
+
+            {/* Content */}
+            <div className="p-4">
+              <div className="flex flex-col max-h-[75vh]">
+                {/* Tool display styled like timeline */}
+                <div className="flex gap-3 mb-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 rounded-md flex items-center justify-center text-sm bg-warning/10 text-warning">
+                      <FontAwesomeIcon icon={toolIcon} className="text-xs" />
+                    </div>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
+                      {/* Tool header */}
+                      <div className="p-3 bg-base-50 border-b border-base-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {toolName.toLowerCase() === 'bash' &&
+                            args &&
+                            typeof args === 'object' &&
+                            'command' in args ? (
+                              <code className="text-sm font-mono bg-base-300 px-2 py-1 rounded text-base-content break-all">
+                                $ {String((args as { command: unknown }).command)}
+                              </code>
+                            ) : (
+                              <span className="text-sm text-base-content/80">
+                                {String(toolSummary)}
+                              </span>
+                            )}
+                          </div>
+
+                          {hasArgs && (
+                            <button
+                              onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                              className="text-xs text-base-content/50 hover:text-base-content px-2 py-1 rounded hover:bg-base-200 flex-shrink-0"
+                            >
+                              {showTechnicalDetails ? 'Hide' : 'Show'} Details
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Technical Details (when expanded) */}
+                      {showTechnicalDetails && hasArgs && (
+                        <div className="px-3 py-2 bg-base-50 border-b border-base-200">
+                          <div className="text-xs text-base-content/70 mb-1 font-medium">
+                            Technical Details:
+                          </div>
+                          <div className="text-xs font-mono text-base-content/80 whitespace-pre-wrap bg-base-100 p-2 rounded border">
+                            <strong>Tool:</strong> {toolName}
+                            {'\n'}
+                            <strong>Arguments:</strong> {JSON.stringify(args, null, 2)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              )}
-              {toolDescription && (
-                <p className="text-sm text-base-content/80 mt-2">{toolDescription}</p>
-              )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() =>
+                      onDecision(currentApproval.toolCallId, ApprovalDecision.ALLOW_ONCE)
+                    }
+                    className="btn btn-outline flex-1"
+                  >
+                    Allow Once
+                    <span className="text-xs opacity-70 ml-2">[Y/A]</span>
+                  </button>
+                  <button
+                    onClick={() =>
+                      onDecision(currentApproval.toolCallId, ApprovalDecision.ALLOW_SESSION)
+                    }
+                    className="btn btn-outline flex-1"
+                  >
+                    Allow Session
+                    <span className="text-xs opacity-70 ml-2">[S]</span>
+                  </button>
+                  <button
+                    onClick={() => onDecision(currentApproval.toolCallId, ApprovalDecision.DENY)}
+                    className="btn btn-outline flex-1"
+                  >
+                    Deny
+                    <span className="text-xs opacity-70 ml-2">[N/D]</span>
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-
-          {/* Tool Annotations */}
-          {request.toolAnnotations && (
-            <div className="flex gap-2 mt-3 flex-wrap">
-              {request.toolAnnotations.readOnlyHint && (
-                <span className="badge badge-success badge-sm">Read-only</span>
-              )}
-              {request.toolAnnotations.idempotentHint && (
-                <span className="badge badge-info badge-sm">Idempotent</span>
-              )}
-              {request.toolAnnotations.destructiveHint && (
-                <span className="badge badge-error badge-sm">Destructive</span>
-              )}
-              {request.toolAnnotations.safeInternal && (
-                <span className="badge badge-neutral badge-sm">Internal</span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Parameters */}
-        <div className="flex-1 overflow-auto mb-4 min-h-[100px]">
-          <h4 className="text-sm font-semibold text-base-content/70 mb-2">Parameters:</h4>
-          <div className="mockup-code">
-            <pre className="text-sm">
-              <code>{formatInput(input)}</code>
-            </pre>
-          </div>
-        </div>
-
-        {/* Navigation for multiple approvals - spec Phase 3.4 */}
-        {approvals.length > 1 && (
-          <div className="flex justify-between items-center mb-4 bg-base-200 rounded-lg p-3">
-            <button
-              onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
-              disabled={currentIndex === 0}
-              className="btn btn-sm btn-ghost"
-            >
-              ← Previous
-              <span className="text-xs opacity-70 ml-1">[←]</span>
-            </button>
-            <span className="text-sm text-base-content/70">Navigate between pending approvals</span>
-            <button
-              onClick={() => setCurrentIndex(Math.min(approvals.length - 1, currentIndex + 1))}
-              disabled={currentIndex === approvals.length - 1}
-              className="btn btn-sm btn-ghost"
-            >
-              Next →<span className="text-xs opacity-70 ml-1">[→]</span>
-            </button>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => onDecision(currentApproval.toolCallId, ApprovalDecision.ALLOW_ONCE)}
-            className="btn btn-success flex-1"
-          >
-            Allow Once
-            <span className="text-xs opacity-70 ml-2">[Y/A]</span>
-          </button>
-          <button
-            onClick={() => onDecision(currentApproval.toolCallId, ApprovalDecision.ALLOW_SESSION)}
-            className="btn btn-info flex-1"
-          >
-            Allow Session
-            <span className="text-xs opacity-70 ml-2">[S]</span>
-          </button>
-          <button
-            onClick={() => onDecision(currentApproval.toolCallId, ApprovalDecision.DENY)}
-            className="btn btn-error flex-1"
-          >
-            Deny
-            <span className="text-xs opacity-70 ml-2">[N/D]</span>
-          </button>
-        </div>
-
-        {/* Help Text */}
-        <div className="mt-4 text-xs text-base-content/60 space-y-1">
-          <div>
-            • <strong>Allow Once:</strong> Approve this specific call only
-          </div>
-          <div>
-            • <strong>Allow Session:</strong> Approve all calls to {toolName} this session
-          </div>
-          <div>
-            • <strong>Deny:</strong> Reject this tool call
           </div>
         </div>
       </div>
-    </Modal>
+    </div>
   );
 }

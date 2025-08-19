@@ -81,6 +81,9 @@ import { MobileSidebar } from '@/components/layout/MobileSidebar';
 // ORGANISMS - Complex interactive components
 import GoogleDocChatMessage from '@/components/organisms/GoogleDocChatMessage';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
+import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
+import type { PendingApproval } from '@/types/api';
+import { ApprovalDecision } from '@/types/core';
 
 type ComponentCategory = 'atoms' | 'molecules' | 'organisms' | 'all';
 
@@ -107,6 +110,67 @@ export default function PlaygroundPage() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showBasicModal, setShowBasicModal] = useState(false);
   const [showAnimatedModal, setShowAnimatedModal] = useState(false);
+  const [showToolApprovalModal, setShowToolApprovalModal] = useState(false);
+
+  // Mock data for tool approval modal
+  const mockPendingApprovals: PendingApproval[] = [
+    {
+      toolCallId: 'call-1',
+      toolCall: {
+        name: 'file-write',
+        arguments: {
+          path: '/Users/example/project/config.json',
+          content: '{"version": "1.2.0", "debug": true}',
+        },
+      },
+      requestedAt: new Date(),
+      requestData: {
+        requestId: 'req-1',
+        toolName: 'file-write',
+        toolDescription: 'Write content to a file at the specified path',
+        input: {
+          path: '/Users/example/project/config.json',
+          content: '{"version": "1.2.0", "debug": true}',
+        },
+        riskLevel: 'destructive',
+        isReadOnly: false,
+        toolAnnotations: {
+          title: 'Write configuration file',
+          destructiveHint: true,
+        },
+      },
+    },
+    {
+      toolCallId: 'call-2',
+      toolCall: {
+        name: 'bash',
+        arguments: {
+          command: 'npm install lodash',
+        },
+      },
+      requestedAt: new Date(),
+      requestData: {
+        requestId: 'req-2',
+        toolName: 'bash',
+        toolDescription: 'Execute a shell command',
+        input: {
+          command: 'npm install lodash',
+        },
+        riskLevel: 'moderate',
+        isReadOnly: false,
+        toolAnnotations: {
+          title: 'Install package',
+        },
+      },
+    },
+  ];
+
+  const handleToolApprovalDecision = (toolCallId: string, decision: ApprovalDecision) => {
+    // In a real implementation, this would send the decision to the backend
+    void toolCallId; // Satisfy linter for unused parameter
+    void decision; // Satisfy linter for unused parameter
+    setShowToolApprovalModal(false);
+  };
 
   const renderAtoms = () => (
     <div className="grid gap-6">
@@ -659,6 +723,28 @@ export default function PlaygroundPage() {
 
             <div className="border border-accent/20 rounded p-4 bg-accent/5">
               <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm bg-accent/20 text-accent px-2 py-1 rounded">O1.5</span>
+                <span className="text-lg font-semibold">ToolApprovalModal</span>
+              </div>
+              <div className="text-sm text-base-content/70 mb-3">
+                <strong>Composition:</strong> Interactive tool approval interface with keyboard
+                shortcuts and multi-approval support
+              </div>
+              <div className="text-xs bg-base-200 p-2 rounded mb-3">
+                <strong>Built from:</strong>
+                <br />
+                🧪 <span className="text-secondary">Molecules:</span> Modal(53)
+                <br />
+                🔬 <span className="text-primary">Atoms:</span> AccentButton(39), Badge(4),
+                DismissButton(60-62)
+              </div>
+              <button className="btn btn-warning" onClick={() => setShowToolApprovalModal(true)}>
+                Show Tool Approval
+              </button>
+            </div>
+
+            <div className="border border-accent/20 rounded p-4 bg-accent/5">
+              <div className="flex items-center gap-2 mb-3">
                 <span className="text-sm bg-accent/20 text-accent px-2 py-1 rounded">O2</span>
                 <span className="text-lg font-semibold">GoogleDocChatMessage</span>
               </div>
@@ -895,6 +981,13 @@ export default function PlaygroundPage() {
       >
         <p>This is an animated modal with smooth transitions.</p>
       </AnimatedModal>
+
+      {showToolApprovalModal && (
+        <ToolApprovalModal
+          approvals={mockPendingApprovals}
+          onDecision={handleToolApprovalDecision}
+        />
+      )}
 
       <div className="alert alert-info mt-8">
         <div>
