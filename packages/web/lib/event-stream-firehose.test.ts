@@ -22,3 +22,53 @@ describe('EventStreamFirehose', () => {
     expect(instance.getStats().isConnected).toBe(false);
   });
 });
+
+describe('Subscription Management', () => {
+  beforeEach(() => {
+    // Reset singleton between tests
+    (EventStreamFirehose as any).instance = null;
+  });
+
+  test('should add subscription and return unique ID', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const mockCallback = vi.fn();
+    const filter = { threadIds: ['thread-1'] };
+
+    const subscriptionId = firehose.subscribe(filter, mockCallback);
+
+    expect(typeof subscriptionId).toBe('string');
+    expect(subscriptionId.length).toBeGreaterThan(0);
+    expect(firehose.getStats().subscriptionCount).toBe(1);
+  });
+
+  test('should assign unique IDs to multiple subscriptions', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const callback1 = vi.fn();
+    const callback2 = vi.fn();
+
+    const id1 = firehose.subscribe({}, callback1);
+    const id2 = firehose.subscribe({}, callback2);
+
+    expect(id1).not.toBe(id2);
+    expect(firehose.getStats().subscriptionCount).toBe(2);
+  });
+
+  test('should remove subscription by ID', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const callback = vi.fn();
+
+    const subscriptionId = firehose.subscribe({}, callback);
+    expect(firehose.getStats().subscriptionCount).toBe(1);
+
+    firehose.unsubscribe(subscriptionId);
+    expect(firehose.getStats().subscriptionCount).toBe(0);
+  });
+
+  test('should handle unsubscribing non-existent ID gracefully', () => {
+    const firehose = EventStreamFirehose.getInstance();
+
+    expect(() => {
+      firehose.unsubscribe('non-existent-id');
+    }).not.toThrow();
+  });
+});
