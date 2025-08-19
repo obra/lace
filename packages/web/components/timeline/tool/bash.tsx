@@ -48,9 +48,13 @@ export const bashRenderer: ToolRenderer = {
     const rawOutput = result.content.map((block) => block.text || '').join('');
 
     // Try to parse structured bash output
-    let bashOutput: { stdout?: string; stderr?: string; exitCode?: number };
+    let bashOutput: { stdoutPreview?: string; stderrPreview?: string; exitCode?: number };
     try {
-      bashOutput = JSON.parse(rawOutput) as { stdout?: string; stderr?: string; exitCode?: number };
+      bashOutput = JSON.parse(rawOutput) as {
+        stdoutPreview?: string;
+        stderrPreview?: string;
+        exitCode?: number;
+      };
     } catch {
       // Fallback to raw output if not structured
       return result.status !== 'completed' ? (
@@ -62,9 +66,9 @@ export const bashRenderer: ToolRenderer = {
       );
     }
 
-    const { stdout, stderr, exitCode } = bashOutput;
-    const hasStdout = stdout && stdout.trim();
-    const hasStderr = stderr && stderr.trim();
+    const { stdoutPreview: stdout, stderrPreview: stderr, exitCode } = bashOutput;
+    const hasStdout = stdout?.trim();
+    const hasStderr = stderr?.trim();
     const hasNonZeroExit = exitCode != null && exitCode !== 0;
 
     return (
