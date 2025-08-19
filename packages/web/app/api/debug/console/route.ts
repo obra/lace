@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     let body: { logs: ConsoleLogEntry[] };
     try {
       body = JSON.parse(text) as { logs: ConsoleLogEntry[] };
-    } catch (parseError) {
+    } catch (_parseError) {
       // Silent handling of malformed JSON - likely from race conditions or network issues
       return NextResponse.json({ error: 'Invalid JSON format' }, { status: 400 });
     }
