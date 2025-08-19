@@ -62,7 +62,7 @@ export const bashRenderer: ToolRenderer = {
       );
     }
 
-    const { stdout, stderr, exitCode } = bashOutput;
+    const { stdoutPreview: stdout, stderrPreview: stderr, exitCode } = bashOutput;
     const hasStdout = stdout && stdout.trim();
     const hasStderr = stderr && stderr.trim();
     const hasNonZeroExit = exitCode != null && exitCode !== 0;
