@@ -3,31 +3,22 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { FirstProjectHero } from '@/components/onboarding/FirstProjectHero';
 import { LoadingView } from '@/components/pages/views/LoadingView';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useUIContext } from '@/components/providers/UIProvider';
-import { useProviders } from '@/hooks/useProviders';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 
 export function HomePage() {
-  const {
-    projects,
-    loading: loadingProjects,
-  } = useProjectContext();
-  
-  const { providers, loading: loadingProviders } = useProviders();
-  
-  const {
-    autoOpenCreateProject,
-    setAutoOpenCreateProject,
-  } = useUIContext();
+  const { projects, loading: loadingProjects } = useProjectContext();
+
+  const { autoOpenCreateProject, setAutoOpenCreateProject } = useUIContext();
 
   const { enableAgentAutoSelection } = useSessionContext();
-  
+
   // Onboarding flow management
   const { handleAutoOpenProjectCreation } = useOnboarding(
     setAutoOpenCreateProject,
@@ -41,7 +32,7 @@ export function HomePage() {
     }
   }, [projects?.length, loadingProjects, handleAutoOpenProjectCreation]);
 
-  const loading = loadingProjects || loadingProviders;
+  const loading = loadingProjects;
 
   return (
     <div className="flex h-screen bg-base-200 text-base-content font-ui">

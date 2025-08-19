@@ -5,6 +5,7 @@ import { useCallback } from 'react';
 import { useURLState } from '@/hooks/useURLState';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
+import { asThreadId } from '@/types/core';
 
 interface UseOnboardingResult {
   handleOnboardingComplete: (
@@ -29,7 +30,7 @@ export function useOnboarding(
       await reloadProjects();
 
       // Navigate directly to the agent chat
-      navigateToAgent(projectId, sessionId, agentId);
+      navigateToAgent(projectId, asThreadId(sessionId), asThreadId(agentId));
 
       // Clear auto-open state
       setAutoOpenCreateProject(false);

@@ -33,6 +33,28 @@ vi.mock('@/hooks/useProviders', () => ({
   useProviders: vi.fn(),
 }));
 
+// Mock Next.js App Router
+const mockPush = vi.fn();
+const mockReplace = vi.fn();
+const mockRefresh = vi.fn();
+const mockBack = vi.fn();
+const mockForward = vi.fn();
+const mockPrefetch = vi.fn();
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+    refresh: mockRefresh,
+    back: mockBack,
+    forward: mockForward,
+    prefetch: mockPrefetch,
+  }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+}));
+
 // Import mocked hooks
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
@@ -77,6 +99,14 @@ global.fetch = vi.fn();
 describe('ProjectSelectorPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Clear router mocks
+    mockPush.mockClear();
+    mockReplace.mockClear();
+    mockRefresh.mockClear();
+    mockBack.mockClear();
+    mockForward.mockClear();
+    mockPrefetch.mockClear();
 
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
       createMockResponse({ project: { id: '1', name: 'Test' } })

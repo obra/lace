@@ -24,6 +24,7 @@ import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useURLState } from '@/hooks/useURLState';
 import { useProviders } from '@/hooks/useProviders';
+import { asThreadId } from '@/types/core';
 
 const AVAILABLE_TOOLS = [
   'bash',
@@ -308,7 +309,7 @@ export function SessionConfigPanel(): React.JSX.Element {
   const handleSessionSelect = useCallback(
     (sessionId: string) => {
       if (project) {
-        navigateToSession(project, sessionId);
+        navigateToSession(project, asThreadId(sessionId));
       }
     },
     [project, navigateToSession]
@@ -322,7 +323,7 @@ export function SessionConfigPanel(): React.JSX.Element {
   const handleAgentSelect = useCallback(
     (agentId: string) => {
       if (project && session) {
-        navigateToAgent(project, session, agentId);
+        navigateToAgent(project, session, asThreadId(agentId));
       }
     },
     [project, session, navigateToAgent]

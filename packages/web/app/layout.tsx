@@ -9,8 +9,8 @@ import { ConsoleForwardScript } from '@/lib/console-forward/script';
 // Fonts are loaded via CSS imports in globals.css
 
 export const metadata: Metadata = {
-  title: 'Lace Web Terminal',
-  description: 'AI coding assistant with multi-agent support',
+  title: 'Lace',
+  description: 'Universal coding environment',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
