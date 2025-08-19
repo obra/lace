@@ -4,6 +4,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faFolder,
@@ -72,6 +73,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
   );
   const { providers, loading: providersLoading, refetch: refetchProviders } = useProviders();
 
+  const router = useRouter();
   const loading = projectLoading || providersLoading;
   const selectedProject = currentProject.id ? currentProject : null;
   const autoOpenCreate = autoOpenCreateProject;
@@ -426,7 +428,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
                       ? 'border-primary bg-primary/5 shadow-md'
                       : 'border-base-300 hover:border-primary/50'
                   }`}
-                  onClick={() => onProjectSelect(project)}
+                  onClick={() => router.push(`/project/${project.id}`)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 flex-1 min-w-0">

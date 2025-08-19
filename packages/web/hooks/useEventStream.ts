@@ -511,13 +511,15 @@ export function useEventStream({
       return;
     }
 
+    // Always close any existing connection first
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
+      eventSourceRef.current = null;
     }
 
     const queryString = buildQueryString(subscriptionRef.current, includeGlobalRef.current);
     const url = `/api/events/stream${queryString ? `?${queryString}` : ''}`;
-
+    
     const eventSource = new EventSource(url);
     eventSourceRef.current = eventSource;
 
@@ -631,10 +633,15 @@ export function useEventStream({
   useEffect(() => {
     const currentKey = subscriptionKey;
 
-    // Only reconnect if subscription actually changed
+    // Always connect on mount (when prevKey is undefined) or when subscription changed
     if (prevSubscriptionKeyRef.current !== currentKey) {
       prevSubscriptionKeyRef.current = currentKey;
       connect();
+    } else {
+      // If we have a subscription but no connection, reconnect
+      if (currentKey && !connection.connected) {
+        connect();
+      }
     }
 
     return () => {

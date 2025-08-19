@@ -2,7 +2,7 @@
 // ABOUTME: Handles coordinated state updates and navigation after onboarding completion
 
 import { useCallback } from 'react';
-import { useAppState } from '@/components/providers/AppStateProvider';
+import { useURLState } from '@/hooks/useURLState';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 
@@ -19,9 +19,7 @@ export function useOnboarding(
   setAutoOpenCreateProject: (open: boolean) => void,
   enableAgentAutoSelection: () => void
 ): UseOnboardingResult {
-  const {
-    actions: { updateHashState },
-  } = useAppState();
+  const { navigateToAgent } = useURLState();
   const { reloadProjects } = useProjectContext();
 
   // Handle onboarding completion - navigate directly to chat
@@ -30,12 +28,8 @@ export function useOnboarding(
       // Reload projects first to ensure the newly created project is in the array
       await reloadProjects();
 
-      // Set all three selections atomically to navigate directly to chat
-      updateHashState({
-        project: projectId,
-        session: sessionId,
-        agent: agentId,
-      });
+      // Navigate directly to the agent chat
+      navigateToAgent(projectId, sessionId, agentId);
 
       // Clear auto-open state
       setAutoOpenCreateProject(false);
@@ -43,7 +37,7 @@ export function useOnboarding(
       // Enable auto-selection for this onboarding completion
       enableAgentAutoSelection();
     },
-    [reloadProjects, updateHashState, setAutoOpenCreateProject, enableAgentAutoSelection]
+    [reloadProjects, navigateToAgent, setAutoOpenCreateProject, enableAgentAutoSelection]
   );
 
   // Auto-open project creation modal when no projects exist

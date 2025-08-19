@@ -1,5 +1,5 @@
-import LaceApp from '@/components/pages/LaceApp';
+import { HomePageClient } from './HomePageClient';
 
 export default function Home() {
-  return <LaceApp />;
+  return <HomePageClient />;
 }

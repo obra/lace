@@ -22,7 +22,7 @@ import type { SessionInfo, ProjectInfo } from '@/types/core';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
-import { useAppState } from '@/components/providers/AppStateProvider';
+import { useURLState } from '@/hooks/useURLState';
 import { useProviders } from '@/hooks/useProviders';
 
 const AVAILABLE_TOOLS = [
@@ -72,9 +72,7 @@ export function SessionConfigPanel(): React.JSX.Element {
     loadAgentConfiguration,
     updateAgent,
   } = useAgentContext();
-  const {
-    actions: { updateHashState },
-  } = useAppState();
+  const { project, session, navigateToSession, navigateToAgent } = useURLState();
   const { providers, loading: providersLoading } = useProviders();
 
   const loading = sessionLoading || agentLoading || providersLoading;
@@ -309,9 +307,11 @@ export function SessionConfigPanel(): React.JSX.Element {
   // Callback functions for SessionsList
   const handleSessionSelect = useCallback(
     (sessionId: string) => {
-      updateHashState({ session: sessionId });
+      if (project) {
+        navigateToSession(project, sessionId);
+      }
     },
-    [updateHashState]
+    [project, navigateToSession]
   );
 
   const handleCreateSessionClick = useCallback(() => {
@@ -321,9 +321,11 @@ export function SessionConfigPanel(): React.JSX.Element {
 
   const handleAgentSelect = useCallback(
     (agentId: string) => {
-      updateHashState({ agent: agentId });
+      if (project && session) {
+        navigateToAgent(project, session, agentId);
+      }
     },
-    [updateHashState]
+    [project, session, navigateToAgent]
   );
 
   const handleCreateAgentClick = useCallback(() => {

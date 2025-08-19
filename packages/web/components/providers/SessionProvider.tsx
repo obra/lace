@@ -13,7 +13,6 @@ import React, {
   type ReactNode,
 } from 'react';
 import { useSessionManagement } from '@/hooks/useSessionManagement';
-import { useHashRouter } from '@/hooks/useHashRouter';
 import type { SessionInfo, ThreadId } from '@/types/core';
 
 // Types for session context
@@ -58,41 +57,20 @@ const SessionContext = createContext<SessionContextType | null>(null);
 interface SessionProviderProps {
   children: ReactNode;
   projectId: string | null;
+  selectedSessionId?: string | null; // Session ID from URL params
   onSessionChange?: (sessionId: string | null) => void;
 }
 
-// Internal hook for agent auto-selection logic
-function useAgentAutoSelection(
-  foundSession: SessionInfo | null,
-  setAgent: (agentId: ThreadId | null) => void
-) {
-  const [shouldAutoSelectAgent, setShouldAutoSelectAgent] = useState(false);
-
-  // Auto-select agent when conditions are met
-  useEffect(() => {
-    if (
-      shouldAutoSelectAgent &&
-      foundSession &&
-      foundSession.agents &&
-      foundSession.agents.length === 1
-    ) {
-      // Auto-select the single agent
-      setAgent(foundSession.agents[0].threadId as ThreadId);
-      setShouldAutoSelectAgent(false); // Reset flag after auto-selection
-    }
-  }, [shouldAutoSelectAgent, foundSession, setAgent]);
-
-  // Reset auto-selection when session changes
-  useEffect(() => {
-    setShouldAutoSelectAgent(false);
-  }, [foundSession?.id]);
-
+// Simple enableAgentAutoSelection function (kept for compatibility)
+function useAgentAutoSelection() {
   return {
-    enableAgentAutoSelection: useCallback(() => setShouldAutoSelectAgent(true), []),
+    enableAgentAutoSelection: useCallback(() => {
+      // No-op in route-based navigation - routes handle navigation directly
+    }, []),
   };
 }
 
-export function SessionProvider({ children, projectId, onSessionChange }: SessionProviderProps) {
+export function SessionProvider({ children, projectId, selectedSessionId, onSessionChange }: SessionProviderProps) {
   // Get session data from pure data hook
   const {
     sessions,
@@ -107,31 +85,25 @@ export function SessionProvider({ children, projectId, onSessionChange }: Sessio
     loadSessionsForProject,
   } = useSessionManagement(projectId);
 
-  // Get selection state from hash router
-  const {
-    session: selectedSession,
-    setSession: setSelectedSession,
-    agent: selectedAgent,
-    setAgent: setSelectedAgent,
-  } = useHashRouter();
+  // Use session from URL params, not hash router
+  const selectedSession = selectedSessionId;
 
   // Compute derived state based on data + selection
   const foundSession = useMemo(() => {
     return selectedSession ? (sessions || []).find((s) => s.id === selectedSession) || null : null;
   }, [selectedSession, sessions]);
 
-  // Agent auto-selection logic
-  const { enableAgentAutoSelection } = useAgentAutoSelection(foundSession, setSelectedAgent);
+  // Agent auto-selection logic (simplified)
+  const { enableAgentAutoSelection } = useAgentAutoSelection();
 
   // Selection actions
   const selectSession = useCallback(
     (sessionId: string | null) => {
-      setSelectedSession(sessionId as ThreadId | null);
       if (onSessionChange) {
         onSessionChange(sessionId);
       }
     },
-    [setSelectedSession, onSessionChange]
+    [onSessionChange]
   );
 
   const onSessionSelect = useCallback(

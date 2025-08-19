@@ -34,6 +34,11 @@ export function TimelineView({
   selectedAgent,
 }: TimelineViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Debug logging for no events case
+  if (events.length === 0) {
+    console.warn('[TIMELINE_VIEW] No events to display. Raw events:', events.length, 'Selected agent:', selectedAgent);
+  }
 
   // Process events (filtering, aggregation, etc.)
   const processedEvents = useProcessedEvents(
