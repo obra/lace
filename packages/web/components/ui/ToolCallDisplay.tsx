@@ -36,7 +36,7 @@ interface ToolCallDisplayProps {
 }
 
 // Tool icon mapping
-const getToolIcon = (toolName: string) => {
+export const getToolIcon = (toolName: string) => {
   const name = toolName.toLowerCase();
   if (name.includes('file')) return faFile;
   if (name.includes('bash') || name.includes('shell')) return faTerminal;
@@ -48,7 +48,7 @@ const getToolIcon = (toolName: string) => {
 };
 
 // Add near the top of the file, after imports
-function createDefaultToolSummary(toolName: string, args: unknown): string {
+export function createDefaultToolSummary(toolName: string, args: unknown): string {
   if (!args || typeof args !== 'object') return `Executed ${toolName}`;
 
   const argsObj = args as Record<string, unknown>;
