@@ -18,6 +18,8 @@ class ConsoleForwarder {
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   /** Store original console methods to restore later and call for local output */
   private originalConsole: Record<string, (...args: unknown[]) => void> = {};
+  /** Track if forwarding has failed to stop future attempts */
+  private forwardingFailed = false;
 
   constructor(config: ConsoleForwardConfig) {
     this.config = config;
@@ -53,7 +55,7 @@ class ConsoleForwarder {
    * Triggers immediate flush if buffer is full to prevent memory issues
    */
   private addToBuffer(level: string, args: unknown[]): void {
-    if (!this.config.enabled) return;
+    if (!this.config.enabled || this.forwardingFailed) return;
 
     const entry: ConsoleLogEntry = {
       level,
@@ -139,7 +141,7 @@ class ConsoleForwarder {
    * Uses fire-and-forget approach to avoid blocking console output on network issues
    */
   private flush(): void {
-    if (this.buffer.length === 0) return;
+    if (this.buffer.length === 0 || this.forwardingFailed) return;
 
     // Copy buffer and clear it immediately to avoid blocking subsequent calls
     const logs = [...this.buffer];
@@ -156,12 +158,23 @@ class ConsoleForwarder {
           body: JSON.stringify({ logs }),
         });
       } catch (error) {
-        // Only log in development to help debug forwarding issues
+        // Set failure flag to stop future forwarding attempts for this browser session
+        this.forwardingFailed = true;
+
+        // Log error once in development to help debug forwarding issues
         if (process.env.NODE_ENV === 'development') {
           // Use original console to avoid infinite loops
-          this.originalConsole.warn?.('Console forwarding failed:', error);
+          this.originalConsole.error?.(
+            'Console forwarding failed. Stopping further attempts for this session:',
+            error
+          );
         }
-        // If server is down or network fails, we just lose these logs
+
+        // Stop the flush timer since we're no longer forwarding
+        if (this.flushTimer) {
+          clearInterval(this.flushTimer);
+          this.flushTimer = null;
+        }
       }
     };
 

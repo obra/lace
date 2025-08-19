@@ -21,7 +21,21 @@ function isArgsArray(data: unknown): data is unknown[] {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as { logs: ConsoleLogEntry[] };
+    // Handle empty or malformed request bodies gracefully
+    const text = await request.text();
+    if (!text || text.trim() === '') {
+      // Silent return for empty requests - common during race conditions
+      return NextResponse.json({ success: true, processed: 0 });
+    }
+
+    let body: { logs: ConsoleLogEntry[] };
+    try {
+      body = JSON.parse(text) as { logs: ConsoleLogEntry[] };
+    } catch (parseError) {
+      // Silent handling of malformed JSON - likely from race conditions or network issues
+      return NextResponse.json({ error: 'Invalid JSON format' }, { status: 400 });
+    }
+
     const { logs } = body;
 
     if (!Array.isArray(logs)) {
