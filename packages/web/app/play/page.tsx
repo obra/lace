@@ -58,6 +58,8 @@ import { OnboardingActions } from '@/components/ui/OnboardingActions';
 import { AccentButton } from '@/components/ui/AccentButton';
 import IconButton from '@/components/ui/IconButton';
 import LoadingDots from '@/components/ui/LoadingDots';
+import BookReader from '@/components/ui/BookReader';
+import MultiInputComponent from '@/components/ui/MultiInputComponent';
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
 import SkeletonLoader from '@/components/ui/SkeletonLoader';
 import InlineCode from '@/components/ui/InlineCode';
@@ -330,6 +332,18 @@ export default function PlaygroundPage() {
             <AtomItem n={43} tip="Atom #43: LoadingDots">
               <LoadingDots />
             </AtomItem>
+            <AtomItem n={63} tip="Atom #63: BookReader - Reading Pride and Prejudice while loading">
+              <BookReader size="md" />
+            </AtomItem>
+            <div className="space-y-2">
+              <div className="text-xs text-base-content/60">Different sizes:</div>
+              <div className="flex items-center gap-2">
+                <BookReader size="xs" />
+                <BookReader size="sm" />
+                <BookReader size="md" />
+                <BookReader size="lg" />
+              </div>
+            </div>
             <AtomItem n={44} tip="Atom #44: LoadingSkeleton">
               <LoadingSkeleton />
             </AtomItem>
@@ -341,6 +355,15 @@ export default function PlaygroundPage() {
             </AtomItem>
             <AtomItem n={47} tip="Atom #47: LLMModelBadge">
               <LLMModelBadge model="Claude 3.5 Sonnet" />
+            </AtomItem>
+            <AtomItem n={64} tip="Atom #64: MultiInputComponent - Management wisdom with input">
+              <div className="w-full max-w-md">
+                <MultiInputComponent
+                  placeholder="Share your thoughts on synergy..."
+                  onChange={(value) => void value}
+                  onSubmit={(value) => void value}
+                />
+              </div>
             </AtomItem>
           </div>
         </div>
@@ -821,7 +844,7 @@ export default function PlaygroundPage() {
       <div>
         <h2 className="text-3xl font-bold mb-6 text-base-content flex items-center gap-2">
           🔬 Atoms
-          <span className="badge badge-primary">62 components</span>
+          <span className="badge badge-primary">64 components</span>
         </h2>
         <p className="text-base-content/70 mb-6">
           Single-purpose UI building blocks - buttons, inputs, icons, labels, and other fundamental
@@ -902,7 +925,7 @@ export default function PlaygroundPage() {
         <div className="stats shadow">
           <div className="stat">
             <div className="stat-title">Total Components</div>
-            <div className="stat-value text-primary">62</div>
+            <div className="stat-value text-primary">64</div>
             <div className="stat-desc">UI Components Available</div>
           </div>
           <div className="stat">
@@ -927,7 +950,7 @@ export default function PlaygroundPage() {
           >
             <span className="hidden sm:inline">🔬 Atoms</span>
             <span className="sm:hidden">Atoms</span>
-            <span className="ml-1">(55)</span>
+            <span className="ml-1">(57)</span>
           </button>
           <button
             className={`btn ${activeCategory === 'molecules' ? 'btn-primary' : 'btn-outline'} btn-sm md:btn-md`}
@@ -951,7 +974,7 @@ export default function PlaygroundPage() {
           >
             <span className="hidden sm:inline">📚 View All</span>
             <span className="sm:hidden">All</span>
-            <span className="ml-1">(62)</span>
+            <span className="ml-1">(64)</span>
           </button>
         </div>
       </div>
@@ -993,8 +1016,9 @@ export default function PlaygroundPage() {
         <div>
           <h4 className="font-bold">📖 Migration Complete!</h4>
           <p className="text-sm mt-1">
-            All 62 UI components are now showcased in this playground, including native OS-level
-            speech recognition. Each component includes usage examples and interactive
+            All 64 UI components are now showcased in this playground, including native OS-level
+            speech recognition, our novel BookReader loading component, and the MultiInputComponent
+            with management wisdom. Each component includes usage examples and interactive
             demonstrations. Components are organized by Atomic Design principles for better
             understanding of the design system.
           </p>

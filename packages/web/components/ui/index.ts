@@ -12,6 +12,8 @@ export { default as AgentBadge } from './AgentBadge';
 export { default as TimestampDisplay } from './TimestampDisplay';
 export { default as TokenUsageDisplay } from './TokenUsageDisplay';
 export { DirectoryField } from './DirectoryField';
+export { default as BookReader } from './BookReader';
+export { default as MultiInputComponent } from './MultiInputComponent';
 
 // MOLECULES - Simple compositions
 export { default as MessageHeader } from './MessageHeader';
