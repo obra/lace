@@ -101,7 +101,7 @@ export async function POST(
 
     // CRITICAL: Setup event handlers for real-time updates
     // Without this, newly spawned agents won't emit events to the UI until page refresh
-    sessionService.setupAgentEventHandlers(agent, sessionId);
+    sessionService.setupAgentEventHandlers(agent, session);
 
     // Convert to API format - use agent's improved API
     const metadata = agent.getThreadMetadata();

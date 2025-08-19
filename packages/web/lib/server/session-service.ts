@@ -29,7 +29,7 @@ export class SessionService {
         if (agent) {
           const { setupAgentApprovals } = await import('./agent-utils');
           setupAgentApprovals(agent, sessionId);
-          this.setupAgentEventHandlers(agent, sessionId);
+          this.setupAgentEventHandlers(agent, session);
         }
       }
 
@@ -40,7 +40,7 @@ export class SessionService {
     return session;
   }
 
-  setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
+  setupAgentEventHandlers(agent: Agent, session: Session): void {
     // Prevent duplicate event handler registration
     if (this.registeredAgents.has(agent)) {
       return;
@@ -48,6 +48,8 @@ export class SessionService {
     this.registeredAgents.add(agent);
     const sseManager = EventStreamManager.getInstance();
     const threadId = agent.threadId;
+    const sessionId = session.getId();
+    const projectId = session.getProjectId();
 
     agent.on(
       'agent_response_complete',
@@ -62,7 +64,7 @@ export class SessionService {
           data: { content, tokenUsage },
           context: {
             sessionId,
-            projectId: undefined,
+            projectId,
             taskId: undefined,
             agentId: undefined,
           },
@@ -155,7 +157,7 @@ export class SessionService {
           data: { id: callId, name: toolName, arguments: input },
           context: {
             sessionId,
-            projectId: undefined,
+            projectId,
             taskId: undefined,
             agentId: undefined,
           },
@@ -173,7 +175,7 @@ export class SessionService {
           data: result as ToolResult, // Cast to ToolResult for type safety
           context: {
             sessionId,
-            projectId: undefined,
+            projectId,
             taskId: undefined,
             agentId: undefined,
           },
@@ -222,7 +224,7 @@ export class SessionService {
           data: `Agent error: ${error.message}`,
           context: {
             sessionId,
-            projectId: undefined,
+            projectId,
             taskId: undefined,
             agentId: undefined,
           },
@@ -268,7 +270,7 @@ export class SessionService {
               },
               context: {
                 sessionId,
-                projectId: undefined,
+                projectId,
                 taskId: undefined,
                 agentId: undefined,
               },
@@ -288,7 +290,7 @@ export class SessionService {
             },
             context: {
               sessionId,
-              projectId: undefined,
+              projectId,
               taskId: undefined,
               agentId: undefined,
             },
@@ -302,7 +304,7 @@ export class SessionService {
             data: event.data,
             context: {
               sessionId,
-              projectId: undefined,
+              projectId,
               taskId: undefined,
               agentId: undefined,
             },
