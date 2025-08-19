@@ -377,6 +377,17 @@ export function useEventStream({
   // Unified event handler that routes to specific callbacks
   const handleStreamEvent = useCallback((event: LaceEvent) => {
     try {
+      console.log('[EVENT_STREAM_CLIENT] Routing event:', {
+        id: event.id,
+        type: event.type,
+        threadId: event.threadId,
+        isSessionEvent: isSessionEvent(event),
+        isTaskEvent: isTaskEvent(event),
+        isAgentEvent: isAgentEvent(event),
+        isProjectEvent: isProjectEvent(event),
+        isGlobalEvent: isGlobalEvent(event),
+      });
+
       if (isSessionEvent(event)) {
         // Handle tool approval requests
         if (event.type === 'TOOL_APPROVAL_REQUEST') {
@@ -519,11 +530,18 @@ export function useEventStream({
 
     const queryString = buildQueryString(subscriptionRef.current, includeGlobalRef.current);
     const url = `/api/events/stream${queryString ? `?${queryString}` : ''}`;
-    
+
+    console.log('[EVENT_STREAM_CLIENT] Connecting to:', {
+      url: url,
+      subscription: subscriptionRef.current,
+      includeGlobal: includeGlobalRef.current,
+    });
+
     const eventSource = new EventSource(url);
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
+      console.log('[EVENT_STREAM_CLIENT] Connected to:', url);
       setConnection((prev) => ({
         ...prev,
         connected: true,
@@ -536,6 +554,18 @@ export function useEventStream({
       try {
         const threadEvent = parseTyped<LaceEvent>(event.data);
 
+        console.log('[EVENT_STREAM_CLIENT] Received event:', {
+          id: threadEvent.id,
+          type: threadEvent.type,
+          threadId: threadEvent.threadId,
+          timestamp: threadEvent.timestamp,
+          dataSize:
+            typeof threadEvent.data === 'string'
+              ? threadEvent.data.length
+              : JSON.stringify(threadEvent.data).length,
+          context: threadEvent.context,
+        });
+
         setLastEvent(threadEvent);
         setSendCount((prev) => prev + 1);
         setConnection((prev) => ({
@@ -545,7 +575,12 @@ export function useEventStream({
 
         handleStreamEventRef.current?.(threadEvent);
       } catch (error) {
-        console.error('[EVENT_STREAM] Failed to parse event:', error);
+        console.error(
+          '[EVENT_STREAM_CLIENT] Failed to parse event:',
+          error,
+          'Raw data:',
+          event.data
+        );
         callbackRefs.current.onError?.(error as Error);
       }
     };
@@ -553,7 +588,13 @@ export function useEventStream({
     eventSource.onerror = (error) => {
       // Check if this is a normal close or an actual error
       if (eventSource.readyState !== EventSource.CLOSED) {
-        console.warn('[EVENT_STREAM] Connection interrupted, attempting reconnect...');
+        console.warn('[EVENT_STREAM_CLIENT] Connection interrupted, attempting reconnect...', {
+          readyState: eventSource.readyState,
+          url: url,
+          error: error,
+        });
+      } else {
+        console.log('[EVENT_STREAM_CLIENT] Connection closed normally');
       }
 
       setConnection((prev) => {
