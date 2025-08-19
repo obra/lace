@@ -147,7 +147,86 @@ class EventStreamFirehose {
   }
 
   private handleIncomingEvent(event: MessageEvent): void {
-    // TODO: Implement in next task
+    this.eventsReceived++;
+
+    try {
+      // Parse the SSE event data
+      const laceEvent = JSON.parse(event.data) as LaceEvent;
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[EVENT_STREAM_FIREHOSE] Received event:', {
+          id: laceEvent.id,
+          type: laceEvent.type,
+          threadId: laceEvent.threadId,
+          subscriptions: this.subscriptions.size,
+        });
+      }
+
+      this.routeEvent(laceEvent);
+    } catch (error) {
+      console.error('[EVENT_STREAM_FIREHOSE] Failed to parse event:', error, event.data);
+    }
+  }
+
+  private routeEvent(event: LaceEvent): void {
+    let routedCount = 0;
+
+    for (const subscription of this.subscriptions.values()) {
+      if (this.eventMatchesFilter(event, subscription.filter)) {
+        try {
+          subscription.callback(event);
+          routedCount++;
+        } catch (error) {
+          console.error('[EVENT_STREAM_FIREHOSE] Error in subscription callback:', error, {
+            subscriptionId: subscription.id,
+            eventId: event.id,
+          });
+          // Continue processing other subscriptions even if one fails
+        }
+      }
+    }
+
+    if (process.env.NODE_ENV === 'development' && routedCount > 0) {
+      console.log(`[EVENT_STREAM_FIREHOSE] Routed event to ${routedCount} subscriptions`);
+    }
+  }
+
+  private eventMatchesFilter(event: LaceEvent, filter: EventFilter): boolean {
+    // Empty filter matches everything
+    if (
+      !filter.threadIds?.length &&
+      !filter.sessionIds?.length &&
+      !filter.projectIds?.length &&
+      !filter.eventTypes?.length
+    ) {
+      return true;
+    }
+
+    // Check thread ID filter
+    if (filter.threadIds?.length && !filter.threadIds.includes(event.threadId)) {
+      return false;
+    }
+
+    // Check session ID filter
+    if (filter.sessionIds?.length) {
+      if (!event.context?.sessionId || !filter.sessionIds.includes(event.context.sessionId)) {
+        return false;
+      }
+    }
+
+    // Check project ID filter
+    if (filter.projectIds?.length) {
+      if (!event.context?.projectId || !filter.projectIds.includes(event.context.projectId)) {
+        return false;
+      }
+    }
+
+    // Check event type filter
+    if (filter.eventTypes?.length && !filter.eventTypes.includes(event.type)) {
+      return false;
+    }
+
+    return true; // All specified filters passed
   }
 }
 
