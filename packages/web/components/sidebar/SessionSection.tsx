@@ -7,7 +7,10 @@ import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComments, faRobot, faCog } from '@/lib/fontawesome';
 import { SidebarSection, SidebarButton, SidebarItem } from '@/components/layout/Sidebar';
+import { SwitchIcon } from '@/components/ui/SwitchIcon';
 import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useURLState } from '@/hooks/useURLState';
 import type { ThreadId, AgentInfo } from '@/types/core';
 
 interface SessionSectionProps {
@@ -29,11 +32,22 @@ export const SessionSection = memo(function SessionSection({
 }: SessionSectionProps) {
   // Get context data
   const { sessionDetails, selectedAgent } = useAgentContext();
+  const { selectedProject } = useProjectContext();
+  const { navigateToProject } = useURLState();
 
   // Don't render if no session is selected
   if (!sessionDetails) {
     return null;
   }
+
+  const handleViewSessions = () => {
+    if (selectedProject) {
+      navigateToProject(selectedProject);
+      if (isMobile) {
+        onCloseMobileNav?.();
+      }
+    }
+  };
 
   const handleSwitchAgent = () => {
     onClearAgent();
@@ -71,12 +85,23 @@ export const SessionSection = memo(function SessionSection({
     ? sessionDetails.agents?.find((a) => a.threadId === selectedAgent)
     : null;
 
+  // Header actions for session navigation
+  const headerActions = selectedProject ? (
+    <SwitchIcon
+      onClick={handleViewSessions}
+      title="Switch to sessions"
+      size="sm"
+      data-testid="session-switch-button"
+    />
+  ) : null;
+
   return (
     <SidebarSection
-      title="Active Session"
+      title="Session"
       icon={faComments}
       defaultCollapsed={false}
       collapsible={false}
+      headerActions={headerActions}
     >
       {/* Session Header */}
       <div className="bg-base-200/40 backdrop-blur-md border border-base-300/20 rounded-xl p-3 mb-3 shadow-sm -ml-1">
