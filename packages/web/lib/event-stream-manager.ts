@@ -262,6 +262,20 @@ export class EventStreamManager {
       timestamp: event.timestamp || new Date(),
     };
 
+    // Debug logging for event broadcasting
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[EVENT_STREAM_SERVER] Broadcasting event:`, {
+        id: fullEvent.id,
+        type: fullEvent.type,
+        threadId: fullEvent.threadId,
+        connections: this.connections.size,
+        data:
+          typeof fullEvent.data === 'string'
+            ? fullEvent.data.substring(0, 100) + '...'
+            : fullEvent.data,
+      });
+    }
+
     const deadConnections: string[] = [];
 
     for (const [connectionId, connection] of this.connections) {
@@ -320,6 +334,16 @@ export class EventStreamManager {
   private sendToConnection(connection: ClientConnection, event: LaceEvent): void {
     const eventData = `id: ${event.id}\ndata: ${stringify(event)}\n\n`;
     const chunk = this.encoder.encode(eventData);
+
+    // Debug logging for individual sends
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[EVENT_STREAM_SERVER] Sending to connection ${connection.id.substring(0, 8)}:`, {
+        eventId: event.id,
+        type: event.type,
+        threadId: event.threadId,
+        subscription: connection.subscription,
+      });
+    }
 
     try {
       connection.controller.enqueue(chunk);
