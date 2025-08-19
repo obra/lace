@@ -168,7 +168,12 @@ export function AgentProvider({
   return <AgentContext.Provider value={value}>{children}</AgentContext.Provider>;
 }
 
-// Hook to use agent context
+// Optional hook - returns null if not within provider
+export function useOptionalAgentContext(): AgentContextType | null {
+  return useContext(AgentContext);
+}
+
+// Hook to use agent context - throws if not within provider
 export function useAgentContext(): AgentContextType {
   const context = useContext(AgentContext);
   if (!context) {
