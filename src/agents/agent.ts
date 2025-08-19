@@ -237,11 +237,6 @@ export class Agent extends EventEmitter {
       currentState: this._state,
     });
 
-    // CRITICAL: Regenerate system prompt with current project context before each message
-    // This ensures that agents working on different projects get the correct context,
-    // even when sharing the same cached provider instance
-    await this._refreshSystemPrompt();
-
     // Check for slash commands
     if (content.startsWith('/compact')) {
       await this._handleCompactCommand();
@@ -280,9 +275,6 @@ export class Agent extends EventEmitter {
       await this.initialize();
     }
 
-    // Ensure system prompt is current before continuing conversation
-    await this._refreshSystemPrompt();
-
     await this._processConversation();
   }
 
@@ -290,35 +282,14 @@ export class Agent extends EventEmitter {
   async initialize(): Promise<void> {
     if (this._initialized) return; // idempotent
 
-    // Load prompts (expensive, happens once)
-    const session = this._getSession();
-    const project = this._getProject();
-
-    logger.debug('Agent._initialize() - loading prompt config with session/project context', {
-      threadId: this._threadId,
-      hasSession: !!session,
-      hasProject: !!project,
-      sessionWorkingDir: session?.getWorkingDirectory(),
-      projectWorkingDir: project?.getWorkingDirectory(),
-    });
-
-    const promptConfig = await loadPromptConfig({
-      tools: this._tools.map((tool) => ({ name: tool.name, description: tool.description })),
-      session: session,
-      project: project,
-    });
-
-    // Cache the prompt config
-    this._promptConfig = promptConfig;
+    // CRITICAL: Always regenerate system prompt with current project context
+    // This ensures that agents working on different projects get the correct context,
+    // even when sharing the same cached provider instance
+    await this._refreshSystemPrompt();
 
     // Record initial events (happens once) - only for new conversations
-    if (!this._hasInitialEvents() && !this._hasConversationStarted()) {
-      this._addInitialEvents(promptConfig);
-    }
-
-    // Configure provider with loaded system prompt (happens every time)
-    if (this.providerInstance) {
-      this.providerInstance.setSystemPrompt(promptConfig.systemPrompt);
+    if (!this._hasInitialEvents() && !this._hasConversationStarted() && this._promptConfig) {
+      this._addInitialEvents(this._promptConfig);
     }
 
     this._initialized = true;
@@ -356,8 +327,9 @@ export class Agent extends EventEmitter {
   }
 
   /**
-   * Refresh system prompt with current project context
-   * This is critical for multi-project scenarios where provider instances are shared
+   * Generate system prompt with current project context and set it on the provider
+   * This is critical for multi-project scenarios where provider instances are shared.
+   * Called during initialization to ensure each agent gets the correct project context.
    */
   private async _refreshSystemPrompt(): Promise<void> {
     if (!this.providerInstance) {

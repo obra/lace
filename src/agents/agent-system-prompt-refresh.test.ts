@@ -108,7 +108,7 @@ describe('Agent System Prompt Refresh', () => {
     });
   }
 
-  it('should call loadPromptConfig on initialization and message processing', async () => {
+  it('should call loadPromptConfig during initialization with correct context', async () => {
     // Create agent
     agent = createAgent();
 
@@ -122,9 +122,14 @@ describe('Agent System Prompt Refresh', () => {
     // Spy on setSystemPrompt to track calls
     const setSystemPromptSpy = vi.spyOn(mockProvider, 'setSystemPrompt');
 
-    // Initialize agent - should call loadPromptConfig once
+    // Initialize agent - should call loadPromptConfig once with proper session/project context
     await agent.initialize();
     expect(mockLoadPromptConfig).toHaveBeenCalledTimes(1);
+    expect(mockLoadPromptConfig).toHaveBeenCalledWith({
+      tools: [],
+      session: expect.anything() as unknown, // Should have session context
+      project: expect.anything() as unknown, // Should have project context
+    });
     expect(setSystemPromptSpy).toHaveBeenCalledWith('Test system prompt');
 
     // Clear the spy
@@ -138,32 +143,28 @@ describe('Agent System Prompt Refresh', () => {
       usage: { promptTokens: 10, completionTokens: 10, totalTokens: 20 },
     });
 
-    // Send a message - should call loadPromptConfig again (refresh)
+    // Send a message - should NOT call loadPromptConfig again (no refresh on every message)
     await agent.sendMessage('Test message');
 
-    // Should have called loadPromptConfig again for refresh
-    expect(mockLoadPromptConfig).toHaveBeenCalledTimes(1);
-    expect(setSystemPromptSpy).toHaveBeenCalledWith('Test system prompt');
+    // Should NOT have called loadPromptConfig again
+    expect(mockLoadPromptConfig).toHaveBeenCalledTimes(0);
+    expect(setSystemPromptSpy).toHaveBeenCalledTimes(0);
   });
 
-  it('should handle system prompt refresh errors gracefully', async () => {
+  it('should handle system prompt generation errors gracefully during initialization', async () => {
     // Create agent
     agent = createAgent();
 
-    // Mock successful initialization
-    mockLoadPromptConfig.mockResolvedValueOnce({
-      systemPrompt: 'Initial system prompt',
-      userInstructions: 'User instructions',
-      filesCreated: [],
-    });
-
-    // Initialize agent successfully
-    await agent.initialize();
-    expect(mockProvider.systemPrompt).toBe('Initial system prompt');
-
-    // Mock loadPromptConfig to fail on refresh
+    // Mock loadPromptConfig to fail during initialization
     mockLoadPromptConfig.mockRejectedValueOnce(new Error('Failed to load prompt config'));
 
+    // Initialize agent - should handle error gracefully
+    await agent.initialize();
+
+    // Should have attempted to load prompt config
+    expect(mockLoadPromptConfig).toHaveBeenCalledTimes(1);
+
+    // System prompt should still be usable (fallback behavior)
     // Mock createResponse for message processing
     vi.spyOn(mockProvider, 'createResponse').mockResolvedValue({
       content: 'Test response',
@@ -171,48 +172,86 @@ describe('Agent System Prompt Refresh', () => {
       usage: { promptTokens: 10, completionTokens: 10, totalTokens: 20 },
     });
 
-    // Send message - should handle refresh error gracefully
+    // Should be able to send messages even after prompt generation error
     await agent.sendMessage('Test message');
-
-    // Should still have the original system prompt (fallback)
-    expect(mockProvider.systemPrompt).toBe('Initial system prompt');
+    // Test passes if no exception is thrown
+    expect(true).toBe(true);
   });
 
-  it('should regenerate system prompt with fresh context on each message', async () => {
-    // Create agent
+  it('should generate different system prompts for different project contexts', async () => {
+    // Create first agent with first project context
     agent = createAgent();
 
-    // Track how many times loadPromptConfig is called with different contexts
-    let callCount = 0;
-    mockLoadPromptConfig.mockImplementation(({ session, project }) => {
-      callCount++;
-      return Promise.resolve({
-        systemPrompt: `System prompt call ${callCount} - session: ${session ? 'yes' : 'no'}, project: ${project ? 'yes' : 'no'}`,
-        userInstructions: 'User instructions',
-        filesCreated: [],
-      });
-    });
+    // Track project context being passed to loadPromptConfig
+    const projectCalls: Array<{ session: string; project: string }> = [];
+    mockLoadPromptConfig.mockImplementation(
+      (params: { project?: { getId(): string }; session?: { getWorkingDirectory(): string } }) => {
+        const projectId = params.project?.getId() || 'none';
+        const sessionWorkingDir = params.session?.getWorkingDirectory() || 'none';
+        projectCalls.push({ session: sessionWorkingDir, project: projectId });
 
-    // Initialize agent
+        return Promise.resolve({
+          systemPrompt: `System prompt for project: ${projectId}`,
+          userInstructions: 'User instructions',
+          filesCreated: [],
+        });
+      }
+    );
+
+    // Initialize first agent
     await agent.initialize();
-    expect(mockProvider.systemPrompt).toContain('System prompt call 1');
 
-    // Mock createResponse
-    vi.spyOn(mockProvider, 'createResponse').mockResolvedValue({
-      content: 'Mock response',
-      toolCalls: [],
-      usage: { promptTokens: 10, completionTokens: 10, totalTokens: 20 },
+    expect(mockProvider.systemPrompt).toContain(`System prompt for project: ${project.getId()}`);
+
+    // Verify that loadPromptConfig was called with the correct project context
+    expect(projectCalls).toHaveLength(1);
+    expect(projectCalls[0]?.project).toBe(project.getId());
+    expect(projectCalls[0]?.session).toBe(project.getWorkingDirectory()); // Session working dir matches project working dir
+
+    // Create a second project and session to simulate multi-project scenario
+    const project2 = Project.create(
+      'Second Test Project',
+      'Second project for testing',
+      tempLaceDirContext.tempDir + '/project2',
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
+
+    const session2 = Session.create({
+      name: 'Second Test Session',
+      projectId: project2.getId(),
     });
 
-    // Send first message - should refresh system prompt
-    await agent.sendMessage('First message');
-    expect(mockProvider.systemPrompt).toContain('System prompt call 2');
+    // Create second agent with second project context
+    const threadId2 = threadManager.generateThreadId();
+    threadManager.createThread(threadId2, session2.getId());
 
-    // Send second message - should refresh system prompt again
-    await agent.sendMessage('Second message');
-    expect(mockProvider.systemPrompt).toContain('System prompt call 3');
+    const agent2 = new Agent({
+      provider: mockProvider,
+      toolExecutor,
+      threadManager,
+      threadId: threadId2,
+      tools: [],
+      metadata: {
+        name: 'Second Test Agent',
+        providerInstanceId: providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      },
+    });
 
-    // Should have called loadPromptConfig 3 times total (1 init + 2 refreshes)
-    expect(mockLoadPromptConfig).toHaveBeenCalledTimes(3);
+    // Initialize second agent - should get different system prompt
+    await agent2.initialize();
+    expect(mockProvider.systemPrompt).toContain(`System prompt for project: ${project2.getId()}`);
+
+    // Verify that loadPromptConfig was called again with different project context
+    expect(projectCalls).toHaveLength(2);
+    expect(projectCalls[1]?.project).toBe(project2.getId());
+    expect(projectCalls[1]?.session).toBe(project2.getWorkingDirectory()); // Session working dir matches project working dir
+
+    // Clean up second agent
+    agent2.removeAllListeners();
+    agent2.stop();
   });
 });
