@@ -89,13 +89,65 @@ class EventStreamFirehose {
     };
   }
 
-  // Placeholder methods - will implement in next tasks
   private connect(): void {
-    // TODO: Implement connection logic
+    if (this.connectionState !== 'disconnected') {
+      return; // Already connecting or connected
+    }
+
+    this.connectionState = 'connecting';
+
+    // Firehose approach - no query parameters needed
+    const url = '/api/events/stream';
+    this.eventSource = new EventSource(url);
+
+    this.setupEventSourceHandlers();
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[EVENT_STREAM_FIREHOSE] Connecting to firehose:', url);
+    }
   }
 
   private disconnect(): void {
-    // TODO: Implement disconnection logic
+    if (this.eventSource) {
+      this.eventSource.close();
+      this.eventSource = null;
+    }
+
+    this.connectionState = 'disconnected';
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[EVENT_STREAM_FIREHOSE] Disconnected');
+    }
+  }
+
+  private setupEventSourceHandlers(): void {
+    if (!this.eventSource) return;
+
+    this.eventSource.onopen = () => {
+      this.connectionState = 'connected';
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[EVENT_STREAM_FIREHOSE] Connected to firehose');
+      }
+    };
+
+    this.eventSource.onmessage = (event) => {
+      try {
+        this.handleIncomingEvent(event);
+      } catch (error) {
+        console.error('[EVENT_STREAM_FIREHOSE] Error handling event:', error);
+      }
+    };
+
+    this.eventSource.onerror = (error) => {
+      if (this.connectionState === 'connected') {
+        console.warn('[EVENT_STREAM_FIREHOSE] Connection error:', error);
+      }
+      this.connectionState = 'disconnected';
+    };
+  }
+
+  private handleIncomingEvent(event: MessageEvent): void {
+    // TODO: Implement in next task
   }
 }
 

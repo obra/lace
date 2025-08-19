@@ -72,3 +72,61 @@ describe('Subscription Management', () => {
     }).not.toThrow();
   });
 });
+
+describe('Connection Management', () => {
+  // Mock EventSource globally for tests
+  const mockEventSource = vi.fn();
+
+  beforeEach(() => {
+    // Reset singleton between tests
+    (EventStreamFirehose as any).instance = null;
+    mockEventSource.mockClear();
+
+    // Create a proper mock EventSource instance
+    const mockInstance = {
+      close: vi.fn(),
+      onopen: null,
+      onmessage: null,
+      onerror: null,
+      url: '/api/events/stream',
+    };
+
+    mockEventSource.mockReturnValue(mockInstance);
+    global.EventSource = mockEventSource;
+  });
+
+  test('should connect when first subscription added', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const callback = vi.fn();
+
+    firehose.subscribe({}, callback);
+
+    expect(mockEventSource).toHaveBeenCalledWith('/api/events/stream');
+    expect(firehose.getStats().isConnected).toBe(false); // Will be true after onopen
+  });
+
+  test('should not create new connection for additional subscriptions', () => {
+    const firehose = EventStreamFirehose.getInstance();
+
+    firehose.subscribe({}, vi.fn());
+    firehose.subscribe({}, vi.fn());
+
+    // Should only be called once total (from previous test state)
+    expect(mockEventSource).toHaveBeenCalledTimes(1);
+  });
+
+  test('should disconnect when last subscription removed', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const callback = vi.fn();
+
+    const subscriptionId = firehose.subscribe({}, callback);
+    const mockClose = vi.fn();
+
+    // Mock the eventSource instance
+    firehose['eventSource'] = { close: mockClose } as unknown as EventSource;
+
+    firehose.unsubscribe(subscriptionId);
+
+    expect(mockClose).toHaveBeenCalled();
+  });
+});
