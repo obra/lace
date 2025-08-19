@@ -6,16 +6,19 @@
 import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComments, faRobot, faCog } from '@/lib/fontawesome';
-import { SidebarSection, SidebarButton, SidebarItem } from '@/components/layout/Sidebar';
+import { SidebarSection, SidebarItem } from '@/components/layout/Sidebar';
+import { SwitchIcon } from '@/components/ui/SwitchIcon';
 import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useURLState } from '@/hooks/useURLState';
 import type { ThreadId, AgentInfo } from '@/types/core';
 
 interface SessionSectionProps {
   isMobile?: boolean;
   onCloseMobileNav?: () => void;
-  onAgentSelect: (agentId: string) => void;
+  onAgentSelect: (agentId: ThreadId) => void;
   onClearAgent: () => void;
-  onConfigureAgent?: (agentId: string) => void;
+  onConfigureAgent?: (agentId: ThreadId) => void;
   onConfigureSession?: () => void;
 }
 
@@ -29,20 +32,24 @@ export const SessionSection = memo(function SessionSection({
 }: SessionSectionProps) {
   // Get context data
   const { sessionDetails, selectedAgent } = useAgentContext();
+  const { selectedProject } = useProjectContext();
+  const { navigateToProject } = useURLState();
 
   // Don't render if no session is selected
   if (!sessionDetails) {
     return null;
   }
 
-  const handleSwitchAgent = () => {
-    onClearAgent();
-    if (isMobile) {
-      onCloseMobileNav?.();
+  const handleViewSessions = () => {
+    if (selectedProject) {
+      navigateToProject(selectedProject);
+      if (isMobile) {
+        onCloseMobileNav?.();
+      }
     }
   };
 
-  const handleAgentSelect = (agentId: string) => {
+  const handleAgentSelect = (agentId: ThreadId) => {
     onAgentSelect(agentId);
     if (isMobile) {
       onCloseMobileNav?.();
@@ -71,12 +78,24 @@ export const SessionSection = memo(function SessionSection({
     ? sessionDetails.agents?.find((a) => a.threadId === selectedAgent)
     : null;
 
+  // Header actions for session navigation
+  const headerActions = selectedProject ? (
+    <SwitchIcon
+      onClick={handleViewSessions}
+      title="Switch to sessions"
+      aria-label="Switch to sessions view"
+      size="sm"
+      data-testid="session-switch-button"
+    />
+  ) : null;
+
   return (
     <SidebarSection
-      title="Active Session"
+      title="Session"
       icon={faComments}
       defaultCollapsed={false}
       collapsible={false}
+      headerActions={headerActions}
     >
       {/* Session Header */}
       <div className="bg-base-200/40 backdrop-blur-md border border-base-300/20 rounded-xl p-3 mb-3 shadow-sm -ml-1">
@@ -115,7 +134,7 @@ export const SessionSection = memo(function SessionSection({
             </SidebarItem>
             {onConfigureAgent && (
               <button
-                onClick={() => onConfigureAgent(agent.threadId)}
+                onClick={() => onConfigureAgent?.(agent.threadId)}
                 className="btn btn-ghost btn-xs p-1 min-h-0 h-auto flex-shrink-0"
                 title="Configure agent"
               >

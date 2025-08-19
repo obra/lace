@@ -10,28 +10,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { ProjectSection } from '@/components/sidebar/ProjectSection';
-import type { SessionInfo, ThreadId, AgentInfo, ProjectInfo } from '@/types/core';
-import {
-  createMockSessionContext,
-  createMockAgentContext,
-  createMockProjectContext,
-} from '@/__tests__/utils/provider-mocks';
+import type { ProjectInfo } from '@/types/core';
+import { createMockProjectContext } from '@/__tests__/utils/provider-mocks';
 
 // Mock the providers
 vi.mock('@/components/providers/ProjectProvider', () => ({
   useProjectContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/SessionProvider', () => ({
-  useSessionContext: vi.fn(),
-}));
-
-vi.mock('@/components/providers/AgentProvider', () => ({
-  useAgentContext: vi.fn(),
-}));
-
 vi.mock('@/hooks/useProviders', () => ({
   useProviders: vi.fn(),
+}));
+
+vi.mock('@/hooks/useURLState', () => ({
+  useURLState: vi.fn(),
 }));
 
 vi.mock('@/components/config/ProjectEditModal', () => ({
@@ -41,21 +33,10 @@ vi.mock('@/components/config/ProjectEditModal', () => ({
 
 // Import mocked hooks
 import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useProviders } from '@/hooks/useProviders';
 
 const mockUseProjectContext = vi.mocked(useProjectContext);
-const mockUseSessionContext = vi.mocked(useSessionContext);
-const mockUseAgentContext = vi.mocked(useAgentContext);
 const mockUseProviders = vi.mocked(useProviders);
-
-// Helper functions for test data
-const createMockSessionsForProject = () => [
-  { id: 'session-1' as ThreadId, name: 'Session 1', createdAt: new Date(), agents: [] },
-  { id: 'session-2' as ThreadId, name: 'Session 2', createdAt: new Date(), agents: [] },
-  { id: 'session-3' as ThreadId, name: 'Session 3', createdAt: new Date(), agents: [] },
-];
 
 // Test data factories
 const createMockProject = (overrides?: Partial<ProjectInfo>): ProjectInfo => ({
@@ -68,23 +49,6 @@ const createMockProject = (overrides?: Partial<ProjectInfo>): ProjectInfo => ({
   sessionCount: 0,
   isArchived: false,
   ...overrides,
-});
-
-const createMockAgent = (id: string, name: string): AgentInfo => ({
-  threadId: id as ThreadId,
-  name,
-  providerInstanceId: 'test-provider',
-  modelId: 'test-model',
-  status: 'idle',
-});
-
-const createMockSessionDetails = (agentCount = 2): SessionInfo => ({
-  id: 'test-session' as ThreadId,
-  name: 'Test Session',
-  createdAt: new Date(),
-  agents: Array.from({ length: agentCount }, (_, i) =>
-    createMockAgent(`agent-${i + 1}`, `Agent ${i + 1}`)
-  ),
 });
 
 describe('ProjectSection', () => {
@@ -108,19 +72,6 @@ describe('ProjectSection', () => {
         projectsForSidebar: [createMockProject()],
         updateProject: vi.fn(),
         loadProjectConfiguration: vi.fn().mockResolvedValue({}),
-      })
-    );
-    mockUseSessionContext.mockReturnValue(
-      createMockSessionContext({
-        sessions: createMockSessionsForProject(),
-      })
-    );
-    mockUseAgentContext.mockReturnValue(
-      createMockAgentContext({
-        sessionDetails: createMockSessionDetails(),
-        selectedAgent: 'agent-1' as ThreadId,
-        foundAgent: createMockAgent('agent-1', 'Agent 1'),
-        currentAgent: createMockAgent('agent-1', 'Agent 1'),
       })
     );
     mockUseProviders.mockReturnValue({
@@ -169,105 +120,6 @@ describe('ProjectSection', () => {
       const settingsButton = screen.getByTestId('workspace-settings-button');
       expect(settingsButton).toBeInTheDocument();
       expect(settingsButton).toHaveAttribute('title', 'Workspace settings');
-    });
-  });
-
-  describe('Project Stats', () => {
-    it('displays sessions count correctly for multiple sessions', () => {
-      render(<ProjectSection {...defaultProps} />);
-
-      expect(screen.getByTestId('sessions-count')).toHaveTextContent('3 sessions');
-    });
-
-    it('displays sessions count correctly for single session', () => {
-      mockUseSessionContext.mockReturnValue(
-        createMockSessionContext({
-          sessions: [
-            { id: 'session-1' as ThreadId, name: 'Session 1', createdAt: new Date(), agents: [] },
-          ],
-        })
-      );
-
-      render(<ProjectSection {...defaultProps} />);
-
-      expect(screen.getByTestId('sessions-count')).toHaveTextContent('1 session');
-    });
-
-    it('displays sessions count correctly for zero sessions', () => {
-      mockUseSessionContext.mockReturnValue(
-        createMockSessionContext({
-          sessions: [],
-        })
-      );
-
-      render(<ProjectSection {...defaultProps} />);
-
-      expect(screen.getByTestId('sessions-count')).toHaveTextContent('0 sessions');
-    });
-
-    it('displays agents count when session details provided', () => {
-      render(<ProjectSection {...defaultProps} />);
-
-      expect(screen.getByTestId('agents-count')).toHaveTextContent('2 agents');
-    });
-
-    it('displays agents count correctly for single agent', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
-          sessionDetails: createMockSessionDetails(1),
-        })
-      );
-
-      render(<ProjectSection {...defaultProps} />);
-
-      expect(screen.getByTestId('agents-count')).toHaveTextContent('1 agent');
-    });
-
-    it('displays agents count correctly for zero agents', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
-          sessionDetails: createMockSessionDetails(0),
-          selectedAgent: null,
-          foundAgent: null,
-        })
-      );
-
-      render(<ProjectSection {...defaultProps} />);
-
-      expect(screen.getByTestId('agents-count')).toHaveTextContent('0 agents');
-    });
-
-    it('does not display agents count when no session details provided', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
-          sessionDetails: null,
-          selectedAgent: null,
-          foundAgent: null,
-        })
-      );
-
-      render(<ProjectSection {...defaultProps} />);
-
-      expect(screen.queryByTestId('agents-count')).not.toBeInTheDocument();
-    });
-
-    it('handles empty agents in session details', () => {
-      const sessionWithEmptyAgents = {
-        ...createMockSessionDetails(),
-        agents: [],
-      };
-
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
-          sessionDetails: sessionWithEmptyAgents,
-          selectedAgent: null,
-          foundAgent: null,
-        })
-      );
-
-      render(<ProjectSection {...defaultProps} />);
-
-      expect(screen.getByTestId('agents-count')).toHaveTextContent('0 agents');
     });
   });
 
@@ -473,18 +325,6 @@ describe('ProjectSection', () => {
       render(<ProjectSection {...defaultProps} />);
 
       expect(mockUseProjectContext).toHaveBeenCalled();
-    });
-
-    it('uses SessionProvider for session count', () => {
-      render(<ProjectSection {...defaultProps} />);
-
-      expect(mockUseSessionContext).toHaveBeenCalled();
-    });
-
-    it('uses AgentProvider for agent count', () => {
-      render(<ProjectSection {...defaultProps} />);
-
-      expect(mockUseAgentContext).toHaveBeenCalled();
     });
   });
 });
