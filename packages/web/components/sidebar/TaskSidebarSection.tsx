@@ -8,10 +8,10 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTasks } from '@/lib/fontawesome';
 import { SidebarSection } from '@/components/layout/Sidebar';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
-import { useTaskContext } from '@/components/providers/TaskProvider';
+import { useOptionalTaskContext } from '@/components/providers/TaskProvider';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
 import type { Task } from '@/types/core';
 
 interface TaskSidebarSectionProps {
@@ -21,10 +21,19 @@ interface TaskSidebarSectionProps {
 export const TaskSidebarSection = memo(function TaskSidebarSection({
   onCloseMobileNav,
 }: TaskSidebarSectionProps) {
-  const { taskManager, showTaskBoard, showTaskCreation, handleTaskDisplay } = useTaskContext();
+  // Conditionally use contexts - they may not be available on all pages
+  const taskContext = useOptionalTaskContext();
+  const agentContext = useOptionalAgentContext();
+
   const { selectedProject } = useProjectContext();
   const { selectedSession } = useSessionContext();
-  const { sessionDetails: selectedSessionDetails } = useAgentContext();
+
+  // Extract values with fallbacks
+  const taskManager = taskContext?.taskManager ?? null;
+  const showTaskBoard = taskContext?.showTaskBoard ?? (() => {});
+  const showTaskCreation = taskContext?.showTaskCreation ?? (() => {});
+  const handleTaskDisplay = taskContext?.handleTaskDisplay ?? (() => {});
+  const selectedSessionDetails = agentContext?.sessionDetails ?? null;
 
   if (!selectedSessionDetails || !selectedProject || !selectedSession || !taskManager) {
     return null;
