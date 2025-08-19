@@ -21,6 +21,7 @@ import { AddInstanceModal } from '@/components/providers/AddInstanceModal';
 import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
 import { ProjectEditModal } from './ProjectEditModal';
 import { ProjectCreateModal } from './ProjectCreateModal';
+import { AnimatedModal } from '@/components/ui/AnimatedModal';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useUIContext } from '@/components/providers/UIProvider';
@@ -62,6 +63,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     onProjectSelect,
     updateProject,
     createProject,
+    deleteProject,
     loadProjectConfiguration,
     reloadProjects,
   } = useProjectContext();
@@ -86,6 +88,10 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
 
   // Project creation state
   const [showCreateProject, setShowCreateProject] = useState(false);
+
+  // Project deletion state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingProject, setDeletingProject] = useState<ProjectInfo | null>(null);
 
   // Provider setup state
   const [showAddProvider, setShowAddProvider] = useState(false);
@@ -183,7 +189,10 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
   };
 
   // Handle context menu actions
-  const handleContextMenuAction = (projectId: string, action: 'archive' | 'unarchive' | 'edit') => {
+  const handleContextMenuAction = (
+    projectId: string,
+    action: 'archive' | 'unarchive' | 'edit' | 'delete'
+  ) => {
     const project = projects.find((p) => p.id === projectId);
     if (!project) return;
 
@@ -198,6 +207,10 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
         setEditingProject(project);
         // Load actual project configuration using provider
         void loadProjectConfig(project.id);
+        break;
+      case 'delete':
+        setDeletingProject(project);
+        setShowDeleteConfirm(true);
         break;
     }
 
@@ -229,6 +242,26 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
   const handleCancelEdit = () => {
     setEditingProject(null);
     setEditConfig(DEFAULT_PROJECT_CONFIG);
+  };
+
+  // Handle delete project confirmation
+  const handleDeleteProject = async () => {
+    if (!deletingProject) return;
+
+    try {
+      await deleteProject(deletingProject.id);
+      setShowDeleteConfirm(false);
+      setDeletingProject(null);
+    } catch (error) {
+      console.error('Project delete error:', { projectId: deletingProject.id, error });
+      throw error;
+    }
+  };
+
+  // Cancel delete project
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setDeletingProject(null);
   };
 
   // Load project configuration using provider method
@@ -493,6 +526,17 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
                               />
                               {project.isArchived ? 'Unarchive' : 'Archive'}
                             </button>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleContextMenuAction(project.id, 'delete');
+                              }}
+                              className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2 text-error"
+                            >
+                              <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                              Delete
+                            </button>
                           </div>
                         )}
                       </div>
@@ -552,6 +596,35 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
           onClose={() => setShowAddProvider(false)}
           onSuccess={handleProviderAdded}
         />
+
+        {/* Delete Confirmation Modal */}
+        <AnimatedModal
+          isOpen={showDeleteConfirm}
+          onClose={handleCancelDelete}
+          title="Delete Project"
+        >
+          <div className="space-y-4">
+            <p className="text-base-content">
+              Are you sure you want to delete the project <strong>{deletingProject?.name}</strong>?
+            </p>
+            <p className="text-base-content/60 text-sm">
+              This will permanently delete the project and all its sessions and conversations. This
+              action cannot be undone.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={handleCancelDelete} className="btn btn-ghost" type="button">
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleDeleteProject()}
+                className="btn btn-error"
+                type="button"
+              >
+                Delete Project
+              </button>
+            </div>
+          </div>
+        </AnimatedModal>
       </div>
     </ProviderInstanceProvider>
   );
