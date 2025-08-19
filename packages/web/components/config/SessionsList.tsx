@@ -3,9 +3,9 @@
 
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRobot, faEdit, faPlus } from '@/lib/fontawesome';
+import { faRobot, faEdit, faPlus, faTrash, faEllipsisV } from '@/lib/fontawesome';
 import type { SessionInfo, AgentInfo } from '@/types/core';
 
 interface SessionsListProps {
@@ -13,7 +13,8 @@ interface SessionsListProps {
   selectedSession: SessionInfo | null;
   loading: boolean;
   onSessionSelect: (sessionId: string) => void;
-  onEditSession: () => void;
+  onEditSession: (sessionId: string) => void;
+  onDeleteSession: (sessionId: string) => void;
   onCreateAgent: () => void;
   onCreateSession: () => void;
   onEditAgent: (agent: AgentInfo) => void;
@@ -26,13 +27,20 @@ export const SessionsList = memo(function SessionsList({
   loading,
   onSessionSelect,
   onEditSession,
+  onDeleteSession,
   onCreateAgent,
   onCreateSession,
   onEditAgent,
   onAgentSelect,
 }: SessionsListProps) {
+  const [showContextMenu, setShowContextMenu] = useState<string | null>(null);
+
+  // Close context menu on backdrop click
+  const handleBackdropClick = () => {
+    setShowContextMenu(null);
+  };
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" onClick={handleBackdropClick}>
       <h3 className="text-lg font-medium text-base-content flex items-center gap-2">
         <FontAwesomeIcon icon={faRobot} className="w-4 h-4" />
         Sessions ({sessions.length})
@@ -46,7 +54,7 @@ export const SessionsList = memo(function SessionsList({
         </div>
       ) : (
         <div className="space-y-3">
-          {sessions
+          {[...sessions]
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
             .map((session) => (
               <div
@@ -67,31 +75,54 @@ export const SessionsList = memo(function SessionsList({
                     </div>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
                     {selectedSession?.id === session.id && (
-                      <>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEditSession();
-                          }}
-                          className="btn btn-ghost btn-xs"
-                          title="Edit Session"
-                        >
-                          <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onCreateAgent();
-                          }}
-                          className="btn btn-primary btn-xs"
-                          title="Launch Agent"
-                        >
-                          <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
-                        </button>
-                      </>
+                      <div className="badge badge-primary badge-sm">Active</div>
                     )}
+
+                    {/* Context Menu Button */}
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowContextMenu(showContextMenu === session.id ? null : session.id);
+                        }}
+                        className="btn btn-ghost btn-xs opacity-60 hover:opacity-100"
+                      >
+                        <FontAwesomeIcon icon={faEllipsisV} className="w-3 h-3" />
+                      </button>
+
+                      {/* Context Menu Dropdown */}
+                      {showContextMenu === session.id && (
+                        <div
+                          className="absolute right-0 top-8 bg-base-100 border border-base-300 rounded-lg shadow-lg py-2 min-w-40 z-10"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditSession(session.id);
+                              setShowContextMenu(null);
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2"
+                          >
+                            <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
+                            Edit
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteSession(session.id);
+                              setShowContextMenu(null);
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2 text-error"
+                          >
+                            <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 

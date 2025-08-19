@@ -9,7 +9,7 @@ import { SessionSection } from '@/components/sidebar/SessionSection';
 import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
 import { FeedbackSection } from '@/components/sidebar/FeedbackSection';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
 
 interface SidebarContentProps {
   // Mobile behavior
@@ -35,7 +35,9 @@ export const SidebarContent = memo(function SidebarContent({
 }: SidebarContentProps) {
   // Get state from providers
   const { selectedProject } = useProjectContext();
-  const { sessionDetails } = useAgentContext();
+  // Conditionally use AgentContext - it may not be available on all pages
+  const agentContext = useOptionalAgentContext();
+  const sessionDetails = agentContext?.sessionDetails ?? null;
   return (
     <>
       {/* WORKSPACE CONTEXT */}

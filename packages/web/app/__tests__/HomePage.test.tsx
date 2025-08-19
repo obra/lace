@@ -26,6 +26,7 @@ vi.mock('@/components/providers/UIProvider', () => ({
 vi.mock('@/components/providers/SessionProvider', () => ({
   useSessionContext: () => ({
     enableAgentAutoSelection: vi.fn(),
+    deleteSession: vi.fn(),
   }),
 }));
 
@@ -89,6 +90,7 @@ describe('HomePage', () => {
       onProjectSelect: vi.fn(),
       updateProject: vi.fn(),
       createProject: vi.fn(),
+      deleteProject: vi.fn(),
       loadProjectConfiguration: vi.fn(),
       reloadProjects: vi.fn(),
     });
@@ -120,6 +122,7 @@ describe('HomePage', () => {
       onProjectSelect: vi.fn(),
       updateProject: vi.fn(),
       createProject: vi.fn(),
+      deleteProject: vi.fn(),
       loadProjectConfiguration: vi.fn(),
       reloadProjects: vi.fn(),
     });
@@ -155,6 +158,7 @@ describe('HomePage', () => {
       onProjectSelect: vi.fn(),
       updateProject: vi.fn(),
       createProject: vi.fn(),
+      deleteProject: vi.fn(),
       loadProjectConfiguration: vi.fn(),
       reloadProjects: vi.fn(),
     });
@@ -203,6 +207,7 @@ describe('HomePage', () => {
       onProjectSelect: vi.fn(),
       updateProject: vi.fn(),
       createProject: vi.fn(),
+      deleteProject: vi.fn(),
       loadProjectConfiguration: vi.fn(),
       reloadProjects: vi.fn(),
     });

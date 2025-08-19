@@ -43,6 +43,7 @@ export interface ProjectContextType {
     workingDirectory: string;
     configuration?: Record<string, unknown>;
   }) => Promise<ProjectInfo>;
+  deleteProject: (projectId: string) => Promise<void>;
   loadProjectConfiguration: (projectId: string) => Promise<Record<string, unknown>>;
   reloadProjects: () => Promise<ProjectInfo[]>;
 }
@@ -69,6 +70,7 @@ export function ProjectProvider({
     error,
     updateProject,
     createProject,
+    deleteProject,
     loadProjectConfiguration,
     reloadProjects,
   } = useProjectManagement();
@@ -152,6 +154,7 @@ export function ProjectProvider({
       // Data operations (passed through)
       updateProject,
       createProject,
+      deleteProject,
       loadProjectConfiguration,
       reloadProjects,
     }),
@@ -167,6 +170,7 @@ export function ProjectProvider({
       handleProjectSelect,
       updateProject,
       createProject,
+      deleteProject,
       loadProjectConfiguration,
       reloadProjects,
     ]

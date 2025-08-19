@@ -25,6 +25,7 @@ interface UseProjectManagementResult {
     workingDirectory: string;
     configuration?: Record<string, unknown>;
   }) => Promise<ProjectInfo>;
+  deleteProject: (projectId: string) => Promise<void>;
   loadProjectConfiguration: (projectId: string) => Promise<Record<string, unknown>>;
   reloadProjects: () => Promise<ProjectInfo[]>;
 }
@@ -98,6 +99,22 @@ export function useProjectManagement(): UseProjectManagementResult {
     [loadProjects]
   );
 
+  const deleteProject = useCallback(
+    async (projectId: string) => {
+      try {
+        await api.delete(`/api/projects/${projectId}`);
+        // Reload projects to remove the deleted project
+        await loadProjects();
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to delete project';
+        setError(errorMessage);
+        console.error('Failed to delete project:', error);
+        throw error;
+      }
+    },
+    [loadProjects]
+  );
+
   const loadProjectConfiguration = useCallback(
     async (projectId: string): Promise<Record<string, unknown>> => {
       try {
@@ -128,6 +145,7 @@ export function useProjectManagement(): UseProjectManagementResult {
     error,
     updateProject,
     createProject,
+    deleteProject,
     loadProjectConfiguration,
     reloadProjects: loadProjects,
   };

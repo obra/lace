@@ -3,7 +3,10 @@
 
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faBars } from '@/lib/fontawesome';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { FirstProjectHero } from '@/components/onboarding/FirstProjectHero';
 import { LoadingView } from '@/components/pages/views/LoadingView';
@@ -11,12 +14,21 @@ import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useSessionContext } from '@/components/providers/SessionProvider';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { MobileSidebar } from '@/components/layout/MobileSidebar';
+import { SidebarContent } from '@/components/sidebar/SidebarContent';
+import { SettingsContainer } from '@/components/settings/SettingsContainer';
 
 export function HomePage() {
   const { projects, loading: loadingProjects } = useProjectContext();
-
-  const { autoOpenCreateProject, setAutoOpenCreateProject } = useUIContext();
-
+  const {
+    autoOpenCreateProject,
+    setAutoOpenCreateProject,
+    showMobileNav,
+    setShowMobileNav,
+    showDesktopSidebar,
+    toggleDesktopSidebar,
+  } = useUIContext();
   const { enableAgentAutoSelection } = useSessionContext();
 
   // Onboarding flow management
@@ -32,22 +44,100 @@ export function HomePage() {
     }
   }, [projects?.length, loadingProjects, handleAutoOpenProjectCreation]);
 
+  const handleSwitchProject = useCallback(() => {
+    // Already on homepage - no navigation needed
+  }, []);
+
   const loading = loadingProjects;
 
   return (
-    <div className="flex h-screen bg-base-200 text-base-content font-ui">
-      <div className="flex-1 flex flex-col min-h-0 text-base-content bg-base-100/30 backdrop-blur-sm">
-        {loading ? (
-          <LoadingView />
-        ) : (
-          <div className="flex-1 p-6 min-h-0 space-y-6">
-            {projects.length === 0 && (
-              <FirstProjectHero onCreateFirstProject={() => setAutoOpenCreateProject(true)} />
-            )}
-            {(projects.length > 0 || autoOpenCreateProject) && <ProjectSelectorPanel />}
-          </div>
-        )}
+    <motion.div
+      className="flex h-screen bg-gradient-to-br from-base-100 via-base-200/50 to-base-200 text-base-content font-ui overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
+      {/* Unified Sidebar */}
+      <div data-testid="sidebar" className="flex-shrink-0 h-full">
+        <SettingsContainer>
+          {({ onOpenSettings }) => (
+            <>
+              {/* Mobile Sidebar */}
+              <AnimatePresence>
+                {showMobileNav && (
+                  <MobileSidebar
+                    isOpen={showMobileNav}
+                    onClose={() => setShowMobileNav(false)}
+                    onSettingsClick={onOpenSettings}
+                  >
+                    <SidebarContent
+                      isMobile={true}
+                      onCloseMobileNav={() => setShowMobileNav(false)}
+                      onSwitchProject={handleSwitchProject}
+                      onAgentSelect={() => {}} // No agent navigation on home page
+                      onClearAgent={() => {}} // No agent clearing on home page
+                      onConfigureAgent={() => {}} // No agent configuration on home page
+                      onConfigureSession={() => {}} // No session configuration on home page
+                    />
+                  </MobileSidebar>
+                )}
+              </AnimatePresence>
+
+              {/* Desktop Sidebar */}
+              <div className="hidden lg:block h-full">
+                <Sidebar
+                  isOpen={showDesktopSidebar}
+                  onToggle={toggleDesktopSidebar}
+                  onSettingsClick={onOpenSettings}
+                >
+                  <SidebarContent
+                    isMobile={false}
+                    onSwitchProject={handleSwitchProject}
+                    onAgentSelect={() => {}} // No agent navigation on home page
+                    onClearAgent={() => {}} // No agent clearing on home page
+                    onConfigureAgent={() => {}} // No agent configuration on home page
+                    onConfigureSession={() => {}} // No session configuration on home page
+                  />
+                </Sidebar>
+              </div>
+            </>
+          )}
+        </SettingsContainer>
       </div>
-    </div>
+
+      {/* Main Content */}
+      <motion.div className="flex-1 flex flex-col min-w-0 h-screen">
+        {/* Top Bar */}
+        <motion.div className="bg-base-100/90 backdrop-blur-md border-b border-base-300/50 flex-shrink-0 z-30">
+          <div className="flex items-center justify-between p-4 lg:px-6">
+            <div className="flex items-center gap-3">
+              <motion.button
+                onClick={() => setShowMobileNav(true)}
+                className="p-2 hover:bg-base-200 rounded-lg lg:hidden"
+              >
+                <FontAwesomeIcon icon={faBars} className="w-6 h-6" />
+              </motion.button>
+              <div className="flex items-center gap-2">
+                <h1 className="font-semibold text-base-content truncate">Projects</h1>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Content Area */}
+        <div className="flex-1 flex flex-col min-h-0 text-base-content bg-base-100/30 backdrop-blur-sm">
+          {loading ? (
+            <LoadingView />
+          ) : (
+            <div className="flex-1 p-6 min-h-0 space-y-6">
+              {projects.length === 0 && (
+                <FirstProjectHero onCreateFirstProject={() => setAutoOpenCreateProject(true)} />
+              )}
+              {(projects.length > 0 || autoOpenCreateProject) && <ProjectSelectorPanel />}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

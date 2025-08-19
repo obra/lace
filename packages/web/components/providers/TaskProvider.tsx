@@ -34,7 +34,12 @@ interface TaskContextValue {
 // Create context
 const TaskContext = createContext<TaskContextValue | null>(null);
 
-// Hook to use task context
+// Optional hook - returns null if not within provider
+export function useOptionalTaskContext(): TaskContextValue | null {
+  return useContext(TaskContext);
+}
+
+// Hook to use task context - throws if not within provider
 export function useTaskContext() {
   const context = useContext(TaskContext);
   if (!context) {
