@@ -3,10 +3,12 @@
 
 import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { EventStreamFirehose } from './event-stream-firehose';
+import type { LaceEvent } from '@/types/core';
 
 describe('EventStreamFirehose', () => {
   beforeEach(() => {
     // Reset singleton between tests
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (EventStreamFirehose as any).instance = null;
   });
 
@@ -26,6 +28,7 @@ describe('EventStreamFirehose', () => {
 describe('Subscription Management', () => {
   beforeEach(() => {
     // Reset singleton between tests
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (EventStreamFirehose as any).instance = null;
   });
 
@@ -79,6 +82,7 @@ describe('Connection Management', () => {
 
   beforeEach(() => {
     // Reset singleton between tests
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (EventStreamFirehose as any).instance = null;
     mockEventSource.mockClear();
 
@@ -89,10 +93,20 @@ describe('Connection Management', () => {
       onmessage: null,
       onerror: null,
       url: '/api/events/stream',
+      readyState: 0,
+      CONNECTING: 0,
+      OPEN: 1,
+      CLOSED: 2,
     };
 
     mockEventSource.mockReturnValue(mockInstance);
-    global.EventSource = mockEventSource;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (mockEventSource as any).CONNECTING = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (mockEventSource as any).OPEN = 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (mockEventSource as any).CLOSED = 2;
+    global.EventSource = mockEventSource as unknown as typeof EventSource;
   });
 
   test('should connect when first subscription added', () => {
@@ -134,6 +148,7 @@ describe('Connection Management', () => {
 describe('Event Filtering and Routing', () => {
   beforeEach(() => {
     // Reset singleton between tests
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (EventStreamFirehose as any).instance = null;
   });
 
@@ -148,7 +163,7 @@ describe('Event Filtering and Routing', () => {
     firehose.subscribe({ threadIds: ['thread-2'] }, callback2);
     firehose.subscribe({ sessionIds: ['session-1'] }, callback3);
 
-    const testEvent: any = {
+    const testEvent: LaceEvent = {
       id: 'event-1',
       type: 'USER_MESSAGE',
       threadId: 'thread-1',
@@ -158,7 +173,7 @@ describe('Event Filtering and Routing', () => {
     };
 
     // Simulate receiving event
-    firehose['routeEvent'](testEvent);
+    (firehose as unknown as { routeEvent: (event: LaceEvent) => void }).routeEvent(testEvent);
 
     expect(callback1).toHaveBeenCalledWith(testEvent); // Matches threadId
     expect(callback2).not.toHaveBeenCalled(); // Wrong threadId
@@ -171,16 +186,18 @@ describe('Event Filtering and Routing', () => {
 
     firehose.subscribe({ sessionIds: ['session-1'] }, callback);
 
-    const eventWithoutContext: any = {
+    const eventWithoutContext: LaceEvent = {
       id: 'event-2',
-      type: 'SYSTEM_MESSAGE',
+      type: 'LOCAL_SYSTEM_MESSAGE',
       threadId: 'system',
       data: 'system event',
       timestamp: new Date(),
       // No context field
-    };
+    } as LaceEvent;
 
-    firehose['routeEvent'](eventWithoutContext);
+    (firehose as unknown as { routeEvent: (event: LaceEvent) => void }).routeEvent(
+      eventWithoutContext
+    );
 
     expect(callback).not.toHaveBeenCalled(); // No session context to match
   });
@@ -194,15 +211,15 @@ describe('Event Filtering and Routing', () => {
     firehose.subscribe({}, callback1);
     firehose.subscribe({}, callback2);
 
-    const testEvent: any = {
+    const testEvent: LaceEvent = {
       id: 'event-3',
-      type: 'AGENT_MESSAGE',
+      type: 'USER_MESSAGE',
       threadId: 'any-thread',
       data: 'any message',
       timestamp: new Date(),
     };
 
-    firehose['routeEvent'](testEvent);
+    (firehose as unknown as { routeEvent: (event: LaceEvent) => void }).routeEvent(testEvent);
 
     expect(callback1).toHaveBeenCalledWith(testEvent);
     expect(callback2).toHaveBeenCalledWith(testEvent);
@@ -218,7 +235,7 @@ describe('Event Filtering and Routing', () => {
     firehose.subscribe({}, errorCallback);
     firehose.subscribe({}, goodCallback);
 
-    const testEvent: any = {
+    const testEvent: LaceEvent = {
       id: 'event-4',
       type: 'USER_MESSAGE',
       threadId: 'thread',
@@ -227,10 +244,226 @@ describe('Event Filtering and Routing', () => {
     };
 
     expect(() => {
-      firehose['routeEvent'](testEvent);
+      (firehose as unknown as { routeEvent: (event: LaceEvent) => void }).routeEvent(testEvent);
     }).not.toThrow();
 
     expect(errorCallback).toHaveBeenCalled();
     expect(goodCallback).toHaveBeenCalledWith(testEvent);
+  });
+});
+
+describe('SuperJSON Event Parsing', () => {
+  beforeEach(() => {
+    // Reset singleton between tests
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (EventStreamFirehose as any).instance = null;
+  });
+
+  test('should correctly parse SuperJSON-formatted events', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const callback = vi.fn();
+
+    firehose.subscribe({ threadIds: ['test-thread'] }, callback);
+
+    // Simulate a SuperJSON-formatted event like the server sends
+    const superJsonEvent = {
+      json: {
+        id: 'test-event-1',
+        type: 'USER_MESSAGE',
+        threadId: 'test-thread',
+        data: 'Hello world',
+        timestamp: '2025-08-19T20:55:00.000Z',
+      },
+      meta: {
+        values: {
+          threadId: [['custom', 'ThreadId']],
+          timestamp: ['Date'],
+        },
+      },
+    };
+
+    // Simulate receiving the event as a MessageEvent
+    const messageEvent = {
+      data: JSON.stringify(superJsonEvent),
+    } as MessageEvent;
+
+    // Test the event handling
+    (
+      firehose as unknown as { handleIncomingEvent: (event: MessageEvent) => void }
+    ).handleIncomingEvent(messageEvent);
+
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'test-event-1',
+        type: 'USER_MESSAGE',
+        threadId: 'test-thread',
+        data: 'Hello world',
+        timestamp: expect.any(Date), // SuperJSON should deserialize this to a Date object
+      })
+    );
+  });
+
+  test('should handle malformed SuperJSON events gracefully', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const callback = vi.fn();
+
+    firehose.subscribe({}, callback);
+
+    // Simulate a malformed event
+    const messageEvent = {
+      data: 'invalid json{',
+    } as MessageEvent;
+
+    // Should not throw
+    expect(() => {
+      (
+        firehose as unknown as { handleIncomingEvent: (event: MessageEvent) => void }
+      ).handleIncomingEvent(messageEvent);
+    }).not.toThrow();
+
+    // Callback should not be called for malformed events
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  test('should handle different event types with SuperJSON parsing', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const userMessageCallback = vi.fn();
+    const agentStateCallback = vi.fn();
+
+    firehose.subscribe({ threadIds: ['agent-thread'] }, userMessageCallback);
+    firehose.subscribe({ threadIds: ['agent-thread'] }, agentStateCallback);
+
+    // Test AGENT_STATE_CHANGE event with nested data
+    const agentStateEvent = {
+      json: {
+        id: 'state-event-1',
+        type: 'AGENT_STATE_CHANGE',
+        threadId: 'agent-thread',
+        data: {
+          agentId: 'agent-123',
+          from: 'idle',
+          to: 'thinking',
+        },
+        timestamp: '2025-08-19T20:55:00.000Z',
+        transient: true,
+      },
+      meta: {
+        values: {
+          threadId: [['custom', 'ThreadId']],
+          timestamp: ['Date'],
+          'data.agentId': [['custom', 'ThreadId']],
+        },
+      },
+    };
+
+    const messageEvent = {
+      data: JSON.stringify(agentStateEvent),
+    } as MessageEvent;
+
+    (
+      firehose as unknown as { handleIncomingEvent: (event: MessageEvent) => void }
+    ).handleIncomingEvent(messageEvent);
+
+    // Both callbacks should receive the event since they both match the filter
+    expect(userMessageCallback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'AGENT_STATE_CHANGE',
+        threadId: 'agent-thread',
+        data: {
+          agentId: 'agent-123',
+          from: 'idle',
+          to: 'thinking',
+        },
+        transient: true,
+      })
+    );
+    expect(agentStateCallback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'AGENT_STATE_CHANGE',
+      })
+    );
+  });
+});
+
+describe('Event Filtering Integration', () => {
+  beforeEach(() => {
+    // Reset singleton between tests
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (EventStreamFirehose as any).instance = null;
+  });
+
+  test('should properly filter events based on threadId with SuperJSON', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const thread1Callback = vi.fn();
+    const thread2Callback = vi.fn();
+
+    firehose.subscribe({ threadIds: ['thread-1'] }, thread1Callback);
+    firehose.subscribe({ threadIds: ['thread-2'] }, thread2Callback);
+
+    // Event for thread-1
+    const thread1Event = {
+      json: {
+        id: 'event-thread-1',
+        type: 'USER_MESSAGE',
+        threadId: 'thread-1',
+        data: 'Message for thread 1',
+        timestamp: '2025-08-19T20:55:00.000Z',
+      },
+      meta: {
+        values: {
+          threadId: [['custom', 'ThreadId']],
+          timestamp: ['Date'],
+        },
+      },
+    };
+
+    const messageEvent1 = {
+      data: JSON.stringify(thread1Event),
+    } as MessageEvent;
+
+    (
+      firehose as unknown as { handleIncomingEvent: (event: MessageEvent) => void }
+    ).handleIncomingEvent(messageEvent1);
+
+    expect(thread1Callback).toHaveBeenCalledTimes(1);
+    expect(thread2Callback).not.toHaveBeenCalled();
+  });
+
+  test("should handle system events that don't match thread filters", () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const threadCallback = vi.fn();
+    const globalCallback = vi.fn();
+
+    firehose.subscribe({ threadIds: ['specific-thread'] }, threadCallback);
+    firehose.subscribe({}, globalCallback); // No filter = matches everything
+
+    // System event
+    const systemEvent = {
+      json: {
+        id: 'system-event-1',
+        type: 'LOCAL_SYSTEM_MESSAGE',
+        threadId: 'system',
+        data: 'Ready!',
+        timestamp: '2025-08-19T20:55:00.000Z',
+        transient: true,
+      },
+      meta: {
+        values: {
+          timestamp: ['Date'],
+        },
+      },
+    };
+
+    const messageEvent = {
+      data: JSON.stringify(systemEvent),
+    } as MessageEvent;
+
+    (
+      firehose as unknown as { handleIncomingEvent: (event: MessageEvent) => void }
+    ).handleIncomingEvent(messageEvent);
+
+    expect(threadCallback).not.toHaveBeenCalled(); // Doesn't match thread filter
+    expect(globalCallback).toHaveBeenCalledTimes(1); // Matches global filter
   });
 });

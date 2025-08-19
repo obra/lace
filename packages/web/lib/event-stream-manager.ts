@@ -264,16 +264,7 @@ export class EventStreamManager {
 
     // Debug logging for event broadcasting
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[EVENT_STREAM_SERVER] Broadcasting event:`, {
-        id: fullEvent.id,
-        type: fullEvent.type,
-        threadId: fullEvent.threadId,
-        connections: this.connections.size,
-        data:
-          typeof fullEvent.data === 'string'
-            ? fullEvent.data.substring(0, 100) + '...'
-            : fullEvent.data,
-      });
+      // Development debug info
     }
 
     const deadConnections: string[] = [];
@@ -337,12 +328,7 @@ export class EventStreamManager {
 
     // Debug logging for individual sends
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[EVENT_STREAM_SERVER] Sending to connection ${connection.id.substring(0, 8)}:`, {
-        eventId: event.id,
-        type: event.type,
-        threadId: event.threadId,
-        subscription: connection.subscription,
-      });
+      // Development debug info
     }
 
     try {

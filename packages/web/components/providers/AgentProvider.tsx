@@ -63,7 +63,7 @@ export function AgentProvider({
   selectedAgentId,
   onAgentChange,
 }: AgentProviderProps) {
-  console.warn('[AGENT_PROVIDER] Initialized with sessionId:', sessionId);
+  // Debug: AgentProvider initialized
 
   // Get agent data from pure data hook
   const {

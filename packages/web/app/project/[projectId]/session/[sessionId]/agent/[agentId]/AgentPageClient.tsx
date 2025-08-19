@@ -20,19 +20,22 @@ interface AgentPageClientProps {
   agentId: string;
 }
 
+// Define stable callback functions outside component to prevent re-renders
+const noOpCallback = () => {};
+
 export function AgentPageClient({ projectId, sessionId, agentId }: AgentPageClientProps) {
   return (
     <UIProvider>
       <ProjectProvider
         selectedProject={projectId}
-        onProjectSelect={() => {}}
-        onProjectChange={() => {}}
+        onProjectSelect={noOpCallback}
+        onProjectChange={noOpCallback}
       >
         <SessionProvider projectId={projectId} selectedSessionId={sessionId}>
-          <AgentProvider 
+          <AgentProvider
             sessionId={sessionId}
             selectedAgentId={agentId}
-            onAgentChange={() => {}}
+            onAgentChange={noOpCallback}
           >
             <ToolApprovalProvider agentId={agentId as ThreadId}>
               <EventStreamProvider
@@ -45,11 +48,7 @@ export function AgentPageClient({ projectId, sessionId, agentId }: AgentPageClie
                   sessionId={sessionId as ThreadId}
                   agents={[]} // Will be populated by AgentProvider
                 >
-                  <AgentPageContent 
-                    projectId={projectId}
-                    sessionId={sessionId}
-                    agentId={agentId}
-                  />
+                  <AgentPageContent projectId={projectId} sessionId={sessionId} agentId={agentId} />
                 </TaskProvider>
               </EventStreamProvider>
             </ToolApprovalProvider>

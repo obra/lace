@@ -65,8 +65,6 @@ export function EventStreamProvider({
   agentId,
   onAgentStateChange,
 }: EventStreamProviderProps) {
-  console.warn('[EVENT_STREAM_PROVIDER] Rendered with agentId:', agentId);
-  
   // Get tool approval handlers from ToolApprovalProvider
   const { handleApprovalRequest, handleApprovalResponse } = useToolApprovalContext();
 
@@ -87,29 +85,56 @@ export function EventStreamProvider({
     [onAgentStateChange]
   );
 
-  // Event stream hook with all event handlers
-  const eventStreamResult = useEventStreamHook({
-    projectId: projectId || undefined,
-    sessionId: sessionId || undefined,
-    threadIds: agentId ? [agentId] : undefined,
-    onConnect: () => {
-      // Event stream connected
+  // Memoize threadIds to prevent unnecessary re-subscriptions
+  const threadIds = useMemo(() => {
+    return agentId ? [agentId] : undefined;
+  }, [agentId]);
+
+  // Create a single stable event handler to ensure consistent references
+  const stableAddAgentEvent = useCallback(
+    (event) => {
+      addAgentEvent(event);
     },
-    onError: (error) => {
-      console.error('Event stream error:', error);
-    },
-    // Agent event handlers
-    onUserMessage: addAgentEvent,
-    onAgentMessage: addAgentEvent,
-    onToolCall: addAgentEvent,
-    onToolResult: addAgentEvent,
-    // Agent state changes
-    onAgentStateChange: handleAgentStateChangeCallback,
-    // Tool approval requests
-    onApprovalRequest: handleApprovalRequest,
-    // Tool approval responses
-    onApprovalResponse: handleApprovalResponse,
-  });
+    [addAgentEvent]
+  );
+
+  // Create the options object with stable references
+  const eventStreamOptions = useMemo(
+    () => ({
+      projectId: projectId || undefined,
+      sessionId: sessionId || undefined,
+      threadIds,
+      onConnect: () => {
+        // Event stream connected
+      },
+      onError: (error) => {
+        console.error('Event stream error:', error);
+      },
+      // Agent event handlers - use single stable handler to prevent stale closures
+      onUserMessage: stableAddAgentEvent,
+      onAgentMessage: stableAddAgentEvent,
+      onToolCall: stableAddAgentEvent,
+      onToolResult: stableAddAgentEvent,
+      // Agent state changes
+      onAgentStateChange: handleAgentStateChangeCallback,
+      // Tool approval requests
+      onApprovalRequest: handleApprovalRequest,
+      // Tool approval responses
+      onApprovalResponse: handleApprovalResponse,
+    }),
+    [
+      projectId,
+      sessionId,
+      threadIds,
+      stableAddAgentEvent,
+      handleAgentStateChangeCallback,
+      handleApprovalRequest,
+      handleApprovalResponse,
+    ]
+  );
+
+  // Event stream hook with stable options object
+  const eventStreamResult = useEventStreamHook(eventStreamOptions);
 
   // Create context value
   const contextValue: EventStreamContextType = useMemo(
