@@ -7,6 +7,7 @@ import { useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars } from '@/lib/fontawesome';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { AgentProvider } from '@/components/providers/AgentProvider';
@@ -25,6 +26,7 @@ interface ProjectPageClientProps {
 function ProjectPageContent({ projectId }: { projectId: string }) {
   const { showMobileNav, setShowMobileNav, showDesktopSidebar, toggleDesktopSidebar } =
     useUIContext();
+  const { currentProject } = useProjectContext();
 
   const handleSwitchProject = useCallback(() => {
     // Navigate to root to show project selection
@@ -99,7 +101,9 @@ function ProjectPageContent({ projectId }: { projectId: string }) {
                 <FontAwesomeIcon icon={faBars} className="w-6 h-6" />
               </motion.button>
               <div className="flex items-center gap-2">
-                <h1 className="font-semibold text-base-content truncate">Project Configuration</h1>
+                <h1 className="font-semibold text-base-content truncate">
+                  {currentProject?.name || `Project ${projectId}`} - Configuration
+                </h1>
               </div>
             </div>
           </div>
