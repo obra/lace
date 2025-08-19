@@ -24,6 +24,7 @@ interface UseSessionManagementResult {
     sessionId: string,
     updates: { name: string; description?: string }
   ) => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<void>;
   loadSessionsForProject: (projectId: string) => Promise<SessionInfo[]>;
 }
 
@@ -136,6 +137,22 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
     [loadSessions]
   );
 
+  const deleteSession = useCallback(
+    async (sessionId: string): Promise<void> => {
+      if (!projectId) return;
+
+      try {
+        await api.delete(`/api/projects/${projectId}/sessions/${sessionId}`);
+        // Reload sessions to remove the deleted one
+        await loadSessions();
+      } catch (error) {
+        console.error('Error deleting session:', error);
+        throw error;
+      }
+    },
+    [projectId, loadSessions]
+  );
+
   const loadSessionsForProject = useCallback(
     async (targetProjectId: string): Promise<SessionInfo[]> => {
       try {
@@ -186,6 +203,7 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
     loadSessionConfiguration,
     updateSessionConfiguration,
     updateSession,
+    deleteSession,
     loadSessionsForProject,
   };
 }

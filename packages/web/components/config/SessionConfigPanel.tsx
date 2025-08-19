@@ -12,6 +12,7 @@ import { SessionCreateModal } from './SessionCreateModal';
 import { SessionEditModal } from './SessionEditModal';
 import { AgentCreateModal } from './AgentCreateModal';
 import { AgentEditModal } from './AgentEditModal';
+import { AnimatedModal } from '@/components/ui/AnimatedModal';
 import type {
   ProviderInfo,
   ModelInfo,
@@ -64,6 +65,7 @@ export function SessionConfigPanel(): React.JSX.Element {
     loadSessionConfiguration,
     updateSessionConfiguration,
     updateSession,
+    deleteSession,
   } = useSessionContext();
   const {
     sessionDetails: selectedSession,
@@ -73,7 +75,7 @@ export function SessionConfigPanel(): React.JSX.Element {
     loadAgentConfiguration,
     updateAgent,
   } = useAgentContext();
-  const { project, session, navigateToSession, navigateToAgent } = useURLState();
+  const { project, session, navigateToSession, navigateToAgent, navigateToProject } = useURLState();
   const { providers, loading: providersLoading } = useProviders();
 
   const loading = sessionLoading || agentLoading || providersLoading;
@@ -81,6 +83,8 @@ export function SessionConfigPanel(): React.JSX.Element {
   const [showCreateAgent, setShowCreateAgent] = useState(false);
   const [showEditConfig, setShowEditConfig] = useState(false);
   const [showEditAgent, setShowEditAgent] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<SessionInfo | null>(null);
   const [editingAgent, setEditingAgent] = useState<{
     threadId: string;
     name: string;
@@ -219,14 +223,20 @@ export function SessionConfigPanel(): React.JSX.Element {
   };
 
   // Handle session edit
-  const handleEditSessionClick = async () => {
-    if (!selectedSession) return;
+  const handleEditSessionClick = async (sessionId?: string) => {
+    // Use provided sessionId or fall back to selectedSession
+    const targetSessionId = sessionId || selectedSession?.id;
+    if (!targetSessionId) return;
+
+    // Find the session to edit
+    const sessionToEdit = sessions.find((s) => s.id === targetSessionId) || selectedSession;
+    if (!sessionToEdit) return;
 
     try {
       // Load session configuration from provider
-      const configuration = await loadSessionConfiguration(selectedSession.id);
+      const configuration = await loadSessionConfiguration(targetSessionId);
 
-      setEditSessionName(selectedSession.name);
+      setEditSessionName(sessionToEdit.name);
       setEditSessionDescription(''); // Session descriptions not currently stored
 
       // Merge with defaults and ensure provider instance is set
@@ -251,7 +261,7 @@ export function SessionConfigPanel(): React.JSX.Element {
         config.providerInstanceId = availableProviders[0].instanceId;
         config.modelId = availableProviders[0].models[0]?.id || '';
       }
-      setEditSessionName(selectedSession.name);
+      setEditSessionName(sessionToEdit.name);
       setEditSessionDescription('');
       setEditSessionConfig(config);
       setShowEditConfig(true);
@@ -353,6 +363,45 @@ export function SessionConfigPanel(): React.JSX.Element {
     [loadAgentConfiguration]
   );
 
+  const handleDeleteSessionClick = useCallback(
+    (sessionId?: string) => {
+      // Store the sessionId for deletion or use selected session
+      const targetSessionId = sessionId || selectedSession?.id;
+      if (!targetSessionId) return;
+
+      // Find the session to delete for display in confirmation
+      const sessionToDelete = sessions.find((s) => s.id === targetSessionId) || selectedSession;
+      if (!sessionToDelete) return;
+
+      setSessionToDelete(sessionToDelete);
+      setShowDeleteConfirm(true);
+    },
+    [sessions, selectedSession]
+  );
+
+  const handleDeleteSession = useCallback(async () => {
+    if (!sessionToDelete) return;
+
+    try {
+      await deleteSession(sessionToDelete.id);
+      setShowDeleteConfirm(false);
+      setSessionToDelete(null);
+
+      // Navigate back to project page if we deleted the currently selected session
+      if (selectedSession?.id === sessionToDelete.id && project) {
+        navigateToProject(project); // Clear session selection
+      }
+    } catch (error) {
+      console.error('Session delete error:', { sessionId: sessionToDelete.id, error });
+      throw error;
+    }
+  }, [sessionToDelete, deleteSession, selectedSession, project, navigateToProject]);
+
+  const handleCancelDelete = useCallback(() => {
+    setShowDeleteConfirm(false);
+    setSessionToDelete(null);
+  }, []);
+
   // Session creation modal handlers
   const handleSessionNameChange = useCallback((name: string) => {
     setNewSessionName(name);
@@ -412,6 +461,7 @@ export function SessionConfigPanel(): React.JSX.Element {
         loading={loading}
         onSessionSelect={handleSessionSelect}
         onEditSession={handleEditSessionClick}
+        onDeleteSession={handleDeleteSessionClick}
         onCreateAgent={handleCreateAgentClick}
         onCreateSession={handleCreateSessionClick}
         onEditAgent={handleEditAgentClick}
@@ -473,6 +523,31 @@ export function SessionConfigPanel(): React.JSX.Element {
         onSubmit={handleEditAgentSubmit}
         onAgentChange={setEditingAgent}
       />
+
+      {/* Delete Confirmation Modal */}
+      <AnimatedModal isOpen={showDeleteConfirm} onClose={handleCancelDelete} title="Delete Session">
+        <div className="space-y-4">
+          <p className="text-base-content">
+            Are you sure you want to delete the session <strong>{sessionToDelete?.name}</strong>?
+          </p>
+          <p className="text-base-content/60 text-sm">
+            This will permanently delete the session and all its conversations and agents. This
+            action cannot be undone.
+          </p>
+          <div className="flex gap-2 justify-end">
+            <button onClick={handleCancelDelete} className="btn btn-ghost" type="button">
+              Cancel
+            </button>
+            <button
+              onClick={() => void handleDeleteSession()}
+              className="btn btn-error"
+              type="button"
+            >
+              Delete Session
+            </button>
+          </div>
+        </div>
+      </AnimatedModal>
     </div>
   );
 }

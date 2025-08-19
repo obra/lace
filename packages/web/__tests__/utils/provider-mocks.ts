@@ -36,6 +36,7 @@ export function createMockSessionContext(
     loadSessionConfiguration: vi.fn(),
     updateSessionConfiguration: vi.fn(),
     updateSession: vi.fn(),
+    deleteSession: vi.fn(),
     loadSessionsForProject: vi.fn(),
 
     // Agent auto-selection control

@@ -34,6 +34,7 @@ const mockTaskContext = vi.hoisted(() => ({
 vi.mock('@/components/providers/TaskProvider', () => ({
   TaskProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   useTaskContext: () => mockTaskContext,
+  useOptionalTaskContext: () => mockTaskContext,
 }));
 
 vi.mock('@/components/providers/ProjectProvider', () => ({
@@ -46,16 +47,18 @@ vi.mock('@/components/providers/SessionProvider', () => ({
 
 vi.mock('@/components/providers/AgentProvider', () => ({
   useAgentContext: vi.fn(),
+  useOptionalAgentContext: vi.fn(),
 }));
 
 // Import mocked hooks
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useAgentContext, useOptionalAgentContext } from '@/components/providers/AgentProvider';
 
 const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseAgentContext = vi.mocked(useAgentContext);
+const mockUseOptionalAgentContext = vi.mocked(useOptionalAgentContext);
 
 // Mock child components
 vi.mock('@/components/layout/Sidebar', () => ({
@@ -184,12 +187,13 @@ describe('TaskSidebarSection', () => {
       })
     );
 
-    mockUseAgentContext.mockReturnValue(
-      createMockAgentContext({
-        sessionDetails: createMockSessionDetails(),
-        selectedAgent: 'test-agent' as ThreadId,
-      })
-    );
+    const mockAgentContext = createMockAgentContext({
+      sessionDetails: createMockSessionDetails(),
+      selectedAgent: 'test-agent' as ThreadId,
+    });
+
+    mockUseAgentContext.mockReturnValue(mockAgentContext);
+    mockUseOptionalAgentContext.mockReturnValue(mockAgentContext);
   });
 
   // Helper function to create mock project
@@ -241,7 +245,7 @@ describe('TaskSidebarSection', () => {
 
     it('returns null when selectedSessionDetails is null', () => {
       mockTaskContext.taskManager = createMockTaskManager();
-      mockUseAgentContext.mockReturnValue(
+      mockUseOptionalAgentContext.mockReturnValue(
         createMockAgentContext({
           sessionDetails: null,
           selectedAgent: 'test-agent' as ThreadId,

@@ -41,6 +41,7 @@ vi.mock('@/components/providers/SessionProvider', () => ({
       name: 'Test Session',
     },
     sessions: [],
+    deleteSession: vi.fn(),
   }),
 }));
 

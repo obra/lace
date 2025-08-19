@@ -46,6 +46,7 @@ export interface SessionContextType {
     sessionId: string,
     updates: { name: string; description?: string }
   ) => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<void>;
   loadSessionsForProject: (projectId: string) => Promise<SessionInfo[]>;
 
   // Agent auto-selection control
@@ -87,6 +88,7 @@ export function SessionProvider({
     loadSessionConfiguration,
     updateSessionConfiguration,
     updateSession,
+    deleteSession,
     loadSessionsForProject,
   } = useSessionManagement(projectId);
 
@@ -142,6 +144,7 @@ export function SessionProvider({
       loadSessionConfiguration,
       updateSessionConfiguration,
       updateSession,
+      deleteSession,
       loadSessionsForProject,
 
       // Agent auto-selection control
@@ -161,6 +164,7 @@ export function SessionProvider({
       loadSessionConfiguration,
       updateSessionConfiguration,
       updateSession,
+      deleteSession,
       loadSessionsForProject,
       enableAgentAutoSelection,
     ]
