@@ -198,7 +198,7 @@ export class SessionService {
         transient: true,
         context: {
           sessionId,
-          projectId: undefined,
+          projectId,
           taskId: undefined,
           agentId: undefined,
         },
