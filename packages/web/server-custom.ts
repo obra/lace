@@ -5,7 +5,13 @@ import { parseArgs } from 'util';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import module from 'module';
-import { isInteractive } from './lib/server-utils';
+// Inline the isInteractive function to avoid import issues in standalone build
+function isInteractive(
+  stdin: { isTTY?: boolean } = process.stdin,
+  stdout: { isTTY?: boolean } = process.stdout
+): boolean {
+  return !!(stdin.isTTY && stdout.isTTY);
+}
 
 // Parse command line arguments
 const { values } = parseArgs({

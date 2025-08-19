@@ -514,6 +514,7 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: false,
         status: 404,
+        statusText: 'Not Found',
         text: () => Promise.resolve('Agent not found'),
         clone: function () {
           return this;
@@ -541,9 +542,10 @@ describe('ToolApprovalProvider', () => {
           clone: expect.any(Function),
         })
       );
+
       expect(consoleSpy).toHaveBeenCalledWith(
         '[TOOL_APPROVAL] Failed to fetch pending approvals:',
-        expect.objectContaining({ message: 'HTTP 404: undefined' })
+        expect.objectContaining({ message: 'HTTP 404: Not Found' })
       );
 
       consoleSpy.mockRestore();
@@ -590,6 +592,7 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: false,
         status: 500,
+        statusText: 'Internal Server Error',
         text: () => Promise.resolve('Internal server error'),
         clone: function () {
           return this;
@@ -617,10 +620,11 @@ describe('ToolApprovalProvider', () => {
           clone: expect.any(Function),
         })
       );
+
       // Should log the HTTP status error
       expect(consoleSpy).toHaveBeenCalledWith(
         '[TOOL_APPROVAL] Failed to fetch pending approvals:',
-        expect.objectContaining({ message: 'HTTP 500: undefined' })
+        expect.objectContaining({ message: 'HTTP 500: Internal Server Error' })
       );
 
       consoleSpy.mockRestore();

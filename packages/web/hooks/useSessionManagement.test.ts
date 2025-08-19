@@ -279,6 +279,9 @@ describe('useSessionManagement', () => {
   });
 
   it('handles create session errors by throwing them', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
     const createError = new Error('Create failed');
     mockFetch
       .mockResolvedValueOnce({
@@ -309,19 +312,32 @@ describe('useSessionManagement', () => {
     });
 
     // Expect the error to be thrown
-    await expect(
-      act(async () => {
+    let thrownError: Error | undefined;
+    try {
+      await act(async () => {
         await result.current.createSession({
           name: 'New Session',
           description: 'A new session',
         });
-      })
-    ).rejects.toThrow('Create failed');
+      });
+    } catch (error) {
+      thrownError = error as Error;
+    }
+
+    expect(thrownError).toBeDefined();
+    expect(thrownError?.message).toBe('Create failed');
+
+    consoleSpy.mockRestore();
+    stderrSpy.mockRestore();
   });
 
   it('handles create session HTTP errors by throwing them', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
     const errorResponse = {
       ok: false,
+      statusText: 'Session creation failed',
       text: () => Promise.resolve(JSON.stringify({ error: 'Session creation failed' })),
       clone: function () {
         return this;
@@ -358,14 +374,23 @@ describe('useSessionManagement', () => {
     });
 
     // Expect the error to be thrown
-    await expect(
-      act(async () => {
+    let thrownError: Error | undefined;
+    try {
+      await act(async () => {
         await result.current.createSession({
           name: 'New Session',
           description: 'A new session',
         });
-      })
-    ).rejects.toThrow();
+      });
+    } catch (error) {
+      thrownError = error as Error;
+    }
+
+    expect(thrownError).toBeDefined();
+    expect(thrownError?.message).toContain('HTTP');
+
+    consoleSpy.mockRestore();
+    stderrSpy.mockRestore();
   });
 
   it('handles load session configuration errors gracefully', async () => {

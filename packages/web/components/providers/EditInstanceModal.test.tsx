@@ -254,9 +254,9 @@ describe('EditInstanceModal', () => {
     const user = userEvent.setup();
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    mockParseResponse.mockResolvedValue({
-      error: 'Instance validation failed',
-    });
+    mockParseResponse
+      .mockResolvedValueOnce({ instances: [] }) // For the initial instances loading
+      .mockRejectedValueOnce(new Error('Invalid JSON')); // For the error response parsing attempt
 
     global.fetch = vi.fn().mockImplementation((url) => {
       if (url === '/api/provider/instances') {
@@ -274,7 +274,8 @@ describe('EditInstanceModal', () => {
       return Promise.resolve({
         ok: false,
         status: 400,
-        text: () => Promise.resolve(''),
+        statusText: 'Bad Request',
+        text: () => Promise.resolve('Bad Request Error'),
         clone: function () {
           return this;
         },
