@@ -27,21 +27,30 @@ import { SessionService } from './session-service';
 import { asThreadId } from '@/types/core';
 import { logger } from '~/utils/logger';
 import type { Agent } from '@/lib/server/lace-imports';
+import { createMockAgent } from '@/test-utils/mock-agent';
 
 describe('SessionService abort error filtering', () => {
   let sessionService: SessionService;
-  let mockAgent: EventEmitter & { threadId: string };
+  let mockAgent: ReturnType<typeof createMockAgent>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     sessionService = new SessionService();
-    mockAgent = Object.assign(new EventEmitter(), {
+    mockAgent = createMockAgent({
       threadId: 'lace_20250101_sess01.1',
+      getFullSession: async () =>
+        ({
+          getId: () => 'lace_20250101_sess01',
+          getProjectId: () => undefined,
+        }) as any,
     });
   });
 
   afterEach(() => {
-    mockAgent.removeAllListeners();
+    // Clear any event handlers stored in the mock
+    if (mockAgent.handlers) {
+      mockAgent.handlers = {};
+    }
   });
 
   it('should filter out AbortError from UI messages', async () => {
