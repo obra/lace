@@ -105,6 +105,7 @@ export const SessionSection = memo(function SessionSection({
             onClick={handleConfigureSession}
             className="btn btn-ghost btn-xs p-1 min-h-0 h-auto flex-shrink-0"
             title="Configure session"
+            data-testid="configure-session-button"
           >
             <FontAwesomeIcon icon={faCog} className="w-3 h-3" />
           </button>
@@ -137,6 +138,7 @@ export const SessionSection = memo(function SessionSection({
                 onClick={() => onConfigureAgent?.(agent.threadId)}
                 className="btn btn-ghost btn-xs p-1 min-h-0 h-auto flex-shrink-0"
                 title="Configure agent"
+                data-testid={`configure-agent-${agent.threadId}-button`}
               >
                 <FontAwesomeIcon icon={faCog} className="w-3 h-3" />
               </button>

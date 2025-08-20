@@ -91,6 +91,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
             onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
             disabled={currentIndex === 0}
             className="btn btn-xs btn-ghost"
+            data-testid="tool-approval-prev-button"
           >
             ←
           </button>
@@ -101,6 +102,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
             onClick={() => setCurrentIndex(Math.min(approvals.length - 1, currentIndex + 1))}
             disabled={currentIndex === approvals.length - 1}
             className="btn btn-xs btn-ghost"
+            data-testid="tool-approval-next-button"
           >
             →
           </button>
@@ -161,6 +163,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
                             <button
                               onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
                               className="text-xs text-base-content/50 hover:text-base-content px-2 py-1 rounded hover:bg-base-200 flex-shrink-0"
+                              data-testid="tool-approval-toggle-details-button"
                             >
                               {showTechnicalDetails ? 'Hide' : 'Show'} Details
                             </button>
@@ -192,6 +195,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
                       onDecision(currentApproval.toolCallId, ApprovalDecision.ALLOW_ONCE)
                     }
                     className="btn btn-outline flex-1"
+                    data-testid="tool-approval-allow-once-button"
                   >
                     Allow Once
                     <span className="text-xs opacity-70 ml-2">[Y/A]</span>
@@ -201,6 +205,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
                       onDecision(currentApproval.toolCallId, ApprovalDecision.ALLOW_SESSION)
                     }
                     className="btn btn-outline flex-1"
+                    data-testid="tool-approval-allow-session-button"
                   >
                     Allow Session
                     <span className="text-xs opacity-70 ml-2">[S]</span>
@@ -208,6 +213,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
                   <button
                     onClick={() => onDecision(currentApproval.toolCallId, ApprovalDecision.DENY)}
                     className="btn btn-outline flex-1"
+                    data-testid="tool-approval-deny-button"
                   >
                     Deny
                     <span className="text-xs opacity-70 ml-2">[N/D]</span>

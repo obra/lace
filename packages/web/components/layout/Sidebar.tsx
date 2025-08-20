@@ -54,6 +54,7 @@ export function Sidebar({ isOpen, onToggle, onSettingsClick, children }: Sidebar
               onClick={onSettingsClick}
               className="p-3 hover:bg-base-200 rounded-xl transition-all duration-200 hover:scale-105 ring-hover"
               title="Settings"
+              data-testid="settings-button"
             >
               <FontAwesomeIcon icon={faCog} className="w-5 h-5 text-base-content/60" />
             </button>
@@ -99,6 +100,7 @@ export function Sidebar({ isOpen, onToggle, onSettingsClick, children }: Sidebar
                 onClick={onSettingsClick}
                 className="p-2.5 hover:bg-base-200/80 rounded-xl transition-all duration-200 hover:scale-105"
                 title="Settings"
+                data-testid="settings-button"
               >
                 <FontAwesomeIcon
                   icon={faCog}
