@@ -254,3 +254,94 @@ export async function createProject(page: Page, name: string, path: string): Pro
   await navigateProjectWizardSteps(page);
   await submitProjectCreation(page);
 }
+
+/**
+ * Chat and Messaging Helpers
+ */
+
+/** Get the message input field using testid */
+export async function getMessageInput(page: Page) {
+  const messageInput = page.locator('[data-testid="message-input"]').first();
+  await messageInput.waitFor({ state: 'visible', timeout: 10000 });
+  return messageInput;
+}
+
+/** Send a message using the message input and send button */
+export async function sendMessage(page: Page, message: string): Promise<void> {
+  const messageInput = await getMessageInput(page);
+  await messageInput.fill(message);
+
+  // Try send button first, fall back to Enter key
+  const sendButton = page.locator('[data-testid="send-button"], [data-testid="send"]').first();
+  if (await sendButton.isVisible().catch(() => false)) {
+    await sendButton.click();
+  } else {
+    await messageInput.press('Enter');
+  }
+}
+
+/** Wait for the stop button to appear (indicates streaming is active) */
+export async function waitForStopButton(page: Page, timeout: number = 10000): Promise<void> {
+  const stopButton = page.locator('[data-testid="stop-button"]').first();
+  await stopButton.waitFor({ state: 'visible', timeout });
+}
+
+/** Click the stop button to halt streaming */
+export async function clickStopButton(page: Page): Promise<void> {
+  const stopButton = page.locator('[data-testid="stop-button"]').first();
+  await stopButton.waitFor({ state: 'visible', timeout: 5000 });
+  await stopButton.click();
+}
+
+/** Wait for the send button to appear (indicates streaming has stopped) */
+export async function waitForSendButton(page: Page, timeout: number = 10000): Promise<void> {
+  const sendButton = page.locator('[data-testid="send-button"], [data-testid="send"]').first();
+  await sendButton.waitFor({ state: 'visible', timeout });
+}
+
+/** Verify a message is visible on the page */
+export async function verifyMessageVisible(
+  page: Page,
+  message: string,
+  timeout: number = 5000
+): Promise<void> {
+  await page.locator(`text="${message}"`).waitFor({ state: 'visible', timeout });
+}
+
+/** Verify a message is NOT visible on the page */
+export async function verifyNoMessage(page: Page, message: string): Promise<void> {
+  const messageVisible = await page
+    .locator(`text="${message}"`)
+    .isVisible()
+    .catch(() => false);
+  if (messageVisible) {
+    throw new Error(`Message "${message}" should not be visible but was found`);
+  }
+}
+
+/**
+ * Session and Agent Management Helpers
+ */
+
+/** Create a new session - placeholder for now, may need actual implementation */
+export async function createSession(page: Page, sessionName?: string): Promise<void> {
+  // This function may need implementation based on actual UI
+  // For now, sessions are typically created automatically with projects
+  // TODO: Implement if explicit session creation UI exists
+  await page.waitForTimeout(100); // Placeholder
+}
+
+/** Create a new agent - placeholder for now, may need actual implementation */
+export async function createAgent(page: Page, agentName?: string): Promise<void> {
+  // This function may need implementation based on actual UI
+  // For now, agents are typically created automatically with projects
+  // TODO: Implement if explicit agent creation UI exists
+  await page.waitForTimeout(100); // Placeholder
+}
+
+/** Select an existing agent - placeholder for now, may need actual implementation */
+export async function selectAgent(page: Page, agentName: string): Promise<void> {
+  // This function may need implementation based on actual UI
+  // TODO: Implement if agent selection UI exists
+  await page.waitForTimeout(100); // Placeholder
+}
