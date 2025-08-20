@@ -92,6 +92,10 @@ interface EventHandlers {
   onAgentStarted?: (event: AgentEvent) => void;
   onAgentStopped?: (event: AgentEvent) => void;
 
+  // Compaction events
+  onCompactionStart?: (event: LaceEvent) => void;
+  onCompactionComplete?: (event: LaceEvent) => void;
+
   // Global events
   onGlobalEvent?: (event: GlobalEvent) => void;
   onSystemNotification?: (event: GlobalEvent) => void;
@@ -234,6 +238,12 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
               const responseData = event.data as { toolCallId: string };
               currentOptions.onApprovalResponse?.(responseData.toolCallId);
             }
+            break;
+          case 'COMPACTION_START':
+            currentOptions.onCompactionStart?.(event);
+            break;
+          case 'COMPACTION_COMPLETE':
+            currentOptions.onCompactionComplete?.(event);
             break;
           // Add other event type cases as needed
         }
