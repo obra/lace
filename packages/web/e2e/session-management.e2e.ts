@@ -72,7 +72,7 @@ test.describe('Session Management', () => {
       await expect(page).toHaveURL(sessionUrl);
 
       // Check if interface is ready for interaction after reload
-      const messageInput = getMessageInput(page);
+      const messageInput = await getMessageInput(page);
       const messageInputDisabled = await messageInput.getAttribute('disabled');
       const placeholder = await messageInput.getAttribute('placeholder');
 

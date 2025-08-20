@@ -68,7 +68,7 @@ test.describe('Agent Management', () => {
     await expect(page).toHaveURL(agentUrl);
 
     // Check if interface is ready and can handle new interactions
-    const messageInput = getMessageInput(page);
+    const messageInput = await getMessageInput(page);
     const messageInputEnabled = await messageInput.getAttribute('disabled');
     const placeholderText = await messageInput.getAttribute('placeholder');
 
