@@ -29,7 +29,7 @@ export class SessionService {
         if (agent) {
           const { setupAgentApprovals } = await import('./agent-utils');
           setupAgentApprovals(agent, sessionId);
-          this.setupAgentEventHandlers(agent, session);
+          await this.setupAgentEventHandlers(agent);
         }
       }
 
@@ -40,12 +40,22 @@ export class SessionService {
     return session;
   }
 
-  setupAgentEventHandlers(agent: Agent, session: Session): void {
+  async setupAgentEventHandlers(agent: Agent): Promise<void> {
     // Prevent duplicate event handler registration
     if (this.registeredAgents.has(agent)) {
       return;
     }
     this.registeredAgents.add(agent);
+
+    // Get session from agent
+    const session = await agent.getFullSession();
+    if (!session) {
+      logger.warn(
+        `[SESSION_SERVICE] No session found for agent ${agent.threadId}, skipping event handler setup`
+      );
+      return;
+    }
+
     const sseManager = EventStreamManager.getInstance();
     const threadId = agent.threadId;
     const sessionId = session.getId();
