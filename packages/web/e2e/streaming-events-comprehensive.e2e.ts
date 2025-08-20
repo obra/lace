@@ -4,7 +4,7 @@
 import { test, expect } from './mocks/setup';
 import { createPageObjects } from './page-objects';
 import { withTempLaceDir } from './utils/withTempLaceDir';
-import { setupAnthropicProvider } from './helpers/test-utils';
+import { setupAnthropicProvider } from './helpers/provider-setup';
 import { streamingHandlers } from './mocks/handlers';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -80,14 +80,15 @@ test.describe('Comprehensive Streaming Events', () => {
 
       // Set up project and chat
       await page.goto('/');
+
+      // Set up Anthropic provider configuration first (before creating project)
+      await setupAnthropicProvider(page);
+
       const projectPath = path.join(tempDir, 'streaming-tokens-project');
       await fs.promises.mkdir(projectPath, { recursive: true });
 
       await projectSelector.createProject('Streaming Tokens Test', projectPath);
       await chatInterface.waitForChatReady();
-
-      // Set up Anthropic provider configuration via UI
-      await setupAnthropicProvider(page);
 
       // Monitor SSE events for AGENT_TOKEN
       const sseEvents: string[] = [];
