@@ -148,7 +148,7 @@ export function TimelineView({
                 );
               })()}
 
-            {isTyping && !streamingContent && (
+            {isTyping && !streamingContent && currentAgent && (
               <motion.div
                 key="typing"
                 initial={{ opacity: 0, y: 4 }}
