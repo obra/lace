@@ -467,3 +467,134 @@ describe('Event Filtering Integration', () => {
     expect(globalCallback).toHaveBeenCalledTimes(1); // Matches global filter
   });
 });
+
+describe('Compaction Events Routing', () => {
+  beforeEach(() => {
+    // Reset singleton between tests
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (EventStreamFirehose as any).instance = null;
+  });
+
+  test('should route COMPACTION_START events to matching subscriptions', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const callback = vi.fn();
+
+    firehose.subscribe({ projectIds: ['test-project'], sessionIds: ['test-session'] }, callback);
+
+    const compactionStartEvent: LaceEvent = {
+      id: 'compaction-start-1',
+      type: 'COMPACTION_START',
+      threadId: 'lace_20250820_test',
+      timestamp: new Date(),
+      data: { auto: true },
+      transient: true,
+      context: {
+        sessionId: 'test-session',
+        projectId: 'test-project',
+      },
+    };
+
+    // Simulate event routing
+    (firehose as unknown as { routeEvent: (event: LaceEvent) => void }).routeEvent(
+      compactionStartEvent
+    );
+
+    expect(callback).toHaveBeenCalledWith(compactionStartEvent);
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  test('should route COMPACTION_COMPLETE events to matching subscriptions', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const callback = vi.fn();
+
+    firehose.subscribe({ projectIds: ['test-project'], sessionIds: ['test-session'] }, callback);
+
+    const compactionCompleteEvent: LaceEvent = {
+      id: 'compaction-complete-1',
+      type: 'COMPACTION_COMPLETE',
+      threadId: 'lace_20250820_test',
+      timestamp: new Date(),
+      data: { success: true },
+      transient: true,
+      context: {
+        sessionId: 'test-session',
+        projectId: 'test-project',
+      },
+    };
+
+    // Simulate event routing
+    (firehose as unknown as { routeEvent: (event: LaceEvent) => void }).routeEvent(
+      compactionCompleteEvent
+    );
+
+    expect(callback).toHaveBeenCalledWith(compactionCompleteEvent);
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  test('should filter compaction events by context', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const matchingCallback = vi.fn();
+    const nonMatchingCallback = vi.fn();
+
+    firehose.subscribe({ projectIds: ['project-1'] }, matchingCallback);
+    firehose.subscribe({ projectIds: ['project-2'] }, nonMatchingCallback);
+
+    const compactionEvent: LaceEvent = {
+      id: 'compaction-filtered',
+      type: 'COMPACTION_START',
+      threadId: 'lace_20250820_test',
+      timestamp: new Date(),
+      data: { auto: false },
+      transient: true,
+      context: {
+        sessionId: 'session-1',
+        projectId: 'project-1',
+      },
+    };
+
+    // Route the event
+    (firehose as unknown as { routeEvent: (event: LaceEvent) => void }).routeEvent(compactionEvent);
+
+    // Only the matching subscription should receive the event
+    expect(matchingCallback).toHaveBeenCalledWith(compactionEvent);
+    expect(matchingCallback).toHaveBeenCalledTimes(1);
+    expect(nonMatchingCallback).not.toHaveBeenCalled();
+  });
+
+  test('should handle both manual and auto compaction events', () => {
+    const firehose = EventStreamFirehose.getInstance();
+    const callback = vi.fn();
+
+    firehose.subscribe({}, callback); // Match all events
+
+    const manualCompaction: LaceEvent = {
+      id: 'manual-compaction',
+      type: 'COMPACTION_START',
+      threadId: 'lace_20250820_test',
+      timestamp: new Date(),
+      data: { auto: false },
+      transient: true,
+      context: { sessionId: 'test-session' },
+    };
+
+    const autoCompaction: LaceEvent = {
+      id: 'auto-compaction',
+      type: 'COMPACTION_START',
+      threadId: 'lace_20250820_test',
+      timestamp: new Date(),
+      data: { auto: true },
+      transient: true,
+      context: { sessionId: 'test-session' },
+    };
+
+    // Route both events
+    (firehose as unknown as { routeEvent: (event: LaceEvent) => void }).routeEvent(
+      manualCompaction
+    );
+    (firehose as unknown as { routeEvent: (event: LaceEvent) => void }).routeEvent(autoCompaction);
+
+    expect(callback).toHaveBeenCalledTimes(2);
+    expect(callback).toHaveBeenCalledWith(manualCompaction);
+    expect(callback).toHaveBeenCalledWith(autoCompaction);
+  });
+});
