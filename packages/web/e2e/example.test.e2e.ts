@@ -12,21 +12,26 @@ import {
 test.describe('Example E2E Test Patterns', () => {
   let testEnv: TestEnvironment;
 
-  test.beforeEach(async ({ page }) => {
-    // BEST PRACTICE: Setup isolated test environment for each test
-    // This creates a unique server process with its own LACE_DIR and database
-    testEnv = await setupTestEnvironment();
-    console.log(`🧪 Test using server: ${testEnv.serverUrl}`);
-    console.log(`📁 Test using LACE_DIR: ${testEnv.tempDir}`);
+  test.beforeEach(
+    async ({ page }) => {
+      // BEST PRACTICE: Setup isolated test environment for each test
+      // This creates a unique server process with its own LACE_DIR and database
+      testEnv = await setupTestEnvironment();
+      console.log(`🧪 Test using server: ${testEnv.serverUrl}`);
+      console.log(`📁 Test using LACE_DIR: ${testEnv.tempDir}`);
 
-    // Navigate to our isolated test server
-    await page.goto(testEnv.serverUrl);
-  });
+      // Navigate to our isolated test server
+      await page.goto(testEnv.serverUrl);
+    },
+    { timeout: 120000 }
+  ); // 2 minutes for server compilation
 
   test.afterEach(async () => {
     // BEST PRACTICE: Always cleanup test environment
     // This kills the server process and removes temp directories
-    await cleanupTestEnvironment(testEnv);
+    if (testEnv) {
+      await cleanupTestEnvironment(testEnv);
+    }
   });
 
   test('Test 1: Create project and verify isolation - should have clean state', async ({
@@ -35,8 +40,7 @@ test.describe('Example E2E Test Patterns', () => {
     console.log('🚀 Test 1: Starting with clean isolated environment');
 
     // Create a project in our isolated environment
-    const projectPath = `${testEnv.tempDir}/test-project-1`;
-    await createProject(page, 'Test Project One', projectPath);
+    await createProject(page, 'Test Project One', testEnv.tempDir);
 
     // Wait for project to be fully loaded
     await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
@@ -91,8 +95,7 @@ test.describe('Example E2E Test Patterns', () => {
     console.log('🚀 Test 2: Starting with completely fresh isolated environment');
 
     // This test gets its own server and LACE_DIR - should have NO data from Test 1
-    const projectPath = `${testEnv.tempDir}/test-project-2`;
-    await createProject(page, 'Test Project Two', projectPath);
+    await createProject(page, 'Test Project Two', testEnv.tempDir);
 
     // Wait for project to be loaded
     await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
@@ -177,8 +180,7 @@ test.describe('Example E2E Test Patterns', () => {
     );
 
     // Verify we can create projects and they're isolated
-    const projectPath = `${testEnv.tempDir}/isolation-test-project`;
-    await createProject(page, 'Isolation Test Project', projectPath);
+    await createProject(page, 'Isolation Test Project', testEnv.tempDir);
 
     // Should not see any data from previous tests
     const anyPreviousMessages = await Promise.all([
