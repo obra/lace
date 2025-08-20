@@ -56,9 +56,11 @@ export async function createProject(page: Page, projectName: string, tempDir: st
   // Take screenshot before clicking for debugging
   // await page.screenshot({ path: 'debug-before-new-project.png' });
 
-  // Look for the New Project button with various selectors
+  // Look for the New Project button with various selectors - handle both empty and existing project states
   const newProjectButton = page
-    .locator('button:has-text("New Project")')
+    .locator('button:has-text("Create your first project")')
+    .or(page.locator('button:has-text("Create New Project")'))
+    .or(page.locator('button:has-text("New Project")'))
     .or(page.locator('[data-testid="new-project-button"]'))
     .or(page.locator('button').filter({ hasText: 'New Project' }))
     .first();
@@ -274,9 +276,11 @@ async function createProjectWithProvider(
   // Wait for page to load
   await page.waitForTimeout(2000);
 
-  // Click "New Project" button
+  // Click "New Project" button - handle both empty and existing project states
   const newProjectButton = page
-    .locator('button:has-text("New Project")')
+    .locator('button:has-text("Create your first project")')
+    .or(page.locator('button:has-text("Create New Project")'))
+    .or(page.locator('button:has-text("New Project")'))
     .or(page.locator('[data-testid="new-project-button"]'))
     .or(page.locator('button').filter({ hasText: 'New Project' }))
     .first();
@@ -421,14 +425,18 @@ export async function setupAnthropicProvider(
   // Wait for settings modal/page to open
   await page.waitForTimeout(2000);
 
-  // Look for provider/Anthropic configuration section
+  // Look for add provider button or provider instances section
   const providerSelectors = [
+    'button:has-text("Add Provider")',
+    'button:has-text("Add New Provider")',
+    'button:has-text("Create Provider")',
+    'button:has-text("+")', // Could be a plus icon button
+    'text="Provider Instances"',
     'text="Provider"',
     'text="Providers"',
     'text="Anthropic"',
     'text="API Configuration"',
     'text="AI Provider"',
-    'button:has-text("Add Provider")',
     'button:has-text("Configure Provider")',
     'button:has-text("Anthropic")',
   ];
@@ -447,21 +455,85 @@ export async function setupAnthropicProvider(
     throw new Error('Could not find provider configuration section');
   }
 
-  // If it's a button, click it. If it's text, look for nearby button
-  if (await providerElement.evaluate((el) => el.tagName.toLowerCase() === 'button')) {
-    await providerElement.click();
-  } else {
-    // Look for a nearby button or click area
-    const nearbyButton = page.locator('button').filter({ near: providerElement }).first();
-    if (await nearbyButton.isVisible().catch(() => false)) {
-      await nearbyButton.click();
-    } else {
-      await providerElement.click(); // Try clicking the element itself
-    }
-  }
+  // Click on the provider element
+  await providerElement.click();
+  console.log('Clicked provider section');
+  await page.waitForTimeout(1000);
 
   // Wait for provider configuration form
   await page.waitForTimeout(1000);
+
+  // After clicking provider section, look for "Add your first instance" or similar
+  const addInstanceSelectors = [
+    // Try different ways to find the "Add your first instance" text/button
+    ':has-text("Add your first instance")',
+    ':has-text("Add your first")',
+    'button:has-text("Add your first instance")',
+    'button:has-text("Add instance")',
+    'button:has-text("Create your first instance")',
+    'a:has-text("Add your first instance")',
+    'div:has-text("Add your first instance")',
+    'span:has-text("Add your first instance")',
+    '*:has-text("Add your first") >> visible=true',
+    'button:has-text("Add Provider")',
+    'button:has-text("Add New Provider")',
+    'button:has-text("Create Provider")',
+    'button:has-text("Add")',
+    'button:has-text("New")',
+    'button:has-text("+")',
+    'text="Add your first instance"',
+    'text="Create your first instance"',
+  ];
+
+  // Debug: log all buttons and text content to understand the UI
+  const allButtons = await page.locator('button').all();
+  console.log(`Found ${allButtons.length} buttons after clicking Provider Instances:`);
+  for (let i = 0; i < Math.min(allButtons.length, 10); i++) {
+    const button = allButtons[i];
+    const text = await button.textContent().catch(() => '');
+    const isVisible = await button.isVisible().catch(() => false);
+    console.log(`Button ${i}: "${text}" visible=${isVisible}`);
+  }
+
+  // Look for all text on page containing relevant keywords
+  const pageText = await page.textContent('body');
+  console.log('Page text includes:');
+  if (pageText && pageText.toLowerCase().includes('instance')) {
+    console.log('  - Contains "instance"');
+  }
+  if (pageText && pageText.toLowerCase().includes('add')) {
+    console.log('  - Contains "add"');
+  }
+  if (pageText && pageText.toLowerCase().includes('create')) {
+    console.log('  - Contains "create"');
+  }
+  if (pageText && pageText.toLowerCase().includes('first')) {
+    console.log('  - Contains "first"');
+  }
+
+  // Log all visible text elements that might be clickable
+  const clickableElements = await page
+    .locator('*:has-text("Add"), *:has-text("Create"), *:has-text("instance")')
+    .all();
+  console.log(`Found ${clickableElements.length} elements containing relevant text`);
+  for (let i = 0; i < Math.min(clickableElements.length, 5); i++) {
+    const element = clickableElements[i];
+    const text = await element.textContent().catch(() => '');
+    const tagName = await element.evaluate((el) => el.tagName).catch(() => '');
+    const isVisible = await element.isVisible().catch(() => false);
+    console.log(`  Element ${i}: ${tagName} "${text.substring(0, 50)}" visible=${isVisible}`);
+  }
+
+  let addProviderButton;
+  for (const selector of addInstanceSelectors) {
+    addProviderButton = page.locator(selector).first();
+    if (await addProviderButton.isVisible().catch(() => false)) {
+      console.log(`Found add provider button with selector: ${selector}`);
+      await addProviderButton.click();
+      await page.waitForTimeout(2000); // Give more time for form to appear
+      break;
+    }
+  }
 
   // Look for API key input field
   const apiKeySelectors = [
@@ -473,7 +545,37 @@ export async function setupAnthropicProvider(
     'input[name*="key"]',
     'textarea[placeholder*="API"]',
     'textarea[placeholder*="key"]',
+    'input[id*="api"]',
+    'input[id*="key"]',
+    'input[class*="api"]',
+    'input[class*="key"]',
   ];
+
+  // Look for provider type selection (dropdown, radio buttons, etc.)
+  const providerTypeSelectors = [
+    'select[name*="provider"]',
+    'select[name*="type"]',
+    'input[value="anthropic"]',
+    'button:has-text("Anthropic")',
+    'label:has-text("Anthropic")',
+    'option:has-text("Anthropic")',
+  ];
+
+  for (const selector of providerTypeSelectors) {
+    const providerTypeElement = page.locator(selector).first();
+    if (await providerTypeElement.isVisible().catch(() => false)) {
+      console.log(`Found provider type selector with selector: ${selector}`);
+      if (selector.startsWith('select')) {
+        await providerTypeElement.selectOption('anthropic');
+      } else if (selector.startsWith('input')) {
+        await providerTypeElement.check();
+      } else {
+        await providerTypeElement.click();
+      }
+      await page.waitForTimeout(1000);
+      break;
+    }
+  }
 
   let apiKeyInput;
   for (const selector of apiKeySelectors) {
@@ -486,6 +588,22 @@ export async function setupAnthropicProvider(
 
   if (!apiKeyInput || !(await apiKeyInput.isVisible().catch(() => false))) {
     await page.screenshot({ path: 'debug-api-key-search.png' });
+    console.log('Taking screenshot of current state for debugging...');
+
+    // Log all input elements on the page for debugging
+    const allInputs = await page.locator('input, textarea, select').all();
+    console.log(`Found ${allInputs.length} input elements on page`);
+    for (let i = 0; i < allInputs.length; i++) {
+      const input = allInputs[i];
+      const tagName = await input.evaluate((el) => el.tagName);
+      const placeholder = await input.getAttribute('placeholder').catch(() => 'none');
+      const name = await input.getAttribute('name').catch(() => 'none');
+      const type = await input.getAttribute('type').catch(() => 'none');
+      console.log(
+        `Input ${i}: ${tagName} placeholder="${placeholder}" name="${name}" type="${type}"`
+      );
+    }
+
     throw new Error('Could not find API key input field');
   }
 
