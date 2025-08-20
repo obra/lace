@@ -141,7 +141,7 @@ class EventStreamFirehose {
       }
     };
 
-    this.eventSource.onerror = (error) => {
+    this.eventSource.onerror = (_error) => {
       if (this.connectionState === 'connected') {
         console.warn('[FIREHOSE] Connection lost');
       }

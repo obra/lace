@@ -88,7 +88,7 @@ describe('Token Usage Integration Tests', () => {
     const sessionService = getSessionService();
     const sessionAgent = session.getAgent(sessionId);
     if (sessionAgent) {
-      sessionService.setupAgentEventHandlers(sessionAgent, sessionId);
+      await sessionService.setupAgentEventHandlers(sessionAgent);
     }
 
     // Clear previous events

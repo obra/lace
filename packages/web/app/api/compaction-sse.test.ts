@@ -5,7 +5,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import type { Agent } from '@/lib/server/lace-imports';
-import { asThreadId } from '@/types/core';
 
 describe('Compaction SSE Events', () => {
   let sseManager: EventStreamManager;
@@ -42,16 +41,16 @@ describe('Compaction SSE Events', () => {
     };
   });
 
-  it('should emit COMPACTION_START when agent emits compaction_start event', () => {
+  it('should emit COMPACTION_START when agent emits compaction_start event', async () => {
     const _threadId = 'lace_20250809_abc123';
-    const sessionId = 'lace_20250809_def456';
+    const _sessionId = 'lace_20250809_def456';
     const projectId = 'proj_789abc';
 
     // Set up session service with project ID
     (sessionService as { projectId?: string }).projectId = projectId;
 
     // Setup event handlers
-    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, asThreadId(sessionId));
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // Trigger compaction start event
     mockAgent.emit('compaction_start', {
@@ -69,19 +68,19 @@ describe('Compaction SSE Events', () => {
         }),
         context: expect.objectContaining({
           projectId,
-          sessionId,
+          sessionId: _sessionId,
         }),
       })
     );
   });
 
-  it('should emit COMPACTION_COMPLETE when agent emits compaction_complete event', () => {
+  it('should emit COMPACTION_COMPLETE when agent emits compaction_complete event', async () => {
     const _threadId = 'lace_20250809_abc123';
-    const sessionId = 'lace_20250809_def456';
+    const _sessionId = 'lace_20250809_def456';
     const projectId = 'proj_789abc';
 
     (sessionService as { projectId?: string }).projectId = projectId;
-    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, asThreadId(sessionId));
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // Trigger compaction complete event
     mockAgent.emit('compaction_complete', {
@@ -99,18 +98,18 @@ describe('Compaction SSE Events', () => {
         }),
         context: expect.objectContaining({
           projectId,
-          sessionId,
+          sessionId: _sessionId,
         }),
       })
     );
   });
 
-  it('should handle manual compact command SSE events', () => {
-    const sessionId = 'lace_20250809_def456';
+  it('should handle manual compact command SSE events', async () => {
+    const _sessionId = 'lace_20250809_def456';
     const projectId = 'proj_789abc';
 
     (sessionService as { projectId?: string }).projectId = projectId;
-    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, asThreadId(sessionId));
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // Trigger manual compaction start
     mockAgent.emit('compaction_start', {
@@ -128,7 +127,7 @@ describe('Compaction SSE Events', () => {
         }),
         context: expect.objectContaining({
           projectId,
-          sessionId,
+          sessionId: _sessionId,
         }),
       })
     );
@@ -150,18 +149,18 @@ describe('Compaction SSE Events', () => {
         }),
         context: expect.objectContaining({
           projectId,
-          sessionId,
+          sessionId: _sessionId,
         }),
       })
     );
   });
 
-  it('should differentiate between auto and manual compaction events', () => {
-    const sessionId = 'lace_20250809_def456';
+  it('should differentiate between auto and manual compaction events', async () => {
+    const _sessionId = 'lace_20250809_def456';
     const projectId = 'proj_789abc';
 
     (sessionService as { projectId?: string }).projectId = projectId;
-    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, asThreadId(sessionId));
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // Trigger auto compaction
     mockAgent.emit('compaction_start', {
@@ -179,7 +178,7 @@ describe('Compaction SSE Events', () => {
         }),
         context: expect.objectContaining({
           projectId,
-          sessionId,
+          sessionId: _sessionId,
         }),
       })
     );
@@ -202,7 +201,7 @@ describe('Compaction SSE Events', () => {
         }),
         context: expect.objectContaining({
           projectId,
-          sessionId,
+          sessionId: _sessionId,
         }),
       })
     );

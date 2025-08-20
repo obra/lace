@@ -44,11 +44,11 @@ describe('SessionService abort error filtering', () => {
     mockAgent.removeAllListeners();
   });
 
-  it('should filter out AbortError from UI messages', () => {
-    const sessionId = asThreadId('lace_20250101_sess01');
+  it('should filter out AbortError from UI messages', async () => {
+    const _sessionId = asThreadId('lace_20250101_sess01');
 
     // Set up event handlers
-    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // Emit an AbortError
     const abortError = new Error('Operation was aborted');
@@ -63,10 +63,10 @@ describe('SessionService abort error filtering', () => {
     expect(mockBroadcast).not.toHaveBeenCalled();
   });
 
-  it('should filter out generic "Request was aborted" errors', () => {
-    const sessionId = asThreadId('lace_20250101_sess01');
+  it('should filter out generic "Request was aborted" errors', async () => {
+    const _sessionId = asThreadId('lace_20250101_sess01');
 
-    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // Emit a generic abort error
     const genericAbortError = new Error('Request was aborted');
@@ -77,10 +77,10 @@ describe('SessionService abort error filtering', () => {
     expect(mockBroadcast).not.toHaveBeenCalled();
   });
 
-  it('should filter out "Aborted" errors', () => {
-    const sessionId = asThreadId('lace_20250101_sess01');
+  it('should filter out "Aborted" errors', async () => {
+    const _sessionId = asThreadId('lace_20250101_sess01');
 
-    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // Emit a simple "Aborted" error
     const abortedError = new Error('Aborted');
@@ -91,10 +91,10 @@ describe('SessionService abort error filtering', () => {
     expect(mockBroadcast).not.toHaveBeenCalled();
   });
 
-  it('should still broadcast non-abort errors to UI', () => {
-    const sessionId = asThreadId('lace_20250101_sess01');
+  it('should still broadcast non-abort errors to UI', async () => {
+    const _sessionId = asThreadId('lace_20250101_sess01');
 
-    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // Emit a regular error
     const regularError = new Error('Network connection failed');
@@ -113,7 +113,7 @@ describe('SessionService abort error filtering', () => {
       timestamp: expect.any(Date),
       data: 'Agent error: Network connection failed',
       context: {
-        sessionId,
+        sessionId: _sessionId,
         projectId: undefined,
         agentId: undefined,
         taskId: undefined,

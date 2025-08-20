@@ -128,7 +128,7 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
     const sessionAgent = session.getAgent(sessionId);
     if (sessionAgent) {
       // Don't start the agent here - let each test start it after setting up handlers
-      sessionService.setupAgentEventHandlers(sessionAgent, sessionId);
+      await sessionService.setupAgentEventHandlers(sessionAgent);
     }
   });
 
