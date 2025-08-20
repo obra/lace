@@ -1123,6 +1123,50 @@ test('custom isolation', async ({ page }) => {
 });
 ```
 
+#### ⚠️ Critical Fix: Test Server LACE_DIR Isolation
+
+**Issue Discovered**: Individual test fixtures that set `LACE_DIR` don't work because the web server reads `LACE_DIR` once at startup. When individual tests try to change the environment variable, the already-running server continues using the original (personal) LACE_DIR.
+
+**Root Cause**: The test server script `scripts/start-test-server.js` wasn't setting an isolated `LACE_DIR` when spawning the server process.
+
+**Solution**: Modified the test server to create and use a temporary `LACE_DIR` at server startup:
+
+```javascript
+// scripts/start-test-server.js
+function startServer() {
+  // Create isolated temporary LACE_DIR for the entire test server session
+  const tempLaceDir = mkdtempSync(join(tmpdir(), 'lace-e2e-server-'));
+  console.log(`📁 Using temporary LACE_DIR: ${tempLaceDir}`);
+
+  const serverProcess = spawn('npx', ['tsx', serverFile, '--port', TEST_PORT_START.toString()], {
+    env: {
+      ...process.env,
+      LACE_DIR: tempLaceDir, // Set isolated LACE_DIR for the server
+      LACE_DB_PATH: ':memory:',
+      // ... other test environment variables
+    },
+  });
+  
+  // Cleanup temp directory on server shutdown
+  function cleanup() {
+    console.log(`🧹 Cleaning up temporary LACE_DIR: ${tempLaceDir}`);
+    rmSync(tempLaceDir, { recursive: true, force: true });
+  }
+  
+  process.on('SIGTERM', cleanup);
+  process.on('SIGINT', cleanup);
+  process.on('exit', cleanup);
+}
+```
+
+**Result**: 
+- Tests now see a clean, empty LACE_DIR with no existing projects
+- UI shows "Create your first project" instead of user's personal projects  
+- Complete isolation between test environment and user's workspace
+- All E2E tests now work reliably without accessing personal data
+
+**Key Lesson**: Server-level environment configuration must happen at server startup, not in individual test fixtures. Always verify that your test infrastructure provides true isolation from the user's environment.
+
 ### API Mocking with MSW
 
 #### Setup
