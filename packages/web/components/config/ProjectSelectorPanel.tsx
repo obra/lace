@@ -474,6 +474,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
               {filteredProjects.map((project) => (
                 <div
                   key={project.id}
+                  data-testid="project-list-entry"
                   className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-lg ${
                     selectedProject?.id === project.id
                       ? 'border-primary bg-primary/5 shadow-md'
