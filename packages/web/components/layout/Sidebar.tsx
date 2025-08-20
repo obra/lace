@@ -87,6 +87,7 @@ export function Sidebar({ open, onToggle, onSettingsClick, children }: SidebarPr
                       <button
                         onClick={onToggle}
                         className="p-2 hover:bg-base-200 rounded-lg transition-colors"
+                        aria-label="Close sidebar"
                       >
                         <FontAwesomeIcon icon={faTimes} className="w-5 h-5 text-base-content/60" />
                       </button>
@@ -102,7 +103,7 @@ export function Sidebar({ open, onToggle, onSettingsClick, children }: SidebarPr
                   <button
                     onClick={onSettingsClick}
                     className="btn btn-ghost w-full justify-start"
-                    title="Settings"
+                    aria-label="Open settings"
                   >
                     <FontAwesomeIcon icon={faCog} className="w-4 h-4 mr-2" />
                     Settings
@@ -126,6 +127,7 @@ export function Sidebar({ open, onToggle, onSettingsClick, children }: SidebarPr
         <button
           className="fixed top-4 left-4 z-30 lg:hidden p-2 bg-base-100 rounded-lg shadow-lg border border-base-300"
           onClick={onToggle}
+          aria-label="Open sidebar"
         >
           <FontAwesomeIcon icon={faBars} className="w-5 h-5 text-base-content/60" />
         </button>
@@ -153,22 +155,23 @@ function DesktopSidebar({
           <button
             onClick={onSettingsClick}
             className="p-3 hover:bg-base-200 rounded-xl transition-all duration-200 hover:scale-105 ring-hover"
-            title="Settings"
+            aria-label="Open settings"
           >
             <FontAwesomeIcon icon={faCog} className="w-5 h-5 text-base-content/60" />
           </button>
         </div>
 
         {/* Clickable border area for toggle */}
-        <div
-          className="absolute -right-2 top-0 bottom-0 w-4 cursor-pointer hover:bg-primary/10 transition-colors duration-200 z-40"
+        <button
+          className="absolute -right-2 top-0 bottom-0 w-4 cursor-pointer hover:bg-primary/10 transition-colors duration-200 z-40 border-none bg-transparent"
           onClick={onToggle}
-          title="Click to expand sidebar"
+          aria-label="Expand sidebar"
         />
 
         <button
           onClick={onToggle}
           className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-lg z-[9999] group"
+          aria-label="Expand sidebar"
         >
           <ChevronRightIcon className="w-4 h-4 text-base-content/60 group-hover:text-base-content transition-colors" />
         </button>
@@ -196,7 +199,7 @@ function DesktopSidebar({
             <button
               onClick={onSettingsClick}
               className="p-2.5 hover:bg-base-200/80 rounded-xl transition-all duration-200 hover:scale-105"
-              title="Settings"
+              aria-label="Open settings"
             >
               <FontAwesomeIcon
                 icon={faCog}
@@ -210,16 +213,17 @@ function DesktopSidebar({
         <div className="flex-1 overflow-y-auto">{children}</div>
 
         {/* Clickable border area for toggle */}
-        <div
-          className="absolute -right-2 top-0 bottom-0 w-4 cursor-pointer hover:bg-primary/10 transition-colors duration-200 z-40 group"
+        <button
+          className="absolute -right-2 top-0 bottom-0 w-4 cursor-pointer hover:bg-primary/10 transition-colors duration-200 z-40 group border-none bg-transparent"
           onClick={onToggle}
-          title="Click to collapse sidebar"
+          aria-label="Collapse sidebar"
         />
 
         {/* Toggle Button */}
         <button
           onClick={onToggle}
           className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-lg z-[9999] group"
+          aria-label="Collapse sidebar"
         >
           <ChevronRightIcon className="w-4 h-4 text-base-content/60 group-hover:text-base-content transition-colors rotate-180" />
         </button>
@@ -251,6 +255,10 @@ export function SidebarSection({
           className={`flex items-center gap-2 hover:text-base-content/80 transition-all duration-200 ${
             collapsible ? 'cursor-pointer' : 'cursor-default'
           }`}
+          aria-label={
+            collapsible ? `${collapsed ? 'Expand' : 'Collapse'} ${title} section` : undefined
+          }
+          aria-expanded={collapsible ? !collapsed : undefined}
         >
           {icon && <FontAwesomeIcon icon={icon} className="w-4 h-4" />}
           <span className="uppercase tracking-wider text-xs font-semibold">{title}</span>
@@ -261,6 +269,8 @@ export function SidebarSection({
             <button
               onClick={() => setCollapsed(!collapsed)}
               className="hover:text-base-content/80 transition-colors"
+              aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${title} section`}
+              aria-expanded={!collapsed}
             >
               <ChevronRightIcon
                 className={`w-4 h-4 transition-transform ${collapsed ? 'rotate-0' : 'rotate-90'}`}
