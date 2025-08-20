@@ -152,6 +152,7 @@ describe('Chat', () => {
         lastEvent: undefined,
         sendCount: 0,
         reconnect: vi.fn(),
+        close: vi.fn(),
       },
       agentEvents: {
         events: [],
