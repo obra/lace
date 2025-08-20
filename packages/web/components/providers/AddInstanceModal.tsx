@@ -153,6 +153,7 @@ export function AddInstanceModal({
                   key={provider.id}
                   className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow text-left"
                   onClick={() => handleProviderSelect(provider)}
+                  data-testid={`provider-card-${provider.id}`}
                 >
                   <div className="card-body py-3">
                     <div className="flex items-center justify-between">
@@ -203,6 +204,7 @@ export function AddInstanceModal({
               onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
               placeholder="sk-..."
               required
+              data-testid="api-key-input"
             />
             <div className="label">
               <span className="label-text-alt">Your API key will be stored securely</span>
@@ -291,7 +293,12 @@ export function AddInstanceModal({
             >
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary vapor-button" disabled={submitting}>
+            <button
+              type="submit"
+              className="btn btn-primary vapor-button"
+              disabled={submitting}
+              data-testid="create-instance-button"
+            >
               {submitting ? (
                 <>
                   <span className="loading loading-spinner loading-sm"></span>
