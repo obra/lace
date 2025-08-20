@@ -33,20 +33,33 @@ interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setThemeState] = useState(() => {
-    if (typeof window === 'undefined') return 'dark';
-    return localStorage.getItem('lace-theme') || 'dark';
-  });
+  const [theme, setThemeState] = useState('dark'); // Always start with dark to avoid hydration mismatch
+  const [mounted, setMounted] = useState(false);
 
+  // Load theme from localStorage after component mounts
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
-
-  const setTheme = useCallback((newTheme: string) => {
-    setThemeState(newTheme);
-    localStorage.setItem('lace-theme', newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme);
+    setMounted(true);
+    const savedTheme = localStorage.getItem('lace-theme') || 'dark';
+    setThemeState(savedTheme);
   }, []);
+
+  // Apply theme to document
+  useEffect(() => {
+    if (mounted) {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  }, [theme, mounted]);
+
+  const setTheme = useCallback(
+    (newTheme: string) => {
+      setThemeState(newTheme);
+      localStorage.setItem('lace-theme', newTheme);
+      if (mounted) {
+        document.documentElement.setAttribute('data-theme', newTheme);
+      }
+    },
+    [mounted]
+  );
 
   const value = useMemo(() => ({ theme, setTheme }), [theme, setTheme]);
 
