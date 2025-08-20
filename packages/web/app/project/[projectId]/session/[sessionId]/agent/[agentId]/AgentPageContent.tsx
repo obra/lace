@@ -4,12 +4,11 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars } from '@/lib/fontawesome';
 
 import { Sidebar } from '@/components/layout/Sidebar';
-import { MobileSidebar } from '@/components/layout/MobileSidebar';
 import { Chat } from '@/components/chat/Chat';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
@@ -38,8 +37,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   const { navigateToAgent } = useURLState();
 
   // UI State
-  const { showMobileNav, setShowMobileNav, showDesktopSidebar, toggleDesktopSidebar } =
-    useUIContext();
+  const { sidebarOpen, toggleSidebar } = useUIContext();
 
   // Context data
   const { currentProject } = useProjectContext();
@@ -192,50 +190,19 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
       <div data-testid="sidebar" className="flex-shrink-0 h-full">
         <SettingsContainer>
           {({ onOpenSettings }) => (
-            <>
-              {/* Mobile Sidebar */}
-              <AnimatePresence>
-                {showMobileNav && (
-                  <MobileSidebar
-                    isOpen={showMobileNav}
-                    onClose={() => setShowMobileNav(false)}
-                    onSettingsClick={onOpenSettings}
-                  >
-                    <SidebarContent
-                      isMobile={true}
-                      onCloseMobileNav={() => setShowMobileNav(false)}
-                      onSwitchProject={handleSwitchProject}
-                      onAgentSelect={handleAgentSelect}
-                      onClearAgent={() =>
-                        (window.location.href = `/project/${projectId}/session/${sessionId}`)
-                      }
-                      onConfigureAgent={handleConfigureAgent}
-                      onConfigureSession={handleConfigureSession}
-                    />
-                  </MobileSidebar>
-                )}
-              </AnimatePresence>
-
-              {/* Desktop Sidebar */}
-              <div className="hidden lg:block h-full">
-                <Sidebar
-                  isOpen={showDesktopSidebar}
-                  onToggle={toggleDesktopSidebar}
-                  onSettingsClick={onOpenSettings}
-                >
-                  <SidebarContent
-                    isMobile={false}
-                    onSwitchProject={handleSwitchProject}
-                    onAgentSelect={handleAgentSelect}
-                    onClearAgent={() =>
-                      (window.location.href = `/project/${projectId}/session/${sessionId}`)
-                    }
-                    onConfigureAgent={handleConfigureAgent}
-                    onConfigureSession={handleConfigureSession}
-                  />
-                </Sidebar>
-              </div>
-            </>
+            <Sidebar open={sidebarOpen} onToggle={toggleSidebar} onSettingsClick={onOpenSettings}>
+              <SidebarContent
+                isMobile={false} // Component now handles mobile/desktop internally
+                onCloseMobileNav={toggleSidebar}
+                onSwitchProject={handleSwitchProject}
+                onAgentSelect={handleAgentSelect}
+                onClearAgent={() =>
+                  (window.location.href = `/project/${projectId}/session/${sessionId}`)
+                }
+                onConfigureAgent={handleConfigureAgent}
+                onConfigureSession={handleConfigureSession}
+              />
+            </Sidebar>
           )}
         </SettingsContainer>
       </div>
@@ -247,7 +214,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
           <motion.div className="flex items-center justify-between p-4 lg:px-6">
             <motion.div className="flex items-center gap-3">
               <motion.button
-                onClick={() => setShowMobileNav(true)}
+                onClick={toggleSidebar}
                 className="p-2 hover:bg-base-200 rounded-lg lg:hidden"
               >
                 <FontAwesomeIcon icon={faBars} className="w-6 h-6" />

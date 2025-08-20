@@ -4,7 +4,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars } from '@/lib/fontawesome';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
@@ -15,7 +15,6 @@ import { TaskProvider } from '@/components/providers/TaskProvider';
 import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
 import { UIProvider, useUIContext } from '@/components/providers/UIProvider';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { MobileSidebar } from '@/components/layout/MobileSidebar';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
 
@@ -24,8 +23,7 @@ interface ProjectPageClientProps {
 }
 
 function ProjectPageContent({ projectId }: { projectId: string }) {
-  const { showMobileNav, setShowMobileNav, showDesktopSidebar, toggleDesktopSidebar } =
-    useUIContext();
+  const { sidebarOpen, toggleSidebar } = useUIContext();
   const { currentProject } = useProjectContext();
 
   const handleSwitchProject = useCallback(() => {
@@ -44,46 +42,17 @@ function ProjectPageContent({ projectId }: { projectId: string }) {
       <div data-testid="sidebar" className="flex-shrink-0 h-full">
         <SettingsContainer>
           {({ onOpenSettings }) => (
-            <>
-              {/* Mobile Sidebar */}
-              <AnimatePresence>
-                {showMobileNav && (
-                  <MobileSidebar
-                    isOpen={showMobileNav}
-                    onClose={() => setShowMobileNav(false)}
-                    onSettingsClick={onOpenSettings}
-                  >
-                    <SidebarContent
-                      isMobile={true}
-                      onCloseMobileNav={() => setShowMobileNav(false)}
-                      onSwitchProject={handleSwitchProject}
-                      onAgentSelect={() => {}} // No agent navigation on project page
-                      onClearAgent={() => {}} // No agent clearing on project page
-                      onConfigureAgent={() => {}} // No agent configuration on project page
-                      onConfigureSession={() => {}} // No session configuration on project page
-                    />
-                  </MobileSidebar>
-                )}
-              </AnimatePresence>
-
-              {/* Desktop Sidebar */}
-              <div className="hidden lg:block h-full">
-                <Sidebar
-                  isOpen={showDesktopSidebar}
-                  onToggle={toggleDesktopSidebar}
-                  onSettingsClick={onOpenSettings}
-                >
-                  <SidebarContent
-                    isMobile={false}
-                    onSwitchProject={handleSwitchProject}
-                    onAgentSelect={() => {}} // No agent navigation on project page
-                    onClearAgent={() => {}} // No agent clearing on project page
-                    onConfigureAgent={() => {}} // No agent configuration on project page
-                    onConfigureSession={() => {}} // No session configuration on project page
-                  />
-                </Sidebar>
-              </div>
-            </>
+            <Sidebar open={sidebarOpen} onToggle={toggleSidebar} onSettingsClick={onOpenSettings}>
+              <SidebarContent
+                isMobile={false} // Component now handles mobile/desktop internally
+                onCloseMobileNav={toggleSidebar}
+                onSwitchProject={handleSwitchProject}
+                onAgentSelect={() => {}} // No agent navigation on project page
+                onClearAgent={() => {}} // No agent clearing on project page
+                onConfigureAgent={() => {}} // No agent configuration on project page
+                onConfigureSession={() => {}} // No session configuration on project page
+              />
+            </Sidebar>
           )}
         </SettingsContainer>
       </div>
@@ -95,7 +64,7 @@ function ProjectPageContent({ projectId }: { projectId: string }) {
           <div className="flex items-center justify-between p-4 lg:px-6">
             <div className="flex items-center gap-3">
               <motion.button
-                onClick={() => setShowMobileNav(true)}
+                onClick={toggleSidebar}
                 className="p-2 hover:bg-base-200 rounded-lg lg:hidden"
               >
                 <FontAwesomeIcon icon={faBars} className="w-6 h-6" />
