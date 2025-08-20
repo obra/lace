@@ -75,7 +75,6 @@ import { TextAreaField } from '@/components/ui/TextAreaField';
 import { UISettingsPanel } from '@/components/settings/panels/UISettingsPanel';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { Sidebar } from '@/components/layout/Sidebar';
-// import { MobileSidebar } from '@/components/layout/MobileSidebar'; // Now unified in Sidebar
 // Removed unused feedback and files imports to satisfy lints
 
 // ORGANISMS - Complex interactive components
