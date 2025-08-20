@@ -33,25 +33,73 @@ async function getAvailablePort(): Promise<number> {
 /**
  * Wait for server to be ready by attempting HTTP requests
  */
-async function waitForServer(url: string, timeoutMs: number = 30000): Promise<void> {
+async function waitForServer(url: string, timeoutMs: number = 60000): Promise<void> {
   const startTime = Date.now();
+  let lastError: string = 'unknown';
+  let hasSeenNextJS = false;
+
+  console.log(`⏳ Waiting for server at ${url}/api/health...`);
 
   while (Date.now() - startTime < timeoutMs) {
     try {
-      const response = await fetch(`${url}/api/health`).catch(() => null);
-      if (response?.ok) {
-        console.log(`✅ Server ready at ${url}`);
-        return;
+      const response = await fetch(`${url}/api/health`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        // Be patient with slow compilation
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (response.ok) {
+        const data = await response.json().catch(() => null);
+        if (data) {
+          console.log(`✅ Server ready at ${url} - health response:`, data);
+          return;
+        } else {
+          lastError = 'Valid response but no JSON data';
+        }
+      } else if (response.status === 500) {
+        // 500 errors might be compilation issues - be more patient
+        lastError = `HTTP ${response.status} (compilation may be in progress)`;
+        console.log(`⚠️ ${url}/api/health returned 500 - likely still compiling...`);
+      } else {
+        lastError = `HTTP ${response.status} ${response.statusText}`;
       }
-    } catch {
-      // Server not ready yet
+    } catch (error) {
+      if (error instanceof Error && error.name === 'TimeoutError') {
+        lastError = 'Request timeout (server may be compiling)';
+      } else {
+        lastError = error instanceof Error ? error.message : String(error);
+      }
+
+      // Check if we can at least connect to the root
+      try {
+        const rootResponse = await fetch(url, {
+          method: 'HEAD',
+          signal: AbortSignal.timeout(5000),
+        });
+        if (rootResponse.status !== 404) {
+          hasSeenNextJS = true;
+        }
+      } catch {
+        // Ignore root check failures
+      }
+
+      // Console log every few attempts to track progress
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      if (elapsed % 5 === 0 && (Date.now() - startTime) % 5000 < 500) {
+        console.log(
+          `🔄 Still waiting for ${url}/api/health (${elapsed}s) - ${lastError}${hasSeenNextJS ? ' (Next.js responding)' : ''}`
+        );
+      }
     }
 
-    // Wait before retrying
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Wait before retrying - longer interval for compilation
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
-  throw new Error(`Server at ${url} failed to start within ${timeoutMs}ms`);
+  throw new Error(
+    `Server at ${url} failed to start within ${timeoutMs}ms. Last error: ${lastError}`
+  );
 }
 
 /**
@@ -67,12 +115,11 @@ async function startTestServer(
   console.log(`🚀 Starting test server with LACE_DIR=${tempDir} on port ${port}`);
 
   // Start server process with isolated environment
-  const serverProcess = spawn('npx', ['tsx', 'server-custom.ts'], {
+  const serverProcess = spawn('npx', ['tsx', 'server-custom.ts', '--port', port.toString()], {
     cwd: process.cwd(),
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
-      PORT: port.toString(),
       LACE_DIR: tempDir,
       ANTHROPIC_KEY: 'test-anthropic-key-for-e2e',
       LACE_DB_PATH: path.join(tempDir, 'lace.db'),
@@ -132,6 +179,11 @@ export async function setupTestEnvironment(): Promise<TestEnvironment> {
 }
 
 export async function cleanupTestEnvironment(env: TestEnvironment) {
+  if (!env) {
+    console.log('⚠️  No test environment to cleanup');
+    return;
+  }
+
   console.log(`🧹 Cleaning up test environment: ${env.tempDir}`);
 
   // Kill server process
@@ -188,8 +240,16 @@ export async function createProject(
   // Navigate to home page (use serverUrl if provided, otherwise assume page is already at the right URL)
   if (serverUrl) {
     await page.goto(serverUrl);
+  } else {
+    // If no serverUrl specified, navigate to root of current server
+    const currentUrl = page.url();
+    if (currentUrl && currentUrl !== 'about:blank') {
+      const baseUrl = new URL(currentUrl).origin;
+      await page.goto(baseUrl);
+    } else {
+      await page.goto('/');
+    }
   }
-  await page.goto('/');
 
   // Wait for page to load
   await page.waitForTimeout(2000);
@@ -247,27 +307,54 @@ export async function createProject(
   await directoryInput.blur();
   await page.waitForTimeout(1000);
 
-  // Click the Create Project button - it should be enabled now
-  const createButton = page.locator('button:has-text("Create Project")');
-  await createButton.waitFor({ state: 'visible', timeout: 5000 });
 
-  // Wait for button to be enabled (form validation should pass with valid directory)
-  await expect(createButton).toBeEnabled({ timeout: 5000 });
-
-  // Click the button
-  await createButton.click();
-
-  // Wait for project to be created and become visible in the sidebar
   // Use test ID to reliably identify when we're in the project interface
   await expect(
     page
-      .locator('[data-testid="current-project-name"], [data-testid="current-project-name-desktop"]')
+      .locator('[data-testid="create-project-wizard-project-name"]')
       .first()
   ).toBeVisible({ timeout: 15000 });
+  
+// Click the continue button using the correct test ID
+  const continueButton = page.locator('[data-testid="project-wizard-continue-button"]');
+  await continueButton.waitFor({ state: 'visible', timeout: 5000 });
+
+  // Wait for button to be enabled (form validation should pass with valid directory)
+  await expect(continueButton).toBeEnabled({ timeout: 5000 });
+
+  // Click the button
+  await continueButton.click();
+
+
+  // We're now on the agent select page. We can accept the defaults
+  
+  // Click the finalContinue button using the correct test ID
+  const finalContinueButton = page.locator('[data-testid="project-wizard-continue-button"]');
+  await finalContinueButton.waitFor({ state: 'visible', timeout: 5000 });
+
+  // Wait for button to be enabled (form validation should pass with valid directory)
+  await expect(finalContinueButton).toBeEnabled({ timeout: 5000 });
+
+  // Click the button
+  await finalContinueButton.click();
+
+
+  // Click the createProject button using the correct test ID
+  const createProjectButton = page.locator('[data-testid="create-project-submit"]');
+  await createProjectButton.waitFor({ state: 'visible', timeout: 5000 });
+
+  // Wait for button to be enabled (form validation should pass with valid directory)
+  await expect(createProjectButton).toBeEnabled({ timeout: 5000 });
+
+  // Click the button
+  await createProjectButton.click();
+
+
+
 
   // Also verify we're in the chat interface (project creation should dump us there)
-  await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
-    timeout: 10000,
+  await page.waitForSelector('[data-testid="project-list-entry"]', {
+    timeout: 30000,
   });
 }
 
@@ -662,7 +749,7 @@ export async function setupAnthropicProvider(
     const text = await element.textContent().catch(() => '');
     const tagName = await element.evaluate((el) => el.tagName).catch(() => '');
     const isVisible = await element.isVisible().catch(() => false);
-    console.log(`  Element ${i}: ${tagName} "${text.substring(0, 50)}" visible=${isVisible}`);
+    console.log(`  Element ${i}: ${tagName} "${text?.substring(0, 50) || ''}" visible=${isVisible}`);
   }
 
   let addProviderButton;
