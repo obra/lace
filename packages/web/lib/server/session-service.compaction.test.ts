@@ -57,7 +57,7 @@ describe('SessionService compaction event streaming', () => {
         ({
           getId: () => 'session_123',
           getProjectId: () => 'project_123',
-        }) as any,
+        }) as Session,
     });
 
     // Setup mock Session
