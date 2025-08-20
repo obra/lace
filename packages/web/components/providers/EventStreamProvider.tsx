@@ -42,6 +42,12 @@ interface AgentAPIActions {
   stopAgent: (agentId: ThreadId) => Promise<boolean>;
 }
 
+export interface CompactionState {
+  isCompacting: boolean;
+  isAuto: boolean;
+  compactingAgentId?: string;
+}
+
 interface EventStreamContextType {
   // Event stream connection
   eventStream: EventStreamConnection;
@@ -51,6 +57,9 @@ interface EventStreamContextType {
 
   // Streaming content
   streamingContent: string | null;
+
+  // Compaction state
+  compactionState: CompactionState;
 
   // Agent API
   agentAPI: AgentAPIActions;
@@ -92,6 +101,13 @@ export function EventStreamProvider({
   // Streaming content state
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
 
+  // Compaction state
+  const [compactionState, setCompactionState] = useState<CompactionState>({
+    isCompacting: false,
+    isAuto: false,
+    compactingAgentId: undefined,
+  });
+
   // Agent state change handler
   const handleAgentStateChangeCallback = useCallback(
     (agentId: string, fromState: string, toState: string) => {
@@ -117,6 +133,26 @@ export function EventStreamProvider({
         return newContent;
       });
     }
+  }, []);
+
+  // Compaction event handlers
+  const handleCompactionStart = useCallback((event: LaceEvent) => {
+    if (event.data && typeof event.data === 'object' && 'auto' in event.data) {
+      const compactionData = event.data as { auto: boolean };
+      setCompactionState({
+        isCompacting: true,
+        isAuto: compactionData.auto,
+        compactingAgentId: event.threadId,
+      });
+    }
+  }, []);
+
+  const handleCompactionComplete = useCallback((event: LaceEvent) => {
+    setCompactionState({
+      isCompacting: false,
+      isAuto: false,
+      compactingAgentId: undefined,
+    });
   }, []);
 
   // Agent message handler to clear streaming content when complete
@@ -168,6 +204,9 @@ export function EventStreamProvider({
       onApprovalRequest: handleApprovalRequest,
       // Tool approval responses
       onApprovalResponse: handleApprovalResponse,
+      // Compaction events
+      onCompactionStart: handleCompactionStart,
+      onCompactionComplete: handleCompactionComplete,
     }),
     [
       projectId,
@@ -179,6 +218,8 @@ export function EventStreamProvider({
       handleAgentStateChangeCallback,
       handleApprovalRequest,
       handleApprovalResponse,
+      handleCompactionStart,
+      handleCompactionComplete,
     ]
   );
 
@@ -205,6 +246,9 @@ export function EventStreamProvider({
       // Streaming content
       streamingContent,
 
+      // Compaction state
+      compactionState,
+
       agentAPI: {
         sendMessage: agentAPI.sendMessage,
         stopAgent: agentAPI.stopAgent,
@@ -222,6 +266,7 @@ export function EventStreamProvider({
       loadingHistory,
       addAgentEvent,
       streamingContent,
+      compactionState,
       agentAPI.sendMessage,
       agentAPI.stopAgent,
       handleAgentStateChangeCallback,
@@ -277,6 +322,16 @@ export function useAgentAPI() {
   }
 
   return context.agentAPI;
+}
+
+export function useCompactionState() {
+  const context = useContext(EventStreamContext);
+
+  if (!context) {
+    throw new Error('useCompactionState must be used within EventStreamProvider');
+  }
+
+  return context.compactionState;
 }
 
 // Note: useToolApprovals is now provided by ToolApprovalProvider
