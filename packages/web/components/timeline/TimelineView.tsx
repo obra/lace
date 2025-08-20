@@ -20,7 +20,7 @@ interface TimelineViewProps {
   events: LaceEvent[];
   agents?: AgentInfo[];
   isTyping: boolean;
-  currentAgent: string;
+  currentAgent?: string;
   streamingContent?: string;
   selectedAgent?: string;
 }
