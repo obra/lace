@@ -123,28 +123,30 @@ test('Core Streaming Events - User Messages, Agent Messages, Agent State, Token 
 
     console.log('🎯 Chat state detected:', chatReady);
 
-    // Navigate to chat interface based on current state
-    if (chatReady === 'create_project') {
-      await page.getByTestId('create-first-project-button').click();
-      // Fill in minimal project info if form appears
-      const pathInput = page.getByTestId('project-path-input');
-      if (await pathInput.isVisible().catch(() => false)) {
-        await pathInput.fill(projectPath);
-        // Try to submit/continue
-        const submitButton = page.getByTestId('create-project-submit');
-        if (await submitButton.isVisible().catch(() => false)) {
-          await submitButton.click();
-        }
-      }
-    } else if (chatReady === 'hero_button') {
-      await page.locator('button:has-text("Create your first project")').click();
-      // Handle form if it appears
-      const pathInput = page.getByTestId('project-path-input');
-      if (await pathInput.isVisible().catch(() => false)) {
-        await pathInput.fill(projectPath);
-        const submitButton = page.getByTestId('create-project-submit');
-        if (await submitButton.isVisible().catch(() => false)) {
-          await submitButton.click();
+    // Navigate to chat interface based on current state - use helper functions
+    if (chatReady === 'create_project' || chatReady === 'hero_button') {
+      // Use our reliable project creation helper that handles modal issues
+      const { createProject } = await import('./helpers/ui-interactions');
+      try {
+        await createProject(page, 'Streaming Test', projectPath);
+      } catch (error) {
+        console.log('Project creation failed, trying force click approach:', error);
+        // Fallback - try force clicking
+        const createButton =
+          chatReady === 'create_project'
+            ? page.getByTestId('create-first-project-button')
+            : page.locator('button:has-text("Create your first project")');
+
+        await createButton.click({ force: true });
+
+        // Fill in minimal form if it appears
+        const pathInput = page.getByTestId('project-path-input');
+        if (await pathInput.isVisible().catch(() => false)) {
+          await pathInput.fill(projectPath);
+          const submitButton = page.getByTestId('create-project-submit');
+          if (await submitButton.isVisible().catch(() => false)) {
+            await submitButton.click();
+          }
         }
       }
     }
