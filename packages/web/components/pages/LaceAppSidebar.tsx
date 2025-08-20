@@ -11,7 +11,7 @@ import type { ThreadId } from '@/types/core';
 import type { useTaskManager } from '@/hooks/useTaskManager';
 
 interface LaceAppSidebarProps {
-  showDesktopSidebar: boolean;
+  sidebarOpen: boolean;
   onToggleSidebar: () => void;
   onSettingsClick: () => void;
   selectedProject: string | null;
@@ -28,7 +28,7 @@ interface LaceAppSidebarProps {
 }
 
 export const LaceAppSidebar = memo(function LaceAppSidebar({
-  showDesktopSidebar,
+  sidebarOpen,
   onToggleSidebar,
   onSettingsClick,
   selectedProject,
@@ -45,11 +45,7 @@ export const LaceAppSidebar = memo(function LaceAppSidebar({
 }: LaceAppSidebarProps) {
   return (
     <div className="hidden lg:block flex-shrink-0">
-      <Sidebar
-        open={showDesktopSidebar}
-        onToggle={onToggleSidebar}
-        onSettingsClick={onSettingsClick}
-      >
+      <Sidebar open={sidebarOpen} onToggle={onToggleSidebar} onSettingsClick={onSettingsClick}>
         {/* Current Project - Show only when project selected */}
         {selectedProject && (
           <SidebarSection

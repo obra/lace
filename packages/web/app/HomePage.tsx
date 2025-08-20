@@ -32,10 +32,10 @@ export function HomePage() {
 
   // Auto-open project creation modal when no projects exist
   useEffect(() => {
-    if (!loadingProjects) {
-      handleAutoOpenProjectCreation(projects?.length || 0);
+    if (!loadingProjects && projects) {
+      handleAutoOpenProjectCreation(projects.length);
     }
-  }, [projects?.length, loadingProjects, handleAutoOpenProjectCreation]);
+  }, [projects?.length, loadingProjects, handleAutoOpenProjectCreation, projects]);
 
   const handleSwitchProject = useCallback(() => {
     // Already on homepage - no navigation needed
@@ -94,10 +94,12 @@ export function HomePage() {
             <LoadingView />
           ) : (
             <div className="flex-1 p-6 min-h-0 space-y-6">
-              {projects.length === 0 && (
+              {projects && projects.length === 0 && (
                 <FirstProjectHero onCreateFirstProject={() => setAutoOpenCreateProject(true)} />
               )}
-              {(projects.length > 0 || autoOpenCreateProject) && <ProjectSelectorPanel />}
+              {((projects && projects.length > 0) || autoOpenCreateProject) && (
+                <ProjectSelectorPanel />
+              )}
             </div>
           )}
         </div>

@@ -13,9 +13,11 @@ import React, {
   ReactNode,
 } from 'react';
 
+type ThemeValue = 'light' | 'dark';
+
 interface ThemeContextType {
-  theme: string;
-  setTheme: (theme: string) => void;
+  theme: ThemeValue;
+  setTheme: (theme: ThemeValue) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
@@ -33,14 +35,20 @@ interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setThemeState] = useState('dark'); // Always start with dark to avoid hydration mismatch
+  const [theme, setThemeState] = useState<ThemeValue>('dark'); // Always start with dark to avoid hydration mismatch
   const [mounted, setMounted] = useState(false);
 
   // Load theme from localStorage after component mounts
   useEffect(() => {
     setMounted(true);
-    const savedTheme = localStorage.getItem('lace-theme') || 'dark';
-    setThemeState(savedTheme);
+    const savedTheme = localStorage.getItem('lace-theme');
+    // Type-safe theme parsing - only accept known theme values
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      setThemeState(savedTheme);
+    } else {
+      // Default to dark theme for invalid or missing values
+      setThemeState('dark');
+    }
   }, []);
 
   // Apply theme to document
@@ -51,7 +59,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   }, [theme, mounted]);
 
   const setTheme = useCallback(
-    (newTheme: string) => {
+    (newTheme: ThemeValue) => {
       setThemeState(newTheme);
       localStorage.setItem('lace-theme', newTheme);
       if (mounted) {

@@ -144,12 +144,6 @@ export function createMockUIContext(overrides?: Partial<UseUIStateResult>): UseU
     loading: false,
     setLoading: vi.fn(),
 
-    // Legacy support
-    showMobileNav: false,
-    showDesktopSidebar: true,
-    setShowMobileNav: vi.fn(),
-    toggleDesktopSidebar: vi.fn(),
-
     // Apply any overrides
     ...overrides,
   };

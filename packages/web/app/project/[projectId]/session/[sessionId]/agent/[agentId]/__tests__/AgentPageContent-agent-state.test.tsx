@@ -17,12 +17,11 @@ vi.mock('@/components/providers/UIProvider', () => ({
   useUIContext: () => ({
     sidebarOpen: true,
     setSidebarOpen: vi.fn(),
+    toggleSidebar: vi.fn(),
     autoOpenCreateProject: false,
     setAutoOpenCreateProject: vi.fn(),
-    showMobileNav: false,
-    setShowMobileNav: vi.fn(),
-    showDesktopSidebar: true,
-    toggleDesktopSidebar: vi.fn(),
+    loading: false,
+    setLoading: vi.fn(),
   }),
 }));
 

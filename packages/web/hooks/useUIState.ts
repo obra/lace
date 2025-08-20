@@ -16,12 +16,6 @@ export interface UseUIStateResult {
   // Loading state
   loading: boolean;
   setLoading: (loading: boolean) => void;
-
-  // Legacy support - will be removed
-  showMobileNav: boolean;
-  showDesktopSidebar: boolean;
-  setShowMobileNav: (show: boolean) => void;
-  toggleDesktopSidebar: () => void;
 }
 
 export function useUIState(): UseUIStateResult {
@@ -29,7 +23,10 @@ export function useUIState(): UseUIStateResult {
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('lace-sidebar-open');
-      return stored !== null ? JSON.parse(stored) : true;
+      if (stored !== null) {
+        // Type-safe parsing - only accept 'true'/'false' strings
+        return stored === 'true';
+      }
     }
     return true;
   });
@@ -44,24 +41,18 @@ export function useUIState(): UseUIStateResult {
   const toggleSidebar = useCallback(() => {
     setSidebarOpen((prev: boolean) => {
       const newValue = !prev;
-      localStorage.setItem('lace-sidebar-open', JSON.stringify(newValue));
+      localStorage.setItem('lace-sidebar-open', String(newValue));
       return newValue;
     });
   }, []);
 
   // Persist sidebar state when it changes
   useEffect(() => {
-    localStorage.setItem('lace-sidebar-open', JSON.stringify(sidebarOpen));
+    localStorage.setItem('lace-sidebar-open', String(sidebarOpen));
   }, [sidebarOpen]);
 
-  // Legacy support - map to unified state
-  const showMobileNav = sidebarOpen;
-  const showDesktopSidebar = sidebarOpen;
-  const setShowMobileNav = setSidebarOpen;
-  const toggleDesktopSidebar = toggleSidebar;
-
   return {
-    // New unified API
+    // Unified sidebar API
     sidebarOpen,
     setSidebarOpen,
     toggleSidebar,
@@ -73,11 +64,5 @@ export function useUIState(): UseUIStateResult {
     // Loading state
     loading,
     setLoading,
-
-    // Legacy support for gradual migration
-    showMobileNav,
-    showDesktopSidebar,
-    setShowMobileNav,
-    toggleDesktopSidebar,
   };
 }
