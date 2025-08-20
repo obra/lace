@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
 import { EventStreamManager } from '@/lib/event-stream-manager';
-import type { Agent } from '@/lib/server/lace-imports';
+import type { Agent, Session } from '@/lib/server/lace-imports';
 import { createMockAgent } from '@/test-utils/mock-agent';
 
 describe('Compaction SSE Events', () => {
@@ -23,12 +23,12 @@ describe('Compaction SSE Events', () => {
 
     // Create mock agent with event emitter capabilities
     mockAgent = createMockAgent({
-      threadId: undefined as any, // This test expects threadId to be undefined
+      threadId: undefined as unknown as string, // This test expects threadId to be undefined
       getFullSession: async () =>
         ({
           getId: () => 'lace_20250809_def456',
           getProjectId: () => 'proj_789abc',
-        }) as any,
+        }) as Session,
     });
   });
 
