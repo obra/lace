@@ -7,24 +7,27 @@ import {
   cleanupTestEnvironment,
   type TestEnvironment,
 } from './helpers/test-utils';
-import { createProject, setupAnthropicProvider } from './helpers/ui-interactions';
-import fs from 'fs';
-import path from 'path';
+import {
+  createProject,
+  setupAnthropicProvider,
+  getMessageInput,
+  sendMessage,
+  verifyMessageVisible,
+} from './helpers/ui-interactions';
+import * as fs from 'fs';
+import * as path from 'path';
 
 test.describe('Example E2E Test Patterns', () => {
   let testEnv: TestEnvironment;
 
-  test.beforeEach(
-    async ({ page }: { page: Page }) => {
-      // BEST PRACTICE: Setup isolated test environment for each test
-      // This creates a unique server process with its own LACE_DIR and database
-      testEnv = await setupTestEnvironment();
+  test.beforeEach(async ({ page }) => {
+    // BEST PRACTICE: Setup isolated test environment for each test
+    // This creates a unique server process with its own LACE_DIR and database
+    testEnv = await setupTestEnvironment();
 
-      // Navigate to our isolated test server
-      await page.goto(testEnv.serverUrl);
-    },
-    { timeout: 120000 }
-  ); // 2 minutes for server compilation
+    // Navigate to our isolated test server
+    await page.goto(testEnv.serverUrl);
+  });
 
   test.afterEach(async () => {
     // BEST PRACTICE: Always cleanup test environment
@@ -46,23 +49,13 @@ test.describe('Example E2E Test Patterns', () => {
     await createProject(page, 'Test Project One', projectPath);
 
     // Wait for project to be fully loaded
-    await page.waitForSelector('[data-testid="message-input"]', {
-      timeout: 10000,
-    });
+    await getMessageInput(page);
 
     // Send a message to create some data
-    const messageInput = page.locator('[data-testid="message-input"]').first();
-    await messageInput.fill('This is test message from Test 1');
-
-    const sendButton = page.locator('[data-testid="send"]').first();
-    if (await sendButton.isVisible().catch(() => false)) {
-      await sendButton.click();
-    } else {
-      await messageInput.press('Enter');
-    }
+    await sendMessage(page, 'This is test message from Test 1');
 
     // Verify message appears
-    await expect(page.getByText('This is test message from Test 1')).toBeVisible({ timeout: 5000 });
+    await verifyMessageVisible(page, 'This is test message from Test 1');
 
     // Verify we're using our isolated server
     expect(page.url()).toContain(testEnv.serverUrl.replace('http://', ''));
