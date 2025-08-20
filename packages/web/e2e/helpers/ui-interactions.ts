@@ -159,10 +159,25 @@ export async function setupProvider(
     }
   }
 
-  // Close settings modal
-  await closeSettingsModal(page);
+  // Close both stacked modals - provider setup creates a modal stack
+  console.log('Closing provider configuration modal...');
+  await closeSettingsModal(page); // Close the provider instance creation modal
+
+  // Small delay to let the first modal close completely
+  await page.waitForTimeout(500);
+
+  console.log('Closing main settings modal...');
+  await closeSettingsModal(page); // Close the main settings modal
 
   console.log(`${providerId} provider configuration completed`);
+}
+
+/** Setup default Anthropic provider for E2E tests */
+export async function setupAnthropicProvider(page: Page): Promise<void> {
+  await setupProvider(page, 'anthropic', {
+    apiKey: 'test-anthropic-key-for-e2e',
+    displayName: 'Test Anthropic Provider',
+  });
 }
 
 /**
@@ -241,6 +256,12 @@ export async function submitProjectCreation(page: Page): Promise<void> {
   const submitButton = page.getByTestId('create-project-submit');
   await submitButton.waitFor({ state: 'visible', timeout: 5000 });
   await submitButton.click();
+
+  // Wait for navigation to the project page after submission
+  await page.waitForURL(/\/project\/[^\/]+\/session\/[^\/]+/, { timeout: 15000 });
+
+  // Wait for the project interface to be ready
+  await page.waitForLoadState('networkidle', { timeout: 10000 });
 }
 
 /** Complete project creation workflow */

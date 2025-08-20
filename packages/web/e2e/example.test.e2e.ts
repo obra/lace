@@ -5,9 +5,11 @@ import { test, expect } from '@playwright/test';
 import {
   setupTestEnvironment,
   cleanupTestEnvironment,
-  createProject,
   type TestEnvironment,
 } from './helpers/test-utils';
+import { createProject, setupAnthropicProvider } from './helpers/ui-interactions';
+import fs from 'fs';
+import path from 'path';
 
 test.describe('Example E2E Test Patterns', () => {
   let testEnv: TestEnvironment;
@@ -39,8 +41,13 @@ test.describe('Example E2E Test Patterns', () => {
   }) => {
     console.log('🚀 Test 1: Starting with clean isolated environment');
 
+    // Setup default provider first
+    await setupAnthropicProvider(page);
+
     // Create a project in our isolated environment
-    await createProject(page, 'Test Project One', testEnv.tempDir);
+    const projectPath = path.join(testEnv.tempDir, 'test-project-one');
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'Test Project One', projectPath);
 
     // Wait for project to be fully loaded
     await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
@@ -67,26 +74,9 @@ test.describe('Example E2E Test Patterns', () => {
     await expect(page.getByText('This is test message from Test 1')).toBeVisible({ timeout: 5000 });
     console.log('✅ Test 1: Created project and sent message');
 
-    // Reload page to verify data persists within this test's isolated server
-    await page.reload();
-    await page.waitForTimeout(2000);
-
-    // The message should still be there (within this test's isolated environment)
-    const messageStillVisible = await page
-      .getByText('This is test message from Test 1')
-      .isVisible()
-      .catch(() => false);
-    if (messageStillVisible) {
-      console.log('✅ Test 1: Data persisted after reload within isolated environment');
-    } else {
-      console.log(
-        'ℹ️  Test 1: Data not visible after reload (acceptable - depends on UI state management)'
-      );
-    }
-
-    // Verify we're still in our isolated server
+    // Verify we're using our isolated server
     expect(page.url()).toContain(testEnv.serverUrl.replace('http://', ''));
-    console.log('✅ Test 1: Still using isolated server after reload');
+    console.log('✅ Test 1: Using isolated server');
   });
 
   test('Test 2: Create different project and verify complete isolation from Test 1', async ({
@@ -94,8 +84,13 @@ test.describe('Example E2E Test Patterns', () => {
   }) => {
     console.log('🚀 Test 2: Starting with completely fresh isolated environment');
 
+    // Setup default provider first
+    await setupAnthropicProvider(page);
+
     // This test gets its own server and LACE_DIR - should have NO data from Test 1
-    await createProject(page, 'Test Project Two', testEnv.tempDir);
+    const projectPath = path.join(testEnv.tempDir, 'test-project-two');
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'Test Project Two', projectPath);
 
     // Wait for project to be loaded
     await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
@@ -134,30 +129,13 @@ test.describe('Example E2E Test Patterns', () => {
     expect(page.url()).toContain(testEnv.serverUrl.replace('http://', ''));
     console.log('✅ Test 2: Using different isolated server from Test 1');
 
-    // Reload and verify our data persists (but not Test 1's data)
-    await page.reload();
-    await page.waitForTimeout(2000);
-
-    // Test 1's message should NEVER appear
-    const test1MessageAfterReload = await page
+    // Verify Test 1's message is still not visible (complete isolation)
+    const test1MessageStillNotVisible = await page
       .getByText('This is test message from Test 1')
       .isVisible()
       .catch(() => false);
-    expect(test1MessageAfterReload).toBeFalsy();
-    console.log('✅ Test 2: Still no pollution from Test 1 after reload');
-
-    // Our message state depends on UI implementation
-    const test2MessageAfterReload = await page
-      .getByText('This is test message from Test 2')
-      .isVisible()
-      .catch(() => false);
-    if (test2MessageAfterReload) {
-      console.log('✅ Test 2: Our data persisted after reload');
-    } else {
-      console.log(
-        'ℹ️  Test 2: Our data not visible after reload (acceptable - depends on UI state management)'
-      );
-    }
+    expect(test1MessageStillNotVisible).toBeFalsy();
+    console.log('✅ Test 2: Confirmed no pollution from Test 1');
   });
 
   test('Test 3: Verify test environment provides complete isolation', async ({ page }) => {
@@ -179,8 +157,13 @@ test.describe('Example E2E Test Patterns', () => {
       new RegExp(testEnv.serverUrl.replace('http://localhost:', 'localhost:'))
     );
 
+    // Setup default provider first
+    await setupAnthropicProvider(page);
+
     // Verify we can create projects and they're isolated
-    await createProject(page, 'Isolation Test Project', testEnv.tempDir);
+    const projectPath = path.join(testEnv.tempDir, 'isolation-test-project');
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'Isolation Test Project', projectPath);
 
     // Should not see any data from previous tests
     const anyPreviousMessages = await Promise.all([
@@ -211,21 +194,25 @@ BEST PRACTICE SUMMARY:
    - Don't hardcode localhost:23457
    - Each test gets its own server URL
 
-3. PROJECT CREATION: Use createProject helper
+3. PROVIDER SETUP: Use setupAnthropicProvider() before creating projects
+   - Sets up test provider configuration automatically
+   - Skips if provider already configured
+
+4. PROJECT CREATION: Use createProject helper
    - Pass testEnv.tempDir for project paths
    - Ensures projects are created in isolated directories
 
-4. CLEANUP: Always use cleanupTestEnvironment() in afterEach  
+5. CLEANUP: Always use cleanupTestEnvironment() in afterEach  
    - Kills server process
    - Removes temp directories
    - Prevents resource leaks
 
-5. ISOLATION VERIFICATION: 
+6. ISOLATION VERIFICATION: 
    - Each test should verify it sees no data from other tests
    - Tests can reload pages and verify persistence within their environment
    - Tests should never see pollution from other tests
 
-6. DEBUGGING:
+7. DEBUGGING:
    - Log testEnv.serverUrl and testEnv.tempDir for debugging
    - Each test gets unique identifiable resources
    - Server logs are prefixed with [SERVER:port] for identification

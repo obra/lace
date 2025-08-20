@@ -12,6 +12,7 @@ import {
   useAgentAPI,
 } from './EventStreamProvider';
 import { ToolApprovalProvider } from './ToolApprovalProvider';
+import { AgentProvider } from './AgentProvider';
 import type { ReactNode } from 'react';
 import type { ThreadId } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
@@ -27,17 +28,20 @@ vi.mock('@/hooks/useAgentEvents');
 vi.mock('@/hooks/useEventStream');
 vi.mock('@/hooks/useSessionAPI');
 vi.mock('@/hooks/useAgentAPI');
+vi.mock('@/hooks/useAgentManagement');
 
 // Import and type the mocked hooks
 import { useAgentEvents as useAgentEventsHook } from '@/hooks/useAgentEvents';
 import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
 import { useSessionAPI as useSessionAPIHook } from '@/hooks/useSessionAPI';
 import { useAgentAPI as useAgentAPIHook } from '@/hooks/useAgentAPI';
+import { useAgentManagement } from '@/hooks/useAgentManagement';
 
 const mockUseAgentEvents = useAgentEventsHook as MockedFunction<() => UseAgentEventsReturn>;
 const mockUseEventStream = useEventStreamHook as MockedFunction<() => UseEventStreamResult>;
 const mockUseSessionAPI = useSessionAPIHook as MockedFunction<() => UseSessionAPIReturn>;
 const mockUseAgentAPI = useAgentAPIHook as MockedFunction<() => UseAgentAPIReturn>;
+const mockUseAgentManagement = vi.mocked(useAgentManagement);
 
 describe('EventStreamProvider', () => {
   // Mock fetch globally
@@ -45,15 +49,17 @@ describe('EventStreamProvider', () => {
   global.fetch = mockFetch;
 
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
-      <EventStreamProvider
-        projectId="test-project"
-        sessionId={'test-session' as ThreadId}
-        agentId={'test-agent' as ThreadId}
-      >
-        {children}
-      </EventStreamProvider>
-    </ToolApprovalProvider>
+    <AgentProvider sessionId="test-session" selectedAgentId="lace_20250101_abc123.1">
+      <ToolApprovalProvider agentId={'lace_20250101_abc123.1' as ThreadId}>
+        <EventStreamProvider
+          projectId="test-project"
+          sessionId={'lace_20250101_def456' as ThreadId}
+          agentId={'lace_20250101_abc123.1' as ThreadId}
+        >
+          {children}
+        </EventStreamProvider>
+      </ToolApprovalProvider>
+    </AgentProvider>
   );
 
   beforeEach(() => {
@@ -121,10 +127,21 @@ describe('EventStreamProvider', () => {
       stopAgent: vi.fn(),
     };
 
+    const mockAgentManagementReturn = {
+      sessionDetails: null,
+      loading: false,
+      createAgent: vi.fn(),
+      updateAgentState: vi.fn(),
+      reloadSessionDetails: vi.fn(),
+      loadAgentConfiguration: vi.fn(),
+      updateAgent: vi.fn(),
+    };
+
     mockUseAgentEvents.mockReturnValue(mockAgentEventsReturn);
     mockUseEventStream.mockReturnValue(mockEventStreamReturn);
     mockUseSessionAPI.mockReturnValue(mockSessionAPIReturn);
     mockUseAgentAPI.mockReturnValue(mockAgentAPIReturn);
+    mockUseAgentManagement.mockReturnValue(mockAgentManagementReturn);
   });
 
   it('provides event stream context to children', async () => {
@@ -175,7 +192,7 @@ describe('EventStreamProvider', () => {
         id: 'event-1',
         type: 'USER_MESSAGE',
         timestamp: new Date(),
-        threadId: 'test-agent' as ThreadId,
+        threadId: 'lace_20250101_abc123.1' as ThreadId,
         data: 'Hello',
       },
     ];
@@ -255,20 +272,23 @@ describe('EventStreamProvider', () => {
       // Wait for any async effects to complete
     });
 
-    expect(mockUseAgentEvents).toHaveBeenCalledWith('test-agent', false);
+    expect(mockUseAgentEvents).toHaveBeenCalledWith('lace_20250101_abc123.1', false);
     expect(mockUseEventStream).toHaveBeenCalledWith({
       projectId: 'test-project',
-      sessionId: 'test-session',
-      threadIds: ['test-agent'],
+      sessionId: 'lace_20250101_def456',
+      threadIds: ['lace_20250101_abc123.1'],
       onConnect: expect.any(Function),
       onError: expect.any(Function),
       onUserMessage: expect.any(Function),
       onAgentMessage: expect.any(Function),
+      onAgentToken: expect.any(Function),
       onToolCall: expect.any(Function),
       onToolResult: expect.any(Function),
       onAgentStateChange: expect.any(Function),
       onApprovalRequest: expect.any(Function),
       onApprovalResponse: expect.any(Function),
+      onCompactionStart: expect.any(Function),
+      onCompactionComplete: expect.any(Function),
     });
   });
 
@@ -304,34 +324,39 @@ describe('EventStreamProvider', () => {
     });
 
     // Verify initial calls are made with correct parameters
-    expect(mockUseAgentEvents).toHaveBeenCalledWith('test-agent', false);
+    expect(mockUseAgentEvents).toHaveBeenCalledWith('lace_20250101_abc123.1', false);
     expect(mockUseEventStream).toHaveBeenCalledWith({
       projectId: 'test-project',
-      sessionId: 'test-session',
-      threadIds: ['test-agent'],
+      sessionId: 'lace_20250101_def456',
+      threadIds: ['lace_20250101_abc123.1'],
       onConnect: expect.any(Function),
       onError: expect.any(Function),
       onUserMessage: expect.any(Function),
       onAgentMessage: expect.any(Function),
+      onAgentToken: expect.any(Function),
       onToolCall: expect.any(Function),
       onToolResult: expect.any(Function),
       onAgentStateChange: expect.any(Function),
       onApprovalRequest: expect.any(Function),
       onApprovalResponse: expect.any(Function),
+      onCompactionStart: expect.any(Function),
+      onCompactionComplete: expect.any(Function),
     });
   });
 
   it('handles missing agentId gracefully', async () => {
     const wrapperWithoutAgent = ({ children }: { children: ReactNode }) => (
-      <ToolApprovalProvider agentId={null}>
-        <EventStreamProvider
-          projectId="test-project"
-          sessionId={'test-session' as ThreadId}
-          agentId={null}
-        >
-          {children}
-        </EventStreamProvider>
-      </ToolApprovalProvider>
+      <AgentProvider sessionId="test-session" selectedAgentId={null}>
+        <ToolApprovalProvider agentId={null}>
+          <EventStreamProvider
+            projectId="test-project"
+            sessionId={'lace_20250101_def456' as ThreadId}
+            agentId={null}
+          >
+            {children}
+          </EventStreamProvider>
+        </ToolApprovalProvider>
+      </AgentProvider>
     );
 
     renderHook(() => useEventStream(), { wrapper: wrapperWithoutAgent });
@@ -342,17 +367,20 @@ describe('EventStreamProvider', () => {
 
     expect(mockUseEventStream).toHaveBeenCalledWith({
       projectId: 'test-project',
-      sessionId: 'test-session',
+      sessionId: 'lace_20250101_def456',
       threadIds: undefined,
       onConnect: expect.any(Function),
       onError: expect.any(Function),
       onUserMessage: expect.any(Function),
       onAgentMessage: expect.any(Function),
+      onAgentToken: expect.any(Function),
       onToolCall: expect.any(Function),
       onToolResult: expect.any(Function),
       onAgentStateChange: expect.any(Function),
       onApprovalRequest: expect.any(Function),
       onApprovalResponse: expect.any(Function),
+      onCompactionStart: expect.any(Function),
+      onCompactionComplete: expect.any(Function),
     });
   });
 });

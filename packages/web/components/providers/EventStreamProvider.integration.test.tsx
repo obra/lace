@@ -11,6 +11,7 @@ import {
   useAgentAPI,
 } from './EventStreamProvider';
 import { ToolApprovalProvider } from './ToolApprovalProvider';
+import { AgentProvider } from './AgentProvider';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { createMockResponse } from '@/test-utils/mock-fetch';
 import type { ThreadId } from '@/types/core';
@@ -21,6 +22,7 @@ vi.mock('@/hooks/useAgentEvents');
 vi.mock('@/hooks/useEventStream');
 vi.mock('@/hooks/useSessionAPI');
 vi.mock('@/hooks/useAgentAPI');
+vi.mock('@/hooks/useAgentManagement');
 
 // Mock global fetch for ToolApprovalProvider
 beforeEach(() => {
@@ -31,6 +33,7 @@ import { useAgentEvents as useAgentEventsHook } from '@/hooks/useAgentEvents';
 import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
 import { useSessionAPI as useSessionAPIHook } from '@/hooks/useSessionAPI';
 import { useAgentAPI as useAgentAPIHook } from '@/hooks/useAgentAPI';
+import { useAgentManagement } from '@/hooks/useAgentManagement';
 import type { PendingApproval } from '@/types/api';
 import type { StreamConnection } from '@/types/stream-events';
 
@@ -48,11 +51,14 @@ function TestEventStreamConsumer() {
       <div data-testid="loading-history">{loadingHistory.toString()}</div>
       <button
         data-testid="send-message-button"
-        onClick={() => sendMessage('test-agent' as ThreadId, 'Hello')}
+        onClick={() => sendMessage('lace_20250101_abc123' as ThreadId, 'Hello')}
       >
         Send Message
       </button>
-      <button data-testid="stop-agent-button" onClick={() => stopAgent('test-agent' as ThreadId)}>
+      <button
+        data-testid="stop-agent-button"
+        onClick={() => stopAgent('lace_20250101_abc123' as ThreadId)}
+      >
         Stop Agent
       </button>
     </div>
@@ -106,6 +112,16 @@ describe('EventStreamProvider Integration', () => {
       sendMessage: mockSendMessage,
       stopAgent: mockStopAgent,
     });
+
+    vi.mocked(useAgentManagement).mockReturnValue({
+      sessionDetails: null,
+      loading: false,
+      createAgent: vi.fn(),
+      updateAgentState: vi.fn(),
+      reloadSessionDetails: vi.fn(),
+      loadAgentConfiguration: vi.fn(),
+      updateAgent: vi.fn(),
+    });
   });
 
   it('provides event stream state to deeply nested components without prop drilling', async () => {
@@ -114,14 +130,14 @@ describe('EventStreamProvider Integration', () => {
         id: 'event-1',
         type: 'USER_MESSAGE',
         timestamp: new Date(),
-        threadId: 'test-agent' as ThreadId,
+        threadId: 'lace_20250101_abc123' as ThreadId,
         data: 'Hello',
       },
       {
         id: 'event-2',
         type: 'AGENT_MESSAGE',
         timestamp: new Date(),
-        threadId: 'test-agent' as ThreadId,
+        threadId: 'lace_20250101_abc123' as ThreadId,
         data: { content: 'Hi there!' },
       },
     ];
@@ -168,21 +184,23 @@ describe('EventStreamProvider Integration', () => {
     await act(async () => {
       render(
         <ThemeProvider>
-          <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
-            <EventStreamProvider
-              projectId="test-project"
-              sessionId={'test-session' as ThreadId}
-              agentId={'test-agent' as ThreadId}
-            >
-              <div>
+          <AgentProvider sessionId="test-session" selectedAgentId="lace_20250101_abc123">
+            <ToolApprovalProvider agentId={'lace_20250101_abc123' as ThreadId}>
+              <EventStreamProvider
+                projectId="test-project"
+                sessionId={'lace_20250101_def456' as ThreadId}
+                agentId={'lace_20250101_abc123' as ThreadId}
+              >
                 <div>
                   <div>
-                    <TestEventStreamConsumer />
+                    <div>
+                      <TestEventStreamConsumer />
+                    </div>
                   </div>
                 </div>
-              </div>
-            </EventStreamProvider>
-          </ToolApprovalProvider>
+              </EventStreamProvider>
+            </ToolApprovalProvider>
+          </AgentProvider>
         </ThemeProvider>
       );
     });
@@ -201,31 +219,33 @@ describe('EventStreamProvider Integration', () => {
     await act(async () => {
       render(
         <ThemeProvider>
-          <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
-            <EventStreamProvider
-              projectId="test-project"
-              sessionId={'test-session' as ThreadId}
-              agentId={'test-agent' as ThreadId}
-            >
-              <div>
+          <AgentProvider sessionId="test-session" selectedAgentId="lace_20250101_abc123">
+            <ToolApprovalProvider agentId={'lace_20250101_abc123' as ThreadId}>
+              <EventStreamProvider
+                projectId="test-project"
+                sessionId={'lace_20250101_def456' as ThreadId}
+                agentId={'lace_20250101_abc123' as ThreadId}
+              >
                 <div>
                   <div>
-                    <TestEventStreamConsumer />
+                    <div>
+                      <TestEventStreamConsumer />
+                    </div>
                   </div>
                 </div>
-              </div>
-            </EventStreamProvider>
-          </ToolApprovalProvider>
+              </EventStreamProvider>
+            </ToolApprovalProvider>
+          </AgentProvider>
         </ThemeProvider>
       );
     });
 
     // Test API calls work without prop drilling
     await user.click(screen.getByTestId('send-message-button'));
-    expect(mockSendMessage).toHaveBeenCalledWith('test-agent', 'Hello');
+    expect(mockSendMessage).toHaveBeenCalledWith('lace_20250101_abc123', 'Hello');
 
     await user.click(screen.getByTestId('stop-agent-button'));
-    expect(mockStopAgent).toHaveBeenCalledWith('test-agent');
+    expect(mockStopAgent).toHaveBeenCalledWith('lace_20250101_abc123');
   });
 
   it('throws error when used outside provider', async () => {
@@ -248,15 +268,17 @@ describe('EventStreamProvider Integration', () => {
     await act(async () => {
       const result = render(
         <ThemeProvider>
-          <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
-            <EventStreamProvider
-              projectId="test-project"
-              sessionId={'test-session' as ThreadId}
-              agentId={'test-agent' as ThreadId}
-            >
-              <TestEventStreamConsumer />
-            </EventStreamProvider>
-          </ToolApprovalProvider>
+          <AgentProvider sessionId="test-session" selectedAgentId="lace_20250101_abc123">
+            <ToolApprovalProvider agentId={'lace_20250101_abc123' as ThreadId}>
+              <EventStreamProvider
+                projectId="test-project"
+                sessionId={'lace_20250101_def456' as ThreadId}
+                agentId={'lace_20250101_abc123' as ThreadId}
+              >
+                <TestEventStreamConsumer />
+              </EventStreamProvider>
+            </ToolApprovalProvider>
+          </AgentProvider>
         </ThemeProvider>
       );
       rerender = result.rerender;
@@ -283,15 +305,17 @@ describe('EventStreamProvider Integration', () => {
     await act(async () => {
       rerender(
         <ThemeProvider>
-          <ToolApprovalProvider agentId={'test-agent' as ThreadId}>
-            <EventStreamProvider
-              projectId="test-project"
-              sessionId={'test-session' as ThreadId}
-              agentId={'test-agent' as ThreadId}
-            >
-              <TestEventStreamConsumer />
-            </EventStreamProvider>
-          </ToolApprovalProvider>
+          <AgentProvider sessionId="test-session" selectedAgentId="lace_20250101_abc123">
+            <ToolApprovalProvider agentId={'lace_20250101_abc123' as ThreadId}>
+              <EventStreamProvider
+                projectId="test-project"
+                sessionId={'lace_20250101_def456' as ThreadId}
+                agentId={'lace_20250101_abc123' as ThreadId}
+              >
+                <TestEventStreamConsumer />
+              </EventStreamProvider>
+            </ToolApprovalProvider>
+          </AgentProvider>
         </ThemeProvider>
       );
     });
@@ -305,34 +329,39 @@ describe('EventStreamProvider Integration', () => {
     await act(async () => {
       render(
         <ThemeProvider>
-          <ToolApprovalProvider agentId={'my-agent' as ThreadId}>
-            <EventStreamProvider
-              projectId="my-project"
-              sessionId={'my-session' as ThreadId}
-              agentId={'my-agent' as ThreadId}
-            >
-              <TestEventStreamConsumer />
-            </EventStreamProvider>
-          </ToolApprovalProvider>
+          <AgentProvider sessionId="my-session" selectedAgentId="lace_20250101_xyz789">
+            <ToolApprovalProvider agentId={'lace_20250101_xyz789' as ThreadId}>
+              <EventStreamProvider
+                projectId="my-project"
+                sessionId={'lace_20250101_qrs456' as ThreadId}
+                agentId={'lace_20250101_xyz789' as ThreadId}
+              >
+                <TestEventStreamConsumer />
+              </EventStreamProvider>
+            </ToolApprovalProvider>
+          </AgentProvider>
         </ThemeProvider>
       );
     });
 
     // Verify hooks are called with correct parameters
-    expect(useAgentEventsHook).toHaveBeenCalledWith('my-agent', false);
+    expect(useAgentEventsHook).toHaveBeenCalledWith('lace_20250101_xyz789', false);
     expect(useEventStreamHook).toHaveBeenCalledWith({
       projectId: 'my-project',
-      sessionId: 'my-session',
-      threadIds: ['my-agent'],
+      sessionId: 'lace_20250101_qrs456',
+      threadIds: ['lace_20250101_xyz789'],
       onConnect: expect.any(Function),
       onError: expect.any(Function),
       onUserMessage: expect.any(Function),
       onAgentMessage: expect.any(Function),
+      onAgentToken: expect.any(Function),
       onToolCall: expect.any(Function),
       onToolResult: expect.any(Function),
       onAgentStateChange: expect.any(Function),
       onApprovalRequest: expect.any(Function),
       onApprovalResponse: expect.any(Function),
+      onCompactionStart: expect.any(Function),
+      onCompactionComplete: expect.any(Function),
     });
   });
 
@@ -340,15 +369,17 @@ describe('EventStreamProvider Integration', () => {
     await act(async () => {
       render(
         <ThemeProvider>
-          <ToolApprovalProvider agentId={null}>
-            <EventStreamProvider
-              projectId="test-project"
-              sessionId={'test-session' as ThreadId}
-              agentId={null}
-            >
-              <TestEventStreamConsumer />
-            </EventStreamProvider>
-          </ToolApprovalProvider>
+          <AgentProvider sessionId="test-session" selectedAgentId={null}>
+            <ToolApprovalProvider agentId={null}>
+              <EventStreamProvider
+                projectId="test-project"
+                sessionId={'lace_20250101_def456' as ThreadId}
+                agentId={null}
+              >
+                <TestEventStreamConsumer />
+              </EventStreamProvider>
+            </ToolApprovalProvider>
+          </AgentProvider>
         </ThemeProvider>
       );
     });
@@ -360,17 +391,20 @@ describe('EventStreamProvider Integration', () => {
     // Verify correct parameters passed
     expect(useEventStreamHook).toHaveBeenCalledWith({
       projectId: 'test-project',
-      sessionId: 'test-session',
+      sessionId: 'lace_20250101_def456',
       threadIds: undefined,
       onConnect: expect.any(Function),
       onError: expect.any(Function),
       onUserMessage: expect.any(Function),
       onAgentMessage: expect.any(Function),
+      onAgentToken: expect.any(Function),
       onToolCall: expect.any(Function),
       onToolResult: expect.any(Function),
       onAgentStateChange: expect.any(Function),
       onApprovalRequest: expect.any(Function),
       onApprovalResponse: expect.any(Function),
+      onCompactionStart: expect.any(Function),
+      onCompactionComplete: expect.any(Function),
     });
   });
 });
