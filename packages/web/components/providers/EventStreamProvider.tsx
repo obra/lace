@@ -174,7 +174,7 @@ export function EventStreamProvider({
 
   // Create a single stable event handler to ensure consistent references
   const stableAddAgentEvent = useCallback(
-    (event) => {
+    (event: LaceEvent) => {
       addAgentEvent(event);
     },
     [addAgentEvent]
@@ -189,7 +189,7 @@ export function EventStreamProvider({
       onConnect: () => {
         // Event stream connected
       },
-      onError: (error) => {
+      onError: (error: unknown) => {
         console.error('Event stream error:', error);
       },
       // Agent event handlers - use single stable handler to prevent stale closures
