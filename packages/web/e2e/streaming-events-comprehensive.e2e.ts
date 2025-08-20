@@ -5,6 +5,7 @@ import { test, expect } from './mocks/setup';
 import { createPageObjects } from './page-objects';
 import { setupAnthropicProvider } from './helpers/provider-setup';
 import { streamingHandlers } from './mocks/handlers';
+import { http, HttpResponse } from 'msw';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -509,15 +510,39 @@ test.describe('Comprehensive Streaming Events', () => {
 
     let requestCount = 0;
     await worker.use(
-      http.post('https://api.anthropic.com/v1/messages', () => {
+      http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
         requestCount++;
 
         // First request fails, subsequent succeed (testing recovery)
         if (requestCount === 1) {
-          return streamingHandlers.error();
+          // Use the error handler logic directly
+          return HttpResponse.json({ error: 'Service temporarily unavailable' }, { status: 503 });
         }
 
-        return streamingHandlers.success();
+        // Use success handler logic - delegate to the original handler
+        const body = (await request.json()) as unknown;
+        if (!body || typeof body !== 'object') {
+          return HttpResponse.json({ error: 'Invalid request' }, { status: 400 });
+        }
+
+        return HttpResponse.json({
+          id: 'msg_test123',
+          type: 'message',
+          role: 'assistant',
+          content: [
+            {
+              type: 'text',
+              text: 'Hello! This is a test response from the mocked Anthropic API.',
+            },
+          ],
+          model: 'claude-3-haiku-20240307',
+          stop_reason: 'end_turn',
+          stop_sequence: null,
+          usage: {
+            input_tokens: 20,
+            output_tokens: 15,
+          },
+        });
       })
     );
 
