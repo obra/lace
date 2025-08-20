@@ -1,7 +1,7 @@
 // ABOUTME: Example E2E test demonstrating best practice patterns for Lace tests
 // ABOUTME: Shows complete per-test isolation with setupTestEnvironment and proper cleanup
 
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import {
   setupTestEnvironment,
   cleanupTestEnvironment,
@@ -15,12 +15,10 @@ test.describe('Example E2E Test Patterns', () => {
   let testEnv: TestEnvironment;
 
   test.beforeEach(
-    async ({ page }) => {
+    async ({ page }: { page: Page }) => {
       // BEST PRACTICE: Setup isolated test environment for each test
       // This creates a unique server process with its own LACE_DIR and database
       testEnv = await setupTestEnvironment();
-      console.log(`🧪 Test using server: ${testEnv.serverUrl}`);
-      console.log(`📁 Test using LACE_DIR: ${testEnv.tempDir}`);
 
       // Navigate to our isolated test server
       await page.goto(testEnv.serverUrl);
@@ -39,8 +37,6 @@ test.describe('Example E2E Test Patterns', () => {
   test('Test 1: Create project and verify isolation - should have clean state', async ({
     page,
   }) => {
-    console.log('🚀 Test 1: Starting with clean isolated environment');
-
     // Setup default provider first
     await setupAnthropicProvider(page);
 
@@ -50,20 +46,15 @@ test.describe('Example E2E Test Patterns', () => {
     await createProject(page, 'Test Project One', projectPath);
 
     // Wait for project to be fully loaded
-    await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
+    await page.waitForSelector('[data-testid="message-input"]', {
       timeout: 10000,
     });
 
     // Send a message to create some data
-    const messageInput = page
-      .locator('input[placeholder*="Message"], textarea[placeholder*="Message"]')
-      .first();
+    const messageInput = page.locator('[data-testid="message-input"]').first();
     await messageInput.fill('This is test message from Test 1');
 
-    const sendButton = page
-      .locator('button')
-      .filter({ hasText: /send|submit/i })
-      .first();
+    const sendButton = page.locator('[data-testid="send"]').first();
     if (await sendButton.isVisible().catch(() => false)) {
       await sendButton.click();
     } else {
@@ -72,18 +63,14 @@ test.describe('Example E2E Test Patterns', () => {
 
     // Verify message appears
     await expect(page.getByText('This is test message from Test 1')).toBeVisible({ timeout: 5000 });
-    console.log('✅ Test 1: Created project and sent message');
 
     // Verify we're using our isolated server
     expect(page.url()).toContain(testEnv.serverUrl.replace('http://', ''));
-    console.log('✅ Test 1: Using isolated server');
   });
 
   test('Test 2: Create different project and verify complete isolation from Test 1', async ({
     page,
   }) => {
-    console.log('🚀 Test 2: Starting with completely fresh isolated environment');
-
     // Setup default provider first
     await setupAnthropicProvider(page);
 
@@ -103,7 +90,6 @@ test.describe('Example E2E Test Patterns', () => {
       .isVisible()
       .catch(() => false);
     expect(test1MessageVisible).toBeFalsy();
-    console.log('✅ Test 2: No data from Test 1 visible (perfect isolation)');
 
     // Send a different message
     const messageInput = page
@@ -123,11 +109,9 @@ test.describe('Example E2E Test Patterns', () => {
 
     // Verify our message appears
     await expect(page.getByText('This is test message from Test 2')).toBeVisible({ timeout: 5000 });
-    console.log('✅ Test 2: Created different project and sent different message');
 
     // Verify we're using a completely different server than Test 1
     expect(page.url()).toContain(testEnv.serverUrl.replace('http://', ''));
-    console.log('✅ Test 2: Using different isolated server from Test 1');
 
     // Verify Test 1's message is still not visible (complete isolation)
     const test1MessageStillNotVisible = await page
@@ -135,21 +119,14 @@ test.describe('Example E2E Test Patterns', () => {
       .isVisible()
       .catch(() => false);
     expect(test1MessageStillNotVisible).toBeFalsy();
-    console.log('✅ Test 2: Confirmed no pollution from Test 1');
   });
 
   test('Test 3: Verify test environment provides complete isolation', async ({ page }) => {
-    console.log('🚀 Test 3: Verifying complete environmental isolation');
-
     // Check that each test gets its own unique environment
     expect(testEnv.tempDir).toMatch(/^\/.*\/lace-test-/);
     expect(testEnv.serverUrl).toMatch(/^http:\/\/localhost:\d+$/);
     expect(testEnv.projectName).toContain('E2E Test Project');
     expect(testEnv.serverProcess).toBeDefined();
-
-    console.log(`✅ Test 3: Unique temp directory: ${testEnv.tempDir}`);
-    console.log(`✅ Test 3: Unique server URL: ${testEnv.serverUrl}`);
-    console.log(`✅ Test 3: Server process PID: ${testEnv.serverProcess.pid}`);
 
     // Verify server is responsive
     await page.goto(testEnv.serverUrl);
@@ -178,7 +155,6 @@ test.describe('Example E2E Test Patterns', () => {
     ]);
 
     expect(anyPreviousMessages.every((visible) => !visible)).toBeTruthy();
-    console.log('✅ Test 3: No pollution from any previous tests');
   });
 });
 
