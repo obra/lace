@@ -131,12 +131,10 @@ export function createMockProjectContext(
  */
 export function createMockUIContext(overrides?: Partial<UseUIStateResult>): UseUIStateResult {
   return {
-    // Navigation state
-    showMobileNav: false,
-    showDesktopSidebar: true,
-    setShowMobileNav: vi.fn(),
-    setShowDesktopSidebar: vi.fn(),
-    toggleDesktopSidebar: vi.fn(),
+    // Unified sidebar state
+    sidebarOpen: true,
+    setSidebarOpen: vi.fn(),
+    toggleSidebar: vi.fn(),
 
     // Modal state
     autoOpenCreateProject: false,
@@ -145,6 +143,12 @@ export function createMockUIContext(overrides?: Partial<UseUIStateResult>): UseU
     // Loading state
     loading: false,
     setLoading: vi.fn(),
+
+    // Legacy support
+    showMobileNav: false,
+    showDesktopSidebar: true,
+    setShowMobileNav: vi.fn(),
+    toggleDesktopSidebar: vi.fn(),
 
     // Apply any overrides
     ...overrides,

@@ -46,7 +46,7 @@ export const LaceAppSidebar = memo(function LaceAppSidebar({
   return (
     <div className="hidden lg:block flex-shrink-0">
       <Sidebar
-        isOpen={showDesktopSidebar}
+        open={showDesktopSidebar}
         onToggle={onToggleSidebar}
         onSettingsClick={onSettingsClick}
       >
