@@ -109,7 +109,7 @@ export async function createProviderInstance(page: Page): Promise<void> {
   await createButton.click();
 
   // Wait for instance to be created
-  await page.waitForSelector('text="1 instance configured"', { timeout: 10000 });
+  await page.waitForLoadState('networkidle', { timeout: 10000 });
 }
 
 /**
@@ -126,8 +126,6 @@ export async function setupProvider(
     endpoint?: string;
   }
 ): Promise<void> {
-  console.log(`Setting up ${providerId} provider configuration...`);
-
   // Check if provider is already configured - try multiple indicators
   const existingProviders = await Promise.race([
     page.locator('text="1 instance configured"').count(),
@@ -136,7 +134,6 @@ export async function setupProvider(
   ]);
 
   if (existingProviders > 0) {
-    console.log('Provider already configured, skipping setup');
     return;
   }
 
@@ -152,24 +149,12 @@ export async function setupProvider(
     await createProviderInstance(page);
   } catch (error) {
     // If instance already exists, just continue
-    if (error instanceof Error && error.message.includes('already exists')) {
-      console.log('Provider instance already exists, continuing...');
-    } else {
+    if (!(error instanceof Error && error.message.includes('already exists'))) {
       throw error;
     }
   }
 
-  // Close both stacked modals - provider setup creates a modal stack
-  console.log('Closing provider configuration modal...');
-  await closeSettingsModal(page); // Close the provider instance creation modal
-
-  // Small delay to let the first modal close completely
-  await page.waitForTimeout(500);
-
-  console.log('Closing main settings modal...');
   await closeSettingsModal(page); // Close the main settings modal
-
-  console.log(`${providerId} provider configuration completed`);
 }
 
 /** Setup default Anthropic provider for E2E tests */
@@ -192,17 +177,15 @@ export async function clickCreateProjectButton(page: Page): Promise<void> {
   try {
     await firstProjectButton.waitFor({ state: 'visible', timeout: 3000 });
     await firstProjectButton.click();
-    console.log('Clicked FirstProjectHero create button');
     return;
-  } catch (error) {
-    console.log('FirstProjectHero button not found, trying ProjectSelectorPanel...');
+  } catch {
+    // FirstProjectHero button not found, try ProjectSelectorPanel
   }
 
   // Fall back to ProjectSelectorPanel button (regular project creation)
   const createButton = page.getByTestId('create-project-button');
   await createButton.waitFor({ state: 'visible', timeout: 5000 });
   await createButton.click();
-  console.log('Clicked ProjectSelectorPanel create button');
 }
 
 /** Fill project creation form */
@@ -257,10 +240,10 @@ export async function submitProjectCreation(page: Page): Promise<void> {
   await submitButton.waitFor({ state: 'visible', timeout: 5000 });
   await submitButton.click();
 
-  // Wait for navigation to the project page after submission
-  await page.waitForURL(/\/project\/[^\/]+\/session\/[^\/]+/, { timeout: 15000 });
+  // Wait for navigation to the agent page after submission
+  await page.waitForURL(/\/project\/[^\/]+\/session\/[^\/]+\/agent\/[^\/]+/, { timeout: 15000 });
 
-  // Wait for the project interface to be ready
+  // Wait for the agent interface to be ready
   await page.waitForLoadState('networkidle', { timeout: 10000 });
 }
 
