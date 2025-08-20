@@ -142,11 +142,38 @@ describe('Chat', () => {
     });
 
     mockUseEventStreamContext.mockReturnValue({
+      eventStream: {
+        connection: {
+          connected: false,
+          lastEventId: undefined,
+          reconnectAttempts: 0,
+          maxReconnectAttempts: 5,
+        },
+        lastEvent: undefined,
+        sendCount: 0,
+        reconnect: vi.fn(),
+      },
+      agentEvents: {
+        events: [],
+        loadingHistory: false,
+        addAgentEvent: vi.fn(),
+      },
       streamingContent: undefined,
+      compactionState: {
+        isCompacting: false,
+        isAuto: false,
+        compactingAgentId: undefined,
+      },
+      agentAPI: {
+        sendMessage: vi.fn(),
+        stopAgent: vi.fn(),
+      },
     });
 
     mockUseCompactionState.mockReturnValue({
       isCompacting: false,
+      isAuto: false,
+      compactingAgentId: undefined,
     });
 
     mockUseAgentContext.mockReturnValue(
