@@ -1,31 +1,162 @@
 // ABOUTME: Reusable E2E test utilities for common operations
-// ABOUTME: Centralizes UI interactions to reduce maintenance when UI changes
+// ABOUTME: Centralizes UI interactions and per-test server management
 
 import { Page, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { spawn, ChildProcess } from 'child_process';
+import { createServer } from 'net';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+
+/**
+ * Find an available port by attempting to create a server
+ */
+async function getAvailablePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.unref();
+    server.on('error', reject);
+
+    server.listen(0, () => {
+      const address = server.address();
+      if (address && typeof address === 'object' && 'port' in address) {
+        const port = address.port;
+        server.close(() => resolve(port));
+      } else {
+        reject(new Error('Unable to get port from server address'));
+      }
+    });
+  });
+}
+
+/**
+ * Wait for server to be ready by attempting HTTP requests
+ */
+async function waitForServer(url: string, timeoutMs: number = 30000): Promise<void> {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeoutMs) {
+    try {
+      const response = await fetch(`${url}/api/health`).catch(() => null);
+      if (response?.ok) {
+        console.log(`✅ Server ready at ${url}`);
+        return;
+      }
+    } catch {
+      // Server not ready yet
+    }
+
+    // Wait before retrying
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  throw new Error(`Server at ${url} failed to start within ${timeoutMs}ms`);
+}
+
+/**
+ * Start a test server with isolated LACE_DIR
+ */
+async function startTestServer(
+  tempDir: string
+): Promise<{ serverUrl: string; serverProcess: ChildProcess }> {
+  // Find available port
+  const port = await getAvailablePort();
+  const serverUrl = `http://localhost:${port}`;
+
+  console.log(`🚀 Starting test server with LACE_DIR=${tempDir} on port ${port}`);
+
+  // Start server process with isolated environment
+  const serverProcess = spawn('npx', ['tsx', 'server-custom.ts'], {
+    cwd: process.cwd(),
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: {
+      ...process.env,
+      PORT: port.toString(),
+      LACE_DIR: tempDir,
+      ANTHROPIC_KEY: 'test-anthropic-key-for-e2e',
+      LACE_DB_PATH: path.join(tempDir, 'lace.db'),
+      NODE_ENV: 'test',
+    },
+  });
+
+  // Handle server output
+  serverProcess.stdout?.on('data', (data) => {
+    const output = data.toString().trim();
+    if (output) console.log(`[SERVER:${port}] ${output}`);
+  });
+
+  serverProcess.stderr?.on('data', (data) => {
+    const output = data.toString().trim();
+    if (output) console.error(`[SERVER:${port}] ${output}`);
+  });
+
+  serverProcess.on('exit', (code) => {
+    if (code !== 0 && code !== null) {
+      console.warn(`Server process ${port} exited with code ${code}`);
+    }
+  });
+
+  // Wait for server to be ready
+  await waitForServer(serverUrl);
+
+  return { serverUrl, serverProcess };
+}
 
 // Environment setup utilities
 export interface TestEnvironment {
   tempDir: string;
   originalLaceDir: string | undefined;
   projectName: string;
+  serverUrl: string;
+  serverProcess: ChildProcess;
 }
 
 export async function setupTestEnvironment(): Promise<TestEnvironment> {
-  // Use the same temp directory pattern as core test utils
+  // Create isolated temp directory for this test
   const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'lace-test-'));
   const originalLaceDir = process.env.LACE_DIR;
-  process.env.LACE_DIR = tempDir;
+
+  // Start isolated test server
+  const { serverUrl, serverProcess } = await startTestServer(tempDir);
 
   const projectName = `E2E Test Project ${Date.now()}`;
 
-  return { tempDir, originalLaceDir, projectName };
+  return {
+    tempDir,
+    originalLaceDir,
+    projectName,
+    serverUrl,
+    serverProcess,
+  };
 }
 
 export async function cleanupTestEnvironment(env: TestEnvironment) {
+  console.log(`🧹 Cleaning up test environment: ${env.tempDir}`);
+
+  // Kill server process
+  if (env.serverProcess && !env.serverProcess.killed) {
+    console.log(`🛑 Stopping server process`);
+    env.serverProcess.kill('SIGTERM');
+
+    // Wait for graceful shutdown, then force kill if needed
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(() => {
+        if (!env.serverProcess.killed) {
+          console.log(`🔨 Force killing server process`);
+          env.serverProcess.kill('SIGKILL');
+        }
+        resolve();
+      }, 5000);
+
+      env.serverProcess.on('exit', () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+    });
+  }
+
+  // Restore original LACE_DIR (though this is less critical now with per-test servers)
   if (env.originalLaceDir !== undefined) {
     process.env.LACE_DIR = env.originalLaceDir;
   } else {
@@ -34,6 +165,7 @@ export async function cleanupTestEnvironment(env: TestEnvironment) {
 
   delete process.env.ANTHROPIC_KEY;
 
+  // Clean up temp directory
   if (
     env.tempDir &&
     (await fs.promises
@@ -42,12 +174,21 @@ export async function cleanupTestEnvironment(env: TestEnvironment) {
       .catch(() => false))
   ) {
     await fs.promises.rm(env.tempDir, { recursive: true, force: true });
+    console.log(`✅ Cleaned up temp directory: ${env.tempDir}`);
   }
 }
 
 // Project management utilities
-export async function createProject(page: Page, projectName: string, tempDir: string) {
-  // Navigate to home page
+export async function createProject(
+  page: Page,
+  projectName: string,
+  tempDir: string,
+  serverUrl?: string
+) {
+  // Navigate to home page (use serverUrl if provided, otherwise assume page is already at the right URL)
+  if (serverUrl) {
+    await page.goto(serverUrl);
+  }
   await page.goto('/');
 
   // Wait for page to load

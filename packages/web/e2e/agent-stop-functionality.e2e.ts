@@ -22,7 +22,7 @@ test.describe('Agent Stop Functionality E2E Tests', () => {
   let testEnv: TestEnvironment;
 
   test.beforeEach(async ({ page }) => {
-    // Set up test environment
+    // Set up test environment (now includes per-test server)
     testEnv = await setupTestEnvironment();
 
     // Set up environment with test key
@@ -35,7 +35,8 @@ test.describe('Agent Stop Functionality E2E Tests', () => {
       };
     }, testEnv.tempDir);
 
-    // Create project using reusable utility
+    // Navigate to our test server and create project
+    await page.goto(testEnv.serverUrl);
     await createProject(page, testEnv.projectName, testEnv.tempDir);
   });
 
