@@ -5,6 +5,9 @@ import { test, expect } from './mocks/setup';
 import {
   setupTestEnvironment,
   cleanupTestEnvironment,
+  type TestEnvironment,
+} from './helpers/test-utils';
+import {
   createProject,
   createSession,
   createAgent,
@@ -15,8 +18,7 @@ import {
   waitForSendButton,
   verifyMessageVisible,
   verifyNoMessage,
-  type TestEnvironment,
-} from './helpers/test-utils';
+} from './helpers/ui-interactions';
 
 test.describe('Agent Stop Functionality E2E Tests', () => {
   let testEnv: TestEnvironment;
