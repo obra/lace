@@ -5,15 +5,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import type { Agent } from '@/lib/server/lace-imports';
+import { createMockAgent } from '@/test-utils/mock-agent';
 
 describe('Compaction SSE Events', () => {
   let sseManager: EventStreamManager;
   let sessionService: ReturnType<typeof getSessionService>;
-  let mockAgent: Partial<Agent> & {
-    on: (event: string, handler: Function) => void;
-    emit: (event: string, data?: unknown) => void;
-    handlers: Record<string, Function>;
-  };
+  let mockAgent: ReturnType<typeof createMockAgent>;
   let broadcastSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
@@ -25,20 +22,14 @@ describe('Compaction SSE Events', () => {
     broadcastSpy = vi.spyOn(sseManager, 'broadcast');
 
     // Create mock agent with event emitter capabilities
-    mockAgent = {
-      on: vi.fn((event: string, handler: Function) => {
-        // Store handlers for manual triggering
-        mockAgent.handlers = mockAgent.handlers || {};
-        mockAgent.handlers[event] = handler;
-        return mockAgent as unknown as Agent;
-      }),
-      emit: (event: string, data?: unknown) => {
-        const handler = mockAgent.handlers?.[event];
-        if (handler) handler(data);
-        return true;
-      },
-      handlers: {},
-    };
+    mockAgent = createMockAgent({
+      threadId: undefined as any, // This test expects threadId to be undefined
+      getFullSession: async () =>
+        ({
+          getId: () => 'lace_20250809_def456',
+          getProjectId: () => 'proj_789abc',
+        }) as any,
+    });
   });
 
   it('should emit COMPACTION_START when agent emits compaction_start event', async () => {

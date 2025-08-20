@@ -6,6 +6,7 @@ import { SessionService } from './session-service';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { Session, Agent } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
+import { createMockAgent } from '@/test-utils/mock-agent';
 
 // Mock dependencies
 vi.mock('@/lib/server/lace-imports', () => ({
@@ -35,11 +36,7 @@ describe('SessionService compaction event streaming', () => {
     getAgent: MockedFunction<(threadId: ThreadId) => unknown>;
     getTaskManager: MockedFunction<() => unknown>;
   };
-  let mockAgent: {
-    on: MockedFunction<(event: string, handler: Function) => void>;
-    off: MockedFunction<(event: string, handler: Function) => void>;
-    threadId: ThreadId;
-  };
+  let mockAgent: ReturnType<typeof createMockAgent>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -53,26 +50,15 @@ describe('SessionService compaction event streaming', () => {
       mockEventStreamManager as unknown as EventStreamManager
     );
 
-    // Setup mock Agent
-    const agentEventHandlers = new Map<string, Function[]>();
-    mockAgent = {
-      on: vi.fn((event: string, handler: Function) => {
-        const handlers = agentEventHandlers.get(event) || [];
-        handlers.push(handler);
-        agentEventHandlers.set(event, handlers);
-      }),
-      off: vi.fn(),
+    // Setup mock Agent using shared utility
+    mockAgent = createMockAgent({
       threadId: 'thread_123' as ThreadId,
-    };
-
-    // Add helper to trigger events for testing
-    (mockAgent as unknown as { emit: (event: string, data: unknown) => void }).emit = (
-      event: string,
-      data: unknown
-    ) => {
-      const handlers = agentEventHandlers.get(event) || [];
-      handlers.forEach((handler) => handler(data));
-    };
+      getFullSession: async () =>
+        ({
+          getId: () => 'session_123',
+          getProjectId: () => 'project_123',
+        }) as any,
+    });
 
     // Setup mock Session
     mockSession = {
