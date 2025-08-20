@@ -277,6 +277,7 @@ export function ProjectCreateModal({
                         <input
                           type="text"
                           value={createName}
+                          data-testid="create-project-wizard-project-name"
                           className="input input-bordered w-full focus:outline-none focus:ring-2 focus:ring-accent/60"
                           readOnly
                         />
