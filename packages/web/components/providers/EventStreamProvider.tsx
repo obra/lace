@@ -56,7 +56,7 @@ interface EventStreamContextType {
   agentEvents: AgentEventsState;
 
   // Streaming content
-  streamingContent: string | null;
+  streamingContent: string | undefined;
 
   // Compaction state
   compactionState: CompactionState;
@@ -99,7 +99,7 @@ export function EventStreamProvider({
   const agentAPI = useAgentAPIHook();
 
   // Streaming content state
-  const [streamingContent, setStreamingContent] = useState<string | null>(null);
+  const [streamingContent, setStreamingContent] = useState<string | undefined>(undefined);
 
   // Compaction state
   const [compactionState, setCompactionState] = useState<CompactionState>({
@@ -160,7 +160,7 @@ export function EventStreamProvider({
     (event: LaceEvent) => {
       // Clear streaming content when we get the complete agent message or a new user message
       if (event.type === 'AGENT_MESSAGE' || event.type === 'USER_MESSAGE') {
-        setStreamingContent(null);
+        setStreamingContent(undefined);
       }
       addAgentEvent(event);
     },
