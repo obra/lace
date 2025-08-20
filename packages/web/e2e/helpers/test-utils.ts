@@ -372,3 +372,168 @@ async function createProjectWithProvider(
     timeout: 10000,
   });
 }
+
+// Provider configuration utilities
+export async function setupAnthropicProvider(
+  page: Page,
+  apiKey: string = 'sk-fake-key'
+): Promise<void> {
+  console.log('Setting up Anthropic provider configuration...');
+
+  // Look for the settings/gear icon in the sidebar
+  const settingsSelectors = [
+    '[data-testid="settings-button"]',
+    'button:has([data-testid="gear-icon"])',
+    'button:has-text("Settings")',
+    '[title="Settings"]',
+    '[aria-label="Settings"]',
+    'button svg[data-icon="gear"]',
+    'button svg[data-icon="cog"]',
+    'button svg[data-icon="settings"]',
+    '.sidebar button:last-child', // Often settings is the last button
+    'nav button:last-child',
+  ];
+
+  let settingsButton;
+  for (const selector of settingsSelectors) {
+    settingsButton = page.locator(selector).first();
+    if (await settingsButton.isVisible().catch(() => false)) {
+      console.log(`Found settings button with selector: ${selector}`);
+      break;
+    }
+  }
+
+  if (!settingsButton || !(await settingsButton.isVisible().catch(() => false))) {
+    // Take a screenshot to debug
+    await page.screenshot({ path: 'debug-settings-search.png' });
+    console.log('Could not find settings button, checking page content...');
+
+    // Log available buttons for debugging
+    const buttons = await page.locator('button').all();
+    console.log(`Found ${buttons.length} buttons on page`);
+
+    throw new Error('Could not find settings button or gear icon');
+  }
+
+  await settingsButton.click();
+  console.log('Clicked settings button');
+
+  // Wait for settings modal/page to open
+  await page.waitForTimeout(2000);
+
+  // Look for provider/Anthropic configuration section
+  const providerSelectors = [
+    'text="Provider"',
+    'text="Providers"',
+    'text="Anthropic"',
+    'text="API Configuration"',
+    'text="AI Provider"',
+    'button:has-text("Add Provider")',
+    'button:has-text("Configure Provider")',
+    'button:has-text("Anthropic")',
+  ];
+
+  let providerElement;
+  for (const selector of providerSelectors) {
+    providerElement = page.locator(selector).first();
+    if (await providerElement.isVisible().catch(() => false)) {
+      console.log(`Found provider section with selector: ${selector}`);
+      break;
+    }
+  }
+
+  if (!providerElement || !(await providerElement.isVisible().catch(() => false))) {
+    await page.screenshot({ path: 'debug-provider-search.png' });
+    throw new Error('Could not find provider configuration section');
+  }
+
+  // If it's a button, click it. If it's text, look for nearby button
+  if (await providerElement.evaluate((el) => el.tagName.toLowerCase() === 'button')) {
+    await providerElement.click();
+  } else {
+    // Look for a nearby button or click area
+    const nearbyButton = page.locator('button').filter({ near: providerElement }).first();
+    if (await nearbyButton.isVisible().catch(() => false)) {
+      await nearbyButton.click();
+    } else {
+      await providerElement.click(); // Try clicking the element itself
+    }
+  }
+
+  // Wait for provider configuration form
+  await page.waitForTimeout(1000);
+
+  // Look for API key input field
+  const apiKeySelectors = [
+    'input[placeholder*="API"]',
+    'input[placeholder*="key"]',
+    'input[placeholder*="sk-"]',
+    'input[type="password"]',
+    'input[name*="api"]',
+    'input[name*="key"]',
+    'textarea[placeholder*="API"]',
+    'textarea[placeholder*="key"]',
+  ];
+
+  let apiKeyInput;
+  for (const selector of apiKeySelectors) {
+    apiKeyInput = page.locator(selector).first();
+    if (await apiKeyInput.isVisible().catch(() => false)) {
+      console.log(`Found API key input with selector: ${selector}`);
+      break;
+    }
+  }
+
+  if (!apiKeyInput || !(await apiKeyInput.isVisible().catch(() => false))) {
+    await page.screenshot({ path: 'debug-api-key-search.png' });
+    throw new Error('Could not find API key input field');
+  }
+
+  await apiKeyInput.fill(apiKey);
+  console.log('Filled API key');
+
+  // Save the configuration
+  const saveSelectors = [
+    'button:has-text("Save")',
+    'button:has-text("Add")',
+    'button:has-text("Configure")',
+    'button:has-text("Create")',
+    'button:has-text("Submit")',
+    'button[type="submit"]',
+  ];
+
+  let saveButton;
+  for (const selector of saveSelectors) {
+    saveButton = page.locator(selector).first();
+    if (await saveButton.isVisible().catch(() => false)) {
+      console.log(`Found save button with selector: ${selector}`);
+      break;
+    }
+  }
+
+  if (saveButton && (await saveButton.isVisible().catch(() => false))) {
+    await saveButton.click();
+    console.log('Clicked save button');
+    await page.waitForTimeout(2000);
+  }
+
+  // Try to close settings modal
+  const closeSelectors = [
+    'button:has-text("Close")',
+    'button:has-text("Done")',
+    '[aria-label="Close"]',
+    'button:has-text("×")',
+    '.modal button[aria-label="close"]',
+  ];
+
+  for (const selector of closeSelectors) {
+    const closeButton = page.locator(selector).first();
+    if (await closeButton.isVisible().catch(() => false)) {
+      await closeButton.click();
+      console.log('Closed settings modal');
+      break;
+    }
+  }
+
+  console.log('Anthropic provider configuration completed');
+}
