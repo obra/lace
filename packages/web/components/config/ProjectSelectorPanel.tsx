@@ -68,7 +68,8 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     reloadProjects,
   } = useProjectContext();
   const { enableAgentAutoSelection, loadSessionsForProject } = useSessionContext();
-  const { autoOpenCreateProject, setAutoOpenCreateProject } = useUIContext();
+  const { autoOpenCreateProject, setAutoOpenCreateProject, isNavigating, setIsNavigating } =
+    useUIContext();
   const { handleOnboardingComplete } = useOnboarding(
     setAutoOpenCreateProject,
     enableAgentAutoSelection
@@ -88,6 +89,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
 
   // Project creation state
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   // Project deletion state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -315,33 +317,51 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     workingDirectory: string;
     configuration: ProjectConfiguration;
   }) => {
+    setIsCreatingProject(true);
+
     try {
       // Step 1: Create project using provider method
       const createdProject = await createProject(projectData);
-
       const projectId = createdProject.id;
 
-      // Select the newly created project
-      onProjectSelect(createdProject);
-
-      // If onboarding is available, get the session for this project
+      // Step 2: Navigate directly to chat - modal stays open until page changes
       if (handleOnboardingComplete) {
-        try {
-          const sessionsData = await loadSessionsForProject(projectId);
-          const sessionId = sessionsData[0]?.id;
-          if (sessionId) {
-            const coordinatorAgentId = sessionId; // coordinator has same threadId
-            await handleOnboardingComplete(projectId, sessionId, coordinatorAgentId);
-          }
-        } catch (error) {
-          console.error('Failed to get project sessions for onboarding:', error);
+        const sessionsData = await loadSessionsForProject(projectId);
+
+        const sessionId = sessionsData[0]?.id;
+        if (sessionId) {
+          const coordinatorAgentId = sessionId; // coordinator has same threadId
+
+          // Navigate directly to chat - let navigation unmount the modal naturally
+          setIsNavigating(true);
+
+          // Add timeout to reset navigation state if something goes wrong
+          const navigationTimeout = setTimeout(() => {
+            setIsNavigating(false);
+          }, 5000);
+
+          await handleOnboardingComplete(projectId, sessionId, coordinatorAgentId);
+          clearTimeout(navigationTimeout);
+
+          // Refresh projects after successful navigation (background refresh)
+          void reloadProjects();
+
+          // Don't reset state here - let page navigation handle component unmount
+          return;
         }
       }
 
+      // Only reset modal state if navigation workflow failed
+      setIsCreatingProject(false);
       setShowCreateProject(false);
       setAutoOpenCreateProject(false);
+      throw new Error('Failed to complete project creation workflow');
     } catch (error) {
-      console.error('Project create error:', { error });
+      console.error('Project create error:', error);
+      // Only close modal on error
+      setIsCreatingProject(false);
+      setShowCreateProject(false);
+      setAutoOpenCreateProject(false);
       throw error;
     }
   };
@@ -417,7 +437,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
 
         {/* Projects Grid - Scrollable */}
         <div className="flex-1 overflow-y-auto min-h-0">
-          {loading ? (
+          {loading || isNavigating ? (
             <div className="flex items-center justify-center py-12">
               <div className="flex items-center gap-3">
                 <div className="loading loading-spinner loading-md"></div>
@@ -600,7 +620,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
         <ProjectCreateModal
           isOpen={showCreateProject}
           providers={providers}
-          loading={loading}
+          loading={isCreatingProject}
           onClose={() => {
             setShowCreateProject(false);
             setAutoOpenCreateProject(false);

@@ -73,12 +73,13 @@ export class Project {
     // Create the project instance
     const project = new Project(projectData);
 
-    // Auto-create a default session (no provider info needed at session level)
+    // Auto-create a default session with project configuration
     try {
       Session.create({
         name: 'Main Session',
         description: 'Default session for project',
         projectId: projectData.id,
+        configuration, // Pass project configuration to session
       });
 
       logger.debug('Auto-created default session for project', { projectId: projectData.id });

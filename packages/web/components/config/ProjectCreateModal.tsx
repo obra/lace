@@ -721,7 +721,7 @@ export function ProjectCreateModal({
               {loading ? (
                 <>
                   <div className="loading loading-spinner loading-sm"></div>
-                  Creating...
+                  Thinking...
                 </>
               ) : (
                 'Create Project'
