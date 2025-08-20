@@ -1,22 +1,15 @@
-// ABOUTME: Agent page content component - extracted from LaceApp for proper routing
-// ABOUTME: Contains the full chat UI with sidebar, chat interface, and modals
+// ABOUTME: Agent page content component - uses new PageLayout architecture
+// ABOUTME: Contains the full chat UI with modals, simplified layout structure
 
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBars } from '@/lib/fontawesome';
-
-import { Sidebar } from '@/components/layout/Sidebar';
 import { Chat } from '@/components/chat/Chat';
-import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
-import { SettingsContainer } from '@/components/settings/SettingsContainer';
 import { AgentEditModal } from '@/components/config/AgentEditModal';
 import { SessionEditModal } from '@/components/config/SessionEditModal';
+import { PageLayout } from '@/components/layout/PageLayout';
 
-import { useUIContext } from '@/components/providers/UIProvider';
 import { asThreadId } from '@/types/core';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
@@ -24,6 +17,7 @@ import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useToolApprovalContext } from '@/components/providers/ToolApprovalProvider';
 import { useProviders } from '@/hooks/useProviders';
 import { useURLState } from '@/hooks/useURLState';
+import { useNavigation } from '@/hooks/useNavigation';
 
 import type { SessionConfiguration } from '@/types/api';
 
@@ -82,10 +76,8 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
     [navigateToAgent, projectId, sessionId]
   );
 
-  const handleSwitchProject = useCallback(() => {
-    // Navigate to root to show project selection
-    window.location.href = '/';
-  }, []);
+  // Navigation using proper Next.js router
+  const navigation = useNavigation();
 
   const handleConfigureAgent = useCallback(
     async (agentIdToEdit: string) => {
@@ -194,11 +186,9 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
               <SidebarContent
                 isMobile={false} // Component now handles mobile/desktop internally
                 onCloseMobileNav={toggleSidebar}
-                onSwitchProject={handleSwitchProject}
+                onSwitchProject={navigation.toHome}
                 onAgentSelect={handleAgentSelect}
-                onClearAgent={() =>
-                  (window.location.href = `/project/${projectId}/session/${sessionId}`)
-                }
+                onClearAgent={() => navigation.toSession(projectId, sessionId)}
                 onConfigureAgent={handleConfigureAgent}
                 onConfigureSession={handleConfigureSession}
               />

@@ -1,25 +1,15 @@
-// ABOUTME: Client component wrapper for home page with providers
-// ABOUTME: Handles interactive logic and provider setup for project selection
+// ABOUTME: Client component wrapper for home page with consolidated providers
+// ABOUTME: Uses new ContextProviders architecture for consistency
 
 'use client';
 
-import { UIProvider } from '@/components/providers/UIProvider';
-import { ProjectProvider } from '@/components/providers/ProjectProvider';
-import { SessionProvider } from '@/components/providers/SessionProvider';
+import { ContextProviders } from '@/components/providers/ContextProviders';
 import { HomePage } from './HomePage';
 
 export function HomePageClient() {
   return (
-    <UIProvider>
-      <ProjectProvider
-        selectedProject={null}
-        onProjectSelect={() => {}} // No-op - ProjectSelectorPanel handles navigation
-        onProjectChange={() => {}}
-      >
-        <SessionProvider projectId={null} selectedSessionId={null}>
-          <HomePage />
-        </SessionProvider>
-      </ProjectProvider>
-    </UIProvider>
+    <ContextProviders>
+      <HomePage />
+    </ContextProviders>
   );
 }
