@@ -1,16 +1,17 @@
-// ABOUTME: Composable Sidebar container component with flexible content slots
-// ABOUTME: Provides layout, styling, and responsive behavior while allowing custom content composition
+// ABOUTME: Unified responsive Sidebar component handling both mobile and desktop layouts
+// ABOUTME: Uses single open/onToggle API with automatic mobile overlay vs desktop panel behavior
 
 'use client';
 
 import React from 'react';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { ChevronRightIcon } from '@/lib/heroicons';
-import { faCog } from '@/lib/fontawesome';
+import { faCog, faTimes, faBars } from '@/lib/fontawesome';
 
 interface SidebarProps {
-  isOpen: boolean;
+  open: boolean;
   onToggle: () => void;
   onSettingsClick?: () => void;
   children: React.ReactNode;
@@ -43,91 +44,187 @@ interface SidebarButtonProps {
   className?: string;
 }
 
-export function Sidebar({ isOpen, onToggle, onSettingsClick, children }: SidebarProps) {
+export function Sidebar({ open, onToggle, onSettingsClick, children }: SidebarProps) {
+  return (
+    <>
+      {/* Mobile version - overlay when open */}
+      <div className="lg:hidden">
+        <AnimatePresence>
+          {open && (
+            <>
+              {/* Mobile backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/50 z-40"
+                onClick={onToggle}
+              />
+
+              {/* Mobile sidebar */}
+              <motion.div
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="fixed left-0 top-0 h-full w-80 bg-base-100 z-50 flex flex-col"
+              >
+                {/* Mobile Header */}
+                <div className="p-4 border-b border-base-300">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 gap-3">
+                      <Link
+                        href="/"
+                        className="flex items-center gap-2 font-semibold tracking-tight"
+                      >
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-content">
+                          ✦
+                        </span>
+                        <span className="text-lg">Lace</span>
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={onToggle}
+                        className="p-2 hover:bg-base-200 rounded-lg transition-colors"
+                      >
+                        <FontAwesomeIcon icon={faTimes} className="w-5 h-5 text-base-content/60" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mobile Content Area */}
+                <div className="flex-1 overflow-y-auto">{children}</div>
+
+                {/* Mobile Footer */}
+                <div className="p-4 border-t border-base-300">
+                  <button
+                    onClick={onSettingsClick}
+                    className="btn btn-ghost w-full justify-start"
+                    title="Settings"
+                  >
+                    <FontAwesomeIcon icon={faCog} className="w-4 h-4 mr-2" />
+                    Settings
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Desktop version - always rendered, but collapsed when !open */}
+      <div className="hidden lg:block h-full">
+        <DesktopSidebar open={open} onToggle={onToggle} onSettingsClick={onSettingsClick}>
+          {children}
+        </DesktopSidebar>
+      </div>
+
+      {/* Mobile hamburger - only show when sidebar is closed */}
+      {!open && (
+        <button
+          className="fixed top-4 left-4 z-30 lg:hidden p-2 bg-base-100 rounded-lg shadow-lg border border-base-300"
+          onClick={onToggle}
+        >
+          <FontAwesomeIcon icon={faBars} className="w-5 h-5 text-base-content/60" />
+        </button>
+      )}
+    </>
+  );
+}
+
+function DesktopSidebar({
+  open,
+  onToggle,
+  onSettingsClick,
+  children,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  onSettingsClick?: () => void;
+  children: React.ReactNode;
+}) {
   // Collapsed state
-  if (!isOpen) {
+  if (!open) {
     return (
-      <>
-        <div className="bg-base-100 border-r border-base-300/50 flex flex-col items-center py-6 transition-all duration-300 w-16 relative shadow-sm h-full">
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={onSettingsClick}
-              className="p-3 hover:bg-base-200 rounded-xl transition-all duration-200 hover:scale-105 ring-hover"
-              title="Settings"
-            >
-              <FontAwesomeIcon icon={faCog} className="w-5 h-5 text-base-content/60" />
-            </button>
-          </div>
-
-          {/* Clickable border area for toggle */}
-          <div
-            className="absolute -right-2 top-0 bottom-0 w-4 cursor-pointer hover:bg-primary/10 transition-colors duration-200 z-40"
-            onClick={onToggle}
-            title="Click to expand sidebar"
-          />
-
+      <div className="bg-base-100 border-r border-base-300/50 flex flex-col items-center py-6 transition-all duration-300 w-16 relative shadow-sm h-full">
+        <div className="flex flex-col gap-3">
           <button
-            onClick={onToggle}
-            className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-lg z-[9999] group"
+            onClick={onSettingsClick}
+            className="p-3 hover:bg-base-200 rounded-xl transition-all duration-200 hover:scale-105 ring-hover"
+            title="Settings"
           >
-            <ChevronRightIcon className="w-4 h-4 text-base-content/60 group-hover:text-base-content transition-colors" />
+            <FontAwesomeIcon icon={faCog} className="w-5 h-5 text-base-content/60" />
           </button>
         </div>
-      </>
+
+        {/* Clickable border area for toggle */}
+        <div
+          className="absolute -right-2 top-0 bottom-0 w-4 cursor-pointer hover:bg-primary/10 transition-colors duration-200 z-40"
+          onClick={onToggle}
+          title="Click to expand sidebar"
+        />
+
+        <button
+          onClick={onToggle}
+          className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-lg z-[9999] group"
+        >
+          <ChevronRightIcon className="w-4 h-4 text-base-content/60 group-hover:text-base-content transition-colors" />
+        </button>
+      </div>
     );
   }
 
   return (
-    <>
-      <div className="bg-base-100/95 backdrop-blur-sm border-r border-base-300/50 flex flex-col relative transition-all duration-300 w-[350px] h-full shadow-lg">
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="p-6 border-b border-base-300/30">
-            <div className="flex items-center justify-between">
-              <div className="flex-1 gap-3">
-                <Link
-                  href="/"
-                  className="flex items-center gap-3 font-semibold tracking-tight hover:opacity-80 transition-opacity"
-                >
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-accent to-cyan-600 text-xs text-white shadow-md">
-                    ✦
-                  </span>
-                  <span className="text-xl font-ui font-medium">Lace</span>
-                </Link>
-              </div>
-              <button
-                onClick={onSettingsClick}
-                className="p-2.5 hover:bg-base-200/80 rounded-xl transition-all duration-200 hover:scale-105"
-                title="Settings"
+    <div className="bg-base-100/95 backdrop-blur-sm border-r border-base-300/50 flex flex-col relative transition-all duration-300 w-[350px] h-full shadow-lg">
+      <div className="flex flex-col h-full">
+        {/* Header */}
+        <div className="p-6 border-b border-base-300/30">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 gap-3">
+              <Link
+                href="/"
+                className="flex items-center gap-3 font-semibold tracking-tight hover:opacity-80 transition-opacity"
               >
-                <FontAwesomeIcon
-                  icon={faCog}
-                  className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
-                />
-              </button>
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-accent to-cyan-600 text-xs text-white shadow-md">
+                  ✦
+                </span>
+                <span className="text-xl font-ui font-medium">Lace</span>
+              </Link>
             </div>
+            <button
+              onClick={onSettingsClick}
+              className="p-2.5 hover:bg-base-200/80 rounded-xl transition-all duration-200 hover:scale-105"
+              title="Settings"
+            >
+              <FontAwesomeIcon
+                icon={faCog}
+                className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
+              />
+            </button>
           </div>
-
-          {/* Content Area */}
-          <div className="flex-1 overflow-y-auto">{children}</div>
-
-          {/* Clickable border area for toggle */}
-          <div
-            className="absolute -right-2 top-0 bottom-0 w-4 cursor-pointer hover:bg-primary/10 transition-colors duration-200 z-40 group"
-            onClick={onToggle}
-            title="Click to collapse sidebar"
-          />
-
-          {/* Toggle Button */}
-          <button
-            onClick={onToggle}
-            className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-lg z-[9999] group"
-          >
-            <ChevronRightIcon className="w-4 h-4 text-base-content/60 group-hover:text-base-content transition-colors rotate-180" />
-          </button>
         </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto">{children}</div>
+
+        {/* Clickable border area for toggle */}
+        <div
+          className="absolute -right-2 top-0 bottom-0 w-4 cursor-pointer hover:bg-primary/10 transition-colors duration-200 z-40 group"
+          onClick={onToggle}
+          title="Click to collapse sidebar"
+        />
+
+        {/* Toggle Button */}
+        <button
+          onClick={onToggle}
+          className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-base-100 border border-base-300 rounded-full flex items-center justify-center hover:bg-base-200 transition-all duration-200 shadow-lg z-[9999] group"
+        >
+          <ChevronRightIcon className="w-4 h-4 text-base-content/60 group-hover:text-base-content transition-colors rotate-180" />
+        </button>
       </div>
-    </>
+    </div>
   );
 }
 
