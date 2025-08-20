@@ -2,13 +2,18 @@
 // ABOUTME: Handles port detection communication between server and Playwright
 
 import { spawn } from 'child_process';
-import { writeFileSync } from 'fs';
+import { writeFileSync, mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
+import { tmpdir } from 'os';
 
 const TEST_PORT_START = 23457;
 const PORT_FILE = join(process.cwd(), '.playwright-server-url');
 
 function startServer() {
+  // Create isolated temporary LACE_DIR for the entire test server session
+  const tempLaceDir = mkdtempSync(join(tmpdir(), 'lace-e2e-server-'));
+  console.log(`📁 Using temporary LACE_DIR: ${tempLaceDir}`);
+
   // Use E2E test server for tool approval tests, regular server otherwise
   const serverFile =
     process.env.E2E_TOOL_APPROVAL_MOCK === 'true' ? 'e2e-test-server.ts' : 'server-custom.ts';
@@ -22,6 +27,7 @@ function startServer() {
       ANTHROPIC_KEY: 'test-anthropic-key-for-e2e-tests',
       ANTHROPIC_API_KEY: 'test-anthropic-key-for-e2e-tests',
       LACE_DB_PATH: ':memory:',
+      LACE_DIR: tempLaceDir, // Set isolated LACE_DIR for the server
       NODE_ENV: 'test',
       VITEST_RUNNING: 'true',
       // Enable tool approval mock provider for E2E tests
@@ -59,15 +65,28 @@ function startServer() {
     process.exit(code || 0);
   });
 
+  // Cleanup function for temp directory
+  function cleanup() {
+    console.log(`🧹 Cleaning up temporary LACE_DIR: ${tempLaceDir}`);
+    try {
+      rmSync(tempLaceDir, { recursive: true, force: true });
+      console.log('✅ Temporary LACE_DIR cleaned up successfully');
+    } catch (error) {
+      console.warn('⚠️ Warning: Failed to clean up temporary LACE_DIR:', error.message);
+    }
+  }
+
   // Handle wrapper script termination
   process.on('SIGTERM', () => {
     console.log('🛑 Received SIGTERM, terminating server...');
     serverProcess.kill('SIGTERM');
+    cleanup();
   });
 
   process.on('SIGINT', () => {
     console.log('🛑 Received SIGINT, terminating server...');
     serverProcess.kill('SIGINT');
+    cleanup();
   });
 
   // Ensure we don't exit before server is ready
@@ -75,6 +94,7 @@ function startServer() {
     if (serverProcess && !serverProcess.killed) {
       serverProcess.kill('SIGTERM');
     }
+    cleanup();
   });
 }
 
