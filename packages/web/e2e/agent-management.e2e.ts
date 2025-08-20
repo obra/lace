@@ -3,7 +3,7 @@
 
 import { test, expect } from './fixtures/test-environment';
 import { createPageObjects } from './page-objects';
-import { getMessageInput } from './helpers/test-utils';
+import { getMessageInput } from './helpers/ui-interactions';
 import * as fs from 'fs';
 import * as path from 'path';
 
