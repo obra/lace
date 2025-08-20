@@ -55,7 +55,7 @@ describe('Sidebar', () => {
     render(<Sidebar {...defaultProps} open={false} onSettingsClick={mockOnSettingsClick} />);
 
     // When collapsed, only desktop collapsed settings button is visible
-    const settingsButton = screen.getByTitle('Settings');
+    const settingsButton = screen.getByLabelText('Open settings');
     fireEvent.click(settingsButton);
     expect(mockOnSettingsClick).toHaveBeenCalledTimes(1);
   });
@@ -65,7 +65,7 @@ describe('Sidebar', () => {
     render(<Sidebar {...defaultProps} open={true} onSettingsClick={mockOnSettingsClick} />);
 
     // When expanded, both mobile and desktop settings buttons exist, click the first one
-    const settingsButtons = screen.getAllByTitle('Settings');
+    const settingsButtons = screen.getAllByLabelText('Open settings');
     expect(settingsButtons.length).toBeGreaterThan(0);
     fireEvent.click(settingsButtons[0]);
     expect(mockOnSettingsClick).toHaveBeenCalledTimes(1);
@@ -87,11 +87,11 @@ describe('Sidebar', () => {
   it('renders settings button in both expanded and collapsed states', () => {
     // Collapsed state
     const { rerender } = render(<Sidebar {...defaultProps} open={false} />);
-    expect(screen.getByTitle('Settings')).toBeInTheDocument();
+    expect(screen.getByLabelText('Open settings')).toBeInTheDocument();
 
     // Expanded state - now has multiple settings buttons (mobile + desktop)
     rerender(<Sidebar {...defaultProps} open={true} />);
-    const settingsButtons = screen.getAllByTitle('Settings');
+    const settingsButtons = screen.getAllByLabelText('Open settings');
     expect(settingsButtons.length).toBeGreaterThan(0);
   });
 

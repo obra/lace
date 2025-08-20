@@ -125,8 +125,8 @@ describe('ThemeProvider', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it('should initialize with theme from localStorage', () => {
-    mockLocalStorage.getItem.mockReturnValue('cupcake');
+  it('should default to dark theme for invalid localStorage values', () => {
+    mockLocalStorage.getItem.mockReturnValue('cupcake'); // Invalid theme value
 
     render(
       <ThemeProvider>
@@ -135,7 +135,8 @@ describe('ThemeProvider', () => {
     );
 
     expect(mockLocalStorage.getItem).toHaveBeenCalledWith('lace-theme');
-    expect(document.documentElement.setAttribute).toHaveBeenCalledWith('data-theme', 'cupcake');
-    expect(screen.getByTestId('current-theme')).toHaveTextContent('cupcake');
+    // Should default to 'dark' for invalid theme values
+    expect(document.documentElement.setAttribute).toHaveBeenCalledWith('data-theme', 'dark');
+    expect(screen.getByTestId('current-theme')).toHaveTextContent('dark');
   });
 });
