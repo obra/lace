@@ -10,6 +10,15 @@ import type { Session } from '@/lib/server/lace-imports';
  * @param overrides - Optional overrides for specific Agent methods/properties
  * @returns A mock Agent object compatible with SessionService.setupAgentEventHandlers()
  */
+type MockAgent = {
+  threadId: string;
+  handlers: Record<string, Function>;
+  on: any; // Mock function for event registration
+  emit: any; // Mock function for event emission
+  getFullSession: any; // Mock function for session retrieval
+  [key: string]: unknown;
+};
+
 export function createMockAgent(
   overrides: {
     threadId?: string;
@@ -18,25 +27,22 @@ export function createMockAgent(
     emit?: (event: string, data?: unknown) => boolean;
     [key: string]: unknown;
   } = {}
-): Partial<Agent> & {
-  on: (event: string, handler: Function) => unknown;
-  emit: (event: string, data?: unknown) => boolean;
-  getFullSession: () => Promise<Session | undefined>;
-  handlers?: Record<string, Function>;
-} {
+): MockAgent {
   // Create event handler storage for manual triggering in tests
-  const mockAgent = {
+  const handlers: Record<string, Function> = {};
+
+  const mockAgent: MockAgent = {
     threadId: overrides.threadId || 'lace_20250101_test01.1',
-    handlers: {} as Record<string, Function>,
+    handlers,
 
     // Event emitter methods - store handlers for manual triggering
     on: vi.fn((event: string, handler: Function) => {
-      mockAgent.handlers[event] = handler;
+      handlers[event] = handler;
       return mockAgent;
     }),
 
-    emit: vi.fn((event: string, data?: unknown) => {
-      const handler = mockAgent.handlers[event];
+    emit: vi.fn((event: string, data?: unknown): boolean => {
+      const handler = handlers[event];
       if (handler) {
         handler(data);
         return true;
