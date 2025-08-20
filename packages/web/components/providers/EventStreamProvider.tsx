@@ -3,7 +3,14 @@
 
 'use client';
 
-import React, { createContext, useContext, useCallback, useMemo, type ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useCallback,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useAgentEvents as useAgentEventsHook } from '@/hooks/useAgentEvents';
 import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
 import { useSessionAPI as useSessionAPIHook } from '@/hooks/useSessionAPI';
@@ -42,6 +49,9 @@ interface EventStreamContextType {
   // Agent events
   agentEvents: AgentEventsState;
 
+  // Streaming content
+  streamingContent: string | null;
+
   // Agent API
   agentAPI: AgentAPIActions;
 
@@ -79,6 +89,9 @@ export function EventStreamProvider({
   const sessionAPI = useSessionAPIHook();
   const agentAPI = useAgentAPIHook();
 
+  // Streaming content state
+  const [streamingContent, setStreamingContent] = useState<string | null>(null);
+
   // Agent state change handler
   const handleAgentStateChangeCallback = useCallback(
     (agentId: string, fromState: string, toState: string) => {
@@ -91,6 +104,31 @@ export function EventStreamProvider({
       }
     },
     [updateAgentState, onAgentStateChange]
+  );
+
+  // Agent token handler for streaming content
+  const handleAgentToken = useCallback((event: LaceEvent) => {
+    if (event.data && typeof event.data === 'object' && 'token' in event.data) {
+      const tokenData = event.data as { token: string };
+      // console.warn('[STREAMING] Adding token:', JSON.stringify(tokenData.token));
+      setStreamingContent((prev) => {
+        const newContent = (prev || '') + tokenData.token;
+        // console.warn('[STREAMING] New content length:', newContent.length);
+        return newContent;
+      });
+    }
+  }, []);
+
+  // Agent message handler to clear streaming content when complete
+  const stableAddAgentEventWithStreaming = useCallback(
+    (event: LaceEvent) => {
+      // Clear streaming content when we get the complete agent message or a new user message
+      if (event.type === 'AGENT_MESSAGE' || event.type === 'USER_MESSAGE') {
+        setStreamingContent(null);
+      }
+      addAgentEvent(event);
+    },
+    [addAgentEvent]
   );
 
   // Memoize threadIds to prevent unnecessary re-subscriptions
@@ -119,8 +157,9 @@ export function EventStreamProvider({
         console.error('Event stream error:', error);
       },
       // Agent event handlers - use single stable handler to prevent stale closures
-      onUserMessage: stableAddAgentEvent,
-      onAgentMessage: stableAddAgentEvent,
+      onUserMessage: stableAddAgentEventWithStreaming,
+      onAgentMessage: stableAddAgentEventWithStreaming,
+      onAgentToken: handleAgentToken,
       onToolCall: stableAddAgentEvent,
       onToolResult: stableAddAgentEvent,
       // Agent state changes
@@ -135,6 +174,8 @@ export function EventStreamProvider({
       sessionId,
       threadIds,
       stableAddAgentEvent,
+      stableAddAgentEventWithStreaming,
+      handleAgentToken,
       handleAgentStateChangeCallback,
       handleApprovalRequest,
       handleApprovalResponse,
@@ -161,6 +202,9 @@ export function EventStreamProvider({
         addAgentEvent,
       },
 
+      // Streaming content
+      streamingContent,
+
       agentAPI: {
         sendMessage: agentAPI.sendMessage,
         stopAgent: agentAPI.stopAgent,
@@ -177,6 +221,7 @@ export function EventStreamProvider({
       events,
       loadingHistory,
       addAgentEvent,
+      streamingContent,
       agentAPI.sendMessage,
       agentAPI.stopAgent,
       handleAgentStateChangeCallback,

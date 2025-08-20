@@ -791,10 +791,14 @@ export class Agent extends EventEmitter {
     const tokenListener = ({ token }: { token: string }) => {
       // Simple pass-through - emit all tokens as received
       this.emit('agent_token', { token });
+
+      // Get context explicitly to ensure AGENT_TOKEN events have projectId
+      const context = this._getEventContext();
       this._addEventAndEmit({
         type: 'AGENT_TOKEN',
         threadId: this._threadId,
         data: { token },
+        context, // Explicitly include context to ensure projectId is present
         transient: true,
       });
     };
@@ -2074,6 +2078,9 @@ export class Agent extends EventEmitter {
    */
   private _getEventContext(): { sessionId?: string; projectId?: string; agentId?: string } {
     const thread = this._threadManager.getThread(this._threadId);
+
+    // Context handling cleaned up - root issue was in session-service.ts
+
     return {
       sessionId: thread?.sessionId,
       projectId: thread?.projectId,
@@ -2095,9 +2102,19 @@ export class Agent extends EventEmitter {
       return null;
     }
 
-    // Add context if not already provided
+    // Ensure context is complete - merge with thread context if needed
+    const threadContext = this._getEventContext();
+
     if (!event.context) {
-      event.context = this._getEventContext();
+      event.context = threadContext;
+    } else {
+      // Merge context to ensure projectId and sessionId are present
+      event.context = {
+        sessionId: event.context.sessionId || threadContext.sessionId,
+        projectId: event.context.projectId || threadContext.projectId,
+        agentId: event.context.agentId || threadContext.agentId,
+        ...event.context, // Preserve any additional context fields
+      };
     }
 
     const addedEvent = this._threadManager.addEvent(event);

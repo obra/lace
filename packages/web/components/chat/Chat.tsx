@@ -6,13 +6,18 @@
 import React, { memo, useCallback } from 'react';
 import { TimelineView } from '@/components/timeline/TimelineView';
 import { MemoizedChatInput } from '@/components/chat/MemoizedChatInput';
-import { useSessionEvents, useAgentAPI } from '@/components/providers/EventStreamProvider';
+import {
+  useSessionEvents,
+  useAgentAPI,
+  useEventStreamContext,
+} from '@/components/providers/EventStreamProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import type { ThreadId, AgentInfo, LaceEvent } from '@/types/core';
 
 export const Chat = memo(function Chat(): React.JSX.Element {
   // Get data from providers
   const { events } = useSessionEvents();
+  const { streamingContent } = useEventStreamContext();
   const { sessionDetails, selectedAgent, agentBusy } = useAgentContext();
   const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useAgentAPI();
 
@@ -50,8 +55,9 @@ export const Chat = memo(function Chat(): React.JSX.Element {
             events={events}
             agents={agents}
             isTyping={agentBusy}
-            currentAgent={currentAgentName}
+            currentAgent={currentAgent?.threadId}
             selectedAgent={inputAgentId}
+            streamingContent={streamingContent}
           />
         </div>
       </div>

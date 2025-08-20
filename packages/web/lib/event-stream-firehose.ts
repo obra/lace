@@ -156,9 +156,11 @@ class EventStreamFirehose {
       // Parse the SuperJSON-serialized SSE event data
       const laceEvent = parseTyped<LaceEvent>(event.data as string);
 
-      // Less verbose - only log important events
+      // Less verbose - only log important events (temporarily include AGENT_TOKEN for debugging)
       if (laceEvent.type !== 'AGENT_TOKEN') {
         console.warn('[FIREHOSE] Parsed:', laceEvent.type, laceEvent.threadId);
+      } else {
+        console.warn('[FIREHOSE] Parsed AGENT_TOKEN:', laceEvent.threadId);
       }
 
       this.routeEvent(laceEvent);
@@ -169,8 +171,8 @@ class EventStreamFirehose {
 
   private routeEvent(event: LaceEvent): void {
     let routedCount = 0;
-    // Only log routing for non-token events
-    if (event.type !== 'AGENT_TOKEN' && process.env.NODE_ENV === 'development') {
+    // Only log routing for non-token events (temporarily include AGENT_TOKEN)
+    if (process.env.NODE_ENV === 'development') {
       console.warn(
         '[FIREHOSE] Routing',
         event.type,
@@ -181,7 +183,9 @@ class EventStreamFirehose {
     }
 
     for (const subscription of this.subscriptions.values()) {
-      if (this.eventMatchesFilter(event, subscription.filter)) {
+      const matches = this.eventMatchesFilter(event, subscription.filter);
+
+      if (matches) {
         try {
           subscription.callback(event);
           routedCount++;
@@ -195,8 +199,8 @@ class EventStreamFirehose {
       }
     }
 
-    // Only log routing results for important events
-    if (event.type !== 'AGENT_TOKEN' && process.env.NODE_ENV === 'development') {
+    // Only log routing results for important events (temporarily include AGENT_TOKEN)
+    if (process.env.NODE_ENV === 'development') {
       console.warn('[FIREHOSE] Event routed to', routedCount, 'subscriptions');
     }
 
