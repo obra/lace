@@ -9,7 +9,7 @@
     "node": ">=20.18.3"
   },
   "scripts": {
-    "build": "tsc && tsc-alias && cp -r src/config/prompts dist/config/ 2>/dev/null || true",
+    "build": "tsc && tsc-alias && cp -r src/config/prompts dist/config/ 2>/dev/null || true && cp -r src/providers/catalog/data dist/providers/catalog/ 2>/dev/null || true",
     "build:clean": "rm -rf dist && npm run build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
@@ -154,6 +154,14 @@
     "./test-utils/temp-lace-dir": {
       "types": "./dist/test-utils/temp-lace-dir.d.ts",
       "import": "./dist/test-utils/temp-lace-dir.js"
+    },
+    "./utils/traffic-logger": {
+      "types": "./dist/utils/traffic-logger.d.ts",
+      "import": "./dist/utils/traffic-logger.js"
+    },
+    "./tools/tool": {
+      "types": "./dist/tools/tool.d.ts",
+      "import": "./dist/tools/tool.js"
     }
   }
 }
