@@ -6,11 +6,6 @@ import { SENTRY_CONFIG } from './lib/sentry-config';
 Sentry.init({
   ...SENTRY_CONFIG,
 
-  // Capture Replay for 10% of all sessions,
-  // plus for 100% of sessions with an error
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1.0,
-
   integrations: [
     Sentry.replayIntegration({
       // Additional Replay configuration goes in here, for example:
