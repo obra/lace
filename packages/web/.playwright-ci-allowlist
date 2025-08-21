@@ -2,4 +2,11 @@
 # Add one test file path per line
 # Lines starting with # are comments and will be ignored
 
+e2e/basic-messaging.e2e.ts
+e2e/basic-user-journey.e2e.ts
 e2e/console-forward.e2e.ts
+e2e/example.test.e2e.ts
+e2e/message-streaming.e2e.ts
+e2e/streaming-basic.e2e.ts
+e2e/streaming-reliability.e2e.ts
+e2e/streaming-sse-events.e2e.ts
