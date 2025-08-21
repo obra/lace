@@ -454,6 +454,7 @@ export function ProjectCreateModal({
                       type="button"
                       className="btn btn-link text-base-content/70 no-underline"
                       onClick={() => setCreateStep(createStep - 1)}
+                      data-testid="project-wizard-back-button"
                     >
                       Back
                     </button>
@@ -474,6 +475,7 @@ export function ProjectCreateModal({
                         type="button"
                         className="btn btn-link text-base-content/70 no-underline"
                         onClick={() => setShowAdvancedOptions(true)}
+                        data-testid="project-advanced-setup-button"
                       >
                         Advanced setup
                       </button>
@@ -493,6 +495,7 @@ export function ProjectCreateModal({
                               !createConfig.providerInstanceId ||
                               !createConfig.modelId))
                         }
+                        data-testid="project-wizard-continue-button"
                       >
                         Continue
                       </AccentButton>

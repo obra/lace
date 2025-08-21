@@ -78,6 +78,7 @@ export const TaskSidebarSection = memo(function TaskSidebarSection({
             onClick={handleTaskBoardClick}
             className="text-sm font-medium text-base-content hover:text-base-content/80 transition-colors"
             disabled={taskManager.tasks.length === 0}
+            data-testid="task-board-button"
           >
             Task Board ({taskManager.tasks.length})
           </button>
