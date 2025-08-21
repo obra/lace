@@ -7,6 +7,15 @@ import {
   cleanupTestEnvironment,
   type TestEnvironment,
 } from './helpers/test-utils';
+import {
+  createProject,
+  setupAnthropicProvider,
+  getMessageInput,
+  sendMessage,
+  verifyMessageVisible,
+} from './helpers/ui-interactions';
+import * as fs from 'fs';
+import * as path from 'path';
 
 test.describe('MSW Setup', () => {
   let testEnv: TestEnvironment;
@@ -22,21 +31,29 @@ test.describe('MSW Setup', () => {
     }
   });
 
-  test('MSW intercepts external API calls', async ({ page }) => {
-    // Make a direct API call from the browser to verify interception
-    const response = await page.evaluate(async () => {
-      const result = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-3-haiku-20240307',
-          messages: [{ role: 'user', content: 'test' }],
-        }),
-      });
-      return result.json();
-    });
+  test('HTTP mocking intercepts Anthropic API calls in server', async ({ page }) => {
+    // Setup provider and create project to trigger API calls through the server
+    await setupAnthropicProvider(page);
 
-    expect(response).toHaveProperty('id', 'msg_test123');
-    expect(response.content[0].text).toContain('test response from the mocked Anthropic API');
+    const projectPath = path.join(testEnv.tempDir, 'api-mock-test-project');
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'API Mock Test Project', projectPath);
+
+    // Wait for project to be fully loaded
+    await getMessageInput(page);
+
+    // Send a message that will trigger an API call - this should be intercepted by our HTTP mocks
+    await sendMessage(page, 'test message to verify API mocking');
+
+    // Verify the message appears (proves the test infrastructure is working)
+    await verifyMessageVisible(page, 'test message to verify API mocking');
+
+    // Wait for AI response which proves the mocking intercepted the API call
+    await expect(
+      page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
+    ).toBeVisible({ timeout: 15000 });
+
+    // If we get here, it means the HTTP mocking system is working correctly
+    expect(true).toBeTruthy(); // Test passes - mocking is functional
   });
 });
