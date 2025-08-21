@@ -148,17 +148,17 @@ async function signAndNotarize(options: SigningOptions) {
   try {
     // Set up certificate
     console.log('🔐 Setting up certificate and keychain...');
-    
-    if (certificateP12.includes('base64')) {
-      // Handle base64 encoded certificate (from environment)
-      tempCertPath = 'temp-certificate.p12';
-      execSync(`echo "${certificateP12}" | base64 --decode > ${tempCertPath}`);
-    } else {
+
+    if (certificateP12.startsWith('/') || certificateP12.includes('.p12')) {
       // Handle file path
       tempCertPath = certificateP12;
       if (!existsSync(tempCertPath)) {
         throw new Error(`Certificate file not found: ${tempCertPath}`);
       }
+    } else {
+      // Handle base64 encoded certificate (from environment)
+      tempCertPath = 'temp-certificate.p12';
+      execSync(`echo "${certificateP12}" | base64 --decode > ${tempCertPath}`);
     }
 
     // Create temporary keychain
@@ -174,30 +174,44 @@ async function signAndNotarize(options: SigningOptions) {
     execSync(`security unlock-keychain -p "${keychainPassword}" ${tempKeychainName}`);
 
     // Import certificate
-    execSync(`security import "${tempCertPath}" -k ${tempKeychainName} -P "${certificatePassword}" -T /usr/bin/codesign`);
-    execSync(`security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${keychainPassword}" ${tempKeychainName}`);
+    execSync(
+      `security import "${tempCertPath}" -k ${tempKeychainName} -P "${certificatePassword}" -T /usr/bin/codesign`
+    );
+    execSync(
+      `security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${keychainPassword}" ${tempKeychainName}`
+    );
 
     // Find signing identity
-    const identityOutput = execSync(`security find-identity -v -p codesigning ${tempKeychainName}`, { encoding: 'utf8' });
+    const identityOutput = execSync(
+      `security find-identity -v -p codesigning ${tempKeychainName}`,
+      { encoding: 'utf8' }
+    );
     const identityMatch = identityOutput.match(/"([^"]*Developer ID Application[^"]*)"/);
-    
+
     if (!identityMatch) {
       throw new Error('No Developer ID Application certificate found in keychain');
     }
-    
+
     const signingIdentity = identityMatch[1];
     console.log(`🔑 Using signing identity: ${signingIdentity}`);
 
     // Sign the binary
     console.log('✍️  Signing binary with hardened runtime...');
-    execSync(`codesign --force --options runtime --deep --sign "${signingIdentity}" "${resolvedBinaryPath}" --verbose`, { stdio: 'inherit' });
+    execSync(
+      `codesign --force --options runtime --deep --sign "${signingIdentity}" "${resolvedBinaryPath}" --verbose`,
+      { stdio: 'inherit' }
+    );
 
     // Verify signature
     console.log('🔍 Verifying signature...');
-    execSync(`codesign --verify --deep --strict --verbose=2 "${resolvedBinaryPath}"`, { stdio: 'inherit' });
-    
+    execSync(`codesign --verify --deep --strict --verbose=2 "${resolvedBinaryPath}"`, {
+      stdio: 'inherit',
+    });
+
     try {
-      execSync(`spctl --assess --type execute --verbose "${resolvedBinaryPath}"`, { stdio: 'inherit' });
+      execSync(`spctl --assess --type execute --verbose "${resolvedBinaryPath}"`, {
+        stdio: 'inherit',
+      });
     } catch {
       console.log('ℹ️  spctl assessment failed (expected for non-notarized binaries)');
     }
@@ -213,7 +227,7 @@ async function signAndNotarize(options: SigningOptions) {
       }
 
       console.log('📤 Starting notarization process...');
-      
+
       // Create ZIP for notarization
       const zipName = `${resolvedBinaryPath.split('/').pop()}-signed.zip`;
       execSync(`zip -r "${zipName}" "${resolvedBinaryPath}"`);
@@ -221,7 +235,10 @@ async function signAndNotarize(options: SigningOptions) {
       try {
         // Submit for notarization
         console.log('📤 Submitting for notarization (this may take several minutes)...');
-        execSync(`xcrun notarytool submit "${zipName}" --apple-id "${appleId}" --password "${applePassword}" --team-id "${teamId}" --wait --timeout 20m --verbose`, { stdio: 'inherit' });
+        execSync(
+          `xcrun notarytool submit "${zipName}" --apple-id "${appleId}" --password "${applePassword}" --team-id "${teamId}" --wait --timeout 20m --verbose`,
+          { stdio: 'inherit' }
+        );
 
         // Staple notarization ticket
         console.log('📎 Stapling notarization ticket...');
@@ -230,7 +247,9 @@ async function signAndNotarize(options: SigningOptions) {
         // Verify stapling
         console.log('🔍 Verifying notarization...');
         execSync(`xcrun stapler validate "${resolvedBinaryPath}"`, { stdio: 'inherit' });
-        execSync(`spctl --assess --type execute --verbose "${resolvedBinaryPath}"`, { stdio: 'inherit' });
+        execSync(`spctl --assess --type execute --verbose "${resolvedBinaryPath}"`, {
+          stdio: 'inherit',
+        });
 
         console.log('✅ Binary successfully signed and notarized!');
       } catch (error) {
@@ -243,13 +262,12 @@ async function signAndNotarize(options: SigningOptions) {
         }
       }
     }
-
   } finally {
     // Clean up
     if (tempCertPath && tempCertPath.includes('temp-certificate.p12') && existsSync(tempCertPath)) {
       unlinkSync(tempCertPath);
     }
-    
+
     if (tempKeychainName) {
       try {
         execSync(`security delete-keychain ${tempKeychainName}`, { stdio: 'pipe' });
