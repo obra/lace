@@ -161,16 +161,7 @@ jobs:
         run: cd packages/web && npm run build
 
       - name: Run allow-listed Playwright tests
-        run: |
-          cd packages/web
-          # Read allow-listed test files (ignore comments and empty lines)
-          TEST_FILES=$(grep -v '^#' .playwright-ci-allowlist | grep -v '^$' | tr '\n' ' ')
-          if [ -n "$TEST_FILES" ]; then
-            echo "Running allow-listed Playwright tests: $TEST_FILES"
-            npm run test:playwright -- $TEST_FILES
-          else
-            echo "No tests in allowlist, skipping Playwright tests"
-          fi
+        run: cd packages/web && npm run test:playwright:ci
         env:
           CI: true
 
