@@ -3,7 +3,7 @@
 
 import { test, expect } from './fixtures/test-environment';
 import { createPageObjects } from './page-objects';
-import { getMessageInput } from './helpers/test-utils';
+import { getMessageInput } from './helpers/ui-interactions';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -68,7 +68,7 @@ test.describe('Agent Management', () => {
     await expect(page).toHaveURL(agentUrl);
 
     // Check if interface is ready and can handle new interactions
-    const messageInput = getMessageInput(page);
+    const messageInput = await getMessageInput(page);
     const messageInputEnabled = await messageInput.getAttribute('disabled');
     const placeholderText = await messageInput.getAttribute('placeholder');
 

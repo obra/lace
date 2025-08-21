@@ -4,36 +4,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { createErrorResponse } from '@/lib/server/api-utils';
-import type { StreamSubscription } from '@/types/stream-events';
-
-// Parse subscription from query parameters
-function parseSubscription(request: NextRequest): StreamSubscription {
-  const url = new URL(request.url);
-
-  // Helper to parse comma-separated arrays, returning undefined for empty results
-  const parseArrayParam = (param: string | null): string[] | undefined => {
-    if (!param) return undefined;
-    const filtered = param.split(',').filter(Boolean);
-    return filtered.length > 0 ? filtered : undefined;
-  };
-
-  return {
-    projectIds: parseArrayParam(url.searchParams.get('projects')),
-    sessionIds: parseArrayParam(url.searchParams.get('sessions')),
-    threads: parseArrayParam(url.searchParams.get('threads')),
-  };
-}
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    const subscription = parseSubscription(request);
+    // Firehose approach: send ALL events, client-side filtering handles specificity
+    const subscription = {};
 
     const manager = EventStreamManager.getInstance();
 
     // Create SSE stream
     const stream = new ReadableStream<Uint8Array>({
       start(controller: ReadableStreamDefaultController<Uint8Array>) {
-        // Add connection to manager
+        // Add connection to manager with empty subscription (all events)
         const connectionId = manager.addConnection(controller, subscription);
 
         // Handle connection cleanup

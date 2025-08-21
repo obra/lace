@@ -7,9 +7,11 @@ import React from 'react';
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { LaceEvent, AgentInfo, ThreadId } from '@/types/core';
+import type { CompactionState } from '@/components/providers/EventStreamProvider';
 import { asThreadId } from '@/types/core';
 import { TimelineMessageWithDetails } from './TimelineMessageWithDetails';
 import { TypingIndicator } from './TypingIndicator';
+import { CompactionIndicator } from './CompactionIndicator';
 import { useProcessedEvents } from '@/hooks/useProcessedEvents';
 import TimelineEntryErrorBoundary from './TimelineEntryErrorBoundary';
 
@@ -20,9 +22,10 @@ interface TimelineViewProps {
   events: LaceEvent[];
   agents?: AgentInfo[];
   isTyping: boolean;
-  currentAgent: string;
+  currentAgent?: string;
   streamingContent?: string;
   selectedAgent?: string;
+  compactionState?: CompactionState;
 }
 
 export function TimelineView({
@@ -32,13 +35,9 @@ export function TimelineView({
   currentAgent,
   streamingContent,
   selectedAgent,
+  compactionState,
 }: TimelineViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Debug logging for no events case
-  if (events.length === 0) {
-    console.warn('[TIMELINE_VIEW] No events to display. Raw events:', events.length, 'Selected agent:', selectedAgent);
-  }
 
   // Process events (filtering, aggregation, etc.)
   const processedEvents = useProcessedEvents(
@@ -149,7 +148,7 @@ export function TimelineView({
                 );
               })()}
 
-            {isTyping && !streamingContent && (
+            {isTyping && !streamingContent && currentAgent && (
               <motion.div
                 key="typing"
                 initial={{ opacity: 0, y: 4 }}
@@ -158,6 +157,18 @@ export function TimelineView({
                 transition={{ duration: 0.1, ease: 'easeOut' }}
               >
                 <TypingIndicator agent={currentAgent} />
+              </motion.div>
+            )}
+
+            {compactionState?.isCompacting && (
+              <motion.div
+                key="compacting"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -2 }}
+                transition={{ duration: 0.1, ease: 'easeOut' }}
+              >
+                <CompactionIndicator compactionState={compactionState} />
               </motion.div>
             )}
           </AnimatePresence>

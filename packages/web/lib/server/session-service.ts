@@ -12,8 +12,6 @@ import { logger } from '~/utils/logger';
 export class SessionService {
   // Track agents that already have event handlers set up to prevent duplicates
   private registeredAgents = new WeakSet<Agent>();
-  // Project ID context for events
-  projectId?: string;
 
   constructor() {}
 
@@ -29,7 +27,7 @@ export class SessionService {
         if (agent) {
           const { setupAgentApprovals } = await import('./agent-utils');
           setupAgentApprovals(agent, sessionId);
-          this.setupAgentEventHandlers(agent, sessionId);
+          await this.setupAgentEventHandlers(agent);
         }
       }
 
@@ -40,14 +38,26 @@ export class SessionService {
     return session;
   }
 
-  setupAgentEventHandlers(agent: Agent, sessionId: ThreadId): void {
+  async setupAgentEventHandlers(agent: Agent): Promise<void> {
     // Prevent duplicate event handler registration
     if (this.registeredAgents.has(agent)) {
       return;
     }
     this.registeredAgents.add(agent);
+
+    // Get session from agent
+    const session = await agent.getFullSession();
+    if (!session) {
+      logger.warn(
+        `[SESSION_SERVICE] No session found for agent ${agent.threadId}, skipping event handler setup`
+      );
+      return;
+    }
+
     const sseManager = EventStreamManager.getInstance();
     const threadId = agent.threadId;
+    const sessionId = session.getId();
+    const projectId = session.getProjectId();
 
     agent.on(
       'agent_response_complete',
@@ -62,7 +72,7 @@ export class SessionService {
           data: { content, tokenUsage },
           context: {
             sessionId,
-            projectId: undefined,
+            projectId,
             taskId: undefined,
             agentId: undefined,
           },
@@ -72,9 +82,6 @@ export class SessionService {
 
     // Handle streaming tokens
     agent.on('agent_token', ({ token }: { token: string }) => {
-      // Keep console output for development
-      process.stdout.write(token);
-
       // Broadcast token to UI for real-time display
       sseManager.broadcast({
         type: 'AGENT_TOKEN',
@@ -84,7 +91,7 @@ export class SessionService {
         transient: true,
         context: {
           sessionId,
-          projectId: undefined,
+          projectId, // Use actual projectId from session instead of undefined
           taskId: undefined,
           agentId: undefined,
         },
@@ -106,7 +113,7 @@ export class SessionService {
         transient: true,
         context: {
           sessionId,
-          projectId: this.projectId,
+          projectId,
           taskId: undefined,
           agentId: undefined,
         },
@@ -130,7 +137,7 @@ export class SessionService {
         transient: true,
         context: {
           sessionId,
-          projectId: this.projectId,
+          projectId,
           taskId: undefined,
           agentId: undefined,
         },
@@ -155,7 +162,7 @@ export class SessionService {
           data: { id: callId, name: toolName, arguments: input },
           context: {
             sessionId,
-            projectId: undefined,
+            projectId,
             taskId: undefined,
             agentId: undefined,
           },
@@ -173,7 +180,7 @@ export class SessionService {
           data: result as ToolResult, // Cast to ToolResult for type safety
           context: {
             sessionId,
-            projectId: undefined,
+            projectId,
             taskId: undefined,
             agentId: undefined,
           },
@@ -196,7 +203,7 @@ export class SessionService {
         transient: true,
         context: {
           sessionId,
-          projectId: undefined,
+          projectId,
           taskId: undefined,
           agentId: undefined,
         },
@@ -222,7 +229,7 @@ export class SessionService {
           data: `Agent error: ${error.message}`,
           context: {
             sessionId,
-            projectId: undefined,
+            projectId,
             taskId: undefined,
             agentId: undefined,
           },
@@ -268,7 +275,7 @@ export class SessionService {
               },
               context: {
                 sessionId,
-                projectId: undefined,
+                projectId,
                 taskId: undefined,
                 agentId: undefined,
               },
@@ -288,7 +295,7 @@ export class SessionService {
             },
             context: {
               sessionId,
-              projectId: undefined,
+              projectId,
               taskId: undefined,
               agentId: undefined,
             },
@@ -302,7 +309,7 @@ export class SessionService {
             data: event.data,
             context: {
               sessionId,
-              projectId: undefined,
+              projectId,
               taskId: undefined,
               agentId: undefined,
             },

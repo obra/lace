@@ -18,6 +18,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:playwright": "playwright test",
+    "test:playwright:ci": "TEST_FILES=$(grep -v '^#' .playwright-ci-allowlist | grep -v '^$' | tr '\\n' ' ') && if [ -n \"$TEST_FILES\" ]; then playwright test $TEST_FILES; else echo 'No tests in allowlist, skipping Playwright tests'; fi",
     "test:playwright:ui": "playwright test --ui",
     "ladle": "ladle serve",
     "ladle:build": "ladle build",

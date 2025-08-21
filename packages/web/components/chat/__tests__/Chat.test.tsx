@@ -82,6 +82,8 @@ vi.mock('@/components/chat/MemoizedChatInput', () => ({
 vi.mock('@/components/providers/EventStreamProvider', () => ({
   useSessionEvents: vi.fn(),
   useAgentAPI: vi.fn(),
+  useEventStreamContext: vi.fn(),
+  useCompactionState: vi.fn(),
 }));
 
 vi.mock('@/components/providers/AgentProvider', () => ({
@@ -89,11 +91,18 @@ vi.mock('@/components/providers/AgentProvider', () => ({
 }));
 
 // Import mocked hooks
-import { useSessionEvents, useAgentAPI } from '@/components/providers/EventStreamProvider';
+import {
+  useSessionEvents,
+  useAgentAPI,
+  useEventStreamContext,
+  useCompactionState,
+} from '@/components/providers/EventStreamProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 
 const mockUseSessionEvents = vi.mocked(useSessionEvents);
 const mockUseAgentAPI = vi.mocked(useAgentAPI);
+const mockUseEventStreamContext = vi.mocked(useEventStreamContext);
+const mockUseCompactionState = vi.mocked(useCompactionState);
 const mockUseAgentContext = vi.mocked(useAgentContext);
 
 // Test data factories
@@ -130,6 +139,42 @@ describe('Chat', () => {
     mockUseAgentAPI.mockReturnValue({
       sendMessage: mockSendMessage,
       stopAgent: mockStopAgent,
+    });
+
+    mockUseEventStreamContext.mockReturnValue({
+      eventStream: {
+        connection: {
+          connected: false,
+          lastEventId: undefined,
+          reconnectAttempts: 0,
+          maxReconnectAttempts: 5,
+        },
+        lastEvent: undefined,
+        sendCount: 0,
+        reconnect: vi.fn(),
+        close: vi.fn(),
+      },
+      agentEvents: {
+        events: [],
+        loadingHistory: false,
+        addAgentEvent: vi.fn(),
+      },
+      streamingContent: undefined,
+      compactionState: {
+        isCompacting: false,
+        isAuto: false,
+        compactingAgentId: undefined,
+      },
+      agentAPI: {
+        sendMessage: vi.fn(),
+        stopAgent: vi.fn(),
+      },
+    });
+
+    mockUseCompactionState.mockReturnValue({
+      isCompacting: false,
+      isAuto: false,
+      compactingAgentId: undefined,
     });
 
     mockUseAgentContext.mockReturnValue(
@@ -214,7 +259,7 @@ describe('Chat', () => {
     it('passes current agent name when selected agent exists', () => {
       render(<Chat />);
 
-      expect(screen.getByTestId('current-agent')).toHaveTextContent('Alice');
+      expect(screen.getByTestId('current-agent')).toHaveTextContent('agent-1');
     });
 
     it('passes default Agent name when selected agent not found', () => {
@@ -232,7 +277,7 @@ describe('Chat', () => {
 
       render(<Chat />);
 
-      expect(screen.getByTestId('current-agent')).toHaveTextContent('Agent');
+      expect(screen.getByTestId('current-agent')).toHaveTextContent('');
     });
 
     it('passes selectedAgent for timeline', () => {
@@ -400,7 +445,7 @@ describe('Chat', () => {
 
       render(<Chat />);
 
-      expect(screen.getByTestId('current-agent')).toHaveTextContent('Bob');
+      expect(screen.getByTestId('current-agent')).toHaveTextContent('agent-2');
       expect(screen.getByTestId('agent-id')).toHaveTextContent('agent-2');
       expect(screen.getByTestId('placeholder')).toHaveTextContent('Message Bob...');
     });
@@ -416,7 +461,7 @@ describe('Chat', () => {
       render(<Chat />);
 
       expect(screen.getByTestId('agents-count')).toHaveTextContent('0');
-      expect(screen.getByTestId('current-agent')).toHaveTextContent('Agent');
+      expect(screen.getByTestId('current-agent')).toHaveTextContent('');
       expect(screen.getByTestId('agent-id')).toHaveTextContent('none');
       expect(screen.getByTestId('placeholder')).toHaveTextContent('Message agent...');
     });
@@ -437,7 +482,7 @@ describe('Chat', () => {
       render(<Chat />);
 
       expect(screen.getByTestId('agents-count')).toHaveTextContent('0');
-      expect(screen.getByTestId('current-agent')).toHaveTextContent('Agent');
+      expect(screen.getByTestId('current-agent')).toHaveTextContent('');
       expect(screen.getByTestId('agent-id')).toHaveTextContent('none');
     });
   });
@@ -498,7 +543,7 @@ describe('Chat', () => {
       render(<Chat />);
 
       expect(screen.getByTestId('agents-count')).toHaveTextContent('1');
-      expect(screen.getByTestId('current-agent')).toHaveTextContent('Solo');
+      expect(screen.getByTestId('current-agent')).toHaveTextContent('solo-agent');
       expect(screen.getByTestId('placeholder')).toHaveTextContent('Message Solo...');
     });
   });

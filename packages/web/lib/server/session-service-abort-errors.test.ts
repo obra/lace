@@ -2,7 +2,6 @@
 // ABOUTME: Ensures abort-related errors don't generate duplicate UI messages
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EventEmitter } from 'events';
 
 // Mock must be hoisted - create a shared broadcast mock
 const mockBroadcast = vi.fn();
@@ -26,29 +25,38 @@ vi.mock('~/utils/logger', () => ({
 import { SessionService } from './session-service';
 import { asThreadId } from '@/types/core';
 import { logger } from '~/utils/logger';
-import type { Agent } from '@/lib/server/lace-imports';
+import type { Agent, Session } from '@/lib/server/lace-imports';
+import { createMockAgent } from '@/test-utils/mock-agent';
 
 describe('SessionService abort error filtering', () => {
   let sessionService: SessionService;
-  let mockAgent: EventEmitter & { threadId: string };
+  let mockAgent: ReturnType<typeof createMockAgent>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     sessionService = new SessionService();
-    mockAgent = Object.assign(new EventEmitter(), {
+    mockAgent = createMockAgent({
       threadId: 'lace_20250101_sess01.1',
+      getFullSession: async () =>
+        ({
+          getId: () => 'lace_20250101_sess01',
+          getProjectId: () => undefined,
+        }) as Session,
     });
   });
 
   afterEach(() => {
-    mockAgent.removeAllListeners();
+    // Clear any event handlers stored in the mock
+    if (mockAgent.handlers) {
+      mockAgent.handlers = {};
+    }
   });
 
-  it('should filter out AbortError from UI messages', () => {
-    const sessionId = asThreadId('lace_20250101_sess01');
+  it('should filter out AbortError from UI messages', async () => {
+    const _sessionId = asThreadId('lace_20250101_sess01');
 
     // Set up event handlers
-    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // Emit an AbortError
     const abortError = new Error('Operation was aborted');
@@ -63,10 +71,10 @@ describe('SessionService abort error filtering', () => {
     expect(mockBroadcast).not.toHaveBeenCalled();
   });
 
-  it('should filter out generic "Request was aborted" errors', () => {
-    const sessionId = asThreadId('lace_20250101_sess01');
+  it('should filter out generic "Request was aborted" errors', async () => {
+    const _sessionId = asThreadId('lace_20250101_sess01');
 
-    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // Emit a generic abort error
     const genericAbortError = new Error('Request was aborted');
@@ -77,10 +85,10 @@ describe('SessionService abort error filtering', () => {
     expect(mockBroadcast).not.toHaveBeenCalled();
   });
 
-  it('should filter out "Aborted" errors', () => {
-    const sessionId = asThreadId('lace_20250101_sess01');
+  it('should filter out "Aborted" errors', async () => {
+    const _sessionId = asThreadId('lace_20250101_sess01');
 
-    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // Emit a simple "Aborted" error
     const abortedError = new Error('Aborted');
@@ -91,10 +99,10 @@ describe('SessionService abort error filtering', () => {
     expect(mockBroadcast).not.toHaveBeenCalled();
   });
 
-  it('should still broadcast non-abort errors to UI', () => {
-    const sessionId = asThreadId('lace_20250101_sess01');
+  it('should still broadcast non-abort errors to UI', async () => {
+    const _sessionId = asThreadId('lace_20250101_sess01');
 
-    sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent, sessionId);
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // Emit a regular error
     const regularError = new Error('Network connection failed');
@@ -113,7 +121,7 @@ describe('SessionService abort error filtering', () => {
       timestamp: expect.any(Date),
       data: 'Agent error: Network connection failed',
       context: {
-        sessionId,
+        sessionId: _sessionId,
         projectId: undefined,
         agentId: undefined,
         taskId: undefined,

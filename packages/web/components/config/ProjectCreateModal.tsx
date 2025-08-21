@@ -277,6 +277,7 @@ export function ProjectCreateModal({
                         <input
                           type="text"
                           value={createName}
+                          data-testid="create-project-wizard-project-name"
                           className="input input-bordered w-full focus:outline-none focus:ring-2 focus:ring-accent/60"
                           readOnly
                         />
@@ -453,6 +454,7 @@ export function ProjectCreateModal({
                       type="button"
                       className="btn btn-link text-base-content/70 no-underline"
                       onClick={() => setCreateStep(createStep - 1)}
+                      data-testid="project-wizard-back-button"
                     >
                       Back
                     </button>
@@ -473,6 +475,7 @@ export function ProjectCreateModal({
                         type="button"
                         className="btn btn-link text-base-content/70 no-underline"
                         onClick={() => setShowAdvancedOptions(true)}
+                        data-testid="project-advanced-setup-button"
                       >
                         Advanced setup
                       </button>
@@ -492,6 +495,7 @@ export function ProjectCreateModal({
                               !createConfig.providerInstanceId ||
                               !createConfig.modelId))
                         }
+                        data-testid="project-wizard-continue-button"
                       >
                         Continue
                       </AccentButton>
@@ -717,7 +721,7 @@ export function ProjectCreateModal({
               {loading ? (
                 <>
                   <div className="loading loading-spinner loading-sm"></div>
-                  Creating...
+                  Thinking...
                 </>
               ) : (
                 'Create Project'

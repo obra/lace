@@ -189,11 +189,15 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
       {/* Unified Sidebar */}
       <div data-testid="sidebar" className="flex-shrink-0 h-full">
         <SettingsContainer>
-          {({ onOpenSettings }) => (
-            <Sidebar open={sidebarOpen} onToggle={toggleSidebar} onSettingsClick={onOpenSettings}>
+          {({ onOpenSettings }: { onOpenSettings: () => void }) => (
+            <Sidebar
+              open={sidebarOpen}
+              onToggle={toggleSidebar}
+              onSettingsClick={onOpenSettings as () => void}
+            >
               <SidebarContent
                 isMobile={false} // Component now handles mobile/desktop internally
-                onCloseMobileNav={toggleSidebar}
+                onCloseMobileNav={toggleSidebar as () => void}
                 onSwitchProject={handleSwitchProject}
                 onAgentSelect={handleAgentSelect}
                 onClearAgent={() =>
@@ -214,7 +218,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
           <motion.div className="flex items-center justify-between p-4 lg:px-6">
             <motion.div className="flex items-center gap-3">
               <motion.button
-                onClick={toggleSidebar}
+                onClick={toggleSidebar as () => void}
                 className="p-2 hover:bg-base-200 rounded-lg lg:hidden"
               >
                 <FontAwesomeIcon icon={faBars} className="w-6 h-6" />

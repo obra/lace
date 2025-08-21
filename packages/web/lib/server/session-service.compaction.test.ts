@@ -6,6 +6,7 @@ import { SessionService } from './session-service';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { Session, Agent } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
+import { createMockAgent } from '@/test-utils/mock-agent';
 
 // Mock dependencies
 vi.mock('@/lib/server/lace-imports', () => ({
@@ -35,11 +36,7 @@ describe('SessionService compaction event streaming', () => {
     getAgent: MockedFunction<(threadId: ThreadId) => unknown>;
     getTaskManager: MockedFunction<() => unknown>;
   };
-  let mockAgent: {
-    on: MockedFunction<(event: string, handler: Function) => void>;
-    off: MockedFunction<(event: string, handler: Function) => void>;
-    threadId: ThreadId;
-  };
+  let mockAgent: ReturnType<typeof createMockAgent>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -53,26 +50,15 @@ describe('SessionService compaction event streaming', () => {
       mockEventStreamManager as unknown as EventStreamManager
     );
 
-    // Setup mock Agent
-    const agentEventHandlers = new Map<string, Function[]>();
-    mockAgent = {
-      on: vi.fn((event: string, handler: Function) => {
-        const handlers = agentEventHandlers.get(event) || [];
-        handlers.push(handler);
-        agentEventHandlers.set(event, handlers);
-      }),
-      off: vi.fn(),
+    // Setup mock Agent using shared utility
+    mockAgent = createMockAgent({
       threadId: 'thread_123' as ThreadId,
-    };
-
-    // Add helper to trigger events for testing
-    (mockAgent as unknown as { emit: (event: string, data: unknown) => void }).emit = (
-      event: string,
-      data: unknown
-    ) => {
-      const handlers = agentEventHandlers.get(event) || [];
-      handlers.forEach((handler) => handler(data));
-    };
+      getFullSession: async () =>
+        ({
+          getId: () => 'session_123',
+          getProjectId: () => 'project_123',
+        }) as Session,
+    });
 
     // Setup mock Session
     mockSession = {
@@ -85,7 +71,7 @@ describe('SessionService compaction event streaming', () => {
     vi.mocked(Session.getByIdSync).mockReturnValue(mockSession as unknown as Session);
   });
 
-  it('should broadcast COMPACTION_START event when agent starts thinking about compaction', () => {
+  it('should broadcast COMPACTION_START event when agent starts thinking about compaction', async () => {
     // Initialize service and register agent
     sessionService = new SessionService();
 
@@ -93,10 +79,7 @@ describe('SessionService compaction event streaming', () => {
     (sessionService as { projectId?: string }).projectId = 'project_123';
 
     // Setup agent event handlers
-    sessionService.setupAgentEventHandlers(
-      mockAgent as unknown as Agent,
-      'session_123' as ThreadId
-    );
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // Simulate agent emitting compaction start event
     (mockAgent as unknown as { emit: (event: string, data: unknown) => void }).emit(
@@ -124,13 +107,10 @@ describe('SessionService compaction event streaming', () => {
     });
   });
 
-  it('should broadcast COMPACTION_COMPLETE event when agent completes thinking after compaction', () => {
+  it('should broadcast COMPACTION_COMPLETE event when agent completes thinking after compaction', async () => {
     sessionService = new SessionService();
     (sessionService as { projectId?: string }).projectId = 'project_123';
-    sessionService.setupAgentEventHandlers(
-      mockAgent as unknown as Agent,
-      'session_123' as ThreadId
-    );
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // First emit start to set compaction in progress
     (mockAgent as unknown as { emit: (event: string, data: unknown) => void }).emit(
@@ -169,13 +149,10 @@ describe('SessionService compaction event streaming', () => {
     });
   });
 
-  it('should handle auto-compaction messages', () => {
+  it('should handle auto-compaction messages', async () => {
     sessionService = new SessionService();
     (sessionService as { projectId?: string }).projectId = 'project_123';
-    sessionService.setupAgentEventHandlers(
-      mockAgent as unknown as Agent,
-      'session_123' as ThreadId
-    );
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // Simulate auto-compaction event
     (mockAgent as unknown as { emit: (event: string, data: unknown) => void }).emit(
@@ -203,13 +180,10 @@ describe('SessionService compaction event streaming', () => {
     });
   });
 
-  it('should not broadcast for non-compaction thinking events', () => {
+  it('should not broadcast for non-compaction thinking events', async () => {
     sessionService = new SessionService();
     (sessionService as { projectId?: string }).projectId = 'project_123';
-    sessionService.setupAgentEventHandlers(
-      mockAgent as unknown as Agent,
-      'session_123' as ThreadId
-    );
+    await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
     // Simulate regular thinking event
     (mockAgent as unknown as { emit: (event: string, data: unknown) => void }).emit(

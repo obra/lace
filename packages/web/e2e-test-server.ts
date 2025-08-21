@@ -3,8 +3,9 @@
 
 console.log('🧪 Starting E2E test server...');
 
-// For E2E tests, we need a different approach that doesn't pollute production code
-// The cleanest solution is to create separate E2E-specific API endpoints
+// Mock Anthropic API HTTP endpoints for E2E tests
+import { mockAnthropicForE2E } from './e2e/helpers/anthropic-mock';
+mockAnthropicForE2E();
 
 // Import and run the main server
-import './server';
+import './server-custom';

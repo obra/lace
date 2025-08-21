@@ -88,6 +88,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
 
   // Project creation state
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   // Project deletion state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -315,33 +316,38 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     workingDirectory: string;
     configuration: ProjectConfiguration;
   }) => {
+    setIsCreatingProject(true);
+
     try {
       // Step 1: Create project using provider method
       const createdProject = await createProject(projectData);
-
       const projectId = createdProject.id;
 
-      // Select the newly created project
-      onProjectSelect(createdProject);
+      // Step 2: Navigate directly to chat - modal stays open until page changes
+      const sessionsData = await loadSessionsForProject(projectId);
 
-      // If onboarding is available, get the session for this project
-      if (handleOnboardingComplete) {
-        try {
-          const sessionsData = await loadSessionsForProject(projectId);
-          const sessionId = sessionsData[0]?.id;
-          if (sessionId) {
-            const coordinatorAgentId = sessionId; // coordinator has same threadId
-            await handleOnboardingComplete(projectId, sessionId, coordinatorAgentId);
-          }
-        } catch (error) {
-          console.error('Failed to get project sessions for onboarding:', error);
-        }
+      const sessionId = sessionsData[0]?.id;
+      if (sessionId) {
+        const coordinatorAgentId = sessionId; // coordinator has same threadId
+
+        // Complete onboarding and navigate to agent
+        await handleOnboardingComplete(projectId, sessionId, coordinatorAgentId);
+
+        // Don't reset state here - let page navigation handle component unmount
+        return;
       }
 
+      // Only reset modal state if navigation workflow failed
+      setIsCreatingProject(false);
       setShowCreateProject(false);
       setAutoOpenCreateProject(false);
+      throw new Error('Failed to complete project creation workflow');
     } catch (error) {
-      console.error('Project create error:', { error });
+      console.error('Project create error:', error);
+      // Only close modal on error
+      setIsCreatingProject(false);
+      setShowCreateProject(false);
+      setAutoOpenCreateProject(false);
       throw error;
     }
   };
@@ -474,6 +480,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
               {filteredProjects.map((project) => (
                 <div
                   key={project.id}
+                  data-testid="project-list-entry"
                   className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-lg ${
                     selectedProject?.id === project.id
                       ? 'border-primary bg-primary/5 shadow-md'
@@ -599,7 +606,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
         <ProjectCreateModal
           isOpen={showCreateProject}
           providers={providers}
-          loading={loading}
+          loading={isCreatingProject}
           onClose={() => {
             setShowCreateProject(false);
             setAutoOpenCreateProject(false);

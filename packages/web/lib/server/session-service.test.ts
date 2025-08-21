@@ -554,9 +554,9 @@ describe('SessionService agent state change broadcasting', () => {
     broadcastSpy.mockClear();
 
     // Act: Call setupAgentEventHandlers multiple times (simulating multiple getSession calls)
-    sessionService.setupAgentEventHandlers(agent, session.getId());
-    sessionService.setupAgentEventHandlers(agent, session.getId());
-    sessionService.setupAgentEventHandlers(agent, session.getId());
+    await sessionService.setupAgentEventHandlers(agent);
+    await sessionService.setupAgentEventHandlers(agent);
+    await sessionService.setupAgentEventHandlers(agent);
 
     // Trigger a state change
     agent.emit('state_change', { from: 'idle', to: 'thinking' });

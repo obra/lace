@@ -21,7 +21,7 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: 'http://localhost:23457',
+    // No baseURL - each test uses its own server URL from setupTestEnvironment
     trace: 'retain-on-failure', // More comprehensive than 'on-first-retry'
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -43,12 +43,8 @@ export default defineConfig({
         ]),
   ],
 
-  webServer: {
-    command: 'node scripts/start-test-server.js',
-    port: 23457,
-    reuseExistingServer: !process.env.CI,
-    timeout: 60 * 1000,
-  },
+  // Per-test servers are now managed by setupTestEnvironment/cleanupTestEnvironment
+  // No global webServer needed
 
   // Global setup for worker isolation
   globalSetup: './e2e/global-setup.ts',

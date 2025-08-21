@@ -262,6 +262,11 @@ export class EventStreamManager {
       timestamp: event.timestamp || new Date(),
     };
 
+    // Debug logging for event broadcasting
+    if (process.env.NODE_ENV === 'development') {
+      // Development debug info
+    }
+
     const deadConnections: string[] = [];
 
     for (const [connectionId, connection] of this.connections) {
@@ -320,6 +325,11 @@ export class EventStreamManager {
   private sendToConnection(connection: ClientConnection, event: LaceEvent): void {
     const eventData = `id: ${event.id}\ndata: ${stringify(event)}\n\n`;
     const chunk = this.encoder.encode(eventData);
+
+    // Debug logging for individual sends
+    if (process.env.NODE_ENV === 'development') {
+      // Development debug info
+    }
 
     try {
       connection.controller.enqueue(chunk);

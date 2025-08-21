@@ -94,7 +94,11 @@ export function ProviderInstanceList() {
                   Anthropic, local models, and more.
                 </p>
               </div>
-              <button className="btn btn-primary vapor-button" onClick={() => openAddModal()}>
+              <button
+                className="btn btn-primary vapor-button"
+                onClick={() => openAddModal()}
+                data-testid="add-first-instance-button"
+              >
                 Add Your First Instance
               </button>
             </div>
@@ -108,6 +112,7 @@ export function ProviderInstanceList() {
               <button
                 className="btn btn-primary vapor-button btn-sm"
                 onClick={() => openAddModal()}
+                data-testid="add-instance-button"
               >
                 Add Instance
               </button>

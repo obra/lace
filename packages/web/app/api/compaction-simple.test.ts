@@ -83,7 +83,7 @@ describe('Compaction Integration Test', () => {
     // Get the session agent and set up event handlers
     const sessionAgent = session.getAgent(sessionId);
     if (sessionAgent) {
-      sessionService.setupAgentEventHandlers(sessionAgent, sessionId);
+      await sessionService.setupAgentEventHandlers(sessionAgent);
     }
   });
 
