@@ -195,10 +195,10 @@ async function signAndNotarize(options: SigningOptions) {
     const signingIdentity = identityMatch[1];
     console.log(`🔑 Using signing identity: ${signingIdentity}`);
 
-    // Sign the binary
-    console.log('✍️  Signing binary with hardened runtime...');
+    // Sign the binary (without hardened runtime for Bun compatibility)
+    console.log('✍️  Signing binary...');
     execSync(
-      `codesign --force --options runtime --deep --sign "${signingIdentity}" "${resolvedBinaryPath}" --verbose`,
+      `codesign --force --deep --sign "${signingIdentity}" "${resolvedBinaryPath}" --verbose`,
       { stdio: 'inherit' }
     );
 
