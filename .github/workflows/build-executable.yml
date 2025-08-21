@@ -18,9 +18,6 @@ jobs:
           - os: macos-latest
             target: bun-darwin-arm64
             name: lace-macos-arm64
-          - os: macos-13
-            target: bun-darwin-x64
-            name: lace-macos-x64
     
     runs-on: ${{ matrix.os }}
     
@@ -121,8 +118,7 @@ jobs:
           
           ### Downloads
           
-          - **lace-macos-arm64.tar.gz** - macOS Apple Silicon (M1/M2/M3)
-          - **lace-macos-x64.tar.gz** - macOS Intel
+          - **lace-macos-arm64.tar.gz** - macOS Apple Silicon (M1/M2/M3/M4)
           - **lace-linux-x64.tar.gz** - Linux x86_64
           
           ### Usage
