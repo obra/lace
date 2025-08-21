@@ -1,23 +1,37 @@
 // ABOUTME: Tests session creation, management, and persistence functionality
 // ABOUTME: Verifies automatic session creation, URL persistence, and session isolation
 
-import { test, expect } from './fixtures/test-environment';
-import { createPageObjects } from './page-objects';
-import { getMessageInput } from './helpers/ui-interactions';
+import { test, expect } from '@playwright/test';
+import {
+  setupTestEnvironment,
+  cleanupTestEnvironment,
+  type TestEnvironment,
+} from './helpers/test-utils';
+import { createProject, setupAnthropicProvider, getMessageInput } from './helpers/ui-interactions';
 import * as fs from 'fs';
 import * as path from 'path';
 
 test.describe('Session Management', () => {
-  test('automatically creates session when project is opened', async ({ page, testEnv }) => {
-    const { projectSelector, chatInterface } = createPageObjects(page);
+  let testEnv: TestEnvironment;
 
-    // Create project and verify it automatically creates a session
-    await page.goto('/');
+  test.beforeEach(async ({ page }) => {
+    testEnv = await setupTestEnvironment();
+    await page.goto(testEnv.serverUrl);
+  });
+
+  test.afterEach(async () => {
+    if (testEnv) {
+      await cleanupTestEnvironment(testEnv);
+    }
+  });
+
+  test('automatically creates session when project is opened', async ({ page }) => {
+    // Setup provider and create project
+    await setupAnthropicProvider(page);
 
     const projectPath = path.join(testEnv.tempDir, 'auto-session-project');
     await fs.promises.mkdir(projectPath, { recursive: true });
-
-    await projectSelector.createProject(testEnv.projectName, projectPath);
+    await createProject(page, 'Auto Session Project', projectPath);
     await chatInterface.waitForChatReady();
 
     // Verify URL contains session and agent IDs

@@ -1,20 +1,20 @@
 // ABOUTME: End-to-end tests for directory browser functionality
 // ABOUTME: Tests complete user workflows for project creation with directory selection
 
-import { test, expect } from './mocks/setup';
+import { test, expect } from '@playwright/test';
 import { homedir } from 'os';
 import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
-} from '@/e2e/helpers/test-utils';
+} from './helpers/test-utils';
 
 test.describe('Directory Browser E2E Tests', () => {
   let testEnv: TestEnvironment;
 
   test.beforeEach(async ({ page }) => {
     testEnv = await setupTestEnvironment();
-    await page.goto('/');
+    await page.goto(testEnv.serverUrl);
   });
 
   test.afterEach(async () => {

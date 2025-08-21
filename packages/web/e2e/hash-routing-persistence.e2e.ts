@@ -1,88 +1,37 @@
 // ABOUTME: E2E test for hash-based URL persistence across page reloads
 // ABOUTME: Tests project/session/agent selection persistence with real browser navigation
 
-/**
- * @vitest-environment node
- */
-
 import { test, expect } from '@playwright/test';
-import { promises as fs } from 'fs';
-import path from 'path';
-import os from 'os';
+import {
+  setupTestEnvironment,
+  cleanupTestEnvironment,
+  type TestEnvironment,
+} from './helpers/test-utils';
+import { createProject, setupAnthropicProvider } from './helpers/ui-interactions';
+import * as fs from 'fs';
+import * as path from 'path';
 
 test.describe('Hash-Based URL Persistence E2E', () => {
-  let tempDir: string;
-  let originalLaceDir: string | undefined;
-  let originalAnthropicKey: string | undefined;
+  let testEnv: TestEnvironment;
 
-  test.beforeEach(async () => {
-    // Create fresh temp directory for each test
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lace-hash-e2e-test-'));
-    originalLaceDir = process.env.LACE_DIR;
-    originalAnthropicKey = process.env.ANTHROPIC_KEY;
-    process.env.LACE_DIR = tempDir;
-
-    // Set test environment variables
-    // Use real ANTHROPIC_KEY if available, otherwise use a placeholder that may cause expected server errors
-    if (!process.env.ANTHROPIC_KEY) {
-      process.env.ANTHROPIC_KEY =
-        process.env.ANTHROPIC_API_KEY || 'sk-ant-test-key-for-e2e-testing';
-    }
+  test.beforeEach(async ({ page }) => {
+    testEnv = await setupTestEnvironment();
+    await page.goto(testEnv.serverUrl);
   });
 
   test.afterEach(async () => {
-    // Clean up after each test
-    if (originalLaceDir !== undefined) {
-      process.env.LACE_DIR = originalLaceDir;
-    } else {
-      delete process.env.LACE_DIR;
-    }
-
-    // Restore original ANTHROPIC_KEY
-    if (originalAnthropicKey !== undefined) {
-      process.env.ANTHROPIC_KEY = originalAnthropicKey;
-    } else {
-      delete process.env.ANTHROPIC_KEY;
-    }
-
-    if (
-      tempDir &&
-      (await fs
-        .access(tempDir)
-        .then(() => true)
-        .catch(() => false))
-    ) {
-      await fs.rm(tempDir, { recursive: true, force: true });
+    if (testEnv) {
+      await cleanupTestEnvironment(testEnv);
     }
   });
 
   test('should persist project selection across page reloads', async ({ page }) => {
-    // Navigate to the app
-    await page.goto('/');
+    // Setup provider and create project using safe helpers
+    await setupAnthropicProvider(page);
 
-    // Wait for projects to load (h1 with "Select a Project" or existing project cards)
-    await page.locator('h1:has-text("Select a Project"), h3').first().waitFor({ timeout: 5000 });
-
-    // Look for existing E2E projects or create one if needed
-    const existingProject = page.locator('h3:has-text("E2E Test Project")').first();
-
-    if ((await existingProject.count()) > 0) {
-      // Click the entire project card (entire card is clickable)
-      await existingProject.click();
-    } else {
-      // Create a new project for testing
-      await page.click('text="Create New Project"');
-
-      // Fill both required form fields using actual placeholder text
-      await page.fill('input[placeholder="Enter project name"]', 'E2E Test Project');
-      await page.fill('input[placeholder="/path/to/project"]', '/tmp/e2e-test-project');
-
-      // Wait for the button to be enabled (only enabled after both fields filled)
-      await page.waitForSelector('button:text("Create Project"):not([disabled])', {
-        timeout: 3000,
-      });
-      await page.click('button:text("Create Project")');
-    }
+    const projectPath = path.join(testEnv.tempDir, 'e2e-test-project');
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'E2E Test Project', projectPath);
 
     // Verify URL contains project hash
     await expect(page).toHaveURL(/.*#\/project\/[^\/]+$/);
@@ -101,27 +50,12 @@ test.describe('Hash-Based URL Persistence E2E', () => {
   });
 
   test('should persist session selection across page reloads', async ({ page }) => {
-    // Start at the base URL
-    await page.goto('/');
+    // Setup provider and create project using safe helpers
+    await setupAnthropicProvider(page);
 
-    // Navigate through project → session selection - wait for page to load
-    await page.waitForSelector('h1:has-text("Select a Project"), h3', { timeout: 5000 });
-
-    // Select or create a project - the entire project card is clickable
-    const existingProject = page.locator('h3:has-text("E2E Hash Test Project")').first();
-    if ((await existingProject.count()) > 0) {
-      // Click the project heading (entire project card is clickable)
-      await existingProject.click();
-    } else {
-      // Create project if none exists
-      await page.click('text="Create New Project"');
-      await page.fill('input[placeholder="Enter project name"]', 'E2E Hash Test Project');
-      await page.fill('input[placeholder="/path/to/project"]', '/tmp/e2e-hash-test-project');
-      await page.waitForSelector('button:text("Create Project"):not([disabled])', {
-        timeout: 3000,
-      });
-      await page.click('button:text("Create Project")');
-    }
+    const projectPath = path.join(testEnv.tempDir, 'e2e-hash-test-project');
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'E2E Hash Test Project', projectPath);
 
     // Wait for project page to load and look for sessions
     await page.waitForSelector('button:text("New Session")', { timeout: 3000 });

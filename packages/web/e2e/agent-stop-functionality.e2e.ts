@@ -1,7 +1,7 @@
 // ABOUTME: E2E test for agent stop functionality using Playwright
 // ABOUTME: Tests stopping agent generation mid-stream using reusable test utilities
 
-import { test, expect } from './mocks/setup';
+import { test, expect } from '@playwright/test';
 import {
   setupTestEnvironment,
   cleanupTestEnvironment,
@@ -9,37 +9,23 @@ import {
 } from './helpers/test-utils';
 import {
   createProject,
-  createSession,
-  createAgent,
-  selectAgent,
+  setupAnthropicProvider,
   sendMessage,
   waitForStopButton,
   clickStopButton,
   waitForSendButton,
   verifyMessageVisible,
-  verifyNoMessage,
+  getMessageInput,
 } from './helpers/ui-interactions';
+import * as fs from 'fs';
+import * as path from 'path';
 
 test.describe('Agent Stop Functionality E2E Tests', () => {
   let testEnv: TestEnvironment;
 
   test.beforeEach(async ({ page }) => {
-    // Set up test environment (now includes per-test server)
     testEnv = await setupTestEnvironment();
-
-    // Set up environment with test key
-    process.env.ANTHROPIC_KEY = 'test-anthropic-key-for-e2e-stop';
-
-    await page.addInitScript((tempDir) => {
-      window.testEnv = {
-        ANTHROPIC_KEY: 'test-key',
-        LACE_DB_PATH: `${tempDir}/lace.db`,
-      };
-    }, testEnv.tempDir);
-
-    // Navigate to our test server and create project
     await page.goto(testEnv.serverUrl);
-    await createProject(page, testEnv.projectName, testEnv.tempDir);
   });
 
   test.afterEach(async () => {
@@ -47,11 +33,15 @@ test.describe('Agent Stop Functionality E2E Tests', () => {
   });
 
   test('should have working chat interface and stop API endpoint', async ({ page }) => {
-    // Project creation automatically creates a session and agent, and dumps user into chat
-    // Verify we're in the chat interface by looking for the message input
-    await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
-      timeout: 10000,
-    });
+    // Setup provider and create project
+    await setupAnthropicProvider(page);
+
+    const projectPath = path.join(testEnv.tempDir, 'stop-test-project');
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'Stop Test Project', projectPath);
+
+    // Wait for project to be fully loaded
+    await getMessageInput(page);
 
     // Send a message to verify the chat interface works
     await sendMessage(page, 'Hello, test message');
@@ -84,10 +74,15 @@ test.describe('Agent Stop Functionality E2E Tests', () => {
   });
 
   test('should handle ESC key press in chat interface', async ({ page }) => {
-    // Project creation automatically creates session and agent, puts us in chat
-    await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
-      timeout: 10000,
-    });
+    // Setup provider and create project
+    await setupAnthropicProvider(page);
+
+    const projectPath = path.join(testEnv.tempDir, 'esc-test-project');
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'ESC Test Project', projectPath);
+
+    // Wait for project to be fully loaded
+    await getMessageInput(page);
 
     // Send a message
     await sendMessage(page, 'Test ESC key functionality');
@@ -100,10 +95,15 @@ test.describe('Agent Stop Functionality E2E Tests', () => {
   });
 
   test('should maintain stable interface during rapid interactions', async ({ page }) => {
-    // Project creation automatically creates session and agent, puts us in chat
-    await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
-      timeout: 10000,
-    });
+    // Setup provider and create project
+    await setupAnthropicProvider(page);
+
+    const projectPath = path.join(testEnv.tempDir, 'rapid-test-project');
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'Rapid Test Project', projectPath);
+
+    // Wait for project to be fully loaded
+    await getMessageInput(page);
 
     // Send a message
     await sendMessage(page, 'Test rapid interactions');
