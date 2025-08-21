@@ -206,9 +206,9 @@ test.describe('Message Streaming', () => {
       await sendMessage(page, message);
       await verifyMessageVisible(page, message);
 
-      // Wait for AI response (mocked)
+      // Wait for AI response (mocked) - use first match to avoid strict mode violations
       await expect(
-        page.getByText("I'm a helpful AI assistant. How can I help you today?")
+        page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
       ).toBeVisible({ timeout: 15000 });
 
       // Small delay between messages to ensure proper sequencing
@@ -225,9 +225,9 @@ test.describe('Message Streaming', () => {
     await sendMessage(page, finalMessage);
     await verifyMessageVisible(page, finalMessage);
 
-    // Verify final AI response appears
+    // Verify final AI response appears - use last match since this is the final response
     await expect(
-      page.getByText("I'm a helpful AI assistant. How can I help you today?")
+      page.getByText("I'm a helpful AI assistant. How can I help you today?").last()
     ).toBeVisible({ timeout: 15000 });
   });
 });
