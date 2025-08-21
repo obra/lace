@@ -1,24 +1,46 @@
 // ABOUTME: Tests agent spawning, selection, and multi-agent workflow functionality
 // ABOUTME: Verifies agent creation, switching between agents, and agent isolation
 
-import { test, expect } from './fixtures/test-environment';
-import { createPageObjects } from './page-objects';
-import { getMessageInput } from './helpers/ui-interactions';
+import { test, expect } from '@playwright/test';
+import {
+  setupTestEnvironment,
+  cleanupTestEnvironment,
+  type TestEnvironment,
+} from './helpers/test-utils';
+import {
+  createProject,
+  setupAnthropicProvider,
+  getMessageInput,
+  sendMessage,
+  verifyMessageVisible,
+} from './helpers/ui-interactions';
 import * as fs from 'fs';
 import * as path from 'path';
 
 test.describe('Agent Management', () => {
-  test('automatically creates default agent when project is opened', async ({ page, testEnv }) => {
-    const { projectSelector, chatInterface } = createPageObjects(page);
+  let testEnv: TestEnvironment;
 
-    // Create project and verify it automatically creates an agent
-    await page.goto('/');
+  test.beforeEach(async ({ page }) => {
+    testEnv = await setupTestEnvironment();
+    await page.goto(testEnv.serverUrl);
+  });
+
+  test.afterEach(async () => {
+    if (testEnv) {
+      await cleanupTestEnvironment(testEnv);
+    }
+  });
+
+  test('automatically creates default agent when project is opened', async ({ page }) => {
+    // Setup provider and create project
+    await setupAnthropicProvider(page);
 
     const projectPath = path.join(testEnv.tempDir, 'auto-agent-project');
     await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'Auto Agent Project', projectPath);
 
-    await projectSelector.createProject(testEnv.projectName, projectPath);
-    await chatInterface.waitForChatReady();
+    // Wait for project to be fully loaded
+    await getMessageInput(page);
 
     // Verify URL contains agent ID
     const projectUrl = page.url();
@@ -33,27 +55,26 @@ test.describe('Agent Management', () => {
 
       // Verify we can interact with the agent (send a message)
       const testMessage = 'Testing default agent functionality';
-      await chatInterface.sendMessage(testMessage);
-      await expect(chatInterface.getMessage(testMessage)).toBeVisible();
+      await sendMessage(page, testMessage);
+      await verifyMessageVisible(page, testMessage);
     }
   });
 
-  test('agent state persists across page reloads', async ({ page, testEnv }) => {
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    // Create project with agent
-    await page.goto('/');
+  test('agent state persists across page reloads', async ({ page }) => {
+    // Setup provider and create project
+    await setupAnthropicProvider(page);
 
     const projectPath = path.join(testEnv.tempDir, 'persistent-agent-project');
     await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'Persistent Agent Project', projectPath);
 
-    await projectSelector.createProject(testEnv.projectName, projectPath);
-    await chatInterface.waitForChatReady();
+    // Wait for project to be fully loaded
+    await getMessageInput(page);
 
     // Send a message to create agent activity
     const testMessage = 'Message to establish agent context';
-    await chatInterface.sendMessage(testMessage);
-    await expect(chatInterface.getMessage(testMessage)).toBeVisible({ timeout: 10000 });
+    await sendMessage(page, testMessage);
+    await verifyMessageVisible(page, testMessage);
 
     // Capture the agent URL
     const agentUrl = page.url();
@@ -82,33 +103,32 @@ test.describe('Agent Management', () => {
 
     if (messageInputEnabled === null && !placeholderText?.includes('interrupt')) {
       // Agent interface is ready
-      await chatInterface.waitForChatReady();
+      await getMessageInput(page);
 
       const reloadMessage = 'Message sent after agent reload';
-      await chatInterface.sendMessage(reloadMessage);
-      await expect(chatInterface.getMessage(reloadMessage)).toBeVisible({ timeout: 10000 });
+      await sendMessage(page, reloadMessage);
+      await verifyMessageVisible(page, reloadMessage);
     } else {
       // Agent might be in processing state - URL persistence is key
       expect(agentUrl).toMatch(/agent\/[^\/]+/);
     }
   });
 
-  test('maintains agent isolation between different workers', async ({ page, testEnv }) => {
-    const { projectSelector, chatInterface } = createPageObjects(page);
-
-    // Create project with agent
-    await page.goto('/');
+  test('maintains agent isolation between different workers', async ({ page }) => {
+    // Setup provider and create project
+    await setupAnthropicProvider(page);
 
     const projectPath = path.join(testEnv.tempDir, 'agent-isolation-project');
     await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'Agent Isolation Project', projectPath);
 
-    await projectSelector.createProject(testEnv.projectName, projectPath);
-    await chatInterface.waitForChatReady();
+    // Wait for project to be fully loaded
+    await getMessageInput(page);
 
     // Send a unique message to establish this agent's context
     const uniqueMessage = `Agent-specific message at ${new Date().getTime()}`;
-    await chatInterface.sendMessage(uniqueMessage);
-    await expect(chatInterface.getMessage(uniqueMessage)).toBeVisible({ timeout: 10000 });
+    await sendMessage(page, uniqueMessage);
+    await verifyMessageVisible(page, uniqueMessage);
 
     // Get the agent information
     const agentUrl = page.url();
@@ -120,15 +140,15 @@ test.describe('Agent Management', () => {
         ? testEnv.tempDir.match(/worker-(\d+)/)
         : null,
       agentId: agentMatch ? agentMatch[1] : 'unknown',
-      messageVisible: await chatInterface.getMessage(uniqueMessage).isVisible(),
+      messageVisible: await page.getByText(uniqueMessage).isVisible(),
       canSendNewMessage: false,
     };
 
     // Test if we can send another message (agent is functioning)
     try {
       const followupMessage = 'Follow-up message to verify agent isolation';
-      await chatInterface.sendMessage(followupMessage);
-      await expect(chatInterface.getMessage(followupMessage)).toBeVisible({ timeout: 10000 });
+      await sendMessage(page, followupMessage);
+      await verifyMessageVisible(page, followupMessage);
       agentIsolationTest.canSendNewMessage = true;
     } catch (error) {
       console.log('Agent isolation: Could not send follow-up message');
