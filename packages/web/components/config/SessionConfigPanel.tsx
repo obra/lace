@@ -24,7 +24,7 @@ import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useURLState } from '@/hooks/useURLState';
-import { useProviders } from '@/hooks/useProviders';
+import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import { asThreadId } from '@/types/core';
 
 const AVAILABLE_TOOLS = [
@@ -76,7 +76,8 @@ export function SessionConfigPanel(): React.JSX.Element {
     updateAgent,
   } = useAgentContext();
   const { project, session, navigateToSession, navigateToAgent, navigateToProject } = useURLState();
-  const { providers, loading: providersLoading } = useProviders();
+  const { availableProviders: providers, instancesLoading: providersLoading } =
+    useProviderInstances();
 
   const loading = sessionLoading || agentLoading || providersLoading;
   const [showCreateSession, setShowCreateSession] = useState(false);

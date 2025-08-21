@@ -16,7 +16,6 @@ import {
   faTrash,
 } from '@/lib/fontawesome';
 import type { ProjectInfo } from '@/types/core';
-import type { ProviderInfo } from '@/types/api';
 import { AddInstanceModal } from '@/components/providers/AddInstanceModal';
 import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
 import { ProjectEditModal } from '@/components/config/ProjectEditModal';
@@ -26,7 +25,7 @@ import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
-import { useProviders } from '@/hooks/useProviders';
+import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
 interface ProjectSelectorPanelProps {
   // No props needed - all data comes from providers
@@ -73,10 +72,10 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     setAutoOpenCreateProject,
     enableAgentAutoSelection
   );
-  const { providers, loading: providersLoading, refetch: refetchProviders } = useProviders();
+  const { availableProviders } = useProviderInstances();
 
   const router = useRouter();
-  const loading = projectLoading || providersLoading;
+  const loading = projectLoading;
   const selectedProject = currentProject.id ? currentProject : null;
   const autoOpenCreate = autoOpenCreateProject;
   const [searchQuery, setSearchQuery] = useState('');
@@ -99,13 +98,6 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
   // Provider setup state
   const [showAddProvider, setShowAddProvider] = useState(false);
 
-  // Get available providers (only those that are configured with instance IDs)
-  const availableProviders = useMemo(() => {
-    return (providers || []).filter((p): p is ProviderInfo & { instanceId: string } =>
-      Boolean(p.configured && p.instanceId)
-    );
-  }, [providers]);
-
   // External trigger: open modal when parent requests (e.g., empty-state button)
   // Only open once per toggle of autoOpenCreate to avoid reopening after user closes
   const autoOpenHandledRef = useRef(false);
@@ -124,10 +116,9 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
 
   // Handle provider instance creation success
   const handleProviderAdded = useCallback(() => {
-    // Trigger a refresh of providers data
-    void refetchProviders();
+    // Provider data will automatically update via context
     setShowAddProvider(false);
-  }, [refetchProviders]);
+  }, []);
 
   // Helper function to check if project was active in given timeframe
   const isProjectActiveInTimeframe = (
@@ -595,7 +586,6 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
         <ProjectEditModal
           isOpen={!!editingProject}
           project={editingProject}
-          providers={providers}
           loading={loading}
           onClose={handleCancelEdit}
           onSubmit={handleEditProject}
@@ -605,7 +595,6 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
         {/* Create Project Modal */}
         <ProjectCreateModal
           isOpen={showCreateProject}
-          providers={providers}
           loading={isCreatingProject}
           onClose={() => {
             setShowCreateProject(false);

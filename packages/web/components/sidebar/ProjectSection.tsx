@@ -10,7 +10,7 @@ import { SidebarSection } from '@/components/layout/Sidebar';
 import { ProjectEditModal } from '@/components/config/ProjectEditModal';
 import { SwitchIcon } from '@/components/ui/SwitchIcon';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useProviders } from '@/hooks/useProviders';
+import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
 interface ProjectSectionProps {
   isMobile?: boolean;
@@ -33,7 +33,7 @@ export const ProjectSection = memo(function ProjectSection({
     useProjectContext();
 
   // Get providers data
-  const { providers } = useProviders();
+  const { availableProviders: providers } = useProviderInstances();
 
   // Load project configuration when modal opens
   useEffect(() => {
@@ -154,7 +154,6 @@ export const ProjectSection = memo(function ProjectSection({
       <ProjectEditModal
         isOpen={showEditModal}
         project={foundProject}
-        providers={providers}
         loading={loading}
         onClose={handleCloseSettings}
         onSubmit={handleUpdateProject}

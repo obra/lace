@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { api } from '@/lib/api-client';
+import type { ProviderInfo, ModelInfo } from '@/types/api';
 
 // Provider Instance Types
 export interface ProviderInstance {
@@ -82,6 +83,9 @@ interface ProviderInstanceContextValue {
   // Modal State
   showAddModal: boolean;
   selectedCatalogProvider: CatalogProvider | null;
+
+  // Computed Properties
+  availableProviders: ProviderInfo[];
 
   // Instance Operations
   loadInstances: () => Promise<void>;
@@ -344,6 +348,51 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
     [testResults, getInstanceById]
   );
 
+  // Computed availableProviders - transforms instances + catalog into ProviderInfo format
+  const availableProviders = useMemo((): ProviderInfo[] => {
+    return instances.map((instance) => {
+      const catalogProvider = catalogProviders.find(
+        (catalog) => catalog.id === instance.catalogProviderId
+      );
+
+      if (!catalogProvider) {
+        // This shouldn't happen in normal operation, but handle gracefully
+        return {
+          id: instance.catalogProviderId,
+          name: instance.displayName,
+          displayName: instance.displayName,
+          type: 'unknown',
+          requiresApiKey: true,
+          models: [],
+          configured: true,
+          instanceId: instance.id,
+        };
+      }
+
+      // Transform catalog models to ModelInfo format
+      const models: ModelInfo[] = catalogProvider.models.map((catalogModel) => ({
+        id: catalogModel.id,
+        displayName: catalogModel.name,
+        description: undefined, // Not available in catalog format
+        contextWindow: catalogModel.context_window,
+        maxOutputTokens: catalogModel.default_max_tokens,
+        capabilities: catalogModel.supports_attachments ? ['attachments'] : undefined,
+        isDefault: false, // Would need to check against catalog provider defaults
+      }));
+
+      return {
+        id: catalogProvider.id,
+        name: catalogProvider.name,
+        displayName: instance.displayName, // Use instance display name, not catalog name
+        type: catalogProvider.type,
+        requiresApiKey: catalogProvider.type !== 'local',
+        models,
+        configured: true, // All instances are configured by definition
+        instanceId: instance.id,
+      };
+    });
+  }, [instances, catalogProviders]);
+
   // Load instances on mount only
   useEffect(() => {
     void loadInstances();
@@ -368,6 +417,9 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
       // Modal State
       showAddModal,
       selectedCatalogProvider,
+
+      // Computed Properties
+      availableProviders,
 
       // Instance Operations
       loadInstances,
@@ -397,6 +449,7 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
       testResults,
       showAddModal,
       selectedCatalogProvider,
+      availableProviders,
       loadInstances,
       createInstance,
       updateInstance,

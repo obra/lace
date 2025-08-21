@@ -11,8 +11,9 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { AccentButton } from '@/components/ui/AccentButton';
 import { DirectoryField } from '@/components/ui';
 import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
-import type { ProviderInfo } from '@/types/api';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
+import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
+import type { ProviderInfo } from '@/types/api';
 
 interface ProjectConfiguration {
   providerInstanceId?: string;
@@ -27,7 +28,6 @@ interface ProjectConfiguration {
 
 interface ProjectCreateModalProps {
   isOpen: boolean;
-  providers: ProviderInfo[];
   loading: boolean;
   onClose: () => void;
   onSubmit: (projectData: {
@@ -67,12 +67,13 @@ const DEFAULT_PROJECT_CONFIG: ProjectConfiguration = {
 
 export function ProjectCreateModal({
   isOpen,
-  providers,
   loading,
   onClose,
   onSubmit,
   onAddProvider,
 }: ProjectCreateModalProps) {
+  // Get providers from ProviderInstanceProvider context
+  const { availableProviders: providers, instancesLoading } = useProviderInstances();
   const [createStep, setCreateStep] = useState<number>(2);
   const [createName, setCreateName] = useState('');
   const [createDescription, setCreateDescription] = useState('');

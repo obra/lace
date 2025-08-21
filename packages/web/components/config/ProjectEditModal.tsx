@@ -10,8 +10,9 @@ import { Modal } from '@/components/ui/Modal';
 import { DirectoryField } from '@/components/ui';
 import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
 import type { ProjectInfo } from '@/types/core';
-import type { ProviderInfo } from '@/types/api';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
+import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
+import type { ProviderInfo } from '@/types/api';
 
 interface ProjectConfiguration {
   providerInstanceId?: string;
@@ -27,7 +28,6 @@ interface ProjectConfiguration {
 interface ProjectEditModalProps {
   isOpen: boolean;
   project: ProjectInfo | null;
-  providers: ProviderInfo[];
   loading: boolean;
   onClose: () => void;
   onSubmit: (
@@ -64,12 +64,13 @@ const AVAILABLE_TOOLS = [
 export function ProjectEditModal({
   isOpen,
   project,
-  providers,
   loading,
   onClose,
   onSubmit,
   initialConfig = {},
 }: ProjectEditModalProps) {
+  // Get providers from ProviderInstanceProvider context
+  const { availableProviders: providers } = useProviderInstances();
   const [editName, setEditName] = useState(project?.name || '');
   const [editDescription, setEditDescription] = useState(project?.description || '');
   const [editWorkingDirectory, setEditWorkingDirectory] = useState(project?.workingDirectory || '');

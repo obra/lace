@@ -6,6 +6,7 @@
 import { UIProvider } from '@/components/providers/UIProvider';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
+import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
 import { HomePage } from './HomePage';
 
 export function HomePageClient() {
@@ -17,7 +18,9 @@ export function HomePageClient() {
         onProjectChange={() => {}}
       >
         <SessionProvider projectId={null} selectedSessionId={null}>
-          <HomePage />
+          <ProviderInstanceProvider>
+            <HomePage />
+          </ProviderInstanceProvider>
         </SessionProvider>
       </ProjectProvider>
     </UIProvider>
