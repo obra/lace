@@ -20,6 +20,11 @@ interface ContextProvidersProps {
   children: ReactNode;
 }
 
+// Helper function to safely convert to ThreadId
+function toThreadId(id: string | null): ThreadId | null {
+  return id as ThreadId;
+}
+
 export function ContextProviders({
   projectId = null,
   sessionId = null,
@@ -40,16 +45,16 @@ export function ContextProviders({
             onAgentChange={() => {}} // Navigation handled by PageLayout
           >
             {/* Agent-specific providers only when we have an agent */}
-            {agentId ? (
-              <ToolApprovalProvider agentId={agentId as ThreadId}>
+            {agentId && sessionId ? (
+              <ToolApprovalProvider agentId={toThreadId(agentId)!}>
                 <EventStreamProvider
                   projectId={projectId}
-                  sessionId={sessionId as ThreadId}
-                  agentId={agentId as ThreadId}
+                  sessionId={toThreadId(sessionId)!}
+                  agentId={toThreadId(agentId)!}
                 >
                   <TaskProvider
                     projectId={projectId}
-                    sessionId={sessionId as ThreadId}
+                    sessionId={toThreadId(sessionId)!}
                     agents={[]} // Will be populated by AgentProvider
                   >
                     {children}
@@ -59,7 +64,7 @@ export function ContextProviders({
             ) : (
               <TaskProvider
                 projectId={projectId}
-                sessionId={sessionId as ThreadId}
+                sessionId={toThreadId(sessionId)}
                 agents={[]} // Will be populated by providers above
               >
                 {children}
