@@ -86,8 +86,8 @@ export function useProjectManagement(): UseProjectManagementResult {
     }): Promise<ProjectInfo> => {
       try {
         const newProject = await api.post<ProjectInfo>('/api/projects', projectData);
-        // Reload projects to include the new project
-        await loadProjects();
+        // Don't automatically reload projects - let caller handle refresh timing
+        // This prevents component unmount/remount during project creation workflow
         return newProject;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to create project';
@@ -96,7 +96,7 @@ export function useProjectManagement(): UseProjectManagementResult {
         throw error;
       }
     },
-    [loadProjects]
+    [] // Remove loadProjects dependency
   );
 
   const deleteProject = useCallback(
