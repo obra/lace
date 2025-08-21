@@ -9,6 +9,7 @@ interface BuildOptions {
   target?: string;
   name?: string;
   outdir?: string;
+  sign?: boolean;
 }
 
 function parseArgs(): BuildOptions {
@@ -26,6 +27,9 @@ function parseArgs(): BuildOptions {
       case '--outdir':
         options.outdir = args[++i];
         break;
+      case '--sign':
+        options.sign = true;
+        break;
       case '--help':
         console.log(`
 Usage: npx tsx build-simple.ts [options]
@@ -34,11 +38,13 @@ Options:
   --target <target>    Bun target (default: bun-darwin-arm64)
   --name <name>        Output executable name (default: lace-standalone)  
   --outdir <outdir>    Output directory (default: build)
+  --sign               Sign and notarize the binary (macOS only)
   --help               Show this help
 
 Examples:
   npx tsx build-simple.ts
   npx tsx build-simple.ts --target bun-linux-x64 --name lace-linux
+  npx tsx build-simple.ts --sign
 `);
         process.exit(0);
     }
@@ -51,6 +57,7 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
   const target = options.target || 'bun-darwin-arm64';
   const name = options.name || 'lace-standalone';
   const outdir = options.outdir || 'build';
+  const sign = options.sign || false;
 
   console.log('🔨 Building simple single-file executable...');
   console.log(`   🎯 Target: ${target}`);
@@ -163,15 +170,23 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
 
   execSync(compileCmd, { stdio: 'inherit' });
 
-  // Re-sign the executable to ensure proper code signing (macOS only)
-  if (process.platform === 'darwin') {
-    console.log('🔏 Re-signing executable (macOS)...');
+  // Handle code signing
+  if (sign && process.platform === 'darwin') {
+    console.log('🔏 Starting signing and notarization...');
     try {
-      execSync(`codesign --remove-signature ${outputPath}`, { stdio: 'pipe' });
-      execSync(`codesign -s - --deep --force ${outputPath}`, { stdio: 'pipe' });
-      console.log('✅ Executable signed successfully');
+      execSync(`npx tsx scripts/sign-and-notarize.ts --binary "${outputPath}"`, { stdio: 'inherit' });
     } catch (error) {
-      console.warn('⚠️  Warning: Code signing failed, but executable may still work');
+      console.error('❌ Signing failed:', error);
+      throw error;
+    }
+  } else if (process.platform === 'darwin') {
+    console.log('🔏 Applying basic ad-hoc signing (macOS)...');
+    try {
+      execSync(`codesign --remove-signature "${outputPath}"`, { stdio: 'pipe' });
+      execSync(`codesign -s - --deep --force "${outputPath}"`, { stdio: 'pipe' });
+      console.log('✅ Ad-hoc signing completed');
+    } catch (error) {
+      console.warn('⚠️  Warning: Ad-hoc signing failed, but executable may still work');
     }
   } else {
     console.log('ℹ️  Skipping code signing (non-macOS platform)');
