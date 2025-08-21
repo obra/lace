@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { logger } from '~/utils/logger';
+// Client-side logger - should not import server-only code
+const logger = console;
 
 export default function FontTest() {
   const testCSSVariables = () => {

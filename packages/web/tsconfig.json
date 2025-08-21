@@ -9,9 +9,6 @@
     "paths": {
       "@/*": [
         "./*"
-      ],
-      "~/*": [
-        "../../src/*"
       ]
     },
     "lib": [
@@ -39,6 +36,9 @@
     ".next/types/**/*.ts",
     "**/*.ts",
     "**/*.tsx"
+  ],
+  "references": [
+    { "path": "../core" }
   ],
   "exclude": [
     "node_modules",

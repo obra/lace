@@ -8,7 +8,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session, Project, Agent, ThreadManager } from '@/lib/server/lace-imports';
 import type { ToolExecutor } from '@/lib/server/lace-imports';
-import type { Tool } from '~/tools/tool';
+import type { AIProvider } from '@lace/core/providers/base-provider';
+import type { Tool } from '@lace/core/tools/tool';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
   createTestProviderInstance,

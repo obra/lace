@@ -81,6 +81,7 @@ export class CompactionHandler {
  */
 export class ConsoleCompactionDisplay implements CompactionDisplay {
   onCompactionStart(): void {
+    // eslint-disable-next-line no-console
     console.log('\n🔄 Compacting conversation to reduce size...');
   }
 
@@ -91,10 +92,12 @@ export class ConsoleCompactionDisplay implements CompactionDisplay {
       const compactedCount = data.compactedEvents.length;
       const reduction = Math.round((1 - compactedCount / originalCount) * 100);
 
+      // eslint-disable-next-line no-console
       console.log(
         `✅ Compaction complete! Reduced from ${originalCount} to ${compactedCount} events (${reduction}% reduction)\n`
       );
     } else {
+      // eslint-disable-next-line no-console
       console.log('✅ Compaction complete!\n');
     }
   }

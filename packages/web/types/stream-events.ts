@@ -1,7 +1,7 @@
 // ABOUTME: Event stream types for real-time notifications
 // ABOUTME: Now uses LaceEvent directly - no StreamEvent wrapper
 
-import type { LaceEvent } from '~/threads/types';
+import type { LaceEvent } from '@lace/core/threads/types';
 
 // Web-specific connection state (not part of core events)
 export interface StreamConnection {

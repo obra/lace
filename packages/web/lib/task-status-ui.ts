@@ -6,7 +6,7 @@ import {
   TASK_STATUS_ORDERED,
   type TaskStatus,
   getStatusConfig,
-} from '~/tasks/task-status';
+} from '@lace/core/tasks/task-status';
 
 // For select dropdowns
 export const getStatusOptions = () =>

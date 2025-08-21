@@ -15,7 +15,7 @@ import { ToolApprovalProvider } from './ToolApprovalProvider';
 import { AgentProvider } from './AgentProvider';
 import type { ReactNode } from 'react';
 import type { ThreadId } from '@/types/core';
-import type { LaceEvent } from '~/threads/types';
+import type { LaceEvent } from '@/types/core';
 import type { PendingApproval } from '@/types/api';
 import type { StreamConnection } from '@/types/stream-events';
 import type { UseAgentEventsReturn } from '@/hooks/useAgentEvents';

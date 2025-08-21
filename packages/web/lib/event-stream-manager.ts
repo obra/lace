@@ -5,7 +5,7 @@
 import type { Task, TaskContext, ThreadId, LaceEvent } from '@/types/core';
 import type { Session } from '@/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
-import { logger } from '~/utils/logger';
+import { logger } from '@lace/core/utils/logger';
 import { stringify } from '@/lib/serialization';
 
 // Type guard for errors with code property (Web Streams API errors)

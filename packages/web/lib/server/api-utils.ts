@@ -2,9 +2,9 @@
 // ABOUTME: Provides validation, serialization, and common patterns for RESTful endpoints
 
 import { z } from 'zod';
-import { logger } from '~/utils/logger';
+import { logger } from '@lace/core/utils/logger';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { TASK_STATUS_VALUES } from '~/tasks/task-status';
+import { TASK_STATUS_VALUES } from '@lace/core/tasks/task-status';
 
 // Route parameter validation schemas
 export const ProjectIdSchema = z.string().uuid('Invalid project ID format');

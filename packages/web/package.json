@@ -11,6 +11,7 @@
     "dev:debug": "LACE_LOG_LEVEL=debug LACE_LOG_STDERR=true tsx server-custom.ts",
     "build": "node ../../scripts/trace-server-dependencies.mjs && next build",
     "start": "NODE_ENV=production tsx server-custom.ts",
+    "typecheck": "npx tsc --noEmit",
     "lint": "NODE_ENV=development next lint; npx tsc --noEmit",
     "lint:fix": "next lint --fix",
     "format": "prettier --write app components e2e hooks lib public scripts test-utils types",
@@ -25,6 +26,7 @@
     "chromatic": "chromatic --exit-zero-on-changes"
   },
   "dependencies": {
+    "@lace/core": "file:../core",
     "@fontsource-variable/dm-sans": "^5.2.6",
     "@fontsource/google-sans-code": "^5.2.1",
     "@fontsource/lato": "^5.2.6",

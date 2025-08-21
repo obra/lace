@@ -1,7 +1,7 @@
 // ABOUTME: Sentry tunnel endpoint to avoid CORS issues in development
 // ABOUTME: Routes Sentry requests through our domain to prevent cross-origin blocking
 import { NextRequest, NextResponse } from 'next/server';
-import { logger } from '~/utils/logger';
+import { logger } from '@/lib/server/lace-imports';
 
 const SENTRY_HOST = 'o543459.ingest.us.sentry.io';
 const SENTRY_PROJECT_ID = '4509844023279616';

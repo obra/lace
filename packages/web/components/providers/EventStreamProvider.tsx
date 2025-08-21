@@ -18,7 +18,7 @@ import { useAgentAPI as useAgentAPIHook } from '@/hooks/useAgentAPI';
 import { useToolApprovalContext } from './ToolApprovalProvider';
 import { useAgentContext } from './AgentProvider';
 import type { ThreadId } from '@/types/core';
-import type { LaceEvent } from '~/threads/types';
+import type { LaceEvent } from '@lace/core/threads/types';
 import type { StreamConnection } from '@/types/stream-events';
 import type { PendingApproval } from '@/types/api';
 

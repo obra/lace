@@ -1,40 +1,43 @@
 // ABOUTME: Server-side imports for Lace core modules - BUSINESS LOGIC CLASSES ONLY
-// ABOUTME: Uses ~ path aliases to reference main project source
+// ABOUTME: Facade for core package imports, maintains clean abstraction boundaries
 
 import 'server-only';
 
 // Business logic classes - should only be used by service layer
-export { Agent } from '~/agents/agent';
-export { ProviderRegistry } from '~/providers/registry';
-export { ProviderCatalogManager } from '~/providers/catalog/manager';
-export { ProviderInstanceManager } from '~/providers/instance/manager';
-export { ToolExecutor } from '~/tools/executor';
-export { EventApprovalCallback } from '~/tools/event-approval-callback';
-export { Session } from '~/sessions/session';
-export { Project } from '~/projects/project';
-export { ThreadManager } from '~/threads/thread-manager';
+export { Agent } from '@lace/core/agents/agent';
+export { ProviderRegistry } from '@lace/core/providers/registry';
+export { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
+export { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
+export { ToolExecutor } from '@lace/core/tools/executor';
+export { EventApprovalCallback } from '@lace/core/tools/event-approval-callback';
+export { Session } from '@lace/core/sessions/session';
+export { Project } from '@lace/core/projects/project';
+export { ThreadManager } from '@lace/core/threads/thread-manager';
 
 // Tool types
 
 // Provider types
-export type { CatalogProvider, ProviderInstancesConfig } from '~/providers/catalog/types';
-export { ProviderInstanceSchema, CredentialSchema } from '~/providers/catalog/types';
-export type { ConfiguredInstance } from '~/providers/registry';
+export type { CatalogProvider, ProviderInstancesConfig } from '@lace/core/providers/catalog/types';
+export { ProviderInstanceSchema, CredentialSchema } from '@lace/core/providers/catalog/types';
+export type { ConfiguredInstance } from '@lace/core/providers/registry';
 
 // Tool implementations
-export { FileReadTool } from '~/tools/implementations/file-read';
+export { FileReadTool } from '@lace/core/tools/implementations/file-read';
 
 // Test utilities
 export {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 export {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
-export { TestProvider } from '~/test-utils/test-provider';
-export { ApprovalPendingError, ApprovalDecision } from '~/tools/approval-types';
+} from '@lace/core/test-utils/provider-defaults';
+export { TestProvider } from '@lace/core/test-utils/test-provider';
+export { ApprovalPendingError, ApprovalDecision } from '@lace/core/tools/approval-types';
 
 // Database and configuration
-export { ensureLaceDir } from '~/config/lace-dir';
+export { ensureLaceDir } from '@lace/core/config/lace-dir';
+
+// Utilities
+export { logger } from '@lace/core/utils/logger';
