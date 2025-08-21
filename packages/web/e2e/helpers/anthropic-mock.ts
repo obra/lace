@@ -33,7 +33,7 @@ export function mockAnthropicForE2E(): void {
         } else if (userMessage.includes('Hello there!')) {
           responseText =
             "Hello! I'm Claude, streaming my response token by token. You can see each word appear as I generate it.";
-        } else if (userMessage.includes('follow-up')) {
+        } else if (userMessage.includes('follow-up message to test conversation flow')) {
           responseText =
             'This is my follow-up response. Notice how each message gets its own streaming animation.';
         } else if (userMessage.includes('slow response')) {
