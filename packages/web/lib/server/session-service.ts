@@ -12,8 +12,6 @@ import { logger } from '~/utils/logger';
 export class SessionService {
   // Track agents that already have event handlers set up to prevent duplicates
   private registeredAgents = new WeakSet<Agent>();
-  // Project ID context for events
-  projectId?: string;
 
   constructor() {}
 
@@ -84,9 +82,6 @@ export class SessionService {
 
     // Handle streaming tokens
     agent.on('agent_token', ({ token }: { token: string }) => {
-      // Keep console output for development
-      process.stdout.write(token);
-
       // Broadcast token to UI for real-time display
       sseManager.broadcast({
         type: 'AGENT_TOKEN',
@@ -118,7 +113,7 @@ export class SessionService {
         transient: true,
         context: {
           sessionId,
-          projectId: this.projectId,
+          projectId,
           taskId: undefined,
           agentId: undefined,
         },
@@ -142,7 +137,7 @@ export class SessionService {
         transient: true,
         context: {
           sessionId,
-          projectId: this.projectId,
+          projectId,
           taskId: undefined,
           agentId: undefined,
         },
