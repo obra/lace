@@ -97,9 +97,20 @@ jobs:
             script -q /dev/null sh -c "npm test"
           fi
 
+      - name: Cache test artifacts
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/cache@v4
+        with:
+          path: |
+            coverage/
+            packages/web/coverage/
+            .vitest-cache/
+          key: test-artifacts-${{ github.sha }}-${{ github.run_id }}
+
   test-coverage:
     name: Test Coverage
     runs-on: ubuntu-latest
+    needs: test
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -109,6 +120,15 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+
+      - name: Restore test artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            coverage/
+            packages/web/coverage/
+            .vitest-cache/
+          key: test-artifacts-${{ github.sha }}-${{ github.run_id }}
 
       - name: Install system dependencies
         run: |
@@ -128,7 +148,7 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Run coverage
+      - name: Run coverage (incremental)
         run: script -q -c "npm run test:coverage" /dev/null
 
       - name: Upload coverage to Codecov
