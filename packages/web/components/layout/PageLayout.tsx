@@ -3,7 +3,7 @@
 
 'use client';
 
-import type { ReactNode } from 'react';
+import React, { type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars } from '@/lib/fontawesome';

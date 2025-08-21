@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { FirstProjectHero } from '@/components/onboarding/FirstProjectHero';
 import { LoadingView } from '@/components/pages/views/LoadingView';

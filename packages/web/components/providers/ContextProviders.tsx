@@ -3,7 +3,7 @@
 
 'use client';
 
-import type { ReactNode } from 'react';
+import React, { type ReactNode } from 'react';
 import { UIProvider } from '@/components/providers/UIProvider';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
