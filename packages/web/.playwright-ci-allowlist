@@ -16,5 +16,7 @@ e2e/page-objects.test.e2e.ts
 e2e/project-persistence.e2e.ts
 e2e/session-management.e2e.ts
 e2e/streaming-basic.e2e.ts
+e2e/streaming-minimal.e2e.ts
 e2e/streaming-reliability.e2e.ts
 e2e/streaming-sse-events.e2e.ts
+e2e/task-management.e2e.ts
