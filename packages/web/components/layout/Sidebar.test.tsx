@@ -13,7 +13,7 @@ import { Sidebar } from './Sidebar';
 
 describe('Sidebar', () => {
   const defaultProps = {
-    isOpen: true,
+    open: true,
     onToggle: vi.fn(),
     children: <div>Sidebar Content</div>,
   };
@@ -24,13 +24,15 @@ describe('Sidebar', () => {
 
   it('renders when open', () => {
     render(<Sidebar {...defaultProps} />);
-    expect(screen.getByText('Sidebar Content')).toBeInTheDocument();
-    expect(screen.getByText('Lace')).toBeInTheDocument();
+    expect(screen.getAllByText('Sidebar Content')).toHaveLength(2); // Both mobile and desktop versions
+    expect(screen.getAllByText('Lace')).toHaveLength(2); // Both mobile and desktop headers
   });
 
   it('renders collapsed state when closed', () => {
-    render(<Sidebar {...defaultProps} isOpen={false} />);
+    render(<Sidebar {...defaultProps} open={false} />);
+    // Mobile version is hidden when closed, desktop shows collapsed state without content
     expect(screen.queryByText('Sidebar Content')).not.toBeInTheDocument();
+    // Desktop collapsed state doesn't show "Lace" text, mobile is hidden
     expect(screen.queryByText('Lace')).not.toBeInTheDocument();
   });
 
@@ -50,19 +52,22 @@ describe('Sidebar', () => {
   // NEW TESTS FOR TASK 3 - These should fail initially
   it('calls onSettingsClick when settings button clicked (collapsed)', () => {
     const mockOnSettingsClick = vi.fn();
-    render(<Sidebar {...defaultProps} isOpen={false} onSettingsClick={mockOnSettingsClick} />);
+    render(<Sidebar {...defaultProps} open={false} onSettingsClick={mockOnSettingsClick} />);
 
-    const settingsButton = screen.getByTitle('Settings');
+    // When collapsed, only desktop collapsed settings button is visible
+    const settingsButton = screen.getByLabelText('Open settings');
     fireEvent.click(settingsButton);
     expect(mockOnSettingsClick).toHaveBeenCalledTimes(1);
   });
 
   it('calls onSettingsClick when settings button clicked (expanded)', () => {
     const mockOnSettingsClick = vi.fn();
-    render(<Sidebar {...defaultProps} isOpen={true} onSettingsClick={mockOnSettingsClick} />);
+    render(<Sidebar {...defaultProps} open={true} onSettingsClick={mockOnSettingsClick} />);
 
-    const settingsButton = screen.getByTitle('Settings');
-    fireEvent.click(settingsButton);
+    // When expanded, both mobile and desktop settings buttons exist, click the first one
+    const settingsButtons = screen.getAllByLabelText('Open settings');
+    expect(settingsButtons.length).toBeGreaterThan(0);
+    fireEvent.click(settingsButtons[0]);
     expect(mockOnSettingsClick).toHaveBeenCalledTimes(1);
   });
 
@@ -81,23 +86,24 @@ describe('Sidebar', () => {
 
   it('renders settings button in both expanded and collapsed states', () => {
     // Collapsed state
-    const { rerender } = render(<Sidebar {...defaultProps} isOpen={false} />);
-    expect(screen.getByTitle('Settings')).toBeInTheDocument();
+    const { rerender } = render(<Sidebar {...defaultProps} open={false} />);
+    expect(screen.getByLabelText('Open settings')).toBeInTheDocument();
 
-    // Expanded state
-    rerender(<Sidebar {...defaultProps} isOpen={true} />);
-    expect(screen.getByTitle('Settings')).toBeInTheDocument();
+    // Expanded state - now has multiple settings buttons (mobile + desktop)
+    rerender(<Sidebar {...defaultProps} open={true} />);
+    const settingsButtons = screen.getAllByLabelText('Open settings');
+    expect(settingsButtons.length).toBeGreaterThan(0);
   });
 
   // REGRESSION TESTS - These should still pass
   it('maintains existing functionality after theme removal', () => {
     render(<Sidebar {...defaultProps} />);
 
-    // Should still render content area
-    expect(screen.getByText('Sidebar Content')).toBeInTheDocument();
+    // Should still render content area (now in both mobile and desktop versions)
+    expect(screen.getAllByText('Sidebar Content')).toHaveLength(2);
 
-    // Should still have header
-    expect(screen.getByText('Lace')).toBeInTheDocument();
+    // Should still have header (now in both mobile and desktop versions)
+    expect(screen.getAllByText('Lace')).toHaveLength(2);
 
     // Should still have toggle functionality
     const buttons = screen.getAllByRole('button');

@@ -75,7 +75,6 @@ import { TextAreaField } from '@/components/ui/TextAreaField';
 import { UISettingsPanel } from '@/components/settings/panels/UISettingsPanel';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { MobileSidebar } from '@/components/layout/MobileSidebar';
 // Removed unused feedback and files imports to satisfy lints
 
 // ORGANISMS - Complex interactive components
@@ -641,7 +640,7 @@ export default function PlaygroundPage() {
                 </div>
               </div>
               <div className="max-w-xs">
-                <Sidebar isOpen={true} onToggle={() => {}} onSettingsClick={() => {}}>
+                <Sidebar open={true} onToggle={() => {}} onSettingsClick={() => {}}>
                   <div>Sidebar content</div>
                 </Sidebar>
               </div>
@@ -649,17 +648,29 @@ export default function PlaygroundPage() {
 
             <div className="border border-secondary/20 rounded p-3 bg-secondary/5">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm bg-secondary/20 text-secondary px-2 py-1 rounded">M4</span>
-                <span className="text-sm font-medium">MobileSidebar</span>
+                <span className="text-sm bg-success/20 text-success px-2 py-1 rounded">
+                  UNIFIED
+                </span>
+                <span className="text-sm font-medium">Responsive Sidebar</span>
                 <div className="text-xs text-base-content/60">
-                  Uses: <span className="text-primary">NavigationItem(16)</span> + responsive
-                  behavior
+                  Mobile overlay + Desktop panel in one component
                 </div>
               </div>
               <div className="max-w-xs">
-                <MobileSidebar isOpen={true} onClose={() => {}} onSettingsClick={() => {}}>
-                  <div>Mobile sidebar content</div>
-                </MobileSidebar>
+                <div className="text-sm text-base-content/60 mb-2">
+                  Automatically handles mobile/desktop layouts:
+                </div>
+                <Sidebar open={true} onToggle={() => {}} onSettingsClick={() => {}}>
+                  <div className="p-4">
+                    <div className="text-sm font-medium mb-2">Unified Sidebar Demo</div>
+                    <div className="text-xs text-base-content/60">
+                      • Desktop: Collapsible panel
+                      <br />
+                      • Mobile: Overlay with backdrop
+                      <br />• Single API: open/onToggle
+                    </div>
+                  </div>
+                </Sidebar>
               </div>
             </div>
           </div>

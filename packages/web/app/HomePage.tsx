@@ -4,7 +4,7 @@
 'use client';
 
 import React, { useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars } from '@/lib/fontawesome';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
@@ -15,20 +15,13 @@ import { useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { MobileSidebar } from '@/components/layout/MobileSidebar';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
 
 export function HomePage() {
   const { projects, loading: loadingProjects } = useProjectContext();
-  const {
-    autoOpenCreateProject,
-    setAutoOpenCreateProject,
-    showMobileNav,
-    setShowMobileNav,
-    showDesktopSidebar,
-    toggleDesktopSidebar,
-  } = useUIContext();
+  const { autoOpenCreateProject, setAutoOpenCreateProject, sidebarOpen, toggleSidebar } =
+    useUIContext();
   const { enableAgentAutoSelection } = useSessionContext();
 
   // Onboarding flow management
@@ -39,10 +32,10 @@ export function HomePage() {
 
   // Auto-open project creation modal when no projects exist
   useEffect(() => {
-    if (!loadingProjects) {
-      handleAutoOpenProjectCreation(projects?.length || 0);
+    if (!loadingProjects && projects) {
+      handleAutoOpenProjectCreation(projects.length);
     }
-  }, [projects?.length, loadingProjects, handleAutoOpenProjectCreation]);
+  }, [projects?.length, loadingProjects, handleAutoOpenProjectCreation, projects]);
 
   const handleSwitchProject = useCallback(() => {
     // Already on homepage - no navigation needed
@@ -61,46 +54,17 @@ export function HomePage() {
       <div data-testid="sidebar" className="flex-shrink-0 h-full">
         <SettingsContainer>
           {({ onOpenSettings }) => (
-            <>
-              {/* Mobile Sidebar */}
-              <AnimatePresence>
-                {showMobileNav && (
-                  <MobileSidebar
-                    isOpen={showMobileNav}
-                    onClose={() => setShowMobileNav(false)}
-                    onSettingsClick={onOpenSettings}
-                  >
-                    <SidebarContent
-                      isMobile={true}
-                      onCloseMobileNav={() => setShowMobileNav(false)}
-                      onSwitchProject={handleSwitchProject}
-                      onAgentSelect={() => {}} // No agent navigation on home page
-                      onClearAgent={() => {}} // No agent clearing on home page
-                      onConfigureAgent={() => {}} // No agent configuration on home page
-                      onConfigureSession={() => {}} // No session configuration on home page
-                    />
-                  </MobileSidebar>
-                )}
-              </AnimatePresence>
-
-              {/* Desktop Sidebar */}
-              <div className="hidden lg:block h-full">
-                <Sidebar
-                  isOpen={showDesktopSidebar}
-                  onToggle={toggleDesktopSidebar}
-                  onSettingsClick={onOpenSettings}
-                >
-                  <SidebarContent
-                    isMobile={false}
-                    onSwitchProject={handleSwitchProject}
-                    onAgentSelect={() => {}} // No agent navigation on home page
-                    onClearAgent={() => {}} // No agent clearing on home page
-                    onConfigureAgent={() => {}} // No agent configuration on home page
-                    onConfigureSession={() => {}} // No session configuration on home page
-                  />
-                </Sidebar>
-              </div>
-            </>
+            <Sidebar open={sidebarOpen} onToggle={toggleSidebar} onSettingsClick={onOpenSettings}>
+              <SidebarContent
+                isMobile={false} // Component now handles mobile/desktop internally
+                onCloseMobileNav={toggleSidebar}
+                onSwitchProject={handleSwitchProject}
+                onAgentSelect={() => {}} // No agent navigation on home page
+                onClearAgent={() => {}} // No agent clearing on home page
+                onConfigureAgent={() => {}} // No agent configuration on home page
+                onConfigureSession={() => {}} // No session configuration on home page
+              />
+            </Sidebar>
           )}
         </SettingsContainer>
       </div>
@@ -112,7 +76,7 @@ export function HomePage() {
           <div className="flex items-center justify-between p-4 lg:px-6">
             <div className="flex items-center gap-3">
               <motion.button
-                onClick={() => setShowMobileNav(true)}
+                onClick={toggleSidebar}
                 className="p-2 hover:bg-base-200 rounded-lg lg:hidden"
               >
                 <FontAwesomeIcon icon={faBars} className="w-6 h-6" />
@@ -130,10 +94,12 @@ export function HomePage() {
             <LoadingView />
           ) : (
             <div className="flex-1 p-6 min-h-0 space-y-6">
-              {projects.length === 0 && (
+              {projects && projects.length === 0 && (
                 <FirstProjectHero onCreateFirstProject={() => setAutoOpenCreateProject(true)} />
               )}
-              {(projects.length > 0 || autoOpenCreateProject) && <ProjectSelectorPanel />}
+              {((projects && projects.length > 0) || autoOpenCreateProject) && (
+                <ProjectSelectorPanel />
+              )}
             </div>
           )}
         </div>

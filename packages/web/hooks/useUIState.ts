@@ -1,15 +1,13 @@
-// ABOUTME: Centralized UI state management for modals and sidebar visibility
-// ABOUTME: Manages mobile navigation, desktop sidebar, and modal display states
+// ABOUTME: Centralized UI state management for modals and unified sidebar visibility
+// ABOUTME: Manages unified sidebar state that works for both mobile and desktop layouts
 
 import { useState, useCallback, useEffect } from 'react';
 
 export interface UseUIStateResult {
-  // Navigation state
-  showMobileNav: boolean;
-  showDesktopSidebar: boolean;
-  setShowMobileNav: (show: boolean) => void;
-  setShowDesktopSidebar: (show: boolean) => void;
-  toggleDesktopSidebar: () => void;
+  // Unified sidebar state
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  toggleSidebar: () => void;
 
   // Modal state
   autoOpenCreateProject: boolean;
@@ -21,9 +19,17 @@ export interface UseUIStateResult {
 }
 
 export function useUIState(): UseUIStateResult {
-  // Navigation state
-  const [showMobileNav, setShowMobileNav] = useState(false);
-  const [showDesktopSidebar, setShowDesktopSidebar] = useState(true);
+  // Unified sidebar state - persisted across navigation
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('lace-sidebar-open');
+      if (stored !== null) {
+        // Type-safe parsing - only accept 'true'/'false' strings
+        return stored === 'true';
+      }
+    }
+    return true;
+  });
 
   // Modal state
   const [autoOpenCreateProject, setAutoOpenCreateProject] = useState(false);
@@ -31,30 +37,25 @@ export function useUIState(): UseUIStateResult {
   // Loading state
   const [loading, setLoading] = useState(false);
 
-  // Sidebar toggle action
-  const toggleDesktopSidebar = useCallback(() => {
-    setShowDesktopSidebar((prev) => !prev);
+  // Unified sidebar toggle with persistence
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((prev: boolean) => {
+      const newValue = !prev;
+      localStorage.setItem('lace-sidebar-open', String(newValue));
+      return newValue;
+    });
   }, []);
 
-  // Close mobile nav when clicking outside or navigation
+  // Persist sidebar state when it changes
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 1024) {
-        setShowMobileNav(false);
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    localStorage.setItem('lace-sidebar-open', String(sidebarOpen));
+  }, [sidebarOpen]);
 
   return {
-    // Navigation state
-    showMobileNav,
-    showDesktopSidebar,
-    setShowMobileNav,
-    setShowDesktopSidebar,
-    toggleDesktopSidebar,
+    // Unified sidebar API
+    sidebarOpen,
+    setSidebarOpen,
+    toggleSidebar,
 
     // Modal state
     autoOpenCreateProject,
