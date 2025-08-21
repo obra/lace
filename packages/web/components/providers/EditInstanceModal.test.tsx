@@ -242,9 +242,10 @@ describe('EditInstanceModal', () => {
     const saveButton = screen.getByRole('button', { name: /save changes/i });
     await user.click(saveButton);
 
-    // Should not make API call to update instance (only the initial load)
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    // Should not make API call to update instance (only the initial loads for instances and catalog)
+    expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(global.fetch).toHaveBeenCalledWith('/api/provider/instances', { method: 'GET' });
+    expect(global.fetch).toHaveBeenCalledWith('/api/provider/catalog', { method: 'GET' });
 
     // Form should show validation state (HTML5 validation)
     expect(nameInput).toBeInvalid();

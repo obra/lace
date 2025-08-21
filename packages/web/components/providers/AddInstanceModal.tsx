@@ -186,6 +186,7 @@ export function AddInstanceModal({
               value={formData.displayName}
               onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
               placeholder="My OpenAI Instance"
+              data-testid="instance-name-input"
               required
             />
             <div className="label">

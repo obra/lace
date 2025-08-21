@@ -88,7 +88,7 @@ export function ProjectCreateModal({
   const isSimplifiedMode = !showAdvancedOptions;
 
   // Providers from context are already available/configured, no need to filter
-  const availableProviders = providers || [];
+  const availableProviders = useMemo(() => providers || [], [providers]);
 
   // Get available models for project creation
   const availableCreateModels = useMemo(() => {
