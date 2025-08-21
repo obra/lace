@@ -20,3 +20,4 @@ e2e/streaming-minimal.e2e.ts
 e2e/streaming-reliability.e2e.ts
 e2e/streaming-sse-events.e2e.ts
 e2e/task-management.e2e.ts
+e2e/tool-approval.e2e.ts
