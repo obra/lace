@@ -28,7 +28,8 @@
     "test:coverage": "vitest run --coverage && cd packages/web && npm run test:coverage",
     "web:dev": "npm run dev --workspace=packages/web",
     "web:build": "npm run build --workspace=packages/web",
-    "web:install": "cd packages/web && npm install"
+    "web:install": "cd packages/web && npm install",
+    "update-catalogs": "npx tsx scripts/update-provider-catalogs.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",
