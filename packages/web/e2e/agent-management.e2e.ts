@@ -55,8 +55,8 @@ test.describe('Agent Management', () => {
 
       // Verify we can interact with the agent (send a message)
       const testMessage = 'Testing default agent functionality';
-      await chatInterface.sendMessage(testMessage);
-      await expect(chatInterface.getMessage(testMessage)).toBeVisible();
+      await sendMessage(page, testMessage);
+      await verifyMessageVisible(page, testMessage);
     }
   });
 
