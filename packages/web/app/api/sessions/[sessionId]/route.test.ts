@@ -22,30 +22,10 @@ vi.mock('server-only', () => ({}));
 
 // Mock only external dependencies while using real tools
 // URL fetch tool might make external HTTP requests
-vi.mock('~/tools/implementations/url-fetch', () => ({
-  UrlFetchTool: vi.fn(() => ({
-    name: 'url-fetch',
-    description: 'Fetch content from a URL (mocked)',
-    schema: {},
-    execute: vi.fn().mockResolvedValue({
-      isError: false,
-      content: [{ type: 'text', text: 'Mocked URL content' }],
-    }),
-  })),
-}));
+// Mock external tools that use core packages - must mock at path level
 
 // Bash tool executes system commands - mock to avoid side effects
-vi.mock('~/tools/implementations/bash', () => ({
-  BashTool: vi.fn(() => ({
-    name: 'bash',
-    description: 'Execute bash commands (mocked)',
-    schema: {},
-    execute: vi.fn().mockResolvedValue({
-      isError: false,
-      content: [{ type: 'text', text: 'Mocked bash output' }],
-    }),
-  })),
-}));
+// These tools are mocked because they have external side effects in tests
 
 describe('Session Detail API Route', () => {
   const _tempLaceDir = setupWebTest();
@@ -362,7 +342,7 @@ describe('Session Detail API Route', () => {
       // instead of going through sessionService.getSessionData()
 
       // Mock the Session class directly
-      const { Session } = await import('~/sessions/session');
+      const { Session } = await import('@/lib/server/lace-imports');
       const mockDirectSessionData = {
         id: 'lace_20250101_sess01',
         name: 'Updated Session',

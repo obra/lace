@@ -146,6 +146,14 @@
     "./threads/compaction/types": {
       "types": "./dist/threads/compaction/types.d.ts",
       "import": "./dist/threads/compaction/types.js"
+    },
+    "./persistence/database": {
+      "types": "./dist/persistence/database.d.ts",
+      "import": "./dist/persistence/database.js"
+    },
+    "./test-utils/temp-lace-dir": {
+      "types": "./dist/test-utils/temp-lace-dir.d.ts",
+      "import": "./dist/test-utils/temp-lace-dir.js"
     }
   }
 }

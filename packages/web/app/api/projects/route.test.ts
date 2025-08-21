@@ -16,8 +16,11 @@ interface ErrorResponse {
 const projectStore = new Map<string, Record<string, unknown>>();
 const sessionStore = new Map<string, Record<string, unknown>>();
 
-vi.mock('~/persistence/database', () => {
+// Mock persistence layer to use in-memory storage for testing
+vi.mock('@/lib/server/lace-imports', async () => {
+  const actual = await vi.importActual('@/lib/server/lace-imports');
   return {
+    ...actual,
     getPersistence: vi.fn(() => ({
       // Mock the persistence layer to use in-memory storage for testing
       loadAllProjects: vi.fn(() => {
@@ -45,8 +48,8 @@ vi.mock('~/persistence/database', () => {
   };
 });
 
-// Mock ThreadManager for session counting - external dependency
-vi.mock('~/threads/thread-manager', () => ({
+// Additional mock for ThreadManager if needed
+vi.mock('@lace/core/threads/thread-manager', () => ({
   ThreadManager: vi.fn(() => ({
     getSessionsForProject: vi.fn(() => []), // Empty array for clean tests
     generateThreadId: vi.fn(() => {
@@ -251,7 +254,7 @@ describe('Projects API', () => {
       };
 
       // Override the persistence mock for this test
-      const { getPersistence } = await import('~/persistence/database');
+      const { getPersistence } = await import('@/lib/server/lace-imports');
       vi.mocked(getPersistence).mockReturnValue(
         mockPersistence as unknown as ReturnType<typeof getPersistence>
       );

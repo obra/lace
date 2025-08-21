@@ -33,7 +33,7 @@ describe('Projects API Integration Tests', () => {
     setupTestProviderDefaults();
 
     // Force persistence reset to ensure clean database state
-    const { resetPersistence } = await import('~/persistence/database');
+    const { resetPersistence } = await import('@/lib/server/lace-imports');
     resetPersistence();
 
     // Create test provider instance
@@ -54,7 +54,7 @@ describe('Projects API Integration Tests', () => {
   describe('GET /api/projects', () => {
     it('should return all projects with session counts', async () => {
       // Create some test projects directly using the real Project class
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@/lib/server/lace-imports');
 
       const project1 = Project.create('Project 1', '/path/1', 'First project', {
         providerInstanceId,
@@ -66,7 +66,7 @@ describe('Projects API Integration Tests', () => {
       });
 
       // Create sessions in project1 to test session counting
-      const { Session } = await import('~/sessions/session');
+      const { Session } = await import('@/lib/server/lace-imports');
       Session.create({
         name: 'Session 1',
         projectId: project1.getId(),
@@ -137,7 +137,7 @@ describe('Projects API Integration Tests', () => {
       expect(data.lastUsedAt).toBeDefined();
 
       // Verify the project was actually created in the database
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@/lib/server/lace-imports');
       const createdProject = Project.getById(data.id);
       expect(createdProject).not.toBeNull();
       expect(createdProject!.getName()).toBe('New Project');
@@ -167,7 +167,7 @@ describe('Projects API Integration Tests', () => {
       expect(data.id).toBeDefined();
 
       // Verify the project was actually created in the database
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@/lib/server/lace-imports');
       const createdProject = Project.getById(data.id);
       expect(createdProject).not.toBeNull();
       expect(createdProject!.getName()).toBe('Minimal Project');

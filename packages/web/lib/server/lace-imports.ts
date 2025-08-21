@@ -38,6 +38,7 @@ export { ApprovalPendingError, ApprovalDecision } from '@lace/core/tools/approva
 
 // Database and configuration
 export { ensureLaceDir } from '@lace/core/config/lace-dir';
+export { resetPersistence, getPersistence } from '@lace/core/persistence/database';
 
 // Utilities
 export { logger } from '@lace/core/utils/logger';
