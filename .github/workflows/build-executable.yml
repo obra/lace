@@ -52,6 +52,18 @@ jobs:
       run: |
         npx tsx scripts/build-simple.ts --target ${{ matrix.target }} --name ${{ matrix.name }}
     
+    - name: Sign and notarize macOS executable
+      if: runner.os == 'macOS'
+      env:
+        APPLE_DEVELOPER_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
+        APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+        APPLE_ID_EMAIL: ${{ secrets.APPLE_ID_EMAIL }}
+        APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      run: |
+        npx tsx scripts/sign-and-notarize.ts --binary "build/${{ matrix.name }}"
+    
     - name: Test executable
       run: |
         chmod +x build/${{ matrix.name }}
