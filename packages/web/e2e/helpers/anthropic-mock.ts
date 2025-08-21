@@ -19,7 +19,10 @@ export function mockAnthropicForE2E(): void {
       // Parse the request to determine which response to send
       const body = await request.text();
       const requestData = JSON.parse(body);
-      const userMessage = requestData.messages?.find((m: any) => m.role === 'user')?.content || '';
+
+      // Get the LAST user message from conversation history (not the first)
+      const userMessages = requestData.messages?.filter((m: any) => m.role === 'user') || [];
+      const userMessage = userMessages[userMessages.length - 1]?.content || '';
 
       // Determine response based on user message content
       let responseText = "I'm a helpful AI assistant. How can I help you today?";
