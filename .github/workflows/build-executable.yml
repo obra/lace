@@ -2,7 +2,6 @@ name: Build Single-File Executable
 
 on:
   push:
-    branches: [ main, f/single-file-install ]
     tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
@@ -53,7 +52,7 @@ jobs:
         npx tsx scripts/build-simple.ts --target ${{ matrix.target }} --name ${{ matrix.name }}
     
     - name: Sign and notarize macOS executable
-      if: runner.os == 'macOS'
+      if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/')
       env:
         APPLE_DEVELOPER_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
         APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
