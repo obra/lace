@@ -70,7 +70,7 @@ export function ProjectEditModal({
   initialConfig = {},
 }: ProjectEditModalProps) {
   // Get providers from ProviderInstanceProvider context
-  const { availableProviders: providers } = useProviderInstances();
+  const { availableProviders } = useProviderInstances();
   const [editName, setEditName] = useState(project?.name || '');
   const [editDescription, setEditDescription] = useState(project?.description || '');
   const [editWorkingDirectory, setEditWorkingDirectory] = useState(project?.workingDirectory || '');
@@ -91,16 +91,11 @@ export function ProjectEditModal({
     setEditConfig(initialConfig);
   }, [initialConfig]);
 
-  // Get available providers (only those that are configured with instance IDs)
-  const availableProviders = providers.filter((p): p is ProviderInfo & { instanceId: string } =>
-    Boolean(p.configured && p.instanceId)
-  );
-
   // Get available models for selected provider
   const availableModels = React.useMemo(() => {
-    const provider = providers.find((p) => p.instanceId === editConfig.providerInstanceId);
+    const provider = availableProviders.find((p) => p.instanceId === editConfig.providerInstanceId);
     return provider?.models || [];
-  }, [providers, editConfig.providerInstanceId]);
+  }, [availableProviders, editConfig.providerInstanceId]);
 
   // Handle environment variable addition
   const handleAddEnvironmentVariable = () => {
@@ -215,7 +210,7 @@ export function ProjectEditModal({
                 value={editConfig.providerInstanceId || ''}
                 onChange={(e) => {
                   const newInstanceId = e.target.value;
-                  const provider = providers.find((p) => p.instanceId === newInstanceId);
+                  const provider = availableProviders.find((p) => p.instanceId === newInstanceId);
                   const providerModels = provider?.models || [];
                   setEditConfig((prev) => ({
                     ...prev,

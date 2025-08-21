@@ -87,18 +87,16 @@ export function ProjectCreateModal({
 
   const isSimplifiedMode = !showAdvancedOptions;
 
-  // Get available providers (only those that are configured with instance IDs)
-  const availableProviders = useMemo(() => {
-    return (providers || []).filter((p): p is ProviderInfo & { instanceId: string } =>
-      Boolean(p.configured && p.instanceId)
-    );
-  }, [providers]);
+  // Providers from context are already available/configured, no need to filter
+  const availableProviders = providers || [];
 
   // Get available models for project creation
   const availableCreateModels = useMemo(() => {
-    const provider = providers.find((p) => p.instanceId === createConfig.providerInstanceId);
+    const provider = availableProviders.find(
+      (p) => p.instanceId === createConfig.providerInstanceId
+    );
     return provider?.models || [];
-  }, [providers, createConfig.providerInstanceId]);
+  }, [availableProviders, createConfig.providerInstanceId]);
 
   // Initialize with first available provider instance
   useEffect(() => {
@@ -335,7 +333,7 @@ export function ProjectCreateModal({
                             value={createConfig.providerInstanceId || ''}
                             onChange={(e) => {
                               const newInstanceId = e.target.value;
-                              const provider = providers.find(
+                              const provider = availableProviders.find(
                                 (p) => p.instanceId === newInstanceId
                               );
                               const providerModels = provider?.models || [];
@@ -437,8 +435,9 @@ export function ProjectCreateModal({
                     </div>
                     <div>
                       <span className="font-medium">Provider:</span>{' '}
-                      {providers.find((p) => p.instanceId === createConfig.providerInstanceId)
-                        ?.displayName || '—'}
+                      {availableProviders.find(
+                        (p) => p.instanceId === createConfig.providerInstanceId
+                      )?.displayName || '—'}
                     </div>
                     <div>
                       <span className="font-medium">Model:</span> {createConfig.modelId || '—'}
@@ -576,7 +575,9 @@ export function ProjectCreateModal({
                     value={createConfig.providerInstanceId || ''}
                     onChange={(e) => {
                       const newInstanceId = e.target.value;
-                      const provider = providers.find((p) => p.instanceId === newInstanceId);
+                      const provider = availableProviders.find(
+                        (p) => p.instanceId === newInstanceId
+                      );
                       const providerModels = provider?.models || [];
                       setCreateConfig((prev) => ({
                         ...prev,

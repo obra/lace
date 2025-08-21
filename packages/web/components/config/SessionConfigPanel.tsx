@@ -76,8 +76,7 @@ export function SessionConfigPanel(): React.JSX.Element {
     updateAgent,
   } = useAgentContext();
   const { project, session, navigateToSession, navigateToAgent, navigateToProject } = useURLState();
-  const { availableProviders: providers, instancesLoading: providersLoading } =
-    useProviderInstances();
+  const { availableProviders, instancesLoading: providersLoading } = useProviderInstances();
 
   const loading = sessionLoading || agentLoading || providersLoading;
   const [showCreateSession, setShowCreateSession] = useState(false);
@@ -109,13 +108,6 @@ export function SessionConfigPanel(): React.JSX.Element {
   const [editSessionName, setEditSessionName] = useState('');
   const [editSessionDescription, setEditSessionDescription] = useState('');
   const [editSessionConfig, setEditSessionConfig] = useState<SessionConfiguration>(DEFAULT_CONFIG);
-
-  // Get available providers (only those that are configured with instance IDs)
-  const availableProviders = useMemo(() => {
-    return providers.filter((p): p is ProviderInfo & { instanceId: string } =>
-      Boolean(p.configured && p.instanceId)
-    );
-  }, [providers]);
 
   // Reset form when project or project configuration changes
   const projectId = currentProject.id;
@@ -484,7 +476,7 @@ export function SessionConfigPanel(): React.JSX.Element {
       <SessionCreateModal
         isOpen={showCreateSession}
         currentProject={currentProject}
-        providers={providers}
+        providers={availableProviders}
         sessionConfig={sessionConfig}
         sessionName={newSessionName}
         sessionDescription={newSessionDescription}
@@ -499,7 +491,7 @@ export function SessionConfigPanel(): React.JSX.Element {
       <AgentCreateModal
         isOpen={showCreateAgent}
         selectedSession={selectedSession}
-        providers={providers}
+        providers={availableProviders}
         agentName={newAgentName}
         selectedInstanceId={selectedInstanceId}
         selectedModelId={selectedModelId}
@@ -515,7 +507,7 @@ export function SessionConfigPanel(): React.JSX.Element {
         isOpen={showEditConfig}
         currentProject={currentProject}
         selectedSession={selectedSession}
-        providers={providers}
+        providers={availableProviders}
         sessionConfig={editSessionConfig}
         sessionName={editSessionName}
         sessionDescription={editSessionDescription}
@@ -530,7 +522,7 @@ export function SessionConfigPanel(): React.JSX.Element {
       <AgentEditModal
         isOpen={showEditAgent}
         editingAgent={editingAgent}
-        providers={providers}
+        providers={availableProviders}
         loading={loading}
         onClose={handleCloseEditAgent}
         onSubmit={handleEditAgentSubmit}
