@@ -18,6 +18,10 @@ export interface UseUIStateResult {
   // Loading state
   loading: boolean;
   setLoading: (loading: boolean) => void;
+
+  // Navigation state
+  isNavigating: boolean;
+  setIsNavigating: (navigating: boolean) => void;
 }
 
 export function useUIState(): UseUIStateResult {
@@ -30,6 +34,9 @@ export function useUIState(): UseUIStateResult {
 
   // Loading state
   const [loading, setLoading] = useState(false);
+
+  // Navigation state
+  const [isNavigating, setIsNavigating] = useState(false);
 
   // Sidebar toggle action
   const toggleDesktopSidebar = useCallback(() => {
@@ -63,5 +70,9 @@ export function useUIState(): UseUIStateResult {
     // Loading state
     loading,
     setLoading,
+
+    // Navigation state
+    isNavigating,
+    setIsNavigating,
   };
 }
