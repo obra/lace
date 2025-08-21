@@ -17,10 +17,8 @@ const projectStore = new Map<string, Record<string, unknown>>();
 const sessionStore = new Map<string, Record<string, unknown>>();
 
 // Mock persistence layer to use in-memory storage for testing
-vi.mock('@/lib/server/lace-imports', async () => {
-  const actual = await vi.importActual('@/lib/server/lace-imports');
+vi.mock('@lace/core/persistence/database', () => {
   return {
-    ...actual,
     getPersistence: vi.fn(() => ({
       // Mock the persistence layer to use in-memory storage for testing
       loadAllProjects: vi.fn(() => {
@@ -45,6 +43,7 @@ vi.mock('@/lib/server/lace-imports', async () => {
         return sessionStore.get(sessionId) || null;
       }),
     })),
+    resetPersistence: vi.fn(),
   };
 });
 
@@ -254,7 +253,7 @@ describe('Projects API', () => {
       };
 
       // Override the persistence mock for this test
-      const { getPersistence } = await import('@/lib/server/lace-imports');
+      const { getPersistence } = await import('@lace/core/persistence/database');
       vi.mocked(getPersistence).mockReturnValue(
         mockPersistence as unknown as ReturnType<typeof getPersistence>
       );
