@@ -11,6 +11,7 @@ import { useUIContext } from '@/components/providers/UIProvider';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
+import { StandardErrorBoundary } from '@/components/pages/ErrorBoundary';
 
 interface PageLayoutProps {
   title: string;
@@ -76,7 +77,7 @@ export function PageLayout({
 
         {/* Content Area */}
         <div className="flex-1 flex flex-col min-h-0 text-base-content bg-base-100/30 backdrop-blur-sm">
-          {children}
+          <StandardErrorBoundary>{children}</StandardErrorBoundary>
         </div>
       </motion.div>
     </motion.div>
