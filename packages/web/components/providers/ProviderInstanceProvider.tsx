@@ -208,15 +208,15 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
 
         await api.post('/api/provider/instances', requestBody);
 
-        // Reload instances to get the updated list
-        await loadInstances();
+        // Reload both instances and catalog to ensure data consistency
+        await Promise.all([loadInstances(), loadCatalog()]);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to create instance';
         console.error('Error creating instance:', errorMessage);
         throw err; // Re-throw so the modal can handle the error
       }
     },
-    [loadInstances, instances]
+    [loadInstances, loadCatalog, instances]
   );
 
   // Update provider instance
@@ -236,15 +236,15 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
 
         await api.put(`/api/provider/instances/${instanceId}`, payload);
 
-        // Reload instances to get the updated data
-        await loadInstances();
+        // Reload both instances and catalog to ensure data consistency
+        await Promise.all([loadInstances(), loadCatalog()]);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to update instance';
         console.error('Error updating instance:', errorMessage);
         throw err; // Re-throw so the modal can handle the error
       }
     },
-    [loadInstances]
+    [loadInstances, loadCatalog]
   );
 
   // Delete provider instance
@@ -263,17 +263,17 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
         });
 
         // Reload to ensure server state is in sync
-        await loadInstances();
+        await Promise.all([loadInstances(), loadCatalog()]);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to delete instance';
         setInstancesError(errorMessage);
         console.error('Error deleting instance:', errorMessage);
         // Reload instances to restore consistent state after failure
-        await loadInstances();
+        await Promise.all([loadInstances(), loadCatalog()]);
         throw err;
       }
     },
-    [loadInstances]
+    [loadInstances, loadCatalog]
   );
 
   // Test provider instance connection
@@ -393,10 +393,11 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
     });
   }, [instances, catalogProviders]);
 
-  // Load instances on mount only
+  // Load instances and catalog on mount
   useEffect(() => {
     void loadInstances();
-  }, [loadInstances]);
+    void loadCatalog();
+  }, [loadInstances, loadCatalog]);
 
   // Context value
   const contextValue = useMemo<ProviderInstanceContextValue>(
