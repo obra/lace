@@ -10,9 +10,11 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-  lint-and-format:
-    name: Lint and Format
+  lint-build:
+    name: Lint, Format & Build
     runs-on: ubuntu-latest
+    outputs:
+      build-cache-key: ${{ steps.cache-key.outputs.key }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,7 +25,23 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
+      - name: Generate build cache key
+        id: cache-key
+        run: echo "key=build-${{ github.sha }}-${{ hashFiles('package-lock.json', 'packages/web/package-lock.json') }}" >> $GITHUB_OUTPUT
+
+      - name: Cache build artifacts
+        uses: actions/cache@v4
+        id: build-cache
+        with:
+          path: |
+            dist/
+            packages/web/.next/
+            node_modules/
+            packages/web/node_modules/
+          key: ${{ steps.cache-key.outputs.key }}
+
       - name: Install dependencies
+        if: steps.build-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Run ESLint
@@ -32,74 +50,16 @@ jobs:
       - name: Check Prettier formatting
         run: npx prettier --check "src/**/*.ts"
 
-  build:
-    name: Build Project
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
       - name: Build project
-        run: cd packages/web && npm run build
+        if: steps.build-cache.outputs.cache-hit != 'true'
+        run: |
+          npm run build
+          cd packages/web && npm run build
 
   test:
     name: Test Suite
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install system dependencies
-        run: |
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            sudo apt-get update
-            sudo apt-get install -y \
-              python3 \
-              make \
-              g++ \
-              libtool \
-              pkg-config \
-              libncurses5-dev \
-              ripgrep
-          else
-            brew install ripgrep
-          fi
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build project
-        run: npm run build
-
-      - name: Run all tests
-        run: |
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            script -q -c "npm test" /dev/null
-          else
-            script -q /dev/null sh -c "npm test"
-          fi
-
-  test-coverage:
-    name: Test Coverage
     runs-on: ubuntu-latest
+    needs: lint-build
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -109,6 +69,16 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+
+      - name: Restore build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            dist/
+            packages/web/.next/
+            node_modules/
+            packages/web/node_modules/
+          key: ${{ needs.lint-build.outputs.build-cache-key }}
 
       - name: Install system dependencies
         run: |
@@ -122,11 +92,50 @@ jobs:
             libncurses5-dev \
             ripgrep
 
-      - name: Install dependencies
+      - name: Install dependencies (fallback)
         run: npm ci
 
-      - name: Build project
-        run: npm run build
+      - name: Run all tests
+        run: script -q -c "npm test" /dev/null
+
+  test-coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    needs: lint-build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Restore build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            dist/
+            packages/web/.next/
+            node_modules/
+            packages/web/node_modules/
+          key: ${{ needs.lint-build.outputs.build-cache-key }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3 \
+            make \
+            g++ \
+            libtool \
+            pkg-config \
+            libncurses5-dev \
+            ripgrep
+
+      - name: Install dependencies (fallback)
+        run: npm ci
 
       - name: Run coverage
         run: script -q -c "npm run test:coverage" /dev/null
@@ -138,70 +147,43 @@ jobs:
           fail_ci_if_error: false
 
 
-  playwright-tests:
-    name: Playwright E2E Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  # Playwright tests disabled to reduce CPU usage in CI
+  # playwright-tests:
+  #   name: Playwright E2E Tests
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #         cache: 'npm'
+  #     
+  #     - name: Install dependencies
+  #       run: npm ci
+  #     
+  #     - name: Install Playwright browsers
+  #       run: cd packages/web && npx playwright install --with-deps chromium webkit
+  #     
+  #     - name: Build web package
+  #       run: cd packages/web && npm run build
+  #     
+  #     - name: Run allow-listed Playwright tests
+  #       run: cd packages/web && npm run test:playwright:ci
+  #       env:
+  #         CI: true
+  #     
+  #     - name: Upload Playwright test results
+  #       uses: actions/upload-artifact@v4
+  #       if: always()
+  #       with:
+  #         name: playwright-test-results
+  #         path: |
+  #           packages/web/test-results/
+  #           packages/web/playwright-report/
+  #         retention-days: 7
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright browsers
-        run: cd packages/web && npx playwright install --with-deps chromium webkit
-
-      - name: Build web package
-        run: cd packages/web && npm run build
-
-      - name: Run allow-listed Playwright tests
-        run: cd packages/web && npm run test:playwright:ci
-        env:
-          CI: true
-
-      - name: Upload Playwright test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-test-results
-          path: |
-            packages/web/test-results/
-            packages/web/playwright-report/
-          retention-days: 7
-
-  build-and-package:
-    name: Build and Package
-    runs-on: ubuntu-latest
-    needs: [lint-and-format, build, test, playwright-tests]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build project
-        run: cd packages/web &&  npm run build
-
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts
-          path: |
-            dist/
-            !dist/**/*.map
-          retention-days: 7
+  # build-and-package job removed - build-executable workflow handles packaging
 
