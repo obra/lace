@@ -40,7 +40,7 @@ test.describe('Error Handling and Recovery', () => {
     });
 
     // Navigate to new project form
-    await page.getByTestId('new-project-button').click();
+    await page.getByTestId('create-first-project-button').click();
 
     // Try to use invalid path
     await page.getByTestId('project-path-input').fill(invalidPath);
@@ -81,7 +81,7 @@ test.describe('Error Handling and Recovery', () => {
 
     // Check if interface remains responsive
     try {
-      await page.getByTestId('new-project-button').isVisible({ timeout: 3000 });
+      await page.getByTestId('create-first-project-button').isVisible({ timeout: 3000 });
       networkErrorTest.interfaceResponsive = true;
       networkErrorTest.canNavigate = true;
     } catch (error) {
@@ -110,7 +110,7 @@ test.describe('Error Handling and Recovery', () => {
     // Try to trigger potential JS errors through unusual interactions
     try {
       // Rapidly click elements
-      await page.getByTestId('new-project-button').click();
+      await page.getByTestId('create-first-project-button').click();
       await page.keyboard.press('Escape');
       await page.keyboard.press('Escape');
 
@@ -124,7 +124,7 @@ test.describe('Error Handling and Recovery', () => {
     const postErrorState = {
       jsErrorsDetected: jsErrors.length,
       interfaceStillVisible: await page
-        .getByTestId('new-project-button')
+        .getByTestId('create-first-project-button')
         .isVisible()
         .catch(() => false),
       canStillType: false,

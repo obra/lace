@@ -172,7 +172,7 @@ test.describe('Stop Functionality', () => {
         method: 'ESC + Click',
         action: async () => {
           await page.keyboard.press('Escape');
-          await page.getByTestId('new-project-button').click();
+          await page.getByTestId('create-first-project-button').click();
           await page.keyboard.press('Escape');
         },
       },

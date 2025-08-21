@@ -96,7 +96,7 @@ test.describe('SSE Event System Reliability', () => {
       {
         name: 'rapid clicks',
         action: async () => {
-          await page.getByTestId('new-project-button').click();
+          await page.getByTestId('create-first-project-button').click();
           await page.keyboard.press('Escape');
         },
       },

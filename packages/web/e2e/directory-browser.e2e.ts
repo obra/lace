@@ -25,7 +25,7 @@ test.describe('Directory Browser E2E Tests', () => {
     // Click "New Project" button
     const newProjectButton = page
       .locator('button:has-text("New Project")')
-      .or(page.locator('[data-testid="new-project-button"]'))
+      .or(page.locator('[data-testid="create-first-project-button"]'))
       .first();
 
     await newProjectButton.waitFor({ timeout: 10000 });
@@ -60,7 +60,7 @@ test.describe('Directory Browser E2E Tests', () => {
     // Navigate to project creation
     const newProjectButton = page
       .locator('button:has-text("New Project")')
-      .or(page.locator('[data-testid="new-project-button"]'))
+      .or(page.locator('[data-testid="create-first-project-button"]'))
       .first();
 
     await newProjectButton.waitFor({ timeout: 10000 });
@@ -99,7 +99,7 @@ test.describe('Directory Browser E2E Tests', () => {
     // Navigate to project creation
     const newProjectButton = page
       .locator('button:has-text("New Project")')
-      .or(page.locator('[data-testid="new-project-button"]'))
+      .or(page.locator('[data-testid="create-first-project-button"]'))
       .first();
 
     await newProjectButton.waitFor({ timeout: 10000 });
@@ -134,7 +134,7 @@ test.describe('Directory Browser E2E Tests', () => {
     // Navigate to project creation
     const newProjectButton = page
       .locator('button:has-text("New Project")')
-      .or(page.locator('[data-testid="new-project-button"]'))
+      .or(page.locator('[data-testid="create-first-project-button"]'))
       .first();
 
     await newProjectButton.waitFor({ timeout: 10000 });
@@ -178,7 +178,7 @@ test.describe('Directory Browser E2E Tests', () => {
     // Navigate to project creation
     const newProjectButton = page
       .locator('button:has-text("New Project")')
-      .or(page.locator('[data-testid="new-project-button"]'))
+      .or(page.locator('[data-testid="create-first-project-button"]'))
       .first();
 
     await newProjectButton.waitFor({ timeout: 10000 });
@@ -248,7 +248,7 @@ test.describe('Directory Browser E2E Tests', () => {
     // This test creates a full project using the DirectoryField
     const newProjectButton = page
       .locator('button:has-text("New Project")')
-      .or(page.locator('[data-testid="new-project-button"]'))
+      .or(page.locator('[data-testid="create-first-project-button"]'))
       .first();
 
     await newProjectButton.waitFor({ timeout: 10000 });

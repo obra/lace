@@ -78,7 +78,7 @@ test.describe('Project Persistence', () => {
     // Check what actually happens - the app might redirect or show error
     const currentUrl = page.url();
     const hasProjectButton = await page
-      .getByTestId('new-project-button')
+      .getByTestId('create-first-project-button')
       .isVisible()
       .catch(() => false);
     const hasMessageInput = await getMessageInput(page)
@@ -114,7 +114,7 @@ test.describe('Project Persistence', () => {
     // Check if we get either project selector (redirect) or can at least load the page
     // The specific behavior may vary, so we test that the page is functional
     const hasProjectSelector = await page
-      .getByTestId('new-project-button')
+      .getByTestId('create-first-project-button')
       .isVisible()
       .catch(() => false);
     const currentUrl = page.url();

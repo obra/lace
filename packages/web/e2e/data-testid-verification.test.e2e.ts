@@ -24,10 +24,10 @@ test.describe('Data-TestID Verification', () => {
 
   test('essential UI elements have data-testid attributes', async ({ page }) => {
     // Verify new project button exists
-    await expect(page.getByTestId('new-project-button')).toBeVisible();
+    await expect(page.getByTestId('create-first-project-button')).toBeVisible();
 
     // Click to open project creation form
-    await page.getByTestId('new-project-button').click();
+    await page.getByTestId('create-first-project-button').click();
 
     // Verify directory input exists (step 2)
     await expect(page.getByTestId('project-path-input')).toBeVisible();
