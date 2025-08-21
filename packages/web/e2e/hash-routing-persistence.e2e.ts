@@ -34,7 +34,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     await createProject(page, 'E2E Test Project', projectPath);
 
     // Verify URL contains project hash
-    await expect(page).toHaveURL(/.*#\/project\/[^\/]+$/);
+    await expect(page).toHaveURL(/.*\/project\/[^\/]+$/);
 
     // Get the current URL with project selection
     const projectUrl = page.url();
@@ -84,7 +84,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     }
 
     // Verify URL contains project and session
-    await expect(page).toHaveURL(/.*#\/project\/[^\/]+\/session\/[^\/]+$/);
+    await expect(page).toHaveURL(/.*\/project\/[^\/]+\/session\/[^\/]+$/);
 
     const sessionUrl = page.url();
 
@@ -97,7 +97,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     // Verify we navigated to session view or stayed at project view (due to potential server errors)
     const currentUrl = page.url();
     // Should have either session URL or project URL
-    expect(currentUrl).toMatch(/#\/project\/[^\/]+(?:\/session\/[^\/]+)?$/);
+    expect(currentUrl).toMatch(/\/project\/[^\/]+(?:\/session\/[^\/]+)?$/);
 
     // Check for session heading or project view elements
     const sessionHeading = page.locator('h4:has-text("E2E Test Session")');
@@ -184,7 +184,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     }
 
     // Verify URL contains project and session (agent may not be accessible due to server issues)
-    const urlPattern = /.*#\/project\/[^\/]+(?:\/session\/[^\/]+(?:\/agent\/[^\/]+)?)?$/;
+    const urlPattern = /.*\/project\/[^\/]+(?:\/session\/[^\/]+(?:\/agent\/[^\/]+)?)?$/;
     await expect(page).toHaveURL(urlPattern);
 
     const fullUrl = page.url();
@@ -236,7 +236,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     }
 
     const projectUrl = page.url();
-    expect(projectUrl).toMatch(/#\/project\/[^\/]+$/);
+    expect(projectUrl).toMatch(/\/project\/[^\/]+$/);
 
     // Step 2: Select a session
     await page.waitForSelector('button:text("New Session"), h3:has-text("Sessions")', {
@@ -269,7 +269,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
 
     const sessionUrl = page.url();
     // Accept either project-level URL or session-level URL
-    expect(sessionUrl).toMatch(/#\/project\/[^\/]+(?:\/session\/[^\/]+)?$/);
+    expect(sessionUrl).toMatch(/\/project\/[^\/]+(?:\/session\/[^\/]+)?$/);
 
     // Test browser back navigation even if we're still at project level
     const beforeBackUrl = page.url();
@@ -301,7 +301,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
 
   test('should handle invalid URLs gracefully', async ({ page }) => {
     // Test with invalid project ID
-    await page.goto('/#/project/invalid-project-id');
+    await page.goto(`${testEnv.serverUrl}/project/invalid-project-id`);
 
     // Should fallback to project selection view
     await expect(
@@ -309,7 +309,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     ).toBeVisible();
 
     // Test with malformed URL
-    await page.goto('/#/invalid/path/structure');
+    await page.goto(`${testEnv.serverUrl}/invalid/path/structure`);
 
     // Should fallback to project selection
     await expect(
@@ -317,7 +317,7 @@ test.describe('Hash-Based URL Persistence E2E', () => {
     ).toBeVisible();
 
     // Test with partial hierarchy (agent without session)
-    await page.goto('/#/project/test/agent/invalid');
+    await page.goto(`${testEnv.serverUrl}/project/test/agent/invalid`);
 
     // Should fallback appropriately (likely to project view since session is missing)
     await expect(

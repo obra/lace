@@ -105,7 +105,7 @@ test.describe('Project Persistence', () => {
     await setupAnthropicProvider(page);
 
     // Navigate to invalid project URL
-    await page.goto(`${testEnv.serverUrl}/#/project/nonexistent-project-id`);
+    await page.goto(`${testEnv.serverUrl}/project/nonexistent-project-id`);
 
     // The application may either show an error or redirect to project selection
     // Wait a reasonable time for the application to handle the invalid URL

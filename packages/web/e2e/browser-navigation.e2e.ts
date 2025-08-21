@@ -75,7 +75,7 @@ test.describe('Browser Navigation Support', () => {
     const backUrl = page.url();
     navigationTest.urlChanges.push(`back: ${backUrl}`);
 
-    if (backUrl === homeUrl || backUrl.includes('/#/') || backUrl !== projectUrl) {
+    if (backUrl === homeUrl || backUrl.includes('/project/') || backUrl !== projectUrl) {
       navigationTest.backNavigation = true;
     }
 
@@ -134,7 +134,7 @@ test.describe('Browser Navigation Support', () => {
     await getMessageInput(page);
 
     const originalUrl = page.url();
-    const urlMatch = originalUrl.match(/(#\/project\/[^\/]+\/session\/[^\/]+\/agent\/[^\/]+)/);
+    const urlMatch = originalUrl.match(/(\/project\/[^\/]+\/session\/[^\/]+\/agent\/[^\/]+)/);
     expect(urlMatch).toBeTruthy(); // Verify we have the expected hash structure
 
     if (urlMatch) {
@@ -241,7 +241,7 @@ test.describe('Browser Navigation Support', () => {
     await getMessageInput(page);
 
     const validProjectUrl = page.url();
-    const urlMatch = validProjectUrl.match(/(#\/project\/[^\/]+\/session\/[^\/]+\/agent\/[^\/]+)/);
+    const urlMatch = validProjectUrl.match(/(\/project\/[^\/]+\/session\/[^\/]+\/agent\/[^\/]+)/);
 
     if (urlMatch) {
       // Extract components for testing
@@ -298,7 +298,7 @@ test.describe('Browser Navigation Support', () => {
 
             if (finalUrl === scenario.url) {
               result = 'url-accepted';
-            } else if (finalUrl === homeUrl || finalUrl.endsWith('/#/')) {
+            } else if (finalUrl === homeUrl || finalUrl.endsWith('/')) {
               result = 'redirected-to-home';
             } else if (finalUrl.includes('/project/') && finalUrl !== scenario.url) {
               result = 'redirected-to-valid-project';
