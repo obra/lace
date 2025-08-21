@@ -96,8 +96,7 @@ test.describe('Streaming Compaction Events', () => {
     const compactionIndicators = [
       page.locator('[data-testid="compaction-indicator"]'),
       page.getByText(/compacting/i),
-      page.getByText(/consolidating/i),
-      page.locator('.compaction-progress'),
+      page.locator('[data-testid="compaction-progress"]'),
     ];
 
     let compactionUIVisible = false;
@@ -188,8 +187,7 @@ test.describe('Streaming Compaction Events', () => {
       const compactionIndicators = [
         page.locator('[data-testid="compaction-indicator"]'),
         page.getByText(/compacting/i),
-        page.getByText(/consolidating/i),
-        page.locator('.compaction-progress'),
+        page.locator('[data-testid="compaction-progress"]'),
       ];
 
       let uiVisible = false;
@@ -268,12 +266,8 @@ test.describe('Streaming Compaction Events', () => {
         selector: page.getByText(/compacting/i),
       },
       {
-        name: 'consolidating-text',
-        selector: page.getByText(/consolidating/i),
-      },
-      {
         name: 'progress-element',
-        selector: page.locator('.compaction-progress'),
+        selector: page.locator('[data-testid="compaction-progress"]'),
       },
     ];
 
@@ -295,7 +289,6 @@ test.describe('Streaming Compaction Events', () => {
     // Monitor for completion indicators
     const completionIndicators = [
       page.getByText(/compaction complete/i),
-      page.getByText(/consolidation finished/i),
       page.locator('[data-testid="compaction-complete"]'),
     ];
 

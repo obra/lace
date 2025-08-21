@@ -7,6 +7,7 @@ e2e/basic-messaging.e2e.ts
 e2e/basic-user-journey.e2e.ts
 e2e/console-forward.e2e.ts
 e2e/data-testid-verification.test.e2e.ts
+e2e/error-handling.e2e.ts
 e2e/example.test.e2e.ts
 e2e/message-streaming.e2e.ts
 e2e/multi-agent-workflows.e2e.ts
