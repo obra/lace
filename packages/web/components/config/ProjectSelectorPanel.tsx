@@ -17,7 +17,6 @@ import {
 } from '@/lib/fontawesome';
 import type { ProjectInfo } from '@/types/core';
 import { AddInstanceModal } from '@/components/providers/AddInstanceModal';
-import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
 import { ProjectEditModal } from '@/components/config/ProjectEditModal';
 import { ProjectCreateModal } from '@/components/config/ProjectCreateModal';
 import { AnimatedModal } from '@/components/ui/AnimatedModal';
@@ -349,312 +348,305 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
   };
 
   return (
-    <ProviderInstanceProvider>
-      <div
-        className="bg-base-100 rounded-lg border border-base-300 p-6 flex flex-col h-full"
-        onClick={handleBackdropClick}
-      >
-        {/* Header (hidden until at least one project exists) */}
-        {projects.length > 0 && (
-          <div className="flex items-start justify-between mb-6 flex-shrink-0">
-            <div className="flex-1">
-              {/* Intentionally omit 'Select Project' title per UX request */}
+    <div
+      className="bg-base-100 rounded-lg border border-base-300 p-6 flex flex-col h-full"
+      onClick={handleBackdropClick}
+    >
+      {/* Header (hidden until at least one project exists) */}
+      {projects.length > 0 && (
+        <div className="flex items-start justify-between mb-6 flex-shrink-0">
+          <div className="flex-1">
+            {/* Intentionally omit 'Select Project' title per UX request */}
 
-              {/* Tabs and Filters */}
-              <div className="flex items-center gap-4 mt-4">
-                {/* Archive Filter Tabs */}
-                <div className="tabs tabs-boxed">
-                  <button
-                    className={`tab ${filter === 'active' ? 'tab-active' : ''}`}
-                    onClick={() => setFilter('active')}
+            {/* Tabs and Filters */}
+            <div className="flex items-center gap-4 mt-4">
+              {/* Archive Filter Tabs */}
+              <div className="tabs tabs-boxed">
+                <button
+                  className={`tab ${filter === 'active' ? 'tab-active' : ''}`}
+                  onClick={() => setFilter('active')}
+                >
+                  Active
+                </button>
+                <button
+                  className={`tab ${filter === 'archived' ? 'tab-active' : ''}`}
+                  onClick={() => setFilter('archived')}
+                >
+                  Archived
+                </button>
+              </div>
+
+              {/* Timeframe Filter (only for active projects) */}
+              {filter === 'active' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-base-content/60">Show:</span>
+                  <select
+                    data-testid="project-timeframe-filter"
+                    value={timeFrame}
+                    onChange={(e) => setTimeFrame(e.target.value as ProjectTimeFrame)}
+                    className="select select-bordered select-sm"
                   >
-                    Active
-                  </button>
-                  <button
-                    className={`tab ${filter === 'archived' ? 'tab-active' : ''}`}
-                    onClick={() => setFilter('archived')}
-                  >
-                    Archived
-                  </button>
+                    <option value="week">This week</option>
+                    <option value="month">This month</option>
+                    <option value="all">All time</option>
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Search */}
+      {projects.length > 6 && (
+        <div className="mb-6 flex-shrink-0">
+          <input
+            type="text"
+            placeholder="Search projects..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="input input-bordered w-full max-w-md"
+          />
+        </div>
+      )}
+
+      {/* Projects Grid - Scrollable */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="flex items-center gap-3">
+              <div className="loading loading-spinner loading-md"></div>
+              <span>Loading projects...</span>
+            </div>
+          </div>
+        ) : filteredProjects.length === 0 ? (
+          <div className="text-center py-12">
+            {projects.length === 0 ? (
+              <>
+                <FontAwesomeIcon icon={faFolder} className="w-16 h-16 text-base-content/20 mb-4" />
+                <h3 className="text-lg font-medium text-base-content mb-2">No Projects Yet</h3>
+                <p className="text-base-content/60">
+                  Create your first project to start working with AI agents
+                </p>
+              </>
+            ) : (
+              <>
+                <h3 className="text-lg font-medium text-base-content mb-2">No matching projects</h3>
+                <p className="text-base-content/60">Try adjusting your search terms</p>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3 pb-4">
+            {/* New Project Button */}
+            <div
+              onClick={() => setShowCreateProject(true)}
+              className="border-2 border-dashed border-primary/50 rounded-lg p-4 cursor-pointer transition-all hover:border-primary hover:bg-primary/5 flex items-center gap-4"
+              data-testid="create-project-button"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setShowCreateProject(true);
+                }
+              }}
+            >
+              <FontAwesomeIcon icon={faPlus} className="w-6 h-6 text-primary" />
+              <div className="text-left">
+                <h3 className="font-semibold text-base-content">Create New Project</h3>
+                <p className="text-sm text-base-content/60">
+                  Start a new project to organize your AI conversations
+                </p>
+              </div>
+            </div>
+
+            {filteredProjects.map((project) => (
+              <div
+                key={project.id}
+                data-testid="project-list-entry"
+                className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-lg ${
+                  selectedProject?.id === project.id
+                    ? 'border-primary bg-primary/5 shadow-md'
+                    : 'border-base-300 hover:border-primary/50'
+                }`}
+                onClick={() => router.push(`/project/${project.id}`)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-focus rounded-lg flex items-center justify-center">
+                      <FontAwesomeIcon icon={faFolder} className="w-5 h-5 text-primary-content" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-base-content truncate">{project.name}</h3>
+                      {project.description && (
+                        <p className="text-sm text-base-content/60 truncate">
+                          {project.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {selectedProject?.id === project.id && (
+                      <div className="badge badge-primary badge-sm">Active</div>
+                    )}
+
+                    {/* Context Menu Button */}
+
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowContextMenu(showContextMenu === project.id ? null : project.id);
+                        }}
+                        className="btn btn-ghost btn-xs opacity-60 hover:opacity-100"
+                      >
+                        <FontAwesomeIcon icon={faEllipsisV} className="w-3 h-3" />
+                      </button>
+
+                      {/* Context Menu Dropdown */}
+                      {showContextMenu === project.id && (
+                        <div className="absolute right-0 top-8 bg-base-100 border border-base-300 rounded-lg shadow-lg py-2 min-w-40 z-10">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleContextMenuAction(project.id, 'edit');
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2"
+                          >
+                            <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
+                            Edit
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleContextMenuAction(
+                                project.id,
+                                project.isArchived ? 'unarchive' : 'archive'
+                              );
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2"
+                          >
+                            <FontAwesomeIcon
+                              icon={project.isArchived ? faFolder : faTrash}
+                              className="w-3 h-3"
+                            />
+                            {project.isArchived ? 'Unarchive' : 'Archive'}
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleContextMenuAction(project.id, 'delete');
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2 text-error"
+                          >
+                            <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 text-sm text-base-content/60">
+                    <div className="flex items-center gap-1">
+                      <FontAwesomeIcon icon={faFileText} className="w-3 h-3" />
+                      <span>{project.sessionCount || 0} sessions</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <FontAwesomeIcon icon={faHistory} className="w-3 h-3" />
+                      <span>{getRelativeTime(project.lastUsedAt)}</span>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Timeframe Filter (only for active projects) */}
-                {filter === 'active' && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-base-content/60">Show:</span>
-                    <select
-                      data-testid="project-timeframe-filter"
-                      value={timeFrame}
-                      onChange={(e) => setTimeFrame(e.target.value as ProjectTimeFrame)}
-                      className="select select-bordered select-sm"
-                    >
-                      <option value="week">This week</option>
-                      <option value="month">This month</option>
-                      <option value="all">All time</option>
-                    </select>
+                {/* Archive Status */}
+                {project.isArchived && (
+                  <div className="pt-2">
+                    <span className="badge badge-warning badge-xs">Archived</span>
                   </div>
                 )}
               </div>
-            </div>
+            ))}
           </div>
-        )}
-
-        {/* Search */}
-        {projects.length > 6 && (
-          <div className="mb-6 flex-shrink-0">
-            <input
-              type="text"
-              placeholder="Search projects..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="input input-bordered w-full max-w-md"
-            />
-          </div>
-        )}
-
-        {/* Projects Grid - Scrollable */}
-        <div className="flex-1 overflow-y-auto min-h-0">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="flex items-center gap-3">
-                <div className="loading loading-spinner loading-md"></div>
-                <span>Loading projects...</span>
-              </div>
-            </div>
-          ) : filteredProjects.length === 0 ? (
-            <div className="text-center py-12">
-              {projects.length === 0 ? (
-                <>
-                  <FontAwesomeIcon
-                    icon={faFolder}
-                    className="w-16 h-16 text-base-content/20 mb-4"
-                  />
-                  <h3 className="text-lg font-medium text-base-content mb-2">No Projects Yet</h3>
-                  <p className="text-base-content/60">
-                    Create your first project to start working with AI agents
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h3 className="text-lg font-medium text-base-content mb-2">
-                    No matching projects
-                  </h3>
-                  <p className="text-base-content/60">Try adjusting your search terms</p>
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3 pb-4">
-              {/* New Project Button */}
-              <div
-                onClick={() => setShowCreateProject(true)}
-                className="border-2 border-dashed border-primary/50 rounded-lg p-4 cursor-pointer transition-all hover:border-primary hover:bg-primary/5 flex items-center gap-4"
-                data-testid="create-project-button"
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setShowCreateProject(true);
-                  }
-                }}
-              >
-                <FontAwesomeIcon icon={faPlus} className="w-6 h-6 text-primary" />
-                <div className="text-left">
-                  <h3 className="font-semibold text-base-content">Create New Project</h3>
-                  <p className="text-sm text-base-content/60">
-                    Start a new project to organize your AI conversations
-                  </p>
-                </div>
-              </div>
-
-              {filteredProjects.map((project) => (
-                <div
-                  key={project.id}
-                  data-testid="project-list-entry"
-                  className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-lg ${
-                    selectedProject?.id === project.id
-                      ? 'border-primary bg-primary/5 shadow-md'
-                      : 'border-base-300 hover:border-primary/50'
-                  }`}
-                  onClick={() => router.push(`/project/${project.id}`)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-focus rounded-lg flex items-center justify-center">
-                        <FontAwesomeIcon icon={faFolder} className="w-5 h-5 text-primary-content" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-base-content truncate">{project.name}</h3>
-                        {project.description && (
-                          <p className="text-sm text-base-content/60 truncate">
-                            {project.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {selectedProject?.id === project.id && (
-                        <div className="badge badge-primary badge-sm">Active</div>
-                      )}
-
-                      {/* Context Menu Button */}
-
-                      <div className="relative">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowContextMenu(showContextMenu === project.id ? null : project.id);
-                          }}
-                          className="btn btn-ghost btn-xs opacity-60 hover:opacity-100"
-                        >
-                          <FontAwesomeIcon icon={faEllipsisV} className="w-3 h-3" />
-                        </button>
-
-                        {/* Context Menu Dropdown */}
-                        {showContextMenu === project.id && (
-                          <div className="absolute right-0 top-8 bg-base-100 border border-base-300 rounded-lg shadow-lg py-2 min-w-40 z-10">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void handleContextMenuAction(project.id, 'edit');
-                              }}
-                              className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2"
-                            >
-                              <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
-                              Edit
-                            </button>
-
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void handleContextMenuAction(
-                                  project.id,
-                                  project.isArchived ? 'unarchive' : 'archive'
-                                );
-                              }}
-                              className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2"
-                            >
-                              <FontAwesomeIcon
-                                icon={project.isArchived ? faFolder : faTrash}
-                                className="w-3 h-3"
-                              />
-                              {project.isArchived ? 'Unarchive' : 'Archive'}
-                            </button>
-
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void handleContextMenuAction(project.id, 'delete');
-                              }}
-                              className="w-full px-4 py-2 text-left hover:bg-base-200 flex items-center gap-2 text-error"
-                            >
-                              <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 text-sm text-base-content/60">
-                      <div className="flex items-center gap-1">
-                        <FontAwesomeIcon icon={faFileText} className="w-3 h-3" />
-                        <span>{project.sessionCount || 0} sessions</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <FontAwesomeIcon icon={faHistory} className="w-3 h-3" />
-                        <span>{getRelativeTime(project.lastUsedAt)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Archive Status */}
-                  {project.isArchived && (
-                    <div className="pt-2">
-                      <span className="badge badge-warning badge-xs">Archived</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Edit Project Modal */}
-        <ProjectEditModal
-          isOpen={!!editingProject}
-          project={editingProject}
-          loading={loading}
-          onClose={handleCancelEdit}
-          onSubmit={handleEditProject}
-          initialConfig={editConfig}
-        />
-
-        {/* Create Project Modal */}
-        <ProjectCreateModal
-          isOpen={showCreateProject}
-          loading={isCreatingProject}
-          onClose={() => {
-            setShowCreateProject(false);
-            setAutoOpenCreateProject(false);
-          }}
-          onSubmit={handleCreateProject}
-          onAddProvider={() => setShowAddProvider(true)}
-        />
-
-        {/* Add Provider Modal */}
-        <AddInstanceModal
-          isOpen={showAddProvider}
-          onClose={() => setShowAddProvider(false)}
-          onSuccess={handleProviderAdded}
-        />
-
-        {/* Delete Confirmation Modal */}
-        {deletingProject && (
-          <AnimatedModal
-            isOpen={showDeleteConfirm}
-            onClose={handleCancelDelete}
-            title="Delete Project"
-          >
-            <div className="space-y-4">
-              <p className="text-base-content">
-                Are you sure you want to delete the project <strong>{deletingProject.name}</strong>?
-              </p>
-              <p className="text-base-content/60 text-sm">
-                This will permanently delete the project and all its sessions and conversations.
-                This action cannot be undone.
-              </p>
-
-              {deleteError && (
-                <div className="alert alert-error">
-                  <span>{deleteError}</span>
-                </div>
-              )}
-
-              <div className="flex gap-2 justify-end">
-                <button
-                  onClick={handleCancelDelete}
-                  className="btn btn-ghost"
-                  type="button"
-                  disabled={isDeleting}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => void handleDeleteProject()}
-                  className={`btn btn-error ${isDeleting ? 'loading' : ''}`}
-                  type="button"
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? 'Deleting...' : 'Delete Project'}
-                </button>
-              </div>
-            </div>
-          </AnimatedModal>
         )}
       </div>
-    </ProviderInstanceProvider>
+
+      {/* Edit Project Modal */}
+      <ProjectEditModal
+        isOpen={!!editingProject}
+        project={editingProject}
+        loading={loading}
+        onClose={handleCancelEdit}
+        onSubmit={handleEditProject}
+        initialConfig={editConfig}
+      />
+
+      {/* Create Project Modal */}
+      <ProjectCreateModal
+        isOpen={showCreateProject}
+        loading={isCreatingProject}
+        onClose={() => {
+          setShowCreateProject(false);
+          setAutoOpenCreateProject(false);
+        }}
+        onSubmit={handleCreateProject}
+        onAddProvider={() => setShowAddProvider(true)}
+      />
+
+      {/* Add Provider Modal */}
+      <AddInstanceModal
+        isOpen={showAddProvider}
+        onClose={() => setShowAddProvider(false)}
+        onSuccess={handleProviderAdded}
+      />
+
+      {/* Delete Confirmation Modal */}
+      {deletingProject && (
+        <AnimatedModal
+          isOpen={showDeleteConfirm}
+          onClose={handleCancelDelete}
+          title="Delete Project"
+        >
+          <div className="space-y-4">
+            <p className="text-base-content">
+              Are you sure you want to delete the project <strong>{deletingProject.name}</strong>?
+            </p>
+            <p className="text-base-content/60 text-sm">
+              This will permanently delete the project and all its sessions and conversations. This
+              action cannot be undone.
+            </p>
+
+            {deleteError && (
+              <div className="alert alert-error">
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={handleCancelDelete}
+                className="btn btn-ghost"
+                type="button"
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleDeleteProject()}
+                className={`btn btn-error ${isDeleting ? 'loading' : ''}`}
+                type="button"
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Project'}
+              </button>
+            </div>
+          </div>
+        </AnimatedModal>
+      )}
+    </div>
   );
 }

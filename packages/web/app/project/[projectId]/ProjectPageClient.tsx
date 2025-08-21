@@ -12,7 +12,6 @@ import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { AgentProvider } from '@/components/providers/AgentProvider';
 import { TaskProvider } from '@/components/providers/TaskProvider';
-import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
 import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
 import { UIProvider, useUIContext } from '@/components/providers/UIProvider';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -110,9 +109,7 @@ export function ProjectPageClient({ projectId }: ProjectPageClientProps) {
               sessionId={null}
               agents={[]} // No agents on project page
             >
-              <ProviderInstanceProvider>
-                <ProjectPageContent projectId={projectId} />
-              </ProviderInstanceProvider>
+              <ProjectPageContent projectId={projectId} />
             </TaskProvider>
           </AgentProvider>
         </SessionProvider>
