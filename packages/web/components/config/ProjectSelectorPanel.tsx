@@ -68,8 +68,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     reloadProjects,
   } = useProjectContext();
   const { enableAgentAutoSelection, loadSessionsForProject } = useSessionContext();
-  const { autoOpenCreateProject, setAutoOpenCreateProject, isNavigating, setIsNavigating } =
-    useUIContext();
+  const { autoOpenCreateProject, setAutoOpenCreateProject } = useUIContext();
   const { handleOnboardingComplete } = useOnboarding(
     setAutoOpenCreateProject,
     enableAgentAutoSelection
@@ -325,30 +324,17 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
       const projectId = createdProject.id;
 
       // Step 2: Navigate directly to chat - modal stays open until page changes
-      if (handleOnboardingComplete) {
-        const sessionsData = await loadSessionsForProject(projectId);
+      const sessionsData = await loadSessionsForProject(projectId);
 
-        const sessionId = sessionsData[0]?.id;
-        if (sessionId) {
-          const coordinatorAgentId = sessionId; // coordinator has same threadId
+      const sessionId = sessionsData[0]?.id;
+      if (sessionId) {
+        const coordinatorAgentId = sessionId; // coordinator has same threadId
 
-          // Navigate directly to chat - let navigation unmount the modal naturally
-          setIsNavigating(true);
+        // Complete onboarding and navigate to agent
+        await handleOnboardingComplete(projectId, sessionId, coordinatorAgentId);
 
-          // Add timeout to reset navigation state if something goes wrong
-          const navigationTimeout = setTimeout(() => {
-            setIsNavigating(false);
-          }, 5000);
-
-          await handleOnboardingComplete(projectId, sessionId, coordinatorAgentId);
-          clearTimeout(navigationTimeout);
-
-          // Refresh projects after successful navigation (background refresh)
-          void reloadProjects();
-
-          // Don't reset state here - let page navigation handle component unmount
-          return;
-        }
+        // Don't reset state here - let page navigation handle component unmount
+        return;
       }
 
       // Only reset modal state if navigation workflow failed
@@ -437,7 +423,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
 
         {/* Projects Grid - Scrollable */}
         <div className="flex-1 overflow-y-auto min-h-0">
-          {loading || isNavigating ? (
+          {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="flex items-center gap-3">
                 <div className="loading loading-spinner loading-md"></div>

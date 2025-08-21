@@ -3,9 +3,6 @@
 
 console.log('🧪 Starting E2E test server...');
 
-// Set up test environment before importing any modules
-process.env.NODE_ENV = 'production';
-
 // Mock Anthropic API HTTP endpoints for E2E tests
 import { mockAnthropicForE2E } from './e2e/helpers/anthropic-mock';
 mockAnthropicForE2E();
