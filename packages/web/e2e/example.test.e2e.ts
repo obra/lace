@@ -1,7 +1,7 @@
 // ABOUTME: Example E2E test demonstrating best practice patterns for Lace tests
-// ABOUTME: Shows complete per-test isolation, MSW mocking, and full conversation flows
+// ABOUTME: Shows complete per-test isolation with mock AI providers and full conversation flows
 
-import { test, expect } from './mocks/setup';
+import { test, expect } from '@playwright/test';
 import {
   setupTestEnvironment,
   cleanupTestEnvironment,
@@ -17,105 +17,17 @@ import {
   clickStopButton,
   waitForSendButton,
 } from './helpers/ui-interactions';
-import { http, HttpResponse } from 'msw';
 import * as fs from 'fs';
 import * as path from 'path';
-
-// Helper function to create streaming Anthropic responses
-function createStreamingAnthropicResponse(responseText: string, delayMs: number = 50) {
-  const tokens = responseText.split(/(\s+)/).filter(Boolean);
-
-  return new ReadableStream({
-    async start(controller) {
-      // Start with initial message structure
-      const initialData = {
-        id: 'msg_example_test',
-        type: 'message',
-        role: 'assistant',
-        content: [{ type: 'text', text: '' }],
-        model: 'claude-3-haiku-20240307',
-        stop_reason: null,
-        stop_sequence: null,
-        usage: { input_tokens: 15, output_tokens: 0 },
-      };
-
-      controller.enqueue(`data: ${JSON.stringify(initialData)}\n\n`);
-
-      // Stream each token with delays to simulate real-time generation
-      for (let i = 0; i < tokens.length; i++) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-
-        const tokenData = {
-          ...initialData,
-          content: [{ type: 'text', text: tokens.slice(0, i + 1).join('') }],
-          usage: { input_tokens: 15, output_tokens: i + 1 },
-        };
-
-        controller.enqueue(`data: ${JSON.stringify(tokenData)}\n\n`);
-      }
-
-      // Final completion message
-      const finalData = {
-        ...initialData,
-        content: [{ type: 'text', text: responseText }],
-        stop_reason: 'end_turn',
-        usage: { input_tokens: 15, output_tokens: tokens.length },
-      };
-
-      controller.enqueue(`data: ${JSON.stringify(finalData)}\n\n`);
-      controller.enqueue('data: [DONE]\n\n');
-      controller.close();
-    },
-  });
-}
 
 test.describe('Example E2E Test Patterns', () => {
   let testEnv: TestEnvironment;
 
-  test.beforeEach(async ({ page, worker }) => {
+  test.beforeEach(async ({ page }) => {
     // BEST PRACTICE: Setup isolated test environment for each test
     // This creates a unique server process with its own LACE_DIR and database
+    // The E2E test server automatically mocks the Anthropic SDK for predictable responses
     testEnv = await setupTestEnvironment();
-
-    // Setup default MSW handler for Anthropic API
-    await worker.use(
-      http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
-        const requestBody = await request.json();
-
-        // Determine response based on user message
-        let responseText = "I'm a helpful AI assistant. How can I help you today?";
-
-        if (typeof requestBody === 'object' && requestBody && 'messages' in requestBody) {
-          const messages = requestBody.messages as any[];
-          const lastUserMessage = messages?.find((m) => m.role === 'user')?.content;
-
-          if (typeof lastUserMessage === 'string') {
-            if (lastUserMessage.includes('test message from Test 1')) {
-              responseText =
-                'I see you sent a test message from Test 1. This is my response as Claude!';
-            } else if (lastUserMessage.includes('test message from Test 2')) {
-              responseText = "Hello from Test 2! I'm responding to your different message.";
-            } else if (lastUserMessage.includes('complete conversation')) {
-              responseText =
-                'This is a complete conversation test. I can help you with various tasks like coding, writing, analysis, and more!';
-            } else if (lastUserMessage.includes('hello')) {
-              responseText =
-                "Hello! It's great to meet you. I'm Claude, an AI assistant created by Anthropic.";
-            }
-          }
-        }
-
-        // Return streaming response
-        return new Response(createStreamingAnthropicResponse(responseText, 30), {
-          status: 200,
-          headers: {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            Connection: 'keep-alive',
-          },
-        });
-      })
-    );
 
     // Navigate to our isolated test server
     await page.goto(testEnv.serverUrl);
@@ -147,11 +59,11 @@ test.describe('Example E2E Test Patterns', () => {
     // Verify user message appears
     await verifyMessageVisible(page, 'This is test message from Test 1');
 
-    // Wait for AI response to appear (may take time due to streaming)
+    // Wait for AI response to appear (mocked by E2E test server)
     await expect(
       page.getByText('I see you sent a test message from Test 1. This is my response as Claude!')
     ).toBeVisible({
-      timeout: 10000,
+      timeout: 15000,
     });
 
     // Verify we're using our isolated server
@@ -169,10 +81,8 @@ test.describe('Example E2E Test Patterns', () => {
     await fs.promises.mkdir(projectPath, { recursive: true });
     await createProject(page, 'Test Project Two', projectPath);
 
-    // Wait for project to be loaded
-    await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
-      timeout: 10000,
-    });
+    // Wait for project to be fully loaded
+    await getMessageInput(page);
 
     // Verify Test 1's message is NOT visible (complete isolation)
     const test1MessageVisible = await page
@@ -181,24 +91,18 @@ test.describe('Example E2E Test Patterns', () => {
       .catch(() => false);
     expect(test1MessageVisible).toBeFalsy();
 
-    // Send a different message
-    const messageInput = page
-      .locator('input[placeholder*="Message"], textarea[placeholder*="Message"]')
-      .first();
-    await messageInput.fill('This is test message from Test 2');
-
-    const sendButton = page
-      .locator('button')
-      .filter({ hasText: /send|submit/i })
-      .first();
-    if (await sendButton.isVisible().catch(() => false)) {
-      await sendButton.click();
-    } else {
-      await messageInput.press('Enter');
-    }
+    // Send a different message using helper
+    await sendMessage(page, 'This is test message from Test 2');
 
     // Verify our message appears
-    await expect(page.getByText('This is test message from Test 2')).toBeVisible({ timeout: 5000 });
+    await verifyMessageVisible(page, 'This is test message from Test 2');
+
+    // Wait for AI response (mocked by E2E test server)
+    await expect(
+      page.getByText("Hello from Test 2! I'm responding to your different message.")
+    ).toBeVisible({
+      timeout: 15000,
+    });
 
     // Verify we're using a completely different server than Test 1
     expect(page.url()).toContain(testEnv.serverUrl.replace('http://', ''));
@@ -232,6 +136,9 @@ test.describe('Example E2E Test Patterns', () => {
     await fs.promises.mkdir(projectPath, { recursive: true });
     await createProject(page, 'Isolation Test Project', projectPath);
 
+    // Wait for project to be fully loaded
+    await getMessageInput(page);
+
     // Should not see any data from previous tests
     const anyPreviousMessages = await Promise.all([
       page
@@ -249,44 +156,7 @@ test.describe('Example E2E Test Patterns', () => {
 
   test('Test 4: Complete conversation flow with streaming and message exchange', async ({
     page,
-    worker,
   }) => {
-    // Enhanced MSW handler for this specific test with slower streaming
-    await worker.use(
-      http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
-        const requestBody = await request.json();
-
-        // Determine response based on user message
-        let responseText =
-          'This is a streaming response that demonstrates real-time token generation in the UI.';
-
-        if (typeof requestBody === 'object' && requestBody && 'messages' in requestBody) {
-          const messages = requestBody.messages as any[];
-          const lastUserMessage = messages?.find((m) => m.role === 'user')?.content;
-
-          if (typeof lastUserMessage === 'string') {
-            if (lastUserMessage.includes('hello')) {
-              responseText =
-                "Hello! I'm Claude, streaming my response token by token. You can see each word appear as I generate it.";
-            } else if (lastUserMessage.includes('follow-up')) {
-              responseText =
-                'This is my follow-up response. Notice how each message gets its own streaming animation.';
-            }
-          }
-        }
-
-        // Return slower streaming response to make it visible
-        return new Response(createStreamingAnthropicResponse(responseText, 100), {
-          status: 200,
-          headers: {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            Connection: 'keep-alive',
-          },
-        });
-      })
-    );
-
     // Setup provider and project
     await setupAnthropicProvider(page);
     const projectPath = path.join(testEnv.tempDir, 'conversation-test-project');
@@ -302,9 +172,11 @@ test.describe('Example E2E Test Patterns', () => {
     // Verify user message appears
     await verifyMessageVisible(page, 'Hello there!');
 
-    // Wait for and verify streaming AI response
+    // Wait for and verify streaming AI response (mocked by E2E test server)
     await expect(
-      page.getByText("Hello! I'm Claude, streaming my response token by token")
+      page.getByText(
+        "Hello! I'm Claude, streaming my response token by token. You can see each word appear as I generate it."
+      )
     ).toBeVisible({
       timeout: 15000,
     });
@@ -326,30 +198,16 @@ test.describe('Example E2E Test Patterns', () => {
 
     // Verify both AI responses are present
     expect(
-      await page.getByText("Hello! I'm Claude, streaming my response token by token").isVisible()
+      await page
+        .getByText(
+          "Hello! I'm Claude, streaming my response token by token. You can see each word appear as I generate it."
+        )
+        .isVisible()
     ).toBeTruthy();
     expect(await page.getByText('This is my follow-up response').isVisible()).toBeTruthy();
   });
 
-  test('Test 5: Message streaming with stop functionality', async ({ page, worker }) => {
-    // Setup very slow streaming for stop testing
-    await worker.use(
-      http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
-        const responseText =
-          'This is a very long response that streams slowly so we can test the stop functionality by interrupting the generation process.';
-
-        // Very slow streaming (500ms per token) to allow time to click stop
-        return new Response(createStreamingAnthropicResponse(responseText, 500), {
-          status: 200,
-          headers: {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            Connection: 'keep-alive',
-          },
-        });
-      })
-    );
-
+  test('Test 5: Message streaming with stop functionality', async ({ page }) => {
     // Setup provider and project
     await setupAnthropicProvider(page);
     const projectPath = path.join(testEnv.tempDir, 'stop-test-project');
@@ -359,7 +217,7 @@ test.describe('Example E2E Test Patterns', () => {
     // Wait for project to be loaded
     await getMessageInput(page);
 
-    // Send message to start streaming
+    // Send message to start streaming (E2E server will mock slow response)
     await sendMessage(page, 'Start a slow response that I can stop');
 
     // Wait for streaming to start (stop button should appear)
@@ -387,21 +245,21 @@ test.describe('Example E2E Test Patterns', () => {
 /*
 BEST PRACTICE SUMMARY:
 
-1. TEST IMPORTS: Use MSW-enabled test setup
-   - import { test, expect } from './mocks/setup' for MSW support
-   - Access worker fixture for per-test API mocking
-   - Import http, HttpResponse from 'msw' for custom handlers
+1. TEST IMPORTS: Use standard Playwright with E2E test server
+   - import { test, expect } from '@playwright/test' for standard Playwright
+   - E2E test server automatically mocks Anthropic SDK for predictable responses
+   - No need for MSW or HTTP interception - mocks at the SDK level
 
 2. SETUP: Always use setupTestEnvironment() in beforeEach
-   - Creates isolated server process per test
+   - Creates isolated server process per test using e2e-test-server.ts
    - Unique LACE_DIR and database per test  
    - Random port to avoid conflicts
 
-3. MSW API MOCKING: Setup realistic streaming responses
-   - Use worker.use() to override API handlers per test
-   - Create streaming responses with createStreamingAnthropicResponse()
-   - Match response content to user messages for realistic conversations
-   - Use appropriate delays (30-100ms normal, 500ms+ for stop testing)
+3. E2E TEST SERVER: Automatic mock AI responses
+   - Uses e2e-test-server.ts which mocks Anthropic SDK directly
+   - Provides predictable AI responses based on user message content
+   - Supports streaming simulation with realistic token-by-token generation
+   - Cleaner than HTTP interception - works at the library level
 
 4. NAVIGATION: Always use testEnv.serverUrl
    - Don't hardcode localhost:23457
@@ -420,10 +278,10 @@ BEST PRACTICE SUMMARY:
    - Verify user messages appear with verifyMessageVisible()
    - Wait for AI responses with appropriate timeouts (10-15 seconds)
    - Test conversation history preservation across multiple exchanges
-   - Verify streaming behavior with visible token-by-token generation
+   - Verify streaming behavior with mocked token-by-token generation
 
 8. STOP FUNCTIONALITY: Test streaming interruption
-   - Use slow streaming (500ms+ delays) for reliable stop testing
+   - Use messages that trigger slow responses in the mock
    - Wait for stop button with waitForStopButton()
    - Click stop with clickStopButton()
    - Wait for send button return with waitForSendButton()
@@ -443,5 +301,5 @@ BEST PRACTICE SUMMARY:
     - Log testEnv.serverUrl and testEnv.tempDir for debugging
     - Each test gets unique identifiable resources
     - Server logs are prefixed with [SERVER:port] for identification
-    - MSW handlers can log request/response data for debugging
+    - SDK mocking allows for predictable, debuggable AI responses
 */
