@@ -42,6 +42,51 @@ export function mockAnthropicForE2E(): void {
         } else if (userMessage.includes('slow response')) {
           responseText =
             'This is a very long response that streams slowly so we can test the stop functionality by interrupting the generation process.';
+        } else if (userMessage.includes('Please tell me a story')) {
+          responseText =
+            'This is a streaming response that demonstrates real-time token generation';
+        } else if (userMessage.includes('First message to build conversation length')) {
+          responseText =
+            'I understand you are building conversation length. This response contains multiple tokens for compaction testing.';
+        } else if (userMessage.includes('Second message continues the conversation')) {
+          responseText =
+            'Continuing the conversation with additional content that may trigger compaction events when the context grows.';
+        } else if (userMessage.includes('Third message may trigger auto-compaction')) {
+          responseText =
+            'This third message response adds even more content to potentially trigger automatic conversation compaction.';
+        } else if (userMessage.includes('/compact')) {
+          responseText =
+            'Manual compaction command received. Processing conversation compaction with progress indicators.';
+        } else if (userMessage.includes('Test message for SSE events')) {
+          responseText =
+            'Response for SSE event testing with multiple event types including AGENT_TOKEN and routing verification.';
+        } else if (userMessage.includes('Can you read a file for me?')) {
+          responseText =
+            'File reading request generates TOOL_CALL and TOOL_RESULT events along with AGENT_MESSAGE events for comprehensive testing.';
+        } else if (userMessage.includes('Help me understand the project structure')) {
+          responseText =
+            'Project structure analysis involves multiple SSE event types and demonstrates complex event filtering and routing capabilities.';
+        } else if (userMessage.includes('First concurrent message')) {
+          responseText =
+            'Processing first concurrent message with streaming reliability testing and concurrent operation handling.';
+        } else if (userMessage.includes('Second concurrent message')) {
+          responseText =
+            'Second concurrent message response tests event stream reliability during multiple simultaneous operations.';
+        } else if (userMessage.includes('Third concurrent message')) {
+          responseText =
+            'Third message in concurrent sequence verifies stream maintains reliability under stress conditions.';
+        } else if (userMessage.includes('Fourth stress test message')) {
+          responseText =
+            'Fourth stress test response demonstrates robust streaming performance under rapid-fire operations.';
+        } else if (userMessage.includes('Final reliability check message')) {
+          responseText =
+            'Final reliability check confirms streaming event delivery remains consistent throughout concurrent operations.';
+        } else if (userMessage.includes('This message tests error handling')) {
+          responseText =
+            'Error handling test response with streaming events and recovery gracefully from any interruptions.';
+        } else if (userMessage.includes('This message should work after recovery')) {
+          responseText =
+            'Recovery test successful - streaming functionality restored and working normally after error conditions.';
         }
       }
 
