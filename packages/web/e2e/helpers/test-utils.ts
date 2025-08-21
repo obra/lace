@@ -76,8 +76,8 @@ async function startTestServer(
   const port = await getAvailablePort();
   const serverUrl = `http://localhost:${port}`;
 
-  // Start server process with isolated environment
-  const serverProcess = spawn('npx', ['tsx', 'server-custom.ts', '--port', port.toString()], {
+  // Start server process with isolated environment using E2E test server
+  const serverProcess = spawn('npx', ['tsx', 'e2e-test-server.ts', '--port', port.toString()], {
     cwd: process.cwd(),
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
@@ -85,17 +85,18 @@ async function startTestServer(
       LACE_DIR: tempDir,
       ANTHROPIC_KEY: 'test-anthropic-key-for-e2e',
       LACE_DB_PATH: path.join(tempDir, 'lace.db'),
-      NODE_ENV: 'test',
+      NODE_ENV: 'production',
+      E2E_TOOL_APPROVAL_MOCK: 'true',
     },
   });
 
-  // Handle server output silently
-  serverProcess.stdout?.on('data', () => {
-    // Server output ignored in tests
+  // Handle server output for debugging
+  serverProcess.stdout?.on('data', (data) => {
+    console.log(`[SERVER:${port}] ${data.toString().trim()}`);
   });
 
-  serverProcess.stderr?.on('data', () => {
-    // Server error output ignored in tests
+  serverProcess.stderr?.on('data', (data) => {
+    console.error(`[SERVER:${port}:ERROR] ${data.toString().trim()}`);
   });
 
   serverProcess.on('exit', () => {
@@ -121,6 +122,19 @@ export async function setupTestEnvironment(): Promise<TestEnvironment> {
   // Create isolated temp directory for this test
   const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'lace-test-'));
   const originalLaceDir = process.env.LACE_DIR;
+
+  // Create mock credentials for E2E tests
+  const credentialsDir = path.join(tempDir, 'credentials');
+  await fs.promises.mkdir(credentialsDir, { recursive: true });
+
+  // Create anthropic-default credentials file
+  const anthropicCredentials = {
+    apiKey: 'test-anthropic-key-for-e2e',
+  };
+  await fs.promises.writeFile(
+    path.join(credentialsDir, 'anthropic-default.json'),
+    JSON.stringify(anthropicCredentials, null, 2)
+  );
 
   // Start isolated test server
   const { serverUrl, serverProcess } = await startTestServer(tempDir);
