@@ -363,6 +363,10 @@ async function startLaceServer() {
    Press Ctrl+C to stop
 `);
 
+    // Signal the actual port to parent process (for menu bar app)
+    console.log(`LACE_SERVER_PORT:${port}`);
+    console.log(`LACE_SERVER_URL:${url}`);
+
     // Open browser if running interactively - use nft-traced dependencies
     if (shouldOpenBrowser) {
       try {

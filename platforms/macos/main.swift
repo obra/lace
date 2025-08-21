@@ -21,7 +21,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func setupMenuBar() {
         statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusBarItem.button?.title = "⚡"
+        
+        // Use the app icon for menu bar - load from Resources folder
+        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "icns")
+        if let iconPath = iconPath, let appIcon = NSImage(contentsOfFile: iconPath) {
+            let resizedIcon = NSImage(size: NSSize(width: 18, height: 18))
+            resizedIcon.lockFocus()
+            appIcon.draw(in: NSRect(x: 0, y: 0, width: 18, height: 18))
+            resizedIcon.unlockFocus()
+            statusBarItem.button?.image = resizedIcon
+            statusBarItem.button?.imagePosition = .imageOnly
+        } else {
+            statusBarItem.button?.title = "⚡"
+        }
         statusBarItem.button?.toolTip = "Lace AI Coding Assistant"
         
         menu = NSMenu()
@@ -76,7 +88,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         serverProcess = Process()
         serverProcess?.executableURL = URL(fileURLWithPath: serverPath)
-        serverProcess?.arguments = ["--host", "127.0.0.1"] // Let it pick dynamic port
+        serverProcess?.arguments = ["--host", "127.0.0.1"] // Use default port (31337 or next available)
         
         // Set up pipes to capture output
         let outputPipe = Pipe()
@@ -114,21 +126,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func parseServerOutput(_ output: String) {
-        // Look for port information in server output
-        // Expected format: "Server starting on http://localhost:3000" or similar
-        let patterns = [
-            #"(?:localhost|127\.0\.0\.1):(\d+)"#,
-            #"port[:\s]+(\d+)"#,
-            #"listening.*?(\d+)"#
-        ]
+        // Debug: Log all server output to help with port detection
+        print("Server output: \(output)")
         
-        for pattern in patterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
+        // Look for the specific port signal from the server
+        if output.contains("LACE_SERVER_PORT:") {
+            if let regex = try? NSRegularExpression(pattern: #"LACE_SERVER_PORT:(\d+)"#, options: []) {
                 let range = NSRange(output.startIndex..<output.endIndex, in: output)
                 if let match = regex.firstMatch(in: output, range: range) {
                     let portRange = match.range(at: 1)
                     if let portSubstring = Range(portRange, in: output) {
                         if let port = Int(output[portSubstring]) {
+                            print("Found server port signal: \(port)")
+                            DispatchQueue.main.async { [weak self] in
+                                self?.serverPort = port
+                                self?.updateMenu()
+                            }
+                            return
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Fallback: Look for URL signal
+        if output.contains("LACE_SERVER_URL:") {
+            if let regex = try? NSRegularExpression(pattern: #"LACE_SERVER_URL:http://[^:]+:(\d+)"#, options: []) {
+                let range = NSRange(output.startIndex..<output.endIndex, in: output)
+                if let match = regex.firstMatch(in: output, range: range) {
+                    let portRange = match.range(at: 1)
+                    if let portSubstring = Range(portRange, in: output) {
+                        if let port = Int(output[portSubstring]) {
+                            print("Found server URL signal: \(port)")
                             DispatchQueue.main.async { [weak self] in
                                 self?.serverPort = port
                                 self?.updateMenu()
