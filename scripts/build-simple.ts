@@ -10,6 +10,7 @@ interface BuildOptions {
   name?: string;
   outdir?: string;
   sign?: boolean;
+  bundle?: boolean;
 }
 
 function parseArgs(): BuildOptions {
@@ -30,6 +31,9 @@ function parseArgs(): BuildOptions {
       case '--sign':
         options.sign = true;
         break;
+      case '--bundle':
+        options.bundle = true;
+        break;
       case '--help':
         console.log(`
 Usage: npx tsx build-simple.ts [options]
@@ -39,12 +43,14 @@ Options:
   --name <name>        Output executable name (default: lace-standalone)  
   --outdir <outdir>    Output directory (default: build)
   --sign               Sign and notarize the binary (macOS only)
+  --bundle             Create macOS .app bundle (macOS only)
   --help               Show this help
 
 Examples:
   npx tsx build-simple.ts
   npx tsx build-simple.ts --target bun-linux-x64 --name lace-linux
   npx tsx build-simple.ts --sign
+  npx tsx build-simple.ts --bundle --sign
 `);
         process.exit(0);
     }
@@ -53,11 +59,64 @@ Examples:
   return options;
 }
 
+async function createAppBundle(
+  executablePath: string,
+  baseName: string,
+  outdir: string
+): Promise<string> {
+  const appName = 'Lace';
+  const appBundlePath = join(outdir, `${appName}.app`);
+  const contentsPath = join(appBundlePath, 'Contents');
+  const macosPath = join(contentsPath, 'MacOS');
+  const resourcesPath = join(contentsPath, 'Resources');
+
+  // Create app bundle structure
+  mkdirSync(appBundlePath, { recursive: true });
+  mkdirSync(contentsPath, { recursive: true });
+  mkdirSync(macosPath, { recursive: true });
+  mkdirSync(resourcesPath, { recursive: true });
+
+  // Build the Swift menu bar app
+  console.log('📱 Building Swift menu bar app...');
+  execSync('make clean && make build', {
+    cwd: 'platforms/macos',
+    stdio: 'inherit',
+  });
+
+  // Copy the Swift app executable
+  const swiftAppPath = 'platforms/macos/build/Lace.app/Contents/MacOS/Lace';
+  if (!existsSync(swiftAppPath)) {
+    throw new Error(
+      `Swift app not found at ${swiftAppPath}. Make sure Swift compilation succeeded.`
+    );
+  }
+  execSync(`cp "${swiftAppPath}" "${join(macosPath, appName)}"`);
+
+  // Copy the lace server as 'lace-server'
+  execSync(`cp "${executablePath}" "${join(macosPath, 'lace-server')}"`);
+
+  // Copy Info.plist
+  execSync(`cp platforms/macos/Info.plist "${contentsPath}/"`);
+
+  // Copy app icon
+  if (existsSync('platforms/macos/AppIcon.icns')) {
+    execSync(`cp platforms/macos/AppIcon.icns "${resourcesPath}/"`);
+    console.log(`   🎨 App icon copied`);
+  }
+
+  console.log(`   📱 Swift menu bar app: ${appName}`);
+  console.log(`   🖥️  Server binary: lace-server`);
+  console.log(`   📄 Info.plist copied`);
+
+  return resolve(appBundlePath);
+}
+
 async function buildSimpleExecutable(options: BuildOptions = {}) {
   const target = options.target || 'bun-darwin-arm64';
   const name = options.name || 'lace-standalone';
   const outdir = options.outdir || 'build';
   const sign = options.sign || false;
+  const bundle = options.bundle || false;
 
   console.log('🔨 Building simple single-file executable...');
   console.log(`   🎯 Target: ${target}`);
@@ -174,7 +233,9 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
   if (sign && process.platform === 'darwin') {
     console.log('🔏 Starting signing and notarization...');
     try {
-      execSync(`npx tsx scripts/sign-and-notarize.ts --binary "${outputPath}"`, { stdio: 'inherit' });
+      execSync(`npx tsx scripts/sign-and-notarize.ts --binary "${outputPath}"`, {
+        stdio: 'inherit',
+      });
     } catch (error) {
       console.error('❌ Signing failed:', error);
       throw error;
@@ -204,6 +265,14 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
     console.log('ℹ️  Note: Cross-platform testing skipped (may not be compatible with build host)');
   } else {
     throw new Error('Executable was not created');
+  }
+
+  // Step 6: Create app bundle if requested
+  let appBundlePath = '';
+  if (bundle && process.platform === 'darwin') {
+    console.log('6️⃣ Creating macOS app bundle...');
+    appBundlePath = await createAppBundle(outputPath, name, outdir);
+    console.log(`✅ App bundle created: ${appBundlePath}`);
   }
 
   // Summary

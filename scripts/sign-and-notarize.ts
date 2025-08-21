@@ -195,13 +195,35 @@ async function signAndNotarize(options: SigningOptions) {
     const signingIdentity = identityMatch[1];
     console.log(`🔑 Using signing identity: ${signingIdentity}`);
 
-    // Sign the binary with hardened runtime and entitlements for Bun compatibility
-    console.log('✍️  Signing binary with hardened runtime and entitlements...');
-    const entitlementsPath = `${process.cwd()}/scripts/entitlements.plist`;
-    execSync(
-      `codesign --force --options runtime --entitlements "${entitlementsPath}" --deep --sign "${signingIdentity}" "${resolvedBinaryPath}" --verbose`,
-      { stdio: 'inherit' }
-    );
+    // Handle app bundle vs standalone binary signing
+    if (resolvedBinaryPath.endsWith('.app')) {
+      console.log('✍️  Signing app bundle with hardened runtime and entitlements...');
+      const entitlementsPath = `${process.cwd()}/scripts/entitlements.plist`;
+
+      // Sign the inner lace-server binary first
+      const laceServerPath = `${resolvedBinaryPath}/Contents/MacOS/lace-server`;
+      if (existsSync(laceServerPath)) {
+        console.log('   🔧 Signing lace-server binary...');
+        execSync(
+          `codesign --force --options runtime --entitlements "${entitlementsPath}" --sign "${signingIdentity}" "${laceServerPath}" --verbose`,
+          { stdio: 'inherit' }
+        );
+      }
+
+      // Then sign the outer app bundle
+      console.log('   📦 Signing app bundle...');
+      execSync(
+        `codesign --force --options runtime --sign "${signingIdentity}" "${resolvedBinaryPath}" --verbose`,
+        { stdio: 'inherit' }
+      );
+    } else {
+      console.log('✍️  Signing binary with hardened runtime and entitlements...');
+      const entitlementsPath = `${process.cwd()}/scripts/entitlements.plist`;
+      execSync(
+        `codesign --force --options runtime --entitlements "${entitlementsPath}" --deep --sign "${signingIdentity}" "${resolvedBinaryPath}" --verbose`,
+        { stdio: 'inherit' }
+      );
+    }
 
     // Verify signature
     console.log('🔍 Verifying signature...');

@@ -46,7 +46,11 @@ jobs:
     
     - name: Build executable
       run: |
-        npx tsx scripts/build-simple.ts --target ${{ matrix.target }} --name ${{ matrix.name }}
+        if [[ "${{ matrix.target }}" == *"darwin"* ]]; then
+          npx tsx scripts/build-simple.ts --target ${{ matrix.target }} --name ${{ matrix.name }} --bundle
+        else
+          npx tsx scripts/build-simple.ts --target ${{ matrix.target }} --name ${{ matrix.name }}
+        fi
     
     - name: Sign and notarize macOS executable
       if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/')
@@ -58,25 +62,40 @@ jobs:
         APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
       run: |
-        npx tsx scripts/sign-and-notarize.ts --binary "build/${{ matrix.name }}"
+        if [[ "${{ matrix.target }}" == *"darwin"* ]]; then
+          npx tsx scripts/sign-and-notarize.ts --binary "build/Lace.app"
+        else
+          npx tsx scripts/sign-and-notarize.ts --binary "build/${{ matrix.name }}"
+        fi
     
     - name: Test executable
       run: |
-        chmod +x build/${{ matrix.name }}
-        ./build/${{ matrix.name }} --help
+        if [[ "${{ matrix.target }}" == *"darwin"* ]]; then
+          # Test the app bundle
+          ls -la build/Lace.app/Contents/MacOS/
+          echo "✅ App bundle structure verified"
+        else
+          chmod +x build/${{ matrix.name }}
+          ./build/${{ matrix.name }} --help
+        fi
     
     - name: Upload executable
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.name }}
-        path: build/${{ matrix.name }}
+        path: |
+          ${{ matrix.target == 'bun-darwin-arm64' && 'build/Lace.app' || format('build/{0}', matrix.name) }}
         retention-days: 7
     
     - name: Create archive
       if: startsWith(github.ref, 'refs/tags/')
       run: |
         cd build
-        tar -czf ${{ matrix.name }}.tar.gz ${{ matrix.name }}
+        if [[ "${{ matrix.target }}" == *"darwin"* ]]; then
+          tar -czf ${{ matrix.name }}.tar.gz Lace.app
+        else
+          tar -czf ${{ matrix.name }}.tar.gz ${{ matrix.name }}
+        fi
     
     - name: Upload release asset
       if: startsWith(github.ref, 'refs/tags/')
@@ -118,18 +137,28 @@ jobs:
           
           ### Downloads
           
-          - **lace-macos-arm64.tar.gz** - macOS Apple Silicon (M1/M2/M3/M4)
+          - **lace-macos-arm64.tar.gz** - macOS App Bundle for Apple Silicon (M1/M2/M3/M4)
           - **lace-linux-x64.tar.gz** - Linux x86_64
           
           ### Usage
           
+          **macOS (App Bundle):**
           ```bash
           # Extract archive
-          tar -xzf lace-[platform].tar.gz
+          tar -xzf lace-macos-arm64.tar.gz
+          
+          # Run Lace (opens menu bar app)
+          open Lace.app
+          ```
+          
+          **Linux:**
+          ```bash
+          # Extract archive
+          tar -xzf lace-linux-x64.tar.gz
           
           # Run Lace
-          ./lace-[platform] --help
-          ./lace-[platform] --port 3000
+          ./lace-linux-x64 --help
+          ./lace-linux-x64 --port 3000
           ```
           
           ### Features

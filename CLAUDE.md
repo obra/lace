@@ -71,6 +71,7 @@ TEST FIRST. Whether you're designing a new feature or fixing a bug, you write th
 
 Good naming is VERY VERY important. Think hard about naming things. It's always ok to ask your human partner for naming advice.
 
+We NEVER leave backward-compatibility or legacy code in place. This is a pre-release v1 and we car e deeply about having a clean, uncluttered architecture. If you EVER see back-compat code, stop and ask me what to do.
 
 ### Development Notes
 - Pre-commit hooks automatically run linting, formatting, and related tests
