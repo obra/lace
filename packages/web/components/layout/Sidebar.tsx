@@ -104,6 +104,7 @@ export function Sidebar({ open, onToggle, onSettingsClick, children }: SidebarPr
                     onClick={onSettingsClick}
                     className="btn btn-ghost w-full justify-start"
                     aria-label="Open settings"
+                    data-testid="settings-button-mobile"
                   >
                     <FontAwesomeIcon icon={faCog} className="w-4 h-4 mr-2" />
                     Settings
@@ -156,6 +157,7 @@ function DesktopSidebar({
             onClick={onSettingsClick}
             className="p-3 hover:bg-base-200 rounded-xl transition-all duration-200 hover:scale-105 ring-hover"
             aria-label="Open settings"
+            data-testid="settings-button"
           >
             <FontAwesomeIcon icon={faCog} className="w-5 h-5 text-base-content/60" />
           </button>
@@ -179,6 +181,7 @@ function DesktopSidebar({
     );
   }
 
+  // Expanded state
   return (
     <div className="bg-base-100/95 backdrop-blur-sm border-r border-base-300/50 flex flex-col relative transition-all duration-300 w-[350px] h-full shadow-lg">
       <div className="flex flex-col h-full">
@@ -200,6 +203,7 @@ function DesktopSidebar({
               onClick={onSettingsClick}
               className="p-2.5 hover:bg-base-200/80 rounded-xl transition-all duration-200 hover:scale-105"
               aria-label="Open settings"
+              data-testid="settings-button"
             >
               <FontAwesomeIcon
                 icon={faCog}
