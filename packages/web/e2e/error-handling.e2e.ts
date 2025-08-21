@@ -7,7 +7,12 @@ import {
   cleanupTestEnvironment,
   type TestEnvironment,
 } from './helpers/test-utils';
-import { createProject, setupAnthropicProvider } from './helpers/ui-interactions';
+import {
+  createProject,
+  setupAnthropicProvider,
+  getMessageInput,
+  sendMessage,
+} from './helpers/ui-interactions';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -109,8 +114,8 @@ test.describe('Error Handling and Recovery', () => {
 
     // Try to trigger potential JS errors through unusual interactions
     try {
-      // Rapidly click elements
-      await page.getByTestId('create-first-project-button').click();
+      // Rapidly press escape and try to navigate - this should not break the interface
+      await page.keyboard.press('Escape');
       await page.keyboard.press('Escape');
       await page.keyboard.press('Escape');
 
@@ -120,16 +125,29 @@ test.describe('Error Handling and Recovery', () => {
       console.log('Triggered JS error during interaction test:', error);
     }
 
-    // Assess post-error state
+    // Assess post-error state - check if message input is still available since we're in chat
     const postErrorState = {
       jsErrorsDetected: jsErrors.length,
-      interfaceStillVisible: await page
-        .getByTestId('create-first-project-button')
-        .isVisible()
+      interfaceStillVisible: await getMessageInput(page)
+        .then(() => true)
         .catch(() => false),
       canStillType: false,
       canSendMessage: false,
     };
+
+    // Try to send a message to verify the interface is still functional
+    if (postErrorState.interfaceStillVisible) {
+      try {
+        await sendMessage(page, 'Test message after JS error simulation');
+        postErrorState.canSendMessage = await page
+          .getByText('Test message after JS error simulation')
+          .isVisible()
+          .catch(() => false);
+        postErrorState.canStillType = true;
+      } catch (error) {
+        console.log('Could not send message after JS error test:', error);
+      }
+    }
 
     console.log('JavaScript error resilience:', postErrorState);
 

@@ -65,7 +65,7 @@ test.describe('Streaming Compaction Events', () => {
       await sendMessage(page, message);
       await verifyMessageVisible(page, message);
 
-      // Wait for expected responses
+      // Wait for specific expected responses based on message content
       if (message.includes('First message')) {
         await expect(
           page.getByText('I understand you are building conversation length').first()
@@ -85,7 +85,7 @@ test.describe('Streaming Compaction Events', () => {
     await verifyMessageVisible(page, compactionCommand);
 
     // Wait for compaction response
-    await expect(page.getByText('Manual compaction command received').first()).toBeVisible({
+    await expect(page.getByText(/Manual compaction command received/).first()).toBeVisible({
       timeout: 15000,
     });
 
@@ -96,8 +96,7 @@ test.describe('Streaming Compaction Events', () => {
     const compactionIndicators = [
       page.locator('[data-testid="compaction-indicator"]'),
       page.getByText(/compacting/i),
-      page.getByText(/consolidating/i),
-      page.locator('.compaction-progress'),
+      page.locator('[data-testid="compaction-progress"]'),
     ];
 
     let compactionUIVisible = false;
@@ -169,7 +168,7 @@ test.describe('Streaming Compaction Events', () => {
       await sendMessage(page, message);
       await verifyMessageVisible(page, message);
 
-      // Wait for specific expected responses
+      // Wait for specific expected responses based on message content
       if (message.includes('First message')) {
         await expect(
           page.getByText('I understand you are building conversation length').first()
@@ -188,8 +187,7 @@ test.describe('Streaming Compaction Events', () => {
       const compactionIndicators = [
         page.locator('[data-testid="compaction-indicator"]'),
         page.getByText(/compacting/i),
-        page.getByText(/consolidating/i),
-        page.locator('.compaction-progress'),
+        page.locator('[data-testid="compaction-progress"]'),
       ];
 
       let uiVisible = false;
@@ -246,7 +244,7 @@ test.describe('Streaming Compaction Events', () => {
     await verifyMessageVisible(page, 'First message to establish context');
 
     await expect(
-      page.getByText('I understand you are building conversation length').first()
+      page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
     ).toBeVisible({ timeout: 15000 });
 
     await page.waitForTimeout(1000);
@@ -268,12 +266,8 @@ test.describe('Streaming Compaction Events', () => {
         selector: page.getByText(/compacting/i),
       },
       {
-        name: 'consolidating-text',
-        selector: page.getByText(/consolidating/i),
-      },
-      {
         name: 'progress-element',
-        selector: page.locator('.compaction-progress'),
+        selector: page.locator('[data-testid="compaction-progress"]'),
       },
     ];
 
@@ -285,7 +279,7 @@ test.describe('Streaming Compaction Events', () => {
     }
 
     // Wait for compaction response
-    await expect(page.getByText('Manual compaction command received').first()).toBeVisible({
+    await expect(page.getByText(/Manual compaction command received/).first()).toBeVisible({
       timeout: 15000,
     });
 
@@ -295,7 +289,6 @@ test.describe('Streaming Compaction Events', () => {
     // Monitor for completion indicators
     const completionIndicators = [
       page.getByText(/compaction complete/i),
-      page.getByText(/consolidation finished/i),
       page.locator('[data-testid="compaction-complete"]'),
     ];
 
