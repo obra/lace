@@ -1,128 +1,172 @@
-// ABOUTME: Tests basic messaging functionality that's currently working
-// ABOUTME: Focuses on reliable message sending and display behavior
+// ABOUTME: Tests basic messaging functionality using standardized E2E patterns
+// ABOUTME: Demonstrates proper isolated test setup and message interaction patterns
 
-import { test, expect } from './mocks/setup';
-import { createPageObjects } from './page-objects';
-import { withTempLaceDir } from './utils/withTempLaceDir';
-import { promises as fs } from 'fs';
-import { join } from 'path';
+import { test, expect } from '@playwright/test';
+import {
+  setupTestEnvironment,
+  cleanupTestEnvironment,
+  type TestEnvironment,
+} from './helpers/test-utils';
+import {
+  createProject,
+  setupAnthropicProvider,
+  getMessageInput,
+  sendMessage,
+  verifyMessageVisible,
+} from './helpers/ui-interactions';
+import * as fs from 'fs';
+import * as path from 'path';
 
 test.describe('Basic Messaging', () => {
+  let testEnv: TestEnvironment;
+
+  test.beforeEach(async ({ page }) => {
+    // Setup isolated test environment with proper mocking
+    testEnv = await setupTestEnvironment();
+    await page.goto(testEnv.serverUrl);
+  });
+
+  test.afterEach(async () => {
+    if (testEnv) {
+      await cleanupTestEnvironment(testEnv);
+    }
+  });
+
   test('can send and display user messages reliably', async ({ page }) => {
-    await withTempLaceDir('lace-e2e-basic-messaging-', async (tempDir) => {
-      const projectName = 'E2E Basic Messaging Project';
-      const { projectSelector, chatInterface } = createPageObjects(page);
-      // Create project
-      await page.goto('/');
-      
-      const projectPath = join(tempDir, 'basic-messaging-project');
-      await fs.mkdir(projectPath, { recursive: true });
-      
-      await projectSelector.createProject(projectName, projectPath);
-      await chatInterface.waitForChatReady();
-      
-      // Test single message sending and display
-      const testMessage = 'Simple test message for basic messaging';
-      
-      await chatInterface.sendMessage(testMessage);
-      
-      // Verify the message appears (more generous timeout)
-      await expect(chatInterface.getMessage(testMessage)).toBeVisible({ timeout: 15000 });
-      
-      // Verify interface remains functional
-      await expect(chatInterface.messageInput).toBeVisible();
-      
-      console.log('Basic messaging: Single message sent and displayed successfully');
-    });
+    // Setup provider first
+    await setupAnthropicProvider(page);
+
+    // Create project in isolated environment
+    const projectPath = path.join(testEnv.tempDir, 'basic-messaging-project');
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'Basic Messaging Project', projectPath);
+
+    // Wait for project to be ready
+    await getMessageInput(page);
+
+    // Test single message sending and display
+    const testMessage = 'Simple test message for basic messaging';
+
+    await sendMessage(page, testMessage);
+
+    // Verify the message appears
+    await verifyMessageVisible(page, testMessage);
+
+    // Verify AI response appears (mocked by E2E test server)
+    await expect(
+      page.getByText("I'm a helpful AI assistant. How can I help you today?")
+    ).toBeVisible({ timeout: 15000 });
+
+    // Verify interface remains functional
+    await expect(await getMessageInput(page)).toBeVisible();
   });
 
   test('interface shows appropriate state during message processing', async ({ page }) => {
-    await withTempLaceDir('lace-e2e-processing-state-', async (tempDir) => {
-      const projectName = 'E2E Processing State Project';
-      const { projectSelector, chatInterface } = createPageObjects(page);
-      // Create project
-      await page.goto('/');
-      
-      const projectPath = join(tempDir, 'processing-state-project');
-      await fs.mkdir(projectPath, { recursive: true });
-      
-      await projectSelector.createProject(projectName, projectPath);
-      await chatInterface.waitForChatReady();
-      
-      // Send a message
-      const testMessage = 'Testing interface state during processing';
-      await chatInterface.sendMessage(testMessage);
-      
-      // Check what the interface shows during/after message sending
-      await page.waitForTimeout(1000);
-      
-      const interfaceState = {
-        messageVisible: await chatInterface.getMessage(testMessage).isVisible().catch(() => false),
-        inputDisabled: await chatInterface.messageInput.isDisabled().catch(() => false),
-        inputPlaceholder: await chatInterface.messageInput.getAttribute('placeholder'),
-        sendButtonVisible: await chatInterface.sendButton.isVisible().catch(() => false),
-        stopButtonVisible: await chatInterface.stopButton.isVisible().catch(() => false),
-      };
-      
-      console.log('Interface state during processing:', interfaceState);
-      
-      // The key requirement is that the message was accepted and interface is functional
-      // We don't require specific UI states, just document what we observe
-      expect(testMessage).toBeTruthy(); // Basic test that we sent a message
-      
-      // Wait for interface to be ready for next interaction
-      await page.waitForTimeout(2000);
-      await expect(chatInterface.messageInput).toBeVisible();
-    });
+    // Setup provider first
+    await setupAnthropicProvider(page);
+
+    // Create project in isolated environment
+    const projectPath = path.join(testEnv.tempDir, 'processing-state-project');
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'Processing State Project', projectPath);
+
+    // Wait for project to be ready
+    await getMessageInput(page);
+
+    // Send a message
+    const testMessage = 'Testing interface state during processing';
+    await sendMessage(page, testMessage);
+
+    // Verify user message appears
+    await verifyMessageVisible(page, testMessage);
+
+    // Check interface state after message sending
+    const messageInput = await getMessageInput(page);
+    const sendButtonVisible = await page
+      .getByTestId('send-button')
+      .isVisible()
+      .catch(() => false);
+    const stopButtonVisible = await page
+      .getByTestId('stop-button')
+      .isVisible()
+      .catch(() => false);
+
+    // Document the interface state
+    const interfaceState = {
+      messageVisible: await page
+        .getByText(testMessage)
+        .isVisible()
+        .catch(() => false),
+      inputVisible: await messageInput.isVisible().catch(() => false),
+      sendButtonVisible,
+      stopButtonVisible,
+    };
+
+    // Interface state documented for debugging: interfaceState
+
+    // Verify basic functionality is working
+    expect(interfaceState.messageVisible).toBeTruthy();
+    expect(interfaceState.inputVisible).toBeTruthy();
+
+    // Wait for AI response (mocked)
+    await expect(
+      page.getByText("I'm a helpful AI assistant. How can I help you today?")
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test('documents current streaming behavior without breaking', async ({ page }) => {
-    await withTempLaceDir('lace-e2e-streaming-behavior-', async (tempDir) => {
-      const projectName = 'E2E Streaming Behavior Project';
-      const { projectSelector, chatInterface } = createPageObjects(page);
-      // Create project
-      await page.goto('/');
-      
-      const projectPath = join(tempDir, 'streaming-behavior-project');
-      await fs.mkdir(projectPath, { recursive: true });
-      
-      await projectSelector.createProject(projectName, projectPath);
-      await chatInterface.waitForChatReady();
-      
-      // Monitor network activity for streaming indicators
-      const requests: string[] = [];
-      page.on('request', request => {
-        if (request.url().includes('/api/')) {
-          requests.push(`${request.method()} ${request.url()}`);
-        }
-      });
-      
-      const responses: string[] = [];  
-      page.on('response', response => {
-        if (response.url().includes('/api/')) {
-          responses.push(`${response.status()} ${response.url()}`);
-        }
-      });
-      
-      // Send a message and observe the network activity
-      const testMessage = 'Testing network behavior for streaming';
-      await chatInterface.sendMessage(testMessage);
-      
-      // Wait a bit to capture network activity
-      await page.waitForTimeout(3000);
-      
-      // Document the behavior we observe
-      const streamingBehavior = {
-        requestsMade: requests.filter(r => r.includes('message') || r.includes('stream')),
-        responsesReceived: responses.filter(r => r.includes('message') || r.includes('stream')),
-        messageAccepted: testMessage.length > 0,
-        timestamp: new Date().toISOString()
-      };
-      
-      console.log('Streaming behavior analysis:', JSON.stringify(streamingBehavior, null, 2));
-      
-      // The test succeeds if we can document the behavior without errors
-      expect(streamingBehavior.messageAccepted).toBeTruthy();
+    // Setup provider first
+    await setupAnthropicProvider(page);
+
+    // Create project in isolated environment
+    const projectPath = path.join(testEnv.tempDir, 'streaming-behavior-project');
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'Streaming Behavior Project', projectPath);
+
+    // Wait for project to be ready
+    await getMessageInput(page);
+
+    // Monitor network activity for streaming indicators
+    const requests: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().includes('/api/')) {
+        requests.push(`${request.method()} ${request.url()}`);
+      }
     });
+
+    const responses: string[] = [];
+    page.on('response', (response) => {
+      if (response.url().includes('/api/')) {
+        responses.push(`${response.status()} ${response.url()}`);
+      }
+    });
+
+    // Send a message and observe the network activity
+    const testMessage = 'Testing network behavior for streaming';
+    await sendMessage(page, testMessage);
+
+    // Verify user message appears
+    await verifyMessageVisible(page, testMessage);
+
+    // Wait for streaming response (mocked)
+    await expect(
+      page.getByText("I'm a helpful AI assistant. How can I help you today?")
+    ).toBeVisible({ timeout: 15000 });
+
+    // Document the network behavior we observe
+    const streamingBehavior = {
+      requestsMade: requests.filter((r) => r.includes('message') || r.includes('stream')),
+      responsesReceived: responses.filter((r) => r.includes('message') || r.includes('stream')),
+      messageAccepted: testMessage.length > 0,
+      timestamp: new Date().toISOString(),
+    };
+
+    // Streaming behavior documented for analysis: streamingBehavior
+
+    // Verify basic functionality is working
+    expect(streamingBehavior.messageAccepted).toBeTruthy();
+
+    // Verify we have some network activity
+    expect(streamingBehavior.requestsMade.length).toBeGreaterThan(0);
   });
 });
