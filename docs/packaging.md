@@ -1,6 +1,6 @@
 # Lace Packaging Guide
 
-This document describes how to create and operate the Bun-based single-file packaging system for Lace.
+This document describes how to create and distribute Lace, including standalone executables and native macOS app bundles with code signing.
 
 ## Overview
 
@@ -14,16 +14,90 @@ The executable extracts itself to a temporary directory and runs the full Lace s
 
 ## Quick Start
 
+### macOS App Bundle (Recommended)
 ```bash
-# 1. Build the Next.js application
-cd packages/web && bun run build
+# Build unsigned app bundle
+npm run build:macos
 
-# 2. Create the single-file executable
-bun run scripts/build-simple.ts
+# Build signed & notarized app bundle
+npm run build:macos:signed
 
-# 3. Run the executable
-./build/lace-standalone --port 3000
+# Run the app
+open build/Lace.app
 ```
+
+### Standalone Executable (Cross-Platform)
+```bash
+# Build standalone executable
+npm run build:standalone
+
+# Run the executable  
+./build/lace-standalone
+```
+
+## macOS App Bundle
+
+### Overview
+The macOS build creates a native `.app` bundle with:
+- **Swift menu bar app** for native macOS experience
+- **Custom app icon** and proper application metadata
+- **Dynamic port detection** and browser launching
+- **Code signing & notarization** for Gatekeeper compatibility
+
+### Build Commands
+```bash
+# Available npm scripts
+npm run build:macos           # Unsigned app bundle (local testing)
+npm run build:macos:signed    # Signed & notarized (distribution)
+```
+
+### Local Code Signing Setup
+
+**Requirements:**
+- Apple Developer Program membership
+- Developer ID Application certificate in keychain
+- App-specific password from Apple ID
+
+**Certificate Check:**
+```bash
+security find-identity -v -p codesigning
+# Should show: "Developer ID Application: Your Name (TEAM_ID)"
+```
+
+**Environment Variables (optional):**
+```bash
+export APPLE_ID_EMAIL="your-email@example.com"  
+export APPLE_ID_PASSWORD="xxxx-xxxx-xxxx-xxxx"  # App-specific password
+export APPLE_TEAM_ID="YOUR_TEAM_ID"
+```
+
+**Manual Signing:**
+```bash
+# Sign existing app bundle
+npx tsx scripts/sign-and-notarize.ts --binary build/Lace.app
+
+# Sign without notarization (faster)
+npx tsx scripts/sign-and-notarize.ts --binary build/Lace.app --skip-notarization
+```
+
+### App Structure
+```
+Lace.app/
+├── Contents/
+│   ├── Info.plist              # App metadata
+│   ├── MacOS/
+│   │   ├── Lace               # Swift menu bar app  
+│   │   └── lace-server        # Bun server executable
+│   └── Resources/
+│       └── AppIcon.icns       # Custom app icon
+```
+
+### Menu Bar Interface
+- **⚡ Icon**: Shows in menu bar (uses your custom icon)
+- **Status**: Displays server status and detected port
+- **Open Lace**: Launches browser to correct URL
+- **Restart Server**: Restarts server process
+- **Quit Lace**: Stops server and exits app
 
 ## Build Process
 
@@ -109,8 +183,8 @@ The executable automatically cleans up temporary files when:
 ./build/lace-standalone [options]
 
 Options:
-  --port, -p <port>    Server port (default: 3000)
-  --host, -h <host>    Server host (default: 127.0.0.1)
+  --port, -p <port>    Server port (default: 31337 or next available)
+  --host, -h <host>    Server host (default: localhost)
   --verbose, -v        Enable verbose logging
   --help               Show help message
 ```
@@ -118,14 +192,14 @@ Options:
 ### Examples
 
 ```bash
-# Default settings (port 3000, localhost)
+# Default settings (port 31337 or next available, localhost)
 ./build/lace-standalone
 
 # Custom port
 ./build/lace-standalone --port 8080
 
-# Listen on all interfaces
-./build/lace-standalone --host 0.0.0.0 --port 3000
+# Listen on all interfaces  
+./build/lace-standalone --host 0.0.0.0
 
 # Verbose logging
 ./build/lace-standalone --verbose
