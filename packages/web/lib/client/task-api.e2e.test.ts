@@ -46,7 +46,6 @@ describe('TaskAPIClient E2E Tests', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',

@@ -43,7 +43,6 @@ describe('Session Configuration API', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Set up environment
     process.env.LACE_DB_PATH = ':memory:';
@@ -244,7 +243,6 @@ describe('TDD: Direct Session Usage', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     process.env.LACE_DB_PATH = ':memory:';
 
@@ -298,7 +296,6 @@ describe('TDD: Direct Session Configuration Update', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     process.env.LACE_DB_PATH = ':memory:';
 

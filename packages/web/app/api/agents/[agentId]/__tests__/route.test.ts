@@ -73,7 +73,6 @@ describe('Agent API', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Create real provider instance for testing
     testProviderInstanceId = await createTestProviderInstance({

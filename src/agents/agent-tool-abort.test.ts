@@ -72,7 +72,6 @@ describe('Agent Tool Abort Functionality', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Create test provider instance
     providerInstanceId = await createTestProviderInstance({

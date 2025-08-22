@@ -32,7 +32,6 @@ describe('Agent System Prompt Refresh', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache(); // Important for test isolation
     vi.clearAllMocks();
 
     // Create provider instance

@@ -943,11 +943,6 @@ Use your task_add_note tool to record important notes as you work and your task_
     Session._sessionRegistry.clear();
   }
 
-  static clearProviderCache(): void {
-    // No-op: Provider caching removed in agent-owned provider architecture
-    // Kept for backward compatibility during test migration
-  }
-
   /**
    * Get temporary directory for this session
    * Creates: /tmp/lace-runtime-{pid}-{timestamp}/project-{projectId}/session-{sessionId}/

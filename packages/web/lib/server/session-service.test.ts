@@ -97,7 +97,6 @@ describe('SessionService Missing Methods', () => {
     // Import Session for use in tests
     const imports = await import('@/lib/server/lace-imports');
     Session = imports.Session;
-    Session.clearProviderCache();
 
     // Create real provider instance
     providerInstanceId = await createTestProviderInstance({
@@ -226,7 +225,6 @@ describe('SessionService approval event forwarding', () => {
 
     // Set up test provider defaults
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Create real provider instance
     providerInstanceId = await createTestProviderInstance({
@@ -354,7 +352,6 @@ describe('SessionService agent state change broadcasting', () => {
 
     // Clear provider cache for test isolation
     const { Session } = await import('@/lib/server/lace-imports');
-    Session.clearProviderCache();
 
     // Create provider instance using the documented pattern
     providerInstanceId = await createTestProviderInstance({

@@ -21,7 +21,7 @@ import {
 } from '@/lib/server/lace-imports';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
-import { Project, Session } from '@/lib/server/lace-imports';
+import { Project } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
 
 // Use real EventStreamManager for integration testing
@@ -40,7 +40,6 @@ describe('Full Conversation Flow', () => {
     vi.clearAllMocks();
 
     // Clear caches to ensure fresh state
-    Session.clearProviderCache();
 
     // Set up spies on real EventStreamManager
     addConnectionSpy = vi.spyOn(EventStreamManager.getInstance(), 'addConnection') as ReturnType<

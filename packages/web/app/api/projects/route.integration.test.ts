@@ -32,7 +32,6 @@ describe('Projects API Integration Tests', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Force persistence reset to ensure clean database state
     const { resetPersistence } = await import('~/persistence/database');

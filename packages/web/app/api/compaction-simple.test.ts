@@ -39,7 +39,6 @@ describe('Compaction Integration Test', () => {
 
     // Setup test providers
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',

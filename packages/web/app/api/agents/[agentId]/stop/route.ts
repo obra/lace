@@ -56,7 +56,6 @@ export async function POST(
 
     // Clear the provider cache to ensure fresh credentials are loaded
     // This is a temporary workaround for the caching issue
-    Session.clearProviderCache();
 
     return createSuperjsonResponse({
       success: true,

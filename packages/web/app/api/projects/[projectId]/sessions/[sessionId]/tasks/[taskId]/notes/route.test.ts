@@ -45,7 +45,6 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Set up environment for session service
     process.env.LACE_DB_PATH = ':memory:';

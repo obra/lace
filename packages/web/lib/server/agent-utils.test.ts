@@ -25,7 +25,6 @@ describe('Event-Based Approval Callback', () => {
   beforeEach(async () => {
     // Set up test provider defaults and create instance
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',

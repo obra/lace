@@ -49,7 +49,6 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Set up environment for session service
     process.env = {

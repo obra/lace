@@ -82,7 +82,6 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
 
     // Setup test providers
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',

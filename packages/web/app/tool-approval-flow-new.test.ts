@@ -32,7 +32,6 @@ describe('Event-Based Tool Approval Integration', () => {
   beforeEach(async () => {
     // Set up test provider defaults and create instance
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
