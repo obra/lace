@@ -22,7 +22,7 @@ import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useToolApprovalContext } from '@/components/providers/ToolApprovalProvider';
-import { useProviders } from '@/hooks/useProviders';
+import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import { useURLState } from '@/hooks/useURLState';
 
 import type { SessionConfiguration } from '@/types/api';
@@ -50,7 +50,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   const { loadSessionConfiguration, updateSessionConfiguration, updateSession } =
     useSessionContext();
   const { pendingApprovals, handleApprovalDecision } = useToolApprovalContext();
-  const { providers } = useProviders();
+  const { availableProviders: providers } = useProviderInstances();
 
   // Modal states
   const [showEditAgent, setShowEditAgent] = useState(false);

@@ -10,6 +10,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { vi, beforeEach, afterEach, expect, describe, it } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { SettingsContainer } from './SettingsContainer';
+import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
 import { stringify } from '@/lib/serialization';
 
 // Mock localStorage
@@ -35,7 +36,11 @@ describe('SettingsContainer', () => {
     let component: ReturnType<typeof render>;
 
     await act(async () => {
-      component = render(<SettingsContainer>{children}</SettingsContainer>);
+      component = render(
+        <ProviderInstanceProvider>
+          <SettingsContainer>{children}</SettingsContainer>
+        </ProviderInstanceProvider>
+      );
     });
 
     // Wait for async effects to complete outside of act

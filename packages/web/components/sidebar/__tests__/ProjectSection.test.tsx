@@ -18,8 +18,8 @@ vi.mock('@/components/providers/ProjectProvider', () => ({
   useProjectContext: vi.fn(),
 }));
 
-vi.mock('@/hooks/useProviders', () => ({
-  useProviders: vi.fn(),
+vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
+  useProviderInstances: vi.fn(),
 }));
 
 vi.mock('@/hooks/useURLState', () => ({
@@ -33,10 +33,10 @@ vi.mock('@/components/config/ProjectEditModal', () => ({
 
 // Import mocked hooks
 import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useProviders } from '@/hooks/useProviders';
+import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
 const mockUseProjectContext = vi.mocked(useProjectContext);
-const mockUseProviders = vi.mocked(useProviders);
+const mockUseProviderInstances = vi.mocked(useProviderInstances);
 
 // Test data factories
 const createMockProject = (overrides?: Partial<ProjectInfo>): ProjectInfo => ({
@@ -74,11 +74,27 @@ describe('ProjectSection', () => {
         loadProjectConfiguration: vi.fn().mockResolvedValue({}),
       })
     );
-    mockUseProviders.mockReturnValue({
-      providers: [],
-      loading: false,
-      error: null,
-      refetch: vi.fn(),
+    mockUseProviderInstances.mockReturnValue({
+      instances: [],
+      instancesLoading: false,
+      instancesError: null,
+      catalogProviders: [],
+      catalogLoading: false,
+      catalogError: null,
+      testResults: {},
+      showAddModal: false,
+      selectedCatalogProvider: null,
+      availableProviders: [],
+      loadInstances: vi.fn(),
+      createInstance: vi.fn(),
+      updateInstance: vi.fn(),
+      deleteInstance: vi.fn(),
+      testInstance: vi.fn(),
+      loadCatalog: vi.fn(),
+      openAddModal: vi.fn(),
+      closeAddModal: vi.fn(),
+      getInstanceById: vi.fn(),
+      getInstanceWithTestResult: vi.fn(),
     });
   });
 

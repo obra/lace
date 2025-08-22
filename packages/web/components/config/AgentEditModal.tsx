@@ -33,10 +33,8 @@ export const AgentEditModal = memo(function AgentEditModal({
   onSubmit,
   onAgentChange,
 }: AgentEditModalProps) {
-  // Get available providers (only those that are configured with instance IDs)
-  const availableProviders = providers.filter((p): p is ProviderInfo & { instanceId: string } =>
-    Boolean(p.configured && p.instanceId)
-  );
+  // Providers are already available/configured from context, no need to filter
+  const availableProviders = providers || [];
 
   if (!editingAgent) return null;
 
@@ -68,7 +66,7 @@ export const AgentEditModal = memo(function AgentEditModal({
             value={editingAgent.providerInstanceId}
             onChange={(e) => {
               const newInstanceId = e.target.value;
-              const provider = providers.find((p) => p.instanceId === newInstanceId);
+              const provider = availableProviders.find((p) => p.instanceId === newInstanceId);
               const providerModels = provider?.models || [];
               onAgentChange(
                 editingAgent

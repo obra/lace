@@ -99,6 +99,31 @@ vi.mock('@/hooks/useURLState', () => ({
   }),
 }));
 
+vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
+  useProviderInstances: () => ({
+    availableProviders: [],
+    instances: [],
+    instancesLoading: false,
+    instancesError: null,
+    catalogProviders: [],
+    catalogLoading: false,
+    catalogError: null,
+    testResults: {},
+    showAddModal: false,
+    selectedCatalogProvider: null,
+    loadInstances: vi.fn(),
+    createInstance: vi.fn(),
+    updateInstance: vi.fn(),
+    deleteInstance: vi.fn(),
+    testInstance: vi.fn(),
+    loadCatalog: vi.fn(),
+    openAddModal: vi.fn(),
+    closeAddModal: vi.fn(),
+    getInstanceById: vi.fn(),
+    getInstanceWithTestResult: vi.fn(),
+  }),
+}));
+
 // Mock framer-motion to avoid animation issues in tests
 vi.mock('framer-motion', () => ({
   motion: {

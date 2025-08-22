@@ -32,8 +32,9 @@ vi.mock('@/hooks/useOnboarding', () => ({
   useOnboarding: vi.fn(),
 }));
 
-vi.mock('@/hooks/useProviders', () => ({
-  useProviders: vi.fn(),
+vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
+  useProviderInstances: vi.fn(),
+  ProviderInstanceProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 // Mock Next.js App Router
@@ -63,13 +64,13 @@ import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
-import { useProviders } from '@/hooks/useProviders';
+import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
 const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseUIContext = vi.mocked(useUIContext);
 const mockUseOnboarding = vi.mocked(useOnboarding);
-const mockUseProviders = vi.mocked(useProviders);
+const mockUseProviderInstances = vi.mocked(useProviderInstances);
 
 const mockProjects: ProjectInfo[] = [
   {
@@ -190,11 +191,27 @@ describe('ProjectSelectorPanel', () => {
       handleAutoOpenProjectCreation: vi.fn(),
     });
 
-    mockUseProviders.mockReturnValue({
-      providers: [],
-      loading: false,
-      error: null,
-      refetch: vi.fn(),
+    mockUseProviderInstances.mockReturnValue({
+      instances: [],
+      instancesLoading: false,
+      instancesError: null,
+      catalogProviders: [],
+      catalogLoading: false,
+      catalogError: null,
+      testResults: {},
+      showAddModal: false,
+      selectedCatalogProvider: null,
+      availableProviders: [],
+      loadInstances: vi.fn(),
+      createInstance: vi.fn(),
+      updateInstance: vi.fn(),
+      deleteInstance: vi.fn(),
+      testInstance: vi.fn(),
+      loadCatalog: vi.fn(),
+      openAddModal: vi.fn(),
+      closeAddModal: vi.fn(),
+      getInstanceById: vi.fn(),
+      getInstanceWithTestResult: vi.fn(),
     });
   });
 

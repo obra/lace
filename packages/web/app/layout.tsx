@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import '@/app/globals.css';
 import { ErrorBoundary } from '@/components/old/ErrorBoundary';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
 import { ConsoleForwardScript } from '@/lib/console-forward/script';
 // Fonts are loaded via CSS imports in globals.css
 
@@ -20,7 +21,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="antialiased">
         <ConsoleForwardScript />
         <ErrorBoundary>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            <ProviderInstanceProvider>{children}</ProviderInstanceProvider>
+          </ThemeProvider>
         </ErrorBoundary>
       </body>
     </html>

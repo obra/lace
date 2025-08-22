@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { api } from '@/lib/api-client';
+import type { ProviderInfo, ModelInfo } from '@/types/api';
 
 // Provider Instance Types
 export interface ProviderInstance {
@@ -82,6 +83,9 @@ interface ProviderInstanceContextValue {
   // Modal State
   showAddModal: boolean;
   selectedCatalogProvider: CatalogProvider | null;
+
+  // Computed Properties
+  availableProviders: ProviderInfo[];
 
   // Instance Operations
   loadInstances: () => Promise<void>;
@@ -204,15 +208,15 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
 
         await api.post('/api/provider/instances', requestBody);
 
-        // Reload instances to get the updated list
-        await loadInstances();
+        // Reload both instances and catalog to ensure data consistency
+        await Promise.all([loadInstances(), loadCatalog()]);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to create instance';
         console.error('Error creating instance:', errorMessage);
         throw err; // Re-throw so the modal can handle the error
       }
     },
-    [loadInstances, instances]
+    [loadInstances, loadCatalog, instances]
   );
 
   // Update provider instance
@@ -232,15 +236,15 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
 
         await api.put(`/api/provider/instances/${instanceId}`, payload);
 
-        // Reload instances to get the updated data
-        await loadInstances();
+        // Reload both instances and catalog to ensure data consistency
+        await Promise.all([loadInstances(), loadCatalog()]);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to update instance';
         console.error('Error updating instance:', errorMessage);
         throw err; // Re-throw so the modal can handle the error
       }
     },
-    [loadInstances]
+    [loadInstances, loadCatalog]
   );
 
   // Delete provider instance
@@ -259,17 +263,17 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
         });
 
         // Reload to ensure server state is in sync
-        await loadInstances();
+        await Promise.all([loadInstances(), loadCatalog()]);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to delete instance';
         setInstancesError(errorMessage);
         console.error('Error deleting instance:', errorMessage);
         // Reload instances to restore consistent state after failure
-        await loadInstances();
+        await Promise.all([loadInstances(), loadCatalog()]);
         throw err;
       }
     },
-    [loadInstances]
+    [loadInstances, loadCatalog]
   );
 
   // Test provider instance connection
@@ -344,10 +348,56 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
     [testResults, getInstanceById]
   );
 
-  // Load instances on mount only
+  // Computed availableProviders - transforms instances + catalog into ProviderInfo format
+  const availableProviders = useMemo((): ProviderInfo[] => {
+    return instances.map((instance) => {
+      const catalogProvider = catalogProviders.find(
+        (catalog) => catalog.id === instance.catalogProviderId
+      );
+
+      if (!catalogProvider) {
+        // This shouldn't happen in normal operation, but handle gracefully
+        return {
+          id: instance.catalogProviderId,
+          name: instance.displayName,
+          displayName: instance.displayName,
+          type: 'unknown',
+          requiresApiKey: true,
+          models: [],
+          configured: true,
+          instanceId: instance.id,
+        };
+      }
+
+      // Transform catalog models to ModelInfo format
+      const models: ModelInfo[] = catalogProvider.models.map((catalogModel) => ({
+        id: catalogModel.id,
+        displayName: catalogModel.name,
+        description: undefined, // Not available in catalog format
+        contextWindow: catalogModel.context_window,
+        maxOutputTokens: catalogModel.default_max_tokens,
+        capabilities: catalogModel.supports_attachments ? ['attachments'] : undefined,
+        isDefault: false, // Would need to check against catalog provider defaults
+      }));
+
+      return {
+        id: catalogProvider.id,
+        name: catalogProvider.name,
+        displayName: instance.displayName, // Use instance display name, not catalog name
+        type: catalogProvider.type,
+        requiresApiKey: catalogProvider.type !== 'local',
+        models,
+        configured: true, // All instances are configured by definition
+        instanceId: instance.id,
+      };
+    });
+  }, [instances, catalogProviders]);
+
+  // Load instances and catalog on mount
   useEffect(() => {
     void loadInstances();
-  }, [loadInstances]);
+    void loadCatalog();
+  }, [loadInstances, loadCatalog]);
 
   // Context value
   const contextValue = useMemo<ProviderInstanceContextValue>(
@@ -368,6 +418,9 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
       // Modal State
       showAddModal,
       selectedCatalogProvider,
+
+      // Computed Properties
+      availableProviders,
 
       // Instance Operations
       loadInstances,
@@ -397,6 +450,7 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
       testResults,
       showAddModal,
       selectedCatalogProvider,
+      availableProviders,
       loadInstances,
       createInstance,
       updateInstance,
