@@ -38,34 +38,70 @@ export const SidebarContent = memo(function SidebarContent({
   // Conditionally use AgentContext - it may not be available on all pages
   const agentContext = useOptionalAgentContext();
   const sessionDetails = agentContext?.sessionDetails ?? null;
+  // Mobile: Use regular flow layout (don't anchor to bottom, let mobile footer handle it)
+  // Desktop: Use flex layout with feedback anchored to bottom
+  if (isMobile) {
+    return (
+      <>
+        {/* WORKSPACE CONTEXT */}
+        {selectedProject && (
+          <ProjectSection
+            isMobile={isMobile}
+            onCloseMobileNav={onCloseMobileNav}
+            onSwitchProject={onSwitchProject}
+          />
+        )}
+
+        {/* ACTIVE SESSION */}
+        {sessionDetails && (
+          <SessionSection
+            isMobile={isMobile}
+            onCloseMobileNav={onCloseMobileNav}
+            onAgentSelect={onAgentSelect}
+            onClearAgent={onClearAgent}
+            onConfigureAgent={onConfigureAgent}
+            onConfigureSession={onConfigureSession}
+          />
+        )}
+
+        {/* TASK MANAGEMENT */}
+        <TaskSidebarSection onCloseMobileNav={onCloseMobileNav} />
+
+        {/* FEEDBACK - just in normal flow on mobile */}
+        <FeedbackSection isMobile={isMobile} onCloseMobileNav={onCloseMobileNav} />
+      </>
+    );
+  }
+
+  // Desktop: Use flex layout with feedback anchored to bottom
   return (
-    <>
-      {/* WORKSPACE CONTEXT */}
-      {selectedProject && (
-        <ProjectSection
-          isMobile={isMobile}
-          onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
-          onSwitchProject={onSwitchProject}
-        />
-      )}
+    <div className="flex flex-col h-full">
+      {/* Main content area */}
+      <div className="flex-1">
+        {/* WORKSPACE CONTEXT */}
+        {selectedProject && (
+          <ProjectSection isMobile={isMobile} onSwitchProject={onSwitchProject} />
+        )}
 
-      {/* ACTIVE SESSION */}
-      {sessionDetails && (
-        <SessionSection
-          isMobile={isMobile}
-          onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
-          onAgentSelect={onAgentSelect}
-          onClearAgent={onClearAgent}
-          onConfigureAgent={onConfigureAgent}
-          onConfigureSession={onConfigureSession}
-        />
-      )}
+        {/* ACTIVE SESSION */}
+        {sessionDetails && (
+          <SessionSection
+            isMobile={isMobile}
+            onAgentSelect={onAgentSelect}
+            onClearAgent={onClearAgent}
+            onConfigureAgent={onConfigureAgent}
+            onConfigureSession={onConfigureSession}
+          />
+        )}
 
-      {/* TASK MANAGEMENT */}
-      <TaskSidebarSection onCloseMobileNav={isMobile ? onCloseMobileNav : undefined} />
+        {/* TASK MANAGEMENT */}
+        <TaskSidebarSection />
+      </div>
 
-      {/* FEEDBACK */}
-      <FeedbackSection isMobile={isMobile} onCloseMobileNav={onCloseMobileNav} />
-    </>
+      {/* FEEDBACK - anchored to bottom on desktop */}
+      <div className="mt-auto">
+        <FeedbackSection isMobile={isMobile} onCloseMobileNav={onCloseMobileNav} />
+      </div>
+    </div>
   );
 });
