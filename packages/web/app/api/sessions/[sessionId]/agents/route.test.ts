@@ -305,7 +305,7 @@ describe('Agent Spawning API E2E Tests', () => {
       expect(data2.error).toBe('Invalid request body');
     });
 
-    it('should return 400 for non-existent provider instance', async () => {
+    it('should create agent with non-existent provider instance (validation deferred to runtime)', async () => {
       const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -317,10 +317,12 @@ describe('Agent Spawning API E2E Tests', () => {
       });
 
       const response = await POST(request, { params: Promise.resolve({ sessionId }) });
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(201);
 
-      const data = await parseResponse<ErrorResponse>(response);
-      expect(data.error).toBe("Provider instance 'non-existent-instance' not found");
+      const data = await parseResponse<AgentWithTokenUsage>(response);
+      expect(data.name).toBe('Non-existent Instance Agent');
+      expect(data.providerInstanceId).toBe('non-existent-instance');
+      // Provider validation happens during agent initialization/operation, not at creation time
     });
   });
 

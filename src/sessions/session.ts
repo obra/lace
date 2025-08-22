@@ -2,7 +2,6 @@
 // ABOUTME: Handles session creation, agent spawning, and session metadata management
 
 import { Agent, type AgentInfo } from '~/agents/agent';
-import type { AIProvider } from '~/providers/base-provider';
 import { ThreadId, asThreadId } from '~/threads/types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
@@ -961,44 +960,6 @@ Use your task_add_note tool to record important notes as you work and your task_
     const sessionTempPath = join(projectTempDir, `session-${this._sessionId}`);
     mkdirSync(sessionTempPath, { recursive: true });
     return sessionTempPath;
-  }
-
-  /**
-   * Create session agent with consistent configuration
-   */
-  private static createSessionAgent(params: {
-    sessionData: SessionData;
-    providerInstance: AIProvider;
-    toolExecutor: ToolExecutor;
-    threadManager: ThreadManager;
-    threadId: string;
-    providerInstanceId: string;
-    modelId: string;
-  }): Agent {
-    const {
-      sessionData,
-      providerInstance,
-      toolExecutor,
-      threadManager,
-      threadId,
-      providerInstanceId,
-      modelId,
-    } = params;
-
-    // Use session name if available, otherwise default to "Lace"
-    const agentName = sessionData.name || 'Lace';
-
-    return new Agent({
-      toolExecutor,
-      threadManager,
-      threadId,
-      tools: toolExecutor.getAllTools(),
-      metadata: {
-        name: agentName,
-        providerInstanceId,
-        modelId,
-      },
-    });
   }
 
   /**

@@ -88,7 +88,7 @@ describe('Session.spawnAgent Method', () => {
     expect(spawnedAgentInfo?.threadId).toBe(agent.threadId);
   });
 
-  it('should allow retrieving spawned agent from session', () => {
+  it('should allow retrieving spawned agent from session', async () => {
     // Spawn agent
     const agent = session.spawnAgent({
       name: 'Retrievable Agent',

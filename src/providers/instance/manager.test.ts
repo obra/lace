@@ -135,12 +135,12 @@ describe('ProviderInstanceManager', () => {
   });
 
   describe('loadCredential', () => {
-    it('returns null when credential file does not exist', async () => {
-      const credential = await manager.loadCredential('non-existent');
+    it('returns null when credential file does not exist', () => {
+      const credential = manager.loadCredential('non-existent');
       expect(credential).toBeNull();
     });
 
-    it('loads existing credential file', async () => {
+    it('loads existing credential file', () => {
       const testCredential: Credential = {
         apiKey: 'sk-test123',
         additionalAuth: { orgId: 'org-123' },
@@ -154,20 +154,20 @@ describe('ProviderInstanceManager', () => {
         JSON.stringify(testCredential, null, 2)
       );
 
-      const loaded = await manager.loadCredential('test-instance');
+      const loaded = manager.loadCredential('test-instance');
       expect(loaded).toEqual(testCredential);
     });
 
-    it('handles corrupted credential JSON gracefully', async () => {
+    it('handles corrupted credential JSON gracefully', () => {
       const credentialsDir = path.join(tempDir, 'credentials');
       fs.mkdirSync(credentialsDir, { recursive: true });
       fs.writeFileSync(path.join(credentialsDir, 'corrupted.json'), '{ invalid');
 
-      const credential = await manager.loadCredential('corrupted');
+      const credential = manager.loadCredential('corrupted');
       expect(credential).toBeNull();
     });
 
-    it('validates credential against schema', async () => {
+    it('validates credential against schema', () => {
       const invalidCredential = {
         apiKey: '', // Empty API key should be invalid
       };
@@ -179,7 +179,7 @@ describe('ProviderInstanceManager', () => {
         JSON.stringify(invalidCredential, null, 2)
       );
 
-      const credential = await manager.loadCredential('invalid');
+      const credential = manager.loadCredential('invalid');
       expect(credential).toBeNull();
     });
   });
@@ -227,7 +227,7 @@ describe('ProviderInstanceManager', () => {
       await manager.saveCredential('test-instance', oldCredential);
       await manager.saveCredential('test-instance', newCredential);
 
-      const loaded = await manager.loadCredential('test-instance');
+      const loaded = manager.loadCredential('test-instance');
       expect(loaded).toEqual(newCredential);
     });
   });
@@ -261,7 +261,7 @@ describe('ProviderInstanceManager', () => {
       expect(fs.existsSync(credentialPath)).toBe(false);
 
       // Other instance should remain
-      const remainingCredential = await manager.loadCredential('test-2');
+      const remainingCredential = manager.loadCredential('test-2');
       expect(remainingCredential).toEqual({ apiKey: 'key-2' });
     });
 

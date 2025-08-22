@@ -22,7 +22,6 @@ import {
 } from '~/test-utils/provider-defaults';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { ProviderRegistry } from '~/providers/registry';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
