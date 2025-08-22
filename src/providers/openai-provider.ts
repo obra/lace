@@ -38,19 +38,15 @@ export class OpenAIProvider extends AIProvider {
 
       const openaiConfig: ClientOptions = {
         apiKey: config.apiKey,
-        dangerouslyAllowBrowser: true, // Allow in test environments
+        dangerouslyAllowBrowser: process.env.NODE_ENV === 'test',
       };
 
       // Support custom base URL for OpenAI-compatible APIs
-      // Prefer config baseURL over environment variable
       const configBaseURL = config.baseURL as string | undefined;
-      const baseURL = configBaseURL;
-
-      if (baseURL) {
-        openaiConfig.baseURL = baseURL;
+      if (configBaseURL) {
+        openaiConfig.baseURL = configBaseURL;
         logger.info('Using custom OpenAI base URL', {
-          baseURL,
-          source: configBaseURL ? 'config' : 'env',
+          baseURL: configBaseURL,
         });
       }
 
@@ -151,11 +147,25 @@ export class OpenAIProvider extends AIProvider {
         const textContent = choice.message.content || '';
 
         const toolCalls: ProviderToolCall[] =
-          choice.message.tool_calls?.map((toolCall: OpenAI.Chat.ChatCompletionMessageToolCall) => ({
-            id: toolCall.id,
-            name: toolCall.function.name,
-            input: JSON.parse(toolCall.function.arguments) as Record<string, unknown>,
-          })) || [];
+          choice.message.tool_calls?.map((toolCall: OpenAI.Chat.ChatCompletionMessageToolCall) => {
+            try {
+              return {
+                id: toolCall.id,
+                name: toolCall.function.name,
+                input: JSON.parse(toolCall.function.arguments) as Record<string, unknown>,
+              };
+            } catch (error) {
+              logger.error('Failed to parse tool call arguments', {
+                toolCallId: toolCall.id,
+                toolName: toolCall.function.name,
+                arguments: toolCall.function.arguments,
+                error: (error as Error).message,
+              });
+              throw new Error(
+                `Invalid JSON in tool call arguments for ${toolCall.function.name}: ${(error as Error).message}`
+              );
+            }
+          }) || [];
 
         logger.debug('Received response from OpenAI', {
           provider: 'openai',
@@ -302,11 +312,25 @@ export class OpenAIProvider extends AIProvider {
           }
 
           // Convert partial tool calls to final format
-          toolCalls = Array.from(partialToolCalls.values()).map((partial) => ({
-            id: partial.id,
-            name: partial.name,
-            input: JSON.parse(partial.arguments) as Record<string, unknown>,
-          }));
+          toolCalls = Array.from(partialToolCalls.values()).map((partial) => {
+            try {
+              return {
+                id: partial.id,
+                name: partial.name,
+                input: JSON.parse(partial.arguments) as Record<string, unknown>,
+              };
+            } catch (error) {
+              logger.error('Failed to parse streaming tool call arguments', {
+                toolCallId: partial.id,
+                toolName: partial.name,
+                arguments: partial.arguments,
+                error: (error as Error).message,
+              });
+              throw new Error(
+                `Invalid JSON in streaming tool call arguments for ${partial.name}: ${(error as Error).message}`
+              );
+            }
+          });
 
           logger.debug('Received streaming response from OpenAI', {
             provider: 'openai',
