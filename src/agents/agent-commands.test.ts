@@ -45,18 +45,19 @@ describe('Agent command handling', () => {
     threadManager.createThread(threadId);
 
     agent = new Agent({
-      provider,
       threadManager,
       toolExecutor,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
 
-    // Set model metadata for the agent
-    agent.updateThreadMetadata({
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
-    });
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
   });
 
   it('should handle /compact command', async () => {

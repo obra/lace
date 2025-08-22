@@ -103,12 +103,19 @@ describe('Agent auto-compaction', () => {
 
     const threadId = threadManager.createThread();
     agent = new Agent({
-      provider: mockProvider,
       threadManager,
       toolExecutor,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     // Set model metadata
     agent.updateThreadMetadata({
@@ -141,12 +148,19 @@ describe('Agent auto-compaction', () => {
 
     const threadId = threadManager.createThread();
     agent = new Agent({
-      provider: mockProvider,
       threadManager,
       toolExecutor,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     // Set model metadata
     agent.updateThreadMetadata({
@@ -180,12 +194,19 @@ describe('Agent auto-compaction', () => {
 
     const threadId = threadManager.createThread();
     agent = new Agent({
-      provider: mockProvider,
       threadManager,
       toolExecutor,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     // Set model metadata
     agent.updateThreadMetadata({
@@ -216,12 +237,19 @@ describe('Agent auto-compaction', () => {
 
     const threadId = threadManager.createThread();
     agent = new Agent({
-      provider: mockProvider,
       threadManager,
       toolExecutor,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     // Set model metadata
     agent.updateThreadMetadata({

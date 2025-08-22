@@ -1,7 +1,7 @@
 // ABOUTME: Tests for Agent tool abort functionality
 // ABOUTME: Validates that tool execution can be cancelled mid-execution
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Agent, AgentConfig } from '~/agents/agent';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { MockSlowTool } from '~/test-utils/mock-slow-tool';
@@ -142,20 +142,21 @@ describe('Agent Tool Abort Functionality', () => {
     const provider = new MockProviderWithTools(mockToolCalls);
 
     const config: AgentConfig = {
-      provider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [slowTool],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     };
 
     agent = new Agent(config);
 
-    // Set thread metadata with model configuration
-    threadManager.updateThreadMetadata(threadId, {
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
-    });
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
     let toolCompletedCount = 0;
     const toolResults: ToolResult[] = [];
@@ -211,20 +212,21 @@ describe('Agent Tool Abort Functionality', () => {
     const provider = new MockProviderWithTools(mockToolCalls);
 
     const config: AgentConfig = {
-      provider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [slowTool],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     };
 
     agent = new Agent(config);
 
-    // Set thread metadata with model configuration
-    threadManager.updateThreadMetadata(threadId, {
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
-    });
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
     const toolResults: ToolResult[] = [];
     agent.on('tool_call_complete', ({ result }: { result: ToolResult }) => {
@@ -264,20 +266,21 @@ describe('Agent Tool Abort Functionality', () => {
     const provider = new MockProviderWithTools(mockToolCalls);
 
     const config: AgentConfig = {
-      provider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [slowTool],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     };
 
     agent = new Agent(config);
 
-    // Set thread metadata with model configuration
-    threadManager.updateThreadMetadata(threadId, {
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
-    });
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
     let toolResult: ToolResult | null = null;
     agent.on('tool_call_complete', ({ result }: { result: ToolResult }) => {
@@ -328,20 +331,21 @@ describe('Agent Tool Abort Functionality', () => {
     const provider = new MockProviderWithTools(mockToolCalls);
 
     const config: AgentConfig = {
-      provider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [slowTool],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     };
 
     agent = new Agent(config);
 
-    // Set thread metadata with model configuration
-    threadManager.updateThreadMetadata(threadId, {
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
-    });
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
     const toolResults = new Map<string, ToolResult>();
     agent.on('tool_call_complete', ({ callId, result }: { callId: string; result: ToolResult }) => {
@@ -397,20 +401,21 @@ describe('Agent Tool Abort Functionality', () => {
     let provider = new MockProviderWithTools(firstToolCalls);
 
     const config: AgentConfig = {
-      provider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [slowTool],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     };
 
     agent = new Agent(config);
 
-    // Set thread metadata with model configuration
-    threadManager.updateThreadMetadata(threadId, {
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
-    });
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
     let firstResult: ToolResult | null = null;
     agent.on('tool_call_complete', ({ result }: { result: ToolResult }) => {
@@ -448,12 +453,19 @@ describe('Agent Tool Abort Functionality', () => {
 
     provider = new MockProviderWithTools(secondToolCalls);
     agent = new Agent({
-      provider,
       toolExecutor,
       threadManager: secondThreadManager,
       threadId: secondThreadId,
       tools: [slowTool],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
     let secondResult: ToolResult | null = null;
     agent.on('tool_call_complete', ({ result }: { result: ToolResult }) => {
@@ -495,20 +507,21 @@ describe('Agent Tool Abort Functionality', () => {
     const provider = new MockProviderWithTools(mockToolCalls);
 
     const config: AgentConfig = {
-      provider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [slowTool],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     };
 
     agent = new Agent(config);
 
-    // Set thread metadata with model configuration
-    threadManager.updateThreadMetadata(threadId, {
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
-    });
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
     const stateChanges: string[] = [];
     const agentEvents: string[] = [];

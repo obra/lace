@@ -199,14 +199,14 @@ export async function createDelegationTestSetup(options?: {
     }
   }
 
-  // TODO: Update this helper to use real provider instances with mocked responses
-  // instead of mocking the internal createProvider method
-  // Mock the createProvider method to return our AIProvider-based mock provider
-  vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
-    (providerType: string, _config?: ProviderConfig) => {
-      return new MockProvider(providerType, model);
-    }
-  );
+  // Mock Agent._createProviderInstance to handle dynamic agent creation in delegation
+  const { Agent } = await import('~/agents/agent');
+  vi.spyOn(Agent.prototype, '_createProviderInstance' as any).mockImplementation(async function (
+    this: any
+  ) {
+    // Return the same mock provider for all agents
+    return new MockProvider('anthropic', model);
+  });
 
   // Provider registry will auto-initialize when needed
   // Just ensure singleton exists for test consistency

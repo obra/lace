@@ -47,12 +47,18 @@ describe('CompactionHandler', () => {
     const toolExecutor = new ToolExecutor();
 
     agent = new Agent({
-      provider,
       threadManager,
       toolExecutor,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
+
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
     mockDisplay = new MockCompactionDisplay();
     handler = new CompactionHandler(agent, mockDisplay);

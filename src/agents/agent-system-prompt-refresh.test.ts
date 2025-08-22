@@ -95,7 +95,7 @@ describe('Agent System Prompt Refresh', () => {
     threadManager.createThread(threadId, session.getId());
 
     return new Agent({
-      provider: mockProvider,
+      // Remove provider: mockProvider - now uses lazy creation
       toolExecutor,
       threadManager,
       threadId: threadId,
@@ -111,6 +111,9 @@ describe('Agent System Prompt Refresh', () => {
   it('should call loadPromptConfig during initialization with correct context', async () => {
     // Create agent
     agent = createAgent();
+
+    // Mock provider creation BEFORE initialize()
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     // Mock prompt config responses
     mockLoadPromptConfig.mockResolvedValue({
@@ -155,6 +158,9 @@ describe('Agent System Prompt Refresh', () => {
     // Create agent
     agent = createAgent();
 
+    // Mock provider creation BEFORE initialize()
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
+
     // Mock loadPromptConfig to fail during initialization
     mockLoadPromptConfig.mockRejectedValueOnce(new Error('Failed to load prompt config'));
 
@@ -181,6 +187,9 @@ describe('Agent System Prompt Refresh', () => {
   it('should generate different system prompts for different project contexts', async () => {
     // Create first agent with first project context
     agent = createAgent();
+
+    // Mock provider creation BEFORE initialize()
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     // Track project context being passed to loadPromptConfig
     const projectCalls: Array<{ session: string; project: string }> = [];
@@ -229,7 +238,7 @@ describe('Agent System Prompt Refresh', () => {
     threadManager.createThread(threadId2, session2.getId());
 
     const agent2 = new Agent({
-      provider: mockProvider,
+      // Remove provider: mockProvider - now uses lazy creation
       toolExecutor,
       threadManager,
       threadId: threadId2,
@@ -240,6 +249,9 @@ describe('Agent System Prompt Refresh', () => {
         modelId: 'claude-3-5-haiku-20241022',
       },
     });
+
+    // Mock provider creation for second agent BEFORE initialize()
+    vi.spyOn(agent2, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     // Initialize second agent - should get different system prompt
     await agent2.initialize();

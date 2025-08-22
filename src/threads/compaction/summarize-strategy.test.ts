@@ -69,12 +69,19 @@ describe('SummarizeCompactionStrategy', () => {
 
     // Create agent with mock provider
     agent = new Agent({
-      provider: mockProvider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     context = {
       threadId,

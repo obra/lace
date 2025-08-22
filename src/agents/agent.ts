@@ -2094,12 +2094,14 @@ export class Agent extends EventEmitter {
       content: promptContent,
     });
 
-    if (!this.providerInstance) {
+    const provider = await this.getProvider();
+
+    if (!provider) {
       throw new Error('Cannot create summary with missing provider instance');
     }
 
     // Get the summary using this agent's provider and model
-    const response = await this.providerInstance.createResponse(
+    const response = await provider.createResponse(
       messages,
       [], // No tools for summarization
       this.model || 'default'

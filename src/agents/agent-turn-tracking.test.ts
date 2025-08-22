@@ -70,21 +70,31 @@ describe('Agent Turn Tracking', () => {
     threadManager.createThread(threadId);
 
     const config: AgentConfig = {
-      provider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     };
 
     agent = new Agent(config);
-    await agent.start();
 
-    // Set model metadata for the agent (required for model-agnostic providers)
-    agent.updateThreadMetadata({
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
+    // Mock provider access for test
+    vi.spyOn(agent, 'getProvider').mockResolvedValue(provider);
+    Object.defineProperty(agent, 'providerInstance', {
+      get: () => provider,
+      configurable: true,
     });
+    Object.defineProperty(agent, 'providerName', {
+      get: () => provider.providerName,
+      configurable: true,
+    });
+
+    await agent.start();
   });
 
   afterEach(() => {
@@ -163,11 +173,26 @@ describe('Agent Turn Tracking', () => {
       ); // 3 second delay
 
       const slowAgent = new Agent({
-        provider: slowProvider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
+      });
+
+      // Mock provider access for test
+      vi.spyOn(slowAgent, 'getProvider').mockResolvedValue(slowProvider);
+      Object.defineProperty(slowAgent, 'providerInstance', {
+        get: () => slowProvider,
+        configurable: true,
+      });
+      Object.defineProperty(slowAgent, 'providerName', {
+        get: () => slowProvider.providerName,
+        configurable: true,
       });
       await slowAgent.start();
       slowAgent.on('turn_progress', (data) => {

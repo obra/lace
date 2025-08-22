@@ -128,7 +128,6 @@ describe('Task Management Workflow Integration', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
@@ -142,8 +141,11 @@ describe('Task Management Workflow Integration', () => {
 
     // TODO: Update this test to use real provider instances with mocked responses
     // instead of mocking the internal createProvider method
-    // For now, we're using the @internal createProvider method
-    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
+    // For now, we're using direct agent mocking for provider creation
+
+    // Import Agent dynamically to avoid circular imports in test setup
+    const { Agent } = await import('~/agents/agent');
+    vi.spyOn(Agent.prototype, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     // Create project and session with provider configuration
     project = Project.create(

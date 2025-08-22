@@ -183,12 +183,17 @@ describe('Turn Tracking Provider Integration Tests', () => {
 
       const provider = new MockIntegrationProvider(mockResponse);
       const agent = new Agent({
-        provider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
       await agent.start();
 
       // Set model metadata for the agent (required for model-agnostic providers)
@@ -234,12 +239,17 @@ describe('Turn Tracking Provider Integration Tests', () => {
 
       const provider = new MockIntegrationProvider(mockResponse);
       const agent = new Agent({
-        provider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
       await agent.start();
 
       // Set model metadata for the agent (required for model-agnostic providers)
@@ -276,12 +286,17 @@ describe('Turn Tracking Provider Integration Tests', () => {
 
       const provider = new MockIntegrationProvider(mockResponse);
       const agent = new Agent({
-        provider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
       await agent.start();
 
       // Set model metadata for the agent (required for model-agnostic providers)
@@ -317,12 +332,17 @@ describe('Turn Tracking Provider Integration Tests', () => {
       const provider = new MockIntegrationProvider(mockResponse, { streaming: true });
 
       const agent = new Agent({
-        provider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
       await agent.start();
 
       // Set model metadata for the agent (required for model-agnostic providers)
@@ -358,12 +378,17 @@ describe('Turn Tracking Provider Integration Tests', () => {
 
       const provider = new MockIntegrationProvider(mockResponse, { streaming: true, slow: true });
       const agent = new Agent({
-        provider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
       await agent.start();
 
       // Set model metadata for the agent (required for model-agnostic providers)
@@ -445,12 +470,17 @@ describe('Turn Tracking Provider Integration Tests', () => {
       };
 
       const agent = new Agent({
-        provider: mockProvider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [mockTool],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
       await agent.start();
 
       // Set model metadata for the agent (required for model-agnostic providers)
@@ -497,12 +527,17 @@ describe('Turn Tracking Provider Integration Tests', () => {
 
       const provider = new MockIntegrationProvider(mockResponse);
       const agent = new Agent({
-        provider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
       await agent.start();
 
       // Set model metadata for the agent (required for model-agnostic providers)
@@ -554,12 +589,17 @@ describe('Turn Tracking Provider Integration Tests', () => {
 
       const provider = new MockIntegrationProvider(mockResponse, { streaming: true });
       const agent = new Agent({
-        provider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
       await agent.start();
 
       // Set model metadata for the agent (required for model-agnostic providers)
@@ -613,12 +653,17 @@ describe('Turn Tracking Provider Integration Tests', () => {
       };
 
       const agent = new Agent({
-        provider: errorProvider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(errorProvider);
       await agent.start();
 
       // Set model metadata for the agent (required for model-agnostic providers)
@@ -661,12 +706,17 @@ describe('Turn Tracking Provider Integration Tests', () => {
 
       const provider = new MockIntegrationProvider(mockResponse);
       const agent = new Agent({
-        provider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
       await agent.start();
 
       // Set model metadata for the agent (required for model-agnostic providers)

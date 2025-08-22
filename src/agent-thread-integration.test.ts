@@ -20,12 +20,19 @@ describe('Agent Single Event Source Integration', () => {
     toolExecutor = new ToolExecutor();
 
     agent = new Agent({
-      provider: mockProvider,
       toolExecutor,
       threadManager,
       threadId: 'integration-test-thread',
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
   });
 
   afterEach(() => {

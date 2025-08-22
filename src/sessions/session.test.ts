@@ -64,9 +64,6 @@ describe('Session', () => {
       apiKey: 'test-openai-key',
     });
 
-    // Clear provider cache to avoid race conditions between tests
-    Session.clearProviderCache();
-
     // Create a test project for all tests with default provider configuration
     testProject = Project.create('Test Project', '/test/path', 'Test project', {
       providerInstanceId,

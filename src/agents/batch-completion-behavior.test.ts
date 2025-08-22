@@ -1,7 +1,7 @@
 // ABOUTME: Tests for tool batch completion behavior - tool failures vs user denials
 // ABOUTME: Verifies tool execution errors continue conversation while user denials pause it
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
@@ -142,12 +142,19 @@ describe('Tool Batch Completion Behavior', () => {
     threadManager.createThread(threadId, session.getId());
 
     agent = new Agent({
-      provider: mockProvider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [configurableTool],
+      metadata: {
+        name: 'batch-test-agent',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId,
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     await agent.start();
 

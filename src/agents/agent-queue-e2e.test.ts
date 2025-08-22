@@ -67,20 +67,21 @@ describe('Agent Queue End-to-End Scenarios', () => {
     const testThreadId = 'lace_20250723_abc123';
 
     agent = new Agent({
-      provider: longProvider,
       toolExecutor: mockToolExecutor,
       threadManager: mockThreadManager,
       threadId: testThreadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(longProvider);
 
     await agent.start();
-
-    // Set model metadata for the agent (required for model-agnostic providers)
-    agent.updateThreadMetadata({
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
-    });
   });
 
   afterEach(() => {

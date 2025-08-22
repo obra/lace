@@ -56,7 +56,6 @@ describe('Temp Directory Integration', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Create provider instance
     providerInstanceId = await createTestProviderInstance({

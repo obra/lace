@@ -28,12 +28,19 @@ describe('Agent Thread Events', () => {
     threadManager.createThread(threadId);
 
     agent = new Agent({
-      provider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
     await agent.start();
 

@@ -109,18 +109,19 @@ describe('Agent token tracking', () => {
     threadManager.createThread(threadId);
 
     agent = new Agent({
-      provider,
-      threadManager,
       toolExecutor,
+      threadManager,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
 
-    // Set model metadata for the agent (required for model-agnostic providers)
-    agent.updateThreadMetadata({
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
-    });
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
   });
 
   afterEach(() => {
@@ -223,18 +224,21 @@ describe('Agent token tracking', () => {
       threadManager.createThread(multiCallThreadId);
 
       const multiCallAgent = new Agent({
-        provider: multiCallProvider,
         toolExecutor,
         threadManager,
         threadId: multiCallThreadId,
         tools: [mockTool],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
 
-      // Set model metadata for the agent (required for model-agnostic providers)
-      multiCallAgent.updateThreadMetadata({
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
-      });
+      // Mock provider creation for test
+      vi.spyOn(multiCallAgent, '_createProviderInstance' as any).mockResolvedValue(
+        multiCallProvider
+      );
 
       await multiCallAgent.start();
 
@@ -344,18 +348,21 @@ describe('Agent token tracking', () => {
       threadManager.createThread(multiCallThreadId2);
 
       const multiCallAgent = new Agent({
-        provider: multiCallProvider,
         toolExecutor,
         threadManager,
         threadId: multiCallThreadId2,
         tools: [mockTool],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
 
-      // Set model metadata for the agent (required for model-agnostic providers)
-      multiCallAgent.updateThreadMetadata({
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
-      });
+      // Mock provider creation for test
+      vi.spyOn(multiCallAgent, '_createProviderInstance' as any).mockResolvedValue(
+        multiCallProvider
+      );
 
       await multiCallAgent.start();
 
@@ -441,18 +448,19 @@ describe('Agent token tracking', () => {
       threadManager.createThread(noUsageThreadId);
 
       const noUsageAgent = new Agent({
-        provider: noUsageProvider,
         toolExecutor,
         threadManager,
         threadId: noUsageThreadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
 
-      // Set model metadata for the agent (required for model-agnostic providers)
-      noUsageAgent.updateThreadMetadata({
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
-      });
+      // Mock provider creation for test
+      vi.spyOn(noUsageAgent, '_createProviderInstance' as any).mockResolvedValue(noUsageProvider);
 
       const completeEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
       noUsageAgent.on('turn_complete', (data) => completeEvents.push(data));
@@ -481,18 +489,19 @@ describe('Agent token tracking', () => {
     threadManager.createThread(threadId2);
 
     const agentNoUsage = new Agent({
-      provider: providerNoUsage,
-      threadManager,
       toolExecutor,
+      threadManager,
       threadId: threadId2,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
 
-    // Set model metadata for the agent
-    agentNoUsage.updateThreadMetadata({
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
-    });
+    // Mock provider creation for test
+    vi.spyOn(agentNoUsage, '_createProviderInstance' as any).mockResolvedValue(providerNoUsage);
 
     await agentNoUsage.sendMessage('Hello');
 

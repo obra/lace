@@ -25,8 +25,6 @@ describe('DelegateTool', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    Session.clearProviderCache();
-
     // Create test provider instance
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',

@@ -95,14 +95,21 @@ describe('Agent Abort Functionality', () => {
     threadManager.createThread(threadId);
 
     const config: AgentConfig = {
-      provider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     };
 
     agent = new Agent(config);
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
     // Set model metadata for the agent (required for model-agnostic providers)
     agent.updateThreadMetadata({
@@ -256,12 +263,19 @@ describe('Agent Abort Functionality', () => {
       });
 
       const abortAgent = new Agent({
-        provider: abortingProvider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'abort-test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
+
+      // Mock provider creation for test
+      vi.spyOn(abortAgent, '_createProviderInstance' as any).mockResolvedValue(abortingProvider);
 
       // Set model metadata for the agent (required for model-agnostic providers)
       abortAgent.updateThreadMetadata({
@@ -295,12 +309,21 @@ describe('Agent Abort Functionality', () => {
       ); // 100ms delay to allow abort
 
       const streamingAgent = new Agent({
-        provider: streamingProvider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'streaming-test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
+
+      // Mock provider creation for test
+      vi.spyOn(streamingAgent, '_createProviderInstance' as any).mockResolvedValue(
+        streamingProvider
+      );
 
       // Set model metadata for the agent (required for model-agnostic providers)
       streamingAgent.updateThreadMetadata({

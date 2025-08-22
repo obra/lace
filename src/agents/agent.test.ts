@@ -195,27 +195,31 @@ describe('Enhanced Agent', () => {
     threadManager.createThread(threadId, session.getId());
 
     const defaultConfig: AgentConfig = {
-      provider: mockProvider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     };
 
     const agent = new Agent({ ...defaultConfig, ...config });
 
-    // Set model metadata for the agent (required for model-agnostic providers)
-    agent.updateThreadMetadata({
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
-    });
+    // Mock provider creation to return our mock provider
+    vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProvider);
 
     return agent;
   }
 
   describe('constructor and basic properties', () => {
-    it('should create agent with correct configuration', () => {
+    it('should create agent with correct configuration', async () => {
       agent = createAgent();
+
+      // Initialize the agent so provider gets set
+      await agent.initialize();
 
       expect(agent.providerName).toBe('mock');
       expect(agent.getThreadId()).toBeDefined();
@@ -248,12 +252,22 @@ describe('Enhanced Agent', () => {
       };
 
       agent = new Agent({
-        provider: mockProvider,
         toolExecutor,
         threadManager,
         threadId: testThreadId,
         tools: [],
         metadata, // NEW parameter
+      });
+
+      // Mock provider access for test
+      vi.spyOn(agent, 'getProvider').mockResolvedValue(mockProvider);
+      Object.defineProperty(agent, 'providerInstance', {
+        get: () => mockProvider,
+        configurable: true,
+      });
+      Object.defineProperty(agent, 'providerName', {
+        get: () => mockProvider.providerName,
+        configurable: true,
       });
 
       // Verify metadata was set
@@ -363,7 +377,9 @@ describe('Enhanced Agent', () => {
         content: '<think>I need to process this</think>This is my response',
         toolCalls: [],
       });
-      agent = createAgent({ provider: mockProvider });
+      agent = createAgent();
+      // Update the mock provider for this test
+      vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProvider);
       await agent.start();
 
       const thinkingComplete = vi.fn();
@@ -462,7 +478,7 @@ describe('Enhanced Agent', () => {
         }
       });
 
-      agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      agent = createAgent({ tools: [mockTool] });
       await agent.start();
     });
 
@@ -619,7 +635,7 @@ describe('Enhanced Agent', () => {
 
     // New tests for non-blocking behavior
     it('should stay in tool_execution state until tools complete', async () => {
-      const mockProvider = createOneTimeToolProvider(
+      const mockProviderForTest = createOneTimeToolProvider(
         [
           { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
           { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
@@ -627,7 +643,9 @@ describe('Enhanced Agent', () => {
         'I will execute the tool.'
       );
 
-      agent = createAgent({ provider: mockProvider });
+      agent = createAgent({});
+      // Use the specific mock provider for this test
+      vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
       await agent.start();
 
       const stateChanges: string[] = [];
@@ -655,12 +673,14 @@ describe('Enhanced Agent', () => {
     });
 
     it('should create tool call events without executing tools', async () => {
-      const mockProvider = createOneTimeToolProvider(
+      const mockProviderForTest = createOneTimeToolProvider(
         [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
         'I will execute the tool.'
       );
 
-      agent = createAgent({ provider: mockProvider });
+      agent = createAgent({});
+      // Use the specific mock provider for this test
+      vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
       await agent.start();
 
       const toolStartEvents: Array<{ toolName: string; input: unknown; callId: string }> = [];
@@ -695,7 +715,7 @@ describe('Enhanced Agent', () => {
     });
 
     it('should create multiple tool call events for multiple tool calls', async () => {
-      const mockProvider = createOneTimeToolProvider(
+      const mockProviderForTest = createOneTimeToolProvider(
         [
           { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
           { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
@@ -704,7 +724,9 @@ describe('Enhanced Agent', () => {
         'I will execute multiple tools.'
       );
 
-      agent = createAgent({ provider: mockProvider });
+      agent = createAgent({});
+      // Use the specific mock provider for this test
+      vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
       await agent.start();
 
       const toolStartEvents: Array<{ toolName: string; input: unknown; callId: string }> = [];
@@ -746,7 +768,7 @@ describe('Enhanced Agent', () => {
 
     it('should execute tool when TOOL_APPROVAL_RESPONSE event received', async () => {
       // Create a provider that returns tool calls only once
-      const mockProvider = createOneTimeToolProvider(
+      const mockProviderForTest = createOneTimeToolProvider(
         [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
         'I will execute the tool.'
       );
@@ -761,7 +783,9 @@ describe('Enhanced Agent', () => {
       // Override the toolExecutor's approval callback for this specific test
       toolExecutor.setApprovalCallback(pendingApprovalCallback);
 
-      agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      agent = createAgent({ tools: [mockTool] });
+      // Use the specific mock provider for this test
+      vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
       await agent.start();
 
       // Send message to create TOOL_CALL event
@@ -810,12 +834,14 @@ describe('Enhanced Agent', () => {
 
     it('should create error result when tool is denied', async () => {
       // Create tool call
-      const mockProvider = createOneTimeToolProvider(
+      const mockProviderForTest = createOneTimeToolProvider(
         [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
         'I will execute the tool.'
       );
 
-      agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      agent = createAgent({ tools: [mockTool] });
+      // Use the specific mock provider for this test
+      vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
 
       // Set up proper EventApprovalCallback for approval workflow
       const approvalCallback = new EventApprovalCallback(agent);
@@ -855,7 +881,7 @@ describe('Enhanced Agent', () => {
 
     it('should execute multiple tools independently as approvals arrive', async () => {
       // Create multiple tool calls with one-time provider to prevent infinite recursion
-      const mockProvider = createOneTimeToolProvider(
+      const mockProviderForTest = createOneTimeToolProvider(
         [
           { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
           { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
@@ -864,7 +890,9 @@ describe('Enhanced Agent', () => {
         'I will execute multiple tools.'
       );
 
-      agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      agent = createAgent({ tools: [mockTool] });
+      // Use the specific mock provider for this test
+      vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
 
       // Set up proper EventApprovalCallback for approval workflow
       const approvalCallback = new EventApprovalCallback(agent);
@@ -913,12 +941,14 @@ describe('Enhanced Agent', () => {
     });
 
     it('should emit tool_call_complete events when tools execute', async () => {
-      const mockProvider = createOneTimeToolProvider(
+      const mockProviderForTest = createOneTimeToolProvider(
         [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
         'I will execute the tool.'
       );
 
-      agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      agent = createAgent({ tools: [mockTool] });
+      // Use the specific mock provider for this test
+      vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
 
       // Set up proper EventApprovalCallback for approval workflow
       const approvalCallback = new EventApprovalCallback(agent);
@@ -974,12 +1004,12 @@ describe('Enhanced Agent', () => {
       // Mock ToolExecutor.executeApprovedTool to track calls (since agent now uses this for granted permissions)
       const executeToolSpy = vi.spyOn(toolExecutor, 'executeApprovedTool');
 
-      const mockProvider = createOneTimeToolProvider(
+      const mockProviderForTest = createOneTimeToolProvider(
         [{ id: 'call_immediate', name: 'mock_tool', input: { action: 'test' } }],
         'I will execute the tool.'
       );
 
-      agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      agent = createAgent({ tools: [mockTool] });
       await agent.start();
 
       // Send message to trigger tool calls
@@ -1011,7 +1041,7 @@ describe('Enhanced Agent', () => {
     });
 
     it('should handle pending tool results without completing batch tracking', async () => {
-      const mockProvider = createOneTimeToolProvider(
+      const mockProviderForTest = createOneTimeToolProvider(
         [
           { id: 'call_pending', name: 'mock_tool', input: { action: 'test' } },
           { id: 'call_pending2', name: 'mock_tool', input: { action: 'test2' } },
@@ -1019,7 +1049,7 @@ describe('Enhanced Agent', () => {
         'I will execute tools.'
       );
 
-      agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      agent = createAgent({ tools: [mockTool] });
 
       // Set up proper EventApprovalCallback to create pending approvals
       const approvalCallback = new EventApprovalCallback(agent);
@@ -1088,7 +1118,7 @@ describe('Enhanced Agent', () => {
         toolCalls: [{ id: 'call_complete', name: 'mock_tool', input: { action: 'test' } }],
       });
 
-      agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      agent = createAgent({ tools: [mockTool] });
       await agent.start();
 
       // Track if batch completion methods are called
@@ -1140,7 +1170,7 @@ describe('Enhanced Agent', () => {
         toolCalls: [{ id: 'call_approval', name: 'mock_tool', input: { action: 'test' } }],
       });
 
-      agent = createAgent({ provider: mockProvider, tools: [mockTool] });
+      agent = createAgent({ tools: [mockTool] });
 
       // Set up proper EventApprovalCallback for approval workflow
       const approvalCallback = new EventApprovalCallback(agent);
@@ -1202,7 +1232,7 @@ describe('Enhanced Agent', () => {
       const bashTool = new BashTool();
       toolExecutor.registerTool('bash', bashTool);
 
-      const mockProvider = createOneTimeToolProvider(
+      const mockProviderForTest = createOneTimeToolProvider(
         [{ id: 'bash_call_1', name: 'bash', input: { command: 'echo "test"' } }],
         'I will run the bash command.'
       );
@@ -1320,7 +1350,9 @@ describe('Enhanced Agent', () => {
 
       vi.spyOn(errorProvider, 'createResponse').mockRejectedValue(new Error('Provider error'));
 
-      agent = createAgent({ provider: errorProvider });
+      agent = createAgent();
+      // Update the mock provider for this test
+      vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(errorProvider);
       await agent.start();
 
       const errorEvents: Array<{ error: Error; context: Record<string, unknown> }> = [];
@@ -1341,7 +1373,9 @@ describe('Enhanced Agent', () => {
 
       vi.spyOn(errorProvider, 'createResponse').mockRejectedValue(new Error('Provider error'));
 
-      agent = createAgent({ provider: errorProvider });
+      agent = createAgent();
+      // Update the mock provider for this test
+      vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(errorProvider);
       await agent.start();
 
       // Add error listener to prevent unhandled error
@@ -1665,7 +1699,9 @@ describe('Enhanced Agent', () => {
 
       beforeEach(async () => {
         streamingProvider = new MockStreamingProvider({ streaming: true });
-        agent = createAgent({ provider: streamingProvider });
+        agent = createAgent();
+        // Update the mock provider for this test
+        vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(streamingProvider);
         await agent.start();
       });
 
@@ -1785,7 +1821,9 @@ describe('Enhanced Agent', () => {
 
       beforeEach(async () => {
         nonStreamingProvider = new MockNonStreamingProvider({ streaming: false });
-        agent = createAgent({ provider: nonStreamingProvider });
+        agent = createAgent();
+        // Update the mock provider for this test
+        vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(nonStreamingProvider);
         await agent.start();
       });
 
@@ -1836,7 +1874,9 @@ describe('Enhanced Agent', () => {
     describe('streaming configuration', () => {
       it('should prefer streaming when both supported and configured', async () => {
         const streamingProvider = new MockStreamingProvider({ streaming: true });
-        agent = createAgent({ provider: streamingProvider });
+        agent = createAgent();
+        // Update the mock provider for this test
+        vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(streamingProvider);
         await agent.start();
 
         const tokenEvents: string[] = [];
@@ -1859,7 +1899,9 @@ describe('Enhanced Agent', () => {
 
       it('should use non-streaming when supported but not configured', async () => {
         const streamingProvider = new MockStreamingProvider({ streaming: false });
-        agent = createAgent({ provider: streamingProvider });
+        agent = createAgent();
+        // Update the mock provider for this test
+        vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(streamingProvider);
         await agent.start();
 
         const tokenEvents: string[] = [];
@@ -1966,11 +2008,26 @@ describe('Enhanced Agent', () => {
 
         // Simulate agent restart by creating new agent with same thread
         const agent2 = new Agent({
-          provider: mockProvider,
           toolExecutor,
           threadManager,
           threadId: agent.getThreadId(), // Use same thread ID
           tools: [],
+          metadata: {
+            name: 'test-agent',
+            modelId: 'test-model',
+            providerInstanceId: 'test-instance',
+          },
+        });
+
+        // Mock provider access for test
+        vi.spyOn(agent2, 'getProvider').mockResolvedValue(mockProvider);
+        Object.defineProperty(agent2, 'providerInstance', {
+          get: () => mockProvider,
+          configurable: true,
+        });
+        Object.defineProperty(agent2, 'providerName', {
+          get: () => mockProvider.providerName,
+          configurable: true,
         });
         await agent2.start();
 

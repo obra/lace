@@ -26,7 +26,6 @@ describe('Session Configuration Integration', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Create a real provider instance for testing
     providerInstanceId = await createTestProviderInstance({
