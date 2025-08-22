@@ -312,8 +312,7 @@ export class Session {
 
     // Get provider and model from session configuration
     const sessionConfig = sessionData.configuration || {};
-    const tempThreadManager = new ThreadManager();
-    const existingThread = tempThreadManager.getThread(sessionId);
+    const existingThread = thread;
 
     // Get provider instance ID and model ID from thread metadata or session config
     const providerInstanceId =
