@@ -52,7 +52,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
         
         // Launch browser item
-        let launchItem = NSMenuItem(title: "Open Lace", action: #selector(openBrowser), keyEquivalent: "o")
+        let launchTitle = serverPort != nil ? "Open Lace" : "Open Lace (port unknown)"
+        let launchItem = NSMenuItem(title: launchTitle, action: #selector(openBrowser), keyEquivalent: "o")
         launchItem.isEnabled = (serverPort != nil)
         menu.addItem(launchItem)
         
@@ -71,7 +72,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let port = serverPort {
             return "Lace Server (port \(port))"
         } else if serverProcess?.isRunning == true {
-            return "Lace Server (starting...)"
+            return "Lace Server (port unknown)"
         } else {
             return "Lace Server (stopped)"
         }
@@ -178,7 +179,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc private func openBrowser() {
         guard let port = serverPort else {
-            showError("Server port not available. Please wait for server to start.")
+            showError("Server port not detected. The server may not have started properly or the port signal was not received.")
             return
         }
         
