@@ -10,6 +10,7 @@ import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { setupAgentApprovals } from '@/lib/server/agent-utils';
 import { EventStreamManager } from '@/lib/event-stream-manager';
+import type { Agent } from '@/lib/server/lace-imports';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -64,7 +65,7 @@ export async function POST(
     }
 
     // Spawn agent - agent will validate and create its own provider during initialization
-    let agent;
+    let agent: Agent;
     try {
       agent = session.spawnAgent({
         name: body.name || '',
@@ -72,6 +73,8 @@ export async function POST(
         modelId: body.modelId,
       });
     } catch (error) {
+      // Log full error for server debugging while keeping client response sanitized
+      console.error('Failed to spawn agent:', error);
       return createErrorResponse(
         `Failed to spawn agent: ${isError(error) ? error.message : 'Unknown error'}`,
         400,

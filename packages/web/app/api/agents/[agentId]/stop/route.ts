@@ -7,7 +7,6 @@ import { asThreadId } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
-import { Session } from '~/sessions/session';
 
 export async function POST(
   request: NextRequest,

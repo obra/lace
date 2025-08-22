@@ -13,7 +13,6 @@ import {
   cleanupTestProviderInstances,
 } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
-import { Session } from '@/lib/server/lace-imports';
 import type { ProjectInfo } from '@/types/core';
 
 // Mock server-only before importing API routes
