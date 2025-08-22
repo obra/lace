@@ -65,7 +65,6 @@ class MockRetryMetricsProvider extends BaseMockProvider {
         throw lastError;
       }
     }
-
     return this.mockResponse;
   }
 
@@ -225,22 +224,27 @@ describe('Agent Retry Metrics Tracking', () => {
       const retryAttemptEvents: Array<{ attempt: number; delay: number; error: Error }> = [];
       const retryExhaustedEvents: Array<{ attempts: number; lastError: Error }> = [];
       const turnCompleteEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
+      const errorEvents: Array<{ error: Error; context: unknown }> = [];
 
       agent.on('retry_attempt', (data) => retryAttemptEvents.push(data));
       agent.on('retry_exhausted', (data) => retryExhaustedEvents.push(data));
       agent.on('turn_complete', (data) => turnCompleteEvents.push(data));
 
-      // This should throw due to retry exhaustion
-      let caughtError: Error | null = null;
-      try {
-        await agent.sendMessage('Test message with retry exhaustion');
-      } catch (error) {
-        caughtError = error as Error;
-      }
+      // Add error listener to prevent unhandled error crashes
+      agent.on('error', (data) => errorEvents.push(data));
 
-      // Verify the operation failed as expected
-      expect(caughtError).toBeTruthy();
-      expect(caughtError?.message).toContain('Final network error');
+      // Agent emits error events instead of throwing for provider errors
+      await agent.sendMessage('Test message with retry exhaustion');
+      expect(errorEvents).toHaveLength(1); // Only retry exhaustion error
+      const retryExhaustionError = errorEvents.find(
+        (e) =>
+          e.context &&
+          typeof e.context === 'object' &&
+          'phase' in e.context &&
+          (e.context as { phase: string }).phase === 'retry_exhaustion'
+      );
+      expect(retryExhaustionError).toBeTruthy();
+      expect(retryExhaustionError?.error.message).toContain('Final network error');
 
       // Verify retry events
       expect(retryAttemptEvents).toHaveLength(3);

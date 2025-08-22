@@ -11,7 +11,7 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**', 'packages/**'],
     coverage: {
       reporter: ['text', 'html', 'lcov'],
       exclude: ['node_modules/', 'dist/', '**/*.test.ts', '**/*.spec.ts'],
@@ -23,4 +23,14 @@ export default defineConfig({
       FORCE_COLOR: '0',
     },
   },
+  projects: [
+    {
+      test: {
+        include: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+        exclude: ['packages/**'],
+        environment: 'jsdom',
+        setupFiles: ['./src/test-setup.ts'],
+      },
+    },
+  ],
 });
