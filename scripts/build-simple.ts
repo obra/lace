@@ -164,11 +164,11 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
     stdio: 'pipe',
   });
 
-  // Copy src directory (needed for provider catalog data and other runtime files)
-  execSync(`cp -r src ${tempBuildDir}/standalone/src`, {
+  // Copy core package source directory (needed for provider catalog data and other runtime files)
+  execSync(`cp -r packages/core/src ${tempBuildDir}/standalone/src`, {
     stdio: 'pipe',
   });
-  console.log('📁 Source directory copied to standalone/src/');
+  console.log('📁 Core source directory copied to standalone/src/');
 
   // Copy static files to the correct location where Next.js server expects them
   // The server runs from packages/web, so static files must be at packages/web/.next/static
