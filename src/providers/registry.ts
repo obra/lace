@@ -128,10 +128,12 @@ export class ProviderRegistry {
     }
 
     // Build provider config from instance and credentials
+    // Priority: instance.endpoint > catalog.api_endpoint > provider default
+    const baseURL = instance.endpoint || catalogProvider.api_endpoint;
     const providerConfig: ProviderConfig = {
       apiKey: credentials.apiKey,
       ...(credentials.additionalAuth || {}),
-      ...(instance.endpoint && { baseURL: instance.endpoint }),
+      ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
     };
 
@@ -171,11 +173,13 @@ export class ProviderRegistry {
     }
 
     // Build provider config with model
+    // Priority: instance.endpoint > catalog.api_endpoint > provider default
+    const baseURL = instance.endpoint || catalogProvider.api_endpoint;
     const providerConfig: ProviderConfig = {
       model: modelId,
       apiKey: credentials.apiKey,
       ...(credentials.additionalAuth || {}),
-      ...(instance.endpoint && { baseURL: instance.endpoint }),
+      ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
     };
 
