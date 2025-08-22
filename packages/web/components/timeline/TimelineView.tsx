@@ -4,7 +4,6 @@
 'use client';
 
 import React from 'react';
-import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { LaceEvent, AgentInfo, ThreadId } from '@/types/core';
 import type { CompactionState } from '@/components/providers/EventStreamProvider';
@@ -37,33 +36,14 @@ export function TimelineView({
   selectedAgent,
   compactionState,
 }: TimelineViewProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
   // Process events (filtering, aggregation, etc.)
   const processedEvents = useProcessedEvents(
     events,
     selectedAgent ? asThreadId(selectedAgent) : undefined
   );
 
-  // Smooth scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (containerRef.current) {
-      // Delay scroll slightly to account for entry animations
-      const timeoutId = setTimeout(() => {
-        if (containerRef.current) {
-          containerRef.current.scrollTo({
-            top: containerRef.current.scrollHeight,
-            behavior: 'smooth',
-          });
-        }
-      }, 50); // Reduced delay for faster feel
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [processedEvents, isTyping, streamingContent]);
-
   return (
-    <div ref={containerRef} className="h-full overflow-y-auto overscroll-contain scroll-smooth">
+    <div className="h-full overscroll-contain scroll-smooth">
       <div className="min-h-full flex flex-col justify-end">
         <div className="p-4 space-y-4 pb-32">
           {processedEvents.length === 0 && (
