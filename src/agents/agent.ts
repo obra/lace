@@ -2150,9 +2150,10 @@ export class Agent extends EventEmitter {
    * This ensures Agent is the single event source for UI updates
    */
   private _addEventAndEmit(event: LaceEvent): LaceEvent | null {
-    // Safety check: only add events if agent is still running
-    if (!this._initialized) {
-      logger.debug('AGENT: Skipping event addition - agent stopped', {
+    // Safety check: only skip tool execution events if agent is stopped
+    // Allow approval events to proceed for proper test cleanup
+    if (!this._initialized && event.type === 'TOOL_RESULT') {
+      logger.debug('AGENT: Skipping tool result - agent stopped', {
         threadId: event.threadId,
         type: event.type,
       });

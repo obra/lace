@@ -8,7 +8,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session, Project, Agent, ThreadManager } from '@/lib/server/lace-imports';
 import type { ToolExecutor } from '@/lib/server/lace-imports';
-import type { AIProvider } from '~/providers/base-provider';
 import type { Tool } from '~/tools/tool';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
@@ -183,7 +182,7 @@ describe('Agent Spawning and Thread Creation', () => {
       metadata: {
         name: 'delegate-agent',
         modelId: 'claude-3-5-haiku-20241022',
-        providerInstanceId: testProviderInstanceId,
+        providerInstanceId: anthropicInstanceId,
       },
     });
 

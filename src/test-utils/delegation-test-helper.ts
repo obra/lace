@@ -201,11 +201,13 @@ export async function createDelegationTestSetup(options?: {
 
   // Mock Agent._createProviderInstance to handle dynamic agent creation in delegation
   const { Agent } = await import('~/agents/agent');
-  vi.spyOn(Agent.prototype, '_createProviderInstance' as any).mockImplementation(async function (
-    this: any
-  ) {
-    // Return the same mock provider for all agents
-    return new MockProvider('anthropic', model);
+
+  // Type-safe approach: mock the method by name without any
+  const createProviderInstanceSpy = vi.fn().mockResolvedValue(new MockProvider('anthropic', model));
+  Object.defineProperty(Agent.prototype, '_createProviderInstance', {
+    value: createProviderInstanceSpy,
+    writable: true,
+    configurable: true,
   });
 
   // Provider registry will auto-initialize when needed

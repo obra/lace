@@ -57,11 +57,23 @@ describe('Event-Based Approval Callback', () => {
     threadManager.createThread(threadId, session.getId());
 
     agent = new Agent({
-      provider,
       toolExecutor,
       threadManager,
       threadId,
       tools: toolExecutor.getAllTools(),
+      metadata: {
+        name: 'test-agent',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId,
+      },
+    });
+
+    // Mock provider creation for test - type-safe approach
+    const createProviderSpy = vi.fn().mockResolvedValue(provider);
+    Object.defineProperty(agent, '_createProviderInstance', {
+      value: createProviderSpy,
+      writable: true,
+      configurable: true,
     });
 
     // Set up approvals

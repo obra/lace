@@ -5,7 +5,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import { AIProvider } from '~/providers/base-provider';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('Retry System Integration Tests', () => {
