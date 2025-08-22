@@ -834,7 +834,7 @@ export class Session {
     // Remove from registry
     Session._sessionRegistry.delete(this._sessionId);
 
-    // Stop and cleanup all agents (including coordinator)
+    // Stop and cleanup all agents (including coordinator) immediately
     for (const agent of this._agents.values()) {
       agent.stop();
       agent.removeAllListeners();

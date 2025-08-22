@@ -113,6 +113,9 @@ describe('SessionService.spawnAgent Method', () => {
     const retrievedAgent = sessionForAgent!.getAgent(agent.threadId as ThreadId);
     expect(retrievedAgent).toBeDefined();
     expect(retrievedAgent?.threadId).toBe(agent.threadId);
+    
+    // Initialize agent so provider is available
+    await retrievedAgent!.initialize();
     expect(retrievedAgent?.providerName).toBe('anthropic');
   });
 

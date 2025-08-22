@@ -176,11 +176,15 @@ describe('Agent Spawning and Thread Creation', () => {
 
     // Create new Agent with the delegate thread ID
     const delegateAgent = new Agent({
-      provider: (sessionAgent as unknown as { _provider: unknown })._provider as AIProvider,
       toolExecutor: toolExecutor as unknown as ToolExecutor,
       threadManager: sessionThreadManager,
       threadId: delegateThreadId,
       tools: (toolExecutor as unknown as { getAllTools: () => unknown[] }).getAllTools() as Tool[],
+      metadata: {
+        name: 'delegate-agent',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId: testProviderInstanceId,
+      },
     });
 
     expect(delegateAgent).toBeDefined();

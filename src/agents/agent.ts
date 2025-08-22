@@ -443,10 +443,14 @@ export class Agent extends EventEmitter {
     this._initialized = false;
     this._clearProgressTimer();
 
-    // Abort any in-progress processing
+    // Abort any in-progress processing immediately
     if (this._abortController) {
       this.abort();
     }
+
+    // Clear any active tool calls to prevent further database operations
+    this._activeToolCalls.clear();
+    this._pendingToolCount = 0;
 
     this._setState('idle');
 
