@@ -9,6 +9,7 @@ on:
 jobs:
   build-executable:
     name: Build Executable
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
     strategy:
       matrix:
         include:
@@ -136,7 +137,6 @@ jobs:
           ### Downloads
           
           - **lace-macos-arm64.tar.gz** - macOS App Bundle for Apple Silicon (M1/M2/M3/M4)
-          - **lace-linux-x64.tar.gz** - Linux x86_64
           
           ### Usage
           
@@ -147,16 +147,6 @@ jobs:
           
           # Run Lace (opens menu bar app)
           open Lace.app
-          ```
-          
-          **Linux:**
-          ```bash
-          # Extract archive
-          tar -xzf lace-linux-x64.tar.gz
-          
-          # Run Lace
-          ./lace-linux-x64 --help
-          ./lace-linux-x64 --port 3000
           ```
           
           ### Features
