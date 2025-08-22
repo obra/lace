@@ -212,6 +212,12 @@ export class Agent extends EventEmitter {
       throw new Error('Cannot send messages to agent with missing provider instance');
     }
 
+    // Early validation that model identifier exists
+    const modelId = this.model;
+    if (!modelId || modelId === 'unknown-model') {
+      throw new Error('Cannot send messages to agent with missing modelId');
+    }
+
     if (this._state === 'idle') {
       // Process immediately
       return this._processMessage(content);
@@ -334,12 +340,19 @@ export class Agent extends EventEmitter {
       this._addInitialEvents(this._promptConfig);
     }
 
-    this._initialized = true;
+    // Only mark as initialized if provider was successfully created
+    if (this._provider) {
+      this._initialized = true;
 
-    logger.info('AGENT: Initialized', {
-      threadId: this._threadId,
-      provider: this.providerInstance?.providerName || 'missing',
-    });
+      logger.info('AGENT: Initialized successfully', {
+        threadId: this._threadId,
+        provider: this.providerInstance?.providerName || 'missing',
+      });
+    } else {
+      logger.warn('AGENT: Initialization incomplete - no provider', {
+        threadId: this._threadId,
+      });
+    }
   }
 
   // Check if initial events already exist
@@ -536,9 +549,8 @@ export class Agent extends EventEmitter {
   }
 
   get providerInstance(): AIProvider | null {
-    // Always use the provider that was passed to the constructor
-    // The Session class is responsible for creating agents with the correct provider
-    // based on their metadata when reconstructing from persistence
+    // Returns the provider instance owned by this agent
+    // Agents create and manage their own provider instances based on thread metadata
     return this._provider;
   }
 
@@ -547,12 +559,22 @@ export class Agent extends EventEmitter {
     if (!this._initialized) {
       await this.initialize();
     }
+
+    // If initialized but provider is null, initialization should have handled it
+    if (this._initialized && !this._provider) {
+      throw new Error(
+        'Provider initialization failed - no provider available after initialization'
+      );
+    }
+
     return this._provider;
   }
 
   get provider(): string {
     const metadata = this.getThreadMetadata();
-    return (metadata?.provider as string) || this._provider?.providerName || 'unknown';
+    const providerName = this._provider?.providerName;
+    const providerInstanceId = (metadata?.providerInstanceId as string) || '';
+    return providerName || providerInstanceId || 'unknown';
   }
 
   get name(): string {
@@ -2105,10 +2127,12 @@ export class Agent extends EventEmitter {
     }
 
     // Get the summary using this agent's provider and model
+    const model = this.model;
+    const validModel = model === 'unknown-model' ? 'default' : model;
     const response = await provider.createResponse(
       messages,
       [], // No tools for summarization
-      this.model || 'default'
+      validModel
     );
 
     return response.content;
