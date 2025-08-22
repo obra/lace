@@ -7,7 +7,6 @@ import { GET, PUT } from '@/app/api/agents/[agentId]/route';
 import { parseResponse } from '@/lib/serialization';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
-  Session,
   createTestProviderInstance,
   cleanupTestProviderInstances,
   setupTestProviderDefaults,
@@ -73,7 +72,6 @@ describe('Agent API', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Create real provider instance for testing
     testProviderInstanceId = await createTestProviderInstance({

@@ -1,7 +1,7 @@
 // ABOUTME: Test Agent session context retrieval for tool security
 // ABOUTME: Validates that Agent can reliably get Session objects for tool execution
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
@@ -88,12 +88,19 @@ describe('Agent Session Context', () => {
       const provider = new TestProvider({});
 
       const orphanAgent = new Agent({
-        provider,
         toolExecutor,
         threadManager: session.getAgent(session.getId())!.threadManager,
         threadId: asThreadId('lace_20250101_orphan'),
         tools: [],
+        metadata: {
+          name: 'orphan-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
+
+      // Mock provider creation for test
+      vi.spyOn(orphanAgent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
       const retrievedSession = await (
         orphanAgent as unknown as { getFullSession(): Promise<Session | undefined> }

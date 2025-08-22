@@ -68,12 +68,19 @@ describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
     const toolExecutor = new ToolExecutor();
 
     agent = new Agent({
-      provider: mockProvider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     context = {
       threadId,
@@ -237,12 +244,19 @@ describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
     const threadId = threadManager.createThread();
 
     agent = new Agent({
-      provider: mockProvider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     context = {
       threadId,

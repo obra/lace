@@ -25,7 +25,6 @@ describe('Event-Based Approval Callback', () => {
   beforeEach(async () => {
     // Set up test provider defaults and create instance
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
@@ -57,11 +56,23 @@ describe('Event-Based Approval Callback', () => {
     threadManager.createThread(threadId, session.getId());
 
     agent = new Agent({
-      provider,
       toolExecutor,
       threadManager,
       threadId,
       tools: toolExecutor.getAllTools(),
+      metadata: {
+        name: 'test-agent',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId,
+      },
+    });
+
+    // Mock provider creation for test - type-safe approach
+    const createProviderSpy = vi.fn().mockResolvedValue(provider);
+    Object.defineProperty(agent, '_createProviderInstance', {
+      value: createProviderSpy,
+      writable: true,
+      configurable: true,
     });
 
     // Set up approvals
@@ -79,7 +90,15 @@ describe('Event-Based Approval Callback', () => {
     expect(approvalCallback).toBeDefined();
 
     // Request approval for a tool that requires approval
-    const toolCall = { id: 'call_123', name: 'bash', arguments: { command: 'ls' } };
+    const toolCall = {
+      id: 'call_123',
+      name: 'bash',
+      arguments: { command: 'ls' },
+    } as const satisfies {
+      id: string;
+      name: string;
+      arguments: unknown;
+    };
 
     try {
       await approvalCallback!.requestApproval(toolCall);
@@ -107,7 +126,15 @@ describe('Event-Based Approval Callback', () => {
     const approvalCallback = agent.toolExecutor.getApprovalCallback();
     expect(approvalCallback).toBeDefined();
 
-    const toolCall = { id: 'call_456', name: 'bash', arguments: { command: 'pwd' } };
+    const toolCall = {
+      id: 'call_456',
+      name: 'bash',
+      arguments: { command: 'pwd' },
+    } as const satisfies {
+      id: string;
+      name: string;
+      arguments: unknown;
+    };
 
     const decision = await approvalCallback!.requestApproval(toolCall);
     expect(decision).toBe(ApprovalDecision.ALLOW_SESSION);
@@ -124,7 +151,15 @@ describe('Event-Based Approval Callback', () => {
     const approvalCallback = agent.toolExecutor.getApprovalCallback();
     expect(approvalCallback).toBeDefined();
 
-    const toolCall = { id: 'call_789', name: 'read', arguments: { file_path: '/test.txt' } };
+    const toolCall = {
+      id: 'call_789',
+      name: 'read',
+      arguments: { file_path: '/test.txt' },
+    } as const satisfies {
+      id: string;
+      name: string;
+      arguments: unknown;
+    };
 
     // First, create an approval request
     try {

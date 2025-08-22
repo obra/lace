@@ -5,7 +5,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import { AIProvider } from '~/providers/base-provider';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('Retry System Integration Tests', () => {
@@ -92,19 +91,21 @@ describe('Retry System Integration Tests', () => {
       };
 
       agent = new Agent({
-        provider: mockProvider as unknown as AIProvider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'mock-model',
+          providerInstanceId: 'test-instance',
+        },
       });
-      await agent.start();
 
-      // Set model metadata for the agent (required for model-agnostic providers)
-      agent.updateThreadMetadata({
-        modelId: 'mock-model',
-        providerInstanceId: 'test-instance',
-      });
+      // Mock provider creation for test
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
+
+      await agent.start();
 
       const turnStartEvents: unknown[] = [];
       const turnCompleteEvents: unknown[] = [];
@@ -197,19 +198,21 @@ describe('Retry System Integration Tests', () => {
       };
 
       agent = new Agent({
-        provider: mockProvider as unknown as AIProvider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'mock-model',
+          providerInstanceId: 'test-instance',
+        },
       });
-      await agent.start();
 
-      // Set model metadata for the agent (required for model-agnostic providers)
-      agent.updateThreadMetadata({
-        modelId: 'mock-model',
-        providerInstanceId: 'test-instance',
-      });
+      // Mock provider creation for test
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
+
+      await agent.start();
 
       await agent.sendMessage('Test retry event forwarding setup');
 
@@ -284,12 +287,20 @@ describe('Retry System Integration Tests', () => {
       };
 
       agent = new Agent({
-        provider: mockProvider as unknown as AIProvider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'mock-model',
+          providerInstanceId: 'test-instance',
+        },
       });
+
+      // Mock provider creation for test
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
+
       await agent.start();
 
       const turnStartEvents: unknown[] = [];

@@ -7,11 +7,14 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
-import { Project, Session } from '@/lib/server/lace-imports';
+import { Project, Session, ThreadManager } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
-import { cleanupTestProviderInstances } from '@/lib/server/lace-imports';
+import {
+  cleanupTestProviderInstances,
+  createTestProviderInstance,
+} from '@/lib/server/lace-imports';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -41,24 +44,16 @@ describe('SessionService.spawnAgent Method', () => {
   let sessionId: string;
   let projectId: string;
   let anthropicInstanceId: string;
-  let openaiInstanceId: string;
 
   beforeEach(async () => {
     // Set up test provider defaults and create instances
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
-    // Create test provider instances individually for more control
-    const { createTestProviderInstance } = await import('~/test-utils/provider-instances');
+    // Create test provider instance
     anthropicInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
       models: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022'],
       apiKey: 'test-anthropic-key',
-    });
-    openaiInstanceId = await createTestProviderInstance({
-      catalogId: 'openai',
-      models: ['gpt-4o', 'gpt-4o-mini'],
-      apiKey: 'test-openai-key',
     });
 
     // Create session service
@@ -82,7 +77,7 @@ describe('SessionService.spawnAgent Method', () => {
   afterEach(async () => {
     sessionService.clearActiveSessions();
     cleanupTestProviderDefaults();
-    await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
+    await cleanupTestProviderInstances([anthropicInstanceId]);
     vi.clearAllMocks();
   });
 
@@ -113,6 +108,9 @@ describe('SessionService.spawnAgent Method', () => {
     const retrievedAgent = sessionForAgent!.getAgent(agent.threadId as ThreadId);
     expect(retrievedAgent).toBeDefined();
     expect(retrievedAgent?.threadId).toBe(agent.threadId);
+
+    // Initialize agent so provider is available
+    await retrievedAgent!.initialize();
     expect(retrievedAgent?.providerName).toBe('anthropic');
   });
 
@@ -219,7 +217,6 @@ describe('SessionService.spawnAgent Method', () => {
     expect(retrievedAgent).toBeDefined();
 
     // Try to add an event directly to the agent's thread
-    const { ThreadManager } = await import('@/lib/server/lace-imports');
     const threadManager = new ThreadManager();
 
     // This should NOT throw an error if the thread was properly persisted
@@ -258,7 +255,6 @@ describe('SessionService.spawnAgent Method', () => {
     expect(serviceAgent).toBeDefined();
 
     // Create fresh ThreadManager instance
-    const { ThreadManager } = await import('@/lib/server/lace-imports');
     const freshThreadManager = new ThreadManager();
 
     // Try to get thread from fresh ThreadManager

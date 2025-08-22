@@ -46,7 +46,6 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
   beforeEach(async () => {
     // Set up test provider defaults and create instance
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',

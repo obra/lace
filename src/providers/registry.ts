@@ -1,7 +1,7 @@
 // ABOUTME: Provider registry for managing available AI providers and their discovery
 // ABOUTME: Handles provider registration and provides providers for agent execution
 
-import { AIProvider, ProviderConfig } from '~/providers/base-provider';
+import { AIProvider, ProviderConfig, ProviderInfo, ModelInfo } from '~/providers/base-provider';
 import { AnthropicProvider } from '~/providers/anthropic-provider';
 import { OpenAIProvider } from '~/providers/openai-provider';
 import { LMStudioProvider } from '~/providers/lmstudio-provider';
@@ -86,7 +86,7 @@ export class ProviderRegistry {
 
     for (const [instanceId, instance] of Object.entries(config.instances)) {
       // Check if credentials exist without loading them
-      const hasCredentials = (await this.instanceManager.loadCredential(instanceId)) !== null;
+      const hasCredentials = this.instanceManager.loadCredential(instanceId) !== null;
 
       instances.push({
         id: instanceId,
@@ -117,8 +117,8 @@ export class ProviderRegistry {
       throw new Error(`Provider instance not found: ${instanceId}`);
     }
 
-    const credentials = await this.instanceManager.loadCredential(instanceId);
-    if (!credentials) {
+    const credentials = this.instanceManager.loadCredential(instanceId);
+    if (credentials == null) {
       throw new Error(`No credentials found for instance: ${instanceId}`);
     }
 
@@ -154,8 +154,8 @@ export class ProviderRegistry {
       throw new Error(`Provider instance not found: ${instanceId}`);
     }
 
-    const credentials = await this.instanceManager.loadCredential(instanceId);
-    if (!credentials) {
+    const credentials = this.instanceManager.loadCredential(instanceId);
+    if (credentials == null) {
       throw new Error(`No credentials found for instance: ${instanceId}`);
     }
 
@@ -205,8 +205,8 @@ export class ProviderRegistry {
 
   // Get all available provider metadata
   getAvailableProviders(): Array<{
-    info: import('./base-provider').ProviderInfo;
-    models: import('./base-provider').ModelInfo[];
+    info: ProviderInfo;
+    models: ModelInfo[];
     configured: boolean;
   }> {
     const providers = ['anthropic', 'openai', 'lmstudio', 'ollama'];
@@ -226,7 +226,7 @@ export class ProviderRegistry {
         results.push({ info, models, configured });
       } catch {
         // Provider not configured - still return info
-        const tempProvider = this.getProviderClass(providerName);
+        const tempProvider = this.getProviderForMetadata(providerName);
         if (tempProvider) {
           const info = tempProvider.getProviderInfo();
           const models = tempProvider.getAvailableModels();
@@ -238,8 +238,8 @@ export class ProviderRegistry {
     return results;
   }
 
-  // Helper to get provider class without full instantiation
-  private getProviderClass(providerName: string): AIProvider | null {
+  // Helper to get provider instance for metadata without full instantiation
+  private getProviderForMetadata(providerName: string): AIProvider | null {
     try {
       switch (providerName.toLowerCase()) {
         case 'anthropic': {
@@ -266,14 +266,13 @@ export class ProviderRegistry {
 
   /**
    * Internal method to create a provider directly.
-   * @internal This should only be used by Session.resolveProviderInstance for synchronous operation.
+   * @internal This should only be used by agents for provider creation.
    * All other code should use createProviderFromInstance or createProviderFromInstanceAndModel.
    */
   createProvider(providerName: string, config: ProviderConfig = {}): AIProvider {
     logger.debug('ProviderRegistry.createProvider called', {
       providerName,
       hasApiKey: !!config.apiKey,
-      apiKeyLength: (config.apiKey as string)?.length,
       configKeys: Object.keys(config),
     });
 
@@ -281,8 +280,7 @@ export class ProviderRegistry {
     switch (providerName.toLowerCase()) {
       case 'anthropic': {
         logger.debug('Creating AnthropicProvider', {
-          hasConfigApiKey: !!config.apiKey,
-          apiKeyLength: (config.apiKey as string)?.length,
+          hasApiKey: !!config.apiKey,
         });
         return new AnthropicProvider({
           ...config,
@@ -291,8 +289,7 @@ export class ProviderRegistry {
       }
       case 'openai': {
         logger.debug('Creating OpenAIProvider', {
-          hasConfigApiKey: !!config.apiKey,
-          apiKeyLength: (config.apiKey as string)?.length,
+          hasApiKey: !!config.apiKey,
         });
         return new OpenAIProvider({
           ...config,

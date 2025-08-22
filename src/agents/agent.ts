@@ -27,9 +27,9 @@ import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { aggregateTokenUsage } from '~/threads/token-aggregation';
+import { ProviderRegistry } from '~/providers/registry';
 
 export interface AgentConfig {
-  provider: AIProvider | null;
   toolExecutor: ToolExecutor;
   threadManager: ThreadManager;
   threadId: string;
@@ -119,7 +119,7 @@ interface AgentEvents {
 }
 
 export class Agent extends EventEmitter {
-  private readonly _provider: AIProvider | null;
+  private _provider: AIProvider | null;
   private readonly _toolExecutor: ToolExecutor;
   private readonly _threadManager: ThreadManager;
   private readonly _threadId: string;
@@ -174,7 +174,7 @@ export class Agent extends EventEmitter {
 
   constructor(config: AgentConfig) {
     super();
-    this._provider = config.provider;
+    this._provider = null; // Will be created in initialize()
     this._toolExecutor = config.toolExecutor;
     this._threadManager = config.threadManager;
     this._threadId = config.threadId;
@@ -206,12 +206,16 @@ export class Agent extends EventEmitter {
       metadata?: QueuedMessage['metadata'];
     }
   ): Promise<void> {
-    if (!this._provider) {
+    const provider = await this.getProvider();
+
+    if (!provider) {
       throw new Error('Cannot send messages to agent with missing provider instance');
     }
 
-    if (!this._initialized) {
-      await this.initialize();
+    // Early validation that model identifier exists
+    const modelId = this.model;
+    if (!modelId || modelId === 'unknown-model') {
+      throw new Error('Cannot send messages to agent with missing modelId');
     }
 
     if (this._state === 'idle') {
@@ -278,9 +282,53 @@ export class Agent extends EventEmitter {
     await this._processConversation();
   }
 
+  // Create provider instance from agent metadata and configuration
+  private async _createProviderInstance(): Promise<AIProvider | null> {
+    // 1. Get agent-specific metadata
+    const metadata = this.getThreadMetadata();
+    let providerInstanceId = metadata?.providerInstanceId as string;
+    let modelId = metadata?.modelId as string;
+
+    // 2. Fall back to session effective config
+    if (!providerInstanceId || !modelId) {
+      const effectiveConfig = this.getEffectiveConfiguration();
+      providerInstanceId = providerInstanceId || (effectiveConfig.providerInstanceId as string);
+      modelId = modelId || (effectiveConfig.modelId as string);
+    }
+
+    if (!providerInstanceId || !modelId) {
+      logger.warn('Agent missing provider configuration', {
+        threadId: this._threadId,
+        hasProviderInstanceId: !!providerInstanceId,
+        hasModelId: !!modelId,
+        metadata,
+      });
+      return null;
+    }
+
+    // 3. Create provider using registry (proper async)
+    try {
+      const registry = ProviderRegistry.getInstance();
+      return await registry.createProviderFromInstanceAndModel(providerInstanceId, modelId);
+    } catch (error) {
+      logger.error('Failed to create provider instance for agent', {
+        threadId: this._threadId,
+        providerInstanceId,
+        modelId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
   // Public initialization method - happens once per agent
   async initialize(): Promise<void> {
     if (this._initialized) return; // idempotent
+
+    // Create provider before system prompt generation
+    if (!this._provider) {
+      this._provider = await this._createProviderInstance();
+    }
 
     // CRITICAL: Always regenerate system prompt with current project context
     // This ensures that agents working on different projects get the correct context,
@@ -292,12 +340,19 @@ export class Agent extends EventEmitter {
       this._addInitialEvents(this._promptConfig);
     }
 
-    this._initialized = true;
+    // Only mark as initialized if provider was successfully created
+    if (this._provider) {
+      this._initialized = true;
 
-    logger.info('AGENT: Initialized', {
-      threadId: this._threadId,
-      provider: this.providerInstance?.providerName || 'missing',
-    });
+      logger.info('AGENT: Initialized successfully', {
+        threadId: this._threadId,
+        provider: this.providerInstance?.providerName || 'missing',
+      });
+    } else {
+      logger.warn('AGENT: Initialization incomplete - no provider', {
+        threadId: this._threadId,
+      });
+    }
   }
 
   // Check if initial events already exist
@@ -401,10 +456,14 @@ export class Agent extends EventEmitter {
     this._initialized = false;
     this._clearProgressTimer();
 
-    // Abort any in-progress processing
+    // Abort any in-progress processing immediately
     if (this._abortController) {
       this.abort();
     }
+
+    // Clear any active tool calls to prevent further database operations
+    this._activeToolCalls.clear();
+    this._pendingToolCount = 0;
 
     this._setState('idle');
 
@@ -490,15 +549,32 @@ export class Agent extends EventEmitter {
   }
 
   get providerInstance(): AIProvider | null {
-    // Always use the provider that was passed to the constructor
-    // The Session class is responsible for creating agents with the correct provider
-    // based on their metadata when reconstructing from persistence
+    // Returns the provider instance owned by this agent
+    // Agents create and manage their own provider instances based on thread metadata
+    return this._provider;
+  }
+
+  // Lazy provider method that auto-initializes
+  async getProvider(): Promise<AIProvider | null> {
+    if (!this._initialized) {
+      await this.initialize();
+    }
+
+    // If initialized but provider is null, initialization should have handled it
+    if (this._initialized && !this._provider) {
+      throw new Error(
+        'Provider initialization failed - no provider available after initialization'
+      );
+    }
+
     return this._provider;
   }
 
   get provider(): string {
     const metadata = this.getThreadMetadata();
-    return (metadata?.provider as string) || this._provider?.providerName || 'unknown';
+    const providerName = this._provider?.providerName;
+    const providerInstanceId = (metadata?.providerInstanceId as string) || '';
+    return providerName || providerInstanceId || 'unknown';
   }
 
   get name(): string {
@@ -764,13 +840,14 @@ export class Agent extends EventEmitter {
     tools: Tool[],
     signal?: AbortSignal
   ): Promise<AgentMessageResult> {
-    if (!this.providerInstance) {
+    const provider = await this.getProvider();
+
+    if (!provider) {
       throw new Error('Cannot send messages to agent with missing provider instance');
     }
 
     // Default to streaming if provider supports it (unless explicitly disabled)
-    const useStreaming =
-      this.providerInstance.supportsStreaming && this.providerInstance.config?.streaming !== false;
+    const useStreaming = provider.supportsStreaming && provider.config?.streaming !== false;
 
     if (useStreaming) {
       return this._createStreamingResponse(messages, tools, signal);
@@ -2043,15 +2120,19 @@ export class Agent extends EventEmitter {
       content: promptContent,
     });
 
-    if (!this.providerInstance) {
+    const provider = await this.getProvider();
+
+    if (!provider) {
       throw new Error('Cannot create summary with missing provider instance');
     }
 
     // Get the summary using this agent's provider and model
-    const response = await this.providerInstance.createResponse(
+    const model = this.model;
+    const validModel = model === 'unknown-model' ? 'default' : model;
+    const response = await provider.createResponse(
       messages,
       [], // No tools for summarization
-      this.model || 'default'
+      validModel
     );
 
     return response.content;
@@ -2093,6 +2174,16 @@ export class Agent extends EventEmitter {
    * This ensures Agent is the single event source for UI updates
    */
   private _addEventAndEmit(event: LaceEvent): LaceEvent | null {
+    // Safety check: only skip tool execution events if agent is stopped
+    // Allow approval events to proceed for proper test cleanup
+    if (!this._initialized && event.type === 'TOOL_RESULT') {
+      logger.debug('AGENT: Skipping tool result - agent stopped', {
+        threadId: event.threadId,
+        type: event.type,
+      });
+      return null;
+    }
+
     // Safety check: only add events if thread exists
     if (event.threadId && !this._threadManager.getThread(event.threadId)) {
       logger.warn('AGENT: Skipping event addition - thread not found', {

@@ -96,20 +96,21 @@ describe('Agent Retry Metrics Tracking', () => {
     threadManager.createThread(threadId);
 
     agent = new Agent({
-      provider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
     await agent.start();
-
-    // Set model metadata for the agent (required for model-agnostic providers)
-    agent.updateThreadMetadata({
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
-    });
   });
 
   afterEach(() => {
@@ -162,19 +163,20 @@ describe('Agent Retry Metrics Tracking', () => {
       // Configure provider to retry 2 times then succeed
       provider = new MockRetryMetricsProvider(true, 2);
       agent = new Agent({
-        provider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
-      await agent.start();
 
-      // Set model metadata for the agent (required for model-agnostic providers)
-      agent.updateThreadMetadata({
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
-      });
+      // Mock provider creation for test
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+      await agent.start();
 
       const retryAttemptEvents: Array<{ attempt: number; delay: number; error: Error }> = [];
       const turnCompleteEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
@@ -205,19 +207,20 @@ describe('Agent Retry Metrics Tracking', () => {
       // Configure provider to retry 3 times and fail
       provider = new MockRetryMetricsProvider(true, 3);
       agent = new Agent({
-        provider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
-      await agent.start();
 
-      // Set model metadata for the agent (required for model-agnostic providers)
-      agent.updateThreadMetadata({
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
-      });
+      // Mock provider creation for test
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+      await agent.start();
 
       const retryAttemptEvents: Array<{ attempt: number; delay: number; error: Error }> = [];
       const retryExhaustedEvents: Array<{ attempts: number; lastError: Error }> = [];
@@ -260,19 +263,20 @@ describe('Agent Retry Metrics Tracking', () => {
       // Test that streaming responses also track retry metrics
       provider = new MockRetryMetricsProvider(true, 2);
       agent = new Agent({
-        provider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
-      await agent.start();
 
-      // Set model metadata for the agent (required for model-agnostic providers)
-      agent.updateThreadMetadata({
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
-      });
+      // Mock provider creation for test
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+      await agent.start();
 
       const retryAttemptEvents: Array<{ attempt: number; delay: number; error: Error }> = [];
       const turnCompleteEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
@@ -296,19 +300,20 @@ describe('Agent Retry Metrics Tracking', () => {
     it('should include retry metrics in turn progress events', async () => {
       provider = new MockRetryMetricsProvider(true, 2);
       agent = new Agent({
-        provider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
-      await agent.start();
 
-      // Set model metadata for the agent (required for model-agnostic providers)
-      agent.updateThreadMetadata({
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
-      });
+      // Mock provider creation for test
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+      await agent.start();
 
       const turnProgressEvents: Array<{ metrics: CurrentTurnMetrics }> = [];
       agent.on('turn_progress', (data) => turnProgressEvents.push(data));
@@ -332,19 +337,20 @@ describe('Agent Retry Metrics Tracking', () => {
     it('should preserve retry metrics when turn is aborted', async () => {
       provider = new MockRetryMetricsProvider(true, 2);
       agent = new Agent({
-        provider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
-      await agent.start();
 
-      // Set model metadata for the agent (required for model-agnostic providers)
-      agent.updateThreadMetadata({
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
-      });
+      // Mock provider creation for test
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+      await agent.start();
 
       const retryAttemptEvents: Array<{ attempt: number; delay: number; error: Error }> = [];
       const turnAbortedEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];

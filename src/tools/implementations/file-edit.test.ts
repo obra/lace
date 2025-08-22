@@ -32,8 +32,6 @@ describe('FileEditTool Integration Tests', () => {
   beforeEach(async () => {
     setupTestProviderDefaults();
 
-    Session.clearProviderCache();
-
     // Create provider instance
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',

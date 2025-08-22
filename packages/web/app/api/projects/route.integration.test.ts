@@ -13,7 +13,6 @@ import {
   cleanupTestProviderInstances,
 } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
-import { Session } from '@/lib/server/lace-imports';
 import type { ProjectInfo } from '@/types/core';
 
 // Mock server-only before importing API routes
@@ -32,7 +31,6 @@ describe('Projects API Integration Tests', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Force persistence reset to ensure clean database state
     const { resetPersistence } = await import('~/persistence/database');

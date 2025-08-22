@@ -46,7 +46,6 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
   beforeEach(async () => {
     // Set up test provider defaults
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Create test provider instance
     providerInstanceId = await createTestProviderInstance({

@@ -23,7 +23,6 @@ describe('Project', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Create a real provider instance for testing
     providerInstanceId = await createTestProviderInstance({

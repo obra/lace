@@ -1,7 +1,7 @@
 // ABOUTME: Integration tests for conversation state management across multiple turns with new Agent
 // ABOUTME: Tests the full conversation flow to catch context truncation bugs using event-driven Agent
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
@@ -186,19 +186,21 @@ describe('Conversation State Management with Enhanced Agent', () => {
     threadManager.createThread(threadId);
 
     agent = new Agent({
-      provider,
       toolExecutor,
       threadManager,
       threadId,
       tools: toolExecutor.getAllTools(),
+      metadata: {
+        name: 'test-agent',
+        modelId: 'mock-model',
+        providerInstanceId: 'test-instance',
+      },
     });
-    await agent.start();
 
-    // Set model metadata for the agent (required for model-agnostic providers)
-    agent.updateThreadMetadata({
-      modelId: 'mock-model',
-      providerInstanceId: 'test-instance',
-    });
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+
+    await agent.start();
   });
 
   afterEach(() => {

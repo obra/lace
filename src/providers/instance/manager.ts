@@ -67,10 +67,10 @@ export class ProviderInstanceManager {
     await fs.promises.writeFile(this.configPath, JSON.stringify(config, null, 2));
   }
 
-  async loadCredential(instanceId: string): Promise<Credential | null> {
+  loadCredential(instanceId: string): Credential | null {
     try {
       const credPath = path.join(this.credentialsDir, `${instanceId}.json`);
-      const content = await fs.promises.readFile(credPath, 'utf-8');
+      const content = fs.readFileSync(credPath, 'utf-8');
       const parsed = JSON.parse(content) as unknown;
       const result = CredentialSchema.safeParse(parsed);
 

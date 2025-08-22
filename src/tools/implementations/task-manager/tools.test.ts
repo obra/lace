@@ -88,7 +88,6 @@ describe('Enhanced Task Manager Tools', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Create a real provider instance for testing
     providerInstanceId = await createTestProviderInstance({

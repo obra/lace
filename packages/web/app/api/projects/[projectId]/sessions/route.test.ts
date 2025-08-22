@@ -24,7 +24,6 @@ describe('Session API endpoints under projects', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Create test provider instance
     providerInstanceId = await createTestProviderInstance({

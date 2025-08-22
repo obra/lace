@@ -123,12 +123,19 @@ describe('Agent retry event forwarding', () => {
     const testThreadId = 'lace_20250723_abc123';
 
     agent = new Agent({
-      provider: mockProvider,
       toolExecutor: mockToolExecutor,
       threadManager: mockThreadManager,
       threadId: testThreadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     await agent.start();
 

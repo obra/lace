@@ -30,7 +30,6 @@ describe('Session History API', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Set up environment
     process.env.LACE_DB_PATH = ':memory:';

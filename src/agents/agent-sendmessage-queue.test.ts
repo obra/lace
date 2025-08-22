@@ -66,18 +66,19 @@ describe('Agent sendMessage Queue Option', () => {
     testThreadId = threadManager.createThread();
 
     agent = new Agent({
-      provider: mockProvider,
       toolExecutor: mockToolExecutor,
       threadManager: threadManager,
       threadId: testThreadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
 
-    // Set model metadata for the agent (required for model-agnostic providers)
-    agent.updateThreadMetadata({
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
-    });
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     await agent.start();
   });

@@ -3,7 +3,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DelegateTool } from '~/tools/implementations/delegate';
-import { Session } from '~/sessions/session';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import type { ToolContext } from '~/tools/types';
 import {
@@ -25,8 +24,6 @@ describe('DelegateTool', () => {
   let providerInstanceId: string;
 
   beforeEach(async () => {
-    Session.clearProviderCache();
-
     // Create test provider instance
     providerInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',

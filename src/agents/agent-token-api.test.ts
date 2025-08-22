@@ -1,7 +1,7 @@
 // ABOUTME: Tests for Agent.getTokenUsage() public API
 // ABOUTME: Ensures agents properly expose their token usage information
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
@@ -66,7 +66,6 @@ describe('Agent getTokenUsage API', () => {
     threadId = threadManager.createThread();
 
     agent = new Agent({
-      provider,
       threadManager,
       toolExecutor: new ToolExecutor(),
       threadId,
@@ -77,6 +76,9 @@ describe('Agent getTokenUsage API', () => {
         providerInstanceId: 'test-provider-instance',
       },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
     await agent.start();
 
@@ -115,8 +117,8 @@ describe('Agent getTokenUsage API', () => {
     const directThreadId = threadManager.createThread();
 
     // Create agent that uses direct token tracking
+    const mockProvider = new MockProvider({ responses: [] });
     const directAgent = new Agent({
-      provider: new MockProvider({ responses: [] }),
       threadManager,
       toolExecutor: new ToolExecutor(),
       threadId: directThreadId,
@@ -127,6 +129,9 @@ describe('Agent getTokenUsage API', () => {
         providerInstanceId: 'test-provider-instance',
       },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(directAgent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     // Set model metadata for the direct agent
     directAgent.updateThreadMetadata({

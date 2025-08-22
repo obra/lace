@@ -8,7 +8,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session, Project, Agent, ThreadManager } from '@/lib/server/lace-imports';
 import type { ToolExecutor } from '@/lib/server/lace-imports';
-import type { AIProvider } from '~/providers/base-provider';
 import type { Tool } from '~/tools/tool';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
@@ -176,11 +175,15 @@ describe('Agent Spawning and Thread Creation', () => {
 
     // Create new Agent with the delegate thread ID
     const delegateAgent = new Agent({
-      provider: (sessionAgent as unknown as { _provider: unknown })._provider as AIProvider,
       toolExecutor: toolExecutor as unknown as ToolExecutor,
       threadManager: sessionThreadManager,
       threadId: delegateThreadId,
       tools: (toolExecutor as unknown as { getAllTools: () => unknown[] }).getAllTools() as Tool[],
+      metadata: {
+        name: 'delegate-agent',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId: anthropicInstanceId,
+      },
     });
 
     expect(delegateAgent).toBeDefined();

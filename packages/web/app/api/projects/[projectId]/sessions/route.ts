@@ -62,7 +62,6 @@ export async function POST(
     }
 
     // Clear provider cache to ensure fresh credentials are loaded
-    Session.clearProviderCache();
 
     // Create session using Session.create with project inheritance
     const session = Session.create({

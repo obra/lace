@@ -32,7 +32,6 @@ describe('SSE Stream E2E Tests', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Set up environment for session service
     process.env.ANTHROPIC_KEY = 'test-key';

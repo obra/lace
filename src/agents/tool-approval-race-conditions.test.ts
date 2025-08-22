@@ -118,24 +118,25 @@ describe('Tool Approval Race Condition Integration Tests', () => {
     threadManager.createThread(threadId, session.getId());
 
     agent = new Agent({
-      provider: mockProvider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [bashTool],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId,
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     // Set up EventApprovalCallback for approval workflow
     const approvalCallback = new EventApprovalCallback(agent);
     agent.toolExecutor.setApprovalCallback(approvalCallback);
 
     await agent.start();
-
-    // Set model metadata for the agent (required for model-agnostic providers)
-    agent.updateThreadMetadata({
-      modelId: 'claude-3-5-haiku-20241022',
-      providerInstanceId,
-    });
   });
 
   afterEach(async () => {

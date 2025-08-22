@@ -204,7 +204,6 @@ describe('ToolExecutor with new schema-based tools', () => {
 
     beforeEach(async () => {
       setupTestProviderDefaults();
-      Session.clearProviderCache();
 
       // Create provider instance
       providerInstanceId = await createTestProviderInstance({

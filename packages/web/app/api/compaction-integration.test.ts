@@ -37,7 +37,6 @@ describe('Token Usage Integration Tests', () => {
 
   beforeEach(async () => {
     await setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Create individual provider instance for this test
     providerInstanceId = await createTestProviderInstance({

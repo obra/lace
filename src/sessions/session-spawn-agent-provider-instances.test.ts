@@ -23,7 +23,6 @@ describe('Session.spawnAgent() with Provider Instances', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Create real provider instances for testing
     providerInstanceId = await createTestProviderInstance({

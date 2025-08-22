@@ -7,7 +7,6 @@ import { asThreadId } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
-import { Session } from '~/sessions/session';
 
 export async function POST(
   request: NextRequest,
@@ -56,7 +55,6 @@ export async function POST(
 
     // Clear the provider cache to ensure fresh credentials are loaded
     // This is a temporary workaround for the caching issue
-    Session.clearProviderCache();
 
     return createSuperjsonResponse({
       success: true,

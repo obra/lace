@@ -56,7 +56,6 @@ describe('Session Detail API Route', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
     vi.clearAllMocks();
 
     // Create test provider instance using the proper helper

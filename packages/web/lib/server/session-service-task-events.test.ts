@@ -29,7 +29,6 @@ describe('SessionService TaskManager Event Forwarding', () => {
     vi.clearAllMocks();
 
     // Clear provider cache to ensure fresh instances
-    Session.clearProviderCache();
 
     // Set up spy on real EventStreamManager
     broadcastSpy = vi.spyOn(EventStreamManager.getInstance(), 'broadcast');

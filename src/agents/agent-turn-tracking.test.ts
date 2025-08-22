@@ -70,27 +70,31 @@ describe('Agent Turn Tracking', () => {
     threadManager.createThread(threadId);
 
     const config: AgentConfig = {
-      provider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     };
 
     agent = new Agent(config);
-    await agent.start();
 
-    // Set model metadata for the agent (required for model-agnostic providers)
-    agent.updateThreadMetadata({
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
-    });
+    // Mock provider access for test
+    vi.spyOn(agent, 'getProvider').mockResolvedValue(provider);
+    vi.spyOn(agent, 'providerInstance', 'get').mockReturnValue(provider);
+    vi.spyOn(agent, 'providerName', 'get').mockReturnValue(provider.providerName);
+
+    await agent.start();
   });
 
   afterEach(() => {
-    // Test cleanup handled by setupCoreTest
     vi.clearAllTimers();
     vi.useRealTimers();
+    vi.restoreAllMocks(); // Prevent spy leakage
   });
 
   describe('turn_start event', () => {
@@ -163,12 +167,21 @@ describe('Agent Turn Tracking', () => {
       ); // 3 second delay
 
       const slowAgent = new Agent({
-        provider: slowProvider,
         toolExecutor,
         threadManager,
         threadId,
         tools: [],
+        metadata: {
+          name: 'test-agent',
+          modelId: 'test-model',
+          providerInstanceId: 'test-instance',
+        },
       });
+
+      // Mock provider access for test
+      vi.spyOn(slowAgent, 'getProvider').mockResolvedValue(slowProvider);
+      vi.spyOn(slowAgent, 'providerInstance', 'get').mockReturnValue(slowProvider);
+      vi.spyOn(slowAgent, 'providerName', 'get').mockReturnValue(slowProvider.providerName);
       await slowAgent.start();
       slowAgent.on('turn_progress', (data) => {
         progressEvents.push(data);

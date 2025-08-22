@@ -81,7 +81,6 @@ describe('EventApprovalCallback Integration Tests', () => {
 
   beforeEach(async () => {
     setupTestProviderDefaults();
-    Session.clearProviderCache();
 
     // Create real provider instance
     providerInstanceId = await createTestProviderInstance({
@@ -130,20 +129,27 @@ describe('EventApprovalCallback Integration Tests', () => {
     threadManager.createThread(threadId, session.getId());
 
     agent = new Agent({
-      provider: mockProvider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [new BashTool()], // Enable bash tool
+      metadata: {
+        name: 'test-agent',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId,
+      },
     });
+
+    // Mock provider access for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
     // Use the SAME threadManager instance everywhere
     threadManager = agent.threadManager;
 
     // Set model metadata for the agent (required for model-agnostic providers)
     agent.updateThreadMetadata({
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
+      modelId: 'claude-3-5-haiku-20241022',
+      providerInstanceId,
     });
 
     // Set up the EventApprovalCallback

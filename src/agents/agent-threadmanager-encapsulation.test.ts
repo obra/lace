@@ -1,7 +1,7 @@
 // ABOUTME: Tests for ThreadManager encapsulation within Agent
 // ABOUTME: Verifies that ThreadManager is properly encapsulated and not exposed publicly
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
@@ -28,12 +28,19 @@ describe('Agent ThreadManager Encapsulation', () => {
     threadManager.createThread(threadId);
 
     agent = new Agent({
-      provider,
       toolExecutor,
       threadManager,
       threadId,
       tools: [],
+      metadata: {
+        name: 'test-agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-instance',
+      },
     });
+
+    // Mock provider creation for test
+    vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
     await agent.start();
   });
