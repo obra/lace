@@ -13,13 +13,15 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            runner: ubuntu-latest
             target: bun-linux-x64
             name: lace-linux-x64
           - os: macos-latest
+            runner: [self-hosted, macOS]
             target: bun-darwin-arm64
             name: lace-macos-arm64
     
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     
     steps:
     - uses: actions/checkout@v4
