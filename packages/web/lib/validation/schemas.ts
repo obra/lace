@@ -17,8 +17,8 @@ export const ToolCallIdSchema = z
   .string()
   .min(1, 'toolCallId cannot be empty')
   .regex(
-    /^[a-zA-Z0-9_-]+$/,
-    'Invalid toolCallId format. Expected alphanumeric characters, underscores, and hyphens only'
+    /^[a-zA-Z0-9_.:/-]+$/,
+    'Invalid toolCallId format. Expected alphanumeric characters, underscores, hyphens, periods, and colons only'
   );
 
 // Message request schema with size limits
