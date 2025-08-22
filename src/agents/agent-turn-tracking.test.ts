@@ -85,22 +85,16 @@ describe('Agent Turn Tracking', () => {
 
     // Mock provider access for test
     vi.spyOn(agent, 'getProvider').mockResolvedValue(provider);
-    Object.defineProperty(agent, 'providerInstance', {
-      get: () => provider,
-      configurable: true,
-    });
-    Object.defineProperty(agent, 'providerName', {
-      get: () => provider.providerName,
-      configurable: true,
-    });
+    vi.spyOn(agent, 'providerInstance', 'get').mockReturnValue(provider);
+    vi.spyOn(agent, 'providerName', 'get').mockReturnValue(provider.providerName);
 
     await agent.start();
   });
 
   afterEach(() => {
-    // Test cleanup handled by setupCoreTest
     vi.clearAllTimers();
     vi.useRealTimers();
+    vi.restoreAllMocks(); // Prevent spy leakage
   });
 
   describe('turn_start event', () => {
@@ -186,14 +180,8 @@ describe('Agent Turn Tracking', () => {
 
       // Mock provider access for test
       vi.spyOn(slowAgent, 'getProvider').mockResolvedValue(slowProvider);
-      Object.defineProperty(slowAgent, 'providerInstance', {
-        get: () => slowProvider,
-        configurable: true,
-      });
-      Object.defineProperty(slowAgent, 'providerName', {
-        get: () => slowProvider.providerName,
-        configurable: true,
-      });
+      vi.spyOn(slowAgent, 'providerInstance', 'get').mockReturnValue(slowProvider);
+      vi.spyOn(slowAgent, 'providerName', 'get').mockReturnValue(slowProvider.providerName);
       await slowAgent.start();
       slowAgent.on('turn_progress', (data) => {
         progressEvents.push(data);
