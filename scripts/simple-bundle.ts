@@ -83,14 +83,19 @@ class SimpleLaceServer {
 
     // Set CLI args for our custom server (it uses parseArgs, not env vars)
     const originalArgv = process.argv;
-    process.argv = [
-      process.argv[0], // bun executable
-      'server.ts', // script name (we're in the web directory now)
-      '--port',
-      String(this.options.port || 3000),
-      '--host',
-      this.options.host || '127.0.0.1',
-    ];
+    const serverArgs = ['server.ts']; // script name (we're in the web directory now)
+
+    // Only pass port if user explicitly specified it
+    if (this.options.port) {
+      serverArgs.push('--port', String(this.options.port));
+    }
+
+    // Only pass host if user explicitly specified it
+    if (this.options.host) {
+      serverArgs.push('--host', this.options.host);
+    }
+
+    process.argv = [process.argv[0], ...serverArgs];
 
     try {
       // Our custom server replaced the standalone server, so just run it from packages/web
@@ -216,14 +221,14 @@ Lace - Single-File AI Coding Assistant
 Usage: lace-standalone [options]
 
 Options:
-  --port, -p <port>    Server port (default: 3000)
-  --host, -h <host>    Server host (default: 127.0.0.1)  
+  --port, -p <port>    Server port (default: 31337 or next available)
+  --host, -h <host>    Server host (default: localhost)  
   --verbose, -v        Enable verbose logging
   --help               Show this help message
 
 Examples:
-  lace-standalone                    # Start on default port 3000
-  lace-standalone --port 8080        # Start on port 8080
+  lace-standalone                    # Start on port 31337 (or next available)
+  lace-standalone --port 8080        # Start on specific port 8080
   lace-standalone --host 0.0.0.0     # Listen on all interfaces
 
 The server extracts and runs the complete Lace Next.js application.
