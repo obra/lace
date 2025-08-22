@@ -3,7 +3,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -45,12 +45,18 @@ interface SidebarButtonProps {
 }
 
 export function Sidebar({ open, onToggle, onSettingsClick, children }: SidebarProps) {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   return (
     <>
       {/* Mobile version - overlay when open */}
       <div className="lg:hidden">
         <AnimatePresence>
-          {open && (
+          {isClient && open && (
             <>
               {/* Mobile backdrop */}
               <motion.div
@@ -124,7 +130,7 @@ export function Sidebar({ open, onToggle, onSettingsClick, children }: SidebarPr
       </div>
 
       {/* Mobile hamburger - only show when sidebar is closed */}
-      {!open && (
+      {isClient && !open && (
         <button
           className="fixed top-4 left-4 z-30 lg:hidden p-2 bg-base-100 rounded-lg shadow-lg border border-base-300"
           onClick={onToggle}
