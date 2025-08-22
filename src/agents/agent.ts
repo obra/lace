@@ -119,7 +119,7 @@ interface AgentEvents {
 }
 
 export class Agent extends EventEmitter {
-  private readonly _provider: AIProvider | null;
+  private _provider: AIProvider | null;
   private readonly _toolExecutor: ToolExecutor;
   private readonly _threadManager: ThreadManager;
   private readonly _threadId: string;

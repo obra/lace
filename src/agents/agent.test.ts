@@ -1010,6 +1010,10 @@ describe('Enhanced Agent', () => {
       );
 
       agent = createAgent({ tools: [mockTool] });
+
+      // Update the agent's provider mock to use the specific test provider
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProviderForTest);
+
       await agent.start();
 
       // Send message to trigger tool calls
@@ -1050,6 +1054,9 @@ describe('Enhanced Agent', () => {
       );
 
       agent = createAgent({ tools: [mockTool] });
+
+      // Update the agent's provider mock to use the specific test provider
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProviderForTest);
 
       // Set up proper EventApprovalCallback to create pending approvals
       const approvalCallback = new EventApprovalCallback(agent);
@@ -1119,6 +1126,10 @@ describe('Enhanced Agent', () => {
       });
 
       agent = createAgent({ tools: [mockTool] });
+
+      // Update the agent's provider mock to use the specific test provider
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
+
       await agent.start();
 
       // Track if batch completion methods are called
@@ -1171,6 +1182,9 @@ describe('Enhanced Agent', () => {
       });
 
       agent = createAgent({ tools: [mockTool] });
+
+      // Update the agent's provider mock to use the specific test provider
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
       // Set up proper EventApprovalCallback for approval workflow
       const approvalCallback = new EventApprovalCallback(agent);
@@ -1237,7 +1251,10 @@ describe('Enhanced Agent', () => {
         'I will run the bash command.'
       );
 
-      agent = createAgent({ provider: mockProvider, tools: [bashTool] });
+      agent = createAgent({ tools: [bashTool] });
+
+      // Update the agent's provider mock to use the specific test provider
+      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProviderForTest);
 
       // Set up EventApprovalCallback for approval workflow
       const approvalCallback = new EventApprovalCallback(agent);
@@ -1583,7 +1600,6 @@ describe('Enhanced Agent', () => {
       });
 
       agent = createAgent({
-        provider: mockProvider,
         tools: [tool1, tool2],
       });
       await agent.start();
@@ -2205,7 +2221,7 @@ describe('Enhanced Agent', () => {
         requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
       });
 
-      agent = createAgent({ provider: mockProvider, tools: [mockTool], toolExecutor });
+      agent = createAgent({ tools: [mockTool], toolExecutor });
       await agent.start();
 
       // Listen for conversation_complete event
@@ -2230,7 +2246,6 @@ describe('Enhanced Agent', () => {
       toolExecutor.registerTool('bash', bashTool);
 
       const agent = createAgent({
-        provider: mockProvider,
         toolExecutor,
         tools: [bashTool],
       });
@@ -2298,7 +2313,6 @@ describe('Enhanced Agent', () => {
       toolExecutor.registerTool('bash', bashTool);
 
       const agent = createAgent({
-        provider: mockProvider,
         toolExecutor,
         tools: [bashTool],
       });
