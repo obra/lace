@@ -37,8 +37,8 @@ export const Chat = memo(function Chat(): React.JSX.Element {
   // Event handlers using provider methods
   const onSendMessage = useCallback(
     async (message: string) => {
-      if (!selectedAgent || !message.trim()) {
-        return false;
+      if (!selectedAgent || !message.trim() || agentBusy) {
+        return false; // Prevent sending when agent is busy
       }
       const success = await sendMessageAPI(selectedAgent as ThreadId, message);
 
@@ -49,7 +49,7 @@ export const Chat = memo(function Chat(): React.JSX.Element {
 
       return success;
     },
-    [selectedAgent, sendMessageAPI, triggerAutoscroll]
+    [selectedAgent, sendMessageAPI, triggerAutoscroll, agentBusy]
   );
 
   const onStopGeneration = useCallback(async () => {
@@ -87,7 +87,8 @@ export const Chat = memo(function Chat(): React.JSX.Element {
           <MemoizedChatInput
             onSubmit={onSendMessage}
             onInterrupt={onStopGeneration}
-            disabled={agentBusy}
+            disabled={false} // Never disable input - allow typing and Escape key
+            sendDisabled={agentBusy} // Disable sending when agent is busy
             isStreaming={agentBusy}
             placeholder={`Message ${inputAgentName}...`}
             agentId={inputAgentId}

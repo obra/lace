@@ -12,6 +12,7 @@ interface ChatInputProps {
   onChange: (value: string) => void;
   onSubmit: () => void | Promise<void>;
   disabled?: boolean;
+  sendDisabled?: boolean;
   onInterrupt?: () => void | Promise<boolean | void>;
   isStreaming?: boolean;
   placeholder?: string;
@@ -25,27 +26,36 @@ interface ChatInputProps {
   autoSubmitOnSpeech?: boolean;
 }
 
-export function ChatInput({
-  value,
-  onChange,
-  onSubmit,
-  disabled = false,
-  onInterrupt,
-  isStreaming = false,
-  placeholder = 'Message the agent...',
-  attachedFiles = [],
-  onFilesAttached,
-  onFileRemoved,
-  onFileCleared,
-  showVoiceButton = true,
-  showFileAttachment = true,
-  speechLanguage = 'en-US',
-  autoSubmitOnSpeech = false,
-}: ChatInputProps) {
+export const ChatInput = React.forwardRef<{ focus: () => void }, ChatInputProps>(function ChatInput(
+  {
+    value,
+    onChange,
+    onSubmit,
+    disabled = false,
+    sendDisabled = false,
+    onInterrupt,
+    isStreaming = false,
+    placeholder = 'Message the agent...',
+    attachedFiles = [],
+    onFilesAttached,
+    onFileRemoved,
+    onFileCleared,
+    showVoiceButton = true,
+    showFileAttachment = true,
+    speechLanguage = 'en-US',
+    autoSubmitOnSpeech = false,
+  },
+  ref
+) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [forceStopSpeech, setForceStopSpeech] = useState(false);
   const [shouldSendAfterStop, setShouldSendAfterStop] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Expose focus method via ref
+  React.useImperativeHandle(ref, () => ({
+    focus: () => textareaRef.current?.focus(),
+  }));
 
   // Speech recognition hook
   const {
@@ -264,7 +274,7 @@ export function ChatInput({
   };
 
   // Button should be enabled when streaming (for stop) or when has content (for send)
-  const isDisabled = !isStreaming && (disabled || isListening || !value.trim());
+  const isDisabled = !isStreaming && (disabled || sendDisabled || isListening || !value.trim());
 
   return (
     <div className="relative">
@@ -402,4 +412,4 @@ export function ChatInput({
       </form>
     </div>
   );
-}
+});
