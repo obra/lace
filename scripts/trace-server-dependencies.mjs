@@ -19,15 +19,15 @@ async function traceServerDependencies() {
   try {
     // Create a temporary file that has static imports to force nft to trace them
     const webDir = path.join(projectRoot, 'packages/web');
-    const tempFile = path.join(webDir, 'temp-trace-imports.mjs');
+    const tempFile = path.join(projectRoot, 'temp-trace-imports.mjs'); // Put in root to resolve hoisted deps
     const tempContent = `
 // Temporary file to force nft to trace dynamic imports from server-custom.ts
 import 'open';
+import 'is-docker';
 import 'default-browser';
 import 'bundle-name';
 import 'define-lazy-prop';
 import 'is-inside-container';
-import 'is-docker';
 import 'is-wsl';
 import 'wsl-utils';
     `.trim();
@@ -43,7 +43,7 @@ import 'wsl-utils';
     
     const result = await nodeFileTrace([serverFile, tempFile], {
       base: projectRoot,
-      processCwd: webDir,
+      processCwd: projectRoot, // Use root instead of webDir to find hoisted deps
       mixedModules: true,
       async readFile(p) {
         try {
@@ -115,16 +115,37 @@ import 'wsl-utils';
     });
     
     // Convert to the format expected by outputFileTracingIncludes
-    // Transform packages/web/node_modules/... to node_modules/... for standalone build
+    // Handle workspace hoisting - packages can be in root node_modules or package node_modules
     const includePatterns = tracedFiles
       .filter(file => file.includes('/node_modules/'))
-      .map(file => file.replace('packages/web/node_modules/', 'node_modules/'))
+      .map(file => {
+        // Keep packages/web/node_modules as is, and root node_modules as is
+        if (file.startsWith('packages/web/node_modules/')) {
+          return file.replace('packages/web/node_modules/', 'node_modules/');
+        }
+        // Root node_modules files are already in correct format
+        return file;
+      })
       .map(file => file.replace(/\\/g, '/'));
     
     console.log('\n📝 Generated include patterns:');
     console.log(`   Total patterns: ${includePatterns.length}`);
     console.log(`   Sample patterns: ${includePatterns.slice(0, 3).join(', ')}`);
     
+    // Manually check for packages in monorepo structure since NFT might not find hoisted deps
+    const openExists = await fs.access(path.join(projectRoot, 'node_modules/open/package.json')).then(() => true).catch(() => false);
+    const isDockerExists = await fs.access(path.join(projectRoot, 'node_modules/is-docker/package.json')).then(() => true).catch(() => false);
+    
+    // Add manual patterns for hoisted dependencies
+    if (openExists && !includePatterns.some(f => f.includes('/open/'))) {
+      includePatterns.push('node_modules/open/**/*');
+      deps['open package'].push('node_modules/open/package.json');
+    }
+    if (isDockerExists && !includePatterns.some(f => f.includes('/is-docker/'))) {
+      includePatterns.push('node_modules/is-docker/**/*');
+      deps['is-docker'].push('node_modules/is-docker/package.json', 'node_modules/is-docker/index.js');
+    }
+
     // Write the trace results to a file that our build process can use
     const traceOutput = {
       timestamp: new Date().toISOString(),
@@ -133,8 +154,8 @@ import 'wsl-utils';
       summary: {
         totalFiles: tracedFiles.length,
         nodeModulesFiles: includePatterns.length,
-        hasIsDocker: includePatterns.some(f => f.includes('/is-docker/')),
-        hasOpen: includePatterns.some(f => f.includes('/open/'))
+        hasIsDocker: deps['is-docker'].length > 0,
+        hasOpen: deps['open package'].length > 0
       }
     };
     
