@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { logger } from '~/utils/logger';
+import { logger } from '@/lib/server/lace-imports';
 
 export default function FontTest() {
   const testCSSVariables = () => {

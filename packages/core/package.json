@@ -1,0 +1,165 @@
+{
+  "name": "@lace/core",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Core backend logic for Lace AI coding assistant",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "engines": {
+    "node": ">=20.18.3"
+  },
+  "scripts": {
+    "build": "tsc && tsc-alias && cp -r src/config/prompts dist/config/ 2>/dev/null || true && cp -r src/providers/catalog/data dist/providers/catalog/ 2>/dev/null || true",
+    "build:clean": "rm -rf dist && npm run build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write \"src\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.54.0",
+    "@lmstudio/sdk": "^1.2.1",
+    "@typescript-eslint/utils": "^8.39.1",
+    "better-sqlite3": "^11.10.0",
+    "mustache": "^4.2.0",
+    "node-fetch": "^3.3.2",
+    "ollama": "^0.5.16",
+    "openai": "^4.77.0",
+    "turndown": "^7.2.0",
+    "zod": "^3.25.69",
+    "zod-to-json-schema": "^3.24.6"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/mustache": "^4.2.5",
+    "@types/node": "^22.16.0",
+    "@types/turndown": "^5.0.5",
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5.6.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./agents/agent": {
+      "types": "./dist/agents/agent.d.ts",
+      "import": "./dist/agents/agent.js"
+    },
+    "./threads/types": {
+      "types": "./dist/threads/types.d.ts",
+      "import": "./dist/threads/types.js"
+    },
+    "./providers/base-provider": {
+      "types": "./dist/providers/base-provider.d.ts",
+      "import": "./dist/providers/base-provider.js"
+    },
+    "./providers/registry": {
+      "types": "./dist/providers/registry.d.ts",
+      "import": "./dist/providers/registry.js"
+    },
+    "./providers/catalog/manager": {
+      "types": "./dist/providers/catalog/manager.d.ts",
+      "import": "./dist/providers/catalog/manager.js"
+    },
+    "./providers/catalog/types": {
+      "types": "./dist/providers/catalog/types.d.ts",
+      "import": "./dist/providers/catalog/types.js"
+    },
+    "./providers/instance/manager": {
+      "types": "./dist/providers/instance/manager.d.ts",
+      "import": "./dist/providers/instance/manager.js"
+    },
+    "./tools/executor": {
+      "types": "./dist/tools/executor.d.ts",
+      "import": "./dist/tools/executor.js"
+    },
+    "./tools/event-approval-callback": {
+      "types": "./dist/tools/event-approval-callback.d.ts",
+      "import": "./dist/tools/event-approval-callback.js"
+    },
+    "./tools/approval-types": {
+      "types": "./dist/tools/approval-types.d.ts",
+      "import": "./dist/tools/approval-types.js"
+    },
+    "./tools/types": {
+      "types": "./dist/tools/types.d.ts",
+      "import": "./dist/tools/types.js"
+    },
+    "./tools/tool": {
+      "types": "./dist/tools/tool.d.ts",
+      "import": "./dist/tools/tool.js"
+    },
+    "./tools/implementations/file-read": {
+      "types": "./dist/tools/implementations/file-read.d.ts",
+      "import": "./dist/tools/implementations/file-read.js"
+    },
+    "./tools/implementations/file-edit": {
+      "types": "./dist/tools/implementations/file-edit.d.ts",
+      "import": "./dist/tools/implementations/file-edit.js"
+    },
+    "./sessions/session": {
+      "types": "./dist/sessions/session.d.ts",
+      "import": "./dist/sessions/session.js"
+    },
+    "./projects/project": {
+      "types": "./dist/projects/project.d.ts",
+      "import": "./dist/projects/project.js"
+    },
+    "./threads/thread-manager": {
+      "types": "./dist/threads/thread-manager.d.ts",
+      "import": "./dist/threads/thread-manager.js"
+    },
+    "./persistence/database": {
+      "types": "./dist/persistence/database.d.ts",
+      "import": "./dist/persistence/database.js"
+    },
+    "./config/lace-dir": {
+      "types": "./dist/config/lace-dir.d.ts",
+      "import": "./dist/config/lace-dir.js"
+    },
+    "./utils/logger": {
+      "types": "./dist/utils/logger.d.ts",
+      "import": "./dist/utils/logger.js"
+    },
+    "./utils/traffic-logger": {
+      "types": "./dist/utils/traffic-logger.d.ts",
+      "import": "./dist/utils/traffic-logger.js"
+    },
+    "./test-utils/provider-instances": {
+      "types": "./dist/test-utils/provider-instances.d.ts",
+      "import": "./dist/test-utils/provider-instances.js"
+    },
+    "./test-utils/provider-defaults": {
+      "types": "./dist/test-utils/provider-defaults.d.ts",
+      "import": "./dist/test-utils/provider-defaults.js"
+    },
+    "./test-utils/test-provider": {
+      "types": "./dist/test-utils/test-provider.d.ts",
+      "import": "./dist/test-utils/test-provider.js"
+    },
+    "./test-utils/temp-lace-dir": {
+      "types": "./dist/test-utils/temp-lace-dir.d.ts",
+      "import": "./dist/test-utils/temp-lace-dir.js"
+    },
+    "./tasks/task-status": {
+      "types": "./dist/tasks/task-status.d.ts",
+      "import": "./dist/tasks/task-status.js"
+    },
+    "./tasks/types": {
+      "types": "./dist/tasks/types.d.ts",
+      "import": "./dist/tasks/types.js"
+    },
+    "./token-management/types": {
+      "types": "./dist/token-management/types.d.ts",
+      "import": "./dist/token-management/types.js"
+    },
+    "./threads/compaction/types": {
+      "types": "./dist/threads/compaction/types.d.ts",
+      "import": "./dist/threads/compaction/types.js"
+    }
+  }
+}

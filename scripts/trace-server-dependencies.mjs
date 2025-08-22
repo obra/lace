@@ -43,7 +43,7 @@ import 'wsl-utils';
     
     const result = await nodeFileTrace([serverFile, tempFile], {
       base: projectRoot,
-      processCwd: webDir,
+      processCwd: projectRoot, // Use root to find hoisted deps
       mixedModules: true,
       async readFile(p) {
         try {
@@ -125,6 +125,20 @@ import 'wsl-utils';
     console.log(`   Total patterns: ${includePatterns.length}`);
     console.log(`   Sample patterns: ${includePatterns.slice(0, 3).join(', ')}`);
     
+    // Manually check for packages in monorepo structure since NFT might not find hoisted deps
+    const openExists = await fs.access(path.join(projectRoot, 'node_modules/open/package.json')).then(() => true).catch(() => false);
+    const isDockerExists = await fs.access(path.join(projectRoot, 'node_modules/is-docker/package.json')).then(() => true).catch(() => false);
+    
+    // Add manual patterns for hoisted dependencies
+    if (openExists && !includePatterns.some(f => f.includes('/open/'))) {
+      includePatterns.push('node_modules/open/**/*');
+      deps['open package'].push('node_modules/open/package.json');
+    }
+    if (isDockerExists && !includePatterns.some(f => f.includes('/is-docker/'))) {
+      includePatterns.push('node_modules/is-docker/**/*');
+      deps['is-docker'].push('node_modules/is-docker/package.json', 'node_modules/is-docker/index.js');
+    }
+
     // Write the trace results to a file that our build process can use
     const traceOutput = {
       timestamp: new Date().toISOString(),
@@ -133,8 +147,8 @@ import 'wsl-utils';
       summary: {
         totalFiles: tracedFiles.length,
         nodeModulesFiles: includePatterns.length,
-        hasIsDocker: includePatterns.some(f => f.includes('/is-docker/')),
-        hasOpen: includePatterns.some(f => f.includes('/open/'))
+        hasIsDocker: deps['is-docker'].length > 0,
+        hasOpen: deps['open package'].length > 0
       }
     };
     

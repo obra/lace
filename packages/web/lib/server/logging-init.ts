@@ -1,7 +1,7 @@
 // ABOUTME: Server-side logging initialization for Next.js web application
 // ABOUTME: Configures the core logger with environment variables and initializes traffic logging if enabled
 
-import { logger } from '~/utils/logger';
+import { logger } from '@/lib/server/lace-imports';
 
 // Also configure the core logger that providers use
 // This is the same logger instance, but we need to ensure it's configured
@@ -34,7 +34,7 @@ if (logLevel || logFile || useStderr) {
 const harFile = process.env.LACE_DEBUG_HAR_FILE;
 if (harFile) {
   // Dynamically import to avoid loading traffic logging if not needed
-  import('~/utils/traffic-logger')
+  import('@lace/core/utils/traffic-logger')
     .then(({ enableTrafficLogging }) => {
       return enableTrafficLogging(harFile);
     })

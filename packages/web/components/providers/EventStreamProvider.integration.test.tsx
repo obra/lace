@@ -15,7 +15,7 @@ import { AgentProvider } from './AgentProvider';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { createMockResponse } from '@/test-utils/mock-fetch';
 import type { ThreadId } from '@/types/core';
-import type { LaceEvent } from '~/threads/types';
+import type { LaceEvent } from '@/types/core';
 
 // Mock all the hooks that EventStreamProvider depends on
 vi.mock('@/hooks/useAgentEvents');

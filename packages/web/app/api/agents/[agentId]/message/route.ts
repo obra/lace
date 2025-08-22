@@ -8,7 +8,7 @@ import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createErrorResponse, createSuccessResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
-import { logger } from '~/utils/logger';
+import { logger } from '@/lib/server/lace-imports';
 
 // Request validation schema
 const messageSchema = z.object({

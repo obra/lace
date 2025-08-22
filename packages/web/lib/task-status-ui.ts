@@ -6,7 +6,7 @@ import {
   TASK_STATUS_ORDERED,
   type TaskStatus,
   getStatusConfig,
-} from '~/tasks/task-status';
+} from '@/types/core';
 
 // For select dropdowns
 export const getStatusOptions = () =>

@@ -13,7 +13,7 @@ vi.mock('@/lib/event-stream-manager', () => ({
   },
 }));
 
-vi.mock('~/utils/logger', () => ({
+vi.mock('@lace/core/utils/logger', () => ({
   logger: {
     error: vi.fn(),
     warn: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock('~/utils/logger', () => ({
 
 import { SessionService } from './session-service';
 import { asThreadId } from '@/types/core';
-import { logger } from '~/utils/logger';
+import { logger } from '@/lib/server/lace-imports';
 import type { Agent, Session } from '@/lib/server/lace-imports';
 import { createMockAgent } from '@/test-utils/mock-agent';
 

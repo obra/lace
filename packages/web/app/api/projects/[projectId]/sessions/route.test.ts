@@ -34,7 +34,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     // Create a test project
-    const { Project } = await import('~/projects/project');
+    const { Project } = await import('@lace/core/projects/project');
     const testProject = Project.create('Test Project', '/test/path', 'A test project', {
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',

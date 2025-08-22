@@ -10,7 +10,7 @@ import { ThreadIdSchema, MessageRequestSchema } from '@/lib/validation/schemas';
 import { messageLimiter } from '@/lib/middleware/rate-limiter';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
-import { logger } from '~/utils/logger';
+import { logger } from '@/lib/server/lace-imports';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {

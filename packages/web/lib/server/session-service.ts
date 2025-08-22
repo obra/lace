@@ -7,7 +7,7 @@ import { ApprovalDecision } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 import { EventStreamManager } from '@/lib/event-stream-manager';
-import { logger } from '~/utils/logger';
+import { logger } from '@/lib/server/lace-imports';
 
 export class SessionService {
   // Track agents that already have event handlers set up to prevent duplicates
