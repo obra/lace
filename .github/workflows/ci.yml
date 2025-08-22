@@ -57,8 +57,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-            runner: ubuntu-latest
           - os: macos-latest
             runner: [self-hosted, macOS]
     steps:
