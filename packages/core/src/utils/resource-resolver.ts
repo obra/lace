@@ -24,18 +24,27 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
     const moduleDir = path.dirname(fileURLToPath(importMetaUrl));
 
     // Find the src/ directory in the module path to determine the relative path from src/
-    const srcIndex = moduleDir.indexOf('/src/');
+    // Handle both monorepo structure (packages/core/src/) and original structure (src/)
+    let srcIndex = moduleDir.indexOf('/packages/core/src/');
+    let srcPrefix = 'packages/core/src';
+
+    if (srcIndex === -1) {
+      srcIndex = moduleDir.indexOf('/src/');
+      srcPrefix = 'src';
+    }
+
     if (srcIndex === -1) {
       throw new Error(
-        `Unable to resolve resource path: module ${importMetaUrl} is not in src/ directory`
+        `Unable to resolve resource path: module ${importMetaUrl} is not in src/ or packages/core/src/ directory`
       );
     }
 
-    // Get the path relative to src/ directory
-    const relativeFromSrc = moduleDir.substring(srcIndex + '/src/'.length);
+    // Get the path relative to src/ directory (accounting for prefix length)
+    const prefixLength = srcIndex + `/${srcPrefix}/`.length;
+    const relativeFromSrc = moduleDir.substring(prefixLength);
 
     // Combine with the relative path and resolve from current working directory
-    return path.resolve(process.cwd(), 'src', relativeFromSrc, relativePath);
+    return path.resolve(process.cwd(), srcPrefix, relativeFromSrc, relativePath);
   } else {
     // In development, use the standard module-relative resolution
     const currentDir = path.dirname(fileURLToPath(importMetaUrl));
