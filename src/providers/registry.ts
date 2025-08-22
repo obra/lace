@@ -86,7 +86,7 @@ export class ProviderRegistry {
 
     for (const [instanceId, instance] of Object.entries(config.instances)) {
       // Check if credentials exist without loading them
-      const hasCredentials = (await this.instanceManager.loadCredential(instanceId)) !== null;
+      const hasCredentials = this.instanceManager.loadCredential(instanceId) !== null;
 
       instances.push({
         id: instanceId,
@@ -117,7 +117,7 @@ export class ProviderRegistry {
       throw new Error(`Provider instance not found: ${instanceId}`);
     }
 
-    const credentials = await this.instanceManager.loadCredential(instanceId);
+    const credentials = this.instanceManager.loadCredential(instanceId);
     if (!credentials) {
       throw new Error(`No credentials found for instance: ${instanceId}`);
     }
@@ -152,7 +152,7 @@ export class ProviderRegistry {
       throw new Error(`Provider instance not found: ${instanceId}`);
     }
 
-    const credentials = await this.instanceManager.loadCredential(instanceId);
+    const credentials = this.instanceManager.loadCredential(instanceId);
     if (!credentials) {
       throw new Error(`No credentials found for instance: ${instanceId}`);
     }
