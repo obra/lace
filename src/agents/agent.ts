@@ -27,9 +27,9 @@ import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { aggregateTokenUsage } from '~/threads/token-aggregation';
+import { ProviderRegistry } from '~/providers/registry';
 
 export interface AgentConfig {
-  provider: AIProvider | null;
   toolExecutor: ToolExecutor;
   threadManager: ThreadManager;
   threadId: string;
@@ -174,7 +174,7 @@ export class Agent extends EventEmitter {
 
   constructor(config: AgentConfig) {
     super();
-    this._provider = config.provider;
+    this._provider = null; // Will be created in initialize()
     this._toolExecutor = config.toolExecutor;
     this._threadManager = config.threadManager;
     this._threadId = config.threadId;
@@ -206,12 +206,10 @@ export class Agent extends EventEmitter {
       metadata?: QueuedMessage['metadata'];
     }
   ): Promise<void> {
-    if (!this._provider) {
-      throw new Error('Cannot send messages to agent with missing provider instance');
-    }
+    const provider = await this.getProvider();
 
-    if (!this._initialized) {
-      await this.initialize();
+    if (!provider) {
+      throw new Error('Cannot send messages to agent with missing provider instance');
     }
 
     if (this._state === 'idle') {
@@ -278,9 +276,53 @@ export class Agent extends EventEmitter {
     await this._processConversation();
   }
 
+  // Create provider instance from agent metadata and configuration
+  private async _createProviderInstance(): Promise<AIProvider | null> {
+    // 1. Get agent-specific metadata
+    const metadata = this.getThreadMetadata();
+    let providerInstanceId = metadata?.providerInstanceId as string;
+    let modelId = metadata?.modelId as string;
+
+    // 2. Fall back to session effective config
+    if (!providerInstanceId || !modelId) {
+      const effectiveConfig = this.getEffectiveConfiguration();
+      providerInstanceId = providerInstanceId || (effectiveConfig.providerInstanceId as string);
+      modelId = modelId || (effectiveConfig.modelId as string);
+    }
+
+    if (!providerInstanceId || !modelId) {
+      logger.warn('Agent missing provider configuration', {
+        threadId: this._threadId,
+        hasProviderInstanceId: !!providerInstanceId,
+        hasModelId: !!modelId,
+        metadata,
+      });
+      return null;
+    }
+
+    // 3. Create provider using registry (proper async)
+    try {
+      const registry = ProviderRegistry.getInstance();
+      return await registry.createProviderFromInstanceAndModel(providerInstanceId, modelId);
+    } catch (error) {
+      logger.error('Failed to create provider instance for agent', {
+        threadId: this._threadId,
+        providerInstanceId,
+        modelId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
   // Public initialization method - happens once per agent
   async initialize(): Promise<void> {
     if (this._initialized) return; // idempotent
+
+    // Create provider before system prompt generation
+    if (!this._provider) {
+      this._provider = await this._createProviderInstance();
+    }
 
     // CRITICAL: Always regenerate system prompt with current project context
     // This ensures that agents working on different projects get the correct context,
@@ -493,6 +535,14 @@ export class Agent extends EventEmitter {
     // Always use the provider that was passed to the constructor
     // The Session class is responsible for creating agents with the correct provider
     // based on their metadata when reconstructing from persistence
+    return this._provider;
+  }
+
+  // Lazy provider method that auto-initializes
+  async getProvider(): Promise<AIProvider | null> {
+    if (!this._initialized) {
+      await this.initialize();
+    }
     return this._provider;
   }
 
@@ -764,13 +814,14 @@ export class Agent extends EventEmitter {
     tools: Tool[],
     signal?: AbortSignal
   ): Promise<AgentMessageResult> {
-    if (!this.providerInstance) {
+    const provider = await this.getProvider();
+
+    if (!provider) {
       throw new Error('Cannot send messages to agent with missing provider instance');
     }
 
     // Default to streaming if provider supports it (unless explicitly disabled)
-    const useStreaming =
-      this.providerInstance.supportsStreaming && this.providerInstance.config?.streaming !== false;
+    const useStreaming = provider.supportsStreaming && provider.config?.streaming !== false;
 
     if (useStreaming) {
       return this._createStreamingResponse(messages, tools, signal);

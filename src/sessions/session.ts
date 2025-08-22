@@ -2,10 +2,9 @@
 // ABOUTME: Handles session creation, agent spawning, and session metadata management
 
 import { Agent, type AgentInfo } from '~/agents/agent';
-import type { AIProvider, ProviderConfig } from '~/providers/base-provider';
+import type { AIProvider } from '~/providers/base-provider';
 import { ThreadId, asThreadId } from '~/threads/types';
 import { ThreadManager } from '~/threads/thread-manager';
-import { ProviderRegistry } from '~/providers/registry';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TaskManager, AgentCreationCallback } from '~/tasks/task-manager';
@@ -34,9 +33,6 @@ import { logger } from '~/utils/logger';
 import type { ApprovalCallback } from '~/tools/approval-types';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { getEnvVar } from '~/config/env-loader';
-import { getLaceDir } from '~/config/lace-dir';
-import * as fs from 'fs';
-import * as path from 'path';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 
@@ -50,7 +46,6 @@ export interface SessionInfo {
 
 export class Session {
   private static _sessionRegistry = new Map<ThreadId, Session>();
-  private static _providerCreationInProgress = new Set<string>();
 
   private _sessionId: ThreadId;
   private _sessionData: SessionData;
@@ -198,22 +193,19 @@ export class Session {
       }
     }
 
-    // Resolve provider instance for the session agent
-    logger.info('🏗️ SESSION CREATE - Resolving provider', {
+    logger.info('🏗️ SESSION CREATE - Agent will create own provider', {
       sessionId: sessionData.id,
       providerInstanceId,
       modelId,
       projectId: options.projectId,
       effectiveConfig,
     });
-    const providerInstance = Session.resolveProviderInstance(providerInstanceId);
 
     // Agent will auto-initialize token budget based on model
 
     // Create coordinator agent (not initialized yet - will be lazy initialized)
     const sessionAgent = Session.createAgentSync({
       sessionData,
-      providerInstance,
       toolExecutor,
       threadManager,
       threadId,
@@ -356,25 +348,13 @@ export class Session {
       throw new Error(`Session ${sessionId} is missing provider configuration`);
     }
 
-    // Create provider using the provider instance system
-    logger.info('🔄 SESSION.GETBYID - Resolving session provider', {
+    logger.info('🔄 SESSION.GETBYID - Agent will create own provider', {
       sessionId,
       providerInstanceId,
       modelId,
       threadMetadata: existingThread?.metadata,
       sessionConfig,
     });
-    let providerInstance: AIProvider | null;
-    try {
-      providerInstance = Session.resolveProviderInstance(providerInstanceId);
-    } catch (error) {
-      logger.warn('Failed to resolve provider instance for session, creating with null provider', {
-        sessionId,
-        providerInstanceId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      providerInstance = null;
-    }
 
     // Create TaskManager using global persistence
     const taskManager = new TaskManager(sessionId, getPersistence());
@@ -391,7 +371,6 @@ export class Session {
     // Create and initialize coordinator agent
     const coordinatorAgent = await session.createAgent({
       sessionData,
-      providerInstance,
       toolExecutor,
       threadManager,
       threadId: sessionId,
@@ -439,34 +418,17 @@ export class Session {
           return;
         }
 
-        // Resolve the provider for this specific delegate agent based on its metadata
-        logger.info('🔄 SESSION.GETBYID - Resolving delegate provider', {
+        logger.info('🔄 SESSION.GETBYID - Delegate will create own provider', {
           sessionId,
           delegateThreadId,
           delegateProviderInstanceId,
           delegateModelId,
           delegateMetadata: delegateThread.metadata,
         });
-        let delegateProviderInstance: AIProvider | null;
-        try {
-          delegateProviderInstance = Session.resolveProviderInstance(delegateProviderInstanceId);
-        } catch (error) {
-          logger.warn(
-            'Failed to resolve provider instance for delegate agent, creating with null provider',
-            {
-              sessionId,
-              delegateThreadId,
-              delegateProviderInstanceId,
-              error: error instanceof Error ? error.message : String(error),
-            }
-          );
-          delegateProviderInstance = null;
-        }
 
         // Create and initialize delegate agent
         const delegateAgent = await session.createAgent({
           sessionData,
-          providerInstance: delegateProviderInstance,
           toolExecutor,
           threadManager,
           threadId: delegateThreadId,
@@ -745,8 +707,7 @@ export class Session {
       }
     }
 
-    // Resolve provider instance lazily
-    logger.info('🚀 SPAWN AGENT - Resolving provider', {
+    logger.info('🚀 SPAWN AGENT - Agent will create own provider', {
       sessionId: this._sessionId,
       agentName,
       targetProviderInstanceId,
@@ -756,7 +717,6 @@ export class Session {
       effectiveProviderInstanceId: targetProviderInstanceId,
       effectiveModelId: targetModelId,
     });
-    const providerInstance = Session.resolveProviderInstance(targetProviderInstanceId);
 
     // Create new toolExecutor for this agent
     const agentToolExecutor = new ToolExecutor();
@@ -770,7 +730,6 @@ export class Session {
 
     // Create agent with metadata
     const agent = new Agent({
-      provider: providerInstance,
       toolExecutor: agentToolExecutor,
       threadManager: this._threadManager,
       threadId: targetThreadId,
@@ -894,21 +853,7 @@ export class Session {
       task
     ) => {
       // The 'provider' parameter should now be a provider instance ID (e.g., 'pi_abc123')
-      // Validate that it's a real provider instance ID by trying to resolve it
-      let providerInstance: AIProvider;
-      try {
-        providerInstance = Session.resolveProviderInstance(provider);
-      } catch (error) {
-        throw new Error(
-          `Invalid provider instance ID: ${provider}. Task assignments must use provider instance IDs (e.g., 'new:pi_abc123/model-name'). Error: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-
-      if (!providerInstance || !providerInstance.isConfigured()) {
-        throw new Error(
-          `Provider instance ${provider} is not properly configured. Task assignments must use valid provider instance IDs.`
-        );
-      }
+      // Note: Agent will validate and create provider during initialization
 
       // Create a more descriptive agent name based on the task
       const agentName = `task-${task.id.split('_').pop()}`;
@@ -994,211 +939,9 @@ Use your task_add_note tool to record important notes as you work and your task_
   /**
    * Clear the session registry - primarily for testing
    */
-  /**
-   * Resolve provider instance configuration to actual provider instance (with caching)
-   */
-  private static _providerCache = new Map<string, AIProvider>();
-
-  static resolveProviderInstance(providerInstanceId: string): AIProvider {
-    const cacheKey = providerInstanceId;
-
-    logger.info('📦 RESOLVE PROVIDER INSTANCE', {
-      providerInstanceId,
-      cacheKey,
-      cacheSize: Session._providerCache.size,
-      cacheKeys: Array.from(Session._providerCache.keys()),
-    });
-
-    // Check cache first, but validate it's properly configured
-    const cached = Session._providerCache.get(cacheKey);
-    if (cached && cached.isConfigured()) {
-      logger.info('✅ Using cached provider instance', {
-        providerInstanceId,
-        cacheKey,
-        isConfigured: true,
-        cachedProviderName: cached.providerName,
-      });
-      return cached;
-    }
-
-    if (cached && !cached.isConfigured()) {
-      logger.warn('⚠️ Cached provider not properly configured, recreating', {
-        providerInstanceId,
-        cacheKey,
-        isConfigured: false,
-      });
-      Session._providerCache.delete(cacheKey);
-    }
-
-    // Check if another thread is currently creating this provider
-    if (Session._providerCreationInProgress.has(cacheKey)) {
-      // Wait briefly and check cache again - the other thread might have completed
-      // This is a simple spin-wait for the synchronous context
-      let attempts = 0;
-      const maxAttempts = 100; // ~100ms max wait
-      while (Session._providerCreationInProgress.has(cacheKey) && attempts < maxAttempts) {
-        const nowCached = Session._providerCache.get(cacheKey);
-        if (nowCached && nowCached.isConfigured()) {
-          logger.info('✅ Using provider created by another thread', {
-            providerInstanceId,
-            cacheKey,
-            attempts,
-          });
-          return nowCached;
-        }
-        attempts++;
-        // Simple synchronous delay
-        const start = Date.now();
-        while (Date.now() - start < 1) {
-          // 1ms busy wait
-        }
-      }
-
-      // If still in progress after waiting, proceed anyway to avoid deadlock
-      if (Session._providerCreationInProgress.has(cacheKey)) {
-        logger.warn('⚠️ Provider creation taking too long, proceeding anyway', {
-          providerInstanceId,
-          cacheKey,
-          attempts,
-        });
-      }
-    }
-
-    // Mark as creation in progress
-    Session._providerCreationInProgress.add(cacheKey);
-
-    logger.debug('Creating new provider instance (not cached)', {
-      providerInstanceId,
-      cacheKey,
-    });
-
-    // Use new provider instance system with synchronous credential loading
-    // Note: We do our own synchronous loading here because Session needs to be synchronous
-    // The registry's createProviderFromInstanceAndModel is async, so we can't use it
-    try {
-      const instanceManager = new ProviderInstanceManager();
-      const config = instanceManager.loadInstancesSync();
-      const instance = config.instances[providerInstanceId];
-
-      if (!instance) {
-        throw new Error(`Provider instance not found: ${providerInstanceId}`);
-      }
-
-      // Load credentials synchronously by reading the credential file directly
-      interface ProviderCredentials {
-        apiKey: string;
-        additionalAuth?: Record<string, unknown>;
-      }
-
-      const credentialsDir = path.join(getLaceDir(), 'credentials');
-      const credentialPath = path.join(credentialsDir, `${providerInstanceId}.json`);
-      let credentials: ProviderCredentials;
-
-      try {
-        const credentialContent = fs.readFileSync(credentialPath, 'utf-8');
-        const parsedCredentials = JSON.parse(credentialContent) as unknown;
-
-        // Type guard to ensure we have valid credentials
-        if (
-          !parsedCredentials ||
-          typeof parsedCredentials !== 'object' ||
-          !('apiKey' in parsedCredentials) ||
-          typeof parsedCredentials.apiKey !== 'string'
-        ) {
-          logger.error('Invalid credential format', {
-            providerInstanceId,
-            hasCredentials: !!parsedCredentials,
-            isObject: typeof parsedCredentials === 'object',
-            hasApiKey:
-              parsedCredentials &&
-              typeof parsedCredentials === 'object' &&
-              'apiKey' in parsedCredentials,
-            apiKeyType:
-              parsedCredentials &&
-              typeof parsedCredentials === 'object' &&
-              'apiKey' in parsedCredentials
-                ? typeof (parsedCredentials as Record<string, unknown>).apiKey
-                : 'N/A',
-          });
-          throw new Error('Invalid credential format');
-        }
-
-        credentials = parsedCredentials as ProviderCredentials;
-        logger.debug('Loaded credentials successfully', {
-          providerInstanceId,
-          hasApiKey: !!credentials.apiKey,
-          apiKeyLength: credentials.apiKey.length,
-        });
-      } catch (credentialError) {
-        logger.error('Failed to load credentials', {
-          providerInstanceId,
-          credentialPath,
-          error:
-            credentialError instanceof Error ? credentialError.message : String(credentialError),
-          fileExists: fs.existsSync(credentialPath),
-        });
-        throw new Error(`No credentials found for instance: ${providerInstanceId}`);
-      }
-
-      // Map catalog provider ID to actual provider type
-      const providerType = instance.catalogProviderId; // anthropic, openai, etc.
-
-      // Build provider config from instance and credentials (no model!)
-      const providerConfig: ProviderConfig = {
-        apiKey: credentials.apiKey,
-        ...(credentials.additionalAuth || {}),
-        ...(instance.endpoint && { baseURL: instance.endpoint }),
-        ...(instance.timeout && { timeout: instance.timeout }),
-      };
-
-      logger.debug('Creating provider with config', {
-        providerType,
-        hasApiKey: !!providerConfig.apiKey,
-        apiKeyLength: (providerConfig.apiKey as string | undefined)?.length,
-        instanceId: providerInstanceId,
-      });
-
-      // Create provider using the registry's internal createProvider method
-      // This is intentional - Session needs synchronous operation, so we can't use
-      // the async createProviderFromInstanceAndModel. We're essentially doing the same
-      // thing but synchronously
-      const providerRegistry = ProviderRegistry.getInstance();
-      const providerInstance = providerRegistry.createProvider(providerType, providerConfig);
-
-      logger.info('✨ Created new provider instance', {
-        providerInstanceId,
-        providerType,
-        providerName: providerInstance.providerName,
-        isConfigured: providerInstance.isConfigured(),
-        cacheKey,
-      });
-
-      // Cache the result
-      Session._providerCache.set(cacheKey, providerInstance);
-
-      // Clear the creation lock
-      Session._providerCreationInProgress.delete(cacheKey);
-
-      return providerInstance;
-    } catch (error) {
-      // Clear the creation lock on error too
-      Session._providerCreationInProgress.delete(cacheKey);
-
-      throw new Error(
-        `Failed to resolve provider instance ${providerInstanceId}: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    }
-  }
 
   static clearRegistry(): void {
     Session._sessionRegistry.clear();
-  }
-
-  static clearProviderCache(): void {
-    Session._providerCache.clear();
-    Session._providerCreationInProgress.clear();
   }
 
   /**
@@ -1259,7 +1002,6 @@ Use your task_add_note tool to record important notes as you work and your task_
    */
   private static createAgentSync(params: {
     sessionData: SessionData;
-    providerInstance: AIProvider | null;
     toolExecutor: ToolExecutor;
     threadManager: ThreadManager;
     threadId: string;
@@ -1268,7 +1010,6 @@ Use your task_add_note tool to record important notes as you work and your task_
     isCoordinator?: boolean;
   }): Agent {
     const {
-      providerInstance,
       toolExecutor,
       threadManager,
       threadId,
@@ -1281,7 +1022,6 @@ Use your task_add_note tool to record important notes as you work and your task_
     const agentName = isCoordinator ? 'Lace' : `Agent-${threadId.split('.').pop()}`;
 
     return new Agent({
-      provider: providerInstance,
       toolExecutor,
       threadManager,
       threadId,
@@ -1299,7 +1039,6 @@ Use your task_add_note tool to record important notes as you work and your task_
    */
   private async createAgent(params: {
     sessionData: SessionData;
-    providerInstance: AIProvider | null;
     toolExecutor: ToolExecutor;
     threadManager: ThreadManager;
     threadId: string;

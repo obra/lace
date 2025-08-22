@@ -14,7 +14,6 @@ import {
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
 import { convertToOpenAIFormat } from '~/providers/format-converters';
-import { getEnvVar } from '~/config/env-loader';
 
 interface OpenAIProviderConfig extends ProviderConfig {
   apiKey: string | null;
@@ -45,8 +44,7 @@ export class OpenAIProvider extends AIProvider {
       // Support custom base URL for OpenAI-compatible APIs
       // Prefer config baseURL over environment variable
       const configBaseURL = config.baseURL as string | undefined;
-      const envBaseURL = getEnvVar('OPENAI_BASE_URL');
-      const baseURL = configBaseURL || envBaseURL;
+      const baseURL = configBaseURL;
 
       if (baseURL) {
         openaiConfig.baseURL = baseURL;
