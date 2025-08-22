@@ -4,6 +4,7 @@
 'use client';
 
 import React, { memo } from 'react';
+import { ThreadId } from '@/types/core';
 import { ProjectSection } from '@/components/sidebar/ProjectSection';
 import { SessionSection } from '@/components/sidebar/SessionSection';
 import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
@@ -18,9 +19,9 @@ interface SidebarContentProps {
 
   // Event handlers (still needed for parent coordination)
   onSwitchProject: () => void;
-  onAgentSelect: (agentId: string) => void;
+  onAgentSelect: (threadId: ThreadId) => void;
   onClearAgent: () => void;
-  onConfigureAgent?: (agentId: string) => void;
+  onConfigureAgent?: (threadId: ThreadId) => void;
   onConfigureSession?: () => void;
 }
 
@@ -38,16 +39,17 @@ export const SidebarContent = memo(function SidebarContent({
   // Conditionally use AgentContext - it may not be available on all pages
   const agentContext = useOptionalAgentContext();
   const sessionDetails = agentContext?.sessionDetails ?? null;
-  // Mobile: Use regular flow layout (don't anchor to bottom, let mobile footer handle it)
-  // Desktop: Use flex layout with feedback anchored to bottom
-  if (isMobile) {
-    return (
-      <>
+  // Single container with responsive classes to prevent hydration mismatches
+  // Mobile: Normal flow layout, Desktop: Flex layout with feedback anchored to bottom
+  return (
+    <div className="lg:flex lg:flex-col lg:h-full">
+      {/* Main content area - flex-1 only on desktop */}
+      <div className="lg:flex-1">
         {/* WORKSPACE CONTEXT */}
         {selectedProject && (
           <ProjectSection
             isMobile={isMobile}
-            onCloseMobileNav={onCloseMobileNav}
+            onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
             onSwitchProject={onSwitchProject}
           />
         )}
@@ -56,7 +58,7 @@ export const SidebarContent = memo(function SidebarContent({
         {sessionDetails && (
           <SessionSection
             isMobile={isMobile}
-            onCloseMobileNav={onCloseMobileNav}
+            onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
             onAgentSelect={onAgentSelect}
             onClearAgent={onClearAgent}
             onConfigureAgent={onConfigureAgent}
@@ -65,41 +67,11 @@ export const SidebarContent = memo(function SidebarContent({
         )}
 
         {/* TASK MANAGEMENT */}
-        <TaskSidebarSection onCloseMobileNav={onCloseMobileNav} />
-
-        {/* FEEDBACK - just in normal flow on mobile */}
-        <FeedbackSection isMobile={isMobile} onCloseMobileNav={onCloseMobileNav} />
-      </>
-    );
-  }
-
-  // Desktop: Use flex layout with feedback anchored to bottom
-  return (
-    <div className="flex flex-col h-full">
-      {/* Main content area */}
-      <div className="flex-1">
-        {/* WORKSPACE CONTEXT */}
-        {selectedProject && (
-          <ProjectSection isMobile={isMobile} onSwitchProject={onSwitchProject} />
-        )}
-
-        {/* ACTIVE SESSION */}
-        {sessionDetails && (
-          <SessionSection
-            isMobile={isMobile}
-            onAgentSelect={onAgentSelect}
-            onClearAgent={onClearAgent}
-            onConfigureAgent={onConfigureAgent}
-            onConfigureSession={onConfigureSession}
-          />
-        )}
-
-        {/* TASK MANAGEMENT */}
-        <TaskSidebarSection />
+        <TaskSidebarSection onCloseMobileNav={isMobile ? onCloseMobileNav : undefined} />
       </div>
 
-      {/* FEEDBACK - anchored to bottom on desktop */}
-      <div className="mt-auto">
+      {/* FEEDBACK - anchored to bottom on desktop only */}
+      <div className="lg:mt-auto">
         <FeedbackSection isMobile={isMobile} onCloseMobileNav={onCloseMobileNav} />
       </div>
     </div>
