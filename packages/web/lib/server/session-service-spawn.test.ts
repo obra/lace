@@ -50,7 +50,6 @@ describe('SessionService.spawnAgent Method', () => {
     setupTestProviderDefaults();
 
     // Create test provider instances individually for more control
-    const { createTestProviderInstance } = await import('@/lib/server/lace-imports');
     anthropicInstanceId = await createTestProviderInstance({
       catalogId: 'anthropic',
       models: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022'],
