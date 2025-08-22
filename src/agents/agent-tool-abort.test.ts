@@ -147,8 +147,8 @@ describe('Agent Tool Abort Functionality', () => {
       tools: [slowTool],
       metadata: {
         name: 'test-agent',
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId,
       },
     };
 
@@ -217,8 +217,8 @@ describe('Agent Tool Abort Functionality', () => {
       tools: [slowTool],
       metadata: {
         name: 'test-agent',
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId,
       },
     };
 
@@ -271,8 +271,8 @@ describe('Agent Tool Abort Functionality', () => {
       tools: [slowTool],
       metadata: {
         name: 'test-agent',
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId,
       },
     };
 
@@ -336,8 +336,8 @@ describe('Agent Tool Abort Functionality', () => {
       tools: [slowTool],
       metadata: {
         name: 'test-agent',
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId,
       },
     };
 
@@ -406,8 +406,8 @@ describe('Agent Tool Abort Functionality', () => {
       tools: [slowTool],
       metadata: {
         name: 'test-agent',
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId,
       },
     };
 
@@ -446,8 +446,8 @@ describe('Agent Tool Abort Functionality', () => {
 
     // Set thread metadata immediately after creation
     secondThreadManager.updateThreadMetadata(secondThreadId, {
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
+      modelId: 'claude-3-5-haiku-20241022',
+      providerInstanceId,
     });
 
     provider = new MockProviderWithTools(secondToolCalls);
@@ -458,8 +458,8 @@ describe('Agent Tool Abort Functionality', () => {
       tools: [slowTool],
       metadata: {
         name: 'test-agent',
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId,
       },
     });
 
@@ -512,8 +512,8 @@ describe('Agent Tool Abort Functionality', () => {
       tools: [slowTool],
       metadata: {
         name: 'test-agent',
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId,
       },
     };
 

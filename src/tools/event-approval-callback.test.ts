@@ -135,8 +135,8 @@ describe('EventApprovalCallback Integration Tests', () => {
       tools: [new BashTool()], // Enable bash tool
       metadata: {
         name: 'test-agent',
-        modelId: 'test-model',
-        providerInstanceId: 'test-instance',
+        modelId: 'claude-3-5-haiku-20241022',
+        providerInstanceId,
       },
     });
 
@@ -148,8 +148,8 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     // Set model metadata for the agent (required for model-agnostic providers)
     agent.updateThreadMetadata({
-      modelId: 'test-model',
-      providerInstanceId: 'test-instance',
+      modelId: 'claude-3-5-haiku-20241022',
+      providerInstanceId,
     });
 
     // Set up the EventApprovalCallback
