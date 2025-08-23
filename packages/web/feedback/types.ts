@@ -11,10 +11,6 @@ type CommentaryType =
   | 'insight' // Deeper understanding of patterns
   | 'celebration'; // Acknowledging good outcomes;
 
-type FeedbackVerbosity = 'quiet' | 'normal' | 'verbose' | 'commentary';
-
-type FeedbackTiming = 'immediate' | 'batched' | 'milestone';
-
 interface FeedbackContext {
   threadId: string;
   agentState?: string;
