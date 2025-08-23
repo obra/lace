@@ -12,9 +12,13 @@ describe('ChatInput Refocus', () => {
     const ref = React.createRef<{ focus: () => void }>();
 
     render(
-      <ScrollProvider>
-        <ChatInput ref={ref} value="test message" onChange={vi.fn()} onSubmit={vi.fn()} />
-      </ScrollProvider>
+      <ChatInput
+        ref={ref}
+        value="test message"
+        onChange={vi.fn<(value: string) => void>()}
+        onSubmit={vi.fn<() => Promise<boolean | void>>()}
+      />,
+      { wrapper: ({ children }) => <ScrollProvider>{children}</ScrollProvider> }
     );
 
     // Should have focus method available
@@ -22,28 +26,33 @@ describe('ChatInput Refocus', () => {
     expect(typeof ref.current?.focus).toBe('function');
   });
 
-  it('should focus textarea when focus method is called', () => {
+  it('should focus textarea when focus method is called', async () => {
     const ref = React.createRef<{ focus: () => void }>();
 
     render(
-      <ScrollProvider>
-        <ChatInput
-          ref={ref}
-          value="test message"
-          onChange={vi.fn()}
-          onSubmit={vi.fn()}
-          disabled={true} // Disable autofocus
-        />
-      </ScrollProvider>
+      <ChatInput
+        ref={ref}
+        value="test message"
+        onChange={vi.fn<(value: string) => void>()}
+        onSubmit={vi.fn<() => Promise<boolean | void>>()}
+        disabled={false} // Allow focus for testing
+      />,
+      { wrapper: ({ children }) => <ScrollProvider>{children}</ScrollProvider> }
     );
 
-    const textarea = screen.getByTestId('message-input') as HTMLTextAreaElement;
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
 
-    // Initially not focused due to disabled
+    // Initially not focused
     expect(document.activeElement).not.toBe(textarea);
+
+    // Ensure element is in DOM tree before focusing
+    expect(textarea.isConnected).toBe(true);
 
     // Call focus method
     ref.current?.focus();
+
+    // Small delay to allow focus to take effect in JSDOM
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     // Should now be focused
     expect(document.activeElement).toBe(textarea);

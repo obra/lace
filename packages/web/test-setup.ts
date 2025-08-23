@@ -31,6 +31,12 @@ class MockEventSource {
 
 global.EventSource = MockEventSource as any;
 
+// Add DOM method polyfills for JSDOM compatibility
+if (typeof Element !== 'undefined') {
+  // ScrollTo method not available in JSDOM
+  Element.prototype.scrollTo ??= function () {};
+}
+
 // Mock server-only to avoid import issues in tests
 // This is the current workaround as suggested in Next.js GitHub issue #60038
 vi.mock('server-only', () => {

@@ -1,3 +1,5 @@
+// ABOUTME: Vitest configuration for the core package
+// ABOUTME: Configures test environment, path aliases, and coverage settings
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'path';
 

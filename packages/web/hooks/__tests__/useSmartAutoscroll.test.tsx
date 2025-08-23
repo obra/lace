@@ -7,12 +7,6 @@ import { useSmartAutoscroll, useTimelineAutoscroll } from '../useSmartAutoscroll
 import { ScrollProvider } from '@/components/providers/ScrollProvider';
 import React from 'react';
 
-// Mock scrollTo method for JSDOM compatibility in this test
-Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
-  value: vi.fn(),
-  writable: true,
-});
-
 // Mock scroll behavior
 const createMockContainer = (scrollTop = 0, scrollHeight = 1000, clientHeight = 500) => {
   const container = {
@@ -89,8 +83,8 @@ describe('useSmartAutoscroll', () => {
   });
 });
 
-describe('useTimelineAutoscroll', () => {
-  it('should trigger autoscroll on new user messages', () => {
+describe('useTimelineAutoscroll', async () => {
+  it('should trigger autoscroll on new user messages', async () => {
     const mockEvents = [{ type: 'AGENT_MESSAGE', content: 'Hello' }];
 
     const { result, rerender } = renderHook(
