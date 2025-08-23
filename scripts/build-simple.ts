@@ -68,9 +68,11 @@ async function copyTracedDependencies(
   const packagePatterns = new Set<string>();
   for (const pattern of tracedFiles) {
     if (pattern.includes('node_modules/')) {
-      // Convert patterns like "node_modules/open/**/*" to "node_modules/open"
-      const basePattern = pattern.replace(/\/\*\*\/\*$/, '');
-      packagePatterns.add(basePattern);
+      // Extract package root from any path: handle scoped packages (@scope/name) and regular packages
+      const match = pattern.match(/^(.+?node_modules\/(@[^\/]+\/[^\/]+|[^\/]+))(?:\/|$)/);
+      if (match) {
+        packagePatterns.add(match[1]);
+      }
     }
   }
 
