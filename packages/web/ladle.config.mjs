@@ -20,7 +20,7 @@ export default {
   viteConfig: {
     resolve: {
       alias: {
-        '~': new URL('../../src', import.meta.url).pathname,
+        '~': new URL('../core/src', import.meta.url).pathname,
         '@': new URL('.', import.meta.url).pathname,
       },
     },

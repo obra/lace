@@ -9,17 +9,17 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist/**/*', 'packages/**/*', 'vitest.config.ts', 'knip.config.ts', 'scripts/**/*'],
+    ignores: ['dist/**/*', 'packages/web/*', 'vitest.config.ts', 'knip.config.ts', 'scripts/**/*'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map(config => ({
     ...config,
     files: ['**/*.ts', '**/*.tsx'],
-    ignores: ['dist/**/*', 'packages/**/*'],
+    ignores: ['dist/**/*', 'packages/web/*'],
   })),
   {
     files: ['**/*.ts', '**/*.tsx'],
-    ignores: ['dist/**/*', 'packages/**/*'],
+    ignores: ['dist/**/*', 'packages/web*'],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',
@@ -81,15 +81,8 @@ export default [
     },
   },
   {
-    files: ['src/cli/**/*.ts', 'src/interfaces/**/*.ts', 'src/app.ts'],
-    ignores: ['dist/**/*', 'packages/**/*'],
-    rules: {
-      'no-console': 'off',
-    },
-  },
-  {
     files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
-    ignores: ['dist/**/*', 'packages/**/*'],
+    ignores: ['dist/**/*', 'packages/web/*'],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',
@@ -119,7 +112,7 @@ export default [
   },
   {
     files: ['**/*.test.ts', '**/*.spec.ts'],
-    ignores: ['dist/**/*', 'packages/**/*'],
+    ignores: ['dist/**/*', 'packages/web/*'],
     plugins: {
       vitest,
     },

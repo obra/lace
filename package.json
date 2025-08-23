@@ -16,7 +16,7 @@
     "build:vfs": "npx tsx scripts/generate-vfs.ts",
     "build:bundle": "bun build build/lace-standalone.ts --target node --outfile dist/lace-server.js",
     "build:executable": "bun build --compile dist/lace-server.js --outfile lace",
-    "build:clean": "rm -rf dist packages/core/dist packages/web/.next && npm run build",
+    "build:clean": "rm -rf dist src/vfs/generated && npm run build:vfs && npm run build:bundle && npm run build:executable",
     "build:standalone": "npx tsx scripts/build-simple.ts",
     "prebuild:standalone:clean": "rm -rf build packages/web/.next packages/web/server.js",
     "build:standalone:clean": "npx tsx scripts/build-simple.ts",
