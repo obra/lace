@@ -17,7 +17,8 @@ const CATWALK_API_URL =
 // Compute absolute path to data directory from script location
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const LOCAL_DATA_DIR = resolve(__dirname, '../packages/core/src/providers/catalog/data');
+const LOCAL_DATA_DIR =
+  process.env.LOCAL_DATA_DIR ?? resolve(__dirname, '../packages/core/src/providers/catalog/data');
 
 // Providers to exclude from syncing (if any)
 const EXCLUDED_PROVIDERS: string[] = [
