@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useEventStream } from './useEventStream';
-import type { ThreadId, CombinedTokenUsage, AgentInfo, ThreadTokenUsage } from '@/types/core';
+import type { ThreadId, CombinedTokenUsage, ThreadTokenUsage } from '@/types/core';
 import type { LaceEvent } from '@/types/core';
 import type { AgentWithTokenUsage } from '@/types/api';
 import { api } from '@/lib/api-client';

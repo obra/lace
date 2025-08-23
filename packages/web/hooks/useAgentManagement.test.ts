@@ -3,7 +3,7 @@
 
 import { renderHook, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
+import type { SessionInfo, ThreadId } from '@/types/core';
 import { useAgentManagement } from './useAgentManagement';
 
 // Mock fetch globally

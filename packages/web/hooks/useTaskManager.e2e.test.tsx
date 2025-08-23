@@ -15,7 +15,6 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
-import { getSessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { TaskAPIClient } from '@/lib/client/task-api';
 

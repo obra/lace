@@ -9,7 +9,6 @@ import type {
   AgentInfo,
   ThreadTokenUsage,
 } from '@/types/core';
-import { ApprovalDecision } from '@/types/core';
 
 // Session configuration interface
 export interface SessionConfiguration {
