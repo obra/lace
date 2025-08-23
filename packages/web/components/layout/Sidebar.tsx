@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { ChevronRightIcon } from '@/lib/heroicons';
 import { faCog, faTimes, faBars } from '@/lib/fontawesome';

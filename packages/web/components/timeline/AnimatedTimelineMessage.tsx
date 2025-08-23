@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { TimelineEntry } from '@/types/web-events';
 import { formatTime } from '@/lib/format';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';

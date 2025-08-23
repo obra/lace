@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useState } from 'react';
-import { motion, PanInfo, useMotionValue, useTransform } from 'framer-motion';
+import { motion, PanInfo, useMotionValue, useTransform } from 'motion/react';
 import { springConfig } from '@/lib/animations';
 
 interface SwipeableCardProps {

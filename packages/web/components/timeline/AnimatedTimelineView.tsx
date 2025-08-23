@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useEffect, useRef } from 'react';
-import { motion, AnimatePresence, useInView } from 'framer-motion';
+import { motion, AnimatePresence, useInView } from 'motion/react';
 import { TimelineEntry } from '@/types/web-events';
 import { AnimatedTimelineMessage } from './AnimatedTimelineMessage';
 import { AnimatedTypingIndicator } from './AnimatedTypingIndicator';

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRobot } from '@/lib/fontawesome';
 import { loadingDots, loadingDot, springConfig, fadeInUp } from '@/lib/animations';
@@ -37,7 +37,7 @@ export function AnimatedTypingIndicator({ agent }: AnimatedTypingIndicatorProps)
   };
 
   const { dotClass, avatarClass } = getAgentStyles(agent);
-  
+
   const getAgentShadowColor = (agentName: string) => {
     switch (agentName) {
       case 'Claude':

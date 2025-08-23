@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { DismissButton } from '@/components/ui/DismissButton';
 import {
   modalOverlay,

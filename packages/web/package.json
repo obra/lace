@@ -25,7 +25,6 @@
     "chromatic": "chromatic --exit-zero-on-changes"
   },
   "dependencies": {
-    "@lace/core": "file:../core",
     "@fontsource-variable/dm-sans": "^5.2.6",
     "@fontsource/google-sans-code": "^5.2.1",
     "@fontsource/lato": "^5.2.6",
@@ -33,12 +32,13 @@
     "@fortawesome/free-solid-svg-icons": "6.7.0",
     "@fortawesome/react-fontawesome": "0.2.2",
     "@heroicons/react": "2.2.0",
+    "@lace/core": "file:../core",
     "@sentry/nextjs": "^10.5.0",
     "clsx": "^2.1.1",
     "daisyui": "^5.0.46",
     "dompurify": "^3.2.6",
-    "framer-motion": "12.23.3",
     "highlight.js": "^11.11.1",
+    "motion": "^12.23.12",
     "next": "^15.4.6",
     "open": "^10.2.0",
     "react": "18.3.1",

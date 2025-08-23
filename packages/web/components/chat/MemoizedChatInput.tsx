@@ -4,7 +4,7 @@
 'use client';
 
 import React, { useState, useCallback, memo, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { CompactTokenUsage } from '@/components/ui/CompactTokenUsage';
 import type { ThreadId } from '@/types/core';

@@ -63,7 +63,7 @@ vi.mock('@/components/chat/ChatInput', () => ({
   ChatInput: mockChatInput,
 }));
 
-vi.mock('framer-motion', () => ({
+vi.mock('motion/react', () => ({
   motion: {
     div: ({ children, ...props }: React.ComponentProps<'div'>) => (
       <div data-testid="motion-div" {...props}>
