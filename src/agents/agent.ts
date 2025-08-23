@@ -2797,9 +2797,14 @@ export class Agent extends EventEmitter {
         // Only check if both paths exist
         if (!toolPath) continue;
 
-        // Normalize paths for comparison - resolve to absolute paths
-        const normalizedToolPath = resolve(toolPath);
-        const normalizedFilePath = resolve(filePath);
+        // Normalize paths for comparison - resolve to absolute paths using agent's working directory
+        const workingDirectory = this._getWorkingDirectory();
+        const normalizedToolPath = workingDirectory
+          ? resolve(workingDirectory, toolPath)
+          : resolve(toolPath);
+        const normalizedFilePath = workingDirectory
+          ? resolve(workingDirectory, filePath)
+          : resolve(filePath);
 
         // Look for corresponding successful TOOL_RESULT
         for (let j = i + 1; j < events.length; j++) {
