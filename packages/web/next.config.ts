@@ -89,7 +89,7 @@ const nextConfig: NextConfig = {
 
     webpackConfig.resolve.alias = {
       ...webpackConfig.resolve.alias,
-      '~': path.resolve(__dirname, '../core/src'),
+      '~': fileURLToPath(new URL('../core/src', import.meta.url)),
       '@': fileURLToPath(new URL('.', import.meta.url)),
     };
 
