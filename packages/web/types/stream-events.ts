@@ -22,38 +22,3 @@ export interface StreamSubscription {
   sessionIds?: string[]; // Filter by session context
   projectIds?: string[]; // Filter by project context
 }
-
-function createEventFilter(subscription: StreamSubscription): EventFilter {
-  return {
-    shouldIncludeEvent: (event: LaceEvent) => {
-      // Filter by thread ID
-      if (subscription.threads && subscription.threads.length > 0) {
-        if (!event.threadId || !subscription.threads.includes(event.threadId)) {
-          return false;
-        }
-      }
-
-      // Filter by session context
-      if (subscription.sessionIds && subscription.sessionIds.length > 0) {
-        if (
-          !event.context?.sessionId ||
-          !subscription.sessionIds.includes(event.context.sessionId)
-        ) {
-          return false;
-        }
-      }
-
-      // Filter by project context
-      if (subscription.projectIds && subscription.projectIds.length > 0) {
-        if (
-          !event.context?.projectId ||
-          !subscription.projectIds.includes(event.context.projectId)
-        ) {
-          return false;
-        }
-      }
-
-      return true;
-    },
-  };
-}
