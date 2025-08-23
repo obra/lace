@@ -318,11 +318,14 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
     stdio: 'pipe',
   });
 
-  // Copy core package source directory (needed for provider catalog data and other runtime files)
-  execSync(`cp -r packages/core/src ${tempBuildDir}/standalone/src`, {
-    stdio: 'pipe',
-  });
-  console.log('📁 Core source directory copied to standalone/src/');
+  // Copy core package source directory to match alias ~/ -> packages/core/src
+  execSync(
+    `mkdir -p ${tempBuildDir}/standalone/packages/core && cp -r packages/core/src ${tempBuildDir}/standalone/packages/core/src`,
+    {
+      stdio: 'pipe',
+    }
+  );
+  console.log('📁 Core source directory copied to standalone/packages/core/src/');
 
   // Copy dependencies using the most efficient method available
   // This significantly reduces the artifact size by only including required packages
