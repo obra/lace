@@ -59,10 +59,12 @@ describe('Compaction E2E Test with MSW', { timeout: 30000 }, () => {
   let originalBroadcast: EventStreamManager['broadcast'] | undefined;
 
   beforeEach(async () => {
-    // Suppress console output during tests
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Only suppress console output in local development, not CI
+    if (!process.env.CI) {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+    }
 
     // Reset MSW handlers
     server.resetHandlers();
@@ -328,8 +330,8 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
       // Check token usage before sending
       await agent.sendMessage(messages[i]!);
 
-      // Small delay to ensure events are processed
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Longer delay to ensure events are processed (CI environments are slower)
+      await new Promise((resolve) => setTimeout(resolve, 250));
 
       // Check current token usage and state
       const events = agent.threadManager.getEvents(agent.threadId);
@@ -341,7 +343,7 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
 
       // Give auto-compaction time to trigger after message 4
       if (i === 3) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
         // Check if compaction happened
         const eventsAfterWait = agent.threadManager.getEvents(agent.threadId);
@@ -354,6 +356,19 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     // Check that compaction actually happened in the thread
     const finalEvents = agent.threadManager.getEvents(agent.threadId);
     const compactionEvent = finalEvents.find((e) => e.type === 'COMPACTION');
+
+    // Debug output for CI environment
+    if (!compactionEvent) {
+      console.error('DEBUG: No COMPACTION event found. Final events:');
+      console.error(finalEvents.map((e) => ({ type: e.type, timestamp: e.timestamp })));
+      console.error('DEBUG: Message count:', messageCount);
+      console.error('DEBUG: Should trigger compaction:', shouldTriggerCompaction);
+      console.error('DEBUG: Compaction requested:', _compactionRequested);
+      console.error(
+        'DEBUG: Streamed events:',
+        streamedEvents.map((e) => (e as any)?.type)
+      );
+    }
 
     expect(compactionEvent).toBeDefined();
     expect(compactionEvent?.data).toMatchObject({
@@ -524,8 +539,8 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     // Send /compact command
     await agent.sendMessage('/compact');
 
-    // Wait for compaction to complete
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Wait for compaction to complete (longer timeout for CI)
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Verify compaction events were emitted
     const compactionStartEvents = streamedEvents.filter(
@@ -543,6 +558,17 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     const compactionComplete = events.find(
       (e) => e.type === 'COMPACTION_COMPLETE' && e.data?.success === true
     );
+
+    // Debug output for CI environment
+    if (!compactionComplete) {
+      console.error('DEBUG: No COMPACTION_COMPLETE event found. Events:');
+      console.error(events.map((e) => ({ type: e.type, timestamp: e.timestamp })));
+      console.error(
+        'DEBUG: Streamed events:',
+        streamedEvents.map((e) => (e as any)?.type)
+      );
+    }
+
     expect(compactionComplete).toBeDefined();
   });
 
@@ -659,6 +685,27 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
     // Verify cumulative token counts
     const expectedTotalInput = tokenUsages.reduce((sum, u) => sum + u.input, 0);
     const expectedTotalOutput = tokenUsages.reduce((sum, u) => sum + u.output, 0);
+
+    // Debug output for CI environment
+    if (!agentData.tokenUsage || agentData.tokenUsage.totalTokens === 0) {
+      console.error('DEBUG: Token usage is missing or zero. Agent data:');
+      console.error(JSON.stringify(agentData, null, 2));
+      console.error(
+        'DEBUG: Expected totals - input:',
+        expectedTotalInput,
+        'output:',
+        expectedTotalOutput
+      );
+      const events = agent!.threadManager.getEvents(agentId);
+      console.error('DEBUG: Thread events:');
+      console.error(
+        events.map((e) => ({
+          type: e.type,
+          timestamp: e.timestamp,
+          usage: (e as any)?.data?.usage,
+        }))
+      );
+    }
 
     expect(agentData.tokenUsage).toMatchObject({
       totalPromptTokens: expectedTotalInput,
