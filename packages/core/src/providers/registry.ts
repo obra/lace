@@ -173,8 +173,8 @@ export class ProviderRegistry {
     }
 
     // Build provider config with model
-    // Priority: instance.endpoint > catalog.api_endpoint > provider default
-    const baseURL = instance.endpoint || catalogProvider.api_endpoint;
+    // Priority: instance.endpoint > catalog.api_endpoint (with env expansion) > provider default
+    const baseURL = instance.endpoint || expandEnvVar(catalogProvider.api_endpoint);
     const providerConfig: ProviderConfig = {
       model: modelId,
       apiKey: credentials.apiKey,
