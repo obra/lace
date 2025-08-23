@@ -15,9 +15,9 @@ export default defineConfig({
 
   // Enhanced reporting and debugging
   reporter: [
-    ['html', { outputFolder: 'playwright-report' }],
+    ['html', { outputFolder: 'temp/playwright-report' }],
     ['list'],
-    ['junit', { outputFile: 'playwright-report/junit.xml' }],
+    ['junit', { outputFile: 'temp/playwright-report/junit.xml' }],
   ],
 
   use: {
