@@ -35,6 +35,7 @@ const { values } = parseArgs({
 });
 
 if (values.help) {
+  // eslint-disable-next-line no-console -- Help text output is appropriate for CLI server
   console.log(`
 Lace Web Server
 
@@ -332,6 +333,7 @@ async function startLaceServer() {
   const port = await findAvailablePort(requestedPort, userSpecifiedPort, hostname);
   const url = `http://${hostname}:${port}`;
 
+  // eslint-disable-next-line no-console -- Server startup message is appropriate for server process
   console.log(`🚀 Starting Lace server on ${url}...`);
 
   // Use the same approach as the original Next.js standalone server
@@ -348,6 +350,7 @@ async function startLaceServer() {
       keepAliveTimeout: undefined,
     });
 
+    // eslint-disable-next-line no-console -- Server ready message with URL/PID is appropriate for server process
     console.log(`
 ✅ Lace is ready!
    
@@ -358,7 +361,9 @@ async function startLaceServer() {
 `);
 
     // Signal the actual port to parent process (for menu bar app)
+    // eslint-disable-next-line no-console -- Port/URL signaling required for parent process communication
     console.log(`LACE_SERVER_PORT:${port}`);
+    // eslint-disable-next-line no-console -- Port/URL signaling required for parent process communication
     console.log(`LACE_SERVER_URL:${url}`);
 
     // Open browser if running interactively - use nft-traced dependencies
@@ -439,11 +444,13 @@ startLaceServer().catch((err) => {
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
+  // eslint-disable-next-line no-console -- Shutdown message is appropriate for server process lifecycle
   console.log('\nReceived SIGTERM, shutting down gracefully...');
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
+  // eslint-disable-next-line no-console -- Shutdown message is appropriate for server process lifecycle
   console.log('\nReceived SIGINT, shutting down gracefully...');
   process.exit(0);
 });
