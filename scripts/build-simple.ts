@@ -1,9 +1,9 @@
 // ABOUTME: Build script that creates simple single-file Lace executable
 // ABOUTME: Embeds Next.js standalone build as ZIP and creates Bun executable
 
-import { execSync } from 'child_process';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, cpSync, statSync } from 'fs';
-import { join, resolve, dirname, basename } from 'path';
+import { execSync } from 'node:child_process';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, cpSync, statSync } from 'node:fs';
+import { join, resolve, basename } from 'node:path';
 
 interface BuildOptions {
   target?: string;
