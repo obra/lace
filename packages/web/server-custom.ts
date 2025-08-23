@@ -85,12 +85,12 @@ const isStandalone = !isDev;
 console.log(`Starting Lace in ${isDev ? 'development' : 'production'} mode...`);
 
 // Setup Node.js module system for standalone build
-const require = module.createRequire(import.meta.url);
+const _require = module.createRequire(import.meta.url);
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // Only set production environment if not already set
 if (!process.env.NODE_ENV) {
-  (process.env as any).NODE_ENV = isStandalone ? 'production' : 'development';
+  (process.env as Record<string, string>).NODE_ENV = isStandalone ? 'production' : 'development';
 }
 
 // In standalone mode, change to the standalone root directory for proper module resolution
@@ -99,16 +99,16 @@ if (isStandalone) {
   const standaloneRoot = path.resolve(__dirname, '../..');
   process.chdir(standaloneRoot);
   webDir = path.join(standaloneRoot, 'packages/web');
-  console.log(`Current working directory: ${process.cwd()}`);
-  console.log(`Web directory: ${webDir}`);
+  console.warn(`Current working directory: ${process.cwd()}`);
+  console.warn(`Web directory: ${webDir}`);
 } else {
   // In development mode, stay in the current directory
   webDir = __dirname;
-  console.log(`Development mode - working directory: ${process.cwd()}`);
+  console.warn(`Development mode - working directory: ${process.cwd()}`);
 }
 
 // Next.js configuration - only needed for standalone builds
-let nextConfig: any = undefined;
+let nextConfig: unknown = undefined;
 
 if (isStandalone) {
   nextConfig = {
@@ -370,7 +370,7 @@ async function startLaceServer() {
     // Open browser if running interactively - use nft-traced dependencies
     if (shouldOpenBrowser) {
       try {
-        console.log(`🔍 DEBUG: Attempting to open browser at ${url}...`);
+        console.warn(`🔍 DEBUG: Attempting to open browser at ${url}...`);
         // Use regular Node.js module resolution now that dependencies are properly traced
         const { default: open } = await import('open');
         await open(url);
