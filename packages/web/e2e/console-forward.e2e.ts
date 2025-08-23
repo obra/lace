@@ -39,6 +39,7 @@ test.describe('Console Forwarding E2E', () => {
 
     // Execute console.log in the browser
     await page.evaluate(() => {
+      // eslint-disable-next-line no-console
       console.log('E2E test message', 123, { test: true });
     });
 
@@ -74,6 +75,7 @@ test.describe('Console Forwarding E2E', () => {
         nested: { value: 42, array: [1, 2, 3] },
       };
       complexObj.circular = complexObj;
+      // eslint-disable-next-line no-console
       console.log('Complex object test:', complexObj);
     });
 
@@ -102,10 +104,15 @@ test.describe('Console Forwarding E2E', () => {
 
     // Test all log levels
     await page.evaluate(() => {
+      // eslint-disable-next-line no-console
       console.log('Test log message');
+      // eslint-disable-next-line no-console
       console.warn('Test warn message');
+      // eslint-disable-next-line no-console
       console.error('Test error message');
+      // eslint-disable-next-line no-console
       console.info('Test info message');
+      // eslint-disable-next-line no-console
       console.debug('Test debug message');
     });
 
@@ -145,6 +152,7 @@ test.describe('Console Forwarding E2E', () => {
     // Rapid console calls to test batching
     await page.evaluate(() => {
       for (let i = 0; i < 10; i++) {
+        // eslint-disable-next-line no-console
         console.log(`Batch message ${i}`);
       }
     });
@@ -175,6 +183,7 @@ test.describe('Console Forwarding E2E', () => {
 
     // Execute console.log - should only work in dev mode
     await page.evaluate(() => {
+      // eslint-disable-next-line no-console
       console.log('Development mode test');
     });
 
