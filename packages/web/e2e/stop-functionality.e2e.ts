@@ -70,8 +70,12 @@ test.describe('Stop Functionality', () => {
           .getByText('Follow-up message after ESC')
           .isVisible()
           .catch(() => false);
-      } catch (_error) {
-        // Could not send follow-up message after ESC
+      } catch (error) {
+        // Could not send follow-up message after ESC - capture error details
+        test.info().attach('follow-up-send-failed.txt', {
+          body: `Follow-up message send failed: ${error instanceof Error ? error.message : String(error)}\nStack: ${error instanceof Error ? error.stack || 'No stack' : 'N/A'}`,
+          contentType: 'text/plain',
+        });
       }
     }
 
@@ -122,8 +126,12 @@ test.describe('Stop Functionality', () => {
         // Don't actually click - just verify it's present and clickable
         const stopButton = page.locator('[data-testid="stop-button"]');
         stopButtonTest.canTriggerStop = await stopButton.isEnabled();
-      } catch (_error) {
-        // Stop button not interactive
+      } catch (error) {
+        // Stop button not interactive - capture error details
+        test.info().attach('stop-button-error.txt', {
+          body: `Stop button interaction failed: ${error instanceof Error ? error.message : String(error)}\nStack: ${error instanceof Error ? error.stack || 'No stack' : 'N/A'}`,
+          contentType: 'text/plain',
+        });
       }
     }
 

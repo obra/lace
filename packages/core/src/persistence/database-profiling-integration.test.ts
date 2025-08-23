@@ -1,8 +1,6 @@
 // ABOUTME: Integration test for database profiling functionality
 // ABOUTME: Verifies that DatabasePersistence works with SQL profiling enabled
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DatabasePersistence } from '~/persistence/database';
 import { logger } from '~/utils/logger';

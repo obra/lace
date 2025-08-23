@@ -5,7 +5,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { ScrollProvider } from '@/components/providers/ScrollProvider';
-import React from 'react';
+import React, { type ComponentProps } from 'react';
+
+type Props = ComponentProps<typeof ChatInput>;
 
 describe('ChatInput Refocus', () => {
   it('should expose focus method via ref', () => {
@@ -15,8 +17,8 @@ describe('ChatInput Refocus', () => {
       <ChatInput
         ref={ref}
         value="test message"
-        onChange={vi.fn<(value: string) => void>()}
-        onSubmit={vi.fn<() => void | Promise<void>>()}
+        onChange={vi.fn<Props['onChange']>()}
+        onSubmit={vi.fn<Props['onSubmit']>()}
       />,
       { wrapper: ScrollProvider }
     );
@@ -33,8 +35,8 @@ describe('ChatInput Refocus', () => {
       <ChatInput
         ref={ref}
         value="test message"
-        onChange={vi.fn<(value: string) => void>()}
-        onSubmit={vi.fn<() => void | Promise<void>>()}
+        onChange={vi.fn<Props['onChange']>()}
+        onSubmit={vi.fn<Props['onSubmit']>()}
         disabled={false} // Allow focus for testing
       />,
       { wrapper: ScrollProvider }

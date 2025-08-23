@@ -151,6 +151,7 @@ export class Agent extends EventEmitter {
   private readonly _stopReasonHandler: StopReasonHandler;
   private _state: AgentState = 'idle';
   private _initialized = false;
+  private _initializing: Promise<void> | null = null;
   private _promptConfig?: PromptConfig; // Cache loaded prompt config
   private _currentTurnMetrics: CurrentTurnMetrics | null = null;
   private _progressTimer: ReturnType<typeof setInterval> | null = null;
@@ -301,7 +302,8 @@ export class Agent extends EventEmitter {
         threadId: this._threadId,
         hasProviderInstanceId: !!providerInstanceId,
         hasModelId: !!modelId,
-        metadata,
+        providerInstanceId: metadata?.providerInstanceId,
+        modelId: metadata?.modelId,
       });
       return null;
     }
@@ -325,34 +327,49 @@ export class Agent extends EventEmitter {
   async initialize(): Promise<void> {
     if (this._initialized) return; // idempotent
 
-    // Create provider before system prompt generation
-    if (!this._provider) {
-      this._provider = await this._createProviderInstance();
+    // If already initializing, wait for existing initialization
+    if (this._initializing) {
+      await this._initializing;
+      return;
     }
 
-    // CRITICAL: Always regenerate system prompt with current project context
-    // This ensures that agents working on different projects get the correct context,
-    // even when sharing the same cached provider instance
-    await this._refreshSystemPrompt();
+    // Start initialization process
+    this._initializing = (async () => {
+      try {
+        // Create provider before system prompt generation
+        if (!this._provider) {
+          this._provider = await this._createProviderInstance();
+        }
 
-    // Record initial events (happens once) - only for new conversations
-    if (!this._hasInitialEvents() && !this._hasConversationStarted() && this._promptConfig) {
-      this._addInitialEvents(this._promptConfig);
-    }
+        // CRITICAL: Always regenerate system prompt with current project context
+        // This ensures that agents working on different projects get the correct context,
+        // even when sharing the same cached provider instance
+        await this._refreshSystemPrompt();
 
-    // Only mark as initialized if provider was successfully created
-    if (this._provider) {
-      this._initialized = true;
+        // Record initial events (happens once) - only for new conversations
+        if (!this._hasInitialEvents() && !this._hasConversationStarted() && this._promptConfig) {
+          this._addInitialEvents(this._promptConfig);
+        }
 
-      logger.info('AGENT: Initialized successfully', {
-        threadId: this._threadId,
-        provider: this.providerInstance?.providerName || 'missing',
-      });
-    } else {
-      logger.warn('AGENT: Initialization incomplete - no provider', {
-        threadId: this._threadId,
-      });
-    }
+        // Only mark as initialized if provider was successfully created
+        if (this._provider) {
+          this._initialized = true;
+
+          logger.info('AGENT: Initialized successfully', {
+            threadId: this._threadId,
+            provider: this.providerInstance?.providerName || 'missing',
+          });
+        } else {
+          logger.warn('AGENT: Initialization incomplete - no provider', {
+            threadId: this._threadId,
+          });
+        }
+      } finally {
+        this._initializing = null;
+      }
+    })();
+
+    await this._initializing;
   }
 
   // Check if initial events already exist

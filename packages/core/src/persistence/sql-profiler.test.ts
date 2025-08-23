@@ -1,8 +1,6 @@
 // ABOUTME: Tests for SQLite profiling functionality
 // ABOUTME: Verifies profiler captures timing data and logs correctly
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SQLProfiler } from '~/persistence/sql-profiler';
 import { logger } from '~/utils/logger';

@@ -16,7 +16,16 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**'],
     coverage: {
       reporter: ['text', 'html', 'lcov'],
-      exclude: ['node_modules/', 'dist/', '**/*.test.ts', '**/*.spec.ts'],
+      exclude: [
+        'node_modules/',
+        'dist/',
+        '**/*.test.ts',
+        '**/*.spec.ts',
+        '**/setup.*',
+        '**/setup/**',
+        '**/.git/worktrees/**',
+        '**/.worktree/**',
+      ],
     },
     environment: 'node',
     setupFiles: [resolve(__dirname, 'src/test-setup.ts')],

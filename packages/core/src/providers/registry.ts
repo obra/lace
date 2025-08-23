@@ -147,7 +147,9 @@ export class ProviderRegistry {
 
     // Build provider config from instance and credentials
     // Priority: instance.endpoint > catalog.api_endpoint (with env expansion) > provider default
-    const baseURL = instance.endpoint || expandEnvVar(catalogProvider.api_endpoint);
+    const trimmedInstance = (instance.endpoint ?? '').trim();
+    const trimmedCatalog = (expandEnvVar(catalogProvider.api_endpoint) ?? '').trim();
+    const baseURL = trimmedInstance || trimmedCatalog;
     const providerConfig: ProviderConfig = {
       apiKey: credentials.apiKey,
       ...(credentials.additionalAuth || {}),
@@ -192,7 +194,9 @@ export class ProviderRegistry {
 
     // Build provider config with model
     // Priority: instance.endpoint > catalog.api_endpoint (with env expansion) > provider default
-    const baseURL = instance.endpoint || expandEnvVar(catalogProvider.api_endpoint);
+    const trimmedInstance = (instance.endpoint ?? '').trim();
+    const trimmedCatalog = (expandEnvVar(catalogProvider.api_endpoint) ?? '').trim();
+    const baseURL = trimmedInstance || trimmedCatalog;
     const providerConfig: ProviderConfig = {
       model: modelId,
       apiKey: credentials.apiKey,

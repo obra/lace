@@ -73,6 +73,12 @@ test.describe('Multi-Agent Workflows', () => {
     };
 
     // Agent Switching UI Detection logged
+    await test.step('Agent Switching UI Detection', async () => {
+      test.info().attach('agent-switching-ui.json', {
+        body: JSON.stringify(agentSwitchingUI, null, 2),
+        contentType: 'application/json',
+      });
+    });
 
     // Test passes if we can document current agent switching capabilities
     expect(agentSwitchingUI.agentIdVisible).toBeTruthy();
@@ -181,10 +187,16 @@ test.describe('Multi-Agent Workflows', () => {
       await page.waitForTimeout(2000);
 
       const reloadedUrl = page.url();
-      agentIsolationTest.agentPersistence = reloadedUrl.includes(agentId || '');
+      agentIsolationTest.agentPersistence = !!agentId && reloadedUrl.includes(agentId);
     }
 
-    // Agent Isolation Test completed
+    // Agent Isolation Test completed - attach results as artifact
+    await test.step('Agent Isolation Diagnostics', async () => {
+      test.info().attach('agent-isolation.json', {
+        body: JSON.stringify(agentIsolationTest, null, 2),
+        contentType: 'application/json',
+      });
+    });
 
     // Test passes if agent system is functional
     expect(agentIsolationTest.urlHasAgent).toBeTruthy();

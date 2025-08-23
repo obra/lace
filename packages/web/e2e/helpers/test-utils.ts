@@ -7,6 +7,9 @@ import * as os from 'os';
 import * as http from 'http';
 import { spawn, ChildProcess } from 'child_process';
 import { createServer } from 'net';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * Find an available port by attempting to create a server
@@ -77,24 +80,20 @@ async function startTestServer(
   const serverUrl = `http://localhost:${port}`;
 
   // Start server process with isolated environment using E2E test server
-  const serverProcess = spawn(
-    'npx',
-    ['tsx', 'packages/web/e2e-test-server.ts', '--port', port.toString()],
-    {
-      cwd: path.resolve(process.cwd(), '../..'),
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        LACE_DIR: tempDir,
-        ANTHROPIC_KEY: 'test-anthropic-key-for-e2e',
-        LACE_DB_PATH: path.join(tempDir, 'lace.db'),
-        NODE_ENV: 'development',
-        E2E_TOOL_APPROVAL_MOCK: 'true',
-        LACE_LOG_LEVEL: 'debug',
-        LACE_LOG_STDERR: 'true',
-      },
-    }
-  );
+  const serverScriptPath = path.resolve(__dirname, '../../../packages/web/e2e-test-server.ts');
+  const serverProcess = spawn('npx', ['tsx', serverScriptPath, '--port', port.toString()], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: {
+      ...process.env,
+      LACE_DIR: tempDir,
+      ANTHROPIC_API_KEY: 'test-anthropic-key-for-e2e',
+      LACE_DB_PATH: path.join(tempDir, 'lace.db'),
+      NODE_ENV: 'test',
+      E2E_TOOL_APPROVAL_MOCK: 'true',
+      LACE_LOG_LEVEL: 'debug',
+      LACE_LOG_STDERR: 'true',
+    },
+  });
 
   // Handle server output for debugging - errors only
   serverProcess.stderr?.on('data', (data: Buffer) => {

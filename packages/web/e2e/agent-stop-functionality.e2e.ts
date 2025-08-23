@@ -49,7 +49,7 @@ test.describe('Agent Stop Functionality E2E Tests', () => {
     // Test that the stop API endpoint is accessible and responds correctly
     // Since we can't easily create slow responses in E2E tests, we'll test
     // that the endpoint exists and handles the request properly
-    const stopResponse = await page.evaluate(async () => {
+    const stopResponse = await (async () => {
       try {
         // Try to call the stop endpoint with a test agent ID
         const result = await page.request.post('/api/agents/lace_20250801_abc123.1/stop', {
@@ -60,7 +60,7 @@ test.describe('Agent Stop Functionality E2E Tests', () => {
       } catch (_error) {
         return { error: _error instanceof Error ? _error.message : 'Unknown error' };
       }
-    });
+    })();
 
     // Stop API test completed
 

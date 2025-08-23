@@ -2,13 +2,22 @@
 // ABOUTME: Validates agent creation, selection, and state management operations
 
 import { renderHook, act } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  beforeEach,
+  beforeAll,
+  afterAll,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockedFunction,
+} from 'vitest';
 import type { SessionInfo, ThreadId } from '@/types/core';
 import { useAgentManagement } from './useAgentManagement';
 
 // Mock fetch globally (typed) and restore after suite
 const originalFetch = global.fetch;
-const mockFetch: vi.MockedFunction<typeof fetch> = vi.fn();
+const mockFetch: MockedFunction<typeof fetch> = vi.fn();
 
 beforeAll(() => {
   // Cast guards against DOM lib differences in Node/Vitest

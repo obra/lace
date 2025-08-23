@@ -5,7 +5,6 @@ import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, cleanup } from '@testing-library/react';
 import { useEventStream } from './useEventStream';
 import type { UseEventStreamOptions } from './useEventStream';
-import { EventStreamFirehose } from '@/lib/event-stream-firehose';
 import type { LaceEvent } from '@/types/core';
 
 // Mock the firehose
@@ -15,21 +14,29 @@ vi.mock('@/lib/event-stream-firehose', () => ({
   },
 }));
 
+// Import the mocked version
+import { EventStreamFirehose } from '@/lib/event-stream-firehose';
+
 describe('useEventStream', () => {
   const mockFirehose = {
-    subscribe: vi.fn(),
+    subscribe: vi.fn().mockReturnValue('mock-subscription-id'),
     unsubscribe: vi.fn(),
     getStats: vi.fn(),
+    getSubscriptions: vi.fn().mockReturnValue(new Map()),
   };
 
   beforeEach(() => {
-    (EventStreamFirehose.getInstance as ReturnType<typeof vi.fn>).mockReturnValue(mockFirehose);
+    vi.mocked(EventStreamFirehose.getInstance).mockReturnValue(
+      mockFirehose as unknown as EventStreamFirehose
+    );
     mockFirehose.subscribe.mockClear();
     mockFirehose.unsubscribe.mockClear();
     mockFirehose.getStats.mockReturnValue({
       isConnected: true,
       subscriptionCount: 1,
       eventsReceived: 5,
+      connectionUrl: null,
+      connectedAt: null,
     });
   });
 

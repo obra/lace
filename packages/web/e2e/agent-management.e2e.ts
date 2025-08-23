@@ -151,8 +151,12 @@ test.describe('Agent Management', () => {
       await sendMessage(page, followupMessage);
       await verifyMessageVisible(page, followupMessage);
       agentIsolationTest.canSendNewMessage = true;
-    } catch (_error) {
-      // Agent isolation: Could not send follow-up message
+    } catch (error) {
+      // Agent isolation: Could not send follow-up message - capture error details
+      test.info().attach('agent-isolation-follow-up-failed.txt', {
+        body: `Agent isolation: follow-up send failed: ${error instanceof Error ? error.message : String(error)}\nStack: ${error instanceof Error ? error.stack || 'No stack' : 'N/A'}`,
+        contentType: 'text/plain',
+      });
     }
 
     // Agent Isolation Test Results documented
