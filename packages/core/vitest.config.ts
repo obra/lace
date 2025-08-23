@@ -1,10 +1,10 @@
 // ABOUTME: Vitest configuration for @lace/core; sets up alias (~), Node test env, coverage, and setup files
 // ABOUTME: Configures test environment, path aliases, and coverage settings for the core package
 import { defineConfig } from 'vitest/config';
-import { resolve } from 'node:path';
+import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   resolve: {
@@ -19,7 +19,7 @@ export default defineConfig({
       exclude: ['node_modules/', 'dist/', '**/*.test.ts', '**/*.spec.ts'],
     },
     environment: 'node',
-    setupFiles: ['src/test-setup.ts'],
+    setupFiles: [resolve(__dirname, 'src/test-setup.ts')],
     env: {
       NO_COLOR: '1',
       FORCE_COLOR: '0',
