@@ -98,7 +98,7 @@ test.describe('Minimal Streaming Events', () => {
       hasStreamingSupport: streamingEvents.length > 0,
     };
 
-    console.log('Streaming Events Analysis:', streamingAnalysis);
+    // Streaming Events Analysis completed
 
     // Test passes if we can document streaming event capabilities
     expect(true).toBeTruthy(); // Always passes - documents current streaming events
@@ -160,7 +160,7 @@ test.describe('Minimal Streaming Events', () => {
       hasProperOrdering: eventSequence.length > 0,
     };
 
-    console.log('Event Ordering Analysis:', orderingAnalysis);
+    // Event Ordering Analysis completed
 
     // Test documents current event ordering behavior
     expect(orderingAnalysis.messagesSent).toBe(messages.length);

@@ -57,7 +57,7 @@ test.describe('SSE Event System Reliability', () => {
         .catch(() => false),
     };
 
-    console.log('SSE Connection Analysis:', sseConnectionTest);
+    // SSE Connection Analysis completed
 
     // Test passes if project loads and interface is functional
     expect(sseConnectionTest.projectLoaded).toBeTruthy();
@@ -134,7 +134,7 @@ test.describe('SSE Event System Reliability', () => {
         stabilityResults.filter((r) => r.stillFunctional).length / interactions.length,
     };
 
-    console.log('SSE Stability Analysis:', stabilityAnalysis);
+    // SSE Stability Analysis completed
 
     // Test passes if interface remains functional after interactions
     expect(stabilityAnalysis.successfulInteractions).toBeGreaterThan(0);

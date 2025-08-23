@@ -57,7 +57,7 @@ test.describe('Error Handling and Recovery', () => {
       canStillInteract: await page.getByTestId('project-path-input').isEnabled(),
     };
 
-    console.log('Invalid path error handling:', errorHandlingAnalysis);
+    // Invalid path error handling completed
 
     // Test passes if interface remains usable
     expect(errorHandlingAnalysis.formStillVisible).toBeTruthy();
@@ -90,10 +90,10 @@ test.describe('Error Handling and Recovery', () => {
       networkErrorTest.interfaceResponsive = true;
       networkErrorTest.canNavigate = true;
     } catch (error) {
-      console.log('Interface responsiveness check failed:', error);
+      // Interface responsiveness check failed
     }
 
-    console.log('Network error resilience:', networkErrorTest);
+    // Network error resilience test completed
 
     // Test passes if we can document network error handling
     expect(networkErrorTest.interfaceResponsive || networkErrorTest.canNavigate).toBeTruthy();
@@ -122,7 +122,7 @@ test.describe('Error Handling and Recovery', () => {
       // Check if interface is still functional
       await page.waitForTimeout(1000);
     } catch (error) {
-      console.log('Triggered JS error during interaction test:', error);
+      // Triggered JS error during interaction test
     }
 
     // Assess post-error state - check if message input is still available since we're in chat
@@ -145,17 +145,17 @@ test.describe('Error Handling and Recovery', () => {
           .catch(() => false);
         postErrorState.canStillType = true;
       } catch (error) {
-        console.log('Could not send message after JS error test:', error);
+        // Could not send message after JS error test
       }
     }
 
-    console.log('JavaScript error resilience:', postErrorState);
+    // JavaScript error resilience test completed
 
     if (postErrorState.canSendMessage) {
-      console.log('Interface fully functional after JS error - excellent resilience');
+      // Interface fully functional after JS error - excellent resilience
       expect(postErrorState.canSendMessage).toBeTruthy();
     } else {
-      console.log('Interface visible but interaction impacted - partial resilience');
+      // Interface visible but interaction impacted - partial resilience
       expect(postErrorState.interfaceStillVisible).toBeTruthy();
     }
   });

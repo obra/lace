@@ -71,11 +71,11 @@ test.describe('Stop Functionality', () => {
           .isVisible()
           .catch(() => false);
       } catch (error) {
-        console.log('Could not send follow-up message after ESC:', error);
+        // Could not send follow-up message after ESC
       }
     }
 
-    console.log('ESC Key Test Results:', escTest);
+    // ESC Key Test Results completed
 
     // Test passes if interface remains functional
     expect(escTest.interfaceStillFunctional).toBeTruthy();
@@ -123,11 +123,11 @@ test.describe('Stop Functionality', () => {
         const stopButton = page.locator('[data-testid="stop-button"]');
         stopButtonTest.canTriggerStop = await stopButton.isEnabled();
       } catch (error) {
-        console.log('Stop button not interactive:', error);
+        // Stop button not interactive
       }
     }
 
-    console.log('Stop Button Analysis:', stopButtonTest);
+    // Stop Button Analysis completed
 
     // Test documents current stop functionality availability
     if (stopButtonTest.hasStopButton || stopButtonTest.hasInterruptButton) {
@@ -203,7 +203,7 @@ test.describe('Stop Functionality', () => {
       .then(() => true)
       .catch(() => false);
 
-    console.log('Rapid Interruption Test:', rapidInterruptionTest);
+    // Rapid Interruption Test completed
 
     // Test passes if system remains stable after rapid interruptions
     expect(rapidInterruptionTest.finalState).toBeTruthy();

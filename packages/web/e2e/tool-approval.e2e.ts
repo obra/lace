@@ -76,7 +76,7 @@ test.describe('Tool Approval Workflow', () => {
       toolRequestsDetected: toolRequests.length,
     };
 
-    console.log('Tool Approval UI Detection:', toolApprovalUI);
+    // Tool Approval UI Detection completed
 
     // Test documents current tool approval system capabilities
     const hasAnyToolUI = Object.values(toolApprovalUI).some((value) =>
@@ -132,12 +132,12 @@ test.describe('Tool Approval Workflow', () => {
           await approveButton.click();
           toolWorkflowTest.toolExecutionRequested = true;
         } catch (error) {
-          console.log('Could not approve tool:', error);
+          // Could not approve tool
         }
       }
     }
 
-    console.log('Tool Workflow Test:', toolWorkflowTest);
+    // Tool Workflow Test completed
 
     // Test passes if we can document tool approval workflow
     expect(toolWorkflowTest.toolTriggerSent).toBeTruthy();
@@ -200,7 +200,7 @@ test.describe('Tool Approval Workflow', () => {
 
     const toolAPITest = tests;
 
-    console.log('Tool API Endpoints Test:', toolAPITest);
+    // Tool API Endpoints Test completed
 
     // Test documents current tool API availability
     const accessibleEndpoints = toolAPITest.filter((test) => test.accessible).length;

@@ -24,7 +24,7 @@ test.describe('Page Objects', () => {
   });
 
   test('page objects provide clean interface for UI interactions', async ({ page }) => {
-    const { projectSelector, chatInterface } = createPageObjects(page);
+    const { projectSelector, _chatInterface } = createPageObjects(page);
 
     // Use page object methods
     await projectSelector.clickNewProject();

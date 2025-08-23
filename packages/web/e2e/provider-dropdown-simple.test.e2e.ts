@@ -33,7 +33,7 @@ test.describe('Provider Dropdown - Simple Test', () => {
     // Verify we can see the add instance button
     await expect(page.getByTestId('add-instance-button')).toBeVisible();
 
-    console.log('✅ Basic settings navigation works');
+    // ✅ Basic settings navigation works
   });
 
   test('provider appears in project creation dropdown after being added', async ({ page }) => {
@@ -94,6 +94,6 @@ test.describe('Provider Dropdown - Simple Test', () => {
     const options = await providerDropdown.locator('option').allTextContents();
 
     expect(options).toContain(providerName);
-    console.log(`✅ Provider "${providerName}" appears in dropdown after creation`);
+    // ✅ Provider appears in dropdown after creation
   });
 });
