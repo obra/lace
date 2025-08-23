@@ -1,7 +1,7 @@
 // ABOUTME: Tests for smart autoscroll functionality
 // ABOUTME: Verifies autoscroll behavior for user messages, streaming, and scroll position tracking
 
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { useSmartAutoscroll, useTimelineAutoscroll } from '../useSmartAutoscroll';
 import { ScrollProvider } from '@/components/providers/ScrollProvider';
@@ -73,17 +73,17 @@ describe('useSmartAutoscroll', () => {
       result.current.scrollToBottom(true);
     });
 
-    // Wait for timeout
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    expect(mockContainer.scrollTo).toHaveBeenCalledWith({
-      top: 1000,
-      behavior: 'smooth',
-    });
+    // Wait for scroll to trigger
+    await waitFor(() =>
+      expect(mockContainer.scrollTo).toHaveBeenCalledWith({
+        top: 1000,
+        behavior: 'smooth',
+      })
+    );
   });
 });
 
-describe('useTimelineAutoscroll', async () => {
+describe('useTimelineAutoscroll', () => {
   it('should trigger autoscroll on new user messages', async () => {
     const mockEvents = [{ type: 'AGENT_MESSAGE', content: 'Hello' }];
 
@@ -109,8 +109,7 @@ describe('useTimelineAutoscroll', async () => {
     });
 
     // Should trigger scroll due to user message
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(mockContainer.scrollTo).toHaveBeenCalled();
+    await waitFor(() => expect(mockContainer.scrollTo).toHaveBeenCalled());
   });
 
   it('should handle streaming content updates', async () => {
@@ -136,8 +135,7 @@ describe('useTimelineAutoscroll', async () => {
       rerender({ streamingContent: 'Streaming response...' });
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(mockContainer.scrollTo).toHaveBeenCalled();
+    await waitFor(() => expect(mockContainer.scrollTo).toHaveBeenCalled());
   });
 
   it('should autoscroll when content is first loaded', async () => {
@@ -167,10 +165,11 @@ describe('useTimelineAutoscroll', async () => {
       rerender({ events: loadedEvents });
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(mockContainer.scrollTo).toHaveBeenCalledWith({
-      top: 1000,
-      behavior: 'smooth',
-    });
+    await waitFor(() =>
+      expect(mockContainer.scrollTo).toHaveBeenCalledWith({
+        top: 1000,
+        behavior: 'smooth',
+      })
+    );
   });
 });

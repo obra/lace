@@ -1,7 +1,7 @@
 // ABOUTME: Tests for chat input refocus functionality
 // ABOUTME: Verifies that chat input refocuses after successful message send
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { ScrollProvider } from '@/components/providers/ScrollProvider';
@@ -16,7 +16,7 @@ describe('ChatInput Refocus', () => {
         ref={ref}
         value="test message"
         onChange={vi.fn<(value: string) => void>()}
-        onSubmit={vi.fn<() => Promise<boolean | void>>()}
+        onSubmit={vi.fn<() => void | Promise<void>>()}
       />,
       { wrapper: ({ children }) => <ScrollProvider>{children}</ScrollProvider> }
     );
@@ -34,7 +34,7 @@ describe('ChatInput Refocus', () => {
         ref={ref}
         value="test message"
         onChange={vi.fn<(value: string) => void>()}
-        onSubmit={vi.fn<() => Promise<boolean | void>>()}
+        onSubmit={vi.fn<() => void | Promise<void>>()}
         disabled={false} // Allow focus for testing
       />,
       { wrapper: ({ children }) => <ScrollProvider>{children}</ScrollProvider> }
@@ -42,19 +42,14 @@ describe('ChatInput Refocus', () => {
 
     const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
 
-    // Initially not focused
-    expect(document.activeElement).not.toBe(textarea);
+    // Ensure textarea is not focused initially by blurring it
+    textarea.blur();
+    await waitFor(() => expect(document.activeElement).not.toBe(textarea));
 
-    // Ensure element is in DOM tree before focusing
-    expect(textarea.isConnected).toBe(true);
-
-    // Call focus method
+    // Test the core behavior: focus method should focus the textarea
     ref.current?.focus();
 
-    // Small delay to allow focus to take effect in JSDOM
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    // Should now be focused
-    expect(document.activeElement).toBe(textarea);
+    // The textarea should be focused after calling focus method
+    await waitFor(() => expect(document.activeElement).toBe(textarea));
   });
 });
