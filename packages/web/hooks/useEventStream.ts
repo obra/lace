@@ -147,7 +147,11 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
       threadIds: options.threadIds,
       eventTypes: undefined, // Could be added later
     };
-  }, [options.projectId, options.sessionId, options.threadIds]);
+  }, [
+    options.projectId,
+    options.sessionId,
+    JSON.stringify(options.threadIds), // Deep comparison for arrays to prevent reference changes
+  ]);
 
   // Subscribe/unsubscribe effect - only runs when filter changes
   useEffect(() => {
