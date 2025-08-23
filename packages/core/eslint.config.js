@@ -90,6 +90,7 @@ export default [
     },
     plugins: {
       vitest,
+      '@typescript-eslint': tseslint.plugin,
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
@@ -101,6 +102,8 @@ export default [
       '@typescript-eslint/no-unsafe-return': 'off',
       'no-console': 'off',
       'no-undef': 'off', // TypeScript handles this
+      'no-unused-vars': 'off', // Disable base rule in favor of TypeScript version  
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
       ...vitest.configs.recommended.rules,
     },
   },
