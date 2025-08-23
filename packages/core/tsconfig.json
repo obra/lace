@@ -3,6 +3,12 @@
     "target": "ES2023",
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "baseUrl": "./src",
+    "paths": {
+      "~/*": ["./*"]
+    },
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -12,11 +18,9 @@
     "declarationMap": true,
     "sourceMap": true,
     "jsx": "react",
-    "jsxFactory": "React.createElement"
+    "jsxFactory": "React.createElement",
+    "composite": true
   },
-  "references": [
-    { "path": "./packages/core" },
-    { "path": "./packages/web" }
-  ],
-  "exclude": ["node_modules", "dist", "knip.config.ts"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

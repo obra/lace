@@ -12,7 +12,7 @@ interface CatwalkFile {
 
 const CATWALK_API_URL =
   'https://api.github.com/repos/charmbracelet/catwalk/contents/internal/providers/configs';
-const LOCAL_DATA_DIR = './src/providers/catalog/data';
+const LOCAL_DATA_DIR = './packages/core/src/providers/catalog/data';
 
 // Providers to exclude from syncing (if any)
 const EXCLUDED_PROVIDERS: string[] = [
