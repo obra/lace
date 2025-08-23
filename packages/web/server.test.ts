@@ -291,7 +291,7 @@ describe('Browser Opening', () => {
   });
 
   test('should handle browser opening failures gracefully', async () => {
-    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockOpen.mockRejectedValue(new Error('Browser not found'));
 
     try {
@@ -305,15 +305,15 @@ describe('Browser Opening', () => {
     expect(mockLogger.warn).toHaveBeenCalledWith('Could not open browser automatically', {
       error: 'unknown error',
     });
-    expect(consoleLogSpy).toHaveBeenCalledWith(
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
       '   ℹ️  Could not open browser automatically (unknown error)'
     );
 
-    consoleLogSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   test('should handle browser opening failures with error codes', async () => {
-    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const error = new Error('Permission denied') as NodeJS.ErrnoException;
     error.code = 'EACCES';
     mockOpen.mockRejectedValue(error);
@@ -329,11 +329,11 @@ describe('Browser Opening', () => {
     expect(mockLogger.warn).toHaveBeenCalledWith('Could not open browser automatically', {
       error: 'EACCES',
     });
-    expect(consoleLogSpy).toHaveBeenCalledWith(
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
       '   ℹ️  Could not open browser automatically (EACCES)'
     );
 
-    consoleLogSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 });
 

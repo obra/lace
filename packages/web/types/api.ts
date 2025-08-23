@@ -10,6 +10,8 @@ import type {
   ThreadTokenUsage,
 } from '@/types/core';
 
+import type { ToolApprovalRequestData } from '@/types/web-events';
+
 // Session configuration interface
 export interface SessionConfiguration {
   providerInstanceId?: string;
@@ -24,7 +26,6 @@ export interface SessionConfiguration {
 
 // Tool approval types
 
-// Multiple approval support - as defined in spec Phase 3.2
 export interface PendingApproval {
   toolCallId: string;
   toolCall: {

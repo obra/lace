@@ -2,7 +2,7 @@
 // ABOUTME: Provides methods for CRUD operations on sessions and agents
 
 import { useState, useCallback } from 'react';
-import { CreateSessionRequest, CreateAgentRequest, isApiError, isApiSuccess } from '@/types/api';
+import { CreateSessionRequest, CreateAgentRequest } from '@/types/api';
 import type { ThreadId, SessionInfo, AgentInfo } from '@/types/core';
 import { api } from '@/lib/api-client';
 

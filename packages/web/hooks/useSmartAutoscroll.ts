@@ -113,7 +113,7 @@ export function useTimelineAutoscroll(
     const hadNewEvent = currentLength > prevEventsLengthRef.current;
 
     if (hadNewEvent && events.length > 0) {
-      const lastEvent = events[events.length - 1] as any;
+      const lastEvent = events[events.length - 1] as { type: string };
 
       // If the last event is a user message, always scroll (force = true)
       if (lastEvent?.type === 'USER_MESSAGE') {

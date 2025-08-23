@@ -139,12 +139,14 @@ afterAll(() => {
 
 // Mock console methods to prevent test noise
 // Save original console methods
+/* eslint-disable no-console */
 const originalConsole = {
   log: console.log,
   error: console.error,
   warn: console.warn,
   info: console.info,
 };
+/* eslint-enable no-console */
 
 // Set up global console mocking
 vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -153,13 +155,13 @@ vi.spyOn(console, 'warn').mockImplementation(() => {});
 vi.spyOn(console, 'info').mockImplementation(() => {});
 
 // Helper to restore console for debugging if needed
-// eslint-disable-next-line no-console
 (globalThis as unknown as { restoreConsole: () => void }).restoreConsole = () => {
-  // eslint-disable-next-line no-console
+  /* eslint-disable no-console */
   console.log = originalConsole.log;
   console.error = originalConsole.error;
   console.warn = originalConsole.warn;
   console.info = originalConsole.info;
+  /* eslint-enable no-console */
 };
 
 // Cleanup after each individual test

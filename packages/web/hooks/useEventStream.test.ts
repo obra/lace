@@ -6,6 +6,7 @@ import { renderHook, cleanup } from '@testing-library/react';
 import { useEventStream } from './useEventStream';
 import type { UseEventStreamOptions } from './useEventStream';
 import { EventStreamFirehose } from '@/lib/event-stream-firehose';
+import type { LaceEvent } from '@/types/core';
 
 // Mock the firehose
 vi.mock('@/lib/event-stream-firehose', () => ({
@@ -22,7 +23,9 @@ describe('useEventStream', () => {
   };
 
   beforeEach(() => {
-    (EventStreamFirehose.getInstance as any).mockReturnValue(mockFirehose);
+    (EventStreamFirehose.getInstance as typeof EventStreamFirehose.getInstance).mockReturnValue(
+      mockFirehose
+    );
     mockFirehose.subscribe.mockClear();
     mockFirehose.unsubscribe.mockClear();
     mockFirehose.getStats.mockReturnValue({
@@ -62,7 +65,7 @@ describe('useEventStream', () => {
 
   test('should call onAgentStateChange callback when AGENT_STATE_CHANGE event is received', async () => {
     const mockOnAgentStateChange = vi.fn();
-    let capturedCallback: ((event: any) => void) | null = null;
+    let capturedCallback: ((event: LaceEvent) => void) | null = null;
 
     mockFirehose.subscribe.mockImplementation((filter, callback) => {
       capturedCallback = callback;
@@ -100,7 +103,7 @@ describe('useEventStream', () => {
     const mockOnUserMessage = vi.fn();
     const mockOnAgentMessage = vi.fn();
     const mockOnToolCall = vi.fn();
-    let capturedCallback: ((event: any) => void) | null = null;
+    let capturedCallback: ((event: LaceEvent) => void) | null = null;
 
     mockFirehose.subscribe.mockImplementation((filter, callback) => {
       capturedCallback = callback;
@@ -152,7 +155,7 @@ describe('useEventStream', () => {
 
   test('should handle malformed AGENT_STATE_CHANGE events gracefully', () => {
     const mockOnAgentStateChange = vi.fn();
-    let capturedCallback: ((event: any) => void) | null = null;
+    let capturedCallback: ((event: LaceEvent) => void) | null = null;
 
     mockFirehose.subscribe.mockImplementation((filter, callback) => {
       capturedCallback = callback;

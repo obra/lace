@@ -96,7 +96,9 @@ const nextConfig: NextConfig = {
       webpackConfig.externals = [
         ...(Array.isArray(webpackConfig.externals)
           ? webpackConfig.externals
-          : [webpackConfig.externals].filter(Boolean)),
+          : webpackConfig.externals
+            ? [webpackConfig.externals]
+            : []),
         /^bun:/,
       ];
     }
