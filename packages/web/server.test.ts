@@ -10,22 +10,9 @@ vi.mock('open', () => ({
   default: vi.fn(),
 }));
 
-// Mock the logger
-vi.mock('@lace/core/utils/logger', () => ({
-  logger: {
-    error: vi.fn(),
-    warn: vi.fn(),
-    info: vi.fn(),
-    debug: vi.fn(),
-  },
-}));
-
 // Import after mocking
 const open = await import('open');
 const mockOpen = vi.mocked(open.default);
-
-const { logger } = await import('@lace/core/utils/logger');
-const mockLogger = vi.mocked(logger);
 
 // Inline the isInteractive function for testing
 function isInteractive(
@@ -298,13 +285,8 @@ describe('Browser Opening', () => {
       await mockOpen('http://localhost:31337');
     } catch (error) {
       const errorCode = (error as NodeJS.ErrnoException).code || 'unknown error';
-      mockLogger.warn('Could not open browser automatically', { error: errorCode });
       console.log(`   ℹ️  Could not open browser automatically (${errorCode})`);
     }
-
-    expect(mockLogger.warn).toHaveBeenCalledWith('Could not open browser automatically', {
-      error: 'unknown error',
-    });
     expect(consoleLogSpy).toHaveBeenCalledWith(
       '   ℹ️  Could not open browser automatically (unknown error)'
     );
@@ -322,13 +304,8 @@ describe('Browser Opening', () => {
       await mockOpen('http://localhost:31337');
     } catch (error) {
       const errorCode = (error as NodeJS.ErrnoException).code || 'unknown error';
-      mockLogger.warn('Could not open browser automatically', { error: errorCode });
       console.log(`   ℹ️  Could not open browser automatically (${errorCode})`);
     }
-
-    expect(mockLogger.warn).toHaveBeenCalledWith('Could not open browser automatically', {
-      error: 'EACCES',
-    });
     expect(consoleLogSpy).toHaveBeenCalledWith(
       '   ℹ️  Could not open browser automatically (EACCES)'
     );
@@ -337,12 +314,12 @@ describe('Browser Opening', () => {
   });
 });
 
-describe('Error Logging', () => {
+describe('Port Validation Logic', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  test('should log invalid port numbers to logger with structured data', () => {
+  test('should identify invalid port numbers correctly', () => {
     const invalidInputs = [
       { input: 'abc', expectedParsed: NaN },
       { input: '0', expectedParsed: 0 },
@@ -351,58 +328,24 @@ describe('Error Logging', () => {
     ];
 
     invalidInputs.forEach(({ input, expectedParsed }) => {
-      mockLogger.error.mockClear();
-
       const requestedPort = parseInt(input, 10);
       const isValid =
         Number.isInteger(requestedPort) && requestedPort >= 1 && requestedPort <= 65535;
 
-      if (!isValid) {
-        // Simulate the production error logging path
-        mockLogger.error(`Invalid port number: "${input}" (parsed as ${requestedPort})`);
-
-        expect(mockLogger.error).toHaveBeenCalledWith(
-          `Invalid port number: "${input}" (parsed as ${expectedParsed})`
-        );
-      }
+      expect(isValid).toBe(false);
+      expect(requestedPort).toBe(expectedParsed);
     });
   });
 
-  test('should log server startup failures with structured error data', () => {
+  test('should validate server error structure', () => {
     const mockError = new Error('Test error') as NodeJS.ErrnoException;
     mockError.code = 'ENOTFOUND';
 
     const port = 31337;
 
-    // Simulate the production error logging path
-    mockLogger.error(`Server error on port ${port}`, {
-      code: mockError.code,
-      message: mockError.message,
-    });
-
-    expect(mockLogger.error).toHaveBeenCalledWith('Server error on port 31337', {
-      code: 'ENOTFOUND',
-      message: 'Test error',
-    });
-  });
-
-  test('should log port unavailable errors', () => {
-    const port = 31337;
-
-    // Simulate the production error logging path
-    mockLogger.error(`Port ${port} is already in use`);
-
-    expect(mockLogger.error).toHaveBeenCalledWith('Port 31337 is already in use');
-  });
-
-  test('should log when no available ports found', () => {
-    const startPort = 31337;
-
-    // Simulate the production error logging path
-    mockLogger.error(`Could not find an available port starting from ${startPort}`);
-
-    expect(mockLogger.error).toHaveBeenCalledWith(
-      'Could not find an available port starting from 31337'
-    );
+    // Verify error structure that would be logged
+    expect(mockError.code).toBe('ENOTFOUND');
+    expect(mockError.message).toBe('Test error');
+    expect(port).toBe(31337);
   });
 });

@@ -582,6 +582,10 @@ describe('OpenAIProvider', () => {
 
     it('should handle streaming setup errors', async () => {
       const streamError = new Error('Stream setup failed');
+
+      // Add error listener to prevent unhandled error events
+      provider.on('error', () => {});
+
       mockCreate.mockImplementation(() => {
         throw streamError;
       });

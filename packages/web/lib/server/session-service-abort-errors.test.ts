@@ -13,15 +13,6 @@ vi.mock('@/lib/event-stream-manager', () => ({
   },
 }));
 
-vi.mock('@lace/core/utils/logger', () => ({
-  logger: {
-    error: vi.fn(),
-    warn: vi.fn(),
-    info: vi.fn(),
-    debug: vi.fn(),
-  },
-}));
-
 import { SessionService } from './session-service';
 import { asThreadId } from '@/types/core';
 import { logger } from '@/lib/server/lace-imports';
@@ -34,6 +25,8 @@ describe('SessionService abort error filtering', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Spy on real logger instead of mocking
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
     sessionService = new SessionService();
     mockAgent = createMockAgent({
       threadId: 'lace_20250101_sess01.1',
@@ -50,6 +43,8 @@ describe('SessionService abort error filtering', () => {
     if (mockAgent.handlers) {
       mockAgent.handlers = {};
     }
+    // Restore logger spy
+    vi.restoreAllMocks();
   });
 
   it('should filter out AbortError from UI messages', async () => {

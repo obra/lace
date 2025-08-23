@@ -33,7 +33,8 @@ const mockProject = {
   delete: vi.fn(),
 };
 
-vi.mock('@/lib/server/lace-imports', () => ({
+// Mock core modules directly instead of facade
+vi.mock('@lace/core/projects/project', () => ({
   Project: {
     getById: vi.fn(),
   },

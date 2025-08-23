@@ -7,8 +7,8 @@ import { GET, PATCH, DELETE } from '@/app/api/projects/[projectId]/sessions/[ses
 import { Project } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 
-// Mock Project
-vi.mock('@/lib/server/lace-imports', () => ({
+// Mock core modules directly instead of facade
+vi.mock('@lace/core/projects/project', () => ({
   Project: {
     getById: vi.fn(),
   },

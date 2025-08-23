@@ -8,13 +8,19 @@ import { Session, Agent } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
 import { createMockAgent } from '@/test-utils/mock-agent';
 
-// Mock dependencies
-vi.mock('@/lib/server/lace-imports', () => ({
+// Mock core modules directly instead of facade
+vi.mock('@lace/core/sessions/session', () => ({
   Session: {
     create: vi.fn(),
     getByIdSync: vi.fn(),
   },
+}));
+
+vi.mock('@lace/core/agents/agent', () => ({
   Agent: vi.fn(),
+}));
+
+vi.mock('@lace/core/threads/thread-manager', () => ({
   ThreadManager: vi.fn(),
 }));
 

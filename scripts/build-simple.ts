@@ -170,6 +170,14 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
   });
   console.log('📁 Core source directory copied to standalone/src/');
 
+  // Copy all workspace node_modules since dependencies are hoisted in monorepo
+  // The Next.js standalone build doesn't include workspace dependencies
+  console.log('📦 Copying workspace dependencies...');
+  execSync(`cp -r node_modules ${tempBuildDir}/standalone/`, {
+    stdio: 'pipe',
+  });
+  console.log('📁 Workspace node_modules copied to standalone/');
+
   // Copy static files to the correct location where Next.js server expects them
   // The server runs from packages/web, so static files must be at packages/web/.next/static
   if (existsSync('packages/web/.next/static')) {
