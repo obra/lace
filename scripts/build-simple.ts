@@ -5,6 +5,42 @@ import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, cpSync, statSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 
+/**
+ * Check if package.json has workspaces field
+ */
+function hasWorkspaces(packageJsonPath: string): boolean {
+  try {
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
+      workspaces?: unknown;
+    };
+    return packageJson.workspaces !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Create minimal package.json for production-only install
+ */
+function createProductionPackageJson(webPackageJsonPath: string, outputPath: string): void {
+  const webPackageJson = JSON.parse(readFileSync(webPackageJsonPath, 'utf8')) as {
+    name: string;
+    version: string;
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+
+  // Create minimal package.json with only runtime dependencies
+  const minimalPackageJson = {
+    name: webPackageJson.name || 'lace-web-standalone',
+    version: webPackageJson.version || '1.0.0',
+    dependencies: webPackageJson.dependencies || {},
+    // Explicitly omit workspaces and devDependencies
+  };
+
+  writeFileSync(outputPath, JSON.stringify(minimalPackageJson, null, 2));
+}
+
 interface BuildOptions {
   target?: string;
   name?: string;
@@ -126,18 +162,37 @@ async function copyProductionDependencies(targetNodeModules: string): Promise<vo
     execSync(`rm -rf ${tempDir}`, { stdio: 'pipe' });
     mkdirSync(tempDir, { recursive: true });
 
-    // Copy package.json files
-    execSync(`cp package.json ${tempDir}/`, { stdio: 'pipe' });
-    if (existsSync('package-lock.json')) {
-      execSync(`cp package-lock.json ${tempDir}/`, { stdio: 'pipe' });
+    // Check if root package.json has workspaces (which breaks npm ci)
+    const rootPackageJsonPath = 'package.json';
+    const webPackageJsonPath = 'packages/web/package.json';
+
+    if (hasWorkspaces(rootPackageJsonPath)) {
+      console.log('   Detected workspaces - creating minimal package.json...');
+      // Create minimal package.json without workspaces
+      createProductionPackageJson(webPackageJsonPath, join(tempDir, 'package.json'));
+    } else {
+      console.log('   No workspaces detected - using root package.json...');
+      // Copy root package.json (legacy approach)
+      execSync(`cp package.json ${tempDir}/`, { stdio: 'pipe' });
+      if (existsSync('package-lock.json')) {
+        execSync(`cp package-lock.json ${tempDir}/`, { stdio: 'pipe' });
+      }
     }
 
     // Install only production dependencies
-    console.log('   Running npm ci --omit=dev...');
-    execSync('npm ci --omit=dev', {
-      cwd: tempDir,
-      stdio: 'pipe',
-    });
+    if (hasWorkspaces(rootPackageJsonPath)) {
+      console.log('   Running npm install --omit=dev (no lock file for minimal package.json)...');
+      execSync('npm install --omit=dev', {
+        cwd: tempDir,
+        stdio: 'pipe',
+      });
+    } else {
+      console.log('   Running npm ci --omit=dev...');
+      execSync('npm ci --omit=dev', {
+        cwd: tempDir,
+        stdio: 'pipe',
+      });
+    }
 
     // Copy the pruned node_modules
     const tempNodeModules = join(tempDir, 'node_modules');
