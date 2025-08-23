@@ -49,7 +49,6 @@ export default [
         'ts': 'never',
         'tsx': 'never'
       }],
-      ...prettierConfig.rules,
       'prettier/prettier': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
       '@typescript-eslint/explicit-function-return-type': 'off',
@@ -85,4 +84,6 @@ export default [
       ...vitest.configs.recommended.rules,
     },
   },
+  // Ensure Prettier disables conflicting stylistic rules repo-wide
+  prettierConfig,
 ];
