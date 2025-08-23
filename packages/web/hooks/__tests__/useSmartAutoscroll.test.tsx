@@ -119,7 +119,7 @@ describe('useTimelineAutoscroll', () => {
     expect(mockContainer.scrollTo).toHaveBeenCalled();
   });
 
-  it('should handle streaming content updates', () => {
+  it('should handle streaming content updates', async () => {
     const mockEvents = [{ type: 'USER_MESSAGE', content: 'Hello' }];
 
     const { result, rerender } = renderHook(
@@ -142,12 +142,11 @@ describe('useTimelineAutoscroll', () => {
       rerender({ streamingContent: 'Streaming response...' });
     });
 
-    setTimeout(() => {
-      expect(mockContainer.scrollTo).toHaveBeenCalled();
-    }, 10);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(mockContainer.scrollTo).toHaveBeenCalled();
   });
 
-  it('should autoscroll when content is first loaded', () => {
+  it('should autoscroll when content is first loaded', async () => {
     const { result, rerender } = renderHook(
       ({ events }: { events: unknown[] }) =>
         useTimelineAutoscroll(events, false, undefined, { scrollDelay: 0 }),
@@ -174,11 +173,10 @@ describe('useTimelineAutoscroll', () => {
       rerender({ events: loadedEvents });
     });
 
-    setTimeout(() => {
-      expect(mockContainer.scrollTo).toHaveBeenCalledWith({
-        top: 1000,
-        behavior: 'smooth',
-      });
-    }, 10);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(mockContainer.scrollTo).toHaveBeenCalledWith({
+      top: 1000,
+      behavior: 'smooth',
+    });
   });
 });
