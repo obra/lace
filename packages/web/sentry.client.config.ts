@@ -14,7 +14,7 @@ Sentry.init({
     }),
   ],
 
-  beforeSend(event, hint) {
+  beforeSend(event, _hint) {
     // Filter out known harmless errors or add context
     if (event.exception) {
       const error = event.exception.values?.[0];

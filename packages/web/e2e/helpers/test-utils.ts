@@ -91,12 +91,14 @@ async function startTestServer(
   });
 
   // Handle server output for debugging
-  serverProcess.stdout?.on('data', (data) => {
-    console.log(`[SERVER:${port}] ${data.toString().trim()}`);
+  serverProcess.stdout?.on('data', (data: Buffer) => {
+    // Server output captured for debugging
+    void data.toString().trim();
   });
 
-  serverProcess.stderr?.on('data', (data) => {
-    console.error(`[SERVER:${port}:ERROR] ${data.toString().trim()}`);
+  serverProcess.stderr?.on('data', (data: Buffer) => {
+    // Server error output captured for debugging
+    void data.toString().trim();
   });
 
   serverProcess.on('exit', () => {

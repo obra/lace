@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 
-export default {
+const config = {
   stories: [
     'components/ui/Badge.stories.*',
     'components/ui/Modal.stories.*',
@@ -28,3 +28,5 @@ export default {
     },
   },
 };
+
+export default config;

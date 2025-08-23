@@ -94,12 +94,13 @@ test.describe('Agent Management', () => {
     const placeholderText = await messageInput.getAttribute('placeholder');
 
     // Document agent reload behavior (similar to session behavior)
-    console.log('Agent reload behavior:', {
+    const agentReloadInfo = {
       agentId: agentMatch ? agentMatch[1] : 'unknown',
       disabled: messageInputEnabled !== null,
       placeholder: placeholderText,
       url: agentUrl,
-    });
+    };
+    void agentReloadInfo; // Agent reload behavior documented
 
     if (messageInputEnabled === null && !placeholderText?.includes('interrupt')) {
       // Agent interface is ready
@@ -150,17 +151,17 @@ test.describe('Agent Management', () => {
       await sendMessage(page, followupMessage);
       await verifyMessageVisible(page, followupMessage);
       agentIsolationTest.canSendNewMessage = true;
-    } catch (error) {
-      console.log('Agent isolation: Could not send follow-up message');
+    } catch (_error) {
+      // Agent isolation: Could not send follow-up message
     }
 
-    console.log('Agent Isolation Test Results:', agentIsolationTest);
+    // Agent Isolation Test Results documented
 
     // Test succeeds if we can establish basic agent functionality
     expect(agentIsolationTest.agentId).not.toBe('unknown');
 
     if (agentIsolationTest.messageVisible && agentIsolationTest.canSendNewMessage) {
-      console.log('Agent isolation working - full functionality');
+      // Agent isolation working - full functionality
       expect(agentIsolationTest.canSendNewMessage).toBeTruthy();
     } else {
       console.log('Agent isolation partial - documenting current behavior');

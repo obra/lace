@@ -6,6 +6,14 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync, existsSync } from 'fs';
 import { withSentryConfig } from '@sentry/nextjs';
 
+interface NFTTraceData {
+  summary: {
+    hasIsDocker: boolean;
+    hasOpen: boolean;
+  };
+  tracedFiles: string[];
+}
+
 // Load nft-traced dependencies - only needed for standalone builds
 function getServerDependencies(): string[] {
   const traceFile = path.resolve('./server-dependencies.json');
@@ -17,7 +25,7 @@ function getServerDependencies(): string[] {
   }
 
   try {
-    const traceData = JSON.parse(readFileSync(traceFile, 'utf8'));
+    const traceData = JSON.parse(readFileSync(traceFile, 'utf8')) as NFTTraceData;
 
     if (!traceData.summary.hasIsDocker || !traceData.summary.hasOpen) {
       throw new Error(
@@ -76,7 +84,11 @@ const nextConfig: NextConfig = {
         fallback?: Record<string, string | boolean>;
         extensionAlias?: Record<string, string[]>;
       };
-      externals?: any;
+      externals?: Array<
+        | string
+        | RegExp
+        | ((ctx: unknown, callback: (error?: Error, result?: unknown) => void) => void)
+      >;
     };
 
     // Ignore all bun:* imports - they're only used in Bun runtime

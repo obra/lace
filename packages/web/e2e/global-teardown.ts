@@ -3,8 +3,8 @@
 
 import { FullConfig } from '@playwright/test';
 
-async function globalTeardown(config: FullConfig): Promise<void> {
-  console.log('🎭 Playwright test suite teardown complete');
+async function globalTeardown(_config: FullConfig): Promise<void> {
+  // Playwright test suite teardown complete
 }
 
 export default globalTeardown;

@@ -15,17 +15,6 @@ type FeedbackVerbosity = 'quiet' | 'normal' | 'verbose' | 'commentary';
 
 type FeedbackTiming = 'immediate' | 'batched' | 'milestone';
 
-interface FeedbackConfig {
-  verbosity: FeedbackVerbosity;
-  timing: FeedbackTiming;
-  enabledTypes: CommentaryType[];
-  showPerformanceMetrics: boolean;
-  showPredictions: boolean;
-  showInsights: boolean;
-  maxFeedbacksPerMinute: number;
-  enableTennisBanter: boolean; // Fun, engaging commentary style
-}
-
 interface FeedbackContext {
   threadId: string;
   agentState?: string;
@@ -107,11 +96,4 @@ export interface PredictiveInsight {
   factors: string[];
   actionable: boolean;
   preventionSuggestions?: string[];
-}
-
-interface FeedbackEventHandlers {
-  onFeedbackGenerated: (event: FeedbackEvent) => void;
-  onInsightGenerated: (insight: FeedbackInsight) => void;
-  onPerformanceAnalysis: (analysis: PerformanceAnalysis) => void;
-  onPredictiveInsight: (insight: PredictiveInsight) => void;
 }

@@ -3,22 +3,13 @@
 
 // Import core types from unified core imports
 import type {
-  AgentState,
   ThreadId,
   ProviderInfo as BackendProviderInfo,
   ModelInfo as BackendModelInfo,
-  SessionInfo,
   AgentInfo,
-  ProjectInfo,
   ThreadTokenUsage,
 } from '@/types/core';
 import { ApprovalDecision } from '@/types/core';
-
-// Import only the types we actually use
-import type { ToolApprovalRequestData } from './web-events';
-import type { LaceEvent } from '@/types/core';
-
-// DESTROYED: API response types removed - using core types with superjson everywhere
 
 // Session configuration interface
 export interface SessionConfiguration {
@@ -43,13 +34,6 @@ export interface PendingApproval {
   };
   requestedAt: Date;
   requestData: ToolApprovalRequestData;
-}
-
-// API request/response for approval decisions
-interface ToolApprovalResponse {
-  requestId: string;
-  decision: ApprovalDecision;
-  reason?: string;
 }
 
 // API request types
@@ -88,8 +72,6 @@ export interface ApiErrorResponse {
   code?: string;
   details?: unknown;
 }
-
-type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 
 // Helper type guards for API responses
 export function isApiError(response: unknown): response is ApiErrorResponse {

@@ -4,7 +4,6 @@
 import { useCallback } from 'react';
 import { useURLState } from '@/hooks/useURLState';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useSessionContext } from '@/components/providers/SessionProvider';
 import { asThreadId } from '@/types/core';
 
 interface UseOnboardingResult {

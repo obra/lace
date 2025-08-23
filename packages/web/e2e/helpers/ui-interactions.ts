@@ -324,7 +324,7 @@ export async function verifyNoMessage(page: Page, message: string): Promise<void
  */
 
 /** Create a new session - placeholder for now, may need actual implementation */
-export async function createSession(page: Page, sessionName?: string): Promise<void> {
+export async function createSession(page: Page, _sessionName?: string): Promise<void> {
   // This function may need implementation based on actual UI
   // For now, sessions are typically created automatically with projects
   // TODO: Implement if explicit session creation UI exists
@@ -332,7 +332,7 @@ export async function createSession(page: Page, sessionName?: string): Promise<v
 }
 
 /** Create a new agent - placeholder for now, may need actual implementation */
-export async function createAgent(page: Page, agentName?: string): Promise<void> {
+export async function createAgent(page: Page, _agentName?: string): Promise<void> {
   // This function may need implementation based on actual UI
   // For now, agents are typically created automatically with projects
   // TODO: Implement if explicit agent creation UI exists
@@ -340,7 +340,7 @@ export async function createAgent(page: Page, agentName?: string): Promise<void>
 }
 
 /** Select an existing agent - placeholder for now, may need actual implementation */
-export async function selectAgent(page: Page, agentName: string): Promise<void> {
+export async function selectAgent(page: Page, _agentName: string): Promise<void> {
   // This function may need implementation based on actual UI
   // TODO: Implement if agent selection UI exists
   await page.waitForTimeout(100); // Placeholder

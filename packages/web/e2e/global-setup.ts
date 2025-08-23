@@ -3,9 +3,8 @@
 
 import { FullConfig } from '@playwright/test';
 
-async function globalSetup(config: FullConfig): Promise<void> {
-  console.log('🎭 Starting Playwright test suite setup');
-  
+async function globalSetup(_config: FullConfig): Promise<void> {
+  // Starting Playwright test suite setup
   // Any global setup needed (currently none, but placeholder for future needs)
 }
 
