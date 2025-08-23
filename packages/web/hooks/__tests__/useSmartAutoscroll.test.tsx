@@ -7,6 +7,12 @@ import { useSmartAutoscroll, useTimelineAutoscroll } from '../useSmartAutoscroll
 import { ScrollProvider } from '@/components/providers/ScrollProvider';
 import React from 'react';
 
+// Mock scrollTo method for JSDOM compatibility in this test
+Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+  value: vi.fn(),
+  writable: true,
+});
+
 // Mock scroll behavior
 const createMockContainer = (scrollTop = 0, scrollHeight = 1000, clientHeight = 500) => {
   const container = {
@@ -109,9 +115,8 @@ describe('useTimelineAutoscroll', () => {
     });
 
     // Should trigger scroll due to user message
-    setTimeout(() => {
-      expect(mockContainer.scrollTo).toHaveBeenCalled();
-    }, 10);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(mockContainer.scrollTo).toHaveBeenCalled();
   });
 
   it('should handle streaming content updates', () => {
