@@ -15,17 +15,18 @@ export default [
   ...tseslint.configs.recommendedTypeChecked.map(config => ({
     ...config,
     files: ['**/*.ts', '**/*.tsx'],
-    ignores: ['dist/**/*'],
+    ignores: ['dist/**/*', '**/*.test.ts', '**/*.spec.ts'],
   })),
   {
     files: ['**/*.ts', '**/*.tsx'],
-    ignores: ['dist/**/*'],
+    ignores: ['dist/**/*', '**/*.test.ts', '**/*.spec.ts'],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',
       globals: globals.node,
       parserOptions: {
         project: './tsconfig.json',
+        tsconfigRootDir: import.meta.dirname,
       },
     },
     plugins: {
@@ -50,6 +51,7 @@ export default [
         'tsx': 'never'
       }],
       'prettier/prettier': 'error',
+      'no-unused-vars': 'off', // Disable base rule in favor of TypeScript version
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-explicit-any': 'error',
@@ -74,13 +76,31 @@ export default [
   {
     files: ['**/*.test.ts', '**/*.spec.ts'],
     ignores: ['dist/**/*'],
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: 'module',
+      globals: { ...globals.node, ...vitest.environments.env.globals },
+      parser: tseslint.parser,
+      parserOptions: {
+        project: null, // Don't use TypeScript project for test files
+        ecmaFeatures: {
+          modules: true,
+        },
+      },
+    },
     plugins: {
       vitest,
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/unbound-method': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
       'no-console': 'off',
+      'no-undef': 'off', // TypeScript handles this
       ...vitest.configs.recommended.rules,
     },
   },
