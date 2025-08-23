@@ -32,8 +32,9 @@ async function getAvailablePort(): Promise<number> {
 /**
  * Wait for server to be ready by attempting HTTP requests
  */
-async function waitForServer(url: string, timeoutMs: number = 60000): Promise<void> {
+async function waitForServer(url: string, timeoutMs: number = 120000): Promise<void> {
   const startTime = Date.now();
+  console.log(`[E2E-WAIT] Waiting for server at ${url} (timeout: ${timeoutMs}ms)`);
 
   while (Date.now() - startTime < timeoutMs) {
     try {
@@ -54,6 +55,7 @@ async function waitForServer(url: string, timeoutMs: number = 60000): Promise<vo
       });
 
       // Server is ready
+      console.log(`[E2E-WAIT] Server ready at ${url} (took ${Date.now() - startTime}ms)`);
       return;
     } catch {
       // Server not ready yet, continue waiting
@@ -77,28 +79,36 @@ async function startTestServer(
   const serverUrl = `http://localhost:${port}`;
 
   // Start server process with isolated environment using E2E test server
-  const serverProcess = spawn('npx', ['tsx', 'e2e-test-server.ts', '--port', port.toString()], {
-    cwd: process.cwd(),
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: {
-      ...process.env,
-      LACE_DIR: tempDir,
-      ANTHROPIC_KEY: 'test-anthropic-key-for-e2e',
-      LACE_DB_PATH: path.join(tempDir, 'lace.db'),
-      NODE_ENV: 'production',
-      E2E_TOOL_APPROVAL_MOCK: 'true',
-    },
-  });
+  const serverProcess = spawn(
+    'npx',
+    ['tsx', 'packages/web/e2e-test-server.ts', '--port', port.toString()],
+    {
+      cwd: path.resolve(process.cwd(), '../..'),
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        LACE_DIR: tempDir,
+        ANTHROPIC_KEY: 'test-anthropic-key-for-e2e',
+        LACE_DB_PATH: path.join(tempDir, 'lace.db'),
+        NODE_ENV: 'production',
+        E2E_TOOL_APPROVAL_MOCK: 'true',
+      },
+    }
+  );
 
   // Handle server output for debugging
   serverProcess.stdout?.on('data', (data: Buffer) => {
-    // Server output captured for debugging
-    void data.toString().trim();
+    const output = data.toString().trim();
+    if (output) {
+      console.log(`[E2E-SERVER-${port}] ${output}`);
+    }
   });
 
   serverProcess.stderr?.on('data', (data: Buffer) => {
-    // Server error output captured for debugging
-    void data.toString().trim();
+    const output = data.toString().trim();
+    if (output) {
+      console.error(`[E2E-SERVER-${port}] ${output}`);
+    }
   });
 
   serverProcess.on('exit', () => {
