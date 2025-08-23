@@ -29,7 +29,7 @@ class MockEventSource {
   }
 }
 
-global.EventSource = MockEventSource as any;
+global.EventSource = MockEventSource as unknown as typeof EventSource;
 
 // Add DOM method polyfills for JSDOM compatibility
 if (typeof Element !== 'undefined') {
