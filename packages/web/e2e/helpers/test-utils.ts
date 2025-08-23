@@ -96,35 +96,11 @@ async function startTestServer(
     }
   );
 
-  // Handle server output for debugging - log to both console and file
-  const logFile = `/tmp/e2e-server-${port}.log`;
-  console.log(`[E2E-SETUP] Server logs will be written to: ${logFile}`);
-
-  serverProcess.stdout?.on('data', (data: Buffer) => {
-    const output = data.toString().trim();
-    if (output) {
-      const logLine = `[E2E-SERVER-${port}] ${output}`;
-      console.warn(logLine);
-      // Also write to file for tailing
-      try {
-        require('fs').appendFileSync(logFile, logLine + '\n');
-      } catch {
-        // Ignore file write errors
-      }
-    }
-  });
-
+  // Handle server output for debugging - errors only
   serverProcess.stderr?.on('data', (data: Buffer) => {
     const output = data.toString().trim();
-    if (output) {
-      const logLine = `[E2E-SERVER-${port}] ${output}`;
-      console.error(logLine);
-      // Also write to file for tailing
-      try {
-        require('fs').appendFileSync(logFile, logLine + '\n');
-      } catch {
-        // Ignore file write errors
-      }
+    if (output && !output.includes('Fast Refresh')) {
+      console.error(`[E2E-SERVER-${port}] ${output}`);
     }
   });
 
