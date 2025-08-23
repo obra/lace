@@ -374,12 +374,21 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
     );
   } else {
     console.warn('⚠️  NFT trace not available, falling back to copying entire node_modules...');
-    console.warn('   Consider running: bun ../../scripts/trace-server-dependencies.mjs');
+    console.warn('   Consider running: bun ./scripts/trace-server-dependencies.mjs');
     console.warn('   Or set BUILD_PROD_DEPS=true to use production dependencies only');
     console.log('📦 Fallback: Copying workspace dependencies...');
-    execSync(`cp -r node_modules ${tempBuildDir}/standalone/`, {
-      stdio: 'pipe',
-    });
+
+    // Try rsync first (preserves symlinks and metadata), fallback to cp -a
+    try {
+      execSync(`rsync -a --delete node_modules/ ${tempBuildDir}/standalone/node_modules/`, {
+        stdio: 'pipe',
+      });
+    } catch {
+      // Fallback to cp -a if rsync is unavailable
+      execSync(`cp -a node_modules ${tempBuildDir}/standalone/`, {
+        stdio: 'pipe',
+      });
+    }
     console.log('📁 Workspace node_modules copied to standalone/');
   }
 
