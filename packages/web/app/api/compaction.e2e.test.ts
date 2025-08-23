@@ -366,7 +366,7 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
       console.error('DEBUG: Compaction requested:', _compactionRequested);
       console.error(
         'DEBUG: Streamed events:',
-        streamedEvents.map((e) => (e as any)?.type)
+        streamedEvents.map((e) => (e as { type?: string })?.type)
       );
     }
 
@@ -565,7 +565,7 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
       console.error(events.map((e) => ({ type: e.type, timestamp: e.timestamp })));
       console.error(
         'DEBUG: Streamed events:',
-        streamedEvents.map((e) => (e as any)?.type)
+        streamedEvents.map((e) => (e as { type?: string })?.type)
       );
     }
 
@@ -702,7 +702,7 @@ Technical context: Testing auto-compaction trigger at 80% threshold.`;
         events.map((e) => ({
           type: e.type,
           timestamp: e.timestamp,
-          usage: (e as any)?.data?.usage,
+          usage: (e as { data?: { usage?: unknown } })?.data?.usage,
         }))
       );
     }
