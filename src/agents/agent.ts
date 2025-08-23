@@ -2797,9 +2797,21 @@ export class Agent extends EventEmitter {
         // Only check if both paths exist
         if (!toolPath) continue;
 
-        // Normalize paths for comparison - resolve to absolute paths
-        const normalizedToolPath = resolve(toolPath);
-        const normalizedFilePath = resolve(filePath);
+        // Normalize paths for comparison - resolve to absolute paths using agent's working directory
+        const workingDirectory = this._getWorkingDirectory();
+        if (!workingDirectory) {
+          // If no working directory available, we can't reliably compare paths
+          // This should not happen in normal operation - log error and skip this comparison
+          logger.error('hasFileBeenRead: No working directory available for path comparison', {
+            threadId: this._threadId,
+            toolPath,
+            filePath,
+          });
+          continue;
+        }
+
+        const normalizedToolPath = resolve(workingDirectory, toolPath);
+        const normalizedFilePath = resolve(workingDirectory, filePath);
 
         // Look for corresponding successful TOOL_RESULT
         for (let j = i + 1; j < events.length; j++) {
