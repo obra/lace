@@ -3,7 +3,7 @@
 
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { useSmartAutoscroll, useTimelineAutoscroll } from '../useSmartAutoscroll';
+import { useSmartAutoscroll, useTimelineAutoscroll } from '@/hooks/useSmartAutoscroll';
 import { ScrollProvider } from '@/components/providers/ScrollProvider';
 import React from 'react';
 
@@ -150,7 +150,7 @@ describe('useTimelineAutoscroll', () => {
 
     const mockContainer = createMockContainer(0, 1000, 500);
     Object.defineProperty(result.current.containerRef, 'current', {
-      value: mockContainer as any,
+      value: mockContainer as Partial<HTMLElement>,
       writable: true,
     });
 

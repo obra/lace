@@ -124,8 +124,9 @@ function processToolCallAggregation(events: LaceEvent[]): ProcessedEvent[] {
         event.data.id || `${event.threadId}-${event.timestamp}-${toolCallCounter++}`;
       pendingToolCalls.set(toolCallId, { call: event });
     } else if (event.type === 'TOOL_RESULT') {
-      // Find matching tool call by ID
-      const toolCallId = (event.data as any)?.toolCallId || (event.data as any)?.id;
+      // Find matching tool call by ID - ToolResult has an id field
+      const toolResult = event.data as ToolResult;
+      const toolCallId = toolResult.id;
 
       let matchingCall = toolCallId ? pendingToolCalls.get(toolCallId) : null;
 
