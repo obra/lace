@@ -20,13 +20,9 @@ interface AnthropicRequest {
  * This intercepts actual HTTP requests to api.anthropic.com
  */
 export function mockAnthropicForE2E(): void {
-  // Setting up Anthropic API HTTP mocks for E2E tests...
-
   const handlers = [
     // Handle Anthropic API requests
     http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
-      // Intercepting Anthropic API request for E2E test
-
       // Parse the request to determine which response to send
       const body = await request.text();
       const requestData = JSON.parse(body) as AnthropicRequest;
