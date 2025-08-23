@@ -35,7 +35,7 @@ export function createMockAgent(
     handlers,
 
     // Event emitter methods - store handlers for manual triggering
-    on: (event: string, handler: (data?: unknown) => void) => {
+    on: (event: string, handler: (data?: unknown) => void): MockAgent => {
       handlers[event] = handler;
       return mockAgent;
     },
