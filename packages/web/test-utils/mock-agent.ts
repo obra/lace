@@ -2,7 +2,6 @@
 // ABOUTME: Provides complete Agent mocks with getFullSession() method for SessionService tests
 
 import { vi } from 'vitest';
-import type { Agent } from '@/lib/server/lace-imports';
 import type { Session } from '@/lib/server/lace-imports';
 
 /**
@@ -12,10 +11,10 @@ import type { Session } from '@/lib/server/lace-imports';
  */
 type MockAgent = {
   threadId: string;
-  handlers: Record<string, Function>;
-  on: any; // Mock function for event registration
-  emit: any; // Mock function for event emission
-  getFullSession: any; // Mock function for session retrieval
+  handlers: Record<string, (data?: unknown) => void>;
+  on: ReturnType<typeof vi.fn>; // Mock function for event registration
+  emit: ReturnType<typeof vi.fn>; // Mock function for event emission
+  getFullSession: ReturnType<typeof vi.fn>; // Mock function for session retrieval
   [key: string]: unknown;
 };
 

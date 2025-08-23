@@ -23,7 +23,6 @@ export function useSmartAutoscroll({
 }: UseSmartAutoscrollOptions = {}): UseSmartAutoscrollReturn {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const wasNearBottomRef = useRef(true); // Start assuming we're at bottom
-  const lastUserMessageTimeRef = useRef<number>(0);
 
   // Check if user is near the bottom of the container
   const isNearBottom = useCallback((): boolean => {

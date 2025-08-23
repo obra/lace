@@ -153,7 +153,9 @@ vi.spyOn(console, 'warn').mockImplementation(() => {});
 vi.spyOn(console, 'info').mockImplementation(() => {});
 
 // Helper to restore console for debugging if needed
+// eslint-disable-next-line no-console
 (globalThis as unknown as { restoreConsole: () => void }).restoreConsole = () => {
+  // eslint-disable-next-line no-console
   console.log = originalConsole.log;
   console.error = originalConsole.error;
   console.warn = originalConsole.warn;
