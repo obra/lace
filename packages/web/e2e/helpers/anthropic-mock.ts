@@ -26,6 +26,7 @@ export function mockAnthropicForE2E(): void {
     // Handle Anthropic API requests
     http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
       // Intercepting Anthropic API request for E2E test
+      console.log('[MSW-MOCK] Intercepted Anthropic API request!');
 
       // Parse the request to determine which response to send
       const body = await request.text();
@@ -34,6 +35,8 @@ export function mockAnthropicForE2E(): void {
       // Get the LAST user message from conversation history (not the first)
       const userMessages = requestData.messages?.filter((m) => m.role === 'user') || [];
       const userMessage = userMessages[userMessages.length - 1]?.content || '';
+
+      console.log(`[MSW-MOCK] User message: "${userMessage}"`);
 
       // Determine response based on user message content
       let responseText = "I'm a helpful AI assistant. How can I help you today?";
@@ -101,7 +104,7 @@ export function mockAnthropicForE2E(): void {
         }
       }
 
-      // Mock response for message: userMessage, responseText
+      console.log(`[MSW-MOCK] Sending response: "${responseText}"`);
 
       // Split response into tokens for streaming
       const tokens = responseText.split(' ');
