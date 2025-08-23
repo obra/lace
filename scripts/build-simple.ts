@@ -86,7 +86,6 @@ async function copyTracedDependencies(
   console.log(`   Found ${packagePatterns.size} unique package patterns`);
 
   let copiedPackages = 0;
-  let totalSize = 0;
 
   for (const pattern of packagePatterns) {
     const packageName = pattern.replace('node_modules/', '');
@@ -126,9 +125,6 @@ async function copyTracedDependencies(
           });
         }
 
-        // Calculate size
-        const packageStats = statSync(targetPath);
-        totalSize += packageStats.size || 0;
         copiedPackages++;
 
         console.log(`   ✅ Copied: ${packageName}`);
@@ -142,7 +138,6 @@ async function copyTracedDependencies(
 
   console.log(`📦 Dependency copying complete:`);
   console.log(`   Packages copied: ${copiedPackages}/${packagePatterns.size}`);
-  console.log(`   Estimated size: ${(totalSize / 1024 / 1024).toFixed(1)}MB`);
 }
 
 /**
