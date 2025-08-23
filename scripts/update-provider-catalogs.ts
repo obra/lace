@@ -1,7 +1,7 @@
 // ABOUTME: Script to fetch and update provider catalogs from Catwalk repository
 // ABOUTME: Syncs provider configuration files from charmbracelet/catwalk to local data directory
 
-import { readFile, writeFile, readdir } from 'node:fs/promises';
+import { readFile, writeFile, readdir, mkdir } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -97,7 +97,8 @@ async function updateProviderCatalogs(): Promise<void> {
         continue;
       }
 
-      // Update the file
+      // Ensure data directory exists and write the file
+      await mkdir(LOCAL_DATA_DIR, { recursive: true });
       await writeFile(localPath, remoteContent, 'utf-8');
 
       if (isNewFile) {
