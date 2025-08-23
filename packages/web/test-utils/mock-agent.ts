@@ -12,9 +12,9 @@ import type { Session } from '@/lib/server/lace-imports';
 type MockAgent = {
   threadId: string;
   handlers: Record<string, (data?: unknown) => void>;
-  on: unknown;
-  emit: unknown;
-  getFullSession: unknown;
+  on: (event: string, handler: (data?: unknown) => void) => MockAgent;
+  emit: (event: string, data?: unknown) => boolean;
+  getFullSession: () => Promise<Session | undefined>;
   [key: string]: unknown;
 };
 
@@ -35,46 +35,31 @@ export function createMockAgent(
     handlers,
 
     // Event emitter methods - store handlers for manual triggering
-    on: vi.fn((event: string, handler: (data?: unknown) => void) => {
+    on: (event: string, handler: (data?: unknown) => void) => {
       handlers[event] = handler;
       return mockAgent;
-    }),
+    },
 
-    emit: vi.fn((event: string, data?: unknown): boolean => {
+    emit: (event: string, data?: unknown): boolean => {
       const handler = handlers[event];
       if (handler) {
         handler(data);
         return true;
       }
       return false;
-    }),
+    },
 
     // getFullSession method that returns a mock session
     getFullSession: overrides.getFullSession
-      ? vi.fn(overrides.getFullSession)
-      : vi.fn(() =>
+      ? overrides.getFullSession
+      : () =>
           Promise.resolve({
             getId: () => 'lace_20250101_sess01',
             getProjectId: () => 'test-project-123',
-          } as Session)
-        ),
+          } as Session),
 
     ...overrides,
   };
-
-  // Override getFullSession if provided
-  if (overrides.getFullSession) {
-    mockAgent.getFullSession = vi.fn().mockImplementation(overrides.getFullSession);
-  }
-
-  // Override event handlers if provided
-  if (overrides.on) {
-    mockAgent.on = vi.fn().mockImplementation(overrides.on);
-  }
-
-  if (overrides.emit) {
-    mockAgent.emit = vi.fn().mockImplementation(overrides.emit);
-  }
 
   return mockAgent;
 }
