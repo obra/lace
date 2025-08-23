@@ -1,9 +1,9 @@
 // ABOUTME: Script to fetch and update provider catalogs from Catwalk repository
 // ABOUTME: Syncs provider configuration files from charmbracelet/catwalk to local data directory
 
-import { readFile, writeFile, readdir } from 'fs/promises';
-import { join, dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { readFile, writeFile, readdir } from 'node:fs/promises';
+import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 interface CatwalkFile {
   name: string;
@@ -123,7 +123,7 @@ async function updateProviderCatalogs(): Promise<void> {
 }
 
 // Run the update if this script is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]!).href) {
   updateProviderCatalogs();
 }
 
