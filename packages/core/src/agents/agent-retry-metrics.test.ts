@@ -230,17 +230,16 @@ describe('Agent Retry Metrics Tracking', () => {
       agent.on('retry_exhausted', (data) => retryExhaustedEvents.push(data));
       agent.on('turn_complete', (data) => turnCompleteEvents.push(data));
 
-      // This should throw due to retry exhaustion
-      let caughtError: Error | null = null;
-      try {
-        await agent.sendMessage('Test message with retry exhaustion');
-      } catch (error) {
-        caughtError = error as Error;
-      }
+      // Add error listener to prevent unhandled error crashes
+      const errorEvents: Array<{ error: Error; context: unknown }> = [];
+      agent.on('error', (data) => errorEvents.push(data));
 
-      // Verify the operation failed as expected
-      expect(caughtError).toBeTruthy();
-      expect(caughtError?.message).toContain('Final network error');
+      // Agent emits error events instead of throwing for provider errors
+      await agent.sendMessage('Test message with retry exhaustion');
+
+      // Verify error event was emitted with correct message
+      expect(errorEvents).toHaveLength(1);
+      expect(errorEvents[0].error.message).toContain('Final network error');
 
       // Verify retry events
       expect(retryAttemptEvents).toHaveLength(3);
