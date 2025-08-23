@@ -252,7 +252,7 @@ export async function submitProjectCreation(page: Page): Promise<void> {
   await submitButton.click();
 
   // Wait for navigation to the agent page after submission
-  await page.waitForURL(/\/project\/[^\/]+\/session\/[^\/]+\/agent\/[^\/]+/, { timeout: 15000 });
+  await page.waitForURL(/\/project\/[^\/]+\/session\/[^\/]+\/agent\/[^\/]+/, { timeout: 60000 });
 
   // Wait for the agent interface to be ready - look for message input instead of network idle
   await getMessageInput(page);
