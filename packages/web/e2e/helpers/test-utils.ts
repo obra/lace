@@ -150,6 +150,22 @@ export async function setupTestEnvironment(): Promise<TestEnvironment> {
     JSON.stringify(anthropicCredentials, null, 2)
   );
 
+  // Create provider-instances.json configuration
+  const providerInstances = {
+    instances: {
+      'anthropic-default': {
+        id: 'anthropic-default',
+        displayName: 'Test Anthropic Provider',
+        catalogProviderId: 'anthropic',
+        isDefault: true,
+      },
+    },
+  };
+  await fs.promises.writeFile(
+    path.join(tempDir, 'provider-instances.json'),
+    JSON.stringify(providerInstances, null, 2)
+  );
+
   // Start isolated test server
   const { serverUrl, serverProcess } = await startTestServer(tempDir);
 
