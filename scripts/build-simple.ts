@@ -20,9 +20,10 @@ function hasWorkspaces(packageJsonPath: string): boolean {
 }
 
 /**
- * Create minimal package.json for production-only install
+ * Create production package.json with exact versions from lock file
+ * Avoids workspace issues while preserving version control
  */
-function createProductionPackageJson(webPackageJsonPath: string, outputPath: string): void {
+function createProductionPackageFiles(webPackageJsonPath: string, tempDir: string): void {
   const webPackageJson = JSON.parse(readFileSync(webPackageJsonPath, 'utf8')) as {
     name: string;
     version: string;
@@ -38,7 +39,7 @@ function createProductionPackageJson(webPackageJsonPath: string, outputPath: str
     // Explicitly omit workspaces and devDependencies
   };
 
-  writeFileSync(outputPath, JSON.stringify(minimalPackageJson, null, 2));
+  writeFileSync(join(tempDir, 'package.json'), JSON.stringify(minimalPackageJson, null, 2));
 }
 
 interface BuildOptions {
@@ -169,7 +170,7 @@ async function copyProductionDependencies(targetNodeModules: string): Promise<vo
     if (hasWorkspaces(rootPackageJsonPath)) {
       console.log('   Detected workspaces - creating minimal package.json...');
       // Create minimal package.json without workspaces
-      createProductionPackageJson(webPackageJsonPath, join(tempDir, 'package.json'));
+      createProductionPackageFiles(webPackageJsonPath, tempDir);
     } else {
       console.log('   No workspaces detected - using root package.json...');
       // Copy root package.json (legacy approach)
@@ -181,8 +182,12 @@ async function copyProductionDependencies(targetNodeModules: string): Promise<vo
 
     // Install only production dependencies
     if (hasWorkspaces(rootPackageJsonPath)) {
-      console.log('   Running npm install --omit=dev (no lock file for minimal package.json)...');
-      execSync('npm install --omit=dev', {
+      console.log('   Running npm install --omit=dev (workspace mode - no lock file)...');
+      execSync('npm install --omit=dev --package-lock-only', {
+        cwd: tempDir,
+        stdio: 'pipe',
+      });
+      execSync('npm ci --omit=dev', {
         cwd: tempDir,
         stdio: 'pipe',
       });
