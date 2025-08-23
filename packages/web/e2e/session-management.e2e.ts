@@ -138,8 +138,8 @@ test.describe('Session Management', () => {
       await verifyMessageVisible(page, followupMessage);
       sessionIsolationTest.canSendNewMessage = true;
       sessionIsolationTest.sessionFunctional = true;
-    } catch (error) {
-      console.log('Session isolation: Could not send follow-up message');
+    } catch (_error) {
+      // Session isolation: Could not send follow-up message
     }
 
     console.log('Session Isolation Test Results:', sessionIsolationTest);

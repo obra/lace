@@ -62,14 +62,17 @@ test.describe('Minimal Streaming Events', () => {
       const text = message.text();
       try {
         if (text.includes('STREAMING_EVENT:')) {
-          const eventData = JSON.parse(text.replace('STREAMING_EVENT:', ''));
+          const eventData = JSON.parse(text.replace('STREAMING_EVENT:', '')) as {
+            type: string;
+            data: unknown;
+          };
           streamingEvents.push({
             type: eventData.type,
             data: eventData.data,
             timestamp: Date.now(),
           });
         }
-      } catch (error) {
+      } catch (_error) {
         // Not a streaming event - ignore
       }
     });

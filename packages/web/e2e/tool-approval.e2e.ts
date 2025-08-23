@@ -160,48 +160,45 @@ test.describe('Tool Approval Workflow', () => {
     // Wait for project to be fully loaded
     await getMessageInput(page);
 
-    // Test tool approval API endpoints directly
-    const toolAPITest = await page.evaluate(async () => {
-      const tests = [];
+    // Test tool approval API endpoints directly using Playwright's request API
+    const tests = [];
 
-      // Test approval endpoint
-      try {
-        const approvalResponse = await fetch('/api/tools/approval', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ toolId: 'test-tool', action: 'approve' }),
-        });
-        tests.push({
-          endpoint: 'approval',
-          status: approvalResponse.status,
-          accessible: true,
-        });
-      } catch (error) {
-        tests.push({
-          endpoint: 'approval',
-          accessible: false,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+    // Test approval endpoint
+    try {
+      const approvalResponse = await page.request.post('/api/tools/approval', {
+        headers: { 'Content-Type': 'application/json' },
+        data: { toolId: 'test-tool', action: 'approve' },
+      });
+      tests.push({
+        endpoint: 'approval',
+        status: approvalResponse.status(),
+        accessible: true,
+      });
+    } catch (error) {
+      tests.push({
+        endpoint: 'approval',
+        accessible: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
-      // Test pending tools endpoint
-      try {
-        const pendingResponse = await fetch('/api/tools/pending');
-        tests.push({
-          endpoint: 'pending',
-          status: pendingResponse.status,
-          accessible: true,
-        });
-      } catch (error) {
-        tests.push({
-          endpoint: 'pending',
-          accessible: false,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+    // Test pending tools endpoint
+    try {
+      const pendingResponse = await page.request.get('/api/tools/pending');
+      tests.push({
+        endpoint: 'pending',
+        status: pendingResponse.status(),
+        accessible: true,
+      });
+    } catch (error) {
+      tests.push({
+        endpoint: 'pending',
+        accessible: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
-      return tests;
-    });
+    const toolAPITest = tests;
 
     console.log('Tool API Endpoints Test:', toolAPITest);
 

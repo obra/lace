@@ -164,7 +164,7 @@ test.describe('Agent Management', () => {
       // Agent isolation working - full functionality
       expect(agentIsolationTest.canSendNewMessage).toBeTruthy();
     } else {
-      console.log('Agent isolation partial - documenting current behavior');
+      // Agent isolation partial - documenting current behavior
       expect(true).toBeTruthy(); // Still valid outcome
     }
   });
