@@ -144,7 +144,7 @@ describe('Port Detection Logic', () => {
   });
 
   test('should find next available port when none specified', async () => {
-    const userSpecified = false;
+    const _userSpecified = false;
     const requestedPort = availablePort;
 
     // Block the requested port
@@ -299,7 +299,7 @@ describe('Browser Opening', () => {
     } catch (error) {
       const errorCode = (error as NodeJS.ErrnoException).code || 'unknown error';
       mockLogger.warn('Could not open browser automatically', { error: errorCode });
-      console.log(`   ℹ️  Could not open browser automatically (${errorCode})`);
+      console.warn(`   ℹ️  Could not open browser automatically (${errorCode})`);
     }
 
     expect(mockLogger.warn).toHaveBeenCalledWith('Could not open browser automatically', {
@@ -323,7 +323,7 @@ describe('Browser Opening', () => {
     } catch (error) {
       const errorCode = (error as NodeJS.ErrnoException).code || 'unknown error';
       mockLogger.warn('Could not open browser automatically', { error: errorCode });
-      console.log(`   ℹ️  Could not open browser automatically (${errorCode})`);
+      console.warn(`   ℹ️  Could not open browser automatically (${errorCode})`);
     }
 
     expect(mockLogger.warn).toHaveBeenCalledWith('Could not open browser automatically', {
