@@ -6,6 +6,7 @@
 import React, { memo, useCallback } from 'react';
 import { TimelineView } from '@/components/timeline/TimelineView';
 import { MemoizedChatInput } from '@/components/chat/MemoizedChatInput';
+import { useTimelineAutoscroll } from '@/hooks/useSmartAutoscroll';
 import {
   useSessionEvents,
   useAgentAPI,
@@ -13,6 +14,7 @@ import {
   useCompactionState,
 } from '@/components/providers/EventStreamProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useScrollContext } from '@/components/providers/ScrollProvider';
 import type { ThreadId, AgentInfo, LaceEvent } from '@/types/core';
 
 export const Chat = memo(function Chat(): React.JSX.Element {
@@ -22,18 +24,32 @@ export const Chat = memo(function Chat(): React.JSX.Element {
   const compactionState = useCompactionState();
   const { sessionDetails, selectedAgent, agentBusy } = useAgentContext();
   const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useAgentAPI();
+  const { triggerAutoscroll } = useScrollContext();
 
   const agents = sessionDetails?.agents;
+
+  // Smart autoscroll for the main conversation container
+  const { containerRef } = useTimelineAutoscroll(events, agentBusy, streamingContent, {
+    nearBottomThreshold: 150,
+    scrollDelay: 50,
+  });
 
   // Event handlers using provider methods
   const onSendMessage = useCallback(
     async (message: string) => {
-      if (!selectedAgent || !message.trim()) {
-        return false;
+      if (!selectedAgent || !message.trim() || agentBusy) {
+        return false; // Prevent sending when agent is busy
       }
-      return await sendMessageAPI(selectedAgent as ThreadId, message);
+      const success = await sendMessageAPI(selectedAgent as ThreadId, message);
+
+      // Trigger forced autoscroll when user sends message
+      if (success) {
+        triggerAutoscroll(true);
+      }
+
+      return success;
     },
-    [selectedAgent, sendMessageAPI]
+    [selectedAgent, sendMessageAPI, triggerAutoscroll, agentBusy]
   );
 
   const onStopGeneration = useCallback(async () => {
@@ -51,7 +67,7 @@ export const Chat = memo(function Chat(): React.JSX.Element {
   return (
     <div className="flex-1 flex flex-col h-full">
       {/* Conversation Display - scrollable area with max width */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={containerRef} className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4">
           <TimelineView
             events={events}
@@ -71,7 +87,8 @@ export const Chat = memo(function Chat(): React.JSX.Element {
           <MemoizedChatInput
             onSubmit={onSendMessage}
             onInterrupt={onStopGeneration}
-            disabled={agentBusy}
+            disabled={false} // Never disable input - allow typing and Escape key
+            sendDisabled={agentBusy} // Disable sending when agent is busy
             isStreaming={agentBusy}
             placeholder={`Message ${inputAgentName}...`}
             agentId={inputAgentId}

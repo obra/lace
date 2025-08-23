@@ -10,6 +10,7 @@ import { AgentProvider } from '@/components/providers/AgentProvider';
 import { EventStreamProvider } from '@/components/providers/EventStreamProvider';
 import { ToolApprovalProvider } from '@/components/providers/ToolApprovalProvider';
 import { TaskProvider } from '@/components/providers/TaskProvider';
+import { ScrollProvider } from '@/components/providers/ScrollProvider';
 
 import { AgentPageContent } from './AgentPageContent';
 import type { ThreadId } from '@/types/core';
@@ -48,7 +49,13 @@ export function AgentPageClient({ projectId, sessionId, agentId }: AgentPageClie
                   sessionId={sessionId as ThreadId}
                   agents={[]} // Will be populated by AgentProvider
                 >
-                  <AgentPageContent projectId={projectId} sessionId={sessionId} agentId={agentId} />
+                  <ScrollProvider>
+                    <AgentPageContent
+                      projectId={projectId}
+                      sessionId={sessionId}
+                      agentId={agentId}
+                    />
+                  </ScrollProvider>
                 </TaskProvider>
               </EventStreamProvider>
             </ToolApprovalProvider>
