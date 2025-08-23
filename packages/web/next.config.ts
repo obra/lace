@@ -41,9 +41,9 @@ const isStandaloneBuild =
 const nextConfig: NextConfig = {
   ...(isStandaloneBuild && {
     output: 'standalone',
-    outputFileTracingRoot: path.resolve('../..'),
+    outputFileTracingRoot: fileURLToPath(new URL('../../', import.meta.url)),
     outputFileTracingIncludes: {
-      '/': getServerDependencies(),
+      '/**/*': getServerDependencies(),
     },
   }),
   typescript: {
