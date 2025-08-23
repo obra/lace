@@ -12,7 +12,8 @@ env:
 jobs:
   lint-and-format:
     name: Lint and Format
-    runs-on: ubuntu-latest
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
+    runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,7 +35,8 @@ jobs:
 
   build:
     name: Build Project
-    runs-on: ubuntu-latest
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
+    runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -53,10 +55,13 @@ jobs:
 
   test:
     name: Test Suite
-    runs-on: ${{ matrix.os }}
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: macos-latest
+            runner: [self-hosted, macOS]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -80,7 +85,13 @@ jobs:
               libncurses5-dev \
               ripgrep
           else
-            brew install ripgrep
+            # Ensure Homebrew exists and avoid slow auto-update/cleanup
+            if ! command -v brew >/dev/null 2>&1; then
+              echo "Homebrew not found; please pre-provision brew on the runner." >&2
+              exit 1
+            fi
+            export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
+            brew install -q ripgrep
           fi
 
       - name: Install dependencies
@@ -94,22 +105,23 @@ jobs:
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             script -q -c "npm test" /dev/null
           else
-            script -q /dev/null sh -c "npm test"
+            script -q -k /dev/null npm test
           fi
 
       - name: Cache test artifacts
-        if: matrix.os == 'ubuntu-latest'
+        if: runner.os == 'Linux'
         uses: actions/cache@v4
         with:
           path: |
             coverage/
             packages/web/coverage/
             .vitest-cache/
-          key: test-artifacts-${{ github.sha }}-${{ github.run_id }}
+          key: test-artifacts-${{ runner.os }}-${{ github.sha }}-${{ github.run_id }}
 
   test-coverage:
     name: Test Coverage
-    runs-on: ubuntu-latest
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
+    runs-on: [self-hosted, macOS]
     needs: test
     steps:
       - name: Checkout code
@@ -128,19 +140,29 @@ jobs:
             coverage/
             packages/web/coverage/
             .vitest-cache/
-          key: test-artifacts-${{ github.sha }}-${{ github.run_id }}
+          key: test-artifacts-${{ runner.os }}-${{ github.sha }}-${{ github.run_id }}
 
       - name: Install system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            python3 \
-            make \
-            g++ \
-            libtool \
-            pkg-config \
-            libncurses5-dev \
-            ripgrep
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y \
+              python3 \
+              make \
+              g++ \
+              libtool \
+              pkg-config \
+              libncurses5-dev \
+              ripgrep
+          else
+            # Ensure Homebrew exists and avoid slow auto-update/cleanup
+            if ! command -v brew >/dev/null 2>&1; then
+              echo "Homebrew not found; please pre-provision brew on the runner." >&2
+              exit 1
+            fi
+            export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
+            brew install -q ripgrep
+          fi
 
       - name: Install dependencies
         run: npm ci
@@ -149,7 +171,12 @@ jobs:
         run: npm run build
 
       - name: Run coverage (incremental)
-        run: script -q -c "npm run test:coverage" /dev/null
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            script -q -c "npm run test:coverage" /dev/null
+          else
+            script -q -k /dev/null npm run test:coverage
+          fi
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -160,7 +187,8 @@ jobs:
 
   playwright-tests:
     name: Playwright E2E Tests
-    runs-on: ubuntu-latest
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
+    runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -197,7 +225,8 @@ jobs:
 
   build-and-package:
     name: Build and Package
-    runs-on: ubuntu-latest
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
+    runs-on: [self-hosted, macOS]
     needs: [lint-and-format, build, test, playwright-tests]
     steps:
       - name: Checkout code

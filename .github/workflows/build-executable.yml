@@ -9,17 +9,16 @@ on:
 jobs:
   build-executable:
     name: Build Executable
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-            target: bun-linux-x64
-            name: lace-linux-x64
           - os: macos-latest
+            runner: [self-hosted, macOS]
             target: bun-darwin-arm64
             name: lace-macos-arm64
     
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     
     steps:
     - uses: actions/checkout@v4
@@ -138,7 +137,6 @@ jobs:
           ### Downloads
           
           - **lace-macos-arm64.tar.gz** - macOS App Bundle for Apple Silicon (M1/M2/M3/M4)
-          - **lace-linux-x64.tar.gz** - Linux x86_64
           
           ### Usage
           
@@ -149,16 +147,6 @@ jobs:
           
           # Run Lace (opens menu bar app)
           open Lace.app
-          ```
-          
-          **Linux:**
-          ```bash
-          # Extract archive
-          tar -xzf lace-linux-x64.tar.gz
-          
-          # Run Lace
-          ./lace-linux-x64 --help
-          ./lace-linux-x64 --port 3000
           ```
           
           ### Features
