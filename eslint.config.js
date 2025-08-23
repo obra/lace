@@ -19,7 +19,7 @@ export default [
   })),
   {
     files: ['**/*.ts', '**/*.tsx'],
-    ignores: ['dist/**/*', 'packages/web*'],
+    ignores: ['dist/**/*', 'packages/**'],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',
