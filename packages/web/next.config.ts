@@ -38,7 +38,7 @@ const isStandaloneBuild =
 const nextConfig: NextConfig = {
   ...(isStandaloneBuild && {
     output: 'standalone',
-    outputFileTracingRoot: path.resolve('../../'),
+    outputFileTracingRoot: path.resolve('../'),
     outputFileTracingIncludes: {
       '/': getServerDependencies(),
     },
@@ -53,7 +53,7 @@ const nextConfig: NextConfig = {
   // Turbopack configuration (stable as of Next.js 15)
   turbopack: {
     resolveAlias: {
-      '~/': path.resolve('../../src') + '/',
+      '~/': path.resolve('../core') + '/',
       '@/': path.resolve('.') + '/',
     },
     resolveExtensions: ['.js', '.jsx', '.ts', '.tsx'],
@@ -88,7 +88,7 @@ const nextConfig: NextConfig = {
 
     webpackConfig.resolve.alias = {
       ...webpackConfig.resolve.alias,
-      '~': path.resolve('../../src'),
+      '~': path.resolve('../core'),
       '@': path.resolve('.'),
     };
 

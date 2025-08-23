@@ -319,7 +319,7 @@ if (isStandalone) {
     outputFileTracingIncludes: { '/': ['packages/web/server-custom.ts', 'node_modules/open/**/*'] },
     turbopack: {
       resolveAlias: {
-        '~/': path.join(process.cwd(), 'src/'),
+        '~/': path.join(process.cwd(), 'packages/core/'),
         '@/': path.join(process.cwd(), 'packages/web/'),
       },
       resolveExtensions: ['.js', '.jsx', '.ts', '.tsx'],
