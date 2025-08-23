@@ -13,7 +13,7 @@ export default defineConfig({
       reporter: ['text', 'html', 'lcov'],
       exclude: ['node_modules/', 'dist/', '**/*.test.ts', '**/*.spec.ts'],
     },
-    environment: 'jsdom',
+    environment: 'node',
     setupFiles: ['src/test-setup.ts'],
     env: {
       NO_COLOR: '1',

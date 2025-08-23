@@ -68,6 +68,7 @@ export default [
           }
         ]
       }],
+      '@typescript-eslint/no-floating-promises': ['error', { ignoreVoid: true }],
       'no-var': 'error'
     },
   },

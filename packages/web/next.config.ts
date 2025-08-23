@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next';
 import path from 'path';
+import { fileURLToPath } from 'node:url';
 import { readFileSync, existsSync } from 'fs';
 import { withSentryConfig } from '@sentry/nextjs';
 
@@ -38,7 +39,7 @@ const isStandaloneBuild =
 const nextConfig: NextConfig = {
   ...(isStandaloneBuild && {
     output: 'standalone',
-    outputFileTracingRoot: path.resolve('../'),
+    outputFileTracingRoot: path.resolve('../..'),
     outputFileTracingIncludes: {
       '/': getServerDependencies(),
     },
@@ -53,8 +54,8 @@ const nextConfig: NextConfig = {
   // Turbopack configuration (stable as of Next.js 15)
   turbopack: {
     resolveAlias: {
-      '~/': path.resolve('../core') + '/',
-      '@/': path.resolve('.') + '/',
+      '~/': fileURLToPath(new URL('../core/src', import.meta.url)) + '/',
+      '@/': fileURLToPath(new URL('.', import.meta.url)) + '/',
     },
     resolveExtensions: ['.js', '.jsx', '.ts', '.tsx'],
   },
@@ -88,8 +89,8 @@ const nextConfig: NextConfig = {
 
     webpackConfig.resolve.alias = {
       ...webpackConfig.resolve.alias,
-      '~': path.resolve('../core'),
-      '@': path.resolve('.'),
+      '~': path.resolve(__dirname, '../core/src'),
+      '@': fileURLToPath(new URL('.', import.meta.url)),
     };
 
     webpackConfig.resolve.extensionAlias = {

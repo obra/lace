@@ -17,8 +17,6 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "jsx": "react",
-    "jsxFactory": "React.createElement",
     "composite": true
   },
   "include": ["src/**/*"],

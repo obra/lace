@@ -9,13 +9,13 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist/**/*', 'packages/web/*', 'vitest.config.ts', 'knip.config.ts', 'scripts/**/*'],
+    ignores: ['dist/**/*', 'packages/**/*', 'vitest.config.ts', 'knip.config.ts', 'scripts/**/*'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map(config => ({
     ...config,
     files: ['**/*.ts', '**/*.tsx'],
-    ignores: ['dist/**/*', 'packages/web/*'],
+    ignores: ['dist/**/*', 'packages/**/*'],
   })),
   {
     files: ['**/*.ts', '**/*.tsx'],
@@ -82,7 +82,7 @@ export default [
   },
   {
     files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
-    ignores: ['dist/**/*', 'packages/web/*'],
+    ignores: ['dist/**/*', 'packages/**/*'],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',
@@ -112,7 +112,7 @@ export default [
   },
   {
     files: ['**/*.test.ts', '**/*.spec.ts'],
-    ignores: ['dist/**/*', 'packages/web/*'],
+    ignores: ['dist/**/*', 'packages/**/*'],
     plugins: {
       vitest,
     },

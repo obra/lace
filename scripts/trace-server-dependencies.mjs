@@ -147,8 +147,8 @@ import 'wsl-utils';
       summary: {
         totalFiles: tracedFiles.length,
         nodeModulesFiles: includePatterns.length,
-        hasIsDocker: deps['is-docker'].length > 0,
-        hasOpen: deps['open package'].length > 0
+        hasIsDocker: deps['is-docker']?.length > 0,
+        hasOpen: deps['open package']?.length > 0
       }
     };
     

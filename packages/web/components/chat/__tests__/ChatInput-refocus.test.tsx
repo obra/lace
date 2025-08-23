@@ -1,7 +1,7 @@
 // ABOUTME: Tests for chat input refocus functionality
 // ABOUTME: Verifies that chat input refocuses after successful message send
 
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { ScrollProvider } from '@/components/providers/ScrollProvider';

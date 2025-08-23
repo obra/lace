@@ -2,7 +2,8 @@
 // ABOUTME: Syncs provider configuration files from charmbracelet/catwalk to local data directory
 
 import { readFile, writeFile, readdir } from 'fs/promises';
-import { join } from 'path';
+import { join, dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
 interface CatwalkFile {
   name: string;
@@ -12,7 +13,11 @@ interface CatwalkFile {
 
 const CATWALK_API_URL =
   'https://api.github.com/repos/charmbracelet/catwalk/contents/internal/providers/configs';
-const LOCAL_DATA_DIR = './packages/core/src/providers/catalog/data';
+
+// Compute absolute path to data directory from script location
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const LOCAL_DATA_DIR = resolve(__dirname, '../packages/core/src/providers/catalog/data');
 
 // Providers to exclude from syncing (if any)
 const EXCLUDED_PROVIDERS: string[] = [
