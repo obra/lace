@@ -106,9 +106,7 @@ test.describe('Console Forwarding E2E', () => {
     await page.evaluate(() => {
       // eslint-disable-next-line no-console -- Testing console forwarding for all log levels
       console.log('Test log message');
-      // eslint-disable-next-line no-console -- Testing console forwarding for all log levels (warn/error are allowed by ESLint but need consistency)
       console.warn('Test warn message');
-      // eslint-disable-next-line no-console -- Testing console forwarding for all log levels (warn/error are allowed by ESLint but need consistency)
       console.error('Test error message');
       // eslint-disable-next-line no-console -- Testing console forwarding for all log levels
       console.info('Test info message');

@@ -1,7 +1,7 @@
 // ABOUTME: Centralized UI state management for modals and unified sidebar visibility
 // ABOUTME: Manages unified sidebar state that works for both mobile and desktop layouts
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 
 export interface UseUIStateResult {
   // Unified sidebar state

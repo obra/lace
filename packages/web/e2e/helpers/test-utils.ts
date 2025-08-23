@@ -34,7 +34,6 @@ async function getAvailablePort(): Promise<number> {
  */
 async function waitForServer(url: string, timeoutMs: number = 120000): Promise<void> {
   const startTime = Date.now();
-  console.log(`[E2E-WAIT] Waiting for server at ${url} (timeout: ${timeoutMs}ms)`);
 
   while (Date.now() - startTime < timeoutMs) {
     try {
@@ -55,7 +54,6 @@ async function waitForServer(url: string, timeoutMs: number = 120000): Promise<v
       });
 
       // Server is ready
-      console.log(`[E2E-WAIT] Server ready at ${url} (took ${Date.now() - startTime}ms)`);
       return;
     } catch {
       // Server not ready yet, continue waiting
@@ -102,7 +100,7 @@ async function startTestServer(
   serverProcess.stdout?.on('data', (data: Buffer) => {
     const output = data.toString().trim();
     if (output) {
-      console.log(`[E2E-SERVER-${port}] ${output}`);
+      console.warn(`[E2E-SERVER-${port}] ${output}`);
     }
   });
 
