@@ -2,17 +2,8 @@
 // ABOUTME: Embeds Next.js standalone build as ZIP and creates Bun executable
 
 import { execSync } from 'child_process';
-import {
-  readFileSync,
-  writeFileSync,
-  existsSync,
-  mkdirSync,
-  cpSync,
-  statSync,
-  lstatSync,
-  readlinkSync,
-} from 'fs';
-import { join, resolve, dirname } from 'path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, cpSync, statSync } from 'fs';
+import { join, resolve, dirname, basename } from 'path';
 
 interface BuildOptions {
   target?: string;
@@ -94,36 +85,17 @@ async function copyTracedDependencies(
 
     try {
       if (existsSync(sourcePath)) {
-        // Check if it's a symlink and preserve it
-        const stats = lstatSync(sourcePath);
-        if (stats.isSymbolicLink()) {
-          console.log(`   🔗 Following symlink: ${packageName}`);
-          // For symlinks, resolve and copy the actual content
-          const linkTarget = readlinkSync(sourcePath);
-          const realPath = resolve(dirname(sourcePath), linkTarget);
-          if (existsSync(realPath)) {
-            cpSync(realPath, targetPath, {
-              recursive: true,
-              preserveTimestamps: true,
-              filter: (src) => {
-                // Skip unnecessary files to reduce size
-                const basename = resolve(src).split('/').pop() || '';
-                return !basename.startsWith('.') || basename === '.js' || basename === '.json';
-              },
-            });
-          }
-        } else {
-          // Copy the package directory
-          cpSync(sourcePath, targetPath, {
-            recursive: true,
-            preserveTimestamps: true,
-            filter: (src) => {
-              // Skip unnecessary files to reduce size
-              const basename = resolve(src).split('/').pop() || '';
-              return !basename.startsWith('.') || basename === '.js' || basename === '.json';
-            },
-          });
-        }
+        // Copy the package directory, dereferencing symlinks
+        cpSync(sourcePath, targetPath, {
+          recursive: true,
+          preserveTimestamps: true,
+          dereference: true,
+          filter: (src) => {
+            // Skip unnecessary files to reduce size
+            const name = basename(src);
+            return !name.startsWith('.') || name === '.js' || name === '.json';
+          },
+        });
 
         copiedPackages++;
 
