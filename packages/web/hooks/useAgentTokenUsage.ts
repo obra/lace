@@ -2,7 +2,7 @@
 // ABOUTME: Loads token data from agent API + real-time updates from SSE events
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useEventStream } from './useEventStream';
+import { useEventStream } from '@/hooks/useEventStream';
 import type { ThreadId, CombinedTokenUsage, ThreadTokenUsage } from '@/types/core';
 import type { LaceEvent } from '@/types/core';
 import type { AgentWithTokenUsage } from '@/types/api';
@@ -16,7 +16,7 @@ export interface UseAgentTokenUsageResult {
   tokenUsage: AgentTokenUsage | null;
   loading: boolean;
   error: string | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 
 export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult {

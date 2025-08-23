@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useState, useCallback, memo, useRef } from 'react';
+import React, { useState, useCallback, memo, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { CompactTokenUsage } from '@/components/ui/CompactTokenUsage';
@@ -28,17 +28,31 @@ export const MemoizedChatInput = memo(function MemoizedChatInput({
 }) {
   const [message, setMessage] = useState('');
   const chatInputRef = useRef<{ focus: () => void } | null>(null);
+  const refocusTimeoutRef = useRef<number | null>(null);
 
   const handleSubmit = useCallback(async () => {
     const success = await onSubmit(message);
     if (success) {
       setMessage('');
       // Refocus the input after successful send
-      setTimeout(() => {
+      if (refocusTimeoutRef.current) {
+        clearTimeout(refocusTimeoutRef.current);
+      }
+      refocusTimeoutRef.current = window.setTimeout(() => {
         chatInputRef.current?.focus();
       }, 50); // Small delay to ensure DOM updates are complete
     }
   }, [message, onSubmit]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (refocusTimeoutRef.current) {
+        clearTimeout(refocusTimeoutRef.current);
+        refocusTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <motion.div

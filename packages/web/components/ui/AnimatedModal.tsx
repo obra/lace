@@ -1,3 +1,4 @@
+// ABOUTME: Animated modal and confirm modal components with accessibility and motion transitions
 'use client';
 
 import React from 'react';

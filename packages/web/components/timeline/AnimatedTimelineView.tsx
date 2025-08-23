@@ -1,3 +1,4 @@
+// ABOUTME: Animated timeline view handling message enter/exit, typing indicator, and scroll-to-bottom affordance
 'use client';
 
 import React from 'react';

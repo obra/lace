@@ -6,9 +6,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SessionInfo, ThreadId } from '@/types/core';
 import { useAgentManagement } from './useAgentManagement';
 
-// Mock fetch globally
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+// Mock fetch globally (typed) and restore after suite
+const originalFetch = global.fetch;
+const mockFetch: vi.MockedFunction<typeof fetch> = vi.fn();
+
+beforeAll(() => {
+  // Cast guards against DOM lib differences in Node/Vitest
+  global.fetch = mockFetch as unknown as typeof fetch;
+});
+
+afterAll(() => {
+  global.fetch = originalFetch;
+});
 
 // Mock parseResponse
 vi.mock('@/lib/serialization', () => ({

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
-import { shimmer, springConfig, staggerContainer, staggerItem } from '@/lib/animations';
+import { shimmer, staggerContainer, staggerItem } from '@/lib/animations';
 
 interface LoadingSkeletonProps {
   variant?: 'text' | 'card' | 'avatar' | 'timeline' | 'carousel';

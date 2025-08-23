@@ -1,3 +1,4 @@
+// ABOUTME: Animated, collapsible sidebar for navigation, timelines, tasks, files, and settings
 'use client';
 
 import React from 'react';

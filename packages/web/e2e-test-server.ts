@@ -4,8 +4,9 @@
 // Starting E2E test server...
 
 // Mock Anthropic API HTTP endpoints for E2E tests
-import { mockAnthropicForE2E } from './e2e/helpers/anthropic-mock';
-mockAnthropicForE2E();
+import { mockAnthropicForE2E } from '@/e2e/helpers/anthropic-mock';
 
-// Import and run the main server
-import './server-custom';
+void (async () => {
+  mockAnthropicForE2E();
+  await import('./server-custom');
+})();
