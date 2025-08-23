@@ -152,6 +152,7 @@ export async function setupTestEnvironment(): Promise<TestEnvironment> {
 
   // Create provider-instances.json configuration
   const providerInstances = {
+    version: '1.0',
     instances: {
       'anthropic-default': {
         id: 'anthropic-default',
