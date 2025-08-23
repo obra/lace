@@ -124,8 +124,8 @@ async function updateProviderCatalogs(): Promise<void> {
 }
 
 // Run the update if this script is executed directly
-if (import.meta.url === pathToFileURL(process.argv[1]!).href) {
-  updateProviderCatalogs();
+if (import.meta.url === pathToFileURL(resolve(process.argv[1]!)).href) {
+  await updateProviderCatalogs();
 }
 
 export { updateProviderCatalogs };
