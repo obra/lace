@@ -96,18 +96,35 @@ async function startTestServer(
     }
   );
 
-  // Handle server output for debugging
+  // Handle server output for debugging - log to both console and file
+  const logFile = `/tmp/e2e-server-${port}.log`;
+  console.log(`[E2E-SETUP] Server logs will be written to: ${logFile}`);
+
   serverProcess.stdout?.on('data', (data: Buffer) => {
     const output = data.toString().trim();
     if (output) {
-      console.warn(`[E2E-SERVER-${port}] ${output}`);
+      const logLine = `[E2E-SERVER-${port}] ${output}`;
+      console.warn(logLine);
+      // Also write to file for tailing
+      try {
+        require('fs').appendFileSync(logFile, logLine + '\n');
+      } catch {
+        // Ignore file write errors
+      }
     }
   });
 
   serverProcess.stderr?.on('data', (data: Buffer) => {
     const output = data.toString().trim();
     if (output) {
-      console.error(`[E2E-SERVER-${port}] ${output}`);
+      const logLine = `[E2E-SERVER-${port}] ${output}`;
+      console.error(logLine);
+      // Also write to file for tailing
+      try {
+        require('fs').appendFileSync(logFile, logLine + '\n');
+      } catch {
+        // Ignore file write errors
+      }
     }
   });
 

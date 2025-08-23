@@ -108,8 +108,16 @@ export async function createProviderInstance(page: Page): Promise<void> {
   await createButton.waitFor({ state: 'visible', timeout: 5000 });
   await createButton.click();
 
-  // Wait for instance to be created
-  await page.waitForLoadState('networkidle', { timeout: 10000 });
+  // Wait for instance creation modal to be dismissed
+  await page
+    .waitForSelector('[data-testid="create-instance-modal"]', { state: 'hidden', timeout: 10000 })
+    .catch(() => {
+      // Fallback if modal testid doesn't exist - wait for any modal to close
+      return page.waitForSelector('.modal', { state: 'hidden', timeout: 10000 }).catch(() => {
+        // Final fallback
+        return page.waitForTimeout(2000);
+      });
+    });
 }
 
 /**
@@ -243,8 +251,8 @@ export async function submitProjectCreation(page: Page): Promise<void> {
   // Wait for navigation to the agent page after submission
   await page.waitForURL(/\/project\/[^\/]+\/session\/[^\/]+\/agent\/[^\/]+/, { timeout: 15000 });
 
-  // Wait for the agent interface to be ready
-  await page.waitForLoadState('networkidle', { timeout: 10000 });
+  // Wait for the agent interface to be ready - look for message input instead of network idle
+  await getMessageInput(page);
 }
 
 /** Complete project creation workflow */
