@@ -92,6 +92,8 @@ async function startTestServer(
         LACE_DB_PATH: path.join(tempDir, 'lace.db'),
         NODE_ENV: 'production',
         E2E_TOOL_APPROVAL_MOCK: 'true',
+        LACE_LOG_LEVEL: 'debug',
+        LACE_LOG_STDERR: 'true',
       },
     }
   );

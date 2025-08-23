@@ -284,10 +284,19 @@ export class Agent extends EventEmitter {
 
   // Create provider instance from agent metadata and configuration
   private async _createProviderInstance(): Promise<AIProvider | null> {
+    logger.debug('Starting provider creation', { threadId: this._threadId });
+
     // 1. Get agent-specific metadata
     const metadata = this.getThreadMetadata();
     let providerInstanceId = metadata?.providerInstanceId as string;
     let modelId = metadata?.modelId as string;
+
+    logger.debug('Agent metadata retrieved', {
+      threadId: this._threadId,
+      providerInstanceId,
+      modelId,
+      metadata,
+    });
 
     // 2. Fall back to session effective config
     if (!providerInstanceId || !modelId) {
@@ -307,10 +316,24 @@ export class Agent extends EventEmitter {
     }
 
     // 3. Create provider using registry (proper async)
+    logger.debug('Attempting to create provider via registry', {
+      threadId: this._threadId,
+      providerInstanceId,
+      modelId,
+    });
     try {
       const registry = ProviderRegistry.getInstance();
-      return await registry.createProviderFromInstanceAndModel(providerInstanceId, modelId);
+      const provider = await registry.createProviderFromInstanceAndModel(
+        providerInstanceId,
+        modelId
+      );
+      logger.debug('Provider created successfully', {
+        threadId: this._threadId,
+        providerType: provider?.constructor.name,
+      });
+      return provider;
     } catch (error) {
+      logger.error('Provider creation failed', { threadId: this._threadId, error });
       logger.error('Failed to create provider instance for agent', {
         threadId: this._threadId,
         providerInstanceId,
@@ -323,11 +346,18 @@ export class Agent extends EventEmitter {
 
   // Public initialization method - happens once per agent
   async initialize(): Promise<void> {
-    if (this._initialized) return; // idempotent
+    logger.debug('Agent initialize called', { threadId: this._threadId });
+    if (this._initialized) {
+      logger.debug('Agent already initialized, skipping', { threadId: this._threadId });
+      return; // idempotent
+    }
 
     // Create provider before system prompt generation
     if (!this._provider) {
+      logger.debug('No provider found, creating new provider', { threadId: this._threadId });
       this._provider = await this._createProviderInstance();
+    } else {
+      logger.debug('Provider already exists', { threadId: this._threadId });
     }
 
     // CRITICAL: Always regenerate system prompt with current project context
