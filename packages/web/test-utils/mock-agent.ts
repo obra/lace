@@ -30,36 +30,35 @@ export function createMockAgent(
   // Create event handler storage for manual triggering in tests
   const handlers: Record<string, (data?: unknown) => void> = {};
 
-  const mockAgent: MockAgent = {
+  // Create base agent object first
+  const mockAgent = {
     threadId: overrides.threadId || 'lace_20250101_test01.1',
     handlers,
-
-    // Event emitter methods - store handlers for manual triggering
-    on: (event: string, handler: (data?: unknown) => void): MockAgent => {
-      handlers[event] = handler;
-      return mockAgent as MockAgent;
-    },
-
-    emit: (event: string, data?: unknown): boolean => {
-      const handler = handlers[event];
-      if (handler) {
-        handler(data);
-        return true;
-      }
-      return false;
-    },
-
-    // getFullSession method that returns a mock session
-    getFullSession: overrides.getFullSession
-      ? overrides.getFullSession
-      : () =>
-          Promise.resolve({
-            getId: () => 'lace_20250101_sess01',
-            getProjectId: () => 'test-project-123',
-          } as Session),
-
     ...overrides,
+  } as MockAgent;
+
+  // Add methods that reference the agent itself
+  mockAgent.on = (event: string, handler: (data?: unknown) => void): MockAgent => {
+    handlers[event] = handler;
+    return mockAgent;
   };
+
+  mockAgent.emit = (event: string, data?: unknown): boolean => {
+    const handler = handlers[event];
+    if (handler) {
+      handler(data);
+      return true;
+    }
+    return false;
+  };
+
+  mockAgent.getFullSession = overrides.getFullSession
+    ? overrides.getFullSession
+    : () =>
+        Promise.resolve({
+          getId: () => 'lace_20250101_sess01',
+          getProjectId: () => 'test-project-123',
+        } as Session);
 
   return mockAgent;
 }
