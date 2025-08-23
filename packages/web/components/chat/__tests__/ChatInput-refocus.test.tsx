@@ -1,5 +1,5 @@
-// ABOUTME: Tests for chat input refocus functionality
-// ABOUTME: Verifies that chat input refocuses after successful message send
+// ABOUTME: Tests for chat input focus handle functionality
+// ABOUTME: Validates that focus handle exists and calling it focuses the textarea
 
 import { render, screen, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
@@ -18,7 +18,7 @@ describe('ChatInput Refocus', () => {
         onChange={vi.fn<(value: string) => void>()}
         onSubmit={vi.fn<() => void | Promise<void>>()}
       />,
-      { wrapper: ({ children }) => <ScrollProvider>{children}</ScrollProvider> }
+      { wrapper: ScrollProvider }
     );
 
     // Should have focus method available
@@ -37,7 +37,7 @@ describe('ChatInput Refocus', () => {
         onSubmit={vi.fn<() => void | Promise<void>>()}
         disabled={false} // Allow focus for testing
       />,
-      { wrapper: ({ children }) => <ScrollProvider>{children}</ScrollProvider> }
+      { wrapper: ScrollProvider }
     );
 
     const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
