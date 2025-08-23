@@ -87,7 +87,7 @@ test.describe('Task Management CRUD Operations', () => {
       try {
         await page.locator('[data-testid="task-button"]').click();
         taskInteractionTest.canOpenTaskInterface = true;
-      } catch (error) {
+      } catch (_error) {
         // Could not open task interface
       }
     }
@@ -96,7 +96,7 @@ test.describe('Task Management CRUD Operations', () => {
       try {
         await page.locator('[data-testid="new-task-button"]').click();
         taskInteractionTest.canCreateTask = true;
-      } catch (error) {
+      } catch (_error) {
         // Could not trigger task creation
       }
     }

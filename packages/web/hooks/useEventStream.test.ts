@@ -23,9 +23,7 @@ describe('useEventStream', () => {
   };
 
   beforeEach(() => {
-    (EventStreamFirehose.getInstance as typeof EventStreamFirehose.getInstance).mockReturnValue(
-      mockFirehose
-    );
+    (EventStreamFirehose.getInstance as ReturnType<typeof vi.fn>).mockReturnValue(mockFirehose);
     mockFirehose.subscribe.mockClear();
     mockFirehose.unsubscribe.mockClear();
     mockFirehose.getStats.mockReturnValue({
@@ -44,7 +42,7 @@ describe('useEventStream', () => {
 
     const { result } = renderHook(() =>
       useEventStream({
-        threadIds: ['thread-1'],
+        threadIds: ['lace_20250101_thread01'],
         projectId: 'project-1',
         onUserMessage: vi.fn(),
       })
@@ -52,7 +50,7 @@ describe('useEventStream', () => {
 
     expect(mockFirehose.subscribe).toHaveBeenCalledWith(
       {
-        threadIds: ['thread-1'],
+        threadIds: ['lace_20250101_thread01'],
         projectIds: ['project-1'],
         sessionIds: undefined,
         eventTypes: undefined,
@@ -74,7 +72,7 @@ describe('useEventStream', () => {
 
     renderHook(() =>
       useEventStream({
-        threadIds: ['thread-1'],
+        threadIds: ['lace_20250101_thread01'],
         onAgentStateChange: mockOnAgentStateChange,
       })
     );
@@ -83,14 +81,14 @@ describe('useEventStream', () => {
     const agentStateChangeEvent = {
       id: 'event-1',
       type: 'AGENT_STATE_CHANGE',
-      threadId: 'thread-1',
+      threadId: 'lace_20250101_thread01',
       data: {
         agentId: 'agent-123',
         from: 'idle',
         to: 'thinking',
       },
       timestamp: new Date(),
-    };
+    } as LaceEvent;
 
     expect(capturedCallback).toBeDefined();
     capturedCallback!(agentStateChangeEvent);
@@ -123,7 +121,7 @@ describe('useEventStream', () => {
     capturedCallback!({
       id: 'event-1',
       type: 'USER_MESSAGE',
-      threadId: 'thread-1',
+      threadId: 'lace_20250101_thread01',
       data: 'Hello',
       timestamp: new Date(),
     });
@@ -133,20 +131,20 @@ describe('useEventStream', () => {
     capturedCallback!({
       id: 'event-2',
       type: 'AGENT_MESSAGE',
-      threadId: 'thread-1',
+      threadId: 'lace_20250101_thread01',
       data: 'Hi there',
       timestamp: new Date(),
-    });
+    } as unknown as LaceEvent);
 
     // Test TOOL_CALL
     expect(capturedCallback).toBeDefined();
     capturedCallback!({
       id: 'event-3',
       type: 'TOOL_CALL',
-      threadId: 'thread-1',
+      threadId: 'lace_20250101_thread01',
       data: { tool: 'search', args: {} },
       timestamp: new Date(),
-    });
+    } as unknown as LaceEvent);
 
     expect(mockOnUserMessage).toHaveBeenCalledTimes(1);
     expect(mockOnAgentMessage).toHaveBeenCalledTimes(1);
@@ -173,10 +171,10 @@ describe('useEventStream', () => {
     capturedCallback!({
       id: 'event-1',
       type: 'AGENT_STATE_CHANGE',
-      threadId: 'thread-1',
+      threadId: 'lace_20250101_thread01',
       data: { invalid: 'data' }, // Missing required fields
       timestamp: new Date(),
-    });
+    } as unknown as LaceEvent);
 
     // Should not call the callback with invalid data
     expect(mockOnAgentStateChange).not.toHaveBeenCalled();
@@ -226,7 +224,7 @@ describe('useEventStream', () => {
 
     const { result } = renderHook(() =>
       useEventStream({
-        threadIds: ['thread-1'],
+        threadIds: ['lace_20250101_thread01'],
         onUserMessage: vi.fn(),
         // These should be ignored but not break anything
         autoReconnect: true,

@@ -89,7 +89,7 @@ test.describe('Error Handling and Recovery', () => {
       await page.getByTestId('create-first-project-button').isVisible({ timeout: 3000 });
       networkErrorTest.interfaceResponsive = true;
       networkErrorTest.canNavigate = true;
-    } catch (error) {
+    } catch (_error) {
       // Interface responsiveness check failed
     }
 
@@ -121,7 +121,7 @@ test.describe('Error Handling and Recovery', () => {
 
       // Check if interface is still functional
       await page.waitForTimeout(1000);
-    } catch (error) {
+    } catch (_error) {
       // Triggered JS error during interaction test
     }
 
@@ -144,7 +144,7 @@ test.describe('Error Handling and Recovery', () => {
           .isVisible()
           .catch(() => false);
         postErrorState.canStillType = true;
-      } catch (error) {
+      } catch (_error) {
         // Could not send message after JS error test
       }
     }

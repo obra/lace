@@ -12,9 +12,9 @@ import type { Session } from '@/lib/server/lace-imports';
 type MockAgent = {
   threadId: string;
   handlers: Record<string, (data?: unknown) => void>;
-  on: ReturnType<typeof vi.fn>; // Mock function for event registration
-  emit: ReturnType<typeof vi.fn>; // Mock function for event emission
-  getFullSession: ReturnType<typeof vi.fn>; // Mock function for session retrieval
+  on: unknown;
+  emit: unknown;
+  getFullSession: unknown;
   [key: string]: unknown;
 };
 
@@ -35,12 +35,12 @@ export function createMockAgent(
     handlers,
 
     // Event emitter methods - store handlers for manual triggering
-    on: vi.fn().mockImplementation((event: string, handler: (data?: unknown) => void) => {
+    on: vi.fn((event: string, handler: (data?: unknown) => void) => {
       handlers[event] = handler;
       return mockAgent;
     }),
 
-    emit: vi.fn().mockImplementation((event: string, data?: unknown): boolean => {
+    emit: vi.fn((event: string, data?: unknown): boolean => {
       const handler = handlers[event];
       if (handler) {
         handler(data);
@@ -51,11 +51,13 @@ export function createMockAgent(
 
     // getFullSession method that returns a mock session
     getFullSession: overrides.getFullSession
-      ? vi.fn().mockImplementation(overrides.getFullSession)
-      : vi.fn().mockResolvedValue({
-          getId: () => 'lace_20250101_sess01',
-          getProjectId: () => 'test-project-123',
-        } as Session),
+      ? vi.fn(overrides.getFullSession)
+      : vi.fn(() =>
+          Promise.resolve({
+            getId: () => 'lace_20250101_sess01',
+            getProjectId: () => 'test-project-123',
+          } as Session)
+        ),
 
     ...overrides,
   };

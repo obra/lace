@@ -126,14 +126,14 @@ test.describe('Multi-Agent Workflows', () => {
       try {
         await page.locator('[data-testid="new-agent-button"]').click();
         agentCreationUI.canTriggerAgentCreation = true;
-      } catch (error) {
+      } catch (_error) {
         // Could not trigger agent creation
       }
     } else if (agentCreationUI.hasAddAgentButton) {
       try {
         await page.locator('[data-testid="add-agent-button"]').click();
         agentCreationUI.canTriggerAgentCreation = true;
-      } catch (error) {
+      } catch (_error) {
         // Could not trigger agent creation
       }
     }

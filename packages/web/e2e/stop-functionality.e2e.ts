@@ -70,7 +70,7 @@ test.describe('Stop Functionality', () => {
           .getByText('Follow-up message after ESC')
           .isVisible()
           .catch(() => false);
-      } catch (error) {
+      } catch (_error) {
         // Could not send follow-up message after ESC
       }
     }
@@ -122,7 +122,7 @@ test.describe('Stop Functionality', () => {
         // Don't actually click - just verify it's present and clickable
         const stopButton = page.locator('[data-testid="stop-button"]');
         stopButtonTest.canTriggerStop = await stopButton.isEnabled();
-      } catch (error) {
+      } catch (_error) {
         // Stop button not interactive
       }
     }

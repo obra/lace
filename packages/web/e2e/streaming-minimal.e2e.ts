@@ -67,7 +67,7 @@ test.describe('Minimal Streaming Events', () => {
             data: unknown;
           };
           streamingEvents.push({
-            type: eventData.type,
+            type: eventData.type as StreamingEvent['type'],
             data: eventData.data,
             timestamp: Date.now(),
           });

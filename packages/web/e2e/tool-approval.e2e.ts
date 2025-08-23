@@ -131,7 +131,7 @@ test.describe('Tool Approval Workflow', () => {
         try {
           await approveButton.click();
           toolWorkflowTest.toolExecutionRequested = true;
-        } catch (error) {
+        } catch (_error) {
           // Could not approve tool
         }
       }

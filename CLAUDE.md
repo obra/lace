@@ -501,3 +501,5 @@ The conversation builder (`buildConversationFromEvents`) is critical for debuggi
    Employ `ts-jest` or similar to verify snapshots and mocks against your TS types.
 - always use tempdir utilities when making temp dirs in tests
 - Also, don't forget that we use superjson exclusively in the web interface and have serialization helpers
+
+- explain the WHY any time you disable a linting rule

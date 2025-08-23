@@ -82,8 +82,6 @@ if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
 const isDev = process.env.NODE_ENV !== 'production';
 const isStandalone = !isDev;
 
-console.log(`Starting Lace in ${isDev ? 'development' : 'production'} mode...`);
-
 // Setup Node.js module system for standalone build
 const _require = module.createRequire(import.meta.url);
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -99,12 +97,9 @@ if (isStandalone) {
   const standaloneRoot = path.resolve(__dirname, '../..');
   process.chdir(standaloneRoot);
   webDir = path.join(standaloneRoot, 'packages/web');
-  console.warn(`Current working directory: ${process.cwd()}`);
-  console.warn(`Web directory: ${webDir}`);
 } else {
   // In development mode, stay in the current directory
   webDir = __dirname;
-  console.warn(`Development mode - working directory: ${process.cwd()}`);
 }
 
 // Next.js configuration - only needed for standalone builds
@@ -357,8 +352,7 @@ async function startLaceServer() {
 ✅ Lace is ready!
    
    🌐 URL: ${url}
-   🔧 Mode: ${isDev ? 'development' : 'production (standalone)'}
-   🔒 Process: Single-process mode (PID: ${process.pid})
+   🔒 PID: ${process.pid}
    
    Press Ctrl+C to stop
 `);
@@ -374,12 +368,10 @@ async function startLaceServer() {
         // Use regular Node.js module resolution now that dependencies are properly traced
         const { default: open } = await import('open');
         await open(url);
-        console.log(`🔍 DEBUG: ✅ Browser opened successfully!`);
       } catch (error) {
         const errorCode = (error as NodeJS.ErrnoException).code || 'unknown error';
         const errorMessage = (error as Error).message || 'unknown message';
-        console.log(`🔍 DEBUG: ❌ Browser opening failed: ${errorMessage} (${errorCode})`);
-        console.log(`   ℹ️  Could not open browser automatically (${errorCode})`);
+        console.error(`🔍 DEBUG: ❌ Browser opening failed: ${errorMessage} (${errorCode})`);
       }
     }
   } catch (error) {
