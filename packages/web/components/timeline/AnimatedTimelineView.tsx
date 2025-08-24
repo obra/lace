@@ -1,12 +1,11 @@
 // ABOUTME: Animated timeline view handling message enter/exit, typing indicator, and scroll-to-bottom affordance
 'use client';
 
-import React from 'react';
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useInView } from 'motion/react';
 import { TimelineEntry } from '@/types/web-events';
-import { AnimatedTimelineMessage } from './AnimatedTimelineMessage';
-import { AnimatedTypingIndicator } from './AnimatedTypingIndicator';
+import { AnimatedTimelineMessage } from '@/components/timeline/AnimatedTimelineMessage';
+import { AnimatedTypingIndicator } from '@/components/timeline/AnimatedTypingIndicator';
 import { staggerContainer, fadeInUp, springConfig } from '@/lib/animations';
 
 interface AnimatedTimelineViewProps {
