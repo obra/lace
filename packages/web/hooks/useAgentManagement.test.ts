@@ -15,17 +15,15 @@ import {
 import type { SessionInfo, ThreadId } from '@/types/core';
 import { useAgentManagement } from './useAgentManagement';
 
-// Mock fetch globally (typed) and restore after suite
-const originalFetch = global.fetch;
+// Mock fetch globally using Vitest's stubbing API
 const mockFetch: MockedFunction<typeof fetch> = vi.fn();
 
 beforeAll(() => {
-  // Cast guards against DOM lib differences in Node/Vitest
-  global.fetch = mockFetch as unknown as typeof fetch;
+  vi.stubGlobal('fetch', mockFetch);
 });
 
 afterAll(() => {
-  global.fetch = originalFetch;
+  vi.unstubAllGlobals();
 });
 
 // Mock parseResponse

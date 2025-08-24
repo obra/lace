@@ -74,7 +74,7 @@ test.describe('Multi-Agent Workflows', () => {
 
     // Agent Switching UI Detection logged
     await test.step('Agent Switching UI Detection', async () => {
-      test.info().attach('agent-switching-ui.json', {
+      await test.info().attach('agent-switching-ui.json', {
         body: JSON.stringify(agentSwitchingUI, null, 2),
         contentType: 'application/json',
       });
@@ -192,7 +192,7 @@ test.describe('Multi-Agent Workflows', () => {
 
     // Agent Isolation Test completed - attach results as artifact
     await test.step('Agent Isolation Diagnostics', async () => {
-      test.info().attach('agent-isolation.json', {
+      await test.info().attach('agent-isolation.json', {
         body: JSON.stringify(agentIsolationTest, null, 2),
         contentType: 'application/json',
       });

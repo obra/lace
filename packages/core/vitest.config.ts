@@ -13,7 +13,7 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**', '**/.git/**'],
     coverage: {
       reporter: ['text', 'html', 'lcov'],
       exclude: [
@@ -31,7 +31,6 @@ export default defineConfig({
     setupFiles: [resolve(__dirname, 'src/test-setup.ts')],
     env: {
       NO_COLOR: '1',
-      FORCE_COLOR: '0',
     },
   },
 });
