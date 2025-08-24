@@ -152,6 +152,7 @@ export class Agent extends EventEmitter {
   private _state: AgentState = 'idle';
   private _initialized = false;
   private _initializing: Promise<void> | null = null;
+  private _initToken: symbol | null = null;
   private _promptConfig?: PromptConfig; // Cache loaded prompt config
   private _currentTurnMetrics: CurrentTurnMetrics | null = null;
   private _progressTimer: ReturnType<typeof setInterval> | null = null;
@@ -333,6 +334,10 @@ export class Agent extends EventEmitter {
       return;
     }
 
+    // Generate unique token for this initialization
+    const initToken = Symbol('init');
+    this._initToken = initToken;
+
     // Start initialization process
     this._initializing = (async () => {
       try {
@@ -351,8 +356,8 @@ export class Agent extends EventEmitter {
           this._addInitialEvents(this._promptConfig);
         }
 
-        // Only mark as initialized if provider was successfully created
-        if (this._provider) {
+        // Only mark as initialized if provider was successfully created AND token is still valid
+        if (this._provider && this._initToken === initToken) {
           this._initialized = true;
 
           logger.info('AGENT: Initialized successfully', {
@@ -471,6 +476,7 @@ export class Agent extends EventEmitter {
 
   stop(): void {
     this._initialized = false;
+    this._initToken = null; // Invalidate any in-flight initialization
     this._clearProgressTimer();
 
     // Abort any in-progress processing immediately
