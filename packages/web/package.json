@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20.18 <23"
+    "node": ">=20.18"
   },
   "scripts": {
     "dev": "TURBOPACK=1 tsx server-custom.ts",
