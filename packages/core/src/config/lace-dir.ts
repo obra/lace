@@ -4,8 +4,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { mkdtempSync } from 'fs';
-import { tmpdir } from 'os';
 import { getEnvVar } from '~/config/env-loader';
 
 /**
@@ -13,9 +11,7 @@ import { getEnvVar } from '~/config/env-loader';
  * Uses LACE_DIR environment variable, falls back to ~/.lace/
  */
 export function getLaceDir(): string {
-  const envValue = getEnvVar('LACE_DIR');
-  const laceDir = envValue || path.join(os.homedir(), '.lace');
-  return laceDir;
+  return getEnvVar('LACE_DIR') || path.join(os.homedir(), '.lace');
 }
 
 /**
@@ -79,7 +75,9 @@ export function getProcessTempDir(): string {
   if (!_processTempDir) {
     const processId = process.pid;
     const timestamp = Date.now();
-    _processTempDir = mkdtempSync(path.join(tmpdir(), `lace-runtime-${processId}-${timestamp}-`));
+    _processTempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), `lace-runtime-${processId}-${timestamp}-`)
+    );
   }
   return _processTempDir;
 }

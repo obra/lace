@@ -290,7 +290,7 @@ describe('Lace Directory Management', () => {
       const tempDir = getProcessTempDir();
 
       expect(tempDir).toMatch(/^.*lace-runtime-\d+-\d+-[a-zA-Z0-9]+$/);
-      expect(existsSync(tempDir)).toBe(true);
+      expect(fs.existsSync(tempDir)).toBe(true);
     });
 
     it('should return the same directory on multiple calls', () => {
@@ -310,7 +310,7 @@ describe('Lace Directory Management', () => {
 
     it('should create directory under system tmpdir', () => {
       const tempDir = getProcessTempDir();
-      const systemTmpDir = tmpdir();
+      const systemTmpDir = os.tmpdir();
 
       expect(tempDir).toContain(systemTmpDir);
     });
