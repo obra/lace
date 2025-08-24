@@ -10,6 +10,7 @@
     "dev": "TURBOPACK=1 tsx server-custom.ts",
     "dev:debug": "TURBOPACK=1 LACE_LOG_LEVEL=debug LACE_LOG_STDERR=true tsx server-custom.ts",
     "build": "node ../../scripts/trace-server-dependencies.mjs && next build --turbopack",
+    "build:standalone": "node ../../scripts/trace-server-dependencies.mjs && BUILD_STANDALONE=true next build",
     "start": "NODE_ENV=production tsx server-custom.ts",
     "lint": "NODE_ENV=development eslint; npx tsc --noEmit",
     "lint:fix": "eslint --fix",

@@ -43,6 +43,7 @@ function getServerDependencies(): string[] {
 }
 
 // Determine if we should build standalone (only for production or explicit standalone builds)
+// Note: Turbopack may have different behavior with outputFileTracingIncludes
 const isStandaloneBuild =
   process.env.BUILD_STANDALONE === 'true' || process.env.NODE_ENV === 'production';
 
