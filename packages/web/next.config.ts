@@ -3,47 +3,9 @@
 import type { NextConfig } from 'next';
 import path from 'path';
 import { fileURLToPath } from 'node:url';
-import { readFileSync, existsSync } from 'fs';
 import { withSentryConfig } from '@sentry/nextjs';
 
-interface NFTTraceData {
-  summary: {
-    hasIsDocker: boolean;
-    hasOpen: boolean;
-  };
-  tracedFiles: string[];
-}
-
-// Load nft-traced dependencies - only needed for standalone builds
-function getServerDependencies(): string[] {
-  const traceFile = path.resolve('./server-dependencies.json');
-
-  if (!existsSync(traceFile)) {
-    throw new Error(
-      `❌ NFT trace file not found at ${traceFile}. Run 'bun ../../scripts/trace-server-dependencies.mjs' first.`
-    );
-  }
-
-  try {
-    const traceData = JSON.parse(readFileSync(traceFile, 'utf8')) as NFTTraceData;
-
-    if (!traceData.summary.hasIsDocker || !traceData.summary.hasOpen) {
-      throw new Error(
-        `❌ NFT trace is incomplete. Missing: ${!traceData.summary.hasOpen ? 'open package ' : ''}${!traceData.summary.hasIsDocker ? 'is-docker package' : ''}`
-      );
-    }
-
-    return ['packages/web/server-custom.ts', ...traceData.tracedFiles];
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      throw new Error(`❌ NFT trace file is corrupted: ${error.message}`);
-    }
-    throw error;
-  }
-}
-
 // Determine if we should build standalone (only for production or explicit standalone builds)
-// Note: Turbopack may have different behavior with outputFileTracingIncludes
 const isStandaloneBuild =
   process.env.BUILD_STANDALONE === 'true' || process.env.NODE_ENV === 'production';
 
@@ -52,7 +14,7 @@ const nextConfig: NextConfig = {
     output: 'standalone',
     outputFileTracingRoot: fileURLToPath(new URL('../../', import.meta.url)),
     outputFileTracingIncludes: {
-      '/**/*': getServerDependencies(),
+      '/': ['packages/web/server-custom.ts'],
     },
   }),
   typescript: {
