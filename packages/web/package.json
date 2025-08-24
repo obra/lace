@@ -53,6 +53,7 @@
     "remark-gfm": "^4.0.1",
     "server-only": "^0.0.1",
     "superjson": "^2.2.2",
+    "tsx": "^4.20.3",
     "tailwindcss": "^4.1.11",
     "zod": "^3.25.69"
   },
@@ -80,7 +81,6 @@
     "msw": "^2.7.0",
     "playwright-msw": "^3.0.1",
     "postcss": "^8.4.38",
-    "tsx": "^4.20.3",
     "typescript": "^5.6.0",
     "vitest": "^3.2.4"
   },
