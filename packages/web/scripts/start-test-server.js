@@ -28,7 +28,7 @@ function startServer() {
       ANTHROPIC_API_KEY: 'test-anthropic-key-for-e2e-tests',
       LACE_DB_PATH: ':memory:',
       LACE_DIR: tempLaceDir, // Set isolated LACE_DIR for the server
-      NODE_ENV: 'test',
+      NODE_ENV: 'production', // Use production build for faster E2E tests
       VITEST_RUNNING: 'true',
       // Enable tool approval mock provider for E2E tests
       E2E_TOOL_APPROVAL_MOCK: process.env.E2E_TOOL_APPROVAL_MOCK || 'false',

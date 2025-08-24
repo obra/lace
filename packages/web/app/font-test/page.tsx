@@ -9,7 +9,7 @@ export default function FontTest() {
     const dmSans = style.getPropertyValue('--font-dm-sans');
     const googleSansCode = style.getPropertyValue('--font-google-sans-code');
 
-    console.warn('font.css.vars', { lato, dmSans, googleSansCode });
+    console.log('font.css.vars', { lato, dmSans, googleSansCode });
 
     return { lato, dmSans, googleSansCode };
   };
@@ -27,7 +27,7 @@ export default function FontTest() {
       const dmSansTest = document.fonts.check('16px "DM Sans"');
       const googleSansCodeTest = document.fonts.check('16px "Google Sans Code"');
 
-      console.warn('font.face.status', {
+      console.log('font.face.status', {
         hasLato,
         hasDMSans,
         hasGoogleSansCode,
