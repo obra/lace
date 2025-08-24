@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { logger } from '~/utils/logger';
 
 export default function FontTest() {
   const testCSSVariables = () => {
@@ -10,7 +9,7 @@ export default function FontTest() {
     const dmSans = style.getPropertyValue('--font-dm-sans');
     const googleSansCode = style.getPropertyValue('--font-google-sans-code');
 
-    logger.debug('font.css.vars', { lato, dmSans, googleSansCode });
+    console.warn('font.css.vars', { lato, dmSans, googleSansCode });
 
     return { lato, dmSans, googleSansCode };
   };
@@ -28,7 +27,7 @@ export default function FontTest() {
       const dmSansTest = document.fonts.check('16px "DM Sans"');
       const googleSansCodeTest = document.fonts.check('16px "Google Sans Code"');
 
-      logger.debug('font.face.status', {
+      console.warn('font.face.status', {
         hasLato,
         hasDMSans,
         hasGoogleSansCode,
@@ -72,11 +71,8 @@ export default function FontTest() {
           : 'Font CSS variables not properly defined',
       };
 
-      logger.debug('font.local.verification', result);
-
       return result;
     } catch (error) {
-      logger.error('font.verification.error', error);
       return { error: error instanceof Error ? error.message : String(error) };
     }
   };
