@@ -17,9 +17,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:playwright": "playwright test",
-    "test:playwright:ci": "TEST_FILES=$(grep -v '^#' .playwright-ci-allowlist | grep -v '^$' | tr '\\n' ' ') && if [ -n \"$TEST_FILES\" ]; then playwright test $TEST_FILES; else echo 'No tests in allowlist, skipping Playwright tests'; fi",
-    "test:playwright:ui": "playwright test --ui",
+    "test:playwright": "npm run build && playwright test",
+    "test:playwright:ci": "npm run build && TEST_FILES=$(grep -v '^#' .playwright-ci-allowlist | grep -v '^$' | tr '\\n' ' ') && if [ -n \"$TEST_FILES\" ]; then playwright test $TEST_FILES; else echo 'No tests in allowlist, skipping Playwright tests'; fi",
+    "test:playwright:ui": "npm run build && playwright test --ui",
     "ladle": "ladle serve",
     "ladle:build": "ladle build",
     "chromatic": "chromatic --exit-zero-on-changes"
