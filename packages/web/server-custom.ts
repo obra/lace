@@ -1,17 +1,10 @@
-// ABOUTME: Custom wrapper around Next.js standalone server with enhanced CLI options
-// ABOUTME: Provides auto-port detection, browser opening, and better UX around standalone build
+// ABOUTME: Custom wrapper around Next.js SINGLE PROCESS standalone server with enhanced CLI options
+// ABOUTME: Provides auto-port detection and better UX around standalone build
 
 import { parseArgs } from 'util';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import module from 'module';
-// Inline the isInteractive function to avoid import issues in standalone build
-function isInteractive(
-  stdin: { isTTY?: boolean } = process.stdin,
-  stdout: { isTTY?: boolean } = process.stdout
-): boolean {
-  return !!(stdin.isTTY && stdout.isTTY);
-}
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -59,10 +52,6 @@ Examples:
 const userSpecifiedPort = !!values.port; // Track if user manually specified port
 const requestedPort = parseInt(values.port || '31337', 10);
 const hostname = values.host || 'localhost';
-
-// Interactive detection is now handled by imported isInteractive function
-
-const shouldOpenBrowser = isInteractive();
 
 // Validate port
 if (!Number.isInteger(requestedPort) || requestedPort < 1 || requestedPort > 65535) {
@@ -313,7 +302,7 @@ if (isStandalone) {
       'Mediapartners-Google|Slurp|DuckDuckBot|baiduspider|yandex|sogou|bitlybot|tumblr|vkShare|quora link preview|redditbot|ia_archiver|Bingbot|BingPreview|applebot|facebookexternalhit|facebookcatalog|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|Yeti',
     bundlePagesRouterDependencies: false,
     configFileName: 'next.config.ts',
-    outputFileTracingIncludes: { '/': ['packages/web/server-custom.ts', 'node_modules/open/**/*'] },
+    outputFileTracingIncludes: { '/': ['packages/web/server-custom.ts'] },
     turbopack: {
       resolveAlias: {
         '~/': path.join(process.cwd(), 'packages/core/'),
@@ -367,20 +356,6 @@ async function startLaceServer() {
     console.log(`LACE_SERVER_PORT:${port}`);
     // eslint-disable-next-line no-console -- Port/URL signaling required for parent process communication
     console.log(`LACE_SERVER_URL:${url}`);
-
-    // Open browser if running interactively - use nft-traced dependencies
-    if (shouldOpenBrowser) {
-      try {
-        console.warn(`🔍 DEBUG: Attempting to open browser at ${url}...`);
-        // Use regular Node.js module resolution now that dependencies are properly traced
-        const { default: open } = await import('open');
-        await open(url);
-      } catch (error) {
-        const errorCode = (error as NodeJS.ErrnoException).code || 'unknown error';
-        const errorMessage = (error as Error).message || 'unknown message';
-        console.error(`🔍 DEBUG: ❌ Browser opening failed: ${errorMessage} (${errorCode})`);
-      }
-    }
   } catch (error) {
     throw new Error(`Failed to start server on ${url}: ${error}`);
   }
