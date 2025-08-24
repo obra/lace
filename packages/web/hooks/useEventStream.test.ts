@@ -13,6 +13,13 @@ import type {
   AgentStateChangeData,
 } from '@/types/core';
 
+interface EventFilter {
+  threadIds?: string[];
+  sessionIds?: string[];
+  projectIds?: string[];
+  eventTypes?: string[];
+}
+
 // Mock the firehose
 vi.mock('@/lib/event-stream-firehose', () => ({
   EventStreamFirehose: {
@@ -33,8 +40,23 @@ describe('useEventStream', () => {
   };
 
   beforeEach(() => {
+    // Create a more complete mock for TypeScript satisfaction
+    const completeMockFirehose = {
+      ...mockFirehose,
+      eventSource: null,
+      subscriptions: new Map(),
+      connectionState: 'connected' as const,
+      eventsReceived: 0,
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      handleIncomingEvent: vi.fn(),
+      setupEventSourceHandlers: vi.fn(),
+      shouldEventPassFilter: vi.fn(),
+      generateSubscriptionId: vi.fn(),
+    };
+
     vi.mocked(EventStreamFirehose.getInstance).mockReturnValue(
-      mockFirehose as ReturnType<typeof EventStreamFirehose.getInstance>
+      completeMockFirehose as unknown as ReturnType<typeof EventStreamFirehose.getInstance>
     );
     mockFirehose.subscribe.mockClear();
     mockFirehose.unsubscribe.mockClear();
@@ -77,10 +99,12 @@ describe('useEventStream', () => {
     const mockOnAgentStateChange = vi.fn();
     let capturedCallback: ((event: LaceEvent) => void) | null = null;
 
-    mockFirehose.subscribe.mockImplementation((filter: any, callback: any) => {
-      capturedCallback = callback;
-      return 'subscription-id';
-    });
+    mockFirehose.subscribe.mockImplementation(
+      (filter: EventFilter, callback: (event: LaceEvent) => void) => {
+        capturedCallback = callback;
+        return 'subscription-id';
+      }
+    );
 
     renderHook(() =>
       useEventStream({
@@ -120,10 +144,12 @@ describe('useEventStream', () => {
     const mockOnToolCall = vi.fn();
     let capturedCallback: ((event: LaceEvent) => void) | null = null;
 
-    mockFirehose.subscribe.mockImplementation((filter: any, callback: any) => {
-      capturedCallback = callback;
-      return 'subscription-id';
-    });
+    mockFirehose.subscribe.mockImplementation(
+      (filter: EventFilter, callback: (event: LaceEvent) => void) => {
+        capturedCallback = callback;
+        return 'subscription-id';
+      }
+    );
 
     renderHook(() =>
       useEventStream({
@@ -180,10 +206,12 @@ describe('useEventStream', () => {
     const mockOnAgentStateChange = vi.fn();
     let capturedCallback: ((event: LaceEvent) => void) | null = null;
 
-    mockFirehose.subscribe.mockImplementation((filter: any, callback: any) => {
-      capturedCallback = callback;
-      return 'subscription-id';
-    });
+    mockFirehose.subscribe.mockImplementation(
+      (filter: EventFilter, callback: (event: LaceEvent) => void) => {
+        capturedCallback = callback;
+        return 'subscription-id';
+      }
+    );
 
     const { result } = renderHook(() =>
       useEventStream({

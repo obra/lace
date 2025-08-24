@@ -10,6 +10,9 @@ import globals from 'globals';
 export default [
   {
     ignores: ['dist/**/*'],
+    linterOptions: {
+      reportUnusedDisableDirectives: 'error',
+    },
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map(config => ({
@@ -24,12 +27,14 @@ export default [
       ecmaVersion: 2024,
       sourceType: 'module',
       globals: globals.node,
+      parser: tseslint.parser,
       parserOptions: {
         project: './tsconfig.json',
         tsconfigRootDir: import.meta.dirname,
       },
     },
     plugins: {
+      '@typescript-eslint': tseslint.plugin,
       prettier,
       'no-relative-import-paths': noRelativeImportPaths,
       'import': importPlugin,
@@ -70,7 +75,20 @@ export default [
         ]
       }],
       '@typescript-eslint/no-floating-promises': ['error', { ignoreVoid: true }],
-      'no-var': 'error'
+      'no-var': 'error',
+      'import/no-extraneous-dependencies': ['error', {
+        devDependencies: [
+          '**/*.test.ts',
+          '**/*.spec.ts',
+          '**/*.stories.*',
+          '**/vite.config.*',
+          '**/vitest.config.*',
+          '**/eslint.config.*',
+          '**/ladle.config.*',
+          '**/test-utils/**',
+          '**/test-setup.*'
+        ]
+      }]
     },
   },
   {

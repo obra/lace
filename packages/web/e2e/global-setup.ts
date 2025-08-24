@@ -6,6 +6,7 @@ import type { FullConfig } from '@playwright/test';
 async function globalSetup(_config: FullConfig): Promise<void> {
   // Starting Playwright test suite setup
   // Any global setup needed (currently none, but placeholder for future needs)
+  await Promise.resolve(); // Satisfy async requirement
 }
 
 export default globalSetup;

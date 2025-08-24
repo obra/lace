@@ -1,8 +1,13 @@
 // ABOUTME: MSW HTTP handlers for mocking Anthropic API in E2E tests
 // ABOUTME: Provides predictable AI responses by intercepting HTTP requests to api.anthropic.com
 
-import { setupServer } from 'msw/node';
+import { setupServer, type SetupServer } from 'msw/node';
 import { http } from 'msw';
+
+// Type the global MSW server reference
+declare global {
+  var __MSW_SERVER__: SetupServer | undefined;
+}
 
 interface AnthropicMessage {
   role: 'user' | 'assistant';
@@ -156,5 +161,5 @@ export function mockAnthropicForE2E(): void {
   // Anthropic API HTTP endpoints mocked for E2E tests
 
   // Store server reference for cleanup
-  (global as Record<string, unknown>).__MSW_SERVER__ = server;
+  globalThis.__MSW_SERVER__ = server;
 }
