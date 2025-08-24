@@ -80,7 +80,7 @@ async function startTestServer(
   const serverUrl = `http://localhost:${port}`;
 
   // Start server process with isolated environment using E2E test server
-  const serverScriptPath = path.resolve(__dirname, '../../../packages/web/e2e-test-server.ts');
+  const serverScriptPath = path.resolve(__dirname, '../../e2e-test-server.ts');
   const serverProcess = spawn('npx', ['tsx', serverScriptPath, '--port', port.toString()], {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
