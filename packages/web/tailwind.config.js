@@ -71,7 +71,7 @@ const config = {
     themes: [
       {
         light: {
-          ...require('daisyui/src/theming/themes')['light'],
+          ...require('daisyui')['light'],
           '--agent-claude': '251 146 60',
           '--agent-gpt4': '34 197 94', 
           '--agent-gemini': '59 130 246',
