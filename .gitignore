@@ -37,7 +37,6 @@ coverage/
 # Playwright test results
 test-results/
 playwright-report/
-
 # Logs
 logs
 *.log

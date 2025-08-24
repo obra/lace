@@ -2,13 +2,29 @@
 // ABOUTME: Validates agent creation, selection, and state management operations
 
 import { renderHook, act } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
+import {
+  beforeEach,
+  beforeAll,
+  afterAll,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockedFunction,
+} from 'vitest';
+import type { SessionInfo, ThreadId } from '@/types/core';
 import { useAgentManagement } from './useAgentManagement';
 
-// Mock fetch globally
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+// Mock fetch globally using Vitest's stubbing API
+const mockFetch: MockedFunction<typeof fetch> = vi.fn();
+
+beforeAll(() => {
+  vi.stubGlobal('fetch', mockFetch);
+});
+
+afterAll(() => {
+  vi.unstubAllGlobals();
+});
 
 // Mock parseResponse
 vi.mock('@/lib/serialization', () => ({

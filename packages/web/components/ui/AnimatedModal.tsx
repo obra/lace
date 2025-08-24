@@ -1,8 +1,9 @@
+// ABOUTME: Animated modal and confirm modal components with accessibility and motion transitions
 'use client';
 
-import React from 'react';
 import { useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import type { ReactNode } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { DismissButton } from '@/components/ui/DismissButton';
 import {
   modalOverlay,
@@ -17,7 +18,7 @@ interface AnimatedModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
-  children: React.ReactNode;
+  children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   showCloseButton?: boolean;
   closeOnBackdropClick?: boolean;

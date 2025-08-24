@@ -139,18 +139,24 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
   optionsRef.current = options;
 
   // Build filter from options (memoized for performance)
-  // Use JSON.stringify for deep comparison to prevent array reference issues
+  // Use deep comparison for threadIds array to prevent unnecessary re-subscriptions
+  const stableThreadIds = useMemo(
+    () => options.threadIds,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(options.threadIds)] // Deep comparison - ignore exhaustive-deps for this dependency
+  );
+
   const filter = useMemo(() => {
     return {
       projectIds: options.projectId ? [options.projectId] : undefined,
       sessionIds: options.sessionId ? [options.sessionId] : undefined,
-      threadIds: options.threadIds,
+      threadIds: stableThreadIds,
       eventTypes: undefined, // Could be added later
     };
   }, [
     options.projectId,
     options.sessionId,
-    JSON.stringify(options.threadIds), // Deep comparison for arrays
+    stableThreadIds, // Stable reference with deep comparison
   ]);
 
   // Subscribe/unsubscribe effect - only runs when filter changes

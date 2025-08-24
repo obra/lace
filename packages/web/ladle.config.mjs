@@ -1,4 +1,6 @@
-export default {
+import { fileURLToPath } from 'node:url';
+
+const config = {
   stories: [
     'components/ui/Badge.stories.*',
     'components/ui/Modal.stories.*',
@@ -20,9 +22,11 @@ export default {
   viteConfig: {
     resolve: {
       alias: {
-        '~': new URL('../../src', import.meta.url).pathname,
-        '@': new URL('.', import.meta.url).pathname,
+        '~': fileURLToPath(new URL('../core/src', import.meta.url)),
+        '@': fileURLToPath(new URL('.', import.meta.url)),
       },
     },
   },
 };
+
+export default config;

@@ -65,7 +65,7 @@ describe('resource-resolver', () => {
       expect(() => {
         resolveResourcePath(fakeImportMetaUrl, 'data');
       }).toThrow(
-        'Unable to resolve resource path: module file:///project/lib/some-module.js is not in src/ directory'
+        'Unable to resolve resource path: module file:///project/lib/some-module.js is not in src/ or packages/core/src/ directory'
       );
     });
   });

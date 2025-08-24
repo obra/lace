@@ -138,20 +138,20 @@ test.describe('Session Management', () => {
       await verifyMessageVisible(page, followupMessage);
       sessionIsolationTest.canSendNewMessage = true;
       sessionIsolationTest.sessionFunctional = true;
-    } catch (error) {
-      console.log('Session isolation: Could not send follow-up message');
+    } catch (_error) {
+      // Session isolation: Could not send follow-up message
     }
 
-    console.log('Session Isolation Test Results:', sessionIsolationTest);
+    // Session Isolation Test Results completed
 
     // Test succeeds if we can establish basic session functionality
     expect(sessionIsolationTest.projectId).not.toBeNull();
 
     if (sessionIsolationTest.messageVisible && sessionIsolationTest.canSendNewMessage) {
-      console.log('Session isolation working - full functionality');
+      // Session isolation working - full functionality
       expect(sessionIsolationTest.canSendNewMessage).toBeTruthy();
     } else {
-      console.log('Session isolation partial - documenting current behavior');
+      // Session isolation partial - documenting current behavior
       expect(true).toBeTruthy(); // Still valid outcome
     }
   });

@@ -1,8 +1,10 @@
+// ABOUTME: Animated button component with motion effects and variant styling
+// ABOUTME: Provides consistent button animations across the application
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
-import { buttonTap, hoverLift, springConfig, focusRing } from '@/lib/animations';
+import { motion } from 'motion/react';
+import { buttonTap, springConfig, focusRing } from '@/lib/animations';
 
 interface AnimatedButtonProps {
   children: React.ReactNode;

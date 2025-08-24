@@ -9,7 +9,7 @@ import type { ThreadId } from '@/types/core';
 
 export interface URLState {
   project: string | null;
-  session: ThreadId | null;  
+  session: ThreadId | null;
   agent: ThreadId | null;
 }
 
@@ -23,25 +23,34 @@ export interface URLActions {
 export function useURLState(): URLState & URLActions {
   const router = useRouter();
   const params = useParams();
-  const pathname = usePathname();
+  const _pathname = usePathname();
 
   // Extract current state from URL params
-  const project = params?.projectId as string || null;
-  const session = params?.sessionId as ThreadId || null;
-  const agent = params?.agentId as ThreadId || null;
+  const project = (params?.projectId as string) || null;
+  const session = (params?.sessionId as ThreadId) || null;
+  const agent = (params?.agentId as ThreadId) || null;
 
   // Navigation functions with automatic cascade clearing
-  const navigateToProject = useCallback((projectId: string) => {
-    router.push(`/project/${projectId}`);
-  }, [router]);
+  const navigateToProject = useCallback(
+    (projectId: string) => {
+      router.push(`/project/${projectId}`);
+    },
+    [router]
+  );
 
-  const navigateToSession = useCallback((projectId: string, sessionId: ThreadId) => {
-    router.push(`/project/${projectId}/session/${sessionId}`);
-  }, [router]);
+  const navigateToSession = useCallback(
+    (projectId: string, sessionId: ThreadId) => {
+      router.push(`/project/${projectId}/session/${sessionId}`);
+    },
+    [router]
+  );
 
-  const navigateToAgent = useCallback((projectId: string, sessionId: ThreadId, agentId: ThreadId) => {
-    router.push(`/project/${projectId}/session/${sessionId}/agent/${agentId}`);
-  }, [router]);
+  const navigateToAgent = useCallback(
+    (projectId: string, sessionId: ThreadId, agentId: ThreadId) => {
+      router.push(`/project/${projectId}/session/${sessionId}/agent/${agentId}`);
+    },
+    [router]
+  );
 
   const navigateToRoot = useCallback(() => {
     router.push('/');
@@ -50,9 +59,9 @@ export function useURLState(): URLState & URLActions {
   return {
     // Current state
     project,
-    session, 
+    session,
     agent,
-    
+
     // Navigation actions
     navigateToProject,
     navigateToSession,

@@ -124,7 +124,8 @@ export function useTaskManager(
         clearTimeout(refetchTimeout.current);
       }
     };
-  }, [projectId, sessionId]); // fetchTasks is stable thanks to useCallback([projectId, sessionId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchTasks is stable thanks to useCallback([projectId, sessionId])
+  }, [projectId, sessionId]);
 
   // Refetch with filters
   const refetch = useCallback(

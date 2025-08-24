@@ -35,6 +35,7 @@ const { values } = parseArgs({
 });
 
 if (values.help) {
+  // eslint-disable-next-line no-console -- Help text output is appropriate for CLI server
   console.log(`
 Lace Web Server
 
@@ -82,15 +83,13 @@ if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
 const isDev = process.env.NODE_ENV !== 'production';
 const isStandalone = !isDev;
 
-console.log(`Starting Lace in ${isDev ? 'development' : 'production'} mode...`);
-
 // Setup Node.js module system for standalone build
-const require = module.createRequire(import.meta.url);
+const _require = module.createRequire(import.meta.url);
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // Only set production environment if not already set
 if (!process.env.NODE_ENV) {
-  (process.env as any).NODE_ENV = isStandalone ? 'production' : 'development';
+  (process.env as Record<string, string>).NODE_ENV = isStandalone ? 'production' : 'development';
 }
 
 // In standalone mode, change to the standalone root directory for proper module resolution
@@ -99,16 +98,13 @@ if (isStandalone) {
   const standaloneRoot = path.resolve(__dirname, '../..');
   process.chdir(standaloneRoot);
   webDir = path.join(standaloneRoot, 'packages/web');
-  console.log(`Current working directory: ${process.cwd()}`);
-  console.log(`Web directory: ${webDir}`);
 } else {
   // In development mode, stay in the current directory
   webDir = __dirname;
-  console.log(`Development mode - working directory: ${process.cwd()}`);
 }
 
 // Next.js configuration - only needed for standalone builds
-let nextConfig: any = undefined;
+let nextConfig: unknown = undefined;
 
 if (isStandalone) {
   nextConfig = {
@@ -319,7 +315,7 @@ if (isStandalone) {
     outputFileTracingIncludes: { '/': ['packages/web/server-custom.ts', 'node_modules/open/**/*'] },
     turbopack: {
       resolveAlias: {
-        '~/': path.join(process.cwd(), 'src/'),
+        '~/': path.join(process.cwd(), 'packages/core/'),
         '@/': path.join(process.cwd(), 'packages/web/'),
       },
       resolveExtensions: ['.js', '.jsx', '.ts', '.tsx'],
@@ -337,6 +333,7 @@ async function startLaceServer() {
   const port = await findAvailablePort(requestedPort, userSpecifiedPort, hostname);
   const url = `http://${hostname}:${port}`;
 
+  // eslint-disable-next-line no-console -- Server startup message is appropriate for server process
   console.log(`🚀 Starting Lace server on ${url}...`);
 
   // Use the same approach as the original Next.js standalone server
@@ -353,33 +350,33 @@ async function startLaceServer() {
       keepAliveTimeout: undefined,
     });
 
+    // eslint-disable-next-line no-console -- Server ready message with URL/PID is appropriate for server process
     console.log(`
 ✅ Lace is ready!
    
    🌐 URL: ${url}
-   🔧 Mode: ${isDev ? 'development' : 'production (standalone)'}
-   🔒 Process: Single-process mode (PID: ${process.pid})
+   🔒 PID: ${process.pid}
    
    Press Ctrl+C to stop
 `);
 
     // Signal the actual port to parent process (for menu bar app)
+    // eslint-disable-next-line no-console -- Port/URL signaling required for parent process communication
     console.log(`LACE_SERVER_PORT:${port}`);
+    // eslint-disable-next-line no-console -- Port/URL signaling required for parent process communication
     console.log(`LACE_SERVER_URL:${url}`);
 
     // Open browser if running interactively - use nft-traced dependencies
     if (shouldOpenBrowser) {
       try {
-        console.log(`🔍 DEBUG: Attempting to open browser at ${url}...`);
+        console.warn(`🔍 DEBUG: Attempting to open browser at ${url}...`);
         // Use regular Node.js module resolution now that dependencies are properly traced
         const { default: open } = await import('open');
         await open(url);
-        console.log(`🔍 DEBUG: ✅ Browser opened successfully!`);
       } catch (error) {
         const errorCode = (error as NodeJS.ErrnoException).code || 'unknown error';
         const errorMessage = (error as Error).message || 'unknown message';
-        console.log(`🔍 DEBUG: ❌ Browser opening failed: ${errorMessage} (${errorCode})`);
-        console.log(`   ℹ️  Could not open browser automatically (${errorCode})`);
+        console.error(`🔍 DEBUG: ❌ Browser opening failed: ${errorMessage} (${errorCode})`);
       }
     }
   } catch (error) {
@@ -447,11 +444,13 @@ startLaceServer().catch((err) => {
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
+  // eslint-disable-next-line no-console -- Shutdown message is appropriate for server process lifecycle
   console.log('\nReceived SIGTERM, shutting down gracefully...');
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
+  // eslint-disable-next-line no-console -- Shutdown message is appropriate for server process lifecycle
   console.log('\nReceived SIGINT, shutting down gracefully...');
   process.exit(0);
 });

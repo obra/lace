@@ -4,7 +4,7 @@
 'use client';
 
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import type { LaceEvent, AgentInfo, ThreadId } from '@/types/core';
 import type { CompactionState } from '@/components/providers/EventStreamProvider';
 import { asThreadId } from '@/types/core';

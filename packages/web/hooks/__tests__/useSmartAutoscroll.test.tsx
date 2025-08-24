@@ -1,9 +1,9 @@
 // ABOUTME: Tests for smart autoscroll functionality
 // ABOUTME: Verifies autoscroll behavior for user messages, streaming, and scroll position tracking
 
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { useSmartAutoscroll, useTimelineAutoscroll } from '../useSmartAutoscroll';
+import { useSmartAutoscroll, useTimelineAutoscroll } from '@/hooks/useSmartAutoscroll';
 import { ScrollProvider } from '@/components/providers/ScrollProvider';
 import React from 'react';
 
@@ -73,18 +73,18 @@ describe('useSmartAutoscroll', () => {
       result.current.scrollToBottom(true);
     });
 
-    // Wait for timeout
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    expect(mockContainer.scrollTo).toHaveBeenCalledWith({
-      top: 1000,
-      behavior: 'smooth',
-    });
+    // Wait for scroll to trigger
+    await waitFor(() =>
+      expect(mockContainer.scrollTo).toHaveBeenCalledWith({
+        top: 1000,
+        behavior: 'smooth',
+      })
+    );
   });
 });
 
 describe('useTimelineAutoscroll', () => {
-  it('should trigger autoscroll on new user messages', () => {
+  it('should trigger autoscroll on new user messages', async () => {
     const mockEvents = [{ type: 'AGENT_MESSAGE', content: 'Hello' }];
 
     const { result, rerender } = renderHook(
@@ -109,12 +109,10 @@ describe('useTimelineAutoscroll', () => {
     });
 
     // Should trigger scroll due to user message
-    setTimeout(() => {
-      expect(mockContainer.scrollTo).toHaveBeenCalled();
-    }, 10);
+    await waitFor(() => expect(mockContainer.scrollTo).toHaveBeenCalled());
   });
 
-  it('should handle streaming content updates', () => {
+  it('should handle streaming content updates', async () => {
     const mockEvents = [{ type: 'USER_MESSAGE', content: 'Hello' }];
 
     const { result, rerender } = renderHook(
@@ -137,12 +135,10 @@ describe('useTimelineAutoscroll', () => {
       rerender({ streamingContent: 'Streaming response...' });
     });
 
-    setTimeout(() => {
-      expect(mockContainer.scrollTo).toHaveBeenCalled();
-    }, 10);
+    await waitFor(() => expect(mockContainer.scrollTo).toHaveBeenCalled());
   });
 
-  it('should autoscroll when content is first loaded', () => {
+  it('should autoscroll when content is first loaded', async () => {
     const { result, rerender } = renderHook(
       ({ events }: { events: unknown[] }) =>
         useTimelineAutoscroll(events, false, undefined, { scrollDelay: 0 }),
@@ -154,7 +150,7 @@ describe('useTimelineAutoscroll', () => {
 
     const mockContainer = createMockContainer(0, 1000, 500);
     Object.defineProperty(result.current.containerRef, 'current', {
-      value: mockContainer as any,
+      value: mockContainer as Partial<HTMLElement>,
       writable: true,
     });
 
@@ -169,11 +165,11 @@ describe('useTimelineAutoscroll', () => {
       rerender({ events: loadedEvents });
     });
 
-    setTimeout(() => {
+    await waitFor(() =>
       expect(mockContainer.scrollTo).toHaveBeenCalledWith({
         top: 1000,
         behavior: 'smooth',
-      });
-    }, 10);
+      })
+    );
   });
 });

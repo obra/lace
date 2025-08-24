@@ -1,7 +1,7 @@
 // ABOUTME: Event stream hook for agent-specific events
 // ABOUTME: Loads historical events for a specific agent and handles real-time updates
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { LaceEvent } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 import { isInternalWorkflowEvent } from '@/types/core';

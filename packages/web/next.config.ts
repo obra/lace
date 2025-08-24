@@ -1,7 +1,18 @@
+// ABOUTME: Next.js configuration for the web interface with webpack customizations and build settings
+// ABOUTME: Configures aliases, externals, Sentry integration, and standalone build optimizations
 import type { NextConfig } from 'next';
 import path from 'path';
+import { fileURLToPath } from 'node:url';
 import { readFileSync, existsSync } from 'fs';
 import { withSentryConfig } from '@sentry/nextjs';
+
+interface NFTTraceData {
+  summary: {
+    hasIsDocker: boolean;
+    hasOpen: boolean;
+  };
+  tracedFiles: string[];
+}
 
 // Load nft-traced dependencies - only needed for standalone builds
 function getServerDependencies(): string[] {
@@ -14,7 +25,7 @@ function getServerDependencies(): string[] {
   }
 
   try {
-    const traceData = JSON.parse(readFileSync(traceFile, 'utf8'));
+    const traceData = JSON.parse(readFileSync(traceFile, 'utf8')) as NFTTraceData;
 
     if (!traceData.summary.hasIsDocker || !traceData.summary.hasOpen) {
       throw new Error(
@@ -38,9 +49,9 @@ const isStandaloneBuild =
 const nextConfig: NextConfig = {
   ...(isStandaloneBuild && {
     output: 'standalone',
-    outputFileTracingRoot: path.resolve('../../'),
+    outputFileTracingRoot: fileURLToPath(new URL('../../', import.meta.url)),
     outputFileTracingIncludes: {
-      '/': getServerDependencies(),
+      '/**/*': getServerDependencies(),
     },
   }),
   typescript: {
@@ -53,8 +64,8 @@ const nextConfig: NextConfig = {
   // Turbopack configuration (stable as of Next.js 15)
   turbopack: {
     resolveAlias: {
-      '~/': path.resolve('../../src') + '/',
-      '@/': path.resolve('.') + '/',
+      '~/': fileURLToPath(new URL('../core/src', import.meta.url)) + '/',
+      '@/': fileURLToPath(new URL('.', import.meta.url)) + '/',
     },
     resolveExtensions: ['.js', '.jsx', '.ts', '.tsx'],
   },
@@ -73,7 +84,11 @@ const nextConfig: NextConfig = {
         fallback?: Record<string, string | boolean>;
         extensionAlias?: Record<string, string[]>;
       };
-      externals?: any;
+      externals?: Array<
+        | string
+        | RegExp
+        | ((ctx: unknown, callback: (error?: Error, result?: unknown) => void) => void)
+      >;
     };
 
     // Ignore all bun:* imports - they're only used in Bun runtime
@@ -81,15 +96,17 @@ const nextConfig: NextConfig = {
       webpackConfig.externals = [
         ...(Array.isArray(webpackConfig.externals)
           ? webpackConfig.externals
-          : [webpackConfig.externals].filter(Boolean)),
+          : webpackConfig.externals
+            ? [webpackConfig.externals]
+            : []),
         /^bun:/,
       ];
     }
 
     webpackConfig.resolve.alias = {
       ...webpackConfig.resolve.alias,
-      '~': path.resolve('../../src'),
-      '@': path.resolve('.'),
+      '~': fileURLToPath(new URL('../core/src', import.meta.url)),
+      '@': fileURLToPath(new URL('.', import.meta.url)),
     };
 
     webpackConfig.resolve.extensionAlias = {

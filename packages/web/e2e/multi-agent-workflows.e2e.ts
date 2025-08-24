@@ -72,7 +72,13 @@ test.describe('Multi-Agent Workflows', () => {
       currentAgentId: initialAgentId,
     };
 
-    console.log('Agent Switching UI Detection:', JSON.stringify(agentSwitchingUI, null, 2));
+    // Agent Switching UI Detection logged
+    await test.step('Agent Switching UI Detection', async () => {
+      await test.info().attach('agent-switching-ui.json', {
+        body: JSON.stringify(agentSwitchingUI, null, 2),
+        contentType: 'application/json',
+      });
+    });
 
     // Test passes if we can document current agent switching capabilities
     expect(agentSwitchingUI.agentIdVisible).toBeTruthy();
@@ -82,10 +88,10 @@ test.describe('Multi-Agent Workflows', () => {
       .some(([, value]) => value === true);
 
     if (hasAgentSwitchingUI) {
-      console.log('Found agent switching UI elements');
+      // Found agent switching UI elements
       expect(hasAgentSwitchingUI).toBeTruthy();
     } else {
-      console.log('No agent switching UI found - single agent model');
+      // No agent switching UI found - single agent model
       expect(true).toBeTruthy(); // Still valid outcome
     }
   });
@@ -126,19 +132,19 @@ test.describe('Multi-Agent Workflows', () => {
       try {
         await page.locator('[data-testid="new-agent-button"]').click();
         agentCreationUI.canTriggerAgentCreation = true;
-      } catch (error) {
-        console.log('Could not trigger agent creation:', error);
+      } catch (_error) {
+        // Could not trigger agent creation
       }
     } else if (agentCreationUI.hasAddAgentButton) {
       try {
         await page.locator('[data-testid="add-agent-button"]').click();
         agentCreationUI.canTriggerAgentCreation = true;
-      } catch (error) {
-        console.log('Could not trigger agent creation:', error);
+      } catch (_error) {
+        // Could not trigger agent creation
       }
     }
 
-    console.log('Agent Creation Analysis:', agentCreationUI);
+    // Agent Creation Analysis completed
 
     // Test passes if we can document agent creation capabilities
     expect(initialUrl).toContain('agent'); // Should have agent in URL
@@ -181,10 +187,16 @@ test.describe('Multi-Agent Workflows', () => {
       await page.waitForTimeout(2000);
 
       const reloadedUrl = page.url();
-      agentIsolationTest.agentPersistence = reloadedUrl.includes(agentId || '');
+      agentIsolationTest.agentPersistence = !!agentId && reloadedUrl.includes(agentId);
     }
 
-    console.log('Agent Isolation Test:', agentIsolationTest);
+    // Agent Isolation Test completed - attach results as artifact
+    await test.step('Agent Isolation Diagnostics', async () => {
+      await test.info().attach('agent-isolation.json', {
+        body: JSON.stringify(agentIsolationTest, null, 2),
+        contentType: 'application/json',
+      });
+    });
 
     // Test passes if agent system is functional
     expect(agentIsolationTest.urlHasAgent).toBeTruthy();

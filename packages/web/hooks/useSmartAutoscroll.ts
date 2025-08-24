@@ -23,7 +23,6 @@ export function useSmartAutoscroll({
 }: UseSmartAutoscrollOptions = {}): UseSmartAutoscrollReturn {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const wasNearBottomRef = useRef(true); // Start assuming we're at bottom
-  const lastUserMessageTimeRef = useRef<number>(0);
 
   // Check if user is near the bottom of the container
   const isNearBottom = useCallback((): boolean => {
@@ -114,7 +113,7 @@ export function useTimelineAutoscroll(
     const hadNewEvent = currentLength > prevEventsLengthRef.current;
 
     if (hadNewEvent && events.length > 0) {
-      const lastEvent = events[events.length - 1] as any;
+      const lastEvent = events[events.length - 1] as { type: string };
 
       // If the last event is a user message, always scroll (force = true)
       if (lastEvent?.type === 'USER_MESSAGE') {

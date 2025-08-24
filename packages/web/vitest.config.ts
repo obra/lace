@@ -1,3 +1,6 @@
+// ABOUTME: Vitest configuration for web package
+// ABOUTME: Sets up test environment for Next.js components and API routes
+
 import { defineConfig } from 'vitest/config';
 import path from 'path';
 
@@ -11,7 +14,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
-      '~': path.resolve(__dirname, '../../src'),
+      '~': path.resolve(__dirname, '../../packages/core/src'),
     },
   },
 });

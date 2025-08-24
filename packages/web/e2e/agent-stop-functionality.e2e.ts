@@ -11,9 +11,6 @@ import {
   createProject,
   setupAnthropicProvider,
   sendMessage,
-  waitForStopButton,
-  clickStopButton,
-  waitForSendButton,
   verifyMessageVisible,
   getMessageInput,
 } from './helpers/ui-interactions';
@@ -52,21 +49,20 @@ test.describe('Agent Stop Functionality E2E Tests', () => {
     // Test that the stop API endpoint is accessible and responds correctly
     // Since we can't easily create slow responses in E2E tests, we'll test
     // that the endpoint exists and handles the request properly
-    const stopResponse = await page.evaluate(async () => {
+    const stopResponse = await (async () => {
       try {
         // Try to call the stop endpoint with a test agent ID
-        const result = await fetch('/api/agents/lace_20250801_abc123.1/stop', {
-          method: 'POST',
+        const result = await page.request.post('/api/agents/lace_20250801_abc123.1/stop', {
           headers: { 'Content-Type': 'application/json' },
         });
-        const data = await result.json();
-        return { status: result.status, data };
-      } catch (error) {
-        return { error: error instanceof Error ? error.message : 'Unknown error' };
+        const data = (await result.json()) as Record<string, unknown>;
+        return { status: result.status(), data };
+      } catch (_error) {
+        return { error: _error instanceof Error ? _error.message : 'Unknown error' };
       }
-    });
+    })();
 
-    console.log('Stop API test result:', stopResponse);
+    // Stop API test completed
 
     // The endpoint should respond (either with success or a proper error for non-existent agent)
     // This verifies the endpoint is wired up and accessible from the frontend

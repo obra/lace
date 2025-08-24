@@ -50,8 +50,3 @@ export const ListDirectoryResponseSchema = z.object({
   breadcrumbNames: z.array(z.string()),
   homeDirectory: z.string(),
 });
-
-// Type inference for request/response validation
-type ListDirectoryRequest = z.infer<typeof ListDirectoryRequestSchema>;
-type ValidatedDirectoryEntry = z.infer<typeof DirectoryEntrySchema>;
-type ValidatedListDirectoryResponse = z.infer<typeof ListDirectoryResponseSchema>;

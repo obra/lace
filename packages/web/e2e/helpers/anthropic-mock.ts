@@ -1,27 +1,39 @@
 // ABOUTME: MSW HTTP handlers for mocking Anthropic API in E2E tests
 // ABOUTME: Provides predictable AI responses by intercepting HTTP requests to api.anthropic.com
 
-import { setupServer } from 'msw/node';
-import { http, HttpResponse } from 'msw';
+import { setupServer, type SetupServer } from 'msw/node';
+import { http } from 'msw';
+
+// Type the global MSW server reference
+declare global {
+  var __MSW_SERVER__: SetupServer | undefined;
+}
+
+interface AnthropicMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface AnthropicRequest {
+  messages: AnthropicMessage[];
+  model: string;
+  stream?: boolean;
+}
 
 /**
  * Mock the Anthropic API HTTP endpoints for E2E tests
  * This intercepts actual HTTP requests to api.anthropic.com
  */
 export function mockAnthropicForE2E(): void {
-  console.log('🎭 Setting up Anthropic API HTTP mocks for E2E tests...');
-
   const handlers = [
     // Handle Anthropic API requests
     http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
-      console.log('🎯 Intercepting Anthropic API request for E2E test');
-
       // Parse the request to determine which response to send
       const body = await request.text();
-      const requestData = JSON.parse(body);
+      const requestData = JSON.parse(body) as AnthropicRequest;
 
       // Get the LAST user message from conversation history (not the first)
-      const userMessages = requestData.messages?.filter((m: any) => m.role === 'user') || [];
+      const userMessages = requestData.messages?.filter((m) => m.role === 'user') || [];
       const userMessage = userMessages[userMessages.length - 1]?.content || '';
 
       // Determine response based on user message content
@@ -90,8 +102,6 @@ export function mockAnthropicForE2E(): void {
         }
       }
 
-      console.log('🤖 Mock response for message:', { userMessage, responseText });
-
       // Split response into tokens for streaming
       const tokens = responseText.split(' ');
 
@@ -148,8 +158,8 @@ export function mockAnthropicForE2E(): void {
   const server = setupServer(...handlers);
   server.listen({ onUnhandledRequest: 'bypass' });
 
-  console.log('✅ Anthropic API HTTP endpoints mocked for E2E tests');
+  // Anthropic API HTTP endpoints mocked for E2E tests
 
   // Store server reference for cleanup
-  (global as any).__MSW_SERVER__ = server;
+  globalThis.__MSW_SERVER__ = server;
 }

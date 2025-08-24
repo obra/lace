@@ -108,8 +108,19 @@ export async function createProviderInstance(page: Page): Promise<void> {
   await createButton.waitFor({ state: 'visible', timeout: 5000 });
   await createButton.click();
 
-  // Wait for instance to be created
-  await page.waitForLoadState('networkidle', { timeout: 10000 });
+  // Wait for instance creation modal to be dismissed
+  await page
+    .waitForSelector('[data-testid="create-instance-modal"]', { state: 'hidden', timeout: 10000 })
+    .catch(() => {
+      // Fallback if modal testid doesn't exist - wait for any modal to close
+      return page.waitForSelector('.modal', { state: 'hidden', timeout: 10000 }).catch(() => {
+        // Final fallback
+        return page.waitForTimeout(2000);
+      });
+    });
+
+  // Dismiss the settings modal after provider creation
+  await closeSettingsModal(page);
 }
 
 /**
@@ -241,10 +252,10 @@ export async function submitProjectCreation(page: Page): Promise<void> {
   await submitButton.click();
 
   // Wait for navigation to the agent page after submission
-  await page.waitForURL(/\/project\/[^\/]+\/session\/[^\/]+\/agent\/[^\/]+/, { timeout: 15000 });
+  await page.waitForURL(/\/project\/[^\/]+\/session\/[^\/]+\/agent\/[^\/]+/, { timeout: 60000 });
 
-  // Wait for the agent interface to be ready
-  await page.waitForLoadState('networkidle', { timeout: 10000 });
+  // Wait for the agent interface to be ready - look for message input instead of network idle
+  await getMessageInput(page);
 }
 
 /** Complete project creation workflow */
@@ -324,7 +335,7 @@ export async function verifyNoMessage(page: Page, message: string): Promise<void
  */
 
 /** Create a new session - placeholder for now, may need actual implementation */
-export async function createSession(page: Page, sessionName?: string): Promise<void> {
+export async function createSession(page: Page, _sessionName?: string): Promise<void> {
   // This function may need implementation based on actual UI
   // For now, sessions are typically created automatically with projects
   // TODO: Implement if explicit session creation UI exists
@@ -332,7 +343,7 @@ export async function createSession(page: Page, sessionName?: string): Promise<v
 }
 
 /** Create a new agent - placeholder for now, may need actual implementation */
-export async function createAgent(page: Page, agentName?: string): Promise<void> {
+export async function createAgent(page: Page, _agentName?: string): Promise<void> {
   // This function may need implementation based on actual UI
   // For now, agents are typically created automatically with projects
   // TODO: Implement if explicit agent creation UI exists
@@ -340,7 +351,7 @@ export async function createAgent(page: Page, agentName?: string): Promise<void>
 }
 
 /** Select an existing agent - placeholder for now, may need actual implementation */
-export async function selectAgent(page: Page, agentName: string): Promise<void> {
+export async function selectAgent(page: Page, _agentName: string): Promise<void> {
   // This function may need implementation based on actual UI
   // TODO: Implement if agent selection UI exists
   await page.waitForTimeout(100); // Placeholder

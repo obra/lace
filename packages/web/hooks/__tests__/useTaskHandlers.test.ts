@@ -33,7 +33,7 @@ const createMockTask = (overrides?: Partial<Task>): Task => ({
   prompt: 'Test task prompt',
   status: 'pending',
   priority: 'medium',
-  threadId: 'thread-1' as any,
+  threadId: 'lace_20250101_thread01' as Task['threadId'],
   createdAt: new Date(),
   updatedAt: new Date(),
   notes: [],
@@ -121,8 +121,8 @@ describe('useTaskHandlers', () => {
         prompt: 'New task prompt',
         status: 'pending' as const,
         priority: 'high' as const,
-        assignedTo: 'user-1' as any,
-        threadId: 'thread-1' as any,
+        assignedTo: 'user-1' as Task['assignedTo'],
+        threadId: 'lace_20250101_thread01' as Task['threadId'],
         createdAt: new Date(),
         updatedAt: new Date(),
         notes: [],
@@ -151,7 +151,7 @@ describe('useTaskHandlers', () => {
         prompt: '', // Empty prompt - should fall back to title
         status: 'pending' as const,
         priority: 'medium' as const,
-        threadId: 'thread-1' as any,
+        threadId: 'lace_20250101_thread01' as Task['threadId'],
         createdAt: new Date(),
         updatedAt: new Date(),
         notes: [],
@@ -192,7 +192,7 @@ describe('useTaskHandlers', () => {
         description: 'From modal',
         status: 'pending' as const,
         priority: 'low' as const,
-        assignedTo: 'user-2' as any,
+        assignedTo: 'user-2' as Task['assignedTo'],
         prompt: 'Custom prompt',
       };
 

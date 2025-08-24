@@ -1,19 +1,11 @@
 // ABOUTME: Design system specific types imported from f-web-spicy
 // ABOUTME: Essential interfaces for UI components, timeline, and chat functionality
 
-import type { ToolResult } from '@/types/core';
-
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
-}
-
-interface ChatState {
-  messages: Message[];
-  isLoading: boolean;
-  error?: string;
 }
 
 export interface GoogleDocAttachment {
@@ -47,13 +39,4 @@ export interface RecentFile {
   path: string;
   lastModified?: Date;
   size?: number;
-}
-
-interface Theme {
-  name: string;
-  colors: {
-    primary: string;
-    secondary: string;
-    accent: string;
-  };
 }

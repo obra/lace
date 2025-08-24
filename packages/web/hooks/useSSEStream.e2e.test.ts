@@ -21,7 +21,6 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '@/lib/server/lace-imports';
-import { Session } from '@/lib/server/lace-imports';
 
 describe('SSE Stream E2E Tests', () => {
   const _tempLaceDir = setupWebTest();

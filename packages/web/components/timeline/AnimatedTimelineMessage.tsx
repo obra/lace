@@ -1,8 +1,9 @@
+// ABOUTME: Animated timeline message component for chat events
+// ABOUTME: Renders user and agent messages with animations and status indicators
 'use client';
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import { TimelineEntry } from '@/types/web-events';
+import { motion } from 'motion/react';
+import type { TimelineEntry } from '@/types/web-events';
 import { formatTime } from '@/lib/format';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {

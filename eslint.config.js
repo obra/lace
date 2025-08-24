@@ -19,7 +19,7 @@ export default [
   })),
   {
     files: ['**/*.ts', '**/*.tsx'],
-    ignores: ['dist/**/*', 'packages/**/*'],
+    ignores: ['dist/**/*', 'packages/**'],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',
@@ -78,13 +78,6 @@ export default [
         message: 'Use Next.js router.push() instead of window.location for navigation in React components'
       }],
       'no-var': 'error'
-    },
-  },
-  {
-    files: ['src/cli/**/*.ts', 'src/interfaces/**/*.ts', 'src/app.ts'],
-    ignores: ['dist/**/*', 'packages/**/*'],
-    rules: {
-      'no-console': 'off',
     },
   },
   {

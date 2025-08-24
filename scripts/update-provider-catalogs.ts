@@ -1,8 +1,9 @@
 // ABOUTME: Script to fetch and update provider catalogs from Catwalk repository
 // ABOUTME: Syncs provider configuration files from charmbracelet/catwalk to local data directory
 
-import { readFile, writeFile, readdir } from 'fs/promises';
-import { join } from 'path';
+import { readFile, writeFile, readdir, mkdir } from 'node:fs/promises';
+import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 interface CatwalkFile {
   name: string;
@@ -12,7 +13,12 @@ interface CatwalkFile {
 
 const CATWALK_API_URL =
   'https://api.github.com/repos/charmbracelet/catwalk/contents/internal/providers/configs';
-const LOCAL_DATA_DIR = './src/providers/catalog/data';
+
+// Compute absolute path to data directory from script location
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const LOCAL_DATA_DIR =
+  process.env.LOCAL_DATA_DIR ?? resolve(__dirname, '../packages/core/src/providers/catalog/data');
 
 // Providers to exclude from syncing (if any)
 const EXCLUDED_PROVIDERS: string[] = [
@@ -91,7 +97,8 @@ async function updateProviderCatalogs(): Promise<void> {
         continue;
       }
 
-      // Update the file
+      // Ensure data directory exists and write the file
+      await mkdir(LOCAL_DATA_DIR, { recursive: true });
       await writeFile(localPath, remoteContent, 'utf-8');
 
       if (isNewFile) {
@@ -118,8 +125,8 @@ async function updateProviderCatalogs(): Promise<void> {
 }
 
 // Run the update if this script is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  updateProviderCatalogs();
+if (import.meta.url === pathToFileURL(resolve(process.argv[1]!)).href) {
+  await updateProviderCatalogs();
 }
 
 export { updateProviderCatalogs };

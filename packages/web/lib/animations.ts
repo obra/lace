@@ -1,5 +1,5 @@
 // ABOUTME: Animation utilities and variants for Framer Motion
-import { Variants, Transition } from 'framer-motion';
+import { Variants, Transition } from 'motion/react';
 
 // Spring configurations for different animation types
 export const springConfig = {

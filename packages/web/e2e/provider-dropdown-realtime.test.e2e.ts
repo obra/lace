@@ -76,9 +76,7 @@ test.describe('Provider Dropdown Real-time Updates', () => {
     const options = await providerDropdown.locator('option').allTextContents();
     expect(options).toContain(providerName);
 
-    console.log(
-      `✅ Test passed: Provider "${providerName}" appears in dropdown immediately after creation`
-    );
+    // ✅ Test passed: Provider appears in dropdown immediately after creation
   });
 
   test('provider appears in project edit modal dropdown as well', async ({ page }) => {
@@ -125,8 +123,6 @@ test.describe('Provider Dropdown Real-time Updates', () => {
     const editOptions = await editProviderDropdown.locator('option').allTextContents();
     expect(editOptions).toContain(providerName);
 
-    console.log(
-      `✅ Test passed: Provider "${providerName}" appears in edit dropdown immediately after creation`
-    );
+    // ✅ Test passed: Provider appears in edit dropdown immediately after creation
   });
 });

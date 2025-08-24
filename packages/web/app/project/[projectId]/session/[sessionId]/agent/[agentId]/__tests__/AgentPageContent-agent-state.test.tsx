@@ -124,8 +124,8 @@ vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
   }),
 }));
 
-// Mock framer-motion to avoid animation issues in tests
-vi.mock('framer-motion', () => ({
+// Mock motion/react to avoid animation issues in tests
+vi.mock('motion/react', () => ({
   motion: {
     div: ({ children, ...props }: React.ComponentProps<'div'>) => <div {...props}>{children}</div>,
     button: ({ children, ...props }: React.ComponentProps<'button'>) => (

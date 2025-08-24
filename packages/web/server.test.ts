@@ -11,7 +11,7 @@ vi.mock('open', () => ({
 }));
 
 // Mock the logger
-vi.mock('../../src/utils/logger', () => ({
+vi.mock('~/utils/logger', () => ({
   logger: {
     error: vi.fn(),
     warn: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock('../../src/utils/logger', () => ({
 const open = await import('open');
 const mockOpen = vi.mocked(open.default);
 
-const { logger } = await import('../../src/utils/logger');
+const { logger } = await import('~/utils/logger');
 const mockLogger = vi.mocked(logger);
 
 // Inline the isInteractive function for testing
@@ -144,7 +144,7 @@ describe('Port Detection Logic', () => {
   });
 
   test('should find next available port when none specified', async () => {
-    const userSpecified = false;
+    const _userSpecified = false;
     const requestedPort = availablePort;
 
     // Block the requested port
@@ -291,7 +291,7 @@ describe('Browser Opening', () => {
   });
 
   test('should handle browser opening failures gracefully', async () => {
-    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockOpen.mockRejectedValue(new Error('Browser not found'));
 
     try {
@@ -299,21 +299,21 @@ describe('Browser Opening', () => {
     } catch (error) {
       const errorCode = (error as NodeJS.ErrnoException).code || 'unknown error';
       mockLogger.warn('Could not open browser automatically', { error: errorCode });
-      console.log(`   ℹ️  Could not open browser automatically (${errorCode})`);
+      console.warn(`   ℹ️  Could not open browser automatically (${errorCode})`);
     }
 
     expect(mockLogger.warn).toHaveBeenCalledWith('Could not open browser automatically', {
       error: 'unknown error',
     });
-    expect(consoleLogSpy).toHaveBeenCalledWith(
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
       '   ℹ️  Could not open browser automatically (unknown error)'
     );
 
-    consoleLogSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   test('should handle browser opening failures with error codes', async () => {
-    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const error = new Error('Permission denied') as NodeJS.ErrnoException;
     error.code = 'EACCES';
     mockOpen.mockRejectedValue(error);
@@ -323,17 +323,17 @@ describe('Browser Opening', () => {
     } catch (error) {
       const errorCode = (error as NodeJS.ErrnoException).code || 'unknown error';
       mockLogger.warn('Could not open browser automatically', { error: errorCode });
-      console.log(`   ℹ️  Could not open browser automatically (${errorCode})`);
+      console.warn(`   ℹ️  Could not open browser automatically (${errorCode})`);
     }
 
     expect(mockLogger.warn).toHaveBeenCalledWith('Could not open browser automatically', {
       error: 'EACCES',
     });
-    expect(consoleLogSpy).toHaveBeenCalledWith(
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
       '   ℹ️  Could not open browser automatically (EACCES)'
     );
 
-    consoleLogSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 });
 

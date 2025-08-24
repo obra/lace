@@ -2,7 +2,7 @@
 // ABOUTME: Verifies loading states, error handling, and hook behavior patterns
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useSessionAPI } from '@/hooks/useSessionAPI';
 import type { ThreadId } from '@/types/core';
 import { createMockResponse, createMockErrorResponse } from '@/test-utils/mock-fetch';

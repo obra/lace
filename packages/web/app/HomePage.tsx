@@ -4,7 +4,7 @@
 'use client';
 
 import React, { useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars } from '@/lib/fontawesome';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
@@ -47,7 +47,7 @@ export function HomePage() {
     <motion.div
       className="flex h-screen bg-gradient-to-br from-base-100 via-base-200/50 to-base-200 text-base-content font-ui overflow-hidden"
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      animate={{ opacity: loading ? 0 : 1 }}
       transition={{ duration: 0.3 }}
     >
       {/* Unified Sidebar */}

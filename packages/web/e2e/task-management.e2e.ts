@@ -74,7 +74,7 @@ test.describe('Task Management CRUD Operations', () => {
         .count(),
     };
 
-    console.log('Task Management UI Detection:', taskUIElements);
+    // Task Management UI Detection completed
 
     // Try to interact with task elements if they exist
     let taskInteractionTest = {
@@ -87,8 +87,8 @@ test.describe('Task Management CRUD Operations', () => {
       try {
         await page.locator('[data-testid="task-button"]').click();
         taskInteractionTest.canOpenTaskInterface = true;
-      } catch (error) {
-        console.log('Could not open task interface:', error);
+      } catch (_error) {
+        // Could not open task interface
       }
     }
 
@@ -96,12 +96,12 @@ test.describe('Task Management CRUD Operations', () => {
       try {
         await page.locator('[data-testid="new-task-button"]').click();
         taskInteractionTest.canCreateTask = true;
-      } catch (error) {
-        console.log('Could not trigger task creation:', error);
+      } catch (_error) {
+        // Could not trigger task creation
       }
     }
 
-    console.log('Task Interaction Test:', taskInteractionTest);
+    // Task Interaction Test completed
 
     // Test documents current task management capabilities
     const hasAnyTaskUI = Object.values(taskUIElements).some((value) =>
@@ -143,7 +143,7 @@ test.describe('Task Management CRUD Operations', () => {
         taskPersistenceTest.reloadTaskCount === taskPersistenceTest.initialTaskCount;
     }
 
-    console.log('Task Persistence Test:', taskPersistenceTest);
+    // Task Persistence Test completed
 
     // Test passes regardless - documents current task persistence behavior
     expect(true).toBeTruthy(); // Always passes - documents current state

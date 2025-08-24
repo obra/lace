@@ -1,7 +1,7 @@
 // ABOUTME: Centralized UI state management for modals and unified sidebar visibility
 // ABOUTME: Manages unified sidebar state that works for both mobile and desktop layouts
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 
 export interface UseUIStateResult {
   // Unified sidebar state
@@ -19,17 +19,8 @@ export interface UseUIStateResult {
 }
 
 export function useUIState(): UseUIStateResult {
-  // Unified sidebar state - persisted across navigation
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('lace-sidebar-open');
-      if (stored !== null) {
-        // Type-safe parsing - only accept 'true'/'false' strings
-        return stored === 'true';
-      }
-    }
-    return true;
-  });
+  // Unified sidebar state - persisted across navigation by React state
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Modal state
   const [autoOpenCreateProject, setAutoOpenCreateProject] = useState(false);
@@ -37,19 +28,12 @@ export function useUIState(): UseUIStateResult {
   // Loading state
   const [loading, setLoading] = useState(false);
 
-  // Unified sidebar toggle with persistence
+  // Unified sidebar toggle
   const toggleSidebar = useCallback(() => {
-    setSidebarOpen((prev: boolean) => {
-      const newValue = !prev;
-      localStorage.setItem('lace-sidebar-open', String(newValue));
-      return newValue;
-    });
+    setSidebarOpen((prev: boolean) => !prev);
   }, []);
 
-  // Persist sidebar state when it changes
-  useEffect(() => {
-    localStorage.setItem('lace-sidebar-open', String(sidebarOpen));
-  }, [sidebarOpen]);
+  // No localStorage persistence needed - Next.js maintains state across navigation
 
   return {
     // Unified sidebar API

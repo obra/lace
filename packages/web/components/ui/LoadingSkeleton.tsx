@@ -1,8 +1,7 @@
 'use client';
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import { shimmer, springConfig, staggerContainer, staggerItem } from '@/lib/animations';
+import { motion } from 'motion/react';
+import { shimmer, staggerContainer, staggerItem } from '@/lib/animations';
 
 interface LoadingSkeletonProps {
   variant?: 'text' | 'card' | 'avatar' | 'timeline' | 'carousel';

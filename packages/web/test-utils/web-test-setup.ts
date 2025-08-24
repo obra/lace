@@ -15,6 +15,7 @@ import { beforeEach, afterEach } from 'vitest';
  * @returns TempLaceDirContext for tests that need access to the temp directory
  */
 export function setupWebTest(): TempLaceDirContext {
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- useTempLaceDir is not a React Hook despite naming, it's a Vitest test utility that uses beforeEach/afterEach
   const tempLaceDir = useTempLaceDir();
 
   // Reset persistence and provider registry before each test

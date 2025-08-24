@@ -39,7 +39,7 @@ export const test = baseTest.extend<
       // Create unique project name for this worker
       const projectName = `E2E Test Project Worker ${workerIndex}`;
 
-      console.log(`Worker ${workerIndex}: Using LACE_DIR=${tempDir}`);
+      // Worker using LACE_DIR
 
       const context: TestEnvironmentContext = {
         tempDir,
@@ -66,7 +66,7 @@ export const test = baseTest.extend<
         await fs.promises.rm(tempDir, { recursive: true, force: true });
       }
 
-      console.log(`Worker ${workerIndex}: Cleaned up LACE_DIR=${tempDir}`);
+      // Worker cleaned up LACE_DIR
     },
     { scope: 'worker' },
   ],

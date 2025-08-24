@@ -29,7 +29,19 @@ class MockEventSource {
   }
 }
 
-global.EventSource = MockEventSource as any;
+global.EventSource = MockEventSource as unknown as typeof EventSource;
+
+// Add DOM method polyfills for JSDOM compatibility
+if (typeof HTMLElement !== 'undefined') {
+  // JSDOM lacks scrollTo on HTMLElement in many setups
+  if (!Object.prototype.hasOwnProperty.call(HTMLElement.prototype, 'scrollTo')) {
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+      value: () => {},
+      writable: true,
+      configurable: true,
+    });
+  }
+}
 
 // Mock server-only to avoid import issues in tests
 // This is the current workaround as suggested in Next.js GitHub issue #60038
@@ -112,18 +124,11 @@ vi.mock('@anthropic-ai/sdk', () => {
 
 // Global cleanup after each test file
 afterAll(() => {
-  // Clear all timers (both real and fake)
-  // Strategy: Get the next timer ID by creating a temporary timer, then clear all
-  // timers from 1 to that ID. This handles cases where tests create timers but
-  // don't properly clean them up, which can prevent the Node.js process from exiting.
-  // This approach works because Node.js timer IDs are incrementing integers.
-  if (typeof globalThis.clearTimeout === 'function') {
-    const maxId = Number(setTimeout(() => {}, 0));
-    for (let i = 1; i <= maxId; i++) {
-      clearTimeout(i);
-      clearInterval(i);
-    }
-  }
+  // Use Vitest fake timers instead of numeric sweeping:
+  // - Ensure `vi.useFakeTimers()` is enabled in tests that create timers.
+  // - Keep `vi.clearAllTimers()` in afterEach to reset all fake timers.
+  // - For any real handles you create here (e.g., SSE/mock streams), clear them explicitly.
+  vi.clearAllTimers();
 
   // Force garbage collection to clean up any remaining references
   // This helps ensure EventEmitters and other objects are properly collected
@@ -134,12 +139,14 @@ afterAll(() => {
 
 // Mock console methods to prevent test noise
 // Save original console methods
+/* eslint-disable no-console */
 const originalConsole = {
   log: console.log,
   error: console.error,
   warn: console.warn,
   info: console.info,
 };
+/* eslint-enable no-console */
 
 // Set up global console mocking
 vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -149,10 +156,12 @@ vi.spyOn(console, 'info').mockImplementation(() => {});
 
 // Helper to restore console for debugging if needed
 (globalThis as unknown as { restoreConsole: () => void }).restoreConsole = () => {
+  /* eslint-disable no-console */
   console.log = originalConsole.log;
   console.error = originalConsole.error;
   console.warn = originalConsole.warn;
   console.info = originalConsole.info;
+  /* eslint-enable no-console */
 };
 
 // Cleanup after each individual test

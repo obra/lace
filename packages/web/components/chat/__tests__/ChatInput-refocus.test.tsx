@@ -1,44 +1,57 @@
-// ABOUTME: Tests for chat input refocus functionality
-// ABOUTME: Verifies that chat input refocuses after successful message send
+// ABOUTME: Tests for chat input focus handle functionality
+// ABOUTME: Validates that focus handle exists and calling it focuses the textarea
 
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
 import { ChatInput } from '@/components/chat/ChatInput';
-import React from 'react';
+import { ScrollProvider } from '@/components/providers/ScrollProvider';
+import React, { type ComponentProps } from 'react';
+
+type Props = ComponentProps<typeof ChatInput>;
 
 describe('ChatInput Refocus', () => {
   it('should expose focus method via ref', () => {
-    const ref = React.createRef<{ focus: () => void }>();
-
-    render(<ChatInput ref={ref} value="test message" onChange={vi.fn()} onSubmit={vi.fn()} />);
-
-    // Should have focus method available
-    expect(ref.current).toBeTruthy();
-    expect(typeof ref.current?.focus).toBe('function');
-  });
-
-  it('should focus textarea when focus method is called', () => {
     const ref = React.createRef<{ focus: () => void }>();
 
     render(
       <ChatInput
         ref={ref}
         value="test message"
-        onChange={vi.fn()}
-        onSubmit={vi.fn()}
-        disabled={true} // Disable autofocus
-      />
+        onChange={vi.fn<Props['onChange']>()}
+        onSubmit={vi.fn<Props['onSubmit']>()}
+      />,
+      { wrapper: ScrollProvider }
     );
 
-    const textarea = screen.getByTestId('message-input') as HTMLTextAreaElement;
+    // Should have focus method available
+    expect(ref.current).toBeTruthy();
+    expect(typeof ref.current?.focus).toBe('function');
+  });
 
-    // Initially not focused due to disabled
-    expect(document.activeElement).not.toBe(textarea);
+  it('should focus textarea when focus method is called', async () => {
+    const ref = React.createRef<{ focus: () => void }>();
 
-    // Call focus method
+    render(
+      <ChatInput
+        ref={ref}
+        value="test message"
+        onChange={vi.fn<Props['onChange']>()}
+        onSubmit={vi.fn<Props['onSubmit']>()}
+        disabled={false} // Allow focus for testing
+      />,
+      { wrapper: ScrollProvider }
+    );
+
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
+
+    // Ensure textarea is not focused initially by blurring it
+    textarea.blur();
+    await waitFor(() => expect(document.activeElement).not.toBe(textarea));
+
+    // Test the core behavior: focus method should focus the textarea
     ref.current?.focus();
 
-    // Should now be focused
-    expect(document.activeElement).toBe(textarea);
+    // The textarea should be focused after calling focus method
+    await waitFor(() => expect(document.activeElement).toBe(textarea));
   });
 });

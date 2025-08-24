@@ -1,11 +1,12 @@
 // ABOUTME: E2E test server that runs the main server with test-specific configuration
 // ABOUTME: Keeps production server clean while allowing E2E tests to run in isolated mode
 
-console.log('🧪 Starting E2E test server...');
+// Starting E2E test server...
 
 // Mock Anthropic API HTTP endpoints for E2E tests
-import { mockAnthropicForE2E } from './e2e/helpers/anthropic-mock';
-mockAnthropicForE2E();
+import { mockAnthropicForE2E } from '@/e2e/helpers/anthropic-mock';
 
-// Import and run the main server
-import './server-custom';
+void (async () => {
+  mockAnthropicForE2E();
+  await import('./server-custom');
+})();

@@ -1,7 +1,8 @@
+// ABOUTME: Animated carousel component with drag support, pagination controls, and smooth transitions
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence, PanInfo } from 'framer-motion';
+import { motion, AnimatePresence, PanInfo } from 'motion/react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import {
   springConfig,
@@ -99,22 +100,36 @@ export function AnimatedCarousel({
     }
   }, [currentIndex]);
 
+  const userInteractTimeoutRef = useRef<number | null>(null);
+
+  const clearUserInteractTimeout = () => {
+    if (userInteractTimeoutRef.current !== null) {
+      clearTimeout(userInteractTimeoutRef.current);
+      userInteractTimeoutRef.current = null;
+    }
+  };
+
+  useEffect(() => () => clearUserInteractTimeout(), []);
+
   const goToNext = () => {
     setIsUserInteracting(true);
     setCurrentIndex((prev) => Math.min(prev + 1, maxIndex));
-    setTimeout(() => setIsUserInteracting(false), 3000);
+    clearUserInteractTimeout();
+    userInteractTimeoutRef.current = window.setTimeout(() => setIsUserInteracting(false), 3000);
   };
 
   const goToPrevious = () => {
     setIsUserInteracting(true);
     setCurrentIndex((prev) => Math.max(prev - 1, 0));
-    setTimeout(() => setIsUserInteracting(false), 3000);
+    clearUserInteractTimeout();
+    userInteractTimeoutRef.current = window.setTimeout(() => setIsUserInteracting(false), 3000);
   };
 
   const goToIndex = (index: number) => {
     setIsUserInteracting(true);
     setCurrentIndex(index);
-    setTimeout(() => setIsUserInteracting(false), 3000);
+    clearUserInteractTimeout();
+    userInteractTimeoutRef.current = window.setTimeout(() => setIsUserInteracting(false), 3000);
   };
 
   const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {

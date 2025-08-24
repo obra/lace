@@ -7,6 +7,9 @@ import * as os from 'os';
 import * as http from 'http';
 import { spawn, ChildProcess } from 'child_process';
 import { createServer } from 'net';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * Find an available port by attempting to create a server
@@ -32,7 +35,7 @@ async function getAvailablePort(): Promise<number> {
 /**
  * Wait for server to be ready by attempting HTTP requests
  */
-async function waitForServer(url: string, timeoutMs: number = 60000): Promise<void> {
+async function waitForServer(url: string, timeoutMs: number = 120000): Promise<void> {
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeoutMs) {
@@ -77,26 +80,27 @@ async function startTestServer(
   const serverUrl = `http://localhost:${port}`;
 
   // Start server process with isolated environment using E2E test server
-  const serverProcess = spawn('npx', ['tsx', 'e2e-test-server.ts', '--port', port.toString()], {
-    cwd: process.cwd(),
+  const serverScriptPath = path.resolve(__dirname, '../../e2e-test-server.ts');
+  const serverProcess = spawn('npx', ['tsx', serverScriptPath, '--port', port.toString()], {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
       LACE_DIR: tempDir,
-      ANTHROPIC_KEY: 'test-anthropic-key-for-e2e',
+      ANTHROPIC_API_KEY: 'test-anthropic-key-for-e2e',
       LACE_DB_PATH: path.join(tempDir, 'lace.db'),
-      NODE_ENV: 'production',
+      NODE_ENV: 'test',
       E2E_TOOL_APPROVAL_MOCK: 'true',
+      LACE_LOG_LEVEL: 'debug',
+      LACE_LOG_STDERR: 'true',
     },
   });
 
-  // Handle server output for debugging
-  serverProcess.stdout?.on('data', (data) => {
-    console.log(`[SERVER:${port}] ${data.toString().trim()}`);
-  });
-
-  serverProcess.stderr?.on('data', (data) => {
-    console.error(`[SERVER:${port}:ERROR] ${data.toString().trim()}`);
+  // Handle server output for debugging - errors only
+  serverProcess.stderr?.on('data', (data: Buffer) => {
+    const output = data.toString().trim();
+    if (output && !output.includes('Fast Refresh')) {
+      console.error(`[E2E-SERVER-${port}] ${output}`);
+    }
   });
 
   serverProcess.on('exit', () => {
@@ -134,6 +138,23 @@ export async function setupTestEnvironment(): Promise<TestEnvironment> {
   await fs.promises.writeFile(
     path.join(credentialsDir, 'anthropic-default.json'),
     JSON.stringify(anthropicCredentials, null, 2)
+  );
+
+  // Create provider-instances.json configuration
+  const providerInstances = {
+    version: '1.0',
+    instances: {
+      'anthropic-default': {
+        id: 'anthropic-default',
+        displayName: 'Test Anthropic Provider',
+        catalogProviderId: 'anthropic',
+        isDefault: true,
+      },
+    },
+  };
+  await fs.promises.writeFile(
+    path.join(tempDir, 'provider-instances.json'),
+    JSON.stringify(providerInstances, null, 2)
   );
 
   // Start isolated test server

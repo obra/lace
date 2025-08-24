@@ -2,7 +2,7 @@
 // ABOUTME: Handles session loading, creation, and project configuration
 
 import { useState, useEffect, useCallback } from 'react';
-import type { SessionInfo, ThreadId } from '@/types/core';
+import type { SessionInfo } from '@/types/core';
 import { api } from '@/lib/api-client';
 
 interface UseSessionManagementResult {

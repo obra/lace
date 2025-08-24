@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { LaceEvent } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 import { isInternalWorkflowEvent } from '@/types/core';
-import { parseResponse } from '@/lib/serialization';
+import { api } from '@/lib/api-client';
 
 // Runtime type guards for safe parsing
 function isPlainObject(val: unknown): val is Record<string, unknown> {
@@ -103,13 +103,8 @@ export function useSessionEvents(
     setLoadingHistory(true);
     const controller = new AbortController();
 
-    void fetch(`/api/threads/${selectedAgent}/history`, { signal: controller.signal })
-      .then(async (res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-        }
-        return parseResponse<unknown>(res);
-      })
+    void api
+      .get<unknown>(`/api/threads/${selectedAgent}/history`, { signal: controller.signal })
       .then((data) => {
         if (isLaceEventArray(data)) {
           // Events are already properly typed LaceEvents from superjson
@@ -150,7 +145,7 @@ export function useSessionEvents(
       });
 
     return () => controller.abort();
-  }, [sessionId, getEventKey]);
+  }, [sessionId, selectedAgent, getEventKey]);
 
   // Filter events by selected agent
   const filteredEvents = useMemo(() => {
