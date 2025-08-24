@@ -8,7 +8,7 @@ The single-file build creates a Bun-compiled executable that contains:
 - Complete Next.js standalone build (optimized for production)
 - All runtime dependencies (including native modules)
 - Custom server with enhanced UX features
-- Automatic port detection and browser opening
+- Automatic port detection
 - Self-extracting ZIP archive with proper module resolution
 
 ## Architecture
@@ -32,8 +32,8 @@ The single-file build creates a Bun-compiled executable that contains:
 - Working directory management for standalone builds
 
 **Build Scripts**
-- `build:standalone:clean`: Full clean build with cache clearing
-- `build:standalone`: Standard build without cache clearing
+- `build`: Next.js build (Turbopack); use BUILD_STANDALONE=true for standalone
+- `build:standalone`: Shorthand for standalone build
 - `scripts/build-simple.ts`: ZIP creation and Bun compilation orchestration
 
 ## Usage
@@ -41,11 +41,11 @@ The single-file build creates a Bun-compiled executable that contains:
 ### Building the Executable
 
 ```bash
-# Full clean build (recommended)
-bun run build:standalone:clean
-
-# Quick build (reuses caches)
+# Standalone build
 bun run build:standalone
+
+# Standard Next.js build (non-standalone)
+bun run build
 ```
 
 ### Running the Executable
@@ -70,7 +70,7 @@ bun run build:standalone
 2. **Setup**: Changes working directory to standalone root for proper module resolution
 3. **Port Detection**: Finds available port starting from requested port
 4. **Server Start**: Launches Next.js server with enhanced features
-5. **Browser Opening**: Automatically opens browser if running interactively
+5. **Readiness Logging**: Logs the URL when the server is ready
 
 
 ## Build Artifacts
@@ -120,7 +120,7 @@ standalone/
 unzip -l lace-standalone.zip | grep node_modules
 
 # Clean build from scratch
-rm -rf build packages/web/.next packages/web/server.js && bun run build:standalone:clean
+rm -rf build packages/web/.next && bun run build:standalone
 ```
 
 ## Performance Considerations

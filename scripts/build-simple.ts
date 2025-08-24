@@ -2,9 +2,8 @@
 // ABOUTME: Embeds Next.js standalone build as ZIP and creates Bun executable
 
 import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, cpSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync, rmSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
-
 
 interface BuildOptions {
   target?: string;
@@ -13,8 +12,6 @@ interface BuildOptions {
   sign?: boolean;
   bundle?: boolean;
 }
-
-
 
 function parseArgs(): BuildOptions {
   const args = process.argv.slice(2);
@@ -160,21 +157,15 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
 
   // Create temp directory to organize files for ZIP
   const tempBuildDir = 'build/temp-standalone';
-  execSync(`rm -rf ${tempBuildDir}`, { stdio: 'pipe' });
+  rmSync(tempBuildDir, { recursive: true, force: true });
   mkdirSync(tempBuildDir, { recursive: true });
 
   // Copy standalone build
-  execSync(`cp -r packages/web/.next/standalone ${tempBuildDir}/standalone`, {
-    stdio: 'pipe',
-  });
+  cpSync('packages/web/.next/standalone', `${tempBuildDir}/standalone`, { recursive: true });
 
   // Copy core package source directory to match alias ~/ -> packages/core/src
-  execSync(
-    `mkdir -p ${tempBuildDir}/standalone/packages/core && cp -r packages/core/src ${tempBuildDir}/standalone/packages/core/src`,
-    {
-      stdio: 'pipe',
-    }
-  );
+  mkdirSync(`${tempBuildDir}/standalone/packages/core`, { recursive: true });
+  cpSync('packages/core/src', `${tempBuildDir}/standalone/packages/core/src`, { recursive: true });
   console.log('📁 Core source directory copied to standalone/packages/core/src/');
 
   // The standalone build already includes all necessary dependencies
@@ -184,13 +175,9 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
   // Copy static files to the correct location where Next.js server expects them
   // The server runs from packages/web, so static files must be at packages/web/.next/static
   if (existsSync('packages/web/.next/static')) {
-    mkdirSync(`${tempBuildDir}/standalone/packages/web/.next`, { recursive: true });
-    execSync(
-      `cp -r packages/web/.next/static ${tempBuildDir}/standalone/packages/web/.next/static`,
-      {
-        stdio: 'pipe',
-      }
-    );
+    const nextDir = `${tempBuildDir}/standalone/packages/web/.next`;
+    mkdirSync(nextDir, { recursive: true });
+    cpSync('packages/web/.next/static', `${nextDir}/static`, { recursive: true });
     console.log('📁 Static assets copied to packages/web/.next/static/');
   } else {
     console.warn('⚠️  Warning: No .next/static directory found - static assets may be missing');
@@ -198,13 +185,9 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
 
   // Replace the standalone server with our custom enhanced server (TypeScript)
   // First remove the original server.js from packages/web
-  execSync(`rm -f ${tempBuildDir}/standalone/packages/web/server.js`, {
-    stdio: 'pipe',
-  });
+  rmSync(`${tempBuildDir}/standalone/packages/web/server.js`, { force: true });
   // Then copy our TypeScript server to the packages/web directory where Next.js dependencies are
-  execSync(`cp packages/web/server-custom.ts ${tempBuildDir}/standalone/packages/web/server.ts`, {
-    stdio: 'pipe',
-  });
+  cpSync('packages/web/server-custom.ts', `${tempBuildDir}/standalone/packages/web/server.ts`);
 
   // Create ZIP with just the standalone build + our server
   execSync(`cd ${tempBuildDir} && zip -r ../lace-standalone.zip . -q`, {
@@ -212,7 +195,7 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
   });
 
   // Clean up temp directory
-  execSync(`rm -rf ${tempBuildDir}`, { stdio: 'pipe' });
+  rmSync(tempBuildDir, { recursive: true, force: true });
 
   // The standalone directory already contains its own .next with build files,
   // but we need to ensure static assets are properly linked
@@ -235,7 +218,7 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
   mkdirSync(outdir, { recursive: true });
   const outputPath = join(outdir, name);
 
-  const compileCmd = `bun build ${execSourcePath} --compile --outfile=${outputPath} --target=${target} --minify --sourcemap=none`;
+  const compileCmd = `bun build ${execSourcePath} --compile --outfile=${outputPath} --target=${target} --minify --sourcemap=none --no-summary`;
   console.log(`🔧 Running: ${compileCmd}`);
 
   execSync(compileCmd, { stdio: 'inherit' });
