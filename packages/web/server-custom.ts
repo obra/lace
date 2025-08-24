@@ -82,6 +82,7 @@ if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
 // Detect if we're running in development or production (standalone) mode
 const isDev = process.env.NODE_ENV !== 'production';
 const isStandalone = !isDev;
+const useTurbopack = process.env.TURBOPACK === '1' || process.env.TURBOPACK === 'true';
 
 // Setup Node.js module system for standalone build
 const _require = module.createRequire(import.meta.url);
@@ -348,6 +349,7 @@ async function startLaceServer() {
       port: port,
       allowRetry: false,
       keepAliveTimeout: undefined,
+      ...(useTurbopack && isDev && { turbopack: true }),
     });
 
     // eslint-disable-next-line no-console -- Server ready message with URL/PID is appropriate for server process

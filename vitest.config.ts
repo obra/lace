@@ -8,7 +8,7 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**', 'packages/**'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**', '**/.next/**', 'packages/**'],
     coverage: {
       reporter: ['text', 'html', 'lcov'],
       exclude: ['node_modules/', 'dist/', '**/*.test.ts', '**/*.spec.ts'],
