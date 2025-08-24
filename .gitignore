@@ -98,7 +98,6 @@ test-vfs-*.js
 
 # Executables
 lace
-lace-*
 
 # Private journal
 .private-journal/
