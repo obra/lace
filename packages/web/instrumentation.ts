@@ -7,6 +7,10 @@ export async function register() {
     await import('./sentry.server.config');
     await import('./lib/server/logging-init');
     await import('./lib/server/data-dir-init');
+
+    // Import server dependencies to ensure Next.js NFT traces them
+    // This ensures our custom server's deps are included in standalone builds
+    await import('./lib/server/dependencies');
   }
 
   if (process.env.NEXT_RUNTIME === 'edge') {
