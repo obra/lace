@@ -33,6 +33,7 @@ export default [
   route('api/projects', 'routes/api.projects.ts'),
   route('api/projects/:projectId', 'routes/api.projects.$projectId.ts'),
   route('api/projects/:projectId/configuration', 'routes/api.projects.$projectId.configuration.ts'),
+  route('api/projects/:projectId/environment', 'routes/api.projects.$projectId.environment.ts'),
   route('api/projects/:projectId/sessions', 'routes/api.projects.$projectId.sessions.ts'),
   route(
     'api/projects/:projectId/sessions/:sessionId/tasks',
