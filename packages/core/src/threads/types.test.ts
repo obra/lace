@@ -2,7 +2,12 @@
 // ABOUTME: Validates that events can store token usage data correctly
 
 import { describe, it, expect } from 'vitest';
-import type { LaceEvent } from '~/threads/types';
+import { 
+  isTransientEventType, 
+  EVENT_TYPES,
+  type LaceEvent,
+  type LaceEventType
+} from '~/threads/types';
 
 describe('LaceEvent token usage', () => {
   it('should allow AGENT_MESSAGE with token usage', () => {
@@ -85,5 +90,125 @@ describe('LaceEvent token usage', () => {
     };
 
     expect(event.data.tokenUsage).toBeUndefined();
+  });
+});
+
+describe('Error Event Types', () => {
+  it('should include AGENT_ERROR in EVENT_TYPES array', () => {
+    expect(EVENT_TYPES).toContain('AGENT_ERROR');
+  });
+
+  it('should classify AGENT_ERROR as transient event type', () => {
+    expect(isTransientEventType('AGENT_ERROR')).toBe(true);
+  });
+
+  it('should validate AgentErrorData interface with valid error event', () => {
+    const validErrorEvent: LaceEvent = {
+      type: 'AGENT_ERROR',
+      threadId: 'test-thread-id',
+      data: {
+        errorType: 'provider_failure',
+        message: 'Test error message',
+        stack: 'Error: Test error\n    at test.js:1:1',
+        context: {
+          phase: 'provider_response',
+          providerName: 'anthropic',
+          providerInstanceId: 'claude-3',
+          modelId: 'claude-3-haiku',
+        },
+        isRetryable: true,
+        retryCount: 0,
+      },
+      timestamp: new Date(),
+    };
+
+    expect(validErrorEvent.type).toBe('AGENT_ERROR');
+    expect(validErrorEvent.data.errorType).toBe('provider_failure');
+    expect(validErrorEvent.data.isRetryable).toBe(true);
+    expect(validErrorEvent.data.context.phase).toBe('provider_response');
+  });
+
+  it('should accept all valid error types', () => {
+    const errorTypes = [
+      'provider_failure',
+      'tool_execution', 
+      'processing_error',
+      'timeout',
+      'streaming_error'
+    ] as const;
+
+    errorTypes.forEach(errorType => {
+      const errorEvent: LaceEvent = {
+        type: 'AGENT_ERROR',
+        threadId: 'test-thread-id',
+        data: {
+          errorType,
+          message: `Test ${errorType} error`,
+          context: {
+            phase: 'provider_response',
+          },
+          isRetryable: false,
+        },
+      };
+
+      expect(errorEvent.data.errorType).toBe(errorType);
+    });
+  });
+
+  it('should accept all valid phases', () => {
+    const phases = [
+      'provider_response',
+      'tool_execution',
+      'conversation_processing',
+      'initialization'
+    ] as const;
+
+    phases.forEach(phase => {
+      const errorEvent: LaceEvent = {
+        type: 'AGENT_ERROR',
+        threadId: 'test-thread-id',
+        data: {
+          errorType: 'processing_error',
+          message: `Test ${phase} error`,
+          context: {
+            phase,
+          },
+          isRetryable: false,
+        },
+      };
+
+      expect(errorEvent.data.context.phase).toBe(phase);
+    });
+  });
+
+  it('should handle optional context fields correctly', () => {
+    const errorEvent: LaceEvent = {
+      type: 'AGENT_ERROR',
+      threadId: 'test-thread-id',
+      data: {
+        errorType: 'tool_execution',
+        message: 'Tool execution failed',
+        context: {
+          phase: 'tool_execution',
+          toolName: 'bash',
+          toolCallId: 'tool-call-123',
+          workingDirectory: '/home/user',
+          retryAttempt: 2,
+        },
+        isRetryable: true,
+        retryCount: 1,
+      },
+    };
+
+    expect(errorEvent.data.context.toolName).toBe('bash');
+    expect(errorEvent.data.context.toolCallId).toBe('tool-call-123');
+    expect(errorEvent.data.context.workingDirectory).toBe('/home/user');
+    expect(errorEvent.data.context.retryAttempt).toBe(2);
+    expect(errorEvent.data.retryCount).toBe(1);
+  });
+
+  it('should ensure AGENT_ERROR is properly typed in LaceEventType union', () => {
+    const eventType: LaceEventType = 'AGENT_ERROR';
+    expect(eventType).toBe('AGENT_ERROR');
   });
 });
