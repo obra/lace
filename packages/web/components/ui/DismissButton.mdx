@@ -42,37 +42,31 @@ function MyComponent() {
 ### Custom Aria Label
 
 ```tsx
-<DismissButton 
-  onClick={handleClose} 
-  ariaLabel="Close modal" 
-/>
+<DismissButton onClick={handleClose} ariaLabel="Close modal" />
 ```
 
 ### Disabled State
 
 ```tsx
-<DismissButton 
-  onClick={handleDismiss} 
-  disabled={true} 
-/>
+<DismissButton onClick={handleDismiss} disabled={true} />
 ```
 
 ## Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `onClick` | `() => void` | - | **Required.** Callback when button is clicked |
-| `ariaLabel` | `string` | `'Dismiss'` | Accessibility label for screen readers |
-| `size` | `'sm' \| 'md' \| 'lg'` | `'md'` | Size variant of the button |
-| `className` | `string` | `''` | Additional CSS classes |
-| `disabled` | `boolean` | `false` | Whether the button is disabled |
+| Prop        | Type                   | Default     | Description                                   |
+| ----------- | ---------------------- | ----------- | --------------------------------------------- |
+| `onClick`   | `() => void`           | -           | **Required.** Callback when button is clicked |
+| `ariaLabel` | `string`               | `'Dismiss'` | Accessibility label for screen readers        |
+| `size`      | `'sm' \| 'md' \| 'lg'` | `'md'`      | Size variant of the button                    |
+| `className` | `string`               | `''`        | Additional CSS classes                        |
+| `disabled`  | `boolean`              | `false`     | Whether the button is disabled                |
 
 ## Design System Integration
 
 This component standardizes dismiss button patterns used across:
 
 - **Modal components**: Close buttons in modal headers
-- **Alert components**: Dismissible alert notifications  
+- **Alert components**: Dismissible alert notifications
 - **File attachments**: Remove file buttons
 - **Voice input**: Stop recording buttons
 

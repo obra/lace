@@ -5,7 +5,7 @@ A reusable alert component built on DaisyUI's alert system for displaying status
 ## Features
 
 - **Built on DaisyUI**: Uses DaisyUI's `alert` classes for consistent theming
-- **Semantic variants**: success, warning, error, info  
+- **Semantic variants**: success, warning, error, info
 - **Proper theming**: Inherits DaisyUI's color system and contrast ratios
 - **Consistent styling**: Unified with DaisyUI design system
 - **Flexible content**: Supports title, description, and custom children
@@ -21,29 +21,29 @@ A reusable alert component built on DaisyUI's alert system for displaying status
 import { Alert } from '@/components/ui/Alert';
 
 // Success alert
-<Alert 
-  variant="success" 
+<Alert
+  variant="success"
   title="Settings are saved"
   description="Your preferences are automatically saved and will persist between sessions."
 />
 
 // Warning alert
-<Alert 
-  variant="warning" 
+<Alert
+  variant="warning"
   title="Settings are not saved"
   description="Your user preferences are only stored during this session."
 />
 
 // Error alert
-<Alert 
-  variant="error" 
+<Alert
+  variant="error"
   title="Failed to save"
   description="There was an error saving your settings. Please try again."
 />
 
 // Info alert
-<Alert 
-  variant="info" 
+<Alert
+  variant="info"
   title="Hardware permissions required"
   description="This demo uses native OS-level speech recognition."
 />
@@ -63,9 +63,9 @@ import { Alert } from '@/components/ui/Alert';
 ### Dismissible
 
 ```tsx
-<Alert 
-  variant="info" 
-  title="Welcome!" 
+<Alert
+  variant="info"
+  title="Welcome!"
   description="This is your first time using the app."
   onDismiss={() => setShowAlert(false)}
 />
@@ -74,31 +74,27 @@ import { Alert } from '@/components/ui/Alert';
 ### Without Icon
 
 ```tsx
-<Alert 
-  variant="success" 
-  title="Task completed" 
-  showIcon={false}
-/>
+<Alert variant="success" title="Task completed" showIcon={false} />
 ```
 
 ## Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `variant` | `'success' \| 'warning' \| 'error' \| 'info'` | - | Alert type determining colors and icon |
-| `title` | `string` | - | Main alert message |
-| `description` | `string` | - | Optional secondary message |
-| `children` | `ReactNode` | - | Custom content below description |
-| `className` | `string` | `''` | Additional CSS classes |
-| `showIcon` | `boolean` | `true` | Whether to show the semantic icon |
-| `onDismiss` | `() => void` | - | Callback for dismiss button |
+| Prop          | Type                                          | Default | Description                            |
+| ------------- | --------------------------------------------- | ------- | -------------------------------------- |
+| `variant`     | `'success' \| 'warning' \| 'error' \| 'info'` | -       | Alert type determining colors and icon |
+| `title`       | `string`                                      | -       | Main alert message                     |
+| `description` | `string`                                      | -       | Optional secondary message             |
+| `children`    | `ReactNode`                                   | -       | Custom content below description       |
+| `className`   | `string`                                      | `''`    | Additional CSS classes                 |
+| `showIcon`    | `boolean`                                     | `true`  | Whether to show the semantic icon      |
+| `onDismiss`   | `() => void`                                  | -       | Callback for dismiss button            |
 
 ## Design System Integration
 
 The Alert component uses DaisyUI semantic colors with proper contrast:
 
 - **Background**: `bg-{variant}/10` - Very light tinted background
-- **Border**: `border-{variant}/20` - Subtle colored border  
+- **Border**: `border-{variant}/20` - Subtle colored border
 - **Icon**: `text-{variant}` - Full strength semantic color
 - **Title**: `text-base-content` - High contrast readable text
 - **Description**: `text-base-content/70` - Slightly muted readable text
@@ -108,21 +104,25 @@ This ensures excellent readability in both light and dark themes while maintaini
 ## Variants
 
 ### Success
+
 - **Use for**: Confirmations, successful operations, positive feedback
 - **Color**: Green tones
 - **Icon**: Check circle
 
-### Warning  
+### Warning
+
 - **Use for**: Cautions, non-critical issues, important notices
 - **Color**: Yellow/amber tones
 - **Icon**: Exclamation triangle
 
 ### Error
+
 - **Use for**: Failures, critical issues, validation errors
-- **Color**: Red tones  
+- **Color**: Red tones
 - **Icon**: Times circle
 
 ### Info
+
 - **Use for**: General information, tips, neutral notices
 - **Color**: Blue tones
 - **Icon**: Info circle
@@ -147,7 +147,8 @@ Replace scattered alert patterns like:
 ```
 
 This component provides a consistent API over DaisyUI's alert system while adding:
+
 - Structured title/description content model
-- Standardized icon integration  
+- Standardized icon integration
 - Optional dismiss functionality
 - Consistent content hierarchy
