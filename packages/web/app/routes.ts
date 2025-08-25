@@ -36,6 +36,10 @@ export default [
   route('api/projects/:projectId/environment', 'routes/api.projects.$projectId.environment.ts'),
   route('api/projects/:projectId/sessions', 'routes/api.projects.$projectId.sessions.ts'),
   route(
+    'api/projects/:projectId/sessions/:sessionId',
+    'routes/api.projects.$projectId.sessions.$sessionId.ts'
+  ),
+  route(
     'api/projects/:projectId/sessions/:sessionId/tasks',
     'routes/api.projects.$projectId.sessions.$sessionId.tasks.ts'
   ),
