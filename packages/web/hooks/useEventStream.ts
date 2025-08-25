@@ -257,7 +257,13 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
           // Add error event handling
           case 'AGENT_ERROR':
             console.warn('[useEventStream] Processing AGENT_ERROR event:', event);
-            currentOptions.onAgentError?.(event);
+            console.warn('[useEventStream] onAgentError handler exists:', !!currentOptions.onAgentError);
+            if (currentOptions.onAgentError) {
+              console.warn('[useEventStream] Calling onAgentError handler');
+              currentOptions.onAgentError(event);
+            } else {
+              console.warn('[useEventStream] No onAgentError handler registered');
+            }
             const errorData = event.data as { message?: string };
             currentOptions.onError?.(new Error(errorData.message || 'Unknown agent error'));
             break;
