@@ -48,20 +48,7 @@ class MockRetryProvider extends BaseMockProvider {
     _model: string,
     _signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    if (this._shouldEmitRetryEvents && this._retryEventData) {
-      if (this._retryEventData.type === 'attempt') {
-        this.emit('retry_attempt', {
-          attempt: this._retryEventData.attempt!,
-          delay: this._retryEventData.delay!,
-          error: this._retryEventData.error!,
-        });
-      } else if (this._retryEventData.type === 'exhausted') {
-        this.emit('retry_exhausted', {
-          attempts: this._retryEventData.attempts!,
-          lastError: this._retryEventData.lastError!,
-        });
-      }
-    }
+    this.emitRetryEventOnce();
     return Promise.resolve({
       content: 'Test response',
       toolCalls: [],
@@ -76,6 +63,17 @@ class MockRetryProvider extends BaseMockProvider {
     _model: string,
     _signal?: AbortSignal
   ): Promise<ProviderResponse> {
+    this.emitRetryEventOnce();
+    return Promise.resolve({
+      content: 'Test streaming response',
+      toolCalls: [],
+      stopReason: 'stop',
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+    });
+  }
+
+  // Helper to emit retry event once and reset state
+  private emitRetryEventOnce(): void {
     if (this._shouldEmitRetryEvents && this._retryEventData) {
       if (this._retryEventData.type === 'attempt') {
         this.emit('retry_attempt', {
@@ -89,13 +87,10 @@ class MockRetryProvider extends BaseMockProvider {
           lastError: this._retryEventData.lastError!,
         });
       }
+      // Reset state after emission
+      this._shouldEmitRetryEvents = false;
+      this._retryEventData = null;
     }
-    return Promise.resolve({
-      content: 'Test streaming response',
-      toolCalls: [],
-      stopReason: 'stop',
-      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-    });
   }
 
   // Method to setup retry events that will be emitted during next provider call
@@ -179,7 +174,7 @@ class MockRetryMetricsProvider extends BaseMockProvider {
 }
 
 describe('Agent Retry Functionality', () => {
-  const _tempLaceDir = setupCoreTest();
+  setupCoreTest();
 
   describe('Retry Event Forwarding', () => {
     let agent: Agent;
