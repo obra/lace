@@ -15,6 +15,7 @@ import {
   ThreadId,
   asThreadId,
   isTransientEventType,
+  type ErrorType,
 } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
@@ -759,7 +760,7 @@ export class Agent extends EventEmitter {
             phase: 'provider_response',
             threadId: this._threadId,
             // Enhanced context for error propagation
-            errorType: 'provider_failure',
+            errorType: 'provider_failure' as ErrorType,
             providerName: this.providerInstance?.providerName,
             providerInstanceId: this.getInfo().providerInstanceId,
             modelId: this.getInfo().modelId,
@@ -850,7 +851,7 @@ export class Agent extends EventEmitter {
         context: {
           phase: 'conversation_processing',
           threadId: this._threadId,
-          errorType: 'processing_error',
+          errorType: 'processing_error' as ErrorType,
           providerName: this.providerInstance?.providerName,
           providerInstanceId: this.getInfo().providerInstanceId,
           modelId: this.getInfo().modelId,
@@ -1372,7 +1373,7 @@ export class Agent extends EventEmitter {
         context: {
           phase: 'tool_execution',
           threadId: this._threadId,
-          errorType: 'tool_execution',
+          errorType: 'tool_execution' as ErrorType,
           toolName: toolCall.name,
           toolCallId: toolCall.id,
           providerName: this.providerInstance?.providerName,

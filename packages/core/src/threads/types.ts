@@ -276,9 +276,12 @@ interface SystemNotificationData {
   type: 'system:notification'; // For compatibility
 }
 
+// Error type definitions - centralized for reuse
+export type ErrorType = 'provider_failure' | 'tool_execution' | 'processing_error' | 'timeout' | 'streaming_error';
+
 // Agent error data
 interface AgentErrorData {
-  errorType: 'provider_failure' | 'tool_execution' | 'processing_error' | 'timeout' | 'streaming_error';
+  errorType: ErrorType;
   message: string;
   stack?: string;
   context: {

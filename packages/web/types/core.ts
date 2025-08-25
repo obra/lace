@@ -9,6 +9,7 @@ export type {
   LaceEvent,
   AgentMessageData,
   AgentStateChangeData,
+  ErrorType,
 } from '~/threads/types';
 
 export type { CombinedTokenUsage, ThreadTokenUsage } from '~/token-management/types';

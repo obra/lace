@@ -1,7 +1,7 @@
 // ABOUTME: Shared event data structures used by both API and SSE streaming
 // ABOUTME: Single source of truth for event payloads - no duplicates
 
-import type { ToolResult, ToolAnnotations, ToolCall } from '@/types/core';
+import type { ToolResult, ToolAnnotations, ToolCall, ErrorType } from '@/types/core';
 import type { CarouselItem, GoogleDocAttachment } from '@/types/design-system';
 
 // Event data structures shared between API and SSE streaming
@@ -44,7 +44,8 @@ export interface TimelineEntry {
     | 'google-doc'
     | 'unknown'
     | 'system-prompt'
-    | 'user-system-prompt';
+    | 'user-system-prompt'
+    | 'error';
   content?: string;
   timestamp: Date;
   agent?: string;
@@ -59,4 +60,32 @@ export interface TimelineEntry {
   // Unknown event specific fields
   eventType?: string;
   metadata?: Record<string, unknown>;
+}
+
+export interface ErrorEntry extends TimelineEntry {
+  type: 'error';
+  errorType: ErrorType;
+  errorMessage: string;
+  errorContext?: Record<string, unknown>;
+  isRetryable: boolean;
+  retryCount?: number;
+  canRetry?: boolean;
+  retryHandler?: () => void;
+}
+
+export interface ErrorLogEntry {
+  id: string;
+  timestamp: Date;
+  errorType: ErrorType;
+  severity: 'warning' | 'error' | 'critical';
+  message: string;
+  context: Record<string, unknown>;
+  isRetryable: boolean;
+  retryCount?: number;
+  resolved: boolean;
+  threadId?: string;
+  sessionId?: string;
+  providerName?: string;
+  providerInstanceId?: string;
+  modelId?: string;
 }
