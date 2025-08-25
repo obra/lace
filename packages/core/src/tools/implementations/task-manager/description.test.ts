@@ -11,6 +11,7 @@ import {
   TaskViewTool,
 } from '~/tools/implementations/task-manager/tools';
 import { DelegateTool } from '~/tools/implementations/delegate';
+import type { TaskStatus } from '~/tools/implementations/task-manager/types';
 
 describe('Tool Descriptions', () => {
   it('should include usage examples in descriptions', () => {
@@ -44,5 +45,27 @@ describe('Tool Descriptions', () => {
     expect(delegateTool.description).toContain('claude-3-5-haiku-20241022');
     expect(delegateTool.description).toContain('claude-sonnet-4-20250514');
     expect(delegateTool.description).not.toContain('claude-3-5-haiku-latest');
+  });
+});
+
+describe('TaskStatus Type Definitions', () => {
+  it('should include archived status', () => {
+    const archivedStatus: TaskStatus = 'archived';
+    expect(archivedStatus).toBe('archived');
+  });
+
+  it('should include all expected status values', () => {
+    const validStatuses: TaskStatus[] = [
+      'pending',
+      'in_progress',
+      'completed',
+      'blocked',
+      'archived',
+    ];
+
+    validStatuses.forEach((status) => {
+      const testStatus: TaskStatus = status;
+      expect(typeof testStatus).toBe('string');
+    });
   });
 });

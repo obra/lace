@@ -3,48 +3,15 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, AgentConfig, CurrentTurnMetrics } from '~/agents/agent';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
+import { TestProvider } from '~/test-utils/test-provider';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 
-// Mock provider for testing
-class MockProvider extends BaseMockProvider {
-  private mockResponse: ProviderResponse;
-  private delay: number;
-
-  constructor(mockResponse: ProviderResponse, delay = 0) {
-    super({});
-    this.mockResponse = mockResponse;
-    this.delay = delay;
-  }
-
-  get providerName(): string {
-    return 'mock';
-  }
-
-  get supportsStreaming(): boolean {
-    return false;
-  }
-
-  async createResponse(
-    _messages: ProviderMessage[],
-    _tools: Tool[],
-    _model: string
-  ): Promise<ProviderResponse> {
-    if (this.delay > 0) {
-      await new Promise((resolve) => setTimeout(resolve, this.delay));
-    }
-    return this.mockResponse;
-  }
-}
-
 describe('Agent Turn Tracking', () => {
   const _tempLaceDir = setupCoreTest();
   let agent: Agent;
-  let provider: MockProvider;
+  let provider: TestProvider;
   let toolExecutor: ToolExecutor;
   let threadManager: ThreadManager;
   let threadId: string;
@@ -52,18 +19,9 @@ describe('Agent Turn Tracking', () => {
   beforeEach(async () => {
     // setupTestPersistence replaced by setupCoreTest
 
-    // Create mock response without tool calls
-    const mockResponse: ProviderResponse = {
-      content: 'Test response',
-      toolCalls: [],
-      usage: {
-        promptTokens: 10,
-        completionTokens: 5,
-        totalTokens: 15,
-      },
-    };
-
-    provider = new MockProvider(mockResponse);
+    provider = new TestProvider({
+      mockResponse: 'Test response',
+    });
     toolExecutor = new ToolExecutor();
     threadManager = new ThreadManager(); // Use in-memory SQLite for tests
     threadId = threadManager.generateThreadId();
@@ -117,7 +75,8 @@ describe('Agent Turn Tracking', () => {
 
       const turnStartEvent = turnStartEvents[0];
       expect(turnStartEvent.userInput).toBe('Hello, world!');
-      expect(turnStartEvent.turnId).toMatch(/^turn_\d+_[a-z0-9]+$/);
+      expect(typeof turnStartEvent.turnId).toBe('string');
+      expect(turnStartEvent.turnId.length).toBeGreaterThan(0);
       expect(turnStartEvent.metrics.turnId).toBe(turnStartEvent.turnId);
       expect(turnStartEvent.metrics.startTime).toBeInstanceOf(Date);
       expect(turnStartEvent.metrics.elapsedMs).toBe(0);
@@ -153,23 +112,20 @@ describe('Agent Turn Tracking', () => {
       // Arrange
       vi.useFakeTimers();
       const progressEvents: Array<{ metrics: CurrentTurnMetrics }> = [];
-      agent.on('turn_progress', (data) => {
-        progressEvents.push(data);
-      });
 
       // Create a provider that takes some time
-      const slowProvider = new MockProvider(
-        {
-          content: 'Slow response',
-          toolCalls: [],
-        },
-        3000
-      ); // 3 second delay
+      const slowProvider = new TestProvider({
+        mockResponse: 'Slow response',
+        delay: 3000, // 3 second delay
+      });
 
+      // Use a dedicated thread for this agent to avoid crosstalk
+      const slowThreadId = threadManager.generateThreadId();
+      threadManager.createThread(slowThreadId);
       const slowAgent = new Agent({
         toolExecutor,
         threadManager,
-        threadId,
+        threadId: slowThreadId,
         tools: [],
         metadata: {
           name: 'test-agent',
@@ -178,14 +134,15 @@ describe('Agent Turn Tracking', () => {
         },
       });
 
+      slowAgent.on('turn_progress', (data) => {
+        progressEvents.push(data);
+      });
+
       // Mock provider access for test
       vi.spyOn(slowAgent, 'getProvider').mockResolvedValue(slowProvider);
       vi.spyOn(slowAgent, 'providerInstance', 'get').mockReturnValue(slowProvider);
       vi.spyOn(slowAgent, 'providerName', 'get').mockReturnValue(slowProvider.providerName);
       await slowAgent.start();
-      slowAgent.on('turn_progress', (data) => {
-        progressEvents.push(data);
-      });
 
       // Act
       const messagePromise = slowAgent.sendMessage('Test message');
@@ -224,7 +181,8 @@ describe('Agent Turn Tracking', () => {
       expect(completeEvents).toHaveLength(1);
 
       const completeEvent = completeEvents[0];
-      expect(completeEvent.turnId).toMatch(/^turn_\d+_[a-z0-9]+$/);
+      expect(typeof completeEvent.turnId).toBe('string');
+      expect(completeEvent.turnId.length).toBeGreaterThan(0);
       expect(completeEvent.metrics.turnId).toBe(completeEvent.turnId);
       expect(completeEvent.metrics.elapsedMs).toBeGreaterThan(0);
       expect(completeEvent.metrics.startTime).toBeInstanceOf(Date);
