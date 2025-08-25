@@ -161,6 +161,9 @@ export function EventStreamProvider({
     // For now, just log to console so we can see it's working
   }, []);
 
+  // Debug: Log when component renders with the handler
+  console.log('[EventStreamProvider] Component render - handleAgentError exists:', !!handleAgentError);
+
   // Agent message handler to clear streaming content when complete
   const stableAddAgentEventWithStreaming = useCallback(
     (event: LaceEvent) => {
@@ -188,7 +191,8 @@ export function EventStreamProvider({
 
   // Create the options object with stable references
   const eventStreamOptions = useMemo(
-    () => ({
+    () => {
+      const options = {
       projectId: projectId || undefined,
       sessionId: sessionId || undefined,
       threadIds,
@@ -214,7 +218,11 @@ export function EventStreamProvider({
       // Compaction events
       onCompactionStart: handleCompactionStart,
       onCompactionComplete: handleCompactionComplete,
-    }),
+      };
+      
+      console.log('[EventStreamProvider] Creating eventStreamOptions with onAgentError:', !!options.onAgentError);
+      return options;
+    },
     [
       projectId,
       sessionId,
