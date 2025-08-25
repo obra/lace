@@ -67,8 +67,8 @@ export const Chat = memo(function Chat(): React.JSX.Element {
   return (
     <div className="flex-1 flex flex-col h-full">
       {/* Conversation Display - scrollable area left-aligned */}
-      <div ref={containerRef} className="flex-1 overflow-y-auto">
-        <div className="px-4">
+      <div ref={containerRef} className="flex-1 overflow-y-auto" data-testid="conversation-scroll">
+        <div className="px-4 sm:px-6 lg:px-8" data-testid="conversation-inner">
           <TimelineView
             events={events}
             agents={agents}
@@ -82,8 +82,8 @@ export const Chat = memo(function Chat(): React.JSX.Element {
       </div>
 
       {/* Chat Input - Fixed at bottom left-aligned */}
-      <div className="flex-shrink-0 pb-6 pt-2 min-h-[80px]">
-        <div className="px-4">
+      <div className="flex-shrink-0 pb-6 pt-2 min-h-[80px]" data-testid="chat-input-container">
+        <div className="px-4 sm:px-6 lg:px-8" data-testid="chat-input-inner">
           <MemoizedChatInput
             onSubmit={onSendMessage}
             onInterrupt={onStopGeneration}
