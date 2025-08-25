@@ -1,11 +1,9 @@
 // ABOUTME: Health check endpoint for server readiness verification
 // ABOUTME: Used by E2E tests and monitoring to verify server is responding correctly
 
-import { NextResponse } from 'next/server';
-
-export async function GET() {
+export async function loader() {
   try {
-    return NextResponse.json(
+    return Response.json(
       {
         status: 'healthy',
         timestamp: new Date().toISOString(),
@@ -16,7 +14,7 @@ export async function GET() {
     );
   } catch (error) {
     console.error('Health check error:', error);
-    return NextResponse.json(
+    return Response.json(
       {
         status: 'error',
         timestamp: new Date().toISOString(),
