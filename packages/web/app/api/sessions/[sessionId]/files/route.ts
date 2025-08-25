@@ -13,7 +13,10 @@ import {
   type SessionFileEntry,
 } from '@/types/session-files';
 
-export async function GET(request: NextRequest, { params }: { params: { sessionId: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ sessionId: string }> }
+) {
   try {
     const { searchParams } = new URL(request.url);
     const rawPath = searchParams.get('path') || '';
@@ -21,9 +24,12 @@ export async function GET(request: NextRequest, { params }: { params: { sessionI
     // Validate request
     const { path: requestedPath } = ListSessionDirectoryRequestSchema.parse({ path: rawPath });
 
+    // Await params before accessing properties
+    const { sessionId } = await params;
+
     // Get session and working directory
     const sessionService = new SessionService();
-    const session = await sessionService.getSession(asThreadId(params.sessionId));
+    const session = await sessionService.getSession(asThreadId(sessionId));
 
     if (!session) {
       return createErrorResponse('Session not found', 404, { code: 'SESSION_NOT_FOUND' });

@@ -67,7 +67,7 @@ describe('/api/sessions/[sessionId]/files', () => {
   it('should list files and directories in session working directory', async () => {
     const request = new NextRequest(`http://localhost/api/sessions/${testSessionId}/files`);
 
-    const response = await GET(request, { params: { sessionId: testSessionId } });
+    const response = await GET(request, { params: Promise.resolve({ sessionId: testSessionId }) });
 
     expect(response.status).toBe(200);
     const data = await parseResponse<SessionDirectoryResponse>(response);
@@ -98,7 +98,7 @@ describe('/api/sessions/[sessionId]/files', () => {
       `http://localhost/api/sessions/${testSessionId}/files?path=src`
     );
 
-    const response = await GET(request, { params: { sessionId: testSessionId } });
+    const response = await GET(request, { params: Promise.resolve({ sessionId: testSessionId }) });
 
     expect(response.status).toBe(200);
     const data = await parseResponse<SessionDirectoryResponse>(response);
@@ -115,7 +115,7 @@ describe('/api/sessions/[sessionId]/files', () => {
       `http://localhost/api/sessions/${testSessionId}/files?path=../../../etc`
     );
 
-    const response = await GET(request, { params: { sessionId: testSessionId } });
+    const response = await GET(request, { params: Promise.resolve({ sessionId: testSessionId }) });
 
     expect(response.status).toBe(403);
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -127,7 +127,9 @@ describe('/api/sessions/[sessionId]/files', () => {
 
     const request = new NextRequest('http://localhost/api/sessions/invalid-session/files');
 
-    const response = await GET(request, { params: { sessionId: 'invalid-session' } });
+    const response = await GET(request, {
+      params: Promise.resolve({ sessionId: 'invalid-session' }),
+    });
 
     expect(response.status).toBe(404);
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -139,7 +141,7 @@ describe('/api/sessions/[sessionId]/files', () => {
 
     const request = new NextRequest(`http://localhost/api/sessions/${testSessionId}/files`);
 
-    const response = await GET(request, { params: { sessionId: testSessionId } });
+    const response = await GET(request, { params: Promise.resolve({ sessionId: testSessionId }) });
 
     expect(response.status).toBe(400);
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -151,7 +153,7 @@ describe('/api/sessions/[sessionId]/files', () => {
       `http://localhost/api/sessions/${testSessionId}/files?path=non-existent`
     );
 
-    const response = await GET(request, { params: { sessionId: testSessionId } });
+    const response = await GET(request, { params: Promise.resolve({ sessionId: testSessionId }) });
 
     expect(response.status).toBe(404);
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -163,7 +165,7 @@ describe('/api/sessions/[sessionId]/files', () => {
       `http://localhost/api/sessions/${testSessionId}/files?path=package.json`
     );
 
-    const response = await GET(request, { params: { sessionId: testSessionId } });
+    const response = await GET(request, { params: Promise.resolve({ sessionId: testSessionId }) });
 
     expect(response.status).toBe(400);
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -182,7 +184,7 @@ describe('/api/sessions/[sessionId]/files', () => {
 
     const request = new NextRequest(`http://localhost/api/sessions/${testSessionId}/files`);
 
-    const response = await GET(request, { params: { sessionId: testSessionId } });
+    const response = await GET(request, { params: Promise.resolve({ sessionId: testSessionId }) });
 
     expect(response.status).toBe(200);
     const data = await parseResponse<SessionDirectoryResponse>(response);

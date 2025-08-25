@@ -45,17 +45,19 @@ function isTextFile(mimeType: string): boolean {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { sessionId: string; path: string[] } }
+  { params }: { params: Promise<{ sessionId: string; path: string[] }> }
 ) {
   try {
-    const filePath = params.path.join('/');
+    // Await params before accessing properties
+    const { sessionId, path: pathSegments } = await params;
+    const filePath = pathSegments.join('/');
 
     // Validate request
     const { path: requestedPath } = GetSessionFileRequestSchema.parse({ path: filePath });
 
     // Get session and working directory
     const sessionService = new SessionService();
-    const session = await sessionService.getSession(asThreadId(params.sessionId));
+    const session = await sessionService.getSession(asThreadId(sessionId));
 
     if (!session) {
       return createErrorResponse('Session not found', 404, { code: 'SESSION_NOT_FOUND' });

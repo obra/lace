@@ -71,7 +71,7 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
     const request = new NextRequest(`http://localhost/api/sessions/${testSessionId}/files/test.ts`);
 
     const response = await GET(request, {
-      params: { sessionId: testSessionId, path: ['test.ts'] },
+      params: Promise.resolve({ sessionId: testSessionId, path: ['test.ts'] }),
     });
 
     expect(response.status).toBe(200);
@@ -89,7 +89,7 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
     );
 
     const response = await GET(request, {
-      params: { sessionId: testSessionId, path: ['package.json'] },
+      params: Promise.resolve({ sessionId: testSessionId, path: ['package.json'] }),
     });
 
     expect(response.status).toBe(200);
@@ -105,7 +105,7 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
     );
 
     const response = await GET(request, {
-      params: { sessionId: testSessionId, path: ['src', 'index.js'] },
+      params: Promise.resolve({ sessionId: testSessionId, path: ['src', 'index.js'] }),
     });
 
     expect(response.status).toBe(200);
@@ -121,7 +121,7 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
     );
 
     const response = await GET(request, {
-      params: { sessionId: testSessionId, path: ['large-file.txt'] },
+      params: Promise.resolve({ sessionId: testSessionId, path: ['large-file.txt'] }),
     });
 
     expect(response.status).toBe(413);
@@ -137,7 +137,10 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
     );
 
     const response = await GET(request, {
-      params: { sessionId: testSessionId, path: ['..', '..', '..', 'etc', 'passwd'] },
+      params: Promise.resolve({
+        sessionId: testSessionId,
+        path: ['..', '..', '..', 'etc', 'passwd'],
+      }),
     });
 
     expect(response.status).toBe(403);
@@ -151,7 +154,7 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
     );
 
     const response = await GET(request, {
-      params: { sessionId: testSessionId, path: ['non-existent.txt'] },
+      params: Promise.resolve({ sessionId: testSessionId, path: ['non-existent.txt'] }),
     });
 
     expect(response.status).toBe(404);
@@ -163,7 +166,7 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
     const request = new NextRequest(`http://localhost/api/sessions/${testSessionId}/files/src`);
 
     const response = await GET(request, {
-      params: { sessionId: testSessionId, path: ['src'] },
+      params: Promise.resolve({ sessionId: testSessionId, path: ['src'] }),
     });
 
     expect(response.status).toBe(400);
@@ -177,7 +180,7 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
     const request = new NextRequest('http://localhost/api/sessions/invalid-session/files/test.ts');
 
     const response = await GET(request, {
-      params: { sessionId: 'invalid-session', path: ['test.ts'] },
+      params: Promise.resolve({ sessionId: 'invalid-session', path: ['test.ts'] }),
     });
 
     expect(response.status).toBe(404);
@@ -191,7 +194,7 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
     const request = new NextRequest(`http://localhost/api/sessions/${testSessionId}/files/test.ts`);
 
     const response = await GET(request, {
-      params: { sessionId: testSessionId, path: ['test.ts'] },
+      params: Promise.resolve({ sessionId: testSessionId, path: ['test.ts'] }),
     });
 
     expect(response.status).toBe(400);
@@ -206,7 +209,7 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
     );
 
     const response = await GET(request, {
-      params: { sessionId: testSessionId, path: ['README.md'] },
+      params: Promise.resolve({ sessionId: testSessionId, path: ['README.md'] }),
     });
 
     expect(response.status).toBe(200);
