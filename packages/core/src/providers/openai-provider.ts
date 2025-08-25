@@ -2,6 +2,7 @@
 // ABOUTME: Wraps OpenAI SDK in the common provider interface
 
 import OpenAI, { ClientOptions } from 'openai';
+import { get_encoding, encoding_for_model, type Tiktoken } from 'tiktoken';
 import { AIProvider } from '~/providers/base-provider';
 import {
   ProviderMessage,
@@ -22,6 +23,7 @@ interface OpenAIProviderConfig extends ProviderConfig {
 
 export class OpenAIProvider extends AIProvider {
   private _openai: OpenAI | null = null;
+  private _encoderCache = new Map<string, Tiktoken>();
 
   constructor(config: OpenAIProviderConfig) {
     super(config);
@@ -30,19 +32,27 @@ export class OpenAIProvider extends AIProvider {
   private getOpenAIClient(): OpenAI {
     if (!this._openai) {
       const config = this._config as OpenAIProviderConfig;
-      if (!config.apiKey) {
+      const configBaseURL = config.baseURL as string | undefined;
+
+      // Allow no API key for local OpenAI-compatible endpoints
+      if (!config.apiKey && !configBaseURL) {
         throw new Error(
           'Missing API key for OpenAI provider. Please ensure the provider instance has valid credentials.'
         );
       }
 
+      if (!config.apiKey && configBaseURL) {
+        logger.info('Using OpenAI-compatible endpoint without API key', {
+          baseURL: configBaseURL,
+        });
+      }
+
       const openaiConfig: ClientOptions = {
-        apiKey: config.apiKey,
+        apiKey: config.apiKey || 'not-required-for-local',
         dangerouslyAllowBrowser: process.env.NODE_ENV === 'test',
       };
 
       // Support custom base URL for OpenAI-compatible APIs
-      const configBaseURL = config.baseURL as string | undefined;
       if (configBaseURL) {
         openaiConfig.baseURL = configBaseURL;
         logger.info('Using custom OpenAI base URL', {
@@ -61,6 +71,67 @@ export class OpenAIProvider extends AIProvider {
 
   get supportsStreaming(): boolean {
     return true;
+  }
+
+  // Provider-specific token counting using tiktoken for OpenAI-compatible models
+  countTokens(messages: ProviderMessage[], tools: Tool[] = [], model?: string): number | null {
+    if (!model) {
+      return null; // Can't count without model
+    }
+
+    try {
+      // Get or create cached encoder for this model
+      let encoding: Tiktoken;
+      if (this._encoderCache.has(model)) {
+        encoding = this._encoderCache.get(model)!;
+      } else {
+        try {
+          encoding = encoding_for_model(model as Parameters<typeof encoding_for_model>[0]);
+        } catch (error) {
+          // Fallback for unknown/custom/OpenAI-compatible models
+          logger.debug(`Model ${model} not recognized by tiktoken, using default encoding`, {
+            error,
+          });
+          encoding = get_encoding('cl100k_base'); // Default for most OpenAI-compatible models
+        }
+        this._encoderCache.set(model, encoding);
+      }
+
+      // Add system prompt
+      const systemPrompt = this.getEffectiveSystemPrompt(messages);
+      let messageText = `system: ${systemPrompt}\n`;
+
+      // Convert messages to text for token counting, excluding system messages to avoid double-counting
+      for (const message of messages) {
+        if (message.role !== 'system') {
+          messageText += `${message.role}: ${message.content}\n`;
+        }
+      }
+
+      // Count base message tokens
+      let totalTokens = encoding.encode(messageText).length;
+
+      // Add tool schema tokens if tools are provided
+      if (tools.length > 0) {
+        const toolsText = JSON.stringify(
+          tools.map((tool) => ({
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.inputSchema,
+          }))
+        );
+        totalTokens += encoding.encode(toolsText).length;
+        totalTokens += tools.length * 3; // Overhead per tool
+      }
+
+      // Add conversation overhead (conservative estimate)
+      totalTokens += 10;
+
+      return totalTokens;
+    } catch (error) {
+      logger.debug('Token counting failed, falling back to estimation', { error });
+      return null; // Fall back to estimation
+    }
   }
 
   private _createRequestPayload(
@@ -175,17 +246,42 @@ export class OpenAIProvider extends AIProvider {
           usage: response.usage,
         });
 
+        // Extract usage data from response, or estimate if missing (for OpenAI-compatible endpoints)
+        let usage: ProviderResponse['usage'];
+        if (response.usage) {
+          usage = {
+            promptTokens: response.usage.prompt_tokens,
+            completionTokens: response.usage.completion_tokens,
+            totalTokens: response.usage.total_tokens,
+          };
+        } else {
+          // Fallback: estimate tokens when OpenAI-compatible endpoints don't provide usage
+          logger.debug('No usage data in OpenAI response, estimating tokens', {
+            provider: 'openai',
+            model: requestPayload.model,
+          });
+
+          // Include system prompt and tool context for accurate estimation
+          const systemPrompt = this.getEffectiveSystemPrompt(messages);
+          const promptText = systemPrompt + '\n' + messages.map((m) => m.content).join(' ');
+          const toolsText = tools.length > 0 ? JSON.stringify(tools) : '';
+
+          const estimatedPromptTokens =
+            this.countTokens(messages, tools, model) ?? this.estimateTokens(promptText + toolsText);
+          const estimatedCompletionTokens = this.estimateTokens(textContent);
+
+          usage = {
+            promptTokens: estimatedPromptTokens,
+            completionTokens: estimatedCompletionTokens,
+            totalTokens: estimatedPromptTokens + estimatedCompletionTokens,
+          };
+        }
+
         return {
           content: textContent,
           toolCalls,
           stopReason: this.normalizeStopReason(choice.finish_reason),
-          usage: response.usage
-            ? {
-                promptTokens: response.usage.prompt_tokens,
-                completionTokens: response.usage.completion_tokens,
-                totalTokens: response.usage.total_tokens,
-              }
-            : undefined,
+          usage,
         };
       },
       { signal }
@@ -340,17 +436,56 @@ export class OpenAIProvider extends AIProvider {
             usage,
           });
 
+          // Extract usage data from stream, or estimate if missing (for OpenAI-compatible endpoints)
+          let finalUsage: ProviderResponse['usage'];
+          if (
+            usage &&
+            typeof usage.prompt_tokens === 'number' &&
+            typeof usage.completion_tokens === 'number' &&
+            typeof usage.total_tokens === 'number'
+          ) {
+            finalUsage = {
+              promptTokens: usage.prompt_tokens,
+              completionTokens: usage.completion_tokens,
+              totalTokens: usage.total_tokens,
+            };
+          } else {
+            // Fallback: estimate tokens when OpenAI-compatible endpoints don't provide usage
+            logger.debug('No usage data in OpenAI streaming response, estimating tokens', {
+              provider: 'openai',
+              model: requestPayload.model,
+            });
+
+            // Build prompt text same way as non-streaming: system prompt + non-system messages
+            const systemPrompt = this.getEffectiveSystemPrompt(messages);
+            const nonSystemMessages = messages.filter((m) => m.role !== 'system');
+            const promptText =
+              systemPrompt + '\n' + nonSystemMessages.map((m) => m.content).join(' ');
+            const toolsText = tools.length > 0 ? JSON.stringify(tools) : '';
+
+            // Include tool call arguments in completion token estimation
+            let completionText = content;
+            for (const partial of partialToolCalls.values()) {
+              completionText += partial.arguments;
+            }
+
+            const estimatedPromptTokens =
+              this.countTokens(messages, tools, model) ??
+              this.estimateTokens(promptText + toolsText);
+            const estimatedCompletionTokens = this.estimateTokens(completionText);
+
+            finalUsage = {
+              promptTokens: estimatedPromptTokens,
+              completionTokens: estimatedCompletionTokens,
+              totalTokens: estimatedPromptTokens + estimatedCompletionTokens,
+            };
+          }
+
           const response = {
             content,
             toolCalls,
             stopReason: this.normalizeStopReason(stopReason),
-            usage: usage
-              ? {
-                  promptTokens: usage.prompt_tokens,
-                  completionTokens: usage.completion_tokens,
-                  totalTokens: usage.total_tokens,
-                }
-              : undefined,
+            usage: finalUsage,
           };
 
           // Emit completion event
@@ -531,6 +666,17 @@ export class OpenAIProvider extends AIProvider {
 
   isConfigured(): boolean {
     const config = this._config as OpenAIProviderConfig;
-    return !!config.apiKey && config.apiKey.length > 0;
+    const configBaseURL = config.baseURL as string | undefined;
+    // Configured if we have an API key, or if we have a custom base URL (for local endpoints)
+    return (!!config.apiKey && config.apiKey.length > 0) || !!configBaseURL;
+  }
+
+  // Clean up encoder cache to prevent memory leaks
+  destroy(): void {
+    for (const encoder of this._encoderCache.values()) {
+      encoder.free();
+    }
+    this._encoderCache.clear();
+    super.removeAllListeners();
   }
 }
