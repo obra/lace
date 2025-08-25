@@ -31,7 +31,7 @@ interface RouteContext {
   }>;
 }
 
-export async function action(request: NextRequest, { request, params }: Route.ActionArgs) {
+export async function action({ request, params }: Route.ActionArgs) {
   try {
     const { projectId, sessionId, taskId } = await validateRouteParams(
       params,

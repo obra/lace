@@ -1,7 +1,7 @@
 // ABOUTME: RESTful task detail API - GET/PATCH/DELETE specific task under project/session
 // ABOUTME: Individual task operations with proper nested route validation
 
-import { NextRequest } from 'next/server';
+import type { Route } from './+types/api.projects.$projectId.sessions.$sessionId.tasks.$taskId';
 import { z } from 'zod';
 import { asThreadId } from '@/types/core';
 import { Project } from '@/lib/server/lace-imports';
@@ -23,18 +23,10 @@ const TaskRouteParamsSchema = z.object({
   taskId: TaskIdSchema,
 });
 
-interface RouteContext {
-  params: Promise<{
-    projectId: string;
-    sessionId: string;
-    taskId: string;
-  }>;
-}
-
-export async function GET(request: NextRequest, context: RouteContext) {
+export async function loader({ request, params }: Route.LoaderArgs) {
   try {
     const { projectId, sessionId, taskId } = await validateRouteParams(
-      context.params,
+      Promise.resolve(params),
       TaskRouteParamsSchema
     );
 
@@ -76,10 +68,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 }
 
-export async function PATCH(request: NextRequest, context: RouteContext) {
+async function handlePatch(
+  request: Request,
+  params: { projectId: string; sessionId: string; taskId: string }
+) {
   try {
     const { projectId, sessionId, taskId } = await validateRouteParams(
-      context.params,
+      Promise.resolve(params),
       TaskRouteParamsSchema
     );
 
@@ -138,10 +133,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 }
 
-export async function DELETE(request: NextRequest, context: RouteContext) {
+async function handleDelete(
+  request: Request,
+  params: { projectId: string; sessionId: string; taskId: string }
+) {
   try {
     const { projectId, sessionId, taskId } = await validateRouteParams(
-      context.params,
+      Promise.resolve(params),
       TaskRouteParamsSchema
     );
 
@@ -188,4 +186,18 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       { code: 'INTERNAL_SERVER_ERROR' }
     );
   }
+}
+
+export async function action({ request, params }: Route.ActionArgs) {
+  const method = request.method;
+
+  if (method === 'PATCH') {
+    return handlePatch(request, params);
+  }
+
+  if (method === 'DELETE') {
+    return handleDelete(request, params);
+  }
+
+  return createErrorResponse('Method not allowed', 405);
 }
