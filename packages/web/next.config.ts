@@ -1,7 +1,6 @@
 // ABOUTME: Next.js configuration for the web interface with webpack customizations and build settings
 // ABOUTME: Configures aliases, externals, Sentry integration, and standalone build optimizations
 import type { NextConfig } from 'next';
-import path from 'path';
 import { fileURLToPath } from 'node:url';
 import { withSentryConfig } from '@sentry/nextjs';
 

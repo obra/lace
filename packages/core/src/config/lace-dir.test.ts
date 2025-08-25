@@ -5,8 +5,6 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { existsSync } from 'fs';
-import { tmpdir } from 'os';
 import {
   getLaceDir,
   ensureLaceDir,
