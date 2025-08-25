@@ -6,7 +6,7 @@
 import React, { useState, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faSearch } from '@/lib/fontawesome';
-import { SidebarSection } from '@/components/layout/Sidebar';
+import SidebarSection from '@/components/ui/SidebarSection';
 import { AccentInput } from '@/components/ui/AccentInput';
 import { SessionFileTree } from '@/components/files/SessionFileTree';
 import { FileViewerModal } from '@/components/modals/FileViewerModal';
@@ -24,6 +24,7 @@ export function FileBrowserSection({
   defaultCollapsed = false,
   className = '',
 }: FileBrowserSectionProps) {
+  const [isExpanded, setIsExpanded] = useState(!defaultCollapsed);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFile, setSelectedFile] = useState<{
     path: string;
@@ -51,18 +52,12 @@ export function FileBrowserSection({
     <>
       <SidebarSection
         title="Files"
-        icon={faFolder}
-        collapsible={true}
-        defaultCollapsed={defaultCollapsed}
-        headerActions={
-          <div className="flex items-center gap-2">
-            <span
-              className="text-xs text-base-content/60 truncate max-w-32"
-              title={workingDirectory}
-            >
-              {workingDirectory.split('/').pop() || workingDirectory}
-            </span>
-          </div>
+        isExpanded={isExpanded}
+        onToggle={() => setIsExpanded(!isExpanded)}
+        badge={
+          workingDirectory
+            ? { text: workingDirectory.split('/').pop() || workingDirectory }
+            : undefined
         }
       >
         {/* Search input */}
