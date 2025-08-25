@@ -39,6 +39,8 @@ export const EVENT_TYPES = [
   'PROJECT_DELETED',
   // System events (transient)
   'SYSTEM_NOTIFICATION',
+  // Error events (transient)
+  'AGENT_ERROR',
 ] as const;
 
 // Derive LaceEventType union from the array
@@ -66,6 +68,8 @@ export function isTransientEventType(type: LaceEventType): boolean {
     'PROJECT_DELETED',
     // System events
     'SYSTEM_NOTIFICATION',
+    // Error events
+    'AGENT_ERROR',
   ].includes(type);
 }
 
@@ -272,6 +276,28 @@ interface SystemNotificationData {
   type: 'system:notification'; // For compatibility
 }
 
+// Agent error data
+interface AgentErrorData {
+  errorType: 'provider_failure' | 'tool_execution' | 'processing_error' | 'timeout' | 'streaming_error';
+  message: string;
+  stack?: string;
+  context: {
+    phase: 'provider_response' | 'tool_execution' | 'conversation_processing' | 'initialization';
+    // Available from Agent
+    providerName?: string;        // From this.providerInstance?.providerName
+    providerInstanceId?: string;  // From thread metadata  
+    modelId?: string;            // From thread metadata
+    // For tool-related errors
+    toolName?: string;           // When phase === 'tool_execution'
+    toolCallId?: string;         // When phase === 'tool_execution'
+    // Additional context
+    workingDirectory?: string;
+    retryAttempt?: number;
+  };
+  isRetryable: boolean;
+  retryCount?: number;
+}
+
 // Discriminated union for type-safe event handling
 export type LaceEvent =
   | (BaseLaceEvent & {
@@ -369,6 +395,10 @@ export type LaceEvent =
   | (BaseLaceEvent & {
       type: 'SYSTEM_NOTIFICATION';
       data: SystemNotificationData;
+    })
+  | (BaseLaceEvent & {
+      type: 'AGENT_ERROR';
+      data: AgentErrorData;
     });
 
 export interface Thread {

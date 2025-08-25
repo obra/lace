@@ -170,6 +170,10 @@ function createLaceEventFromDb(
     case 'SYSTEM_NOTIFICATION':
       throw new Error('SYSTEM_NOTIFICATION events are transient and should not be persisted');
 
+    // Error events are transient
+    case 'AGENT_ERROR':
+      throw new Error('AGENT_ERROR events are transient and should not be persisted');
+
     default: {
       const _exhaustive: never = type;
       throw new Error(`Unknown event type: ${String(_exhaustive)}`);
