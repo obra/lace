@@ -1,7 +1,7 @@
 // ABOUTME: API route for testing server-side Sentry error reporting
 // ABOUTME: Throws a test error when called to verify Sentry captures server errors
 
-import * as Sentry from '@sentry/nextjs';
+import * as Sentry from '@sentry/node';
 
 export async function action() {
   try {

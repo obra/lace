@@ -1,6 +1,6 @@
 // ABOUTME: Client-side Sentry configuration for error tracking in browser
 // ABOUTME: Captures client-side errors, performance data, and user interactions
-import * as Sentry from '@sentry/nextjs';
+import * as Sentry from '@sentry/react';
 import { SENTRY_CONFIG } from './lib/sentry-config';
 
 Sentry.init({
