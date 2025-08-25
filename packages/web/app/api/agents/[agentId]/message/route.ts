@@ -9,6 +9,7 @@ import { createErrorResponse, createSuccessResponse } from '@/lib/server/api-uti
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { logger } from '~/utils/logger';
+import { EventStreamManager } from '@/lib/event-stream-manager';
 
 // Request validation schema
 const messageSchema = z.object({
@@ -75,6 +76,33 @@ export async function POST(
         sessionId,
         messageId,
         error: error instanceof Error ? error.message : String(error),
+      });
+
+      // Emit API-level error event for initialization/validation failures
+      const eventStreamManager = EventStreamManager.getInstance();
+      eventStreamManager.broadcast({
+        type: 'AGENT_ERROR',
+        threadId: agentId,
+        timestamp: new Date(),
+        data: {
+          errorType: 'provider_failure' as const,
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          context: {
+            phase: 'initialization' as const,
+            // Get provider context from agent
+            providerInstanceId: agent.getInfo().providerInstanceId,
+            modelId: agent.getInfo().modelId,
+            providerName: agent.providerInstance?.providerName,
+          },
+          isRetryable: true, // Provider instance issues are usually retryable
+          retryCount: 0,
+        },
+        transient: true,
+        context: {
+          sessionId: sessionId,
+          agentId: agentId,
+        },
       });
     });
 

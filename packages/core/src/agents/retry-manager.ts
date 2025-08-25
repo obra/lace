@@ -1,7 +1,7 @@
 // ABOUTME: Backend retry coordination for failed operations
 // ABOUTME: Handles agent and tool retry logic with exponential backoff
 
-import type { Agent } from './agent';
+import type { Agent } from '~/agents/agent';
 import type { ToolExecutor } from '~/tools/executor';
 import type { ToolCall, ToolResult, ToolContext } from '~/tools/types';
 import type { ErrorType } from '~/threads/types';
@@ -25,7 +25,7 @@ export class RetryManager {
 
     // Calculate exponential backoff delay
     const delay = this.BASE_DELAY * Math.pow(2, currentAttempts);
-    await new Promise(resolve => setTimeout(resolve, delay));
+    await new Promise((resolve) => setTimeout(resolve, delay));
 
     this.retryAttempts.set(key, currentAttempts + 1);
 
@@ -42,17 +42,17 @@ export class RetryManager {
           // Retry the last conversation turn by processing queued messages
           await agent.processQueuedMessages();
           break;
-        
+
         case 'processing_error':
           // Restart conversation processing
           await agent.processQueuedMessages();
           break;
-          
+
         case 'streaming_error':
           // Retry with non-streaming mode - for now just retry normally
           await agent.processQueuedMessages();
           break;
-          
+
         case 'timeout':
           // Retry with same configuration - timeout handling is at provider level
           await agent.processQueuedMessages();
@@ -78,9 +78,9 @@ export class RetryManager {
         attempt: currentAttempts + 1,
         error: error instanceof Error ? error.message : String(error),
       });
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Retry failed' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Retry failed',
       };
     }
   }
@@ -98,7 +98,7 @@ export class RetryManager {
     }
 
     const delay = this.BASE_DELAY * Math.pow(2, currentAttempts);
-    await new Promise(resolve => setTimeout(resolve, delay));
+    await new Promise((resolve) => setTimeout(resolve, delay));
 
     this.retryAttempts.set(key, currentAttempts + 1);
 
@@ -112,7 +112,7 @@ export class RetryManager {
     try {
       // Execute the tool again with the same parameters
       const result = await toolExecutor.executeTool(toolCall, context);
-      
+
       if (result.status === 'failed') {
         return { success: false, error: 'Tool execution failed on retry' };
       }
@@ -133,7 +133,7 @@ export class RetryManager {
       });
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Tool retry failed'
+        error: error instanceof Error ? error.message : 'Tool retry failed',
       };
     }
   }
