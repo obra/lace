@@ -1,26 +1,23 @@
 // ABOUTME: Recovery API that uses core ThreadManager query methods
 // ABOUTME: Thin web layer over core approval system
 
-import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
 import { ThreadIdSchema } from '@/lib/validation/schemas';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
+import type { Route } from './+types/api.threads.$threadId.approvals.pending';
 
 // Validation schema
 const ParamsSchema = z.object({
   threadId: ThreadIdSchema,
 });
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ threadId: string }> }
-): Promise<NextResponse> {
+export async function loader({ request, params }: Route.LoaderArgs) {
   try {
     // Validate parameters
-    const paramsResult = ParamsSchema.safeParse(await params);
+    const paramsResult = ParamsSchema.safeParse(params);
     if (!paramsResult.success) {
       return createErrorResponse('Invalid parameters', 400, {
         code: 'VALIDATION_ERROR',

@@ -1,9 +1,9 @@
 // ABOUTME: Provider instance connection testing endpoint
 // ABOUTME: Tests connection to configured provider instance and returns status
 
-import { NextRequest } from 'next/server';
 import { ProviderRegistry } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
+import type { Route } from './+types/api.provider.instances.$instanceId.test';
 
 export interface TestConnectionResponse {
   success: boolean;
@@ -12,12 +12,18 @@ export interface TestConnectionResponse {
   testedAt: string;
 }
 
-export async function POST(
-  _request: NextRequest,
-  { params }: { params: Promise<{ instanceId: string }> }
-) {
+export async function action({ request, params }: Route.ActionArgs) {
+  if (request.method !== 'POST') {
+    return createSuperjsonResponse({
+      success: false,
+      status: 'error',
+      message: 'Method not allowed',
+      testedAt: new Date().toISOString(),
+    } as TestConnectionResponse);
+  }
+
   try {
-    const { instanceId } = await params;
+    const { instanceId } = params;
 
     const registry = ProviderRegistry.getInstance();
 

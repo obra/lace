@@ -1,17 +1,17 @@
 // ABOUTME: Provider catalog API endpoint
 // ABOUTME: Returns available providers from Catwalk catalog data with models and metadata
 
-import { NextRequest } from 'next/server';
 import { ProviderRegistry } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import type { CatalogProvider } from '@/lib/server/lace-imports';
+import type { Route } from './+types/api.provider.catalog';
 
 export interface CatalogResponse {
   providers: CatalogProvider[];
 }
 
-export async function GET(_request: NextRequest) {
+export async function loader({ request }: Route.LoaderArgs) {
   try {
     const registry = ProviderRegistry.getInstance();
 

@@ -1,13 +1,13 @@
 // ABOUTME: Session detail API endpoint for getting specific session information
 // ABOUTME: Returns session metadata and list of agents within the session
 
-import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
+import type { Route } from './+types/api.sessions.$sessionId';
 
 // Type guard for ThreadId using client-safe validation
 function isValidThreadId(sessionId: string): sessionId is ThreadId {
@@ -19,13 +19,17 @@ function isError(error: unknown): error is Error {
   return error instanceof Error;
 }
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
-): Promise<NextResponse> {
+// Schema for validating session update requests
+const UpdateSessionSchema = z.object({
+  name: z.string().min(1, 'Name cannot be empty').optional(),
+  description: z.string().optional(),
+  status: z.enum(['active', 'archived', 'completed']).optional(),
+});
+
+export async function loader({ request, params }: Route.LoaderArgs) {
   try {
     const sessionService = getSessionService();
-    const { sessionId: sessionIdParam } = await params;
+    const { sessionId: sessionIdParam } = params;
 
     if (!isValidThreadId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
@@ -57,20 +61,14 @@ export async function GET(
   }
 }
 
-// Schema for validating session update requests
-const UpdateSessionSchema = z.object({
-  name: z.string().min(1, 'Name cannot be empty').optional(),
-  description: z.string().optional(),
-  status: z.enum(['active', 'archived', 'completed']).optional(),
-});
+export async function action({ request, params }: Route.ActionArgs) {
+  if (request.method !== 'PATCH') {
+    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
-): Promise<NextResponse> {
   try {
     const sessionService = getSessionService();
-    const { sessionId: sessionIdParam } = await params;
+    const { sessionId: sessionIdParam } = params;
 
     if (!isValidThreadId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });

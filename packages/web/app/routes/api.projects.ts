@@ -1,11 +1,11 @@
 // ABOUTME: REST API endpoints for project management - GET all projects, POST new project
 // ABOUTME: Uses Project class for business logic and validation with proper error handling
 
-import { NextRequest } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
+import type { Route } from './+types/api.projects';
 
 const CreateProjectSchema = z.object({
   name: z.string().optional(), // Made optional for auto-generation
@@ -14,7 +14,7 @@ const CreateProjectSchema = z.object({
   configuration: z.record(z.unknown()).optional(),
 });
 
-export async function GET() {
+export async function loader({ request }: Route.LoaderArgs) {
   try {
     const projects = Project.getAll();
 
@@ -28,7 +28,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function action({ request }: Route.ActionArgs) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = CreateProjectSchema.parse(body);

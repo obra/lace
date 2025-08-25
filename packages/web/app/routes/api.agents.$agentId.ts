@@ -1,7 +1,6 @@
 // ABOUTME: REST API endpoints for individual agent management - GET, PUT for agent updates
 // ABOUTME: Handles agent configuration updates including provider and model changes
 
-import { NextRequest } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
@@ -9,6 +8,7 @@ import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 import { ProviderRegistry } from '@/lib/server/lace-imports';
+import type { Route } from './+types/api.agents.$agentId';
 
 const AgentUpdateSchema = z
   .object({
@@ -29,12 +29,9 @@ const AgentUpdateSchema = z
     }
   );
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ agentId: string }> }
-) {
+export async function loader({ request, params }: Route.LoaderArgs) {
   try {
-    const { agentId } = await params;
+    const { agentId } = params;
 
     if (!isValidThreadId(agentId)) {
       return createErrorResponse('Invalid agent ID', 400, { code: 'VALIDATION_FAILED' });
@@ -83,12 +80,13 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ agentId: string }> }
-) {
+export async function action({ request, params }: Route.ActionArgs) {
+  if (request.method !== 'PUT') {
+    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  }
+
   try {
-    const { agentId } = await params;
+    const { agentId } = params;
 
     if (!isValidThreadId(agentId)) {
       return createErrorResponse('Invalid agent ID', 400, { code: 'VALIDATION_FAILED' });

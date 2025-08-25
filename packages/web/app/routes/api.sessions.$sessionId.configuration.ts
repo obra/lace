@@ -1,13 +1,13 @@
 // ABOUTME: REST API endpoints for session configuration - GET, PUT for configuration management
 // ABOUTME: Handles session configuration retrieval and updates with validation and inheritance
 
-import { NextRequest } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
+import type { Route } from './+types/api.sessions.$sessionId.configuration';
 
 // Type guard for ThreadId using client-safe validation
 function isValidThreadId(sessionId: string): sessionId is ThreadId {
@@ -24,12 +24,9 @@ const ConfigurationSchema = z.object({
   environmentVariables: z.record(z.string()).optional(),
 });
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
-) {
+export async function loader({ request, params }: Route.LoaderArgs) {
   try {
-    const { sessionId: sessionIdParam } = await params;
+    const { sessionId: sessionIdParam } = params;
 
     if (!isValidThreadId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
@@ -55,12 +52,13 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
-) {
+export async function action({ request, params }: Route.ActionArgs) {
+  if (request.method !== 'PUT') {
+    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  }
+
   try {
-    const { sessionId: sessionIdParam } = await params;
+    const { sessionId: sessionIdParam } = params;
 
     if (!isValidThreadId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });

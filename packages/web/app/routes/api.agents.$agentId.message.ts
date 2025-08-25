@@ -1,7 +1,6 @@
 // ABOUTME: API endpoint for sending messages to a specific agent
 // ABOUTME: Cleaner agent-focused API instead of thread-based messaging
 
-import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
@@ -9,18 +8,20 @@ import { createErrorResponse, createSuccessResponse } from '@/lib/server/api-uti
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { logger } from '~/utils/logger';
+import type { Route } from './+types/api.agents.$agentId.message';
 
 // Request validation schema
 const messageSchema = z.object({
   message: z.string().min(1, 'Message cannot be empty'),
 });
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ agentId: string }> }
-): Promise<NextResponse> {
+export async function action({ request, params }: Route.ActionArgs) {
+  if (request.method !== 'POST') {
+    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  }
+
   try {
-    const { agentId: agentIdParam } = await params;
+    const { agentId: agentIdParam } = params;
 
     // Validate agent ID format
     if (!isValidThreadId(agentIdParam)) {

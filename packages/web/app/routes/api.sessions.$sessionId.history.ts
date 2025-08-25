@@ -1,20 +1,17 @@
 // ABOUTME: API endpoint for loading conversation history from database
 // ABOUTME: Returns all previous messages and events for a session to enable conversation restoration
 
-import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import type { LaceEvent } from '@/types/core';
 import { asThreadId, isConversationEvent } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
+import type { Route } from './+types/api.sessions.$sessionId.history';
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
-): Promise<NextResponse> {
+export async function loader({ request, params }: Route.LoaderArgs) {
   try {
-    const { sessionId: sessionIdParam } = await params;
+    const { sessionId: sessionIdParam } = params;
 
     // Validate session ID format using client-safe validation that accepts both lace and UUID formats
     if (!isValidThreadId(sessionIdParam)) {
