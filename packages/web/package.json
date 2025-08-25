@@ -7,8 +7,8 @@
     "node": ">=20.18"
   },
   "scripts": {
-    "dev": "TURBOPACK=1 tsx server-custom.ts",
-    "dev:debug": "TURBOPACK=1 LACE_LOG_LEVEL=debug LACE_LOG_STDERR=true tsx server-custom.ts",
+    "dev": "tsx server-custom.ts",
+    "dev:debug": "LACE_LOG_LEVEL=debug LACE_LOG_STDERR=true tsx server-custom.ts",
     "build": "next build --turbopack",
     "build:standalone": "BUILD_STANDALONE=true next build",
     "start": "NODE_ENV=production tsx server-custom.ts",
