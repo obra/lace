@@ -4,12 +4,12 @@
 import { ProjectPageClient } from './ProjectPageClient';
 
 interface ProjectPageProps {
-  params: Promise<{
+  params: {
     projectId: string;
-  }>;
+  };
 }
 
-export default async function ProjectPage({ params }: ProjectPageProps) {
-  const { projectId } = await params;
+export default function ProjectPage({ params }: ProjectPageProps) {
+  const { projectId } = params;
   return <ProjectPageClient projectId={projectId} />;
 }

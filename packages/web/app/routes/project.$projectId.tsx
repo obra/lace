@@ -7,6 +7,6 @@ import ProjectPage from '@/app/project/[projectId]/page';
 export default function Project() {
   const { projectId } = useParams();
 
-  // Pass projectId as prop to maintain compatibility
+  // Pass params as regular object
   return <ProjectPage params={{ projectId: projectId! }} />;
 }
