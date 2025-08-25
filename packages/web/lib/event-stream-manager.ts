@@ -4,10 +4,29 @@
 // StreamEvent removed - using LaceEvent directly
 import type { Task, TaskContext, ThreadId, LaceEvent, ErrorType, ErrorPhase } from '@/types/core';
 import { asThreadId } from '@/types/core';
-import type { Session } from '@/lib/server/lace-imports';
+import type { Session, Agent } from '@/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
 import { logger } from '~/utils/logger';
 import { stringify } from '@/lib/serialization';
+
+// Interface for AGENT_ERROR event data
+interface AgentErrorEventData {
+  errorType: ErrorType;
+  message: string;
+  stack?: string;
+  context: {
+    phase: ErrorPhase;
+    providerName?: string;
+    providerInstanceId?: string;
+    modelId?: string;
+    toolName?: string;
+    toolCallId?: string;
+    workingDirectory?: string;
+    retryAttempt?: number;
+  };
+  isRetryable: boolean;
+  retryCount: number;
+}
 
 // Type guard for errors with code property (Web Streams API errors)
 function hasErrorCode(error: unknown): error is Error & { code: string } {
@@ -197,7 +216,7 @@ export class EventStreamManager {
 
   // Extract agent error handler registration into reusable method
   private registerAgentErrorHandler(
-    agent: any, // Agent type
+    agent: Agent,
     agentThreadId: string, 
     projectId: string, 
     sessionId: string
@@ -241,12 +260,12 @@ export class EventStreamManager {
   }
 
   // Method to register error handlers for newly spawned agents (for manual spawning)
-  registerAgentErrorHandlers(session: any, agentThreadId: string): void {
-    const agent = session.getAgent(agentThreadId);
+  registerAgentErrorHandlers(session: Session, agentThreadId: string): void {
+    const agent = session.getAgent(asThreadId(agentThreadId));
     if (agent) {
       const projectId = session.getProjectId();
       const sessionId = session.getId();
-      this.registerAgentErrorHandler(agent, agentThreadId, projectId, sessionId);
+      this.registerAgentErrorHandler(agent, agentThreadId, projectId || '', sessionId || '');
     }
   }
 
@@ -343,11 +362,12 @@ export class EventStreamManager {
 
     // Optional: Add debug logging for error events
     if (fullEvent.type === 'AGENT_ERROR') {
+      const errorData = fullEvent.data as AgentErrorEventData;
       logger.debug('[EVENT_STREAM] Broadcasting agent error event', {
         threadId: fullEvent.threadId,
-        errorType: (fullEvent.data as any)?.errorType,
-        phase: (fullEvent.data as any)?.context?.phase,
-        isRetryable: (fullEvent.data as any)?.isRetryable,
+        errorType: errorData.errorType,
+        phase: errorData.context.phase,
+        isRetryable: errorData.isRetryable,
       });
     }
 
