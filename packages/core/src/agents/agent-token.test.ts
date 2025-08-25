@@ -79,6 +79,37 @@ class StreamingTokenProvider extends TestProvider {
   }
 }
 
+// Reusable mock tool for token testing with configurable schema
+class MockTool extends Tool {
+  name = 'test_tool';
+  description = 'Test tool for token tracking';
+  schema = z.object({
+    test: z.string().optional(),
+  });
+
+  constructor(name = 'test_tool', schema = z.object({ test: z.string().optional() })) {
+    super();
+    this.name = name;
+    this.schema = schema;
+  }
+
+  protected executeValidated(
+    _args: z.infer<typeof this.schema>,
+    context?: ToolContext
+  ): Promise<ToolResult> {
+    if (context?.signal?.aborted) {
+      return Promise.resolve({
+        content: [{ type: 'text', text: 'Tool execution aborted' }],
+        status: 'aborted' as const,
+      });
+    }
+    return Promise.resolve({
+      content: [{ type: 'text', text: 'Tool executed successfully' }],
+      status: 'completed' as const,
+    });
+  }
+}
+
 describe('Agent Token Management', () => {
   setupCoreTest();
   let agent: Agent;
@@ -178,31 +209,6 @@ describe('Agent Token Management', () => {
           stopReason: 'stop',
         };
 
-        // Mock tool that returns a result
-        class MockTool extends Tool {
-          name = 'test_tool';
-          description = 'Test tool for token tracking';
-          schema = z.object({
-            test: z.string().optional(),
-          });
-
-          protected executeValidated(
-            _args: z.infer<typeof this.schema>,
-            context?: ToolContext
-          ): Promise<ToolResult> {
-            if (context?.signal?.aborted) {
-              return Promise.resolve({
-                content: [{ type: 'text', text: 'Tool execution aborted' }],
-                status: 'aborted' as const,
-              });
-            }
-            return Promise.resolve({
-              content: [{ type: 'text', text: 'Tool executed successfully' }],
-              status: 'completed' as const,
-            });
-          }
-        }
-
         const mockTool = new MockTool();
 
         // Register the tool with the executor so it can be executed
@@ -245,8 +251,12 @@ describe('Agent Token Management', () => {
         // Act
         await multiCallAgent.sendMessage('Use a tool to help me');
 
-        // Add delay to allow turn completion to process
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Wait for turn completion event
+        if (completeEvents.length === 0) {
+          await new Promise<void>((resolve) => {
+            multiCallAgent.once('turn_complete', () => resolve());
+          });
+        }
 
         // Assert
         expect(completeEvents).toHaveLength(1);
@@ -337,29 +347,7 @@ describe('Agent Token Management', () => {
           stopReason: 'stop',
         };
 
-        class MockTool2 extends Tool {
-          name = 'test_tool';
-          description = 'Test tool';
-          schema = z.object({});
-
-          protected executeValidated(
-            _args: z.infer<typeof this.schema>,
-            context?: ToolContext
-          ): Promise<ToolResult> {
-            if (context?.signal?.aborted) {
-              return Promise.resolve({
-                content: [{ type: 'text', text: 'Tool execution aborted' }],
-                status: 'aborted' as const,
-              });
-            }
-            return Promise.resolve({
-              content: [{ type: 'text', text: 'Tool result' }],
-              status: 'completed' as const,
-            });
-          }
-        }
-
-        const mockTool = new MockTool2();
+        const mockTool = new MockTool('test_tool', z.object({}));
 
         // Register the tool with the executor so it can be executed
         toolExecutor.registerTool('test_tool', mockTool);
