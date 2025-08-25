@@ -52,8 +52,8 @@ After 3 failed attempts:
 When solving tricky issues:
 
 - Add comment explaining the fix
-- Update documentation if relevant
-- Add tests to prevent regression unless you have a strong reason not to
+- Update documentation if relevant.
+- Add regression tests by default; omit only with an explicit, documented reason.
 - Share the learning with your partner
 
 ## Common Pitfalls
