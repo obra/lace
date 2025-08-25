@@ -26,24 +26,7 @@ import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useURLState } from '@/hooks/useURLState';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import { asThreadId } from '@/types/core';
-
-const AVAILABLE_TOOLS = [
-  'bash',
-  'file_read',
-  'file_write',
-  'file_edit',
-  'file_list',
-  'file_find',
-  'url_fetch',
-  'ripgrep_search',
-  'delegate',
-  'task_add',
-  'task_list',
-  'task_complete',
-  'task_update',
-  'task_add_note',
-  'task_view',
-];
+import { AVAILABLE_TOOLS } from '@/lib/available-tools';
 
 const DEFAULT_CONFIG: SessionConfiguration = {
   // Note: providerInstanceId and modelId should be set by user selection, not defaults
