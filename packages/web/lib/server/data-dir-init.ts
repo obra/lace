@@ -1,7 +1,5 @@
 // ABOUTME: LACE_DIR initialization for web app startup
 // ABOUTME: Ensures LACE configuration directory exists before any database operations
-
-import 'server-only';
 import { ensureLaceDir } from '@/lib/server/lace-imports';
 
 // Initialize LACE_DIR at startup
