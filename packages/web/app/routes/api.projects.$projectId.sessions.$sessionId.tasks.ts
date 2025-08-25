@@ -1,7 +1,7 @@
 // ABOUTME: RESTful task management API - list and create tasks under project/session
 // ABOUTME: Provides proper nested route structure for task CRUD operations
 
-import { NextRequest } from 'next/server';
+import type { Route } from './+types/api.projects.$projectId.sessions.$sessionId.tasks';
 import { z } from 'zod';
 import { asThreadId } from '@/types/core';
 import { Project } from '@/lib/server/lace-imports';
@@ -23,16 +23,9 @@ const RouteParamsSchema = z.object({
   sessionId: SessionIdSchema,
 });
 
-interface RouteContext {
-  params: Promise<{
-    projectId: string;
-    sessionId: string;
-  }>;
-}
-
-export async function GET(request: NextRequest, context: RouteContext) {
+export async function loader({ request, params }: Route.LoaderArgs) {
   try {
-    const { projectId, sessionId } = await validateRouteParams(context.params, RouteParamsSchema);
+    const { projectId, sessionId } = await validateRouteParams(params, RouteParamsSchema);
 
     // Get project first to verify it exists
     const project = Project.getById(projectId);
@@ -81,9 +74,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 }
 
-export async function POST(request: NextRequest, context: RouteContext) {
+export async function action({ request, params }: Route.ActionArgs) {
   try {
-    const { projectId, sessionId } = await validateRouteParams(context.params, RouteParamsSchema);
+    const { projectId, sessionId } = await validateRouteParams(params, RouteParamsSchema);
 
     const body = (await request.json()) as Record<string, unknown>;
     let validatedBody;
