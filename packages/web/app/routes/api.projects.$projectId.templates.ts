@@ -1,10 +1,8 @@
 // ABOUTME: REST API endpoints for project prompt templates - GET all templates, POST new template
 // ABOUTME: Uses Project class prompt template manager for business logic and validation
 
-import { NextRequest, NextResponse } from 'next/server';
+import type { Route } from './+types/api.projects.$projectId.templates';
 import { Project } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 
 const CreateTemplateSchema = z.object({
@@ -21,35 +19,35 @@ function isError(error: unknown): error is Error {
   return error instanceof Error;
 }
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ projectId: string }> }
-): Promise<NextResponse> {
+export async function loader({ params }: Route.LoaderArgs): Promise<Response> {
   try {
-    const { projectId } = await params;
+    const { projectId } = params;
     const project = Project.getById(projectId);
     if (!project) {
-      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      return Response.json(
+        { error: 'Project not found', code: 'RESOURCE_NOT_FOUND' },
+        { status: 404 }
+      );
     }
 
     const templates = project.getAllPromptTemplates();
 
-    return createSuperjsonResponse({ templates });
+    return Response.json({ templates });
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : 'Failed to fetch templates';
-    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
+    return Response.json({ error: errorMessage, code: 'INTERNAL_SERVER_ERROR' }, { status: 500 });
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ projectId: string }> }
-): Promise<NextResponse> {
+export async function action({ request, params }: Route.ActionArgs): Promise<Response> {
   try {
-    const { projectId } = await params;
+    const { projectId } = params;
     const project = Project.getById(projectId);
     if (!project) {
-      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      return Response.json(
+        { error: 'Project not found', code: 'RESOURCE_NOT_FOUND' },
+        { status: 404 }
+      );
     }
 
     const body: unknown = await request.json();
@@ -65,16 +63,20 @@ export async function POST(
       isDefault: validatedData.isDefault,
     });
 
-    return createSuperjsonResponse({ template: template.toJSON() }, { status: 201 });
+    return Response.json({ template: template.toJSON() }, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid request data', 400, {
-        code: 'VALIDATION_FAILED',
-        details: error.errors,
-      });
+      return Response.json(
+        {
+          error: 'Invalid request data',
+          code: 'VALIDATION_FAILED',
+          details: error.errors,
+        },
+        { status: 400 }
+      );
     }
 
     const errorMessage = isError(error) ? error.message : 'Failed to create template';
-    return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
+    return Response.json({ error: errorMessage, code: 'INTERNAL_SERVER_ERROR' }, { status: 500 });
   }
 }
