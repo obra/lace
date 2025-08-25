@@ -755,7 +755,17 @@ export class Agent extends EventEmitter {
 
         this.emit('error', {
           error: error instanceof Error ? error : new Error(String(error)),
-          context: { phase: 'provider_response', threadId: this._threadId },
+          context: {
+            phase: 'provider_response',
+            threadId: this._threadId,
+            // Enhanced context for error propagation
+            errorType: 'provider_failure',
+            providerName: this.providerInstance?.providerName,
+            providerInstanceId: this.getInfo().providerInstanceId,
+            modelId: this.getInfo().modelId,
+            isRetryable: this.isRetryableError(error),
+            retryCount: 0,
+          },
         });
 
         // Complete turn tracking even when provider error occurs
@@ -837,7 +847,16 @@ export class Agent extends EventEmitter {
 
       this.emit('error', {
         error: error instanceof Error ? error : new Error(String(error)),
-        context: { phase: 'conversation_processing', threadId: this._threadId },
+        context: {
+          phase: 'conversation_processing',
+          threadId: this._threadId,
+          errorType: 'processing_error',
+          providerName: this.providerInstance?.providerName,
+          providerInstanceId: this.getInfo().providerInstanceId,
+          modelId: this.getInfo().modelId,
+          isRetryable: false,
+          retryCount: 0,
+        },
       });
 
       // Complete turn tracking even when error occurs
@@ -1345,6 +1364,23 @@ export class Agent extends EventEmitter {
         toolCallId: toolCall.id,
         toolName: toolCall.name,
         error: error instanceof Error ? error.message : String(error),
+      });
+
+      // Emit error event for tool failures
+      this.emit('error', {
+        error: error instanceof Error ? error : new Error(`Tool execution failed: ${error instanceof Error ? error.message : String(error)}`),
+        context: {
+          phase: 'tool_execution',
+          threadId: this._threadId,
+          errorType: 'tool_execution',
+          toolName: toolCall.name,
+          toolCallId: toolCall.id,
+          providerName: this.providerInstance?.providerName,
+          providerInstanceId: this.getInfo().providerInstanceId,
+          modelId: this.getInfo().modelId,
+          isRetryable: false,
+          retryCount: 0,
+        },
       });
 
       // Only handle error if thread still exists
@@ -2851,6 +2887,26 @@ export class Agent extends EventEmitter {
       }
     }
 
+    return false;
+  }
+
+  private isRetryableError(error: unknown): boolean {
+    if (error instanceof Error) {
+      const message = error.message.toLowerCase();
+      
+      // Network errors are typically retryable
+      if (message.includes('network') || message.includes('timeout')) {
+        return true;
+      }
+      // Rate limit errors are retryable  
+      if (message.includes('rate limit') || message.includes('quota')) {
+        return true;
+      }
+      // 5xx HTTP errors are retryable
+      if (message.includes('500') || message.includes('502') || message.includes('503')) {
+        return true;
+      }
+    }
     return false;
   }
 }
