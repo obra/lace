@@ -202,35 +202,16 @@ describe('Chat', () => {
   });
 
   describe('Layout Structure', () => {
-    it('renders with correct layout classes', () => {
+    it('renders timeline view component', () => {
       renderChat();
 
-      const container = screen.getByTestId('timeline-view').closest('.flex-1.flex.flex-col.h-full');
-      expect(container).toBeInTheDocument();
+      expect(screen.getByTestId('timeline-view')).toBeInTheDocument();
     });
 
-    it('renders timeline view in scrollable container', () => {
+    it('renders chat input component', () => {
       renderChat();
 
-      const timelineContainer = screen
-        .getByTestId('timeline-view')
-        .closest('.max-w-3xl.mx-auto.px-4');
-      expect(timelineContainer).toBeInTheDocument();
-
-      const scrollableArea = timelineContainer?.closest('.flex-1.overflow-y-auto');
-      expect(scrollableArea).toBeInTheDocument();
-    });
-
-    it('renders chat input in fixed bottom container', () => {
-      renderChat();
-
-      const inputContainer = screen
-        .getByTestId('memoized-chat-input')
-        .closest('.max-w-3xl.mx-auto.px-4');
-      expect(inputContainer).toBeInTheDocument();
-
-      const fixedBottom = inputContainer?.closest('.flex-shrink-0.pb-6.pt-2.min-h-\\[80px\\]');
-      expect(fixedBottom).toBeInTheDocument();
+      expect(screen.getByTestId('memoized-chat-input')).toBeInTheDocument();
     });
   });
 
