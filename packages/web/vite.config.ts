@@ -8,14 +8,29 @@ import path from 'path';
 export default defineConfig({
   plugins: [
     reactRouter({
-      ssr: false, // SPA mode only - no server-side rendering
+      ssr: false,
+      prerender: false,
+      buildDirectory: 'build',
     }),
   ],
+  build: {
+    rollupOptions: {
+      input: {
+        main: '/app/entry.client.tsx',
+      },
+    },
+  },
+  ssr: {
+    noExternal: ['react-router'],
+  },
   resolve: {
     alias: {
       '~': path.resolve(__dirname, '../core/src'),
       '@': path.resolve(__dirname, '.'),
     },
+  },
+  css: {
+    postcss: './postcss.config.js',
   },
   // No proxy needed - API routes handled by React Router v7
 });
