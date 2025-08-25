@@ -1,11 +1,11 @@
 // ABOUTME: REST API endpoints for project configuration - GET, PUT for configuration management
 // ABOUTME: Handles project configuration retrieval and updates with validation and error handling
 
-import { NextRequest } from 'next/server';
 import { Project, ProviderRegistry } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
+import type { Route } from './+types/api.projects.$projectId.configuration';
 
 const ConfigurationSchema = z.object({
   providerInstanceId: z.string().min(1).optional(),
@@ -17,13 +17,9 @@ const ConfigurationSchema = z.object({
   environmentVariables: z.record(z.string()).optional(),
 });
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ projectId: string }> }
-) {
+export async function loader({ request, params }: Route.LoaderArgs) {
   try {
-    const resolvedParams = await params;
-    const project = Project.getById(resolvedParams.projectId);
+    const project = Project.getById(params.projectId);
 
     if (!project) {
       return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
@@ -41,16 +37,16 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ projectId: string }> }
-) {
+export async function action({ request, params }: Route.ActionArgs) {
+  if (request.method !== 'PUT') {
+    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  }
+
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = ConfigurationSchema.parse(body);
 
-    const resolvedParams = await params;
-    const project = Project.getById(resolvedParams.projectId);
+    const project = Project.getById(params.projectId);
 
     if (!project) {
       return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
