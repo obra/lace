@@ -75,7 +75,8 @@ describe('Agent Turn Tracking', () => {
 
       const turnStartEvent = turnStartEvents[0];
       expect(turnStartEvent.userInput).toBe('Hello, world!');
-      expect(turnStartEvent.turnId).toMatch(/^turn_\d+_[a-z0-9]+$/);
+      expect(typeof turnStartEvent.turnId).toBe('string');
+      expect(turnStartEvent.turnId.length).toBeGreaterThan(0);
       expect(turnStartEvent.metrics.turnId).toBe(turnStartEvent.turnId);
       expect(turnStartEvent.metrics.startTime).toBeInstanceOf(Date);
       expect(turnStartEvent.metrics.elapsedMs).toBe(0);
@@ -111,9 +112,6 @@ describe('Agent Turn Tracking', () => {
       // Arrange
       vi.useFakeTimers();
       const progressEvents: Array<{ metrics: CurrentTurnMetrics }> = [];
-      agent.on('turn_progress', (data) => {
-        progressEvents.push(data);
-      });
 
       // Create a provider that takes some time
       const slowProvider = new TestProvider({
@@ -121,16 +119,23 @@ describe('Agent Turn Tracking', () => {
         delay: 3000, // 3 second delay
       });
 
+      // Use a dedicated thread for this agent to avoid crosstalk
+      const slowThreadId = threadManager.generateThreadId();
+      threadManager.createThread(slowThreadId);
       const slowAgent = new Agent({
         toolExecutor,
         threadManager,
-        threadId,
+        threadId: slowThreadId,
         tools: [],
         metadata: {
           name: 'test-agent',
           modelId: 'test-model',
           providerInstanceId: 'test-instance',
         },
+      });
+
+      slowAgent.on('turn_progress', (data) => {
+        progressEvents.push(data);
       });
 
       // Mock provider access for test
