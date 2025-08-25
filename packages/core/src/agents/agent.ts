@@ -175,6 +175,7 @@ export class Agent extends EventEmitter {
     threshold: 0.8, // Compact at 80% of limit
   };
 
+
   constructor(config: AgentConfig) {
     super();
     this._provider = null; // Will be created in initialize()

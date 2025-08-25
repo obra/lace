@@ -298,62 +298,79 @@ Creating a global SystemErrorCapture would bypass the ownership hierarchy and lo
 
 ### Phase 3: Error Broadcasting
 
-#### Task 3.1: Update SessionService Error Forwarding
-**Files**: `packages/web/lib/server/session-service.ts`
+#### Task 3.1: Update EventStreamManager to Handle Agent Errors  
+**Files**: `packages/web/lib/event-stream-manager.ts`
 
-Add error event handlers to setupAgentEventHandlers to listen to the existing `error` events:
+**Key Insight**: The implementer correctly enhanced Agent error emission but created an unnecessary `ErrorEventBridge` class. We should use the existing `EventStreamManager.registerSession()` pattern instead.
 
-**Location**: After line 100 (existing agent event handlers)
+**FIRST: Delete the unnecessary bridge**
+- Delete file: `packages/core/src/agents/error-event-bridge.ts`  
+- Remove unused import and field from `packages/core/src/agents/agent.ts`:
+  - Remove `import { ErrorEventBridge } from './error-event-bridge';`
+  - Remove `private readonly _errorEventBridge: ErrorEventBridge;`
+
+**SECOND: Add agent error handling to existing EventStreamManager**
+
+**Location**: In `EventStreamManager.registerSession()` method, after existing task event handlers (around line 176)
 ```typescript
-// Handle agent errors (existing 'error' events from agent)
-agent.on('error', (errorEvent: { error: Error; context: Record<string, unknown> }) => {
-  const { error, context } = errorEvent;
-  
-  // Extract enhanced context from Agent error emission (Task 2.1)
-  const errorData = {
-    errorType: context.errorType as string,
-    message: error.message,
-    stack: error.stack,
-    context: {
-      phase: context.phase as string,
-      providerName: context.providerName as string | undefined,
-      providerInstanceId: context.providerInstanceId as string | undefined,
-      modelId: context.modelId as string | undefined,
-      toolName: context.toolName as string | undefined,
-      toolCallId: context.toolCallId as string | undefined,
-    },
-    isRetryable: context.isRetryable as boolean,
-    retryCount: context.retryCount as number,
-  };
-
-  logger.debug(
-    `[SESSION_SERVICE] Agent ${threadId} error occurred, broadcasting AGENT_ERROR`
-  );
-  
-  sseManager.broadcast({
-    type: 'AGENT_ERROR',
-    threadId,
-    timestamp: new Date(),
-    data: errorData,
-    transient: true,
-    context: {
-      sessionId,
-      projectId,
-      taskId: undefined,
-      agentId: threadId,
-    },
-  });
-});
+// Handle agent errors (same pattern as task events)
+const agents = session.getAgents();
+for (const agentInfo of agents) {
+  const agent = session.getAgent(agentInfo.threadId);
+  if (agent) {
+    agent.on('error', (errorEvent: { error: Error; context: Record<string, unknown> }) => {
+      const { error, context } = errorEvent;
+      
+      logger.debug(
+        `[EVENT_STREAM] Agent ${agentInfo.threadId} error occurred, broadcasting AGENT_ERROR`
+      );
+      
+      this.broadcast({
+        type: 'AGENT_ERROR',
+        threadId: agentInfo.threadId,
+        timestamp: new Date(),
+        data: {
+          errorType: context.errorType as string,
+          message: error.message,
+          stack: error.stack,
+          context: {
+            phase: context.phase as string,
+            providerName: context.providerName as string | undefined,
+            providerInstanceId: context.providerInstanceId as string | undefined,
+            modelId: context.modelId as string | undefined,
+            toolName: context.toolName as string | undefined,
+            toolCallId: context.toolCallId as string | undefined,
+            workingDirectory: context.workingDirectory as string | undefined,
+            retryAttempt: context.retryAttempt as number | undefined,
+          },
+          isRetryable: context.isRetryable as boolean,
+          retryCount: context.retryCount as number,
+        },
+        transient: true,
+        context: { 
+          projectId, 
+          sessionId, 
+          agentId: agentInfo.threadId 
+        },
+      });
+    });
+  }
+}
 ```
 
+**Why This Approach**:
+- Follows existing pattern used for task events and agent spawning
+- Uses existing `registerSession()` method that SessionService already calls
+- No new bridge classes - leverages existing EventStreamManager bridge
+- Consistent with how all other system events work
 
 **Testing**:
-- File: `packages/web/lib/server/session-service-error-events.test.ts` (NEW)
-- Test agent error event forwarding from existing `error` events
-- Test error event broadcasting to SSE stream
+- File: `packages/web/lib/event-stream-manager-agent-errors.test.ts` (NEW)
+- Test agent error event forwarding through EventStreamManager
+- Test error event broadcasting to SSE stream  
 - Test error context extraction and structure
 - Use real session instances with real agents
-- Verify error events reach EventStreamManager with correct data structure
+- Verify error events reach frontend with correct data structure
 
 #### Task 3.2: ~~Ensure EventStreamManager Handles Error Events~~ (MINIMAL CHANGES)
 
