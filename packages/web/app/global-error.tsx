@@ -2,7 +2,7 @@
 // ABOUTME: Catches unhandled React errors and reports them to Sentry before showing fallback UI
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
+import * as Sentry from '@sentry/react';
 import { useEffect } from 'react';
 
 export default function GlobalError({

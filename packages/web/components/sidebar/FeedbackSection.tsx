@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComments } from '@/lib/fontawesome';
-import * as Sentry from '@sentry/nextjs';
+import * as Sentry from '@sentry/react';
 
 interface FeedbackSectionProps {
   isMobile?: boolean;
