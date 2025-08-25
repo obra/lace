@@ -166,6 +166,9 @@ export function EventStreamProvider({
 
   // Debug: Log when component renders with the handler
   console.log(`[EventStreamProvider:${instanceId}] Component render - handleAgentError exists:`, !!handleAgentError);
+  
+  // Force useMemo to re-run by adding a timestamp (temporary debug)
+  const forceUpdate = Date.now();
 
   // Agent message handler to clear streaming content when complete
   const stableAddAgentEventWithStreaming = useCallback(
@@ -239,6 +242,7 @@ export function EventStreamProvider({
       handleCompactionStart,
       handleCompactionComplete,
       handleAgentError,
+      forceUpdate, // Force useMemo to re-run (temporary debug)
     ]
   );
 
