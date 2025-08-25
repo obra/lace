@@ -11,11 +11,15 @@ export default [
   route('font-test', 'routes/font-test.tsx'),
   route('speech-demo', 'routes/speech-demo.tsx'),
   route('sentry-test', 'routes/sentry-test.tsx'),
-  route('project/:projectId', 'routes/project.$projectId.tsx', [
-    route('session/:sessionId', 'routes/project.$projectId.session.$sessionId.tsx', [
-      route('agent/:agentId', 'routes/project.$projectId.session.$sessionId.agent.$agentId.tsx'),
-    ]),
-  ]),
+  route('project/:projectId', 'routes/project.$projectId.tsx'),
+  route(
+    'project/:projectId/session/:sessionId',
+    'routes/project.$projectId.session.$sessionId.tsx'
+  ),
+  route(
+    'project/:projectId/session/:sessionId/agent/:agentId',
+    'routes/project.$projectId.session.$sessionId.agent.$agentId.tsx'
+  ),
 
   // API routes
   route('api/health', 'routes/api.health.ts'),
