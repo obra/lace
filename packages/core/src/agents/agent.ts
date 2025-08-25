@@ -888,7 +888,7 @@ export class Agent extends EventEmitter {
             retryCount: 0,
           },
         });
-      } catch (infoError) {
+      } catch (_infoError) {
         // If getInfo() fails, emit basic error
         this.emit('error', {
           error: error instanceof Error ? error : new Error(String(error)),
@@ -1445,7 +1445,7 @@ export class Agent extends EventEmitter {
             retryCount: 0,
           },
         });
-      } catch (infoError) {
+      } catch (_infoError) {
         // If getInfo() fails, emit basic error
         this.emit('error', {
           error:

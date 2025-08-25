@@ -3,6 +3,7 @@
 
 // StreamEvent removed - using LaceEvent directly
 import type { Task, TaskContext, ThreadId, LaceEvent, ErrorType, ErrorPhase } from '@/types/core';
+import { asThreadId } from '@/types/core';
 import type { Session } from '@/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
 import { logger } from '~/utils/logger';
@@ -178,9 +179,9 @@ export class EventStreamManager {
     // Handle agent spawning events to register error handlers for new agents
     taskManager.on('agent:spawned', (event: unknown) => {
       const e = event as { agentThreadId: string };
-      const newAgent = session.getAgent(e.agentThreadId);
+      const newAgent = session.getAgent(asThreadId(e.agentThreadId));
       if (newAgent) {
-        this.registerAgentErrorHandler(newAgent, e.agentThreadId, projectId, sessionId);
+        this.registerAgentErrorHandler(newAgent, e.agentThreadId, projectId || '', sessionId || '');
       }
     });
 
@@ -189,7 +190,7 @@ export class EventStreamManager {
     for (const agentInfo of agents) {
       const agent = session.getAgent(agentInfo.threadId);
       if (agent) {
-        this.registerAgentErrorHandler(agent, agentInfo.threadId, projectId, sessionId);
+        this.registerAgentErrorHandler(agent, agentInfo.threadId, projectId || '', sessionId || '');
       }
     }
   }
