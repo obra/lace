@@ -51,7 +51,6 @@ const AVAILABLE_TOOLS = [
   'file_find',
   'url_fetch',
   'ripgrep_search',
-  'file_insert',
   'delegate',
   'task_add',
   'task_list',

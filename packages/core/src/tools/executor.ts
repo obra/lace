@@ -17,7 +17,6 @@ import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file-read';
 import { FileWriteTool } from '~/tools/implementations/file-write';
 import { FileEditTool } from '~/tools/implementations/file-edit';
-import { FileInsertTool } from '~/tools/implementations/file-insert';
 import { FileListTool } from '~/tools/implementations/file-list';
 import { RipgrepSearchTool } from '~/tools/implementations/ripgrep-search';
 import { FileFindTool } from '~/tools/implementations/file-find';
@@ -84,7 +83,6 @@ export class ToolExecutor {
       new FileReadTool(), // Schema-based file read tool
       new FileWriteTool(),
       new FileEditTool(),
-      new FileInsertTool(),
       new FileListTool(),
       new RipgrepSearchTool(),
       new FileFindTool(),

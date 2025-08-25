@@ -21,9 +21,8 @@
 
 ### Modifying Code
 
-- **file_edit**: Replace text in files (must match exactly)
+- **file_edit**: Replace text in files (must match exactly). Supports insertions via empty old_text
 - **file_write**: Create new files or overwrite existing
-- **file_insert**: Add content at specific line numbers
 
 ### System Operations
 
