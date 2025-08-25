@@ -2,7 +2,7 @@
 // ABOUTME: Manages global event distribution with client-side filtering
 
 // StreamEvent removed - using LaceEvent directly
-import type { Task, TaskContext, ThreadId, LaceEvent } from '@/types/core';
+import type { Task, TaskContext, ThreadId, LaceEvent, ErrorType, ErrorPhase } from '@/types/core';
 import type { Session } from '@/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
 import { logger } from '~/utils/logger';
@@ -175,48 +175,77 @@ export class EventStreamManager {
       });
     });
 
-    // Handle agent errors (same pattern as task events)
+    // Handle agent spawning events to register error handlers for new agents
+    taskManager.on('agent:spawned', (event: unknown) => {
+      const e = event as { agentThreadId: string };
+      const newAgent = session.getAgent(e.agentThreadId);
+      if (newAgent) {
+        this.registerAgentErrorHandler(newAgent, e.agentThreadId, projectId, sessionId);
+      }
+    });
+
+    // Handle agent errors for existing agents
     const agents = session.getAgents();
     for (const agentInfo of agents) {
       const agent = session.getAgent(agentInfo.threadId);
       if (agent) {
-        agent.on('error', (errorEvent: { error: Error; context: Record<string, unknown> }) => {
-          const { error, context } = errorEvent;
-          
-          logger.debug(
-            `[EVENT_STREAM] Agent ${agentInfo.threadId} error occurred, broadcasting AGENT_ERROR`
-          );
-          
-          this.broadcast({
-            type: 'AGENT_ERROR',
-            threadId: agentInfo.threadId,
-            timestamp: new Date(),
-            data: {
-              errorType: context.errorType as string,
-              message: error.message,
-              stack: error.stack,
-              context: {
-                phase: context.phase as string,
-                providerName: context.providerName as string | undefined,
-                providerInstanceId: context.providerInstanceId as string | undefined,
-                modelId: context.modelId as string | undefined,
-                toolName: context.toolName as string | undefined,
-                toolCallId: context.toolCallId as string | undefined,
-                workingDirectory: context.workingDirectory as string | undefined,
-                retryAttempt: context.retryAttempt as number | undefined,
-              },
-              isRetryable: context.isRetryable as boolean,
-              retryCount: context.retryCount as number,
-            },
-            transient: true,
-            context: { 
-              projectId, 
-              sessionId, 
-              agentId: agentInfo.threadId 
-            },
-          });
-        });
+        this.registerAgentErrorHandler(agent, agentInfo.threadId, projectId, sessionId);
       }
+    }
+  }
+
+  // Extract agent error handler registration into reusable method
+  private registerAgentErrorHandler(
+    agent: any, // Agent type
+    agentThreadId: string, 
+    projectId: string, 
+    sessionId: string
+  ): void {
+    agent.on('error', (errorEvent: { error: Error; context: Record<string, unknown> }) => {
+      const { error, context } = errorEvent;
+      
+      logger.debug(
+        `[EVENT_STREAM] Agent ${agentThreadId} error occurred, broadcasting AGENT_ERROR`
+      );
+      
+      this.broadcast({
+        type: 'AGENT_ERROR',
+        threadId: agentThreadId,
+        timestamp: new Date(),
+        data: {
+          errorType: context.errorType as ErrorType,
+          message: error.message,
+          stack: error.stack,
+          context: {
+            phase: context.phase as ErrorPhase,
+            providerName: context.providerName as string | undefined,
+            providerInstanceId: context.providerInstanceId as string | undefined,
+            modelId: context.modelId as string | undefined,
+            toolName: context.toolName as string | undefined,
+            toolCallId: context.toolCallId as string | undefined,
+            workingDirectory: context.workingDirectory as string | undefined,
+            retryAttempt: context.retryAttempt as number | undefined,
+          },
+          isRetryable: context.isRetryable as boolean,
+          retryCount: context.retryCount as number,
+        },
+        transient: true,
+        context: { 
+          projectId, 
+          sessionId, 
+          agentId: agentThreadId 
+        },
+      });
+    });
+  }
+
+  // Method to register error handlers for newly spawned agents (for manual spawning)
+  registerAgentErrorHandlers(session: any, agentThreadId: string): void {
+    const agent = session.getAgent(agentThreadId);
+    if (agent) {
+      const projectId = session.getProjectId();
+      const sessionId = session.getId();
+      this.registerAgentErrorHandler(agent, agentThreadId, projectId, sessionId);
     }
   }
 

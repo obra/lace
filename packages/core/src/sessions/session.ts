@@ -747,6 +747,20 @@ export class Session {
     }
 
     this._agents.set(agent.threadId, agent);
+
+    // Emit agent:spawned event for EventStreamManager integration
+    this._taskManager.emit('agent:spawned', {
+      type: 'agent:spawned',
+      agentThreadId: targetThreadId,
+      providerInstanceId: targetProviderInstanceId,
+      modelId: targetModelId,
+      timestamp: new Date(),
+      context: {
+        sessionId: this._sessionId,
+        spawnMethod: 'manual', // vs 'task-based'
+      },
+    });
+
     return agent;
   }
 

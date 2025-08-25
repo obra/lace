@@ -277,8 +277,17 @@ interface SystemNotificationData {
 }
 
 // Error type definitions - centralized for reuse
-export type ErrorType = 'provider_failure' | 'tool_execution' | 'processing_error' | 'timeout' | 'streaming_error';
-export type ErrorPhase = 'provider_response' | 'tool_execution' | 'conversation_processing' | 'initialization';
+export type ErrorType =
+  | 'provider_failure'
+  | 'tool_execution'
+  | 'processing_error'
+  | 'timeout'
+  | 'streaming_error';
+export type ErrorPhase =
+  | 'provider_response'
+  | 'tool_execution'
+  | 'conversation_processing'
+  | 'initialization';
 
 // Agent error data
 interface AgentErrorData {
@@ -288,12 +297,12 @@ interface AgentErrorData {
   context: {
     phase: ErrorPhase;
     // Available from Agent
-    providerName?: string;        // From this.providerInstance?.providerName
-    providerInstanceId?: string;  // From thread metadata  
-    modelId?: string;            // From thread metadata
+    providerName?: string; // From this.providerInstance?.providerName
+    providerInstanceId?: string; // From thread metadata
+    modelId?: string; // From thread metadata
     // For tool-related errors
-    toolName?: string;           // When phase === 'tool_execution'
-    toolCallId?: string;         // When phase === 'tool_execution'
+    toolName?: string; // When phase === 'tool_execution'
+    toolCallId?: string; // When phase === 'tool_execution'
     // Additional context
     workingDirectory?: string;
     retryAttempt?: number;

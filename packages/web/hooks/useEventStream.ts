@@ -100,6 +100,9 @@ interface EventHandlers {
   onGlobalEvent?: (event: GlobalEvent) => void;
   onSystemNotification?: (event: GlobalEvent) => void;
 
+  // Error event handlers
+  onAgentError?: (event: LaceEvent) => void;
+
   // Connection events (deprecated but kept for compatibility)
   onConnect?: () => void;
   onDisconnect?: () => void;
@@ -250,6 +253,11 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
             break;
           case 'COMPACTION_COMPLETE':
             currentOptions.onCompactionComplete?.(event);
+            break;
+          // Add error event handling
+          case 'AGENT_ERROR':
+            currentOptions.onAgentError?.(event);
+            currentOptions.onError?.(new Error((event.data as any)?.message || 'Unknown agent error'));
             break;
           // Add other event type cases as needed
         }
