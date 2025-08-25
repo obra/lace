@@ -461,7 +461,7 @@ describe('Agent Token Management', () => {
             promptTokens: 100,
             completionTokens: 50,
             totalTokens: 150,
-          }) as Record<string, unknown>,
+          }),
         })
       );
 
@@ -562,9 +562,9 @@ describe('Agent Token Management', () => {
             totalPromptTokens: 0,
             totalCompletionTokens: 0,
             totalTokens: 0,
-            contextLimit: expect.any(Number) as number,
-            percentUsed: expect.any(Number) as number,
-            nearLimit: expect.any(Boolean) as boolean,
+            contextLimit: expect.any(Number),
+            percentUsed: expect.any(Number),
+            nearLimit: expect.any(Boolean),
           })
         );
 

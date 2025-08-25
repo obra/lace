@@ -4,7 +4,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, AgentConfig, CurrentTurnMetrics } from '~/agents/agent';
 import { TestProvider } from '~/test-utils/test-provider';
-import { ProviderResponse } from '~/providers/base-provider';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
