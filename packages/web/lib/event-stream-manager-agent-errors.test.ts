@@ -58,7 +58,7 @@ describe('EventStreamManager Agent Error Handling', () => {
     });
 
     // Register session to set up agent error handlers
-    eventStreamManager.registerSession(session, project.getId());
+    eventStreamManager.registerSession(session);
   });
 
   afterEach(async () => {

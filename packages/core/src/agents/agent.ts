@@ -175,7 +175,6 @@ export class Agent extends EventEmitter {
     threshold: 0.8, // Compact at 80% of limit
   };
 
-
   constructor(config: AgentConfig) {
     super();
     this._provider = null; // Will be created in initialize()
@@ -780,7 +779,7 @@ export class Agent extends EventEmitter {
               retryCount: 0,
             },
           });
-        } catch (infoError) {
+        } catch (_infoError) {
           // If getInfo() fails, emit basic error
           this.emit('error', {
             error: error instanceof Error ? error : new Error(String(error)),
@@ -1427,7 +1426,12 @@ export class Agent extends EventEmitter {
       try {
         const agentInfo = this.getInfo();
         this.emit('error', {
-          error: error instanceof Error ? error : new Error(`Tool execution failed: ${error instanceof Error ? error.message : String(error)}`),
+          error:
+            error instanceof Error
+              ? error
+              : new Error(
+                  `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`
+                ),
           context: {
             phase: 'tool_execution',
             threadId: this._threadId,
@@ -1444,7 +1448,12 @@ export class Agent extends EventEmitter {
       } catch (infoError) {
         // If getInfo() fails, emit basic error
         this.emit('error', {
-          error: error instanceof Error ? error : new Error(`Tool execution failed: ${error instanceof Error ? error.message : String(error)}`),
+          error:
+            error instanceof Error
+              ? error
+              : new Error(
+                  `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`
+                ),
           context: {
             phase: 'tool_execution',
             threadId: this._threadId,
@@ -2970,12 +2979,12 @@ export class Agent extends EventEmitter {
   private isRetryableError(error: unknown): boolean {
     if (error instanceof Error) {
       const message = error.message.toLowerCase();
-      
+
       // Network errors are typically retryable
       if (message.includes('network') || message.includes('timeout')) {
         return true;
       }
-      // Rate limit errors are retryable  
+      // Rate limit errors are retryable
       if (message.includes('rate limit') || message.includes('quota')) {
         return true;
       }
