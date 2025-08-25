@@ -4,13 +4,13 @@
 import { SessionPageClient } from './SessionPageClient';
 
 interface SessionPageProps {
-  params: Promise<{
+  params: {
     projectId: string;
     sessionId: string;
-  }>;
+  };
 }
 
-export default async function SessionPage({ params }: SessionPageProps) {
-  const { projectId, sessionId } = await params;
+export default function SessionPage({ params }: SessionPageProps) {
+  const { projectId, sessionId } = params;
   return <SessionPageClient projectId={projectId} sessionId={sessionId} />;
 }

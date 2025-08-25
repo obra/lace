@@ -4,14 +4,14 @@
 import { AgentPageClient } from './AgentPageClient';
 
 interface AgentPageProps {
-  params: Promise<{
+  params: {
     projectId: string;
     sessionId: string;
     agentId: string;
-  }>;
+  };
 }
 
-export default async function AgentPage({ params }: AgentPageProps) {
-  const { projectId, sessionId, agentId } = await params;
+export default function AgentPage({ params }: AgentPageProps) {
+  const { projectId, sessionId, agentId } = params;
   return <AgentPageClient projectId={projectId} sessionId={sessionId} agentId={agentId} />;
 }
