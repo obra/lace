@@ -1,12 +1,10 @@
-## Environment Context
-
-**System Information:**
+## Environment
 
 - OS: {{system.os}} {{system.arch}}
 - Working Directory: {{project.cwd}}
 - Session Started: {{system.sessionTime}}
 
-**Git Context:**
+**Git:**
 {{#git.branch}}
 
 - Current Branch: {{git.branch}}
@@ -20,3 +18,5 @@
 
 **Project Structure:**
 {{project.tree}}
+
+IMPORTANT: This environment information was current when the session started, but will not be updated over the course of the conversation
