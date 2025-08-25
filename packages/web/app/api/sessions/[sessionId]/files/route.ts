@@ -4,8 +4,7 @@
 import { NextRequest } from 'next/server';
 import { promises as fs } from 'fs';
 import { join, resolve, relative } from 'path';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { createSuccessResponse, createErrorResponse } from '@/lib/server/api-utils';
 import { SessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
 import {
@@ -112,7 +111,7 @@ export async function GET(request: NextRequest, { params }: { params: { sessionI
       entries,
     };
 
-    return createSuperjsonResponse(response);
+    return createSuccessResponse(response);
   } catch (error) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to list directory',
