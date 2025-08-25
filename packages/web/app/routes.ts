@@ -4,16 +4,16 @@
 import { type RouteConfig, index, route } from '@react-router/dev/routes';
 
 export default [
-  // Frontend routes
-  index('routes/_index.ts'),
-  route('docs', 'routes/docs.ts'),
-  route('play', 'routes/play.ts'),
-  route('font-test', 'routes/font-test.ts'),
-  route('speech-demo', 'routes/speech-demo.ts'),
-  route('sentry-test', 'routes/sentry-test.ts'),
-  route('project/:projectId', 'routes/project.$projectId.ts', [
-    route('session/:sessionId', 'routes/project.$projectId.session.$sessionId.ts', [
-      route('agent/:agentId', 'routes/project.$projectId.session.$sessionId.agent.$agentId.ts'),
+  // Frontend routes (.tsx - contain JSX)
+  index('routes/_index.tsx'),
+  route('docs', 'routes/docs.tsx'),
+  route('play', 'routes/play.tsx'),
+  route('font-test', 'routes/font-test.tsx'),
+  route('speech-demo', 'routes/speech-demo.tsx'),
+  route('sentry-test', 'routes/sentry-test.tsx'),
+  route('project/:projectId', 'routes/project.$projectId.tsx', [
+    route('session/:sessionId', 'routes/project.$projectId.session.$sessionId.tsx', [
+      route('agent/:agentId', 'routes/project.$projectId.session.$sessionId.agent.$agentId.tsx'),
     ]),
   ]),
 
@@ -34,6 +34,7 @@ export default [
   route('api/projects/:projectId', 'routes/api.projects.$projectId.ts'),
   route('api/projects/:projectId/configuration', 'routes/api.projects.$projectId.configuration.ts'),
   route('api/projects/:projectId/environment', 'routes/api.projects.$projectId.environment.ts'),
+  route('api/projects/:projectId/templates', 'routes/api.projects.$projectId.templates.ts'),
   route('api/projects/:projectId/sessions', 'routes/api.projects.$projectId.sessions.ts'),
   route(
     'api/projects/:projectId/sessions/:sessionId',
