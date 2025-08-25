@@ -1,7 +1,7 @@
 // ABOUTME: Centralized list of available tools for configuration components
 // ABOUTME: Single source of truth for tool lists used across the web interface
 
-export const AVAILABLE_TOOLS: string[] = [
+export const AVAILABLE_TOOLS = [
   'bash',
   'file_read',
   'file_write',
@@ -18,6 +18,6 @@ export const AVAILABLE_TOOLS: string[] = [
   'task_update',
   'task_add_note',
   'task_view',
-];
+] as const;
 
 export type AvailableTool = (typeof AVAILABLE_TOOLS)[number];
