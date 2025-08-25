@@ -3,48 +3,16 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, AgentConfig, CurrentTurnMetrics } from '~/agents/agent';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
+import { TestProvider } from '~/test-utils/test-provider';
+import { ProviderResponse } from '~/providers/base-provider';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 
-// Mock provider for testing
-class MockProvider extends BaseMockProvider {
-  private mockResponse: ProviderResponse;
-  private delay: number;
-
-  constructor(mockResponse: ProviderResponse, delay = 0) {
-    super({});
-    this.mockResponse = mockResponse;
-    this.delay = delay;
-  }
-
-  get providerName(): string {
-    return 'mock';
-  }
-
-  get supportsStreaming(): boolean {
-    return false;
-  }
-
-  async createResponse(
-    _messages: ProviderMessage[],
-    _tools: Tool[],
-    _model: string
-  ): Promise<ProviderResponse> {
-    if (this.delay > 0) {
-      await new Promise((resolve) => setTimeout(resolve, this.delay));
-    }
-    return this.mockResponse;
-  }
-}
-
 describe('Agent Turn Tracking', () => {
   const _tempLaceDir = setupCoreTest();
   let agent: Agent;
-  let provider: MockProvider;
+  let provider: TestProvider;
   let toolExecutor: ToolExecutor;
   let threadManager: ThreadManager;
   let threadId: string;
@@ -52,18 +20,9 @@ describe('Agent Turn Tracking', () => {
   beforeEach(async () => {
     // setupTestPersistence replaced by setupCoreTest
 
-    // Create mock response without tool calls
-    const mockResponse: ProviderResponse = {
-      content: 'Test response',
-      toolCalls: [],
-      usage: {
-        promptTokens: 10,
-        completionTokens: 5,
-        totalTokens: 15,
-      },
-    };
-
-    provider = new MockProvider(mockResponse);
+    provider = new TestProvider({
+      mockResponse: 'Test response',
+    });
     toolExecutor = new ToolExecutor();
     threadManager = new ThreadManager(); // Use in-memory SQLite for tests
     threadId = threadManager.generateThreadId();
@@ -158,13 +117,10 @@ describe('Agent Turn Tracking', () => {
       });
 
       // Create a provider that takes some time
-      const slowProvider = new MockProvider(
-        {
-          content: 'Slow response',
-          toolCalls: [],
-        },
-        3000
-      ); // 3 second delay
+      const slowProvider = new TestProvider({
+        mockResponse: 'Slow response',
+        delay: 3000, // 3 second delay
+      });
 
       const slowAgent = new Agent({
         toolExecutor,
