@@ -7,19 +7,23 @@ import { useEventStream } from './useEventStream';
 import type { LaceEvent, ErrorType, ErrorPhase } from '@/types/core';
 
 // Mock EventSource for testing
+interface MockMessageEvent {
+  data: string;
+}
+
 class MockEventSource {
-  private listeners: Map<string, ((event: any) => void)[]> = new Map();
+  private listeners: Map<string, ((event: MockMessageEvent) => void)[]> = new Map();
   
   constructor(public url: string) {}
 
-  addEventListener(type: string, listener: (event: any) => void) {
+  addEventListener(type: string, listener: (event: MockMessageEvent) => void) {
     if (!this.listeners.has(type)) {
       this.listeners.set(type, []);
     }
     this.listeners.get(type)!.push(listener);
   }
 
-  removeEventListener(type: string, listener: (event: any) => void) {
+  removeEventListener(type: string, listener: (event: MockMessageEvent) => void) {
     const typeListeners = this.listeners.get(type);
     if (typeListeners) {
       const index = typeListeners.indexOf(listener);
@@ -34,7 +38,7 @@ class MockEventSource {
   }
 
   // Test helper to simulate events
-  simulateEvent(type: string, data: any) {
+  simulateEvent(type: string, data: unknown) {
     const typeListeners = this.listeners.get(type);
     if (typeListeners) {
       typeListeners.forEach(listener => {
@@ -45,28 +49,28 @@ class MockEventSource {
 }
 
 // Mock global EventSource
-global.EventSource = MockEventSource as any;
+global.EventSource = MockEventSource as unknown as typeof EventSource;
 
 describe('useEventStream Error Handling', () => {
-  let mockEventSource: MockEventSource;
+  let _mockEventSource: MockEventSource;
   
   beforeEach(() => {
     vi.clearAllMocks();
-    mockEventSource = new MockEventSource('/test-stream');
+    _mockEventSource = new MockEventSource('/test-stream');
   });
 
   describe('AGENT_ERROR Event Handler Registration', () => {
     it('should register onAgentError handler correctly', () => {
       const mockAgentErrorHandler = vi.fn();
       
-      const { result } = renderHook(() =>
+      const { result: _result } = renderHook(() =>
         useEventStream({
           onAgentError: mockAgentErrorHandler,
         })
       );
 
       // Simulate AGENT_ERROR event
-      const agentErrorEvent: LaceEvent = {
+      const _agentErrorEvent: LaceEvent = {
         type: 'AGENT_ERROR',
         threadId: 'test-thread',
         timestamp: new Date(),
@@ -119,7 +123,7 @@ describe('useEventStream Error Handling', () => {
 
   describe('Error Event Processing', () => {
     it('should process provider failure errors correctly', () => {
-      const agentErrorEvent: LaceEvent = {
+      const _agentErrorEvent: LaceEvent = {
         type: 'AGENT_ERROR',
         threadId: 'test-thread',
         timestamp: new Date(),
@@ -140,10 +144,10 @@ describe('useEventStream Error Handling', () => {
       };
 
       // The event structure should be valid for the handler
-      expect(agentErrorEvent.type).toBe('AGENT_ERROR');
-      expect(agentErrorEvent.data).toHaveProperty('errorType');
-      expect(agentErrorEvent.data).toHaveProperty('message');
-      expect(agentErrorEvent.data).toHaveProperty('isRetryable');
+      expect(_agentErrorEvent.type).toBe('AGENT_ERROR');
+      expect(_agentErrorEvent.data).toHaveProperty('errorType');
+      expect(_agentErrorEvent.data).toHaveProperty('message');
+      expect(_agentErrorEvent.data).toHaveProperty('isRetryable');
     });
 
     it('should process tool execution errors correctly', () => {
@@ -199,7 +203,7 @@ describe('useEventStream Error Handling', () => {
     it('should convert AGENT_ERROR events to Error objects for generic handler', () => {
       // Test that the generic onError handler receives Error instances
       const testMessage = 'Test agent error message';
-      const agentErrorEvent: LaceEvent = {
+      const _agentErrorEvent: LaceEvent = {
         type: 'AGENT_ERROR',
         threadId: 'test-thread',
         timestamp: new Date(),
@@ -221,7 +225,7 @@ describe('useEventStream Error Handling', () => {
     });
 
     it('should handle missing error message gracefully', () => {
-      const agentErrorEvent: LaceEvent = {
+      const _agentErrorEvent: LaceEvent = {
         type: 'AGENT_ERROR',
         threadId: 'test-thread',
         timestamp: new Date(),
