@@ -86,7 +86,7 @@ export function ProjectEditModal({
     setEditConfig((prev) => ({
       ...prev,
       environmentVariables: {
-        ...prev.environmentVariables,
+        ...(prev.environmentVariables ?? {}),
         [newEnvKey.trim()]: newEnvValue.trim(),
       },
     }));
@@ -110,7 +110,7 @@ export function ProjectEditModal({
     setEditConfig((prev) => ({
       ...prev,
       toolPolicies: {
-        ...prev.toolPolicies,
+        ...(prev.toolPolicies ?? {}),
         [tool]: policy,
       },
     }));

@@ -42,7 +42,7 @@ interface ProjectCreateModalProps {
 
 const DEFAULT_PROJECT_CONFIG: ProjectConfiguration = {
   maxTokens: 4096,
-  tools: AVAILABLE_TOOLS,
+  tools: [...AVAILABLE_TOOLS],
   toolPolicies: {},
   environmentVariables: {},
 };
@@ -137,7 +137,7 @@ export function ProjectCreateModal({
     setCreateConfig((prev) => ({
       ...prev,
       environmentVariables: {
-        ...prev.environmentVariables,
+        ...(prev.environmentVariables ?? {}),
         [createNewEnvKey.trim()]: createNewEnvValue.trim(),
       },
     }));
@@ -160,7 +160,7 @@ export function ProjectCreateModal({
     setCreateConfig((prev) => ({
       ...prev,
       toolPolicies: {
-        ...prev.toolPolicies,
+        ...(prev.toolPolicies ?? {}),
         [tool]: policy,
       },
     }));

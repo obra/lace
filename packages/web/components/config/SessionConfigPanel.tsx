@@ -31,7 +31,7 @@ import { AVAILABLE_TOOLS } from '@/lib/available-tools';
 const DEFAULT_CONFIG: SessionConfiguration = {
   // Note: providerInstanceId and modelId should be set by user selection, not defaults
   maxTokens: 4096,
-  tools: AVAILABLE_TOOLS,
+  tools: [...AVAILABLE_TOOLS],
   toolPolicies: {},
   environmentVariables: {},
 };

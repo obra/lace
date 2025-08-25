@@ -54,7 +54,7 @@ export const SessionEditModal = memo(function SessionEditModal({
     onSessionConfigChange({
       ...sessionConfig,
       environmentVariables: {
-        ...sessionConfig.environmentVariables,
+        ...(sessionConfig.environmentVariables ?? {}),
         [newEnvKey.trim()]: newEnvValue.trim(),
       },
     });
@@ -76,7 +76,7 @@ export const SessionEditModal = memo(function SessionEditModal({
     onSessionConfigChange({
       ...sessionConfig,
       toolPolicies: {
-        ...sessionConfig.toolPolicies,
+        ...(sessionConfig.toolPolicies ?? {}),
         [tool]: policy,
       },
     });
