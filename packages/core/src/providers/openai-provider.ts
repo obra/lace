@@ -71,18 +71,28 @@ export class OpenAIProvider extends AIProvider {
     }
 
     try {
-      // Use default encoding for OpenAI-compatible models since we can't assume specific model support
-      const encoding = get_encoding('cl100k_base'); // Default for most OpenAI-compatible models
-
-      // Convert messages to text for token counting
-      let messageText = '';
-      for (const message of messages) {
-        messageText += `${message.role}: ${message.content}\n`;
+      // Try model-specific encoding first, fall back to default
+      let encoding;
+      try {
+        encoding = encoding_for_model(model as Parameters<typeof encoding_for_model>[0]);
+      } catch (error) {
+        // Fallback for unknown/custom/OpenAI-compatible models
+        logger.debug(`Model ${model} not recognized by tiktoken, using default encoding`, {
+          error,
+        });
+        encoding = get_encoding('cl100k_base'); // Default for most OpenAI-compatible models
       }
 
       // Add system prompt
       const systemPrompt = this.getEffectiveSystemPrompt(messages);
-      messageText = `system: ${systemPrompt}\n${messageText}`;
+      let messageText = `system: ${systemPrompt}\n`;
+
+      // Convert messages to text for token counting, excluding system messages to avoid double-counting
+      for (const message of messages) {
+        if (message.role !== 'system') {
+          messageText += `${message.role}: ${message.content}\n`;
+        }
+      }
 
       // Count base message tokens
       let totalTokens = encoding.encode(messageText).length;
@@ -223,7 +233,7 @@ export class OpenAIProvider extends AIProvider {
         });
 
         // Extract usage data from response, or estimate if missing (for OpenAI-compatible endpoints)
-        let usage;
+        let usage: ProviderResponse['usage'];
         if (response.usage) {
           usage = {
             promptTokens: response.usage.prompt_tokens,
@@ -237,12 +247,13 @@ export class OpenAIProvider extends AIProvider {
             model: requestPayload.model,
           });
 
+          // Include system prompt and tool context for accurate estimation
+          const systemPrompt = this.getEffectiveSystemPrompt(messages);
+          const promptText = systemPrompt + '\n' + messages.map((m) => m.content).join(' ');
+          const toolsText = tools.length > 0 ? JSON.stringify(tools) : '';
+
           const estimatedPromptTokens =
-            this.countTokens(messages, tools, model) ||
-            this.estimateTokens(
-              messages.map((m) => m.content).join(' ') +
-                (tools.length > 0 ? JSON.stringify(tools) : '')
-            );
+            this.countTokens(messages, tools, model) ?? this.estimateTokens(promptText + toolsText);
           const estimatedCompletionTokens = this.estimateTokens(textContent);
 
           usage = {
@@ -412,7 +423,7 @@ export class OpenAIProvider extends AIProvider {
           });
 
           // Extract usage data from stream, or estimate if missing (for OpenAI-compatible endpoints)
-          let finalUsage;
+          let finalUsage: ProviderResponse['usage'];
           if (usage) {
             finalUsage = {
               promptTokens: usage.prompt_tokens,
@@ -426,12 +437,14 @@ export class OpenAIProvider extends AIProvider {
               model: requestPayload.model,
             });
 
+            // Include system prompt and tool context for accurate estimation
+            const systemPrompt = this.getEffectiveSystemPrompt(messages);
+            const promptText = systemPrompt + '\n' + messages.map((m) => m.content).join(' ');
+            const toolsText = tools.length > 0 ? JSON.stringify(tools) : '';
+
             const estimatedPromptTokens =
-              this.countTokens(messages, tools, model) ||
-              this.estimateTokens(
-                messages.map((m) => m.content).join(' ') +
-                  (tools.length > 0 ? JSON.stringify(tools) : '')
-              );
+              this.countTokens(messages, tools, model) ??
+              this.estimateTokens(promptText + toolsText);
             const estimatedCompletionTokens = this.estimateTokens(content);
 
             finalUsage = {

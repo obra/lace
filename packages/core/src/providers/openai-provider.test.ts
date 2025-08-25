@@ -601,33 +601,100 @@ describe('OpenAIProvider', () => {
   });
 
   describe('token counting', () => {
-    it('should count tokens using tiktoken for known models', async () => {
+    it('should count tokens using tiktoken for known models', () => {
       const messages = [
         { role: 'user' as const, content: 'Hello, how are you?' },
         { role: 'assistant' as const, content: 'I am doing well, thank you!' },
       ];
 
-      const tokenCount = await provider.countTokens(messages, [], 'gpt-4o');
+      const tokenCount = provider.countTokens(messages, [], 'gpt-4o');
 
       expect(tokenCount).toBeGreaterThan(0);
       expect(typeof tokenCount).toBe('number');
     });
 
-    it('should return null if no model is provided', async () => {
+    it('should return null if no model is provided', () => {
       const messages = [{ role: 'user' as const, content: 'Hello' }];
 
-      const tokenCount = await provider.countTokens(messages, []);
+      const tokenCount = provider.countTokens(messages, []);
 
       expect(tokenCount).toBeNull();
     });
 
-    it('should handle token counting with tools', async () => {
+    it('should handle token counting with tools', () => {
       const messages = [{ role: 'user' as const, content: 'Use the test tool' }];
 
-      const tokenCount = await provider.countTokens(messages, [mockTool], 'gpt-4o');
+      const tokenCount = provider.countTokens(messages, [mockTool], 'gpt-4o');
 
       expect(tokenCount).toBeGreaterThan(0);
       expect(typeof tokenCount).toBe('number');
+    });
+
+    it('should not double-count system messages', () => {
+      const messagesWithSystem = [
+        { role: 'system' as const, content: 'You are a helpful assistant.' },
+        { role: 'user' as const, content: 'Hello' },
+      ];
+
+      const messagesWithoutSystem = [{ role: 'user' as const, content: 'Hello' }];
+
+      const tokensWithSystem = provider.countTokens(messagesWithSystem, [], 'gpt-4o');
+      const tokensWithoutSystem = provider.countTokens(messagesWithoutSystem, [], 'gpt-4o');
+
+      expect(tokensWithSystem).toBeGreaterThan(0);
+      expect(tokensWithoutSystem).toBeGreaterThan(0);
+      // The difference should be minimal since system prompt is added in both cases
+      expect(Math.abs((tokensWithSystem || 0) - (tokensWithoutSystem || 0))).toBeLessThan(10);
+    });
+
+    it('should provide fallback estimation for streaming response without usage data', async () => {
+      const mockStream = {
+        [Symbol.asyncIterator]: vi.fn(),
+      };
+
+      const chunks = [
+        {
+          choices: [
+            {
+              delta: {
+                content: 'Streaming response',
+              },
+              finish_reason: null,
+            },
+          ],
+          // No usage field in chunks
+        },
+        {
+          choices: [
+            {
+              delta: {},
+              finish_reason: 'stop',
+            },
+          ],
+          // No usage field at end either
+        },
+      ];
+
+      mockStream[Symbol.asyncIterator].mockReturnValue(
+        {
+          async *[Symbol.asyncIterator]() {
+            for (const chunk of chunks) {
+              yield await Promise.resolve(chunk);
+            }
+          },
+        }[Symbol.asyncIterator]()
+      );
+
+      mockCreate.mockResolvedValue(mockStream);
+
+      const messages = [{ role: 'user' as const, content: 'Stream test' }];
+      const response = await provider.createStreamingResponse(messages, [], 'gpt-4o');
+
+      // Should still have usage data from estimation
+      expect(response.usage).toBeDefined();
+      expect(response.usage?.totalTokens).toBeGreaterThan(0);
+      expect(response.usage?.promptTokens).toBeGreaterThan(0);
+      expect(response.usage?.completionTokens).toBeGreaterThan(0);
     });
 
     it('should provide fallback token estimation when response has no usage data', async () => {
