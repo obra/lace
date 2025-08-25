@@ -46,9 +46,3 @@ Found N+1 query issue. Adding eager loading:
   new='User.findAll({ include: [Post, Comment] })']
 ```
 
-## Remember
-
-- Explore before acting
-- Fix the specific issue asked
-- Follow project conventions
-- Suggest improvements but don't over-engineer

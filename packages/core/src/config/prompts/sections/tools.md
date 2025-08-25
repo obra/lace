@@ -130,3 +130,9 @@ User Request → task_add (break down) → delegate (parallel work) → task_com
 - Use non-interactive flags (`-y`, `--non-interactive`)
 - Check command existence before use
 - Quote paths with spaces
+
+## Tool Usage
+
+- When you're using tools, explain what you're doing to your partner, but be as brief as you can.
+- Use search/read tools to understand existing context and verify assumptions before making changes.
+- When possible, bundle multiple tool calls into one response.
