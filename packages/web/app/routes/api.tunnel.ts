@@ -1,12 +1,17 @@
 // ABOUTME: Sentry tunnel endpoint to avoid CORS issues in development
 // ABOUTME: Routes Sentry requests through our domain to prevent cross-origin blocking
-import { NextRequest, NextResponse } from 'next/server';
+
 import { logger } from '~/utils/logger';
+import type { Route } from './+types/api.tunnel';
 
 const SENTRY_HOST = 'o543459.ingest.us.sentry.io';
 const SENTRY_PROJECT_ID = '4509844023279616';
 
-export async function POST(request: NextRequest) {
+export async function action({ request }: Route.ActionArgs) {
+  if (request.method !== 'POST') {
+    return new Response('Method not allowed', { status: 405 });
+  }
+
   try {
     logger.info('🔄 Sentry tunnel request received');
 
@@ -36,7 +41,7 @@ export async function POST(request: NextRequest) {
 
       if (!dsnUrl.hostname.includes(SENTRY_HOST)) {
         logger.warn('❌ Invalid DSN rejected', { hostname: dsnUrl.hostname });
-        return new NextResponse('Invalid DSN', { status: 400 });
+        return new Response('Invalid DSN', { status: 400 });
       }
     }
 
@@ -77,7 +82,7 @@ export async function POST(request: NextRequest) {
       logger.info('✅ Sentry response received', responseLog);
     }
 
-    return new NextResponse(null, {
+    return new Response(null, {
       status: sentryResponse.status,
     });
   } catch (error) {
@@ -85,6 +90,6 @@ export async function POST(request: NextRequest) {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });
-    return new NextResponse('Tunnel error', { status: 500 });
+    return new Response('Tunnel error', { status: 500 });
   }
 }
