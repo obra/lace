@@ -1323,6 +1323,16 @@ export class Agent extends EventEmitter {
     try {
       const workingDirectory = this._getWorkingDirectory();
 
+      // Check if agent has been stopped before attempting tool execution
+      if (!this._initialized) {
+        logger.debug('Tool execution skipped - agent has been stopped', {
+          threadId: this._threadId,
+          toolName: toolCall.name,
+          toolCallId: toolCall.id,
+        });
+        return; // Silently skip tool execution if agent is stopped
+      }
+
       // Get session for security policy enforcement
       const session = await this.getFullSession();
       if (!session) {
