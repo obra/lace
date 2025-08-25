@@ -19,4 +19,4 @@
 **Project Structure:**
 {{project.tree}}
 
-IMPORTANT: This environment information was current when the session started, but will not be updated over the course of the conversation
+IMPORTANT: This environment information reflects the state at session start and will not update automatically during the conversation.
