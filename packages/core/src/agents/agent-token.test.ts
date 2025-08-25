@@ -13,33 +13,6 @@ import { ToolExecutor } from '~/tools/executor';
 import { ApprovalDecision } from '~/tools/approval-types';
 import { z } from 'zod';
 
-// Mock provider for multi-response token testing
-class MultiResponseProvider extends TestProvider {
-  private responses: ProviderResponse[];
-  private currentIndex = 0;
-
-  constructor(responses: ProviderResponse[]) {
-    super({});
-    this.responses = responses;
-  }
-
-  createResponse(_messages: ProviderMessage[]): Promise<ProviderResponse> {
-    if (this.currentIndex < this.responses.length) {
-      return Promise.resolve(this.responses[this.currentIndex++]);
-    }
-    // Default response if we run out
-    return Promise.resolve({
-      content: 'Default response',
-      toolCalls: [],
-      usage: {
-        promptTokens: 10,
-        completionTokens: 5,
-        totalTokens: 15,
-      },
-    });
-  }
-}
-
 // Mock provider for streaming token tests
 class StreamingTokenProvider extends TestProvider {
   private mockResponse: ProviderResponse;
