@@ -1,7 +1,6 @@
 // ABOUTME: REST API endpoint for listing directories with home directory security
 // ABOUTME: Returns directory contents with permissions and metadata for file browser component
 
-import { NextRequest } from 'next/server';
 import { promises as fs, constants as fsConstants } from 'fs';
 import { join, resolve, relative, sep } from 'path';
 import { homedir } from 'os';
@@ -9,11 +8,12 @@ import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { ListDirectoryRequestSchema } from '@/types/filesystem';
 import type { DirectoryEntry, ListDirectoryResponse } from '@/types/filesystem';
+import type { Route } from './+types/api.filesystem.list';
 
-export async function GET(request: NextRequest) {
+export async function loader({ request }: Route.LoaderArgs) {
   try {
-    const { searchParams } = new URL(request.url);
-    const rawPath = searchParams.get('path') || homedir();
+    const url = new URL(request.url);
+    const rawPath = url.searchParams.get('path') || homedir();
 
     // Validate input
     const { path } = ListDirectoryRequestSchema.parse({ path: rawPath });

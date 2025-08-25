@@ -1,11 +1,11 @@
 // ABOUTME: Session API endpoints under projects hierarchy - GET sessions by project, POST new session
 // ABOUTME: Uses Project class methods for session management with proper project-session relationships
 
-import { NextRequest } from 'next/server';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
+import type { Route } from './+types/api.projects.$projectId.sessions';
 
 const CreateSessionSchema = z.object({
   name: z.string().min(1, 'Session name is required'),
@@ -15,12 +15,9 @@ const CreateSessionSchema = z.object({
   configuration: z.record(z.unknown()).optional(),
 });
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ projectId: string }> }
-) {
+export async function loader({ request, params }: Route.LoaderArgs) {
   try {
-    const { projectId } = await params;
+    const { projectId } = params;
     const project = Project.getById(projectId);
     if (!project) {
       return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
@@ -47,12 +44,13 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ projectId: string }> }
-) {
+export async function action({ request, params }: Route.ActionArgs) {
+  if (request.method !== 'POST') {
+    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  }
+
   try {
-    const { projectId } = await params;
+    const { projectId } = params;
     const body = (await request.json()) as Record<string, unknown>;
     const validatedData = CreateSessionSchema.parse(body);
 

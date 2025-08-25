@@ -1,13 +1,13 @@
 // ABOUTME: Thin API layer that uses core ThreadManager for approval responses
 // ABOUTME: Web-specific route that delegates to core event system
 
-import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId, ApprovalDecision } from '@/types/core';
 import { ThreadIdSchema, ToolCallIdSchema } from '@/lib/validation/schemas';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
+import type { Route } from './+types/api.threads.$threadId.approvals.$toolCallId';
 
 // Validation schemas
 const ParamsSchema = z.object({
@@ -21,13 +21,14 @@ const BodySchema = z.object({
   }),
 });
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ threadId: string; toolCallId: string }> }
-): Promise<NextResponse> {
+export async function action({ request, params }: Route.ActionArgs) {
+  if (request.method !== 'POST') {
+    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  }
+
   try {
     // Validate parameters
-    const paramsResult = ParamsSchema.safeParse(await params);
+    const paramsResult = ParamsSchema.safeParse(params);
     if (!paramsResult.success) {
       return createErrorResponse('Invalid parameters', 400, {
         code: 'VALIDATION_FAILED',

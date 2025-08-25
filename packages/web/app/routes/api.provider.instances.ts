@@ -1,7 +1,6 @@
 // ABOUTME: Provider instances API endpoint
 // ABOUTME: Handles listing and creating provider instances with credential management
 
-import { NextRequest } from 'next/server';
 import {
   ProviderRegistry,
   ProviderInstanceManager,
@@ -11,6 +10,7 @@ import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 import type { ConfiguredInstance } from '@/lib/server/lace-imports';
+import type { Route } from './+types/api.provider.instances';
 
 export interface InstancesResponse {
   instances: ConfiguredInstance[];
@@ -40,7 +40,7 @@ const CreateInstanceSchema = z.object({
   }),
 });
 
-export async function GET(_request: NextRequest) {
+export async function loader({ request }: Route.LoaderArgs) {
   try {
     const registry = ProviderRegistry.getInstance();
 
@@ -56,7 +56,11 @@ export async function GET(_request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function action({ request }: Route.ActionArgs) {
+  if (request.method !== 'POST') {
+    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  }
+
   try {
     const body = (await request.json()) as unknown;
     const validatedData = CreateInstanceSchema.parse(body);

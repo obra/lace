@@ -1,9 +1,9 @@
 // ABOUTME: API route handler for receiving browser console logs
 // ABOUTME: Outputs forwarded console messages to server terminal with proper formatting
 
-import { NextRequest, NextResponse } from 'next/server';
 import { deserialize, stringify } from '@/lib/serialization';
 import type { ConsoleLogEntry } from '@/lib/console-forward';
+import type { Route } from './+types/api.debug.console';
 
 /**
  * Type guard to check if data is in SuperJSON format
@@ -19,13 +19,17 @@ function isArgsArray(data: unknown): data is unknown[] {
   return Array.isArray(data);
 }
 
-export async function POST(request: NextRequest) {
+export async function action({ request }: Route.ActionArgs) {
+  if (request.method !== 'POST') {
+    return Response.json({ error: 'Method not allowed' }, { status: 405 });
+  }
+
   try {
     // Handle empty or malformed request bodies gracefully
     const text = await request.text();
     if (!text || text.trim() === '') {
       // Silent return for empty requests - common during race conditions
-      return NextResponse.json({ success: true, processed: 0 });
+      return Response.json({ success: true, processed: 0 });
     }
 
     let body: { logs: ConsoleLogEntry[] };
@@ -33,13 +37,13 @@ export async function POST(request: NextRequest) {
       body = JSON.parse(text) as { logs: ConsoleLogEntry[] };
     } catch (_parseError) {
       // Silent handling of malformed JSON - likely from race conditions or network issues
-      return NextResponse.json({ error: 'Invalid JSON format' }, { status: 400 });
+      return Response.json({ error: 'Invalid JSON format' }, { status: 400 });
     }
 
     const { logs } = body;
 
     if (!Array.isArray(logs)) {
-      return NextResponse.json({ error: 'Invalid logs format' }, { status: 400 });
+      return Response.json({ error: 'Invalid logs format' }, { status: 400 });
     }
 
     // Output each log to server console with formatting
@@ -156,9 +160,9 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    return NextResponse.json({ success: true, processed: logs.length });
+    return Response.json({ success: true, processed: logs.length });
   } catch (error) {
     console.error('[CONSOLE-FORWARD] Error processing logs:', error);
-    return NextResponse.json({ error: 'Failed to process logs' }, { status: 500 });
+    return Response.json({ error: 'Failed to process logs' }, { status: 500 });
   }
 }

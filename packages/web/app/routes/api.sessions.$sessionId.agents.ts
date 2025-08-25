@@ -1,7 +1,6 @@
 // ABOUTME: Agent spawning API endpoints for creating and listing agents within a session
 // ABOUTME: Agents are child threads (sessionId.N) that run within a session
 
-import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { CreateAgentRequest } from '@/types/api';
 import { asThreadId, ThreadId } from '@/types/core';
@@ -11,6 +10,7 @@ import { createErrorResponse } from '@/lib/server/api-utils';
 import { setupAgentApprovals } from '@/lib/server/agent-utils';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import type { Agent } from '@/lib/server/lace-imports';
+import type { Route } from './+types/api.sessions.$sessionId.agents';
 
 // Type guard for unknown error values
 function isError(error: unknown): error is Error {
@@ -35,13 +35,39 @@ function isValidThreadId(sessionId: string): boolean {
   return isClientValidThreadId(sessionId);
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
-): Promise<NextResponse> {
+export async function loader({ request, params }: Route.LoaderArgs) {
   try {
     const sessionService = getSessionService();
-    const { sessionId: sessionIdParam } = await params;
+    const { sessionId: sessionIdParam } = params;
+
+    if (!isValidThreadId(sessionIdParam)) {
+      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
+    }
+
+    const sessionId = asThreadId(sessionIdParam);
+
+    const session = await sessionService.getSession(sessionId);
+
+    if (!session) {
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+    }
+
+    // Get agents from Session instance
+    const agents = session.getAgents();
+    return createSuperjsonResponse(agents);
+  } catch (_error: unknown) {
+    return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
+  }
+}
+
+export async function action({ request, params }: Route.ActionArgs) {
+  if (request.method !== 'POST') {
+    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  }
+
+  try {
+    const sessionService = getSessionService();
+    const { sessionId: sessionIdParam } = params;
 
     if (!isValidThreadId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
@@ -130,34 +156,6 @@ export async function POST(
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
-  }
-}
-
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
-): Promise<NextResponse> {
-  try {
-    const sessionService = getSessionService();
-    const { sessionId: sessionIdParam } = await params;
-
-    if (!isValidThreadId(sessionIdParam)) {
-      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
-    }
-
-    const sessionId = asThreadId(sessionIdParam);
-
-    const session = await sessionService.getSession(sessionId);
-
-    if (!session) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
-    }
-
-    // Get agents from Session instance
-    const agents = session.getAgents();
-    return createSuperjsonResponse(agents);
-  } catch (_error: unknown) {
     return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
 }

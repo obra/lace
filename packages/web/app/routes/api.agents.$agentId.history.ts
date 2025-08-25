@@ -1,20 +1,17 @@
 // ABOUTME: API endpoint for loading conversation history for a specific agent
 // ABOUTME: Returns events only for the requested agent, enabling per-agent conversation views
 
-import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import type { LaceEvent } from '@/types/core';
 import { asThreadId, isConversationEvent } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
+import type { Route } from './+types/api.agents.$agentId.history';
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ agentId: string }> }
-): Promise<NextResponse> {
+export async function loader({ request, params }: Route.LoaderArgs) {
   try {
-    const { agentId: agentIdParam } = await params;
+    const { agentId: agentIdParam } = params;
 
     // Validate agent ID format
     if (!isValidThreadId(agentIdParam)) {

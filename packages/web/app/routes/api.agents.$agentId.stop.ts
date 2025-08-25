@@ -1,19 +1,20 @@
 // ABOUTME: Stop endpoint for halting agent processing while keeping agent alive
 // ABOUTME: Calls agent.abort() to stop current generation but preserves agent state
 
-import { NextRequest } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
 import { isValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
+import type { Route } from './+types/api.agents.$agentId.stop';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ agentId: string }> }
-) {
+export async function action({ request, params }: Route.ActionArgs) {
+  if (request.method !== 'POST') {
+    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  }
+
   try {
-    const { agentId } = await params;
+    const { agentId } = params;
 
     if (!isValidThreadId(agentId)) {
       return createErrorResponse('Invalid agent ID format', 400, {
