@@ -4,7 +4,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { AgentProvider, useAgentContext } from '@/components/providers/AgentProvider';
@@ -20,7 +20,7 @@ const noOpCallback = () => {};
 
 // Client component that handles auto-redirect to coordinator agent
 function SessionRedirect({ projectId, sessionId }: { projectId: string; sessionId: string }) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { sessionDetails } = useAgentContext();
 
   useEffect(() => {
@@ -30,17 +30,15 @@ function SessionRedirect({ projectId, sessionId }: { projectId: string; sessionI
 
       if (coordinatorAgent) {
         // Redirect to coordinator agent
-        router.push(
-          `/project/${projectId}/session/${sessionId}/agent/${coordinatorAgent.threadId}`
-        );
+        navigate(`/project/${projectId}/session/${sessionId}/agent/${coordinatorAgent.threadId}`);
       } else if (sessionDetails.agents.length === 1) {
         // If only one agent, use it
-        router.push(
+        navigate(
           `/project/${projectId}/session/${sessionId}/agent/${sessionDetails.agents[0].threadId}`
         );
       }
     }
-  }, [sessionDetails, projectId, sessionId, router]);
+  }, [sessionDetails, projectId, sessionId, navigate]);
 
   return (
     <div className="flex h-screen bg-base-200 text-base-content font-ui items-center justify-center">
