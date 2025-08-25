@@ -85,7 +85,8 @@ export function EventStreamProvider({
   agentId,
   onAgentStateChange,
 }: EventStreamProviderProps) {
-  console.log('[EventStreamProvider] Component render start for session:', sessionId);
+  const instanceId = React.useRef(Math.random().toString(36).substring(2, 8)).current;
+  console.log(`[EventStreamProvider:${instanceId}] Component render start for session:`, sessionId);
   
   // Get tool approval handlers from ToolApprovalProvider
   const { handleApprovalRequest, handleApprovalResponse } = useToolApprovalContext();
@@ -158,13 +159,13 @@ export function EventStreamProvider({
   }, []);
 
   const handleAgentError = useCallback((event: LaceEvent) => {
-    console.warn('[EventStreamProvider] Agent error event received:', event);
+    console.warn(`[EventStreamProvider:${instanceId}] Agent error event received:`, event);
     // TODO: Integrate with error display UI
     // For now, just log to console so we can see it's working
-  }, []);
+  }, [instanceId]);
 
   // Debug: Log when component renders with the handler
-  console.log('[EventStreamProvider] Component render - handleAgentError exists:', !!handleAgentError);
+  console.log(`[EventStreamProvider:${instanceId}] Component render - handleAgentError exists:`, !!handleAgentError);
 
   // Agent message handler to clear streaming content when complete
   const stableAddAgentEventWithStreaming = useCallback(
@@ -222,7 +223,7 @@ export function EventStreamProvider({
       onCompactionComplete: handleCompactionComplete,
       };
       
-      console.log('[EventStreamProvider] Creating eventStreamOptions with onAgentError:', !!options.onAgentError);
+      console.log(`[EventStreamProvider:${instanceId}] Creating eventStreamOptions with onAgentError:`, !!options.onAgentError);
       return options;
     },
     [
