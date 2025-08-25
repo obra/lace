@@ -599,4 +599,60 @@ describe('OpenAIProvider', () => {
       );
     });
   });
+
+  describe('token counting', () => {
+    it('should count tokens using tiktoken for known models', async () => {
+      const messages = [
+        { role: 'user' as const, content: 'Hello, how are you?' },
+        { role: 'assistant' as const, content: 'I am doing well, thank you!' },
+      ];
+
+      const tokenCount = await provider.countTokens(messages, [], 'gpt-4o');
+
+      expect(tokenCount).toBeGreaterThan(0);
+      expect(typeof tokenCount).toBe('number');
+    });
+
+    it('should return null if no model is provided', async () => {
+      const messages = [{ role: 'user' as const, content: 'Hello' }];
+
+      const tokenCount = await provider.countTokens(messages, []);
+
+      expect(tokenCount).toBeNull();
+    });
+
+    it('should handle token counting with tools', async () => {
+      const messages = [{ role: 'user' as const, content: 'Use the test tool' }];
+
+      const tokenCount = await provider.countTokens(messages, [mockTool], 'gpt-4o');
+
+      expect(tokenCount).toBeGreaterThan(0);
+      expect(typeof tokenCount).toBe('number');
+    });
+
+    it('should provide fallback token estimation when response has no usage data', async () => {
+      // Mock response without usage data (like OpenAI-compatible endpoints)
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: 'Response without usage data',
+              tool_calls: undefined,
+            },
+            finish_reason: 'stop',
+          },
+        ],
+        // No usage field - this triggers fallback estimation
+      });
+
+      const messages = [{ role: 'user' as const, content: 'Test message' }];
+      const response = await provider.createResponse(messages, [], 'gpt-4o');
+
+      // Should still have usage data from estimation
+      expect(response.usage).toBeDefined();
+      expect(response.usage?.totalTokens).toBeGreaterThan(0);
+      expect(response.usage?.promptTokens).toBeGreaterThan(0);
+      expect(response.usage?.completionTokens).toBeGreaterThan(0);
+    });
+  });
 });

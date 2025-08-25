@@ -2,6 +2,7 @@
 // ABOUTME: Wraps OpenAI SDK in the common provider interface
 
 import OpenAI, { ClientOptions } from 'openai';
+import { get_encoding, encoding_for_model } from 'tiktoken';
 import { AIProvider } from '~/providers/base-provider';
 import {
   ProviderMessage,
@@ -61,6 +62,52 @@ export class OpenAIProvider extends AIProvider {
 
   get supportsStreaming(): boolean {
     return true;
+  }
+
+  // Provider-specific token counting using tiktoken for OpenAI-compatible models
+  countTokens(messages: ProviderMessage[], tools: Tool[] = [], model?: string): number | null {
+    if (!model) {
+      return null; // Can't count without model
+    }
+
+    try {
+      // Use default encoding for OpenAI-compatible models since we can't assume specific model support
+      const encoding = get_encoding('cl100k_base'); // Default for most OpenAI-compatible models
+
+      // Convert messages to text for token counting
+      let messageText = '';
+      for (const message of messages) {
+        messageText += `${message.role}: ${message.content}\n`;
+      }
+
+      // Add system prompt
+      const systemPrompt = this.getEffectiveSystemPrompt(messages);
+      messageText = `system: ${systemPrompt}\n${messageText}`;
+
+      // Count base message tokens
+      let totalTokens = encoding.encode(messageText).length;
+
+      // Add tool schema tokens if tools are provided
+      if (tools.length > 0) {
+        const toolsText = JSON.stringify(
+          tools.map((tool) => ({
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.inputSchema,
+          }))
+        );
+        totalTokens += encoding.encode(toolsText).length;
+        totalTokens += tools.length * 3; // Overhead per tool
+      }
+
+      // Add conversation overhead (conservative estimate)
+      totalTokens += 10;
+
+      return totalTokens;
+    } catch (error) {
+      logger.debug('Token counting failed, falling back to estimation', { error });
+      return null; // Fall back to estimation
+    }
   }
 
   private _createRequestPayload(
@@ -175,17 +222,41 @@ export class OpenAIProvider extends AIProvider {
           usage: response.usage,
         });
 
+        // Extract usage data from response, or estimate if missing (for OpenAI-compatible endpoints)
+        let usage;
+        if (response.usage) {
+          usage = {
+            promptTokens: response.usage.prompt_tokens,
+            completionTokens: response.usage.completion_tokens,
+            totalTokens: response.usage.total_tokens,
+          };
+        } else {
+          // Fallback: estimate tokens when OpenAI-compatible endpoints don't provide usage
+          logger.debug('No usage data in OpenAI response, estimating tokens', {
+            provider: 'openai',
+            model: requestPayload.model,
+          });
+
+          const estimatedPromptTokens =
+            this.countTokens(messages, tools, model) ||
+            this.estimateTokens(
+              messages.map((m) => m.content).join(' ') +
+                (tools.length > 0 ? JSON.stringify(tools) : '')
+            );
+          const estimatedCompletionTokens = this.estimateTokens(textContent);
+
+          usage = {
+            promptTokens: estimatedPromptTokens,
+            completionTokens: estimatedCompletionTokens,
+            totalTokens: estimatedPromptTokens + estimatedCompletionTokens,
+          };
+        }
+
         return {
           content: textContent,
           toolCalls,
           stopReason: this.normalizeStopReason(choice.finish_reason),
-          usage: response.usage
-            ? {
-                promptTokens: response.usage.prompt_tokens,
-                completionTokens: response.usage.completion_tokens,
-                totalTokens: response.usage.total_tokens,
-              }
-            : undefined,
+          usage,
         };
       },
       { signal }
@@ -340,17 +411,41 @@ export class OpenAIProvider extends AIProvider {
             usage,
           });
 
+          // Extract usage data from stream, or estimate if missing (for OpenAI-compatible endpoints)
+          let finalUsage;
+          if (usage) {
+            finalUsage = {
+              promptTokens: usage.prompt_tokens,
+              completionTokens: usage.completion_tokens,
+              totalTokens: usage.total_tokens,
+            };
+          } else {
+            // Fallback: estimate tokens when OpenAI-compatible endpoints don't provide usage
+            logger.debug('No usage data in OpenAI streaming response, estimating tokens', {
+              provider: 'openai',
+              model: requestPayload.model,
+            });
+
+            const estimatedPromptTokens =
+              this.countTokens(messages, tools, model) ||
+              this.estimateTokens(
+                messages.map((m) => m.content).join(' ') +
+                  (tools.length > 0 ? JSON.stringify(tools) : '')
+              );
+            const estimatedCompletionTokens = this.estimateTokens(content);
+
+            finalUsage = {
+              promptTokens: estimatedPromptTokens,
+              completionTokens: estimatedCompletionTokens,
+              totalTokens: estimatedPromptTokens + estimatedCompletionTokens,
+            };
+          }
+
           const response = {
             content,
             toolCalls,
             stopReason: this.normalizeStopReason(stopReason),
-            usage: usage
-              ? {
-                  promptTokens: usage.prompt_tokens,
-                  completionTokens: usage.completion_tokens,
-                  totalTokens: usage.total_tokens,
-                }
-              : undefined,
+            usage: finalUsage,
           };
 
           // Emit completion event
