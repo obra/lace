@@ -644,7 +644,7 @@ describe('OpenAIProvider', () => {
       expect(tokensWithSystem).toBeGreaterThan(0);
       expect(tokensWithoutSystem).toBeGreaterThan(0);
       // The difference should be minimal since system prompt is added in both cases
-      expect(Math.abs((tokensWithSystem || 0) - (tokensWithoutSystem || 0))).toBeLessThan(10);
+      expect(Math.abs((tokensWithSystem ?? 0) - (tokensWithoutSystem ?? 0))).toBeLessThan(10);
     });
 
     it('should provide fallback estimation for streaming response without usage data', async () => {
@@ -685,7 +685,7 @@ describe('OpenAIProvider', () => {
         }[Symbol.asyncIterator]()
       );
 
-      mockCreate.mockResolvedValue(mockStream);
+      mockCreate.mockReturnValue(mockStream);
 
       const messages = [{ role: 'user' as const, content: 'Stream test' }];
       const response = await provider.createStreamingResponse(messages, [], 'gpt-4o');
