@@ -11,6 +11,17 @@ import { Tool } from '~/tools/tool';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { createMockThreadManager } from '~/test-utils/thread-manager-mock';
 
+// Helper to safely spy on private method without 'as any'
+interface AgentWithCreateProvider {
+  _createProviderInstance: () => Promise<AIProvider>;
+}
+
+function spyOnCreateProviderInstance(agent: Agent, mockProvider: AIProvider) {
+  return vi
+    .spyOn(agent as unknown as AgentWithCreateProvider, '_createProviderInstance')
+    .mockResolvedValue(mockProvider);
+}
+
 // Mock provider that can emit retry events for event forwarding tests
 class MockRetryProvider extends BaseMockProvider {
   get providerName(): string {
@@ -200,7 +211,7 @@ describe('Agent Retry Functionality', () => {
       });
 
       // Mock provider creation for test
-      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
+      spyOnCreateProviderInstance(agent, mockProvider);
 
       await agent.start();
 
@@ -349,7 +360,7 @@ describe('Agent Retry Functionality', () => {
       });
 
       // Mock provider creation for test
-      vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+      spyOnCreateProviderInstance(agent, provider);
 
       await agent.start();
     });
@@ -415,7 +426,7 @@ describe('Agent Retry Functionality', () => {
         });
 
         // Mock provider creation for test
-        vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+        spyOnCreateProviderInstance(agent, provider);
         await agent.start();
 
         const retryAttemptEvents: Array<{ attempt: number; delay: number; error: Error }> = [];
@@ -459,7 +470,7 @@ describe('Agent Retry Functionality', () => {
         });
 
         // Mock provider creation for test
-        vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+        spyOnCreateProviderInstance(agent, provider);
         await agent.start();
 
         const retryExhaustedEvents: Array<{ attempts: number; lastError: Error }> = [];
@@ -494,7 +505,7 @@ describe('Agent Retry Functionality', () => {
           },
         });
 
-        vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+        spyOnCreateProviderInstance(agent, provider);
         await agent.start();
 
         const turnCompleteEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
@@ -525,7 +536,7 @@ describe('Agent Retry Functionality', () => {
           },
         });
 
-        vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+        spyOnCreateProviderInstance(agent, provider);
         await agent.start();
 
         const progressEvents: Array<{ metrics: CurrentTurnMetrics }> = [];
@@ -556,7 +567,7 @@ describe('Agent Retry Functionality', () => {
           },
         });
 
-        vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+        spyOnCreateProviderInstance(agent, provider);
         await agent.start();
 
         const turnCompleteEvents: Array<{ turnId: string; metrics: CurrentTurnMetrics }> = [];
