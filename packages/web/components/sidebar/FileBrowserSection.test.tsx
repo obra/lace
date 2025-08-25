@@ -54,7 +54,6 @@ describe('FileBrowserSection', () => {
     expect(screen.getByText('Files')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search files...')).toBeInTheDocument();
     expect(screen.getByTestId('session-file-tree')).toBeInTheDocument();
-    expect(screen.getByText('project')).toBeInTheDocument(); // Working directory name
   });
 
   it('should update search term when typing in search input', async () => {
@@ -103,7 +102,7 @@ describe('FileBrowserSection', () => {
     expect(screen.getByText('Files')).toBeInTheDocument();
   });
 
-  it('should show working directory name in header when not collapsed', () => {
+  it('should render correctly when not collapsed', () => {
     render(
       <FileBrowserSection
         {...defaultProps}
@@ -112,7 +111,8 @@ describe('FileBrowserSection', () => {
       />
     );
 
-    expect(screen.getByText('project')).toBeInTheDocument();
+    expect(screen.getByText('Files')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search files...')).toBeInTheDocument();
   });
 
   it('should handle collapsed state properly', () => {

@@ -54,11 +54,6 @@ export function FileBrowserSection({
         title="Files"
         isExpanded={isExpanded}
         onToggle={() => setIsExpanded(!isExpanded)}
-        badge={
-          workingDirectory
-            ? { text: workingDirectory.split('/').pop() || workingDirectory }
-            : undefined
-        }
       >
         {/* Search input */}
         <div className="px-2 pb-3">
