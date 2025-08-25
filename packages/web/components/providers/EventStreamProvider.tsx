@@ -155,6 +155,12 @@ export function EventStreamProvider({
     });
   }, []);
 
+  const handleAgentError = useCallback((event: LaceEvent) => {
+    console.warn('[EventStreamProvider] Agent error event received:', event);
+    // TODO: Integrate with error display UI
+    // For now, just log to console so we can see it's working
+  }, []);
+
   // Agent message handler to clear streaming content when complete
   const stableAddAgentEventWithStreaming = useCallback(
     (event: LaceEvent) => {
@@ -192,11 +198,7 @@ export function EventStreamProvider({
       onError: (error: unknown) => {
         console.error('Event stream error:', error);
       },
-      onAgentError: (event: LaceEvent) => {
-        console.warn('[EventStreamProvider] Agent error event received:', event);
-        // TODO: Integrate with error display UI
-        // For now, just log to console so we can see it's working
-      },
+      onAgentError: handleAgentError,
       // Agent event handlers - use single stable handler to prevent stale closures
       onUserMessage: stableAddAgentEventWithStreaming,
       onAgentMessage: stableAddAgentEventWithStreaming,
@@ -225,6 +227,7 @@ export function EventStreamProvider({
       handleApprovalResponse,
       handleCompactionStart,
       handleCompactionComplete,
+      handleAgentError,
     ]
   );
 
