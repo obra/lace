@@ -10,6 +10,7 @@ export type {
   AgentMessageData,
   AgentStateChangeData,
   ErrorType,
+  ErrorPhase,
 } from '~/threads/types';
 
 export type { CombinedTokenUsage, ThreadTokenUsage } from '~/token-management/types';

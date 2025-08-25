@@ -174,6 +174,50 @@ export class EventStreamManager {
         transient: true,
       });
     });
+
+    // Handle agent errors (same pattern as task events)
+    const agents = session.getAgents();
+    for (const agentInfo of agents) {
+      const agent = session.getAgent(agentInfo.threadId);
+      if (agent) {
+        agent.on('error', (errorEvent: { error: Error; context: Record<string, unknown> }) => {
+          const { error, context } = errorEvent;
+          
+          logger.debug(
+            `[EVENT_STREAM] Agent ${agentInfo.threadId} error occurred, broadcasting AGENT_ERROR`
+          );
+          
+          this.broadcast({
+            type: 'AGENT_ERROR',
+            threadId: agentInfo.threadId,
+            timestamp: new Date(),
+            data: {
+              errorType: context.errorType as string,
+              message: error.message,
+              stack: error.stack,
+              context: {
+                phase: context.phase as string,
+                providerName: context.providerName as string | undefined,
+                providerInstanceId: context.providerInstanceId as string | undefined,
+                modelId: context.modelId as string | undefined,
+                toolName: context.toolName as string | undefined,
+                toolCallId: context.toolCallId as string | undefined,
+                workingDirectory: context.workingDirectory as string | undefined,
+                retryAttempt: context.retryAttempt as number | undefined,
+              },
+              isRetryable: context.isRetryable as boolean,
+              retryCount: context.retryCount as number,
+            },
+            transient: true,
+            context: { 
+              projectId, 
+              sessionId, 
+              agentId: agentInfo.threadId 
+            },
+          });
+        });
+      }
+    }
   }
 
   // WeakSet to track registered TaskManager instances
@@ -265,6 +309,16 @@ export class EventStreamManager {
     // Debug logging for event broadcasting
     if (process.env.NODE_ENV === 'development') {
       // Development debug info
+    }
+
+    // Optional: Add debug logging for error events
+    if (fullEvent.type === 'AGENT_ERROR') {
+      logger.debug('[EVENT_STREAM] Broadcasting agent error event', {
+        threadId: fullEvent.threadId,
+        errorType: (fullEvent.data as any)?.errorType,
+        phase: (fullEvent.data as any)?.context?.phase,
+        isRetryable: (fullEvent.data as any)?.isRetryable,
+      });
     }
 
     const deadConnections: string[] = [];
