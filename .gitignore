@@ -99,8 +99,8 @@ test-vfs-*.js
 # Executables
 lace
 
-# Private journal
-.private-journal/
+# Private journal - should be committed
+#.private-journal/
 
 # Temp VFS stubs
 src/vfs/*-stub.ts
