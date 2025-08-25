@@ -3,51 +3,23 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '~/agents/agent';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
+import { TestProvider } from '~/test-utils/test-provider';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { createMockThreadManager } from '~/test-utils/thread-manager-mock';
 
-// Mock provider for testing
-class MockProvider extends BaseMockProvider {
-  constructor() {
-    super({});
-  }
-
-  get providerName(): string {
-    return 'mock';
-  }
-
-  get supportsStreaming(): boolean {
-    return false;
-  }
-
-  createResponse(
-    _messages: ProviderMessage[],
-    _tools: Tool[],
-    _model: string
-  ): Promise<ProviderResponse> {
-    return Promise.resolve({
-      content: 'mock response',
-      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-      toolCalls: [],
-      stopReason: 'end_turn',
-    });
-  }
-}
-
 describe('Agent Queue Methods', () => {
   const _tempLaceDir = setupCoreTest();
   let agent: Agent;
-  let mockProvider: MockProvider;
+  let mockProvider: TestProvider;
   let mockToolExecutor: ToolExecutor;
   let mockThreadManager: ThreadManager;
 
   beforeEach(() => {
-    mockProvider = new MockProvider();
+    mockProvider = new TestProvider({
+      mockResponse: 'mock response',
+    });
 
     mockToolExecutor = {
       registerAllAvailableTools: vi.fn(),
