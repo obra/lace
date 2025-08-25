@@ -99,6 +99,10 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
   useEventStream({
     threadIds: [agentId],
     onAgentMessage: handleAgentMessage,
+    onAgentError: (event: LaceEvent) => {
+      console.warn('[useAgentTokenUsage] Agent error event received:', event);
+      // This hook doesn't handle errors - just log for debugging
+    },
   });
 
   // Initial load on mount or agentId change
