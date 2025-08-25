@@ -6,6 +6,25 @@ import { renderHook } from '@testing-library/react';
 import { useEventStream } from './useEventStream';
 import type { LaceEvent, ErrorType, ErrorPhase } from '@/types/core';
 
+// Interface for test error event data
+interface TestErrorEventData {
+  errorType: ErrorType;
+  message?: string;
+  stack?: string;
+  context: {
+    phase: ErrorPhase;
+    providerName?: string;
+    providerInstanceId?: string;
+    modelId?: string;
+    toolName?: string;
+    toolCallId?: string;
+    workingDirectory?: string;
+    retryAttempt?: number;
+  };
+  isRetryable: boolean;
+  retryCount: number;
+}
+
 // Mock EventSource for testing
 interface MockMessageEvent {
   data: string;
@@ -171,8 +190,8 @@ describe('useEventStream Error Handling', () => {
       };
 
       expect(toolErrorEvent.data).toHaveProperty('errorType', 'tool_execution');
-      expect((toolErrorEvent.data as any).context).toHaveProperty('toolName', 'bash');
-      expect((toolErrorEvent.data as any).context).toHaveProperty('toolCallId', 'tool-call-456');
+      expect((toolErrorEvent.data as TestErrorEventData).context).toHaveProperty('toolName', 'bash');
+      expect((toolErrorEvent.data as TestErrorEventData).context).toHaveProperty('toolCallId', 'tool-call-456');
     });
 
     it('should process conversation processing errors correctly', () => {
@@ -195,7 +214,7 @@ describe('useEventStream Error Handling', () => {
       };
 
       expect(processingErrorEvent.data).toHaveProperty('errorType', 'processing_error');
-      expect((processingErrorEvent.data as any).context).toHaveProperty('phase', 'conversation_processing');
+      expect((processingErrorEvent.data as TestErrorEventData).context).toHaveProperty('phase', 'conversation_processing');
     });
   });
 
@@ -282,7 +301,7 @@ describe('useEventStream Error Handling', () => {
       expect(completeErrorEvent).toHaveProperty('transient', true);
 
       // Validate data structure
-      const data = completeErrorEvent.data as any;
+      const data = completeErrorEvent.data as TestErrorEventData;
       expect(data).toHaveProperty('errorType');
       expect(data).toHaveProperty('message');
       expect(data).toHaveProperty('stack');
@@ -322,7 +341,7 @@ describe('useEventStream Error Handling', () => {
           },
         };
 
-        expect((errorEvent.data as any).errorType).toBe(errorType);
+        expect((errorEvent.data as TestErrorEventData).errorType).toBe(errorType);
       });
     });
 
@@ -350,7 +369,7 @@ describe('useEventStream Error Handling', () => {
           },
         };
 
-        expect((errorEvent.data as any).context.phase).toBe(phase);
+        expect((errorEvent.data as TestErrorEventData).context.phase).toBe(phase);
       });
     });
   });
