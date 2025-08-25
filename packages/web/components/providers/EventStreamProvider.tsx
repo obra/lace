@@ -192,6 +192,11 @@ export function EventStreamProvider({
       onError: (error: unknown) => {
         console.error('Event stream error:', error);
       },
+      onAgentError: (event: LaceEvent) => {
+        console.warn('Agent error event received:', event);
+        // TODO: Integrate with error display UI
+        // For now, just log to console so we can see it's working
+      },
       // Agent event handlers - use single stable handler to prevent stale closures
       onUserMessage: stableAddAgentEventWithStreaming,
       onAgentMessage: stableAddAgentEventWithStreaming,
