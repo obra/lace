@@ -1,18 +1,24 @@
 @import 'tailwindcss';
 @import '@fortawesome/fontawesome-svg-core/styles.css';
 /* Optimized font loading with variable fonts and selective weights */
-@import '@fontsource/lato/400.css';  /* Regular weight only for Lato */
-@import '@fontsource/lato/700.css';  /* Bold weight for Lato */
-@import '@fontsource-variable/dm-sans/index.css';  /* DM Sans variable font */
-@import '@fontsource/google-sans-code/latin.css';  /* Google Sans Code Latin subset only */
+@import '@fontsource/lato/400.css'; /* Regular weight only for Lato */
+@import '@fontsource/lato/700.css'; /* Bold weight for Lato */
+@import '@fontsource-variable/dm-sans/index.css'; /* DM Sans variable font */
+@import '@fontsource/google-sans-code/latin.css'; /* Google Sans Code Latin subset only */
 @plugin "daisyui";
 
 /* Typography: utilities bound to local fonts */
 :root {
   /* Local fonts via @fontsource packages */
-  --font-lato: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-dm-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-google-sans-code: 'Google Sans Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  --font-lato:
+    'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-dm-sans:
+    'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-google-sans-code:
+    'Google Sans Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
 }
 
 /* Google Sans Code now loaded via @fontsource package for consistency */
@@ -39,8 +45,8 @@
 /* Use Google Sans Code for code and technical content */
 .font-code {
   font-family:
-    var(--font-google-sans-code, 'Google Sans Code'), 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    'Liberation Mono', 'Courier New', monospace;
+    var(--font-google-sans-code, 'Google Sans Code'), 'JetBrains Mono', ui-monospace,
+    SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 
 /* Use Lato where desired */
@@ -155,7 +161,9 @@ select {
 
 /* Monospace font utilities for code, terminal, and technical content */
 .font-mono {
-  font-family: 'Google Sans Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace !important;
+  font-family:
+    'Google Sans Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace !important;
   font-variant-ligatures: common-ligatures;
   font-feature-settings:
     'liga' 1,
@@ -501,7 +509,8 @@ select {
 
 /* Pulse animation for voice input */
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
     opacity: 1;
   }

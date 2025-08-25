@@ -7,16 +7,13 @@ export async function POST() {
   try {
     // Capture a message first
     Sentry.captureMessage('Test server API called', 'info');
-    
+
     // Then throw an error to test error reporting
     throw new Error('Test server-side error for Sentry');
   } catch (error) {
     // Sentry will automatically capture this
     Sentry.captureException(error);
-    
-    return NextResponse.json(
-      { error: 'Test server error triggered' },
-      { status: 500 }
-    );
+
+    return NextResponse.json({ error: 'Test server error triggered' }, { status: 500 });
   }
 }

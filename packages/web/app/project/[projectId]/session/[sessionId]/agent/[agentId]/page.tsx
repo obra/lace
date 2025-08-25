@@ -6,7 +6,7 @@ import { AgentPageClient } from './AgentPageClient';
 interface AgentPageProps {
   params: Promise<{
     projectId: string;
-    sessionId: string; 
+    sessionId: string;
     agentId: string;
   }>;
 }
