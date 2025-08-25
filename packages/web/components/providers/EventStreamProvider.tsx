@@ -85,6 +85,8 @@ export function EventStreamProvider({
   agentId,
   onAgentStateChange,
 }: EventStreamProviderProps) {
+  console.log('[EventStreamProvider] Component render start for session:', sessionId);
+  
   // Get tool approval handlers from ToolApprovalProvider
   const { handleApprovalRequest, handleApprovalResponse } = useToolApprovalContext();
 
