@@ -12,6 +12,7 @@
     "build": "react-router build",
     "build:standalone": "react-router build",
     "start": "NODE_ENV=production tsx server-custom.ts",
+    "typecheck": "tsc --noEmit",
     "lint": "NODE_ENV=development eslint; npx tsc --noEmit",
     "lint:fix": "eslint --fix",
     "format": "prettier --write app components e2e hooks lib public scripts test-utils types",
