@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFile, faSave, faExternalLinkAlt, faCopy, faSpinner } from '@/lib/fontawesome';
+import { faFile, faDownload, faExternalLinkAlt, faCopy, faSpinner } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { api } from '@/lib/api-client';
 import type { SessionFileContentResponse } from '@/types/session-files';
@@ -38,10 +38,10 @@ function FileViewerHeader({
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <FontAwesomeIcon icon={faFile} className="w-4 h-4 text-gray-500" />
+        <FontAwesomeIcon icon={faFile} className="w-4 h-4 text-base-content/60" />
         <div>
           <div className="font-medium">{fileName}</div>
-          <div className="text-sm text-gray-500">{filePath}</div>
+          <div className="text-sm text-base-content/60">{filePath}</div>
         </div>
       </div>
 
@@ -51,7 +51,7 @@ function FileViewerHeader({
         </button>
 
         <button onClick={onDownload} className="btn btn-ghost btn-sm" title="Download file">
-          <FontAwesomeIcon icon={faSave} className="w-4 h-4" />
+          <FontAwesomeIcon icon={faDownload} className="w-4 h-4" />
         </button>
 
         <button onClick={onPopOut} className="btn btn-ghost btn-sm" title="Open in new window">
@@ -96,7 +96,7 @@ function FileContent({ fileContent, isLoading, error }: FileContentProps) {
     return (
       <div className="flex items-center justify-center p-8">
         <FontAwesomeIcon icon={faSpinner} className="w-6 h-6 animate-spin mr-3" />
-        <span>Loading file content...</span>
+        <span className="text-base-content">Loading file content...</span>
       </div>
     );
   }
@@ -104,8 +104,8 @@ function FileContent({ fileContent, isLoading, error }: FileContentProps) {
   if (error) {
     return (
       <div className="p-8 text-center">
-        <div className="text-red-600 mb-4">{error}</div>
-        <div className="text-sm text-gray-500">
+        <div className="text-error mb-4">{error}</div>
+        <div className="text-sm text-base-content/60">
           The file could not be loaded. It may be too large, binary, or inaccessible.
         </div>
       </div>
@@ -113,13 +113,13 @@ function FileContent({ fileContent, isLoading, error }: FileContentProps) {
   }
 
   if (!fileContent) {
-    return <div className="p-8 text-center text-gray-500">No file selected</div>;
+    return <div className="p-8 text-center text-base-content/60">No file selected</div>;
   }
 
   return (
-    <div className="h-96 overflow-auto border border-gray-200 rounded">
+    <div className="h-96 overflow-auto border border-base-300 rounded">
       {/* File info header */}
-      <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 text-sm text-gray-600">
+      <div className="bg-base-200 px-3 py-2 border-b border-base-300 text-sm text-base-content/60">
         <div className="flex justify-between">
           <span>{fileContent.mimeType}</span>
           <span>{formatFileSize(fileContent.size)}</span>

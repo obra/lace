@@ -54,7 +54,7 @@ function getFileIcon(
   }
 
   // Simple file icon - could be enhanced with file type detection
-  return <FontAwesomeIcon icon={faFile} className="w-4 h-4 text-gray-500" />;
+  return <FontAwesomeIcon icon={faFile} className="w-4 h-4 text-base-content/60" />;
 }
 
 // Highlight search term in text
@@ -112,11 +112,14 @@ function FileTreeItem({
         {node.type === 'directory' && (
           <div className="w-4 h-4 flex items-center justify-center">
             {node.isLoading ? (
-              <FontAwesomeIcon icon={faSpinner} className="w-3 h-3 animate-spin text-gray-400" />
+              <FontAwesomeIcon
+                icon={faSpinner}
+                className="w-3 h-3 animate-spin text-base-content/40"
+              />
             ) : (
               <FontAwesomeIcon
                 icon={node.isExpanded ? faChevronDown : faChevronRight}
-                className="w-3 h-3 text-gray-400"
+                className="w-3 h-3 text-base-content/40"
               />
             )}
           </div>
@@ -133,7 +136,7 @@ function FileTreeItem({
 
         {/* File size for files */}
         {node.type === 'file' && node.size && (
-          <span className="text-xs text-gray-400">{formatFileSize(node.size)}</span>
+          <span className="text-xs text-base-content/40">{formatFileSize(node.size)}</span>
         )}
       </div>
 
@@ -305,7 +308,7 @@ export function SessionFileTree({
     return (
       <div className={`flex items-center justify-center p-4 ${className}`}>
         <FontAwesomeIcon icon={faSpinner} className="w-4 h-4 animate-spin mr-2" />
-        <span className="text-sm text-gray-600">Loading files...</span>
+        <span className="text-sm text-base-content/60">Loading files...</span>
       </div>
     );
   }
@@ -338,7 +341,7 @@ export function SessionFileTree({
         />
       ))}
       {fileTree.length === 0 && hasLoaded && (
-        <div className="p-4 text-center text-sm text-gray-500">No files found</div>
+        <div className="p-4 text-center text-sm text-base-content/60">No files found</div>
       )}
     </div>
   );
