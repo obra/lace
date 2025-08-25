@@ -12,6 +12,7 @@ import { ModelSelectionForm } from './ModelSelectionForm';
 import type { ProviderInfo, SessionConfiguration } from '@/types/api';
 import type { ProjectInfo, SessionInfo } from '@/types/core';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
+import { AVAILABLE_TOOLS } from '@/lib/available-tools';
 
 interface SessionEditModalProps {
   isOpen: boolean;
@@ -28,24 +29,6 @@ interface SessionEditModalProps {
   onSessionDescriptionChange: (description: string) => void;
   onSessionConfigChange: (config: SessionConfiguration) => void;
 }
-
-const AVAILABLE_TOOLS = [
-  'bash',
-  'file_read',
-  'file_write',
-  'file_edit',
-  'file_list',
-  'file_find',
-  'url_fetch',
-  'ripgrep_search',
-  'delegate',
-  'task_add',
-  'task_list',
-  'task_complete',
-  'task_update',
-  'task_add_note',
-  'task_view',
-];
 
 export const SessionEditModal = memo(function SessionEditModal({
   isOpen,

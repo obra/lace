@@ -13,6 +13,7 @@ import type { ProjectInfo } from '@/types/core';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import type { ProviderInfo } from '@/types/api';
+import { AVAILABLE_TOOLS } from '@/lib/available-tools';
 
 interface ProjectConfiguration {
   providerInstanceId?: string;
@@ -41,24 +42,6 @@ interface ProjectEditModalProps {
   ) => Promise<void>;
   initialConfig?: ProjectConfiguration;
 }
-
-const AVAILABLE_TOOLS = [
-  'bash',
-  'file_read',
-  'file_write',
-  'file_edit',
-  'file_list',
-  'file_find',
-  'url_fetch',
-  'ripgrep_search',
-  'delegate',
-  'task_add',
-  'task_list',
-  'task_complete',
-  'task_update',
-  'task_add_note',
-  'task_view',
-];
 
 export function ProjectEditModal({
   isOpen,
