@@ -35,6 +35,10 @@ export default [
   route('api/projects/:projectId/configuration', 'routes/api.projects.$projectId.configuration.ts'),
   route('api/projects/:projectId/environment', 'routes/api.projects.$projectId.environment.ts'),
   route('api/projects/:projectId/templates', 'routes/api.projects.$projectId.templates.ts'),
+  route(
+    'api/projects/:projectId/templates/:templateId',
+    'routes/api.projects.$projectId.templates.$templateId.ts'
+  ),
   route('api/projects/:projectId/sessions', 'routes/api.projects.$projectId.sessions.ts'),
   route(
     'api/projects/:projectId/sessions/:sessionId',
@@ -47,6 +51,10 @@ export default [
   route(
     'api/projects/:projectId/sessions/:sessionId/tasks/:taskId/notes',
     'routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.notes.ts'
+  ),
+  route(
+    'api/projects/:projectId/sessions/:sessionId/tasks/:taskId',
+    'routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.ts'
   ),
 
   // Session management routes
