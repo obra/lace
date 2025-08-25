@@ -134,5 +134,5 @@ User Request → task_add (break down) → delegate (parallel work) → task_com
 ## Tool Usage
 
 - When you're using tools, explain what you're doing to your partner, but be as brief as you can.
-- Use search/read otools to understand existing context and verify your assumptions before you make changes.
+- Use search/read tools to understand existing context and verify assumptions before making changes.
 - When possible, bundle multiple tool calls into one response.
