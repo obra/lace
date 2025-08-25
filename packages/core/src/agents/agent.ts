@@ -198,6 +198,15 @@ export class Agent extends EventEmitter {
       }
     });
 
+    // Default error handler to prevent unhandled error crashes
+    this.on('error', ({ error, context }) => {
+      logger.error('Agent error event emitted', {
+        error: error.message,
+        context,
+        threadId: this._threadId,
+      });
+    });
+
     // Events are emitted through _addEventAndEmit() helper method
   }
 
@@ -754,40 +763,37 @@ export class Agent extends EventEmitter {
           providerName: this.providerInstance?.providerName || 'missing',
         });
 
-        // Only emit error if there are listeners to avoid unhandled error crashes
-        if (this.listenerCount('error') > 0) {
-          try {
-            const agentInfo = this.getInfo();
-            this.emit('error', {
-              error: error instanceof Error ? error : new Error(String(error)),
-              context: {
-                phase: 'provider_response',
-                threadId: this._threadId,
-                // Enhanced context for error propagation
-                errorType: 'provider_failure' as ErrorType,
-                providerName: this.providerInstance?.providerName,
-                providerInstanceId: agentInfo.providerInstanceId,
-                modelId: agentInfo.modelId,
-                isRetryable: this.isRetryableError(error),
-                retryCount: 0,
-              },
-            });
-          } catch (infoError) {
-            // If getInfo() fails, emit basic error
-            this.emit('error', {
-              error: error instanceof Error ? error : new Error(String(error)),
-              context: {
-                phase: 'provider_response',
-                threadId: this._threadId,
-                errorType: 'provider_failure' as ErrorType,
-                providerName: this.providerInstance?.providerName,
-                providerInstanceId: 'unknown',
-                modelId: 'unknown',
-                isRetryable: this.isRetryableError(error),
-                retryCount: 0,
-              },
-            });
-          }
+        try {
+          const agentInfo = this.getInfo();
+          this.emit('error', {
+            error: error instanceof Error ? error : new Error(String(error)),
+            context: {
+              phase: 'provider_response',
+              threadId: this._threadId,
+              // Enhanced context for error propagation
+              errorType: 'provider_failure' as ErrorType,
+              providerName: this.providerInstance?.providerName,
+              providerInstanceId: agentInfo.providerInstanceId,
+              modelId: agentInfo.modelId,
+              isRetryable: this.isRetryableError(error),
+              retryCount: 0,
+            },
+          });
+        } catch (infoError) {
+          // If getInfo() fails, emit basic error
+          this.emit('error', {
+            error: error instanceof Error ? error : new Error(String(error)),
+            context: {
+              phase: 'provider_response',
+              threadId: this._threadId,
+              errorType: 'provider_failure' as ErrorType,
+              providerName: this.providerInstance?.providerName,
+              providerInstanceId: 'unknown',
+              modelId: 'unknown',
+              isRetryable: this.isRetryableError(error),
+              retryCount: 0,
+            },
+          });
         }
 
         // Complete turn tracking even when provider error occurs
@@ -867,39 +873,36 @@ export class Agent extends EventEmitter {
         stack: error instanceof Error ? error.stack : undefined,
       });
 
-      // Only emit error if there are listeners to avoid unhandled error crashes
-      if (this.listenerCount('error') > 0) {
-        try {
-          const agentInfo = this.getInfo();
-          this.emit('error', {
-            error: error instanceof Error ? error : new Error(String(error)),
-            context: {
-              phase: 'conversation_processing',
-              threadId: this._threadId,
-              errorType: 'processing_error' as ErrorType,
-              providerName: this.providerInstance?.providerName,
-              providerInstanceId: agentInfo.providerInstanceId,
-              modelId: agentInfo.modelId,
-              isRetryable: false,
-              retryCount: 0,
-            },
-          });
-        } catch (infoError) {
-          // If getInfo() fails, emit basic error
-          this.emit('error', {
-            error: error instanceof Error ? error : new Error(String(error)),
-            context: {
-              phase: 'conversation_processing',
-              threadId: this._threadId,
-              errorType: 'processing_error' as ErrorType,
-              providerName: this.providerInstance?.providerName,
-              providerInstanceId: 'unknown',
-              modelId: 'unknown',
-              isRetryable: false,
-              retryCount: 0,
-            },
-          });
-        }
+      try {
+        const agentInfo = this.getInfo();
+        this.emit('error', {
+          error: error instanceof Error ? error : new Error(String(error)),
+          context: {
+            phase: 'conversation_processing',
+            threadId: this._threadId,
+            errorType: 'processing_error' as ErrorType,
+            providerName: this.providerInstance?.providerName,
+            providerInstanceId: agentInfo.providerInstanceId,
+            modelId: agentInfo.modelId,
+            isRetryable: false,
+            retryCount: 0,
+          },
+        });
+      } catch (infoError) {
+        // If getInfo() fails, emit basic error
+        this.emit('error', {
+          error: error instanceof Error ? error : new Error(String(error)),
+          context: {
+            phase: 'conversation_processing',
+            threadId: this._threadId,
+            errorType: 'processing_error' as ErrorType,
+            providerName: this.providerInstance?.providerName,
+            providerInstanceId: 'unknown',
+            modelId: 'unknown',
+            isRetryable: false,
+            retryCount: 0,
+          },
+        });
       }
 
       // Complete turn tracking even when error occurs
@@ -1409,43 +1412,41 @@ export class Agent extends EventEmitter {
         error: error instanceof Error ? error.message : String(error),
       });
 
-      // Emit error event for tool failures only if there are listeners
-      if (this.listenerCount('error') > 0) {
-        try {
-          const agentInfo = this.getInfo();
-          this.emit('error', {
-            error: error instanceof Error ? error : new Error(`Tool execution failed: ${error instanceof Error ? error.message : String(error)}`),
-            context: {
-              phase: 'tool_execution',
-              threadId: this._threadId,
-              errorType: 'tool_execution' as ErrorType,
-              toolName: toolCall.name,
-              toolCallId: toolCall.id,
-              providerName: this.providerInstance?.providerName,
-              providerInstanceId: agentInfo.providerInstanceId,
-              modelId: agentInfo.modelId,
-              isRetryable: false,
-              retryCount: 0,
-            },
-          });
-        } catch (infoError) {
-          // If getInfo() fails, emit basic error
-          this.emit('error', {
-            error: error instanceof Error ? error : new Error(`Tool execution failed: ${error instanceof Error ? error.message : String(error)}`),
-            context: {
-              phase: 'tool_execution',
-              threadId: this._threadId,
-              errorType: 'tool_execution' as ErrorType,
-              toolName: toolCall.name,
-              toolCallId: toolCall.id,
-              providerName: this.providerInstance?.providerName,
-              providerInstanceId: 'unknown',
-              modelId: 'unknown',
-              isRetryable: false,
-              retryCount: 0,
-            },
-          });
-        }
+      // Emit error event for tool failures
+      try {
+        const agentInfo = this.getInfo();
+        this.emit('error', {
+          error: error instanceof Error ? error : new Error(`Tool execution failed: ${error instanceof Error ? error.message : String(error)}`),
+          context: {
+            phase: 'tool_execution',
+            threadId: this._threadId,
+            errorType: 'tool_execution' as ErrorType,
+            toolName: toolCall.name,
+            toolCallId: toolCall.id,
+            providerName: this.providerInstance?.providerName,
+            providerInstanceId: agentInfo.providerInstanceId,
+            modelId: agentInfo.modelId,
+            isRetryable: false,
+            retryCount: 0,
+          },
+        });
+      } catch (infoError) {
+        // If getInfo() fails, emit basic error
+        this.emit('error', {
+          error: error instanceof Error ? error : new Error(`Tool execution failed: ${error instanceof Error ? error.message : String(error)}`),
+          context: {
+            phase: 'tool_execution',
+            threadId: this._threadId,
+            errorType: 'tool_execution' as ErrorType,
+            toolName: toolCall.name,
+            toolCallId: toolCall.id,
+            providerName: this.providerInstance?.providerName,
+            providerInstanceId: 'unknown',
+            modelId: 'unknown',
+            isRetryable: false,
+            retryCount: 0,
+          },
+        });
       }
 
       // Only handle error if thread still exists
