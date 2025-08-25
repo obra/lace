@@ -1,11 +1,11 @@
 // ABOUTME: Event stream endpoint for all real-time events
 // ABOUTME: Multi-project, multi-session notifications via single stream
 
-import { NextRequest, NextResponse } from 'next/server';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { createErrorResponse } from '@/lib/server/api-utils';
+import type { Route } from './+types/api.events.stream';
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function loader({ request }: Route.LoaderArgs) {
   try {
     // Firehose approach: send ALL events, client-side filtering handles specificity
     const subscription = {};
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
 
     // Return SSE response
-    return new NextResponse(stream, {
+    return new Response(stream, {
       status: 200,
       headers: {
         'Content-Type': 'text/event-stream',
@@ -47,18 +47,4 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return createErrorResponse(errorMessage, 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
-}
-
-// Health check endpoint
-export async function HEAD(_request: NextRequest): Promise<NextResponse> {
-  const manager = EventStreamManager.getInstance();
-  const stats = manager.getStats();
-
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'X-Connection-Count': stats.totalConnections.toString(),
-      'X-Oldest-Connection': stats.oldestConnection?.toISOString() || 'none',
-    },
-  });
 }

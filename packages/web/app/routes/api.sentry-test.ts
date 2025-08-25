@@ -1,9 +1,9 @@
 // ABOUTME: API route for testing server-side Sentry error reporting
 // ABOUTME: Throws a test error when called to verify Sentry captures server errors
-import { NextResponse } from 'next/server';
+
 import * as Sentry from '@sentry/nextjs';
 
-export async function POST() {
+export async function action() {
   try {
     // Capture a message first
     Sentry.captureMessage('Test server API called', 'info');
@@ -14,6 +14,6 @@ export async function POST() {
     // Sentry will automatically capture this
     Sentry.captureException(error);
 
-    return NextResponse.json({ error: 'Test server error triggered' }, { status: 500 });
+    return Response.json({ error: 'Test server error triggered' }, { status: 500 });
   }
 }
