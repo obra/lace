@@ -1,7 +1,7 @@
 // ABOUTME: RESTful task notes API - add notes to tasks under project/session
 // ABOUTME: Provides note creation with proper nested route validation
 
-import { NextRequest } from 'next/server';
+import type { Route } from './+types/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.notes';
 import { z } from 'zod';
 import { asThreadId } from '@/types/core';
 import { Project } from '@/lib/server/lace-imports';
@@ -31,10 +31,10 @@ interface RouteContext {
   }>;
 }
 
-export async function POST(request: NextRequest, context: RouteContext) {
+export async function action(request: NextRequest, { request, params }: Route.ActionArgs) {
   try {
     const { projectId, sessionId, taskId } = await validateRouteParams(
-      context.params,
+      params,
       NotesRouteParamsSchema
     );
 
