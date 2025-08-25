@@ -22,7 +22,6 @@ import { FileReadTool } from '~/tools/implementations/file-read';
 import { FileWriteTool } from '~/tools/implementations/file-write';
 import { Project } from '~/projects/project';
 import { FileEditTool } from '~/tools/implementations/file-edit';
-import { FileInsertTool } from '~/tools/implementations/file-insert';
 import { FileListTool } from '~/tools/implementations/file-list';
 import { RipgrepSearchTool } from '~/tools/implementations/ripgrep-search';
 import { FileFindTool } from '~/tools/implementations/file-find';
@@ -806,7 +805,6 @@ export class Session {
       new FileReadTool(),
       new FileWriteTool(),
       new FileEditTool(),
-      new FileInsertTool(),
       new FileListTool(),
       new RipgrepSearchTool(),
       new FileFindTool(),
