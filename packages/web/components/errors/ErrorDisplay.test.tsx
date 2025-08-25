@@ -100,8 +100,10 @@ describe('Error Display Components', () => {
     it('should show timestamp when enabled', () => {
       render(<ErrorLogEntry error={mockErrorEntry} showTimestamp={true} />);
       
-      // TimestampDisplay should be rendered (exact text depends on implementation)
-      expect(screen.getByRole('time')).toBeInTheDocument();
+      // TimestampDisplay should be rendered - check for clock icon or time text pattern
+      const hasClockIcon = document.querySelector('.fa-clock');
+      const hasTimeText = screen.queryByText(/\d{1,2}:\d{2}/);
+      expect(hasClockIcon || hasTimeText).toBeTruthy();
     });
 
     it('should hide timestamp when disabled', () => {

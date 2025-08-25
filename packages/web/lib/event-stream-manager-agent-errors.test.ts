@@ -11,9 +11,29 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '@/lib/server/lace-imports';
-import type { LaceEvent } from '@/types/core';
+import type { LaceEvent, ErrorType, ErrorPhase } from '@/types/core';
+
+// Typed interface for expected AGENT_ERROR event data
+interface AgentErrorEventData {
+  errorType: ErrorType;
+  message: string;
+  stack?: string;
+  context: {
+    phase: ErrorPhase;
+    providerName?: string;
+    providerInstanceId?: string;
+    modelId?: string;
+    toolName?: string;
+    toolCallId?: string;
+    workingDirectory?: string;
+    retryAttempt?: number;
+  };
+  isRetryable: boolean;
+  retryCount: number;
+}
 
 describe('EventStreamManager Agent Error Handling', () => {
+  const _tempLaceDir = setupWebTest(); // Handles temp LACE_DIR + persistence automatically
   let eventStreamManager: EventStreamManager;
   let session: Session;
   let project: Project;
@@ -21,8 +41,8 @@ describe('EventStreamManager Agent Error Handling', () => {
   let capturedEvents: LaceEvent[] = [];
 
   beforeEach(async () => {
-    setupWebTest();
     setupTestProviderDefaults();
+    // Session.clearProviderCache(); // Not available in web package
 
     // Create provider instance
     providerInstanceId = await createTestProviderInstance({
@@ -62,12 +82,14 @@ describe('EventStreamManager Agent Error Handling', () => {
   });
 
   afterEach(async () => {
+    // Clean up in correct order
     vi.restoreAllMocks();
     session?.destroy();
     cleanupTestProviderDefaults();
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
     }
+    vi.clearAllMocks();
   });
 
   describe('Agent Error Event Forwarding', () => {
@@ -289,7 +311,7 @@ describe('EventStreamManager Agent Error Handling', () => {
       const errorEvent = capturedEvents.find(event => event.type === 'AGENT_ERROR');
       expect(errorEvent).toBeDefined();
       expect(errorEvent!.data).toHaveProperty('stack');
-      expect((errorEvent!.data as any).stack).toContain('Error with stack');
+      expect((errorEvent!.data as AgentErrorEventData).stack).toContain('Error with stack');
     });
   });
 
@@ -388,8 +410,8 @@ describe('EventStreamManager Agent Error Handling', () => {
 
       expect(coordinatorError).toBeDefined();
       expect(delegateError).toBeDefined();
-      expect((coordinatorError!.data as any).message).toBe('Coordinator error');
-      expect((delegateError!.data as any).message).toBe('Delegate error');
+      expect((coordinatorError!.data as AgentErrorEventData).message).toBe('Coordinator error');
+      expect((delegateError!.data as AgentErrorEventData).message).toBe('Delegate error');
     });
   });
 
@@ -487,10 +509,10 @@ describe('EventStreamManager Agent Error Handling', () => {
       // Verify each error type was captured correctly
       for (const errorType of errorTypes) {
         const errorEvent = agentErrorEvents.find(
-          event => (event.data as any).errorType === errorType
+          event => (event.data as AgentErrorEventData).errorType === errorType
         );
         expect(errorEvent).toBeDefined();
-        expect((errorEvent!.data as any).message).toBe(`Test ${errorType} error`);
+        expect((errorEvent!.data as AgentErrorEventData).message).toBe(`Test ${errorType} error`);
       }
     });
 
@@ -527,10 +549,10 @@ describe('EventStreamManager Agent Error Handling', () => {
       // Verify each phase was captured correctly
       for (const phase of phases) {
         const errorEvent = agentErrorEvents.find(
-          event => (event.data as any).context.phase === phase
+          event => (event.data as AgentErrorEventData).context.phase === phase
         );
         expect(errorEvent).toBeDefined();
-        expect((errorEvent!.data as any).message).toBe(`Test ${phase} error`);
+        expect((errorEvent!.data as AgentErrorEventData).message).toBe(`Test ${phase} error`);
       }
     });
   });
