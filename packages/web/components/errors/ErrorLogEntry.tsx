@@ -79,12 +79,12 @@ export function ErrorLogEntry({
           
           {error.errorContext && Object.keys(error.errorContext).length > 0 && (
             <div className="text-xs opacity-60 mb-2">
-              Failed {getPhaseDescription((error.errorContext as any).phase)}
-              {(error.errorContext as any).toolName && 
-                ` using ${(error.errorContext as any).toolName} tool`
+              Failed {getPhaseDescription(String(error.errorContext.phase || ''))}
+              {'toolName' in error.errorContext && error.errorContext.toolName ? 
+                ` using ${String(error.errorContext.toolName)} tool` : ''
               }
-              {(error.errorContext as any).providerName && 
-                ` via ${(error.errorContext as any).providerName} provider`
+              {'providerName' in error.errorContext && error.errorContext.providerName ? 
+                ` via ${String(error.errorContext.providerName)} provider` : ''
               }
             </div>
           )}
