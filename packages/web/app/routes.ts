@@ -38,6 +38,10 @@ export default [
     'api/projects/:projectId/sessions/:sessionId/tasks',
     'routes/api.projects.$projectId.sessions.$sessionId.tasks.ts'
   ),
+  route(
+    'api/projects/:projectId/sessions/:sessionId/tasks/:taskId/notes',
+    'routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.notes.ts'
+  ),
 
   // Session management routes
   route('api/sessions/:sessionId', 'routes/api.sessions.$sessionId.ts'),
