@@ -79,10 +79,7 @@ export function Sidebar({ open, onToggle, onSettingsClick, children }: SidebarPr
                 <div className="p-4 border-b border-base-300">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 gap-3">
-                      <Link
-                        href="/"
-                        className="flex items-center gap-2 font-semibold tracking-tight"
-                      >
+                      <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
                         <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-content">
                           ✦
                         </span>
@@ -196,7 +193,7 @@ function DesktopSidebar({
           <div className="flex items-center justify-between">
             <div className="flex-1 gap-3">
               <Link
-                href="/"
+                to="/"
                 className="flex items-center gap-3 font-semibold tracking-tight hover:opacity-80 transition-opacity"
               >
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-accent to-cyan-600 text-xs text-white shadow-md">

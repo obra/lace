@@ -19,10 +19,7 @@ const config = [
   {
     ignores: ['.next/**/*', 'node_modules/**/*', 'stories_parked/**/*', 'temp/**/*'],
   },
-  // Add Next.js specific configuration
-  ...compat.config({
-    extends: ['next/core-web-vitals'],
-  }),
+  // Remove Next.js configuration - using React Router v7 now
   // Extend selected rules from root config
   {
     files: ['**/*.ts', '**/*.tsx'],
