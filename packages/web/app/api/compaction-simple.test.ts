@@ -6,7 +6,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { getSessionService } from '@/lib/server/session-service';
 import {
@@ -169,7 +168,7 @@ describe('Compaction Integration Test', () => {
     await agent.start();
 
     // Check token usage via API
-    const request = new NextRequest(`http://localhost:3000/api/agents/${sessionId}`);
+    const request = new Request(`http://localhost:3000/api/agents/${sessionId}`);
     const response = await getAgent({
       request,
       params: { agentId: sessionId },
