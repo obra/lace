@@ -7,6 +7,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { loader, action } from '@/app/routes/api.provider.instances.$instanceId';
 import { parseResponse } from '@/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 import { ProviderRegistry } from '@/lib/server/lace-imports';
 import type { ProviderInstancesConfig } from '@/lib/server/lace-imports';
 import type {
@@ -63,10 +64,7 @@ describe('Provider Instance Detail API', () => {
       );
 
       const mockRequest = {} as Request;
-      const response = await loader({
-        request: mockRequest,
-        params: { instanceId: 'test-instance' },
-      });
+      const response = await loader(createLoaderArgs(mockRequest, { instanceId: 'test-instance' }));
       const data = await parseResponse<InstanceDetailResponse>(response);
 
       expect(response.status).toBe(200);
@@ -82,10 +80,7 @@ describe('Provider Instance Detail API', () => {
 
     it('should return 404 for non-existent instance', async () => {
       const mockRequest = {} as Request;
-      const response = await loader({
-        request: mockRequest,
-        params: { instanceId: 'nonexistent' },
-      });
+      const response = await loader(createLoaderArgs(mockRequest, { instanceId: 'nonexistent' }));
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(404);
@@ -124,10 +119,7 @@ describe('Provider Instance Detail API', () => {
       );
 
       const mockRequest = {} as Request;
-      const response = await action({
-        request: mockRequest,
-        params: { instanceId: 'test-instance' },
-      });
+      const response = await action(createActionArgs(mockRequest, { instanceId: 'test-instance' }));
       const data = await parseResponse<DeleteInstanceResponse>(response);
 
       expect(response.status).toBe(200);
@@ -147,10 +139,7 @@ describe('Provider Instance Detail API', () => {
 
     it('should return 404 for non-existent instance', async () => {
       const mockRequest = {} as Request;
-      const response = await action({
-        request: mockRequest,
-        params: { instanceId: 'nonexistent' },
-      });
+      const response = await action(createActionArgs(mockRequest, { instanceId: 'nonexistent' }));
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(404);
@@ -175,10 +164,7 @@ describe('Provider Instance Detail API', () => {
       );
 
       const mockRequest = {} as Request;
-      const response = await action({
-        request: mockRequest,
-        params: { instanceId: 'test-instance' },
-      });
+      const response = await action(createActionArgs(mockRequest, { instanceId: 'test-instance' }));
       const data = await parseResponse<DeleteInstanceResponse>(response);
 
       expect(response.status).toBe(200);
@@ -222,10 +208,7 @@ describe('Provider Instance Detail API', () => {
         json: async () => updateData,
       } as Request;
 
-      const response = await action({
-        request: mockRequest,
-        params: { instanceId: 'test-instance' },
-      });
+      const response = await action(createActionArgs(mockRequest, { instanceId: 'test-instance' }));
       const data = await parseResponse<UpdateInstanceResponse>(response);
 
       expect(response.status).toBe(200);
@@ -284,10 +267,7 @@ describe('Provider Instance Detail API', () => {
         json: async () => updateData,
       } as Request;
 
-      const response = await action({
-        request: mockRequest,
-        params: { instanceId: 'test-instance' },
-      });
+      const response = await action(createActionArgs(mockRequest, { instanceId: 'test-instance' }));
       const data = await parseResponse<UpdateInstanceResponse>(response);
 
       expect(response.status).toBe(200);
@@ -314,10 +294,7 @@ describe('Provider Instance Detail API', () => {
         json: async () => updateData,
       } as Request;
 
-      const response = await action({
-        request: mockRequest,
-        params: { instanceId: 'nonexistent' },
-      });
+      const response = await action(createActionArgs(mockRequest, { instanceId: 'nonexistent' }));
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(404);
@@ -349,10 +326,7 @@ describe('Provider Instance Detail API', () => {
         json: async () => updateData,
       } as Request;
 
-      const response = await action({
-        request: mockRequest,
-        params: { instanceId: 'test-instance' },
-      });
+      const response = await action(createActionArgs(mockRequest, { instanceId: 'test-instance' }));
 
       expect(response.status).toBe(400);
     });
@@ -383,10 +357,7 @@ describe('Provider Instance Detail API', () => {
         json: async () => updateData,
       } as Request;
 
-      const response = await action({
-        request: mockRequest,
-        params: { instanceId: 'test-instance' },
-      });
+      const response = await action(createActionArgs(mockRequest, { instanceId: 'test-instance' }));
       const data = await parseResponse<UpdateInstanceResponse>(response);
 
       expect(response.status).toBe(200);
