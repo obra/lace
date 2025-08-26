@@ -14,7 +14,7 @@ const ParamsSchema = z.object({
   threadId: ThreadIdSchema,
 });
 
-export async function loader({ request, params }: Route.LoaderArgs) {
+export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
     // Validate parameters
     const paramsResult = ParamsSchema.safeParse(params);
