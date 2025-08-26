@@ -6,7 +6,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { POST } from '@/app/api/threads/[threadId]/message/route';
+import { action as POST } from '@/app/routes/api.threads.$threadId.message';
+import { createActionArgs } from '@/test-utils/route-test-helpers';
 import type { MessageResponse } from '@/types/api';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { asThreadId } from '@/types/core';
