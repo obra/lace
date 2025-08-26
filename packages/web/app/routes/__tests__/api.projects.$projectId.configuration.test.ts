@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { loader as GET, action as PUT } from '@/app/routes/api.projects.$projectId.configuration';
+import { loader, action } from '@/app/routes/api.projects.$projectId.configuration';
 import { parseResponse } from '@/lib/serialization';
 
 // Type interfaces for API responses
@@ -59,7 +59,7 @@ describe('Project Configuration API', () => {
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
       const request = new NextRequest('http://localhost/api/projects/test-project/configuration');
-      const response = await GET({
+      const response = await loader({
         request,
         params: { projectId: 'test-project' },
       });
@@ -85,7 +85,7 @@ describe('Project Configuration API', () => {
       Project.getById = vi.fn().mockReturnValue(null);
 
       const request = new NextRequest('http://localhost/api/projects/nonexistent/configuration');
-      const response = await GET({
+      const response = await loader({
         request,
         params: { projectId: 'nonexistent' },
       });
@@ -102,7 +102,7 @@ describe('Project Configuration API', () => {
       });
 
       const request = new NextRequest('http://localhost/api/projects/test-project/configuration');
-      const response = await GET({
+      const response = await loader({
         request,
         params: { projectId: 'test-project' },
       });
@@ -136,7 +136,7 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT({
+      const response = await action({
         request,
         params: { projectId: 'test-project' },
       });
@@ -156,7 +156,7 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT({
+      const response = await action({
         request,
         params: { projectId: 'nonexistent' },
       });
@@ -183,7 +183,7 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT({
+      const response = await action({
         request,
         params: { projectId: 'test-project' },
       });
@@ -207,7 +207,7 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT({
+      const response = await action({
         request,
         params: { projectId: 'test-project' },
       });
