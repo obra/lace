@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET, PUT } from '@/app/api/agents/[agentId]/route';
+import { loader as GET, action as PUT } from '@/app/routes/api.agents.$agentId';
 import { parseResponse } from '@/lib/serialization';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
@@ -111,8 +111,9 @@ describe('Agent API', () => {
   describe('GET /api/agents/:agentId', () => {
     it('should return agent details when found', async () => {
       const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1');
-      const response = await GET(request, {
-        params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
+      const response = await GET({
+        request,
+        params: { agentId: 'lace_20241122_abc123.1' },
       });
       const data = await parseResponse<AgentWithTokenUsage>(response);
 
@@ -147,8 +148,9 @@ describe('Agent API', () => {
       });
 
       const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1');
-      const response = await GET(request, {
-        params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
+      const response = await GET({
+        request,
+        params: { agentId: 'lace_20241122_abc123.1' },
       });
       const data = await parseResponse<AgentWithTokenUsage>(response);
 
@@ -160,7 +162,7 @@ describe('Agent API', () => {
 
     it('should return 400 for invalid agent ID', async () => {
       const request = new NextRequest('http://localhost/api/agents/invalid-id');
-      const response = await GET(request, { params: Promise.resolve({ agentId: 'invalid-id' }) });
+      const response = await GET({ request, params: { agentId: 'invalid-id' } });
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -171,8 +173,9 @@ describe('Agent API', () => {
       mockSessionService.getSession.mockResolvedValue(null);
 
       const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1');
-      const response = await GET(request, {
-        params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
+      const response = await GET({
+        request,
+        params: { agentId: 'lace_20241122_abc123.1' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -184,8 +187,9 @@ describe('Agent API', () => {
       mockSession.getAgent.mockReturnValue(null);
 
       const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.99');
-      const response = await GET(request, {
-        params: Promise.resolve({ agentId: 'lace_20241122_abc123.99' }),
+      const response = await GET({
+        request,
+        params: { agentId: 'lace_20241122_abc123.99' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -207,8 +211,9 @@ describe('Agent API', () => {
       mockAgent.getTokenUsage = vi.fn().mockReturnValue(mockTokenUsage);
 
       const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1');
-      const response = await GET(request, {
-        params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
+      const response = await GET({
+        request,
+        params: { agentId: 'lace_20241122_abc123.1' },
       });
       const data = await parseResponse<AgentWithTokenUsage>(response);
 
@@ -229,10 +234,10 @@ describe('Agent API', () => {
 
       mockAgent.getTokenUsage = vi.fn().mockReturnValue(defaultTokenUsage);
 
-      const response = await GET(
-        new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1'),
-        { params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }) }
-      );
+      const response = await GET({
+        request: new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1'),
+        params: { agentId: 'lace_20241122_abc123.1' },
+      });
       const data = await parseResponse<AgentWithTokenUsage>(response);
 
       expect(data.tokenUsage).toEqual(defaultTokenUsage);
@@ -242,8 +247,9 @@ describe('Agent API', () => {
       mockSessionService.getSession.mockRejectedValue(new Error('Database error'));
 
       const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1');
-      const response = await GET(request, {
-        params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
+      const response = await GET({
+        request,
+        params: { agentId: 'lace_20241122_abc123.1' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -270,8 +276,9 @@ describe('Agent API', () => {
       mockSessionService.getSession.mockResolvedValue(mockSession);
       mockSession.getAgent.mockReturnValue(mockAgent);
 
-      const response = await PUT(request, {
-        params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
+      const response = await PUT({
+        request,
+        params: { agentId: 'lace_20241122_abc123.1' },
       });
       const data = await parseResponse<AgentWithTokenUsage>(response);
 
@@ -312,8 +319,9 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, {
-        params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
+      const response = await PUT({
+        request,
+        params: { agentId: 'lace_20241122_abc123.1' },
       });
 
       expect(response.status).toBe(200);
@@ -331,8 +339,9 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, {
-        params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
+      const response = await PUT({
+        request,
+        params: { agentId: 'lace_20241122_abc123.1' },
       });
 
       expect(response.status).toBe(200);
@@ -350,7 +359,7 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, { params: Promise.resolve({ agentId: 'invalid-id' }) });
+      const response = await PUT({ request, params: { agentId: 'invalid-id' } });
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -370,8 +379,9 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, {
-        params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
+      const response = await PUT({
+        request,
+        params: { agentId: 'lace_20241122_abc123.1' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -393,8 +403,9 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, {
-        params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
+      const response = await PUT({
+        request,
+        params: { agentId: 'lace_20241122_abc123.1' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -415,8 +426,9 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, {
-        params: Promise.resolve({ agentId: 'lace_20241122_abc123.99' }),
+      const response = await PUT({
+        request,
+        params: { agentId: 'lace_20241122_abc123.99' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -431,8 +443,9 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, {
-        params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
+      const response = await PUT({
+        request,
+        params: { agentId: 'lace_20241122_abc123.1' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -455,8 +468,9 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, {
-        params: Promise.resolve({ agentId: 'lace_20241122_abc123.1' }),
+      const response = await PUT({
+        request,
+        params: { agentId: 'lace_20241122_abc123.1' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
