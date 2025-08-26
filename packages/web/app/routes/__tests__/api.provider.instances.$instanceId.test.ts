@@ -2,7 +2,6 @@
 // ABOUTME: Verifies instance retrieval and deletion with real implementations
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { NextRequest } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -63,7 +62,7 @@ describe('Provider Instance Detail API', () => {
         JSON.stringify(config, null, 2)
       );
 
-      const mockRequest = {} as NextRequest;
+      const mockRequest = {} as Request;
       const response = await loader({
         request: mockRequest,
         params: { instanceId: 'test-instance' },
@@ -82,7 +81,7 @@ describe('Provider Instance Detail API', () => {
     });
 
     it('should return 404 for non-existent instance', async () => {
-      const mockRequest = {} as NextRequest;
+      const mockRequest = {} as Request;
       const response = await loader({
         request: mockRequest,
         params: { instanceId: 'nonexistent' },
@@ -124,7 +123,7 @@ describe('Provider Instance Detail API', () => {
         JSON.stringify({ apiKey: 'test-key' }, null, 2)
       );
 
-      const mockRequest = {} as NextRequest;
+      const mockRequest = {} as Request;
       const response = await action({
         request: mockRequest,
         params: { instanceId: 'test-instance' },
@@ -147,7 +146,7 @@ describe('Provider Instance Detail API', () => {
     });
 
     it('should return 404 for non-existent instance', async () => {
-      const mockRequest = {} as NextRequest;
+      const mockRequest = {} as Request;
       const response = await action({
         request: mockRequest,
         params: { instanceId: 'nonexistent' },
@@ -175,7 +174,7 @@ describe('Provider Instance Detail API', () => {
         JSON.stringify(config, null, 2)
       );
 
-      const mockRequest = {} as NextRequest;
+      const mockRequest = {} as Request;
       const response = await action({
         request: mockRequest,
         params: { instanceId: 'test-instance' },
@@ -221,7 +220,7 @@ describe('Provider Instance Detail API', () => {
 
       const mockRequest = {
         json: async () => updateData,
-      } as NextRequest;
+      } as Request;
 
       const response = await action({
         request: mockRequest,
@@ -283,7 +282,7 @@ describe('Provider Instance Detail API', () => {
 
       const mockRequest = {
         json: async () => updateData,
-      } as NextRequest;
+      } as Request;
 
       const response = await action({
         request: mockRequest,
@@ -313,7 +312,7 @@ describe('Provider Instance Detail API', () => {
 
       const mockRequest = {
         json: async () => updateData,
-      } as NextRequest;
+      } as Request;
 
       const response = await action({
         request: mockRequest,
@@ -348,7 +347,7 @@ describe('Provider Instance Detail API', () => {
 
       const mockRequest = {
         json: async () => updateData,
-      } as NextRequest;
+      } as Request;
 
       const response = await action({
         request: mockRequest,
@@ -382,7 +381,7 @@ describe('Provider Instance Detail API', () => {
 
       const mockRequest = {
         json: async () => updateData,
-      } as NextRequest;
+      } as Request;
 
       const response = await action({
         request: mockRequest,
