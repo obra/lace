@@ -122,9 +122,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     mockAgent.getPendingApprovals.mockReturnValue(mockPendingApprovals);
 
     const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
-    const params = Promise.resolve({ threadId });
-
-    const response = await GET(createLoaderArgs(request, params));
+    const response = await GET(createLoaderArgs(request, { threadId }));
 
     // Verify Agent.getPendingApprovals was called
     expect(mockAgent.getPendingApprovals).toHaveBeenCalledWith();
@@ -141,9 +139,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     mockAgent.getPendingApprovals.mockReturnValue([]);
 
     const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
-    const params = Promise.resolve({ threadId });
-
-    const response = await GET(createLoaderArgs(request, params));
+    const response = await GET(createLoaderArgs(request, { threadId }));
 
     expect(mockAgent.getPendingApprovals).toHaveBeenCalledWith();
     expect(response.status).toBe(200);
@@ -159,9 +155,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     mockSession.getAgent.mockReturnValue(null);
 
     const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
-    const params = Promise.resolve({ threadId });
-
-    const response = await GET(createLoaderArgs(request, params));
+    const response = await GET(createLoaderArgs(request, { threadId }));
 
     // Should not call getPendingApprovals if agent not found
     expect(mockAgent.getPendingApprovals).not.toHaveBeenCalled();
@@ -258,9 +252,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     mockAgent.getPendingApprovals.mockReturnValue(mockPendingApprovals);
 
     const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
-    const params = Promise.resolve({ threadId });
-
-    const response = await GET(createLoaderArgs(request, params));
+    const response = await GET(createLoaderArgs(request, { threadId }));
 
     expect(response.status).toBe(200);
     const data = await parseResponse<unknown[]>(response);
@@ -276,9 +268,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     });
 
     const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
-    const params = Promise.resolve({ threadId });
-
-    const response = await GET(createLoaderArgs(request, params));
+    const response = await GET(createLoaderArgs(request, { threadId }));
 
     expect(response.status).toBe(500);
     const data = await parseResponse<{ error: string; code?: string }>(response);
