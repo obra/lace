@@ -17,6 +17,7 @@ import {
   cleanupTestProviderInstances,
 } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
+import { createActionArgs } from '@/test-utils/route-test-helpers';
 
 // Console capture for verifying error output
 let consoleLogs: string[] = [];
@@ -89,9 +90,7 @@ describe('Thread Messaging API', () => {
       body: JSON.stringify({ message: 'Hello, agent!' }),
     });
 
-    const response = await POST(request, {
-      params: Promise.resolve({ threadId: realThreadId }),
-    });
+    const response = await POST(createActionArgs(request, { threadId: realThreadId }));
 
     expect(response.status).toBe(202);
     const data = await parseResponse<MessageResponse>(response);
@@ -107,9 +106,7 @@ describe('Thread Messaging API', () => {
       body: JSON.stringify({ message: 'Hello!' }),
     });
 
-    const response = await POST(request, {
-      params: Promise.resolve({ threadId: 'invalid-thread-id' }),
-    });
+    const response = await POST(createActionArgs(request, { threadId: 'invalid-thread-id' }));
 
     expect(response.status).toBe(400);
   });
@@ -121,9 +118,7 @@ describe('Thread Messaging API', () => {
       body: JSON.stringify({ message: 'Hello!' }),
     });
 
-    const response = await POST(request, {
-      params: Promise.resolve({ threadId: 'lace_20240101_fake12' }),
-    });
+    const response = await POST(createActionArgs(request, { threadId: 'lace_20240101_fake12' }));
 
     expect(response.status).toBe(404);
   });
@@ -135,9 +130,7 @@ describe('Thread Messaging API', () => {
       body: JSON.stringify({}),
     });
 
-    const response = await POST(request, {
-      params: Promise.resolve({ threadId: realThreadId }),
-    });
+    const response = await POST(createActionArgs(request, { threadId: realThreadId }));
 
     expect(response.status).toBe(400);
   });
@@ -149,9 +142,7 @@ describe('Thread Messaging API', () => {
       body: JSON.stringify({ message: '' }),
     });
 
-    const response = await POST(request, {
-      params: Promise.resolve({ threadId: realThreadId }),
-    });
+    const response = await POST(createActionArgs(request, { threadId: realThreadId }));
 
     expect(response.status).toBe(400);
   });
@@ -172,9 +163,7 @@ describe('Thread Messaging API', () => {
       body: JSON.stringify({ message: 'Test message' }),
     });
 
-    const response = await POST(request, {
-      params: Promise.resolve({ threadId: realThreadId }),
-    });
+    const response = await POST(createActionArgs(request, { threadId: realThreadId }));
 
     expect(response.status).toBe(202);
 
@@ -214,9 +203,7 @@ describe('Thread Messaging API', () => {
     // Clear any previous console logs for this specific test
     consoleLogs = [];
 
-    const response = await POST(request, {
-      params: Promise.resolve({ threadId: realThreadId }),
-    });
+    const response = await POST(createActionArgs(request, { threadId: realThreadId }));
 
     expect(response.status).toBe(400);
 
@@ -243,9 +230,7 @@ describe('Thread Messaging API', () => {
       body: JSON.stringify({ message: 'Hello delegate!' }),
     });
 
-    const response = await POST(request, {
-      params: Promise.resolve({ threadId: delegateThreadId }),
-    });
+    const response = await POST(createActionArgs(request, { threadId: delegateThreadId }));
 
     expect(response.status).toBe(202);
     const data = await parseResponse<MessageResponse>(response);
@@ -260,9 +245,7 @@ describe('Thread Messaging API', () => {
       body: JSON.stringify({ message: 'Test auto-start' }),
     });
 
-    const response = await POST(request, {
-      params: Promise.resolve({ threadId: realThreadId }),
-    });
+    const response = await POST(createActionArgs(request, { threadId: realThreadId }));
 
     expect(response.status).toBe(202);
 
