@@ -55,9 +55,9 @@ test.describe('Error Propagation E2E', () => {
     const retryButtons = await page.locator('[data-testid*="retry"], button:has-text("Retry")').all();
     const errorLogs = await page.locator('[data-testid*="error-log"], .error-log').all();
     
-    console.log(`Found ${errorElements.length} error UI elements`);
-    console.log(`Found ${retryButtons.length} retry buttons`);
-    console.log(`Found ${errorLogs.length} error log sections`);
+    console.warn(`Found ${errorElements.length} error UI elements`);
+    console.warn(`Found ${retryButtons.length} retry buttons`);
+    console.warn(`Found ${errorLogs.length} error log sections`);
     
     // Step 6: Check for error-related console messages
     const hasErrorLogs = consoleMessages.some(msg => 
@@ -67,9 +67,9 @@ test.describe('Error Propagation E2E', () => {
     );
     
     if (hasErrorLogs) {
-      console.log('✅ Error-related logging found in browser console');
+      console.warn('✅ Error-related logging found in browser console');
     } else {
-      console.log('ℹ️  No error-specific logs in console');
+      console.warn('ℹ️  No error-specific logs in console');
     }
     
     // Document current error propagation infrastructure
@@ -80,7 +80,7 @@ test.describe('Error Propagation E2E', () => {
       consoleMessageCount: consoleMessages.length,
     };
     
-    console.log('Error propagation infrastructure:', errorInfrastructure);
+    console.warn('Error propagation infrastructure:', errorInfrastructure);
     
     // Test always passes - documenting current capabilities
     expect(true).toBeTruthy();
@@ -108,9 +108,9 @@ test.describe('Error Propagation E2E', () => {
                         pageContent.includes('error');
     
     if (hasToolError) {
-      console.log('✅ Tool execution error visible in UI');
+      console.warn('✅ Tool execution error visible in UI');
     } else {
-      console.log('ℹ️  Tool error not visible - documenting current state');
+      console.warn('ℹ️  Tool error not visible - documenting current state');
     }
     
     // Test passes regardless - documenting current capabilities
@@ -130,13 +130,13 @@ test.describe('Error Propagation E2E', () => {
     const errorToasts = await page.locator('[data-testid*="error-toast"], .toast').all();
     const errorDisplays = await page.locator('[data-testid*="error-display"], .alert-error').all();
     
-    console.log(`Found ${retryButtons.length} retry buttons`);
-    console.log(`Found ${errorToasts.length} error toasts`);
-    console.log(`Found ${errorDisplays.length} error displays`);
+    console.warn(`Found ${retryButtons.length} retry buttons`);
+    console.warn(`Found ${errorToasts.length} error toasts`);
+    console.warn(`Found ${errorDisplays.length} error displays`);
     
     // Document current retry capabilities
     if (retryButtons.length > 0) {
-      console.log('✅ Retry functionality UI elements present');
+      console.warn('✅ Retry functionality UI elements present');
       
       // Test retry button interaction
       const firstRetryButton = retryButtons[0];
@@ -144,10 +144,10 @@ test.describe('Error Propagation E2E', () => {
       
       if (isVisible) {
         await firstRetryButton.click();
-        console.log('✅ Retry button clickable');
+        console.warn('✅ Retry button clickable');
       }
     } else {
-      console.log('ℹ️  No retry UI elements found - documenting current state');
+      console.warn('ℹ️  No retry UI elements found - documenting current state');
     }
     
     // Test always passes - documenting current error recovery capabilities
@@ -167,9 +167,9 @@ test.describe('Error Propagation E2E', () => {
     const errorDetails = await page.locator('[data-testid*="error-details"], .error-context').all();
     const stackTraces = await page.locator('pre, .stack-trace, code').all();
     
-    console.log(`Found ${contextToggles.length} context toggle elements`);
-    console.log(`Found ${errorDetails.length} error detail sections`);
-    console.log(`Found ${stackTraces.length} code/stack trace elements`);
+    console.warn(`Found ${contextToggles.length} context toggle elements`);
+    console.warn(`Found ${errorDetails.length} error detail sections`);
+    console.warn(`Found ${stackTraces.length} code/stack trace elements`);
     
     // Test context disclosure functionality
     if (contextToggles.length > 0) {
@@ -178,15 +178,15 @@ test.describe('Error Propagation E2E', () => {
       
       if (isVisible) {
         await firstToggle.click();
-        console.log('✅ Error context toggle works');
+        console.warn('✅ Error context toggle works');
       }
     }
     
     // Document current error context capabilities
     if (errorDetails.length > 0 || stackTraces.length > 0) {
-      console.log('✅ Error debugging information UI present');
+      console.warn('✅ Error debugging information UI present');
     } else {
-      console.log('ℹ️  No error debugging UI found - documenting current state');
+      console.warn('ℹ️  No error debugging UI found - documenting current state');
     }
     
     // Test always passes - documenting current error context display capabilities
