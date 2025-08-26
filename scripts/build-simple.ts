@@ -124,58 +124,45 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
   console.log(`   📝 Name: ${name}`);
   console.log(`   📁 Output: ${outdir}\n`);
 
-  // Step 1: Check Next.js build exists
-  console.log('1️⃣ Checking Next.js build...');
+  // Step 1: Check React Router v7 build exists
+  console.log('1️⃣ Checking React Router v7 build...');
 
-  // Step 1.5: Copy custom server (no compilation - let Bun run the TypeScript directly)
-  console.log('1️⃣.5️⃣ Using custom server TypeScript file...');
-
-  if (!existsSync('packages/web/server-custom.ts')) {
-    throw new Error('Custom server-custom.ts not found');
+  if (!existsSync('packages/web/build')) {
+    throw new Error('React Router v7 build not found. Run: cd packages/web && npm run build');
   }
-  console.log('✅ Custom server ready\n');
+  console.log('✅ React Router v7 build ready\n');
 
-  // Step 2: Create ZIP of standalone build + custom server
-  console.log('2️⃣ Creating ZIP of standalone build...');
-  const zipPath = 'build/lace-standalone.zip';
+  // Step 2: Create ZIP of React Router v7 build + core backend
+  console.log('2️⃣ Creating ZIP of React Router v7 build...');
+  const zipPath = 'build/lace-react-router.zip';
   mkdirSync('build', { recursive: true });
 
   // Create temp directory to organize files for ZIP
-  const tempBuildDir = 'build/temp-standalone';
+  const tempBuildDir = 'build/temp-react-router';
   rmSync(tempBuildDir, { recursive: true, force: true });
   mkdirSync(tempBuildDir, { recursive: true });
 
-  // Copy standalone build
-  cpSync('packages/web/.next/standalone', `${tempBuildDir}/standalone`, { recursive: true });
+  // Copy React Router v7 build output
+  cpSync('packages/web/build', `${tempBuildDir}/build`, { recursive: true });
+  console.log('📁 React Router v7 build copied');
 
-  // Copy core package source directory to match alias ~/ -> packages/core/src
-  mkdirSync(`${tempBuildDir}/standalone/packages/core`, { recursive: true });
-  cpSync('packages/core/src', `${tempBuildDir}/standalone/packages/core/src`, { recursive: true });
-  console.log('📁 Core source directory copied to standalone/packages/core/src/');
+  // Copy core backend source
+  cpSync('src', `${tempBuildDir}/src`, { recursive: true });
+  console.log('📁 Core backend copied to src/');
 
-  // The standalone build already includes all necessary dependencies
-  console.log('📦 Using Next.js standalone dependencies (built-in)...');
-  console.log('   ✅ Dependencies included via Next.js outputFileTracingIncludes');
-
-  // Copy static files to the correct location where Next.js server expects them
-  // The server runs from packages/web, so static files must be at packages/web/.next/static
-  if (existsSync('packages/web/.next/static')) {
-    const nextDir = `${tempBuildDir}/standalone/packages/web/.next`;
-    mkdirSync(nextDir, { recursive: true });
-    cpSync('packages/web/.next/static', `${nextDir}/static`, { recursive: true });
-    console.log('📁 Static assets copied to packages/web/.next/static/');
-  } else {
-    console.warn('⚠️  Warning: No .next/static directory found - static assets may be missing');
+  // Copy package.json and dependencies
+  cpSync('package.json', `${tempBuildDir}/package.json`);
+  if (existsSync('node_modules')) {
+    cpSync('node_modules', `${tempBuildDir}/node_modules`, { recursive: true });
+    console.log('📦 Dependencies copied');
   }
 
-  // Replace the standalone server with our custom enhanced server (TypeScript)
-  // First remove the original server.js from packages/web
-  rmSync(`${tempBuildDir}/standalone/packages/web/server.js`, { force: true });
-  // Then copy our TypeScript server to the packages/web directory where Next.js dependencies are
-  cpSync('packages/web/server-custom.ts', `${tempBuildDir}/standalone/packages/web/server.ts`);
+  // Copy server startup file
+  cpSync('packages/web/server-custom.ts', `${tempBuildDir}/server.ts`);
+  console.log('🖥️ Server file copied');
 
-  // Create ZIP with just the standalone build + our server
-  execSync(`cd ${tempBuildDir} && zip -r ../lace-standalone.zip . -q`, {
+  // Create ZIP with React Router build + backend + server
+  execSync(`cd ${tempBuildDir} && zip -r ../lace-react-router.zip . -q`, {
     stdio: 'pipe',
   });
 
