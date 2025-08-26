@@ -116,8 +116,9 @@ describe('Full Conversation Flow', () => {
       }
     );
 
-    const sessionResponse = await createProjectSession(createSessionRequest, {
-      params: Promise.resolve({ projectId }),
+    const sessionResponse = await createProjectSession({
+      request: createSessionRequest,
+      params: { projectId },
     });
 
     if (sessionResponse.status !== 201) {
@@ -146,8 +147,9 @@ describe('Full Conversation Flow', () => {
       }
     );
 
-    const agentResponse = await spawnAgent(spawnAgentRequest, {
-      params: Promise.resolve({ sessionId: sessionId as string }),
+    const agentResponse = await spawnAgent({
+      request: spawnAgentRequest,
+      params: { sessionId: sessionId as string },
     });
     expect(agentResponse.status).toBe(201);
     const agentData = await parseResponse<{ threadId: ThreadId; name: string }>(agentResponse);
@@ -158,7 +160,10 @@ describe('Full Conversation Flow', () => {
     const streamRequest = new NextRequest(
       `http://localhost:3000/api/events/stream?sessions=${sessionId}`
     );
-    const streamResponse = await streamEvents(streamRequest);
+    const streamResponse = await streamEvents({
+      request: streamRequest,
+      params: {},
+    });
 
     expect(streamResponse.status).toBe(200);
     expect(streamResponse.headers.get('Content-Type')).toBe('text/event-stream');
@@ -176,8 +181,9 @@ describe('Full Conversation Flow', () => {
       }
     );
 
-    const messageResponse = await sendMessage(messageRequest, {
-      params: Promise.resolve({ threadId: agentThreadId as string }),
+    const messageResponse = await sendMessage({
+      request: messageRequest,
+      params: { threadId: agentThreadId as string },
     });
     expect(messageResponse.status).toBe(202);
     const messageData = await parseResponse<{ status: string }>(messageResponse);
@@ -211,8 +217,9 @@ describe('Full Conversation Flow', () => {
         headers: { 'Content-Type': 'application/json' },
       }
     );
-    const sessionResponse = await createProjectSession(createSessionRequest, {
-      params: Promise.resolve({ projectId }),
+    const sessionResponse = await createProjectSession({
+      request: createSessionRequest,
+      params: { projectId },
     });
     expect(sessionResponse.status).toBe(201);
     const sessionData = await parseResponse<SessionInfo>(sessionResponse);
@@ -231,8 +238,9 @@ describe('Full Conversation Flow', () => {
         headers: { 'Content-Type': 'application/json' },
       }
     );
-    const agent1Response = await spawnAgent(spawnAgent1Request, {
-      params: Promise.resolve({ sessionId: sessionId as string }),
+    const agent1Response = await spawnAgent({
+      request: spawnAgent1Request,
+      params: { sessionId: sessionId as string },
     });
     expect(agent1Response.status).toBe(201);
 
@@ -249,8 +257,9 @@ describe('Full Conversation Flow', () => {
         headers: { 'Content-Type': 'application/json' },
       }
     );
-    const agent2Response = await spawnAgent(spawnAgent2Request, {
-      params: Promise.resolve({ sessionId: sessionId as string }),
+    const agent2Response = await spawnAgent({
+      request: spawnAgent2Request,
+      params: { sessionId: sessionId as string },
     });
     expect(agent2Response.status).toBe(201);
 
@@ -258,8 +267,9 @@ describe('Full Conversation Flow', () => {
     const listAgentsRequest = new NextRequest(
       `http://localhost:3000/api/sessions/${sessionId}/agents`
     );
-    const listResponse = await listAgents(listAgentsRequest, {
-      params: Promise.resolve({ sessionId: sessionId as string }),
+    const listResponse = await listAgents({
+      request: listAgentsRequest,
+      params: { sessionId: sessionId as string },
     });
     expect(listResponse.status).toBe(200);
     const agents = await parseResponse<Array<{ name: string }>>(listResponse);
@@ -292,8 +302,8 @@ describe('Full Conversation Flow', () => {
     const projectId1 = project1.getId();
     const projectId2 = project2.getId();
 
-    const session1Response = await createProjectSession(
-      new NextRequest(`http://localhost:3000/api/projects/${projectId1}/sessions`, {
+    const session1Response = await createProjectSession({
+      request: new NextRequest(`http://localhost:3000/api/projects/${projectId1}/sessions`, {
         method: 'POST',
         body: JSON.stringify({
           name: 'Session 1',
@@ -302,13 +312,13 @@ describe('Full Conversation Flow', () => {
         }),
         headers: { 'Content-Type': 'application/json' },
       }),
-      { params: Promise.resolve({ projectId: projectId1 }) }
-    );
+      params: { projectId: projectId1 },
+    });
     const session1Data = await parseResponse<SessionInfo>(session1Response);
     const session1Id: ThreadId = session1Data.id as ThreadId;
 
-    const session2Response = await createProjectSession(
-      new NextRequest(`http://localhost:3000/api/projects/${projectId2}/sessions`, {
+    const session2Response = await createProjectSession({
+      request: new NextRequest(`http://localhost:3000/api/projects/${projectId2}/sessions`, {
         method: 'POST',
         body: JSON.stringify({
           name: 'Session 2',
@@ -317,19 +327,21 @@ describe('Full Conversation Flow', () => {
         }),
         headers: { 'Content-Type': 'application/json' },
       }),
-      { params: Promise.resolve({ projectId: projectId2 }) }
-    );
+      params: { projectId: projectId2 },
+    });
     const session2Data = await parseResponse<SessionInfo>(session2Response);
     const session2Id: ThreadId = session2Data.id as ThreadId;
 
     // Connect to streams
-    await streamEvents(
-      new NextRequest(`http://localhost:3000/api/events/stream?sessions=${session1Id}`)
-    );
+    await streamEvents({
+      request: new NextRequest(`http://localhost:3000/api/events/stream?sessions=${session1Id}`),
+      params: {},
+    });
 
-    await streamEvents(
-      new NextRequest(`http://localhost:3000/api/events/stream?sessions=${session2Id}`)
-    );
+    await streamEvents({
+      request: new NextRequest(`http://localhost:3000/api/events/stream?sessions=${session2Id}`),
+      params: {},
+    });
 
     // Verify each session has its own connection
     expect(addConnectionSpy).toHaveBeenCalledWith(expect.any(Object), expect.any(Object));
