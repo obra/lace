@@ -43,6 +43,41 @@ export function ErrorDisplay({
     return errorType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
+  // Safe formatter for context values that handles objects/arrays properly
+  const safeFormatValue = (value: unknown): string => {
+    if (typeof value === 'string') {
+      // Truncate very long strings
+      return value.length > 300 ? value.substring(0, 300) + '…' : value;
+    }
+    
+    if (value === null || value === undefined) {
+      return String(value);
+    }
+
+    if (typeof value === 'object') {
+      try {
+        // Handle objects/arrays with circular reference protection
+        const seen = new Set();
+        const result = JSON.stringify(value, (key, val) => {
+          if (typeof val === 'object' && val !== null) {
+            if (seen.has(val)) {
+              return '[Circular Reference]';
+            }
+            seen.add(val);
+          }
+          return val;
+        }, 2);
+        
+        // Truncate very long JSON
+        return result.length > 300 ? result.substring(0, 300) + '…' : result;
+      } catch {
+        return '[Complex Object]';
+      }
+    }
+
+    return String(value);
+  };
+
   if (compact) {
     return (
       <div className={`alert ${getAlertClass()} compact`} role="alert">
@@ -85,7 +120,7 @@ export function ErrorDisplay({
                   {Object.entries(error.context).map(([key, value]) => (
                     <div key={key} className="flex gap-2">
                       <span className="text-base-content/60">{key}:</span>
-                      <span>{String(value)}</span>
+                      <span>{safeFormatValue(value)}</span>
                     </div>
                   ))}
                 </div>

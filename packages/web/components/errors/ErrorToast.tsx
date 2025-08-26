@@ -1,7 +1,7 @@
 // ABOUTME: Toast notification component for immediate error feedback
 // ABOUTME: Provides non-intrusive error notifications with auto-dismiss and retry actions
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faExclamationTriangle, 
@@ -33,16 +33,22 @@ export function ErrorToast({
   compact = false
 }: ErrorToastProps): React.JSX.Element {
   const [isVisible, setIsVisible] = useState(true);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-dismiss functionality
   useEffect(() => {
     if (autoDismiss > 0) {
-      const timer = setTimeout(() => {
+      timerRef.current = setTimeout(() => {
         setIsVisible(false);
         onDismiss?.();
       }, autoDismiss);
 
-      return () => clearTimeout(timer);
+      return () => {
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
+      };
     }
   }, [autoDismiss, onDismiss]);
 
@@ -75,6 +81,11 @@ export function ErrorToast({
   };
 
   const handleDismiss = () => {
+    // Clear the auto-dismiss timer to prevent double onDismiss calls
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
     setIsVisible(false);
     onDismiss?.();
   };
