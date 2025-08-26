@@ -129,23 +129,25 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
 
             if (urlPath.includes('/notes') && method === 'POST' && taskIdFromUrl) {
               // Handle POST /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}/notes
-              return await addNote(request, {
-                params: Promise.resolve({
+              return await addNote({
+                request,
+                params: {
                   projectId: routeProjectId,
                   sessionId: routeSessionId,
                   taskId: taskIdFromUrl,
-                }),
+                },
               });
             } else if (taskIdFromUrl && !urlPath.includes('/notes')) {
               // Handle individual task operations: GET/PATCH/DELETE /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}
               const response = await (
                 method === 'GET' ? getTask : method === 'PATCH' ? updateTask : deleteTask
-              )(request, {
-                params: Promise.resolve({
+              )({
+                request,
+                params: {
                   projectId: routeProjectId,
                   sessionId: routeSessionId,
                   taskId: taskIdFromUrl,
-                }),
+                },
               });
 
               if (method === 'GET') {
@@ -159,19 +161,21 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
               return response;
             } else if (method === 'POST' && urlPath.endsWith('/tasks')) {
               // Handle POST /api/projects/{projectId}/sessions/{sessionId}/tasks
-              return await createTask(request, {
-                params: Promise.resolve({
+              return await createTask({
+                request,
+                params: {
                   projectId: routeProjectId,
                   sessionId: routeSessionId,
-                }),
+                },
               });
             } else if (method === 'GET' && urlPath.endsWith('/tasks')) {
               // Handle GET /api/projects/{projectId}/sessions/{sessionId}/tasks
-              return await listTasks(request, {
-                params: Promise.resolve({
+              return await listTasks({
+                request,
+                params: {
                   projectId: routeProjectId,
                   sessionId: routeSessionId,
-                }),
+                },
               });
             }
           }
