@@ -20,15 +20,15 @@ import { TaskAPIClient } from '@/lib/client/task-api';
 
 // Import API routes to test against
 import {
-  GET as listTasks,
-  POST as createTask,
+  loader as listTasks,
+  action as createTask,
 } from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks';
 import {
-  GET as getTask,
-  PATCH as updateTask,
-  DELETE as deleteTask,
+  loader as getTask,
+  action as updateTask,
+  action as deleteTask,
 } from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId';
-import { POST as addNote } from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.notes';
+import { action as addNote } from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.notes';
 import { NextRequest } from 'next/server';
 
 // Mock external dependencies only
