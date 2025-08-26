@@ -18,21 +18,23 @@ export class RetryManager {
   ): Promise<{ success: boolean; error?: string }> {
     const key = `agent-${agent.threadId}-${errorType}`;
     const currentAttempts = this.retryAttempts.get(key) || 0;
+    const newAttempts = currentAttempts + 1;
 
-    if (currentAttempts >= this.MAX_RETRIES) {
+    if (newAttempts > this.MAX_RETRIES) {
       return { success: false, error: 'Maximum retry attempts exceeded' };
     }
 
-    // Calculate exponential backoff delay
-    const delay = this.BASE_DELAY * Math.pow(2, currentAttempts);
-    await new Promise((resolve) => setTimeout(resolve, delay));
+    // Pre-increment to prevent race conditions
+    this.retryAttempts.set(key, newAttempts);
 
-    this.retryAttempts.set(key, currentAttempts + 1);
+    // Calculate exponential backoff delay using incremented attempts
+    const delay = this.BASE_DELAY * Math.pow(2, newAttempts - 1);
+    await new Promise((resolve) => setTimeout(resolve, delay));
 
     logger.debug('RetryManager: Attempting agent retry', {
       threadId: agent.threadId,
       errorType,
-      attempt: currentAttempts + 1,
+      attempt: newAttempts,
       delay,
     });
 
