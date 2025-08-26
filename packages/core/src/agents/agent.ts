@@ -1373,10 +1373,13 @@ export class Agent extends EventEmitter {
         error: error instanceof Error ? error.message : String(error),
       });
 
-      // Emit error event for tool failures  
-      const toolError = error instanceof Error ? error : new Error(
-        `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`
-      );
+      // Emit error event for tool failures
+      const toolError =
+        error instanceof Error
+          ? error
+          : new Error(
+              `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`
+            );
       this._emitError(toolError, {
         phase: 'tool_execution',
         threadId: this._threadId,

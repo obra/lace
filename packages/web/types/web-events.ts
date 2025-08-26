@@ -65,15 +65,15 @@ export interface TimelineEntry {
 export interface ErrorEntry extends TimelineEntry {
   type: 'error';
   errorType: ErrorType;
-  errorMessage: string;
-  errorContext?: Record<string, unknown>;
+  message: string;
+  context?: Record<string, unknown>;
   isRetryable: boolean;
   retryCount?: number;
   canRetry?: boolean;
   retryHandler?: () => void;
 }
 
-export interface ErrorLogEntry {
+export interface AgentErrorLogEntry {
   id: string;
   timestamp: Date;
   errorType: ErrorType;

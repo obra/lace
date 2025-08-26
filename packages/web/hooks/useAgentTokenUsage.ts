@@ -1,7 +1,7 @@
 // ABOUTME: Hook for agent token usage tracking without polling
 // ABOUTME: Loads token data from agent API + real-time updates from SSE events
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSessionEvents } from '@/components/providers/EventStreamProvider';
 import type { ThreadId, CombinedTokenUsage, ThreadTokenUsage } from '@/types/core';
 import type { LaceEvent } from '@/types/core';
@@ -98,18 +98,24 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
   // Use shared event stream context for real-time updates
   const { events } = useSessionEvents();
   
-  // Filter and handle agent messages for this specific agent
-  useEffect(() => {
-    const agentEvents = events.filter(event => 
-      event.threadId === agentId && event.type === 'AGENT_MESSAGE'
-    );
-    
-    // Process the latest agent message for token updates
-    const latestMessage = agentEvents[agentEvents.length - 1];
-    if (latestMessage) {
-      handleAgentMessage(latestMessage);
+  // Find latest agent message with O(1) reverse scan using useMemo
+  const latestAgentMessage = useMemo(() => {
+    // Reverse scan to find the latest AGENT_MESSAGE for this agent
+    for (let i = events.length - 1; i >= 0; i--) {
+      const event = events[i];
+      if (event.threadId === agentId && event.type === 'AGENT_MESSAGE') {
+        return event;
+      }
     }
-  }, [events, agentId, handleAgentMessage]);
+    return null;
+  }, [events, agentId]);
+  
+  // Handle latest agent message for token updates
+  useEffect(() => {
+    if (latestAgentMessage) {
+      handleAgentMessage(latestAgentMessage);
+    }
+  }, [latestAgentMessage, handleAgentMessage]);
 
   // Initial load on mount or agentId change
   useEffect(() => {

@@ -4,14 +4,12 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ErrorDisplay } from './ErrorDisplay';
-import { ErrorLogEntry } from './ErrorLogEntry';
-import { ErrorToast } from './ErrorToast';
-import type { ErrorLogEntry as ErrorLogEntryType, ErrorEntry } from '@/types/web-events';
+import { ErrorDisplay, ErrorLogEntry, ErrorToast } from '@/components/errors';
+import type { AgentErrorLogEntry as AgentErrorLogEntryType, ErrorEntry } from '@/types/web-events';
 
 describe('Error Display Components', () => {
   describe('ErrorDisplay', () => {
-    const mockErrorLogEntry: ErrorLogEntryType = {
+    const mockErrorLogEntry: AgentErrorLogEntryType = {
       id: 'error-123',
       timestamp: new Date(),
       errorType: 'provider_failure',
@@ -78,8 +76,8 @@ describe('Error Display Components', () => {
       id: 'timeline-error-456',
       type: 'error',
       errorType: 'tool_execution',
-      errorMessage: 'Tool execution failed: command not found',
-      errorContext: {
+      message: 'Tool execution failed: command not found',
+      context: {
         phase: 'tool_execution',
         toolName: 'bash',
         toolCallId: 'tool-call-789',
@@ -100,16 +98,17 @@ describe('Error Display Components', () => {
     it('should show timestamp when enabled', () => {
       render(<ErrorLogEntry error={mockErrorEntry} showTimestamp={true} />);
       
-      // TimestampDisplay should be rendered - check for clock icon or time text pattern
-      const hasClockIcon = document.querySelector('.fa-clock');
-      const hasTimeText = screen.queryByText(/\d{1,2}:\d{2}/);
-      expect(hasClockIcon || hasTimeText).toBeTruthy();
+      // TimestampDisplay should render time text in HH:MM format
+      const timestampText = screen.queryByText(/\d{1,2}:\d{2}/);
+      expect(timestampText).toBeInTheDocument();
     });
 
     it('should hide timestamp when disabled', () => {
       render(<ErrorLogEntry error={mockErrorEntry} showTimestamp={false} />);
       
-      expect(screen.queryByRole('time')).not.toBeInTheDocument();
+      // TimestampDisplay should not render time text in HH:MM format when timestamp is hidden
+      const timestampText = screen.queryByText(/\d{1,2}:\d{2}/);
+      expect(timestampText).not.toBeInTheDocument();
     });
 
     it('should show retry button for retryable errors with canRetry', () => {
@@ -177,6 +176,9 @@ describe('Error Display Components', () => {
     });
 
     it('should auto-dismiss after specified time', async () => {
+      // Use fake timers for deterministic timing
+      vi.useFakeTimers();
+      
       const onDismiss = vi.fn();
       render(
         <ErrorToast 
@@ -187,9 +189,11 @@ describe('Error Display Components', () => {
         />
       );
       
-      // Wait for auto-dismiss
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // Fast-forward time to trigger auto-dismiss
+      vi.advanceTimersByTime(150);
       expect(onDismiss).toHaveBeenCalledOnce();
+      
+      vi.useRealTimers();
     });
 
     it('should render compact mode correctly', () => {

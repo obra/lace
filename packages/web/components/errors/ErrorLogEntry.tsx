@@ -74,29 +74,29 @@ export function ErrorLogEntry({
           </div>
           
           <div className="text-sm text-base-content/80 mb-2">
-            {error.errorMessage}
+            {error.message}
           </div>
           
-          {error.errorContext && Object.keys(error.errorContext).length > 0 && (
+          {error.context && Object.keys(error.context).length > 0 && (
             <div className="text-xs opacity-60 mb-2">
-              Failed {getPhaseDescription(String(error.errorContext.phase || ''))}
-              {'toolName' in error.errorContext && error.errorContext.toolName ? 
-                ` using ${String(error.errorContext.toolName)} tool` : ''
+              Failed {getPhaseDescription(typeof error.context.phase === 'string' ? error.context.phase : '')}
+              {error.context.toolName && typeof error.context.toolName === 'string' ? 
+                ` using ${error.context.toolName} tool` : ''
               }
-              {'providerName' in error.errorContext && error.errorContext.providerName ? 
-                ` via ${String(error.errorContext.providerName)} provider` : ''
+              {error.context.providerName && typeof error.context.providerName === 'string' ? 
+                ` via ${error.context.providerName} provider` : ''
               }
             </div>
           )}
           
-          {showContext && error.errorContext && (
+          {showContext && error.context && (
             <details className="collapse collapse-arrow mt-2">
               <summary className="collapse-title text-xs font-medium py-1">
                 Technical Details
               </summary>
               <div className="collapse-content">
                 <div className="bg-base-200 rounded p-2 text-xs font-mono">
-                  {Object.entries(error.errorContext).map(([key, value]) => (
+                  {Object.entries(error.context).map(([key, value]) => (
                     <div key={key} className="flex gap-2">
                       <span className="text-base-content/60 min-w-0 flex-shrink-0">{key}:</span>
                       <span className="min-w-0 break-all">{String(value)}</span>
@@ -119,6 +119,7 @@ export function ErrorLogEntry({
             className="btn btn-xs btn-warning"
             onClick={onRetry}
             title="Retry this operation"
+            aria-label="Retry this operation"
           >
             <FontAwesomeIcon icon={faRedo} />
           </button>

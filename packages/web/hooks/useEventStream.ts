@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { EventStreamFirehose } from '@/lib/event-stream-firehose';
 import type { LaceEvent, Task } from '@/types/core';
 import type { PendingApproval } from '@/types/api';
+import type { AgentErrorEventData } from '@/lib/event-stream-manager';
 
 // Re-export types from original for compatibility
 export interface TaskEvent {
@@ -114,6 +115,9 @@ export interface UseEventStreamOptions extends EventHandlers {
   sessionId?: string;
   threadIds?: string[];
   includeGlobal?: boolean;
+  
+  // Prevents calling onError for AGENT_ERROR events to avoid duplicate handling
+  treatAgentErrorAsGeneric?: boolean;
 
   // These are now ignored but kept for API compatibility
   autoReconnect?: boolean;
@@ -257,8 +261,11 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
           // Add error event handling
           case 'AGENT_ERROR':
             currentOptions.onAgentError?.(event);
-            const errorData = event.data as { message?: string };
-            currentOptions.onError?.(new Error(errorData.message || 'Unknown agent error'));
+            // Only call onError if treatAgentErrorAsGeneric is not disabled
+            if (currentOptions.treatAgentErrorAsGeneric !== false) {
+              const errorData = event.data as AgentErrorEventData;
+              currentOptions.onError?.(new Error(errorData.message || 'Unknown agent error'));
+            }
             break;
           // Add other event type cases as needed
         }

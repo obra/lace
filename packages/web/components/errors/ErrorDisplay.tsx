@@ -4,10 +4,10 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExclamationTriangle, faRedo, faInfo } from '@/lib/fontawesome';
-import type { ErrorLogEntry } from '@/types/web-events';
+import type { AgentErrorLogEntry } from '@/types/web-events';
 
 interface ErrorDisplayProps {
-  error: ErrorLogEntry;
+  error: AgentErrorLogEntry;
   showContext?: boolean;
   onRetry?: () => void;
   onDismiss?: () => void;

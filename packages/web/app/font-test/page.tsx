@@ -1,3 +1,6 @@
+// ABOUTME: Font diagnostic test page to verify font loading and CSS variables
+// ABOUTME: Development utility for troubleshooting font configuration issues
+
 'use client';
 
 import React from 'react';

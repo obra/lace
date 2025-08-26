@@ -558,10 +558,33 @@ describe('EventStreamManager Agent Error Handling', () => {
   });
 
   describe('EventStreamManager Integration', () => {
-    it('should register agent error handlers when session is registered', () => {
-      // This is tested implicitly by all other tests working
-      // The fact that events are being captured proves the handlers were registered
-      expect(true).toBe(true);
+    it('should register agent error handlers when session is registered', async () => {
+      // Verify that error handlers are working by triggering an error
+      const agent = session.getAgent(session.getId());
+      expect(agent).toBeDefined();
+
+      // Clear any existing captured events
+      capturedEvents.length = 0;
+
+      // Emit error to verify handler is registered
+      agent!.emit('error', {
+        error: new Error('Handler registration test'),
+        context: {
+          phase: 'initialization',
+          threadId: session.getId(),
+          errorType: 'provider_failure',
+          isRetryable: false,
+          retryCount: 0,
+        },
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Verify that the error handler was registered and event was captured
+      expect(capturedEvents.length).toBeGreaterThan(0);
+      const errorEvent = capturedEvents.find(e => e.type === 'AGENT_ERROR');
+      expect(errorEvent).toBeDefined();
+      expect((errorEvent!.data as AgentErrorEventData).message).toBe('Handler registration test');
     });
 
     it('should handle newly spawned agents correctly', async () => {
