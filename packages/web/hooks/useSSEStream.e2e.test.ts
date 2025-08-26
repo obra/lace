@@ -159,10 +159,9 @@ describe('SSE Stream E2E Tests', () => {
     );
 
     // Send the message (this should trigger SSE events)
-    const messagePromise = sendMessage({
-      request: messageRequest,
-      params: { threadId: agentThreadId },
-    });
+    const messagePromise = sendMessage(
+      createActionArgs(messageRequest, { threadId: agentThreadId })
+    );
 
     // Read from the SSE stream with timeout
     const streamPromise = new Promise<string>((resolve, reject) => {
