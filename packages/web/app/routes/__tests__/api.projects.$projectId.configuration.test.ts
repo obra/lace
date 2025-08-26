@@ -2,7 +2,6 @@
 // ABOUTME: Covers configuration retrieval, updates with validation and error handling
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { loader, action } from '@/app/routes/api.projects.$projectId.configuration';
 import { parseResponse } from '@/lib/serialization';
 
@@ -58,7 +57,7 @@ describe('Project Configuration API', () => {
       const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
-      const request = new NextRequest('http://localhost/api/projects/test-project/configuration');
+      const request = new Request('http://localhost/api/projects/test-project/configuration');
       const response = await loader({
         request,
         params: { projectId: 'test-project' },
@@ -84,7 +83,7 @@ describe('Project Configuration API', () => {
       const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(null);
 
-      const request = new NextRequest('http://localhost/api/projects/nonexistent/configuration');
+      const request = new Request('http://localhost/api/projects/nonexistent/configuration');
       const response = await loader({
         request,
         params: { projectId: 'nonexistent' },
@@ -101,7 +100,7 @@ describe('Project Configuration API', () => {
         throw new Error('Database error');
       });
 
-      const request = new NextRequest('http://localhost/api/projects/test-project/configuration');
+      const request = new Request('http://localhost/api/projects/test-project/configuration');
       const response = await loader({
         request,
         params: { projectId: 'test-project' },
@@ -130,7 +129,7 @@ describe('Project Configuration API', () => {
         },
       };
 
-      const request = new NextRequest('http://localhost/api/projects/test-project/configuration', {
+      const request = new Request('http://localhost/api/projects/test-project/configuration', {
         method: 'PUT',
         body: JSON.stringify(updates),
         headers: { 'Content-Type': 'application/json' },
@@ -150,7 +149,7 @@ describe('Project Configuration API', () => {
       const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(null);
 
-      const request = new NextRequest('http://localhost/api/projects/nonexistent/configuration', {
+      const request = new Request('http://localhost/api/projects/nonexistent/configuration', {
         method: 'PUT',
         body: JSON.stringify({ provider: 'openai' }),
         headers: { 'Content-Type': 'application/json' },
@@ -177,7 +176,7 @@ describe('Project Configuration API', () => {
         },
       };
 
-      const request = new NextRequest('http://localhost/api/projects/test-project/configuration', {
+      const request = new Request('http://localhost/api/projects/test-project/configuration', {
         method: 'PUT',
         body: JSON.stringify(invalidUpdates),
         headers: { 'Content-Type': 'application/json' },
@@ -201,7 +200,7 @@ describe('Project Configuration API', () => {
         throw new Error('Update failed');
       });
 
-      const request = new NextRequest('http://localhost/api/projects/test-project/configuration', {
+      const request = new Request('http://localhost/api/projects/test-project/configuration', {
         method: 'PUT',
         body: JSON.stringify({ provider: 'openai' }),
         headers: { 'Content-Type': 'application/json' },
