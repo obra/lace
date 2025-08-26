@@ -2,7 +2,6 @@
 // ABOUTME: Covers GET all projects, POST new project with validation and error scenarios
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { loader, action } from '@/app/routes/api.projects';
 import { parseResponse } from '@/lib/serialization';
 import type { ProjectInfo } from '@/types/core';
@@ -148,7 +147,7 @@ describe('Projects API', () => {
         configuration: { key: 'value' },
       };
 
-      const request = new NextRequest('http://localhost/api/projects', {
+      const request = new Request('http://localhost/api/projects', {
         method: 'POST',
         body: JSON.stringify(requestBody),
         headers: { 'Content-Type': 'application/json' },
@@ -186,7 +185,7 @@ describe('Projects API', () => {
         workingDirectory: '/minimal/path',
       };
 
-      const request = new NextRequest('http://localhost/api/projects', {
+      const request = new Request('http://localhost/api/projects', {
         method: 'POST',
         body: JSON.stringify(requestBody),
         headers: { 'Content-Type': 'application/json' },
@@ -212,7 +211,7 @@ describe('Projects API', () => {
         description: 'Missing name and workingDirectory',
       };
 
-      const request = new NextRequest('http://localhost/api/projects', {
+      const request = new Request('http://localhost/api/projects', {
         method: 'POST',
         body: JSON.stringify(requestBody),
         headers: { 'Content-Type': 'application/json' },
@@ -232,7 +231,7 @@ describe('Projects API', () => {
         workingDirectory: '/test/path',
       };
 
-      const request = new NextRequest('http://localhost/api/projects', {
+      const request = new Request('http://localhost/api/projects', {
         method: 'POST',
         body: JSON.stringify(requestBody),
         headers: { 'Content-Type': 'application/json' },
@@ -267,7 +266,7 @@ describe('Projects API', () => {
         workingDirectory: '/test/path',
       };
 
-      const request = new NextRequest('http://localhost/api/projects', {
+      const request = new Request('http://localhost/api/projects', {
         method: 'POST',
         body: JSON.stringify(requestBody),
         headers: { 'Content-Type': 'application/json' },
