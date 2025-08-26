@@ -362,13 +362,31 @@ export class EventStreamManager {
 
     // Optional: Add debug logging for error events
     if (fullEvent.type === 'AGENT_ERROR') {
-      const errorData = fullEvent.data as AgentErrorEventData;
-      logger.debug('[EVENT_STREAM] Broadcasting agent error event', {
-        threadId: fullEvent.threadId,
-        errorType: errorData.errorType,
-        phase: errorData.context.phase,
-        isRetryable: errorData.isRetryable,
-      });
+      // Runtime guard for safe error data access
+      const data = fullEvent.data;
+      if (
+        data &&
+        typeof data === 'object' &&
+        'errorType' in data &&
+        'context' in data &&
+        'isRetryable' in data &&
+        data.context &&
+        typeof data.context === 'object' &&
+        'phase' in data.context
+      ) {
+        const errorData = data as AgentErrorEventData;
+        logger.debug('[EVENT_STREAM] Broadcasting agent error event', {
+          threadId: fullEvent.threadId,
+          errorType: errorData.errorType,
+          phase: errorData.context.phase,
+          isRetryable: errorData.isRetryable,
+        });
+      } else {
+        logger.debug('[EVENT_STREAM] Broadcasting agent error event with invalid data shape', {
+          threadId: fullEvent.threadId,
+          rawData: data,
+        });
+      }
     }
 
     const deadConnections: string[] = [];

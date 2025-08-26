@@ -31,24 +31,21 @@ interface MockMessageEvent {
 }
 
 class MockEventSource {
-  private listeners: Map<string, ((event: MockMessageEvent) => void)[]> = new Map();
+  private listeners: Map<string, Set<(event: MockMessageEvent) => void>> = new Map();
   
   constructor(public url: string) {}
 
   addEventListener(type: string, listener: (event: MockMessageEvent) => void) {
     if (!this.listeners.has(type)) {
-      this.listeners.set(type, []);
+      this.listeners.set(type, new Set());
     }
-    this.listeners.get(type)!.push(listener);
+    this.listeners.get(type)!.add(listener);
   }
 
   removeEventListener(type: string, listener: (event: MockMessageEvent) => void) {
     const typeListeners = this.listeners.get(type);
     if (typeListeners) {
-      const index = typeListeners.indexOf(listener);
-      if (index > -1) {
-        typeListeners.splice(index, 1);
-      }
+      typeListeners.delete(listener);
     }
   }
 
@@ -60,7 +57,9 @@ class MockEventSource {
   simulateEvent(type: string, data: unknown) {
     const typeListeners = this.listeners.get(type);
     if (typeListeners) {
-      typeListeners.forEach(listener => {
+      // Use snapshot to avoid issues if listeners mutate during dispatch
+      const listenersSnapshot = Array.from(typeListeners);
+      listenersSnapshot.forEach(listener => {
         listener({ data: JSON.stringify(data) });
       });
     }
