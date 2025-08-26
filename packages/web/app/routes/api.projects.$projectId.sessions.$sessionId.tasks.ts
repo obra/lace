@@ -25,10 +25,7 @@ const RouteParamsSchema = z.object({
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   try {
-    const { projectId, sessionId } = await validateRouteParams(
-      params as Record<string, string>,
-      RouteParamsSchema
-    );
+    const { projectId, sessionId } = validateRouteParams(params, RouteParamsSchema);
 
     // Get project first to verify it exists
     const project = Project.getById(projectId);
@@ -79,10 +76,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 export async function action({ request, params }: Route.ActionArgs) {
   try {
-    const { projectId, sessionId } = await validateRouteParams(
-      params as Record<string, string>,
-      RouteParamsSchema
-    );
+    const { projectId, sessionId } = validateRouteParams(params, RouteParamsSchema);
 
     const body = (await (request as Request).json()) as Record<string, unknown>;
     let validatedBody;
