@@ -3,6 +3,18 @@
 
 import { getTaskStatusDBConstraint } from '~/tasks/task-status';
 
+// Custom error for transient event persistence attempts
+export class TransientEventError extends Error {
+  constructor(eventType: string, eventId?: string, threadId?: string) {
+    const context = [eventId && `eventId: ${eventId}`, threadId && `threadId: ${threadId}`]
+      .filter(Boolean)
+      .join(', ');
+    const contextSuffix = context ? ` (${context})` : '';
+    super(`${eventType} events are transient and should not be persisted${contextSuffix}`);
+    this.name = 'TransientEventError';
+  }
+}
+
 // Common SQLite interface that both better-sqlite3 and bun:sqlite implement
 interface SQLiteDatabase {
   prepare(sql: string): {
@@ -514,12 +526,7 @@ export class DatabasePersistence {
 
     // Guard against attempting to persist transient events
     if (isTransientEventType(event.type)) {
-      logger.warn('Attempted to persist transient event - ignoring', {
-        eventType: event.type,
-        eventId: event.id,
-        threadId: event.threadId,
-      });
-      return false; // Event was not saved
+      throw new TransientEventError(event.type, event.id, event.threadId);
     }
 
     try {

@@ -15,7 +15,7 @@ export class RetryManager {
   async retryAgentOperation(
     agent: Agent,
     errorType: ErrorType
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<{ success: boolean; error?: string; attempt?: number }> {
     const key = `agent-${agent.threadId}-${errorType}`;
     const currentAttempts = this.retryAttempts.get(key) || 0;
     const newAttempts = currentAttempts + 1;
@@ -23,7 +23,7 @@ export class RetryManager {
     if (newAttempts > this.MAX_RETRIES) {
       // Clear retry tracking to prevent map growth
       this.retryAttempts.delete(key);
-      return { success: false, error: 'Maximum retry attempts exceeded' };
+      return { success: false, error: 'Maximum retry attempts exceeded', attempt: newAttempts };
     }
 
     // Pre-increment to prevent race conditions
@@ -74,7 +74,7 @@ export class RetryManager {
         errorType,
         totalAttempts: newAttempts,
       });
-      return { success: true };
+      return { success: true, attempt: newAttempts };
     } catch (error) {
       logger.warn('RetryManager: Agent retry failed', {
         threadId: agent.threadId,
@@ -85,6 +85,7 @@ export class RetryManager {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Retry failed',
+        attempt: newAttempts,
       };
     }
   }
@@ -93,7 +94,7 @@ export class RetryManager {
     toolExecutor: ToolExecutor,
     toolCall: ToolCall,
     context: ToolContext
-  ): Promise<{ success: boolean; result?: ToolResult; error?: string }> {
+  ): Promise<{ success: boolean; result?: ToolResult; error?: string; attempt?: number }> {
     const key = `tool-${toolCall.id}`;
     const currentAttempts = this.retryAttempts.get(key) || 0;
     const newAttempts = currentAttempts + 1;
@@ -101,7 +102,7 @@ export class RetryManager {
     if (newAttempts > this.MAX_RETRIES) {
       // Clear retry tracking to prevent map growth
       this.retryAttempts.delete(key);
-      return { success: false, error: 'Maximum retry attempts exceeded' };
+      return { success: false, error: 'Maximum retry attempts exceeded', attempt: newAttempts };
     }
 
     // Pre-increment to prevent race conditions
@@ -130,7 +131,7 @@ export class RetryManager {
           result.content.length > 0 && result.content[0].text
             ? result.content[0].text
             : 'Tool execution failed on retry';
-        return { success: false, error: errorDetails };
+        return { success: false, error: errorDetails, attempt: newAttempts };
       }
 
       this.retryAttempts.delete(key);
@@ -139,7 +140,7 @@ export class RetryManager {
         toolName: toolCall.name,
         totalAttempts: newAttempts,
       });
-      return { success: true, result };
+      return { success: true, result, attempt: newAttempts };
     } catch (error) {
       logger.warn('RetryManager: Tool retry failed', {
         toolCallId: toolCall.id,
@@ -150,6 +151,7 @@ export class RetryManager {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Tool retry failed',
+        attempt: newAttempts,
       };
     }
   }
