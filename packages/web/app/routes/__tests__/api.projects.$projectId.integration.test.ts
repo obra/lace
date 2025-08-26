@@ -13,6 +13,7 @@ vi.mock('server-only', () => ({}));
 
 import { loader, action } from '@/app/routes/api.projects.$projectId';
 import { parseResponse } from '@/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 import { Session } from '@/lib/server/lace-imports';
 import type { ProjectInfo } from '@/types/core';
 
@@ -64,10 +65,7 @@ describe('Individual Project API Integration Tests', () => {
   describe('GET /api/projects/:projectId', () => {
     it('should return project when it exists', async () => {
       const request = new Request(`http://localhost/api/projects/${testProject.getId()}`);
-      const response = await loader({
-        request,
-        params: { projectId: testProject.getId() },
-      });
+      const response = await loader(createLoaderArgs(request, { projectId: testProject.getId() }));
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
@@ -93,10 +91,7 @@ describe('Individual Project API Integration Tests', () => {
       });
 
       const request = new Request(`http://localhost/api/projects/${testProject.getId()}`);
-      const response = await loader({
-        request,
-        params: { projectId: testProject.getId() },
-      });
+      const response = await loader(createLoaderArgs(request, { projectId: testProject.getId() }));
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
@@ -106,10 +101,7 @@ describe('Individual Project API Integration Tests', () => {
     it('should return 404 when project does not exist', async () => {
       const nonExistentId = 'd7af6313-2caa-4645-966e-05447d1524d1';
       const request = new Request(`http://localhost/api/projects/${nonExistentId}`);
-      const response = await loader({
-        request,
-        params: { projectId: nonExistentId },
-      });
+      const response = await loader(createLoaderArgs(request, { projectId: nonExistentId }));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
@@ -126,10 +118,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { projectId: testProject.getId() },
-      });
+      const response = await action(createActionArgs(request, { projectId: testProject.getId() }));
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
@@ -151,10 +140,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { projectId: testProject.getId() },
-      });
+      const response = await action(createActionArgs(request, { projectId: testProject.getId() }));
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
@@ -175,10 +161,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { projectId: testProject.getId() },
-      });
+      const response = await action(createActionArgs(request, { projectId: testProject.getId() }));
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
@@ -198,10 +181,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { projectId: testProject.getId() },
-      });
+      const response = await action(createActionArgs(request, { projectId: testProject.getId() }));
       await response.json();
 
       expect(response.status).toBe(200);
@@ -220,10 +200,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { projectId: testProject.getId() },
-      });
+      const response = await action(createActionArgs(request, { projectId: testProject.getId() }));
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
@@ -246,10 +223,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { projectId: testProject.getId() },
-      });
+      const response = await action(createActionArgs(request, { projectId: testProject.getId() }));
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
@@ -276,10 +250,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { projectId: testProject.getId() },
-      });
+      const response = await action(createActionArgs(request, { projectId: testProject.getId() }));
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
@@ -307,10 +278,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { projectId: nonExistentId },
-      });
+      const response = await action(createActionArgs(request, { projectId: nonExistentId }));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
@@ -325,10 +293,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { projectId: testProject.getId() },
-      });
+      const response = await action(createActionArgs(request, { projectId: testProject.getId() }));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -344,7 +309,7 @@ describe('Individual Project API Integration Tests', () => {
         method: 'DELETE',
       });
 
-      const response = await action({ request, params: { projectId } });
+      const response = await action(createActionArgs(request, { projectId }));
       const data = await parseResponse<SuccessResponse>(response);
 
       expect(response.status).toBe(200);
@@ -380,7 +345,7 @@ describe('Individual Project API Integration Tests', () => {
         method: 'DELETE',
       });
 
-      const response = await action({ request, params: { projectId } });
+      const response = await action(createActionArgs(request, { projectId }));
       const data = await parseResponse<SuccessResponse>(response);
 
       expect(response.status).toBe(200);
@@ -398,10 +363,7 @@ describe('Individual Project API Integration Tests', () => {
         method: 'DELETE',
       });
 
-      const response = await action({
-        request,
-        params: { projectId: nonExistentId },
-      });
+      const response = await action(createActionArgs(request, { projectId: nonExistentId }));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
