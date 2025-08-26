@@ -1,37 +1,31 @@
-// ABOUTME: Vite configuration for React Router v7 Framework Mode
-// ABOUTME: Configures SPA mode, path aliases, and API proxy for development
-
+// vite.config.ts
 import { defineConfig } from 'vite';
 import { reactRouter } from '@react-router/dev/vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
-import path from 'path';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const isDev = process.env.NODE_ENV !== 'production';
 
 export default defineConfig({
   plugins: [
-    reactRouter({
-      ssr: false,
-      prerender: false,
-    }),
-    tsconfigPaths(),
+    reactRouter({ ssr: false, prerender: false }),
+    // Only use tsconfigPaths in dev to avoid sourcemap issues in build
+    ...(isDev ? [tsconfigPaths()] : []),
   ],
   build: {
-    rollupOptions: {
-      input: {
-        main: '/app/entry.client.tsx',
-      },
-    },
-  },
-  ssr: {
-    noExternal: ['react-router'],
+    // Turn OFF sourcemaps so Rollup reports the raw, underlying error
+    sourcemap: false,
   },
   resolve: {
     alias: {
-      '~': path.resolve(__dirname, '../core/src'),
-      '@': path.resolve(__dirname, '.'),
+      '~': resolve(__dirname, '../core/src'),
+      '@': resolve(__dirname, '.'),
     },
   },
-  css: {
-    postcss: './postcss.config.js',
-  },
-  // No proxy needed - API routes handled by React Router v7
+  ssr: { noExternal: ['react-router'] },
+  css: { postcss: './postcss.config.js' },
 });

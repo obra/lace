@@ -3,7 +3,8 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET, PATCH, DELETE } from '@/app/api/projects/[projectId]/route';
+import { loader as GET, action as PATCH } from '@/app/routes/api.projects.$projectId';
+const DELETE = PATCH; // Both PATCH and DELETE use the same action function
 import { parseResponse } from '@/lib/serialization';
 import type { ProjectInfo } from '@/types/core';
 
@@ -49,9 +50,12 @@ describe('Individual Project API', () => {
       const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
-      const request = new NextRequest('http://localhost/api/projects/test-project');
-      const response = await GET(request, {
-        params: Promise.resolve({ projectId: 'test-project' }),
+      const request = new NextRequest('http://localhost/api/projects/test-project', {
+        method: 'DELETE',
+      });
+      const response = await GET({
+        request,
+        params: { projectId: 'test-project' },
       });
       const data = await parseResponse<ProjectInfo>(response);
 
@@ -73,8 +77,9 @@ describe('Individual Project API', () => {
       Project.getById = vi.fn().mockReturnValue(null);
 
       const request = new NextRequest('http://localhost/api/projects/nonexistent');
-      const response = await GET(request, {
-        params: Promise.resolve({ projectId: 'nonexistent' }),
+      const response = await GET({
+        request,
+        params: { projectId: 'nonexistent' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -88,9 +93,12 @@ describe('Individual Project API', () => {
         throw new Error('Database error');
       });
 
-      const request = new NextRequest('http://localhost/api/projects/test-project');
-      const response = await GET(request, {
-        params: Promise.resolve({ projectId: 'test-project' }),
+      const request = new NextRequest('http://localhost/api/projects/test-project', {
+        method: 'DELETE',
+      });
+      const response = await GET({
+        request,
+        params: { projectId: 'test-project' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -116,8 +124,9 @@ describe('Individual Project API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, {
-        params: Promise.resolve({ projectId: 'test-project' }),
+      const response = await PATCH({
+        request,
+        params: { projectId: 'test-project' },
       });
       const data = await parseResponse<ProjectInfo>(response);
 
@@ -135,8 +144,9 @@ describe('Individual Project API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, {
-        params: Promise.resolve({ projectId: 'nonexistent' }),
+      const response = await PATCH({
+        request,
+        params: { projectId: 'nonexistent' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -159,8 +169,9 @@ describe('Individual Project API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, {
-        params: Promise.resolve({ projectId: 'test-project' }),
+      const response = await PATCH({
+        request,
+        params: { projectId: 'test-project' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -182,8 +193,9 @@ describe('Individual Project API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, {
-        params: Promise.resolve({ projectId: 'test-project' }),
+      const response = await PATCH({
+        request,
+        params: { projectId: 'test-project' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -197,9 +209,12 @@ describe('Individual Project API', () => {
       const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
-      const request = new NextRequest('http://localhost/api/projects/test-project');
-      const response = await DELETE(request, {
-        params: Promise.resolve({ projectId: 'test-project' }),
+      const request = new NextRequest('http://localhost/api/projects/test-project', {
+        method: 'DELETE',
+      });
+      const response = await DELETE({
+        request,
+        params: { projectId: 'test-project' },
       });
       const data = await parseResponse<SuccessResponse>(response);
 
@@ -211,9 +226,12 @@ describe('Individual Project API', () => {
       const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(null);
 
-      const request = new NextRequest('http://localhost/api/projects/nonexistent');
-      const response = await DELETE(request, {
-        params: Promise.resolve({ projectId: 'nonexistent' }),
+      const request = new NextRequest('http://localhost/api/projects/nonexistent', {
+        method: 'DELETE',
+      });
+      const response = await DELETE({
+        request,
+        params: { projectId: 'nonexistent' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -228,9 +246,12 @@ describe('Individual Project API', () => {
         throw new Error('Deletion failed');
       });
 
-      const request = new NextRequest('http://localhost/api/projects/test-project');
-      const response = await DELETE(request, {
-        params: Promise.resolve({ projectId: 'test-project' }),
+      const request = new NextRequest('http://localhost/api/projects/test-project', {
+        method: 'DELETE',
+      });
+      const response = await DELETE({
+        request,
+        params: { projectId: 'test-project' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 

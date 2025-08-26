@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { POST } from './route';
+import { action as POST } from '@/app/routes/api.agents.$agentId.stop';
 
 // Mock only the external dependencies we need
 vi.mock('@/lib/server/session-service');
@@ -36,7 +36,9 @@ describe('/api/agents/[agentId]/stop', () => {
     vi.clearAllMocks();
   });
 
-  const mockRequest = {} as NextRequest;
+  const mockRequest = new NextRequest('http://localhost/api/agents/test/stop', {
+    method: 'POST',
+  });
 
   it('should stop agent successfully', async () => {
     const agentId = 'lace_20250801_abc123.1';
@@ -59,7 +61,7 @@ describe('/api/agents/[agentId]/stop', () => {
     const mockResponse = { status: 200 };
     mockCreateSuperjsonResponse.mockReturnValue(mockResponse as never);
 
-    const result = await POST(mockRequest, { params });
+    const result = await POST({ request: mockRequest, params: await params });
 
     expect(mockSessionService.getSession).toHaveBeenCalledWith('lace_20250801_abc123');
     expect(mockSession.getAgent).toHaveBeenCalledWith(agentId);
@@ -94,7 +96,7 @@ describe('/api/agents/[agentId]/stop', () => {
     const mockResponse = { status: 200 };
     mockCreateSuperjsonResponse.mockReturnValue(mockResponse as never);
 
-    const result = await POST(mockRequest, { params });
+    const result = await POST({ request: mockRequest, params: await params });
 
     expect(mockAgent.abort).toHaveBeenCalled();
     expect(mockCreateSuperjsonResponse).toHaveBeenCalledWith({
@@ -113,7 +115,7 @@ describe('/api/agents/[agentId]/stop', () => {
     const mockErrorResponse = { status: 400 };
     mockCreateErrorResponse.mockReturnValue(mockErrorResponse as never);
 
-    const result = await POST(mockRequest, { params });
+    const result = await POST({ request: mockRequest, params: await params });
 
     expect(mockCreateErrorResponse).toHaveBeenCalledWith('Invalid agent ID format', 400, {
       code: 'VALIDATION_FAILED',
@@ -140,7 +142,7 @@ describe('/api/agents/[agentId]/stop', () => {
     const mockErrorResponse = { status: 500 };
     mockCreateErrorResponse.mockReturnValue(mockErrorResponse as never);
 
-    const result = await POST(mockRequest, { params });
+    const result = await POST({ request: mockRequest, params: await params });
 
     expect(mockCreateErrorResponse).toHaveBeenCalledWith('Invalid session format', 500, {
       code: 'INTERNAL_SERVER_ERROR',
@@ -161,7 +163,7 @@ describe('/api/agents/[agentId]/stop', () => {
     const mockErrorResponse = { status: 404 };
     mockCreateErrorResponse.mockReturnValue(mockErrorResponse as never);
 
-    const result = await POST(mockRequest, { params });
+    const result = await POST({ request: mockRequest, params: await params });
 
     expect(mockSessionService.getSession).toHaveBeenCalledWith('lace_20250801_xyz789');
     expect(mockCreateErrorResponse).toHaveBeenCalledWith('Session not found', 404, {
@@ -187,7 +189,7 @@ describe('/api/agents/[agentId]/stop', () => {
     const mockErrorResponse = { status: 404 };
     mockCreateErrorResponse.mockReturnValue(mockErrorResponse as never);
 
-    const result = await POST(mockRequest, { params });
+    const result = await POST({ request: mockRequest, params: await params });
 
     expect(mockSession.getAgent).toHaveBeenCalledWith(agentId);
     expect(mockCreateErrorResponse).toHaveBeenCalledWith('Agent not found', 404, {
@@ -209,7 +211,7 @@ describe('/api/agents/[agentId]/stop', () => {
     const mockErrorResponse = { status: 500 };
     mockCreateErrorResponse.mockReturnValue(mockErrorResponse as never);
 
-    const result = await POST(mockRequest, { params });
+    const result = await POST({ request: mockRequest, params: await params });
 
     expect(mockCreateErrorResponse).toHaveBeenCalledWith('Database connection failed', 500, {
       code: 'INTERNAL_SERVER_ERROR',

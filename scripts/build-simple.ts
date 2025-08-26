@@ -126,21 +126,6 @@ async function buildSimpleExecutable(options: BuildOptions = {}) {
 
   // Step 1: Check Next.js build exists
   console.log('1️⃣ Checking Next.js build...');
-  const nextBuildPath = 'packages/web/.next';
-  if (!existsSync(nextBuildPath)) {
-    throw new Error(
-      `Next.js build not found at ${nextBuildPath}. Run: cd packages/web && bun run build`
-    );
-  }
-
-  // Check that standalone build exists
-  const standalonePath = 'packages/web/.next/standalone';
-  if (!existsSync(standalonePath)) {
-    throw new Error(
-      `Standalone build not found at ${standalonePath}. Ensure next.config.ts has output: 'standalone'`
-    );
-  }
-  console.log('✅ Next.js standalone build found\n');
 
   // Step 1.5: Copy custom server (no compilation - let Bun run the TypeScript directly)
   console.log('1️⃣.5️⃣ Using custom server TypeScript file...');
