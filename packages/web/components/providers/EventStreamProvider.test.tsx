@@ -279,6 +279,7 @@ describe('EventStreamProvider', () => {
       threadIds: ['lace_20250101_abc123.1'],
       onConnect: expect.any(Function),
       onError: expect.any(Function),
+      onAgentError: expect.any(Function),
       onUserMessage: expect.any(Function),
       onAgentMessage: expect.any(Function),
       onAgentToken: expect.any(Function),
@@ -298,7 +299,7 @@ describe('EventStreamProvider', () => {
 
     expect(() => {
       renderHook(() => useEventStreamConnection());
-    }).toThrow('useEventStream must be used within EventStreamProvider');
+    }).toThrow('useEventStreamConnection must be used within EventStreamProvider');
 
     expect(() => {
       renderHook(() => useSessionEvents());
@@ -331,6 +332,7 @@ describe('EventStreamProvider', () => {
       threadIds: ['lace_20250101_abc123.1'],
       onConnect: expect.any(Function),
       onError: expect.any(Function),
+      onAgentError: expect.any(Function),
       onUserMessage: expect.any(Function),
       onAgentMessage: expect.any(Function),
       onAgentToken: expect.any(Function),
@@ -371,6 +373,7 @@ describe('EventStreamProvider', () => {
       threadIds: undefined,
       onConnect: expect.any(Function),
       onError: expect.any(Function),
+      onAgentError: expect.any(Function),
       onUserMessage: expect.any(Function),
       onAgentMessage: expect.any(Function),
       onAgentToken: expect.any(Function),
