@@ -194,7 +194,7 @@ describe('Provider Instances API', () => {
         json: async () => requestBody,
       } as Request;
 
-      const response = await POST({ request: mockRequest });
+      const response = await POST(createActionArgs(mockRequest, {}));
       const data = await parseResponse<CreateInstanceResponse>(response);
 
       expect(response.status).toBe(201);
@@ -248,7 +248,7 @@ describe('Provider Instances API', () => {
         json: async () => invalidBody,
       } as Request;
 
-      const response = await POST({ request: mockRequest });
+      const response = await POST(createActionArgs(mockRequest, {}));
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
@@ -267,7 +267,7 @@ describe('Provider Instances API', () => {
         json: async () => requestBody,
       } as Request;
 
-      const response = await POST({ request: mockRequest });
+      const response = await POST(createActionArgs(mockRequest, {}));
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
@@ -302,7 +302,7 @@ describe('Provider Instances API', () => {
         json: async () => requestBody,
       } as Request;
 
-      const response = await POST({ request: mockRequest });
+      const response = await POST(createActionArgs(mockRequest, {}));
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
