@@ -10,9 +10,10 @@ export async function POST() {
 
     // Then throw an error to test error reporting
     throw new Error('Test server-side error for Sentry');
-  } catch (error) {
-    // Sentry will automatically capture this
-    Sentry.captureException(error);
+  } catch (error: unknown) {
+    // Explicitly capture the caught error with Sentry.captureException so it is reported to Sentry
+    const err = error instanceof Error ? error : new Error(String(error));
+    Sentry.captureException(err);
 
     return NextResponse.json({ error: 'Test server error triggered' }, { status: 500 });
   }
