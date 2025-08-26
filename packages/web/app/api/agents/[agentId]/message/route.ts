@@ -12,6 +12,62 @@ import { logger } from '~/utils/logger';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import type { ErrorType, ErrorPhase } from '@/types/core';
 
+// Helper to sanitize error text by redacting sensitive info and truncating
+function sanitizeErrorText(text?: string): string {
+  if (!text) return '';
+  
+  // Redact API keys and Bearer tokens
+  let sanitized = text
+    .replace(/sk-[a-zA-Z0-9-_]{20,}/g, 'sk-***REDACTED***')
+    .replace(/Bearer\s+[a-zA-Z0-9-_+=\/]{20,}/g, 'Bearer ***REDACTED***')
+    .replace(/Authorization:\s*Bearer\s+[a-zA-Z0-9-_+=\/]{20,}/g, 'Authorization: Bearer ***REDACTED***');
+  
+  // Truncate very long text
+  if (sanitized.length > 10000) {
+    sanitized = sanitized.substring(0, 10000) + '... (truncated)';
+  }
+  
+  return sanitized;
+}
+
+// Helper to safely get agent provider context
+function getAgentProviderContext(agent: unknown) {
+  try {
+    // Type guard for agent with required methods
+    if (
+      agent && 
+      typeof agent === 'object' && 
+      'getInfo' in agent && 
+      typeof agent.getInfo === 'function'
+    ) {
+      const info = (agent.getInfo as () => { providerInstanceId?: string; modelId?: string })();
+      const providerName = 
+        agent && 
+        typeof agent === 'object' && 
+        'providerInstance' in agent &&
+        agent.providerInstance &&
+        typeof agent.providerInstance === 'object' &&
+        'providerName' in agent.providerInstance
+          ? String(agent.providerInstance.providerName)
+          : 'unknown';
+
+      return {
+        providerInstanceId: info.providerInstanceId || 'unknown',
+        modelId: info.modelId || 'unknown',
+        providerName,
+      };
+    }
+  } catch {
+    // Fall through to default
+  }
+  
+  return {
+    providerInstanceId: 'unknown',
+    modelId: 'unknown',
+    providerName: 'unknown',
+  };
+}
+
 // Request validation schema
 const messageSchema = z.object({
   message: z.string().min(1, 'Message cannot be empty'),
@@ -141,33 +197,35 @@ export async function POST(
       // Use classifyAgentError utility for better error categorization
       const errorClassification = classifyAgentError(error);
 
-      // Emit API-level error event for initialization/validation failures
-      const eventStreamManager = EventStreamManager.getInstance();
-      eventStreamManager.broadcast({
-        type: 'AGENT_ERROR',
-        threadId: agentId,
-        timestamp: new Date(),
-        data: {
-          errorType: errorClassification.errorType,
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          context: {
-            phase: errorClassification.phase,
-            // Get provider context from agent
-            providerInstanceId: agent.getInfo().providerInstanceId,
-            modelId: agent.getInfo().modelId,
-            providerName: agent.providerInstance?.providerName,
+      // Only broadcast for initialization/validation failures to avoid duplicate events
+      if (errorClassification.phase === 'initialization' || errorClassification.phase === 'conversation_processing') {
+        const providerContext = getAgentProviderContext(agent);
+        const eventStreamManager = EventStreamManager.getInstance();
+        eventStreamManager.broadcast({
+          type: 'AGENT_ERROR',
+          threadId: agentId,
+          timestamp: new Date(),
+          data: {
+            errorType: errorClassification.errorType,
+            message: sanitizeErrorText(error instanceof Error ? error.message : String(error)),
+            stack: sanitizeErrorText(error instanceof Error ? error.stack : undefined),
+            context: {
+              phase: errorClassification.phase,
+              providerInstanceId: providerContext.providerInstanceId,
+              modelId: providerContext.modelId,
+              providerName: providerContext.providerName,
+            },
+            isRetryable: errorClassification.isRetryable,
+            retryCount: 0,
           },
-          isRetryable: errorClassification.isRetryable,
-          retryCount: 0,
-        },
-        transient: true,
-        context: {
-          projectId: session.getProjectId(),
-          sessionId: sessionId,
-          agentId: agentId,
-        },
-      });
+          transient: true,
+          context: {
+            projectId: session.getProjectId(),
+            sessionId: sessionId,
+            agentId: agentId,
+          },
+        });
+      }
     });
 
     return createSuccessResponse(
