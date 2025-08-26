@@ -231,10 +231,9 @@ describe('Full Conversation Flow', () => {
         headers: { 'Content-Type': 'application/json' },
       }
     );
-    const agent1Response = await spawnAgent({
-      request: spawnAgent1Request,
-      params: { sessionId: sessionId as string },
-    });
+    const agent1Response = await spawnAgent(
+      createActionArgs(spawnAgent1Request, { sessionId: sessionId as string })
+    );
     expect(agent1Response.status).toBe(201);
 
     // Spawn second agent
@@ -250,10 +249,9 @@ describe('Full Conversation Flow', () => {
         headers: { 'Content-Type': 'application/json' },
       }
     );
-    const agent2Response = await spawnAgent({
-      request: spawnAgent2Request,
-      params: { sessionId: sessionId as string },
-    });
+    const agent2Response = await spawnAgent(
+      createActionArgs(spawnAgent2Request, { sessionId: sessionId as string })
+    );
     expect(agent2Response.status).toBe(201);
 
     // List agents
@@ -292,46 +290,54 @@ describe('Full Conversation Flow', () => {
     const projectId1 = project1.getId();
     const projectId2 = project2.getId();
 
-    const session1Response = await createProjectSession({
-      request: new Request(`http://localhost:3000/api/projects/${projectId1}/sessions`, {
-        method: 'POST',
-        body: JSON.stringify({
-          name: 'Session 1',
-          providerInstanceId: anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
+    const session1Response = await createProjectSession(
+      createActionArgs(
+        new Request(`http://localhost:3000/api/projects/${projectId1}/sessions`, {
+          method: 'POST',
+          body: JSON.stringify({
+            name: 'Session 1',
+            providerInstanceId: anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
+          }),
+          headers: { 'Content-Type': 'application/json' },
         }),
-        headers: { 'Content-Type': 'application/json' },
-      }),
-      params: { projectId: projectId1 },
-    });
+        { projectId: projectId1 }
+      )
+    );
     const session1Data = await parseResponse<SessionInfo>(session1Response);
     const session1Id: ThreadId = session1Data.id as ThreadId;
 
-    const session2Response = await createProjectSession({
-      request: new Request(`http://localhost:3000/api/projects/${projectId2}/sessions`, {
-        method: 'POST',
-        body: JSON.stringify({
-          name: 'Session 2',
-          providerInstanceId: anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
+    const session2Response = await createProjectSession(
+      createActionArgs(
+        new Request(`http://localhost:3000/api/projects/${projectId2}/sessions`, {
+          method: 'POST',
+          body: JSON.stringify({
+            name: 'Session 2',
+            providerInstanceId: anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
+          }),
+          headers: { 'Content-Type': 'application/json' },
         }),
-        headers: { 'Content-Type': 'application/json' },
-      }),
-      params: { projectId: projectId2 },
-    });
+        { projectId: projectId2 }
+      )
+    );
     const session2Data = await parseResponse<SessionInfo>(session2Response);
     const session2Id: ThreadId = session2Data.id as ThreadId;
 
     // Connect to streams
-    await streamEvents({
-      request: new Request(`http://localhost:3000/api/events/stream?sessions=${session1Id}`),
-      params: {},
-    });
+    await streamEvents(
+      createLoaderArgs(
+        new Request(`http://localhost:3000/api/events/stream?sessions=${session1Id}`),
+        {}
+      )
+    );
 
-    await streamEvents({
-      request: new Request(`http://localhost:3000/api/events/stream?sessions=${session2Id}`),
-      params: {},
-    });
+    await streamEvents(
+      createLoaderArgs(
+        new Request(`http://localhost:3000/api/events/stream?sessions=${session2Id}`),
+        {}
+      )
+    );
 
     // Verify each session has its own connection
     expect(addConnectionSpy).toHaveBeenCalledWith(expect.any(Object), expect.any(Object));
