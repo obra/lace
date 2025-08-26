@@ -6,7 +6,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { getSessionService } from '@/lib/server/session-service';
 import {
@@ -119,7 +118,7 @@ describe('Token Usage Integration Tests', () => {
 
   it('should maintain proper API separation: session returns metadata only, agent returns runtime data', async () => {
     // Test Session API - should return only metadata
-    const sessionRequest = new NextRequest(
+    const sessionRequest = new Request(
       `http://localhost:3000/api/projects/${projectId}/sessions/${sessionId}`
     );
     const sessionResponse = await getSession({
@@ -139,7 +138,7 @@ describe('Token Usage Integration Tests', () => {
     }
 
     // Test Agent API - should include token usage
-    const agentRequest = new NextRequest(`http://localhost:3000/api/agents/${sessionId}`);
+    const agentRequest = new Request(`http://localhost:3000/api/agents/${sessionId}`);
     const agentResponse = await getAgent({
       request: agentRequest,
       params: { agentId: sessionId as string },
@@ -209,7 +208,7 @@ describe('Token Usage Integration Tests', () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Check token usage via Agent API
-    const agentRequest = new NextRequest(`http://localhost:3000/api/agents/${sessionId}`);
+    const agentRequest = new Request(`http://localhost:3000/api/agents/${sessionId}`);
     const agentResponse = await getAgent({
       request: agentRequest,
       params: { agentId: sessionId as string },
@@ -232,7 +231,7 @@ describe('Token Usage Integration Tests', () => {
 
   it('should handle agents with no token usage gracefully', async () => {
     // Test agent without any conversation history
-    const agentRequest = new NextRequest(`http://localhost:3000/api/agents/${sessionId}`);
+    const agentRequest = new Request(`http://localhost:3000/api/agents/${sessionId}`);
     const agentResponse = await getAgent({
       request: agentRequest,
       params: { agentId: sessionId as string },
@@ -286,7 +285,7 @@ describe('Token Usage Integration Tests', () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Check token usage after compaction
-    const agentRequest = new NextRequest(`http://localhost:3000/api/agents/${sessionId}`);
+    const agentRequest = new Request(`http://localhost:3000/api/agents/${sessionId}`);
     const agentResponse = await getAgent({
       request: agentRequest,
       params: { agentId: sessionId as string },
