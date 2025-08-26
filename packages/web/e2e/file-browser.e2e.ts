@@ -1,10 +1,22 @@
 // ABOUTME: End-to-end tests for complete file browser functionality
 // ABOUTME: Tests file browsing, search, viewing, and pop-out functionality with real filesystem
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './mocks/setup';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+
+// Helper function to create a project with test files
+async function createTestProject(page: any, projectName: string, testProjectDir: string) {
+  await page.getByRole('button', { name: /new project/i }).click();
+  await page.getByLabel(/project name/i).fill(projectName);
+  await page.getByLabel(/working directory/i).fill(testProjectDir);
+  await page.getByRole('button', { name: /create project/i }).click();
+
+  // Navigate to session
+  await page.waitForSelector('[data-testid="session-link"]');
+  await page.getByTestId('session-link').first().click();
+}
 
 test.describe('File Browser E2E Tests', () => {
   let testProjectDir: string;
@@ -29,7 +41,9 @@ test.describe('File Browser E2E Tests', () => {
       )
     );
 
-    await fs.writeFile(join(testProjectDir, 'README.md'), '# Test Project\n\nThis is a test.');
+    await fs.writeFile(join(testProjectDir, 'README.md'), '# Test Project
+
+This is a test.');
 
     await fs.writeFile(
       join(testProjectDir, 'src', 'index.ts'),
@@ -66,22 +80,14 @@ export function Button({ children, onClick }: ButtonProps) {
   test.afterEach(async () => {
     // Clean up test directory
     try {
-      await fs.rm(testProjectDir, { recursive: true });
+      await fs.rm(testProjectDir, { recursive: true, force: true });
     } catch {
       // Ignore cleanup errors
     }
   });
 
   test('should display file browser in session sidebar', async ({ page }) => {
-    // Create a project with our test directory
-    await page.getByRole('button', { name: /new project/i }).click();
-    await page.getByLabel(/project name/i).fill('Test Project');
-    await page.getByLabel(/working directory/i).fill(testProjectDir);
-    await page.getByRole('button', { name: /create project/i }).click();
-
-    // Navigate to session
-    await page.waitForSelector('[data-testid="session-link"]');
-    await page.getByTestId('session-link').first().click();
+    await createTestProject(page, `Test Project ${Date.now()}`, testProjectDir);
 
     // Verify file browser section appears in sidebar
     await expect(page.getByText('Files')).toBeVisible();
@@ -94,9 +100,7 @@ export function Button({ children, onClick }: ButtonProps) {
   });
 
   test('should expand directories and show nested files', async ({ page }) => {
-    // Setup project (same as above)
-    await page.getByRole('button', { name: /new project/i }).click();
-    await page.getByLabel(/project name/i).fill('Test Project');
+    await createTestProject(page, `Test Project ${Date.now()}`, testProjectDir);
     await page.getByLabel(/working directory/i).fill(testProjectDir);
     await page.getByRole('button', { name: /create project/i }).click();
 
@@ -119,14 +123,7 @@ export function Button({ children, onClick }: ButtonProps) {
   });
 
   test('should open file viewer modal when clicking files', async ({ page }) => {
-    // Setup project
-    await page.getByRole('button', { name: /new project/i }).click();
-    await page.getByLabel(/project name/i).fill('Test Project');
-    await page.getByLabel(/working directory/i).fill(testProjectDir);
-    await page.getByRole('button', { name: /create project/i }).click();
-
-    await page.waitForSelector('[data-testid="session-link"]');
-    await page.getByTestId('session-link').first().click();
+    await createTestProject(page, `Test Project ${Date.now()}`, testProjectDir);
 
     // Click on a file
     await page.getByText('README.md').click();
@@ -191,6 +188,9 @@ export function Button({ children, onClick }: ButtonProps) {
 
     // Verify popup content
     await popupPage.waitForLoadState();
+    
+    // Verify the popup navigated to the file viewer route
+    expect(popupPage.url()).toContain('/file-viewer');
     await expect(popupPage.getByText('README.md')).toBeVisible();
     await expect(popupPage.getByText('# Test Project')).toBeVisible();
     await expect(popupPage.getByRole('button', { name: /copy/i })).toBeVisible();
