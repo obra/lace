@@ -9,14 +9,14 @@ import { createErrorResponse } from '@/lib/server/api-utils';
 import type { Route } from './+types/api.agents.$agentId.stop';
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if (request.method !== 'POST') {
+  if ((request as Request).method !== 'POST') {
     return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
   }
 
   try {
-    const { agentId } = params;
+    const { agentId } = params as { agentId: string };
 
-    if (!isValidThreadId(agentId)) {
+    if (!isValidThreadId(agentId as string)) {
       return createErrorResponse('Invalid agent ID format', 400, {
         code: 'VALIDATION_FAILED',
       });
