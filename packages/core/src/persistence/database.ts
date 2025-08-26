@@ -82,6 +82,7 @@ import {
   ThreadId,
   AssigneeId,
   AgentMessageData,
+  isTransientEventType,
 } from '~/threads/types';
 import type { ToolCall, ToolResult } from '~/tools/types';
 import {
@@ -510,6 +511,16 @@ export class DatabasePersistence {
 
   saveEvent(event: LaceEvent): boolean {
     if (this._closed || this._disabled || !this.db) return false;
+
+    // Guard against attempting to persist transient events
+    if (isTransientEventType(event.type)) {
+      logger.warn('Attempted to persist transient event - ignoring', {
+        eventType: event.type,
+        eventId: event.id,
+        threadId: event.threadId,
+      });
+      return false; // Event was not saved
+    }
 
     try {
       const stmt = this.db.prepare(`

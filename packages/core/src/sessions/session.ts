@@ -757,6 +757,7 @@ export class Session {
       timestamp: new Date(),
       context: {
         sessionId: this._sessionId,
+        projectId: this._projectId,
         spawnMethod: 'manual', // vs 'task-based'
       },
     });
