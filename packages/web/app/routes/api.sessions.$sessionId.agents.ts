@@ -35,16 +35,16 @@ function isValidThreadId(sessionId: string): boolean {
   return isClientValidThreadId(sessionId);
 }
 
-export async function loader({ request, params }: Route.LoaderArgs) {
+export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
     const sessionService = getSessionService();
-    const { sessionId: sessionIdParam } = params;
+    const { sessionId: sessionIdParam } = params as { sessionId: string };
 
     if (!isValidThreadId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const sessionId = asThreadId(sessionIdParam);
+    const sessionId = asThreadId(sessionIdParam as string);
 
     const session = await sessionService.getSession(sessionId);
 
@@ -61,22 +61,22 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if (request.method !== 'POST') {
+  if ((request as Request).method !== 'POST') {
     return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
   }
 
   try {
     const sessionService = getSessionService();
-    const { sessionId: sessionIdParam } = params;
+    const { sessionId: sessionIdParam } = params as { sessionId: string };
 
     if (!isValidThreadId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const sessionId = asThreadId(sessionIdParam);
+    const sessionId = asThreadId(sessionIdParam as string);
 
     // Parse and validate request body
-    const bodyData: unknown = await request.json();
+    const bodyData: unknown = await (request as Request).json();
 
     if (!isCreateAgentRequest(bodyData)) {
       return createErrorResponse('Invalid request body', 400, { code: 'VALIDATION_FAILED' });
