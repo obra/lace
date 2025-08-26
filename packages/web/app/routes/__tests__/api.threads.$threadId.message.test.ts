@@ -6,7 +6,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/threads/[threadId]/message/route';
 import type { MessageResponse } from '@/types/api';
 import { Project, Session } from '@/lib/server/lace-imports';
@@ -84,7 +83,7 @@ describe('Thread Messaging API', () => {
   });
 
   it('should accept and process messages', async () => {
-    const request = new NextRequest('http://localhost/api/threads/test/message', {
+    const request = new Request('http://localhost/api/threads/test/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'Hello, agent!' }),
@@ -102,7 +101,7 @@ describe('Thread Messaging API', () => {
   });
 
   it('should return 400 for invalid thread ID', async () => {
-    const request = new NextRequest('http://localhost/api/threads/test/message', {
+    const request = new Request('http://localhost/api/threads/test/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'Hello!' }),
@@ -116,7 +115,7 @@ describe('Thread Messaging API', () => {
   });
 
   it('should return 404 for non-existent session', async () => {
-    const request = new NextRequest('http://localhost/api/threads/test/message', {
+    const request = new Request('http://localhost/api/threads/test/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'Hello!' }),
@@ -130,7 +129,7 @@ describe('Thread Messaging API', () => {
   });
 
   it('should return 400 for missing message', async () => {
-    const request = new NextRequest('http://localhost/api/threads/test/message', {
+    const request = new Request('http://localhost/api/threads/test/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
@@ -144,7 +143,7 @@ describe('Thread Messaging API', () => {
   });
 
   it('should return 400 for empty message', async () => {
-    const request = new NextRequest('http://localhost/api/threads/test/message', {
+    const request = new Request('http://localhost/api/threads/test/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: '' }),
@@ -167,7 +166,7 @@ describe('Thread Messaging API', () => {
     const initialEvents = threadManager.getEvents(asThreadId(realThreadId));
     const initialUserMessageCount = initialEvents.filter((e) => e.type === 'USER_MESSAGE').length;
 
-    const request = new NextRequest('http://localhost/api/threads/test/message', {
+    const request = new Request('http://localhost/api/threads/test/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'Test message' }),
@@ -206,7 +205,7 @@ describe('Thread Messaging API', () => {
   });
 
   it('should handle malformed JSON gracefully', async () => {
-    const request = new NextRequest('http://localhost/api/threads/test/message', {
+    const request = new Request('http://localhost/api/threads/test/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: 'invalid json',
@@ -238,7 +237,7 @@ describe('Thread Messaging API', () => {
     });
     const delegateThreadId = delegateAgent.threadId;
 
-    const request = new NextRequest('http://localhost/api/threads/test/message', {
+    const request = new Request('http://localhost/api/threads/test/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'Hello delegate!' }),
@@ -255,7 +254,7 @@ describe('Thread Messaging API', () => {
 
   it('should handle agent startup correctly', async () => {
     // This test verifies that the auto-start functionality works
-    const request = new NextRequest('http://localhost/api/threads/test/message', {
+    const request = new Request('http://localhost/api/threads/test/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'Test auto-start' }),
