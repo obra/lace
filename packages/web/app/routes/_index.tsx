@@ -1,12 +1,8 @@
-// ABOUTME: Minimal home page route for testing React Router v7
-// ABOUTME: Simple component to verify basic functionality without complex providers
+// ABOUTME: Home page route for React Router v7
+// ABOUTME: Renders the main homepage using existing HomePageClient component
+
+import { HomePageClient } from '@/app/HomePageClient';
 
 export default function Home() {
-  return (
-    <div>
-      <h1>Lace - React Router v7</h1>
-      <p>Migration successful!</p>
-      <a href="/api/health">Test API</a>
-    </div>
-  );
+  return <HomePageClient />;
 }
