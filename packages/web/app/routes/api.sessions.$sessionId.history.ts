@@ -9,9 +9,9 @@ import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import type { Route } from './+types/api.sessions.$sessionId.history';
 
-export async function loader({ request, params }: Route.LoaderArgs) {
+export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const { sessionId: sessionIdParam } = params;
+    const { sessionId: sessionIdParam } = params as { sessionId: string };
 
     // Validate session ID format using client-safe validation that accepts both lace and UUID formats
     if (!isValidThreadId(sessionIdParam)) {
