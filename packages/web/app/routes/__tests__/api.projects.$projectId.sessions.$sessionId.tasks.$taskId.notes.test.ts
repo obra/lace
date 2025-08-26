@@ -18,6 +18,7 @@ import {
 } from '@/lib/server/lace-imports';
 import type { Task } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
+import { createActionArgs } from '@/test-utils/route-test-helpers';
 
 // Mock external dependencies only
 vi.mock('server-only', () => ({}));
@@ -123,15 +124,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }
       );
 
-      const context = {
-        params: Promise.resolve({
+      const response = (await POST(
+        createActionArgs(request, {
           projectId: testProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await POST(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(201);
 
       const data = await parseResponse<{ message: string; task: Task }>(response);
@@ -156,15 +155,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }
       );
 
-      const context = {
-        params: Promise.resolve({
+      const response = (await POST(
+        createActionArgs(request, {
           projectId: testProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await POST(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(201);
 
       const data = await parseResponse<{ message: string; task: Task }>(response);
@@ -184,15 +181,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }
       );
 
-      const context = {
-        params: Promise.resolve({
+      const response = (await POST(
+        createActionArgs(request, {
           projectId: testProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await POST(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(400);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -209,15 +204,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }
       );
 
-      const context = {
-        params: Promise.resolve({
+      const response = (await POST(
+        createActionArgs(request, {
           projectId: testProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await POST(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(400);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -234,15 +227,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }
       );
 
-      const context = {
-        params: Promise.resolve({
+      const response = (await POST(
+        createActionArgs(request, {
           projectId: 'invalid-uuid',
           sessionId: 'invalid-session',
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await POST(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(500);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -262,15 +253,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }
       );
 
-      const context = {
-        params: Promise.resolve({
+      const response = (await POST(
+        createActionArgs(request, {
           projectId: nonExistentProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await POST(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -288,15 +277,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }
       );
 
-      const context = {
-        params: Promise.resolve({
+      const response = (await POST(
+        createActionArgs(request, {
           projectId: testProjectId,
           sessionId: nonExistentSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await POST(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -313,15 +300,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }
       );
 
-      const context = {
-        params: Promise.resolve({
+      const response = (await POST(
+        createActionArgs(request, {
           projectId: testProjectId,
           sessionId: testSessionId,
           taskId: 'nonexistent',
-        }),
-      };
-
-      const response = (await POST(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -346,15 +331,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }
       );
 
-      const context = {
-        params: Promise.resolve({
+      const response = (await POST(
+        createActionArgs(request, {
           projectId: testProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await POST(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -375,15 +358,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }
       );
 
-      const context = {
-        params: Promise.resolve({
+      const response = (await POST(
+        createActionArgs(request, {
           projectId: testProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await POST(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(201);
 
       const data = await parseResponse<{ message: string; task: Task }>(response);
