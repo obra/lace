@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET, PUT } from '@/app/api/projects/[projectId]/configuration/route';
+import { loader as GET, action as PUT } from '@/app/routes/api.projects.$projectId.configuration';
 import { parseResponse } from '@/lib/serialization';
 
 // Type interfaces for API responses
@@ -59,8 +59,9 @@ describe('Project Configuration API', () => {
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
       const request = new NextRequest('http://localhost/api/projects/test-project/configuration');
-      const response = await GET(request, {
-        params: Promise.resolve({ projectId: 'test-project' }),
+      const response = await GET({
+        request,
+        params: { projectId: 'test-project' },
       });
       const data = await parseResponse<ConfigurationResponse>(response);
 
@@ -84,8 +85,9 @@ describe('Project Configuration API', () => {
       Project.getById = vi.fn().mockReturnValue(null);
 
       const request = new NextRequest('http://localhost/api/projects/nonexistent/configuration');
-      const response = await GET(request, {
-        params: Promise.resolve({ projectId: 'nonexistent' }),
+      const response = await GET({
+        request,
+        params: { projectId: 'nonexistent' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -100,8 +102,9 @@ describe('Project Configuration API', () => {
       });
 
       const request = new NextRequest('http://localhost/api/projects/test-project/configuration');
-      const response = await GET(request, {
-        params: Promise.resolve({ projectId: 'test-project' }),
+      const response = await GET({
+        request,
+        params: { projectId: 'test-project' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -133,8 +136,9 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, {
-        params: Promise.resolve({ projectId: 'test-project' }),
+      const response = await PUT({
+        request,
+        params: { projectId: 'test-project' },
       });
       const data = await parseResponse<ConfigurationResponse>(response);
 
@@ -152,8 +156,9 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, {
-        params: Promise.resolve({ projectId: 'nonexistent' }),
+      const response = await PUT({
+        request,
+        params: { projectId: 'nonexistent' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -178,8 +183,9 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, {
-        params: Promise.resolve({ projectId: 'test-project' }),
+      const response = await PUT({
+        request,
+        params: { projectId: 'test-project' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -201,8 +207,9 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, {
-        params: Promise.resolve({ projectId: 'test-project' }),
+      const response = await PUT({
+        request,
+        params: { projectId: 'test-project' },
       });
       const data = await parseResponse<ErrorResponse>(response);
 

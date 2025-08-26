@@ -12,9 +12,9 @@ const UpdateSessionSchema = z.object({
   status: z.enum(['active', 'archived', 'completed']).optional(),
 });
 
-export async function loader({ request, params }: Route.LoaderArgs) {
+export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const { projectId, sessionId } = params;
+    const { projectId, sessionId } = params as { projectId: string; sessionId: string };
     const project = Project.getById(projectId);
     if (!project) {
       return Response.json(
@@ -47,10 +47,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if (request.method === 'PATCH') {
+  if ((request as Request).method === 'PATCH') {
     try {
-      const { projectId, sessionId } = params;
-      const body = (await request.json()) as Record<string, unknown>;
+      const { projectId, sessionId } = params as { projectId: string; sessionId: string };
+      const body = (await (request as Request).json()) as Record<string, unknown>;
       const validatedData = UpdateSessionSchema.parse(body);
 
       const project = Project.getById(projectId);
@@ -95,9 +95,9 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
   }
 
-  if (request.method === 'DELETE') {
+  if ((request as Request).method === 'DELETE') {
     try {
-      const { projectId, sessionId } = params;
+      const { projectId, sessionId } = params as { projectId: string; sessionId: string };
       const project = Project.getById(projectId);
       if (!project) {
         return Response.json(

@@ -2,7 +2,7 @@
 // ABOUTME: Validates security restrictions, error handling, and directory listing functionality
 
 import { describe, it, expect } from 'vitest';
-import { GET } from './route';
+import { loader as GET } from '@/app/routes/api.filesystem.list';
 import { NextRequest } from 'next/server';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -13,7 +13,7 @@ import type { ListDirectoryResponse } from '@/types/filesystem';
 describe('/api/filesystem/list', () => {
   it('should list home directory contents', async () => {
     const request = new NextRequest(`http://localhost/api/filesystem/list?path=${homedir()}`);
-    const response = await GET(request);
+    const response = await GET({ request, params: {} });
 
     expect(response.status).toBe(200);
     const data = await parseResponse<ListDirectoryResponse>(response);
@@ -24,7 +24,7 @@ describe('/api/filesystem/list', () => {
 
   it('should reject paths outside home directory', async () => {
     const request = new NextRequest('http://localhost/api/filesystem/list?path=/etc');
-    const response = await GET(request);
+    const response = await GET({ request, params: {} });
 
     expect(response.status).toBe(403);
     const data = await parseResponse<{ error: string; code: string }>(response);
@@ -34,7 +34,7 @@ describe('/api/filesystem/list', () => {
   it('should handle non-existent directories', async () => {
     const invalidPath = join(homedir(), 'definitely-does-not-exist-12345');
     const request = new NextRequest(`http://localhost/api/filesystem/list?path=${invalidPath}`);
-    const response = await GET(request);
+    const response = await GET({ request, params: {} });
 
     expect(response.status).toBe(404);
     const data = await parseResponse<{ error: string; code: string }>(response);
@@ -43,7 +43,7 @@ describe('/api/filesystem/list', () => {
 
   it('should only return directories', async () => {
     const request = new NextRequest(`http://localhost/api/filesystem/list?path=${homedir()}`);
-    const response = await GET(request);
+    const response = await GET({ request, params: {} });
 
     const data = await parseResponse<ListDirectoryResponse>(response);
     for (const entry of data.entries) {
@@ -53,7 +53,7 @@ describe('/api/filesystem/list', () => {
 
   it('should default to home directory when no path provided', async () => {
     const request = new NextRequest('http://localhost/api/filesystem/list');
-    const response = await GET(request);
+    const response = await GET({ request, params: {} });
 
     expect(response.status).toBe(200);
     const data = await parseResponse<ListDirectoryResponse>(response);
@@ -63,7 +63,7 @@ describe('/api/filesystem/list', () => {
   it('should handle path traversal attempts', async () => {
     const maliciousPath = join(homedir(), '../../../etc');
     const request = new NextRequest(`http://localhost/api/filesystem/list?path=${maliciousPath}`);
-    const response = await GET(request);
+    const response = await GET({ request, params: {} });
 
     expect(response.status).toBe(403);
     const data = await parseResponse<{ error: string; code: string }>(response);
@@ -72,7 +72,7 @@ describe('/api/filesystem/list', () => {
 
   it('should include permission information in entries', async () => {
     const request = new NextRequest(`http://localhost/api/filesystem/list?path=${homedir()}`);
-    const response = await GET(request);
+    const response = await GET({ request, params: {} });
 
     const data = await parseResponse<ListDirectoryResponse>(response);
     if (data.entries.length > 0) {
@@ -85,7 +85,7 @@ describe('/api/filesystem/list', () => {
 
   it('should sort directories alphabetically', async () => {
     const request = new NextRequest(`http://localhost/api/filesystem/list?path=${homedir()}`);
-    const response = await GET(request);
+    const response = await GET({ request, params: {} });
 
     const data = await parseResponse<ListDirectoryResponse>(response);
     if (data.entries.length > 1) {
@@ -103,7 +103,7 @@ describe('/api/filesystem/list', () => {
       await fs.writeFile(tempFilePath, 'test content');
 
       const request = new NextRequest(`http://localhost/api/filesystem/list?path=${tempFilePath}`);
-      const response = await GET(request);
+      const response = await GET({ request, params: {} });
 
       // Should be 400 (not a directory) since we created a file
       expect(response.status).toBe(400);

@@ -19,8 +19,8 @@ import {
 } from '@/lib/server/lace-imports';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { parseResponse } from '@/lib/serialization';
-import { GET as getAgent } from '@/app/api/agents/[agentId]/route';
-import { GET as getSession } from '@/app/api/projects/[projectId]/sessions/[sessionId]/route';
+import { loader as getAgent } from '@/app/routes/api.agents.$agentId';
+import { loader as getSession } from '@/app/routes/api.projects.$projectId.sessions.$sessionId';
 import type { ThreadId, SessionInfo } from '@/types/core';
 import type { AgentWithTokenUsage } from '@/types/api';
 
@@ -122,8 +122,9 @@ describe('Token Usage Integration Tests', () => {
     const sessionRequest = new NextRequest(
       `http://localhost:3000/api/projects/${projectId}/sessions/${sessionId}`
     );
-    const sessionResponse = await getSession(sessionRequest, {
-      params: Promise.resolve({ projectId, sessionId }),
+    const sessionResponse = await getSession({
+      request: sessionRequest,
+      params: { projectId, sessionId },
     });
 
     expect(sessionResponse.status).toBe(200);
@@ -135,8 +136,9 @@ describe('Token Usage Integration Tests', () => {
 
     // Test Agent API - should include token usage
     const agentRequest = new NextRequest(`http://localhost:3000/api/agents/${sessionId}`);
-    const agentResponse = await getAgent(agentRequest, {
-      params: Promise.resolve({ agentId: sessionId }),
+    const agentResponse = await getAgent({
+      request: agentRequest,
+      params: { agentId: sessionId },
     });
 
     expect(agentResponse.status).toBe(200);
@@ -204,8 +206,9 @@ describe('Token Usage Integration Tests', () => {
 
     // Check token usage via Agent API
     const agentRequest = new NextRequest(`http://localhost:3000/api/agents/${sessionId}`);
-    const agentResponse = await getAgent(agentRequest, {
-      params: Promise.resolve({ agentId: sessionId }),
+    const agentResponse = await getAgent({
+      request: agentRequest,
+      params: { agentId: sessionId },
     });
 
     expect(agentResponse.status).toBe(200);
@@ -226,8 +229,9 @@ describe('Token Usage Integration Tests', () => {
   it('should handle agents with no token usage gracefully', async () => {
     // Test agent without any conversation history
     const agentRequest = new NextRequest(`http://localhost:3000/api/agents/${sessionId}`);
-    const agentResponse = await getAgent(agentRequest, {
-      params: Promise.resolve({ agentId: sessionId }),
+    const agentResponse = await getAgent({
+      request: agentRequest,
+      params: { agentId: sessionId },
     });
 
     expect(agentResponse.status).toBe(200);
@@ -279,8 +283,9 @@ describe('Token Usage Integration Tests', () => {
 
     // Check token usage after compaction
     const agentRequest = new NextRequest(`http://localhost:3000/api/agents/${sessionId}`);
-    const agentResponse = await getAgent(agentRequest, {
-      params: Promise.resolve({ agentId: sessionId }),
+    const agentResponse = await getAgent({
+      request: agentRequest,
+      params: { agentId: sessionId },
     });
 
     const agentData = (await parseResponse(agentResponse)) as AgentWithTokenUsage;

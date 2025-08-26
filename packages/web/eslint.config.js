@@ -18,6 +18,11 @@ const compat = new FlatCompat({
 
 const config = [
   reactHooks.configs['recommended-latest'],
+  settings: {
+    'import/resolver': {
+      typescript: { project: './tsconfig.json' },
+    },
+  },
 
   {
     ignores: ['.next/**/*', 'node_modules/**/*', 'stories_parked/**/*', 'temp/**/*',    '.react-router/**/*', 

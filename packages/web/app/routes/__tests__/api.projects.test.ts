@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET, POST } from '@/app/routes/api.projects';
+import { loader as GET, action as POST } from '@/app/routes/api.projects';
 import { parseResponse } from '@/lib/serialization';
 import type { ProjectInfo } from '@/types/core';
 
@@ -94,7 +94,7 @@ describe('Projects API', () => {
       const _project2 = Project.create('Project 2', '/path/2', 'Second project');
 
       // Act: Call the API endpoint
-      const response = await GET();
+      const response = await GET({ request: new Request('http://localhost/api/projects') });
       const data = await parseResponse<ProjectInfo[]>(response);
 
       // Assert: Verify the projects are returned
@@ -123,7 +123,7 @@ describe('Projects API', () => {
 
     it('should return empty array when no projects exist', async () => {
       // Act: Call API with no projects created
-      const response = await GET();
+      const response = await GET({ request: new Request('http://localhost/api/projects') });
       const data = await parseResponse<ProjectInfo[]>(response);
 
       // Assert: Empty array returned
@@ -149,7 +149,7 @@ describe('Projects API', () => {
       });
 
       // Act: Create the project via API
-      const response = await POST(request);
+      const response = await POST({ request });
       const data = await parseResponse<ProjectInfo>(response);
 
       // Assert: Verify project was created with correct data
@@ -187,7 +187,7 @@ describe('Projects API', () => {
       });
 
       // Act: Create project with minimal data
-      const response = await POST(request);
+      const response = await POST({ request });
       const data = await parseResponse<ProjectInfo>(response);
 
       // Assert: Verify project created with defaults for optional fields
@@ -212,7 +212,7 @@ describe('Projects API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await POST(request);
+      const response = await POST({ request });
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -232,7 +232,7 @@ describe('Projects API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await POST(request);
+      const response = await POST({ request });
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(201);
@@ -268,7 +268,7 @@ describe('Projects API', () => {
       });
 
       // Act: Attempt to create project when persistence fails
-      const response = await POST(request);
+      const response = await POST({ request });
       const data = await parseResponse<ErrorResponse>(response);
 
       // Assert: API handles the persistence error gracefully
