@@ -9,6 +9,7 @@ import {
 const DELETE = PATCH; // Both PATCH and DELETE use the same action function
 import { Project } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 
 // Mock Project
 vi.mock('@/lib/server/lace-imports', () => ({
@@ -50,8 +51,10 @@ describe('Individual session API endpoints', () => {
       mockProject.getSession.mockReturnValue(mockSession);
 
       const response = await GET(
-        new Request('http://localhost/api/projects/project1/sessions/session1'),
-        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
+        createLoaderArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
+          projectId: 'project1',
+          sessionId: 'session1',
+        })
       );
 
       const data = await parseResponse<{
@@ -74,8 +77,10 @@ describe('Individual session API endpoints', () => {
       mockedGetById.mockReturnValue(null);
 
       const response = await GET(
-        new Request('http://localhost/api/projects/project1/sessions/session1'),
-        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
+        createLoaderArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
+          projectId: 'project1',
+          sessionId: 'session1',
+        })
       );
 
       const data = await parseResponse<{ error: string }>(response);
@@ -88,8 +93,13 @@ describe('Individual session API endpoints', () => {
       mockProject.getSession.mockReturnValue(null);
 
       const response = await GET(
-        new Request('http://localhost/api/projects/project1/sessions/nonexistent'),
-        { params: Promise.resolve({ projectId: 'project1', sessionId: 'nonexistent' }) }
+        createLoaderArgs(
+          new Request('http://localhost/api/projects/project1/sessions/nonexistent'),
+          {
+            projectId: 'project1',
+            sessionId: 'nonexistent',
+          }
+        )
       );
 
       const data = await parseResponse<{ error: string }>(response);
@@ -102,8 +112,10 @@ describe('Individual session API endpoints', () => {
       mockProject.getSession.mockReturnValue(mockSession);
 
       const response = await GET(
-        new Request('http://localhost/api/projects/project1/sessions/session1'),
-        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
+        createLoaderArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
+          projectId: 'project1',
+          sessionId: 'session1',
+        })
       );
 
       const data = await parseResponse<{
@@ -128,8 +140,10 @@ describe('Individual session API endpoints', () => {
       mockProject.getSession.mockReturnValue(mockSession);
 
       const response = await GET(
-        new Request('http://localhost/api/projects/project1/sessions/session1'),
-        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
+        createLoaderArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
+          projectId: 'project1',
+          sessionId: 'session1',
+        })
       );
 
       expect(response.status).toBe(200);
@@ -145,8 +159,10 @@ describe('Individual session API endpoints', () => {
       });
 
       const response = await GET(
-        new Request('http://localhost/api/projects/project1/sessions/session1'),
-        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
+        createLoaderArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
+          projectId: 'project1',
+          sessionId: 'session1',
+        })
       );
 
       const data = await parseResponse<{ error: string }>(response);
@@ -177,9 +193,9 @@ describe('Individual session API endpoints', () => {
         }),
       });
 
-      const response = await PATCH(request, {
-        params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
-      });
+      const response = await PATCH(
+        createActionArgs(request, { projectId: 'project1', sessionId: 'session1' })
+      );
 
       const data = await parseResponse<{
         id: string;
@@ -207,9 +223,9 @@ describe('Individual session API endpoints', () => {
         }),
       });
 
-      const response = await PATCH(request, {
-        params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
-      });
+      const response = await PATCH(
+        createActionArgs(request, { projectId: 'project1', sessionId: 'session1' })
+      );
 
       const data = await parseResponse<{ error: string }>(response);
 
@@ -227,9 +243,9 @@ describe('Individual session API endpoints', () => {
         }),
       });
 
-      const response = await PATCH(request, {
-        params: Promise.resolve({ projectId: 'project1', sessionId: 'nonexistent' }),
-      });
+      const response = await PATCH(
+        createActionArgs(request, { projectId: 'project1', sessionId: 'nonexistent' })
+      );
 
       const data = await parseResponse<{ error: string }>(response);
 
@@ -245,9 +261,9 @@ describe('Individual session API endpoints', () => {
         }),
       });
 
-      const response = await PATCH(request, {
-        params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
-      });
+      const response = await PATCH(
+        createActionArgs(request, { projectId: 'project1', sessionId: 'session1' })
+      );
 
       const data = await parseResponse<{ error: string; details?: unknown }>(response);
 
@@ -272,9 +288,9 @@ describe('Individual session API endpoints', () => {
         }),
       });
 
-      const response = await PATCH(request, {
-        params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
-      });
+      const response = await PATCH(
+        createActionArgs(request, { projectId: 'project1', sessionId: 'session1' })
+      );
 
       const data = await parseResponse<{
         id: string;
@@ -302,9 +318,9 @@ describe('Individual session API endpoints', () => {
         }),
       });
 
-      const response = await PATCH(request, {
-        params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }),
-      });
+      const response = await PATCH(
+        createActionArgs(request, { projectId: 'project1', sessionId: 'session1' })
+      );
 
       const data = await parseResponse<{ error: string }>(response);
 
@@ -318,8 +334,10 @@ describe('Individual session API endpoints', () => {
       mockProject.deleteSession.mockReturnValue(true);
 
       const response = await DELETE(
-        new Request('http://localhost/api/projects/project1/sessions/session1'),
-        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
+        createActionArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
+          projectId: 'project1',
+          sessionId: 'session1',
+        })
       );
 
       const data = await parseResponse<{ success: boolean }>(response);
@@ -333,8 +351,10 @@ describe('Individual session API endpoints', () => {
       mockedGetById.mockReturnValue(null);
 
       const response = await DELETE(
-        new Request('http://localhost/api/projects/project1/sessions/session1'),
-        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
+        createActionArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
+          projectId: 'project1',
+          sessionId: 'session1',
+        })
       );
 
       const data = await parseResponse<{ error: string }>(response);
@@ -347,8 +367,13 @@ describe('Individual session API endpoints', () => {
       mockProject.deleteSession.mockReturnValue(false);
 
       const response = await DELETE(
-        new Request('http://localhost/api/projects/project1/sessions/nonexistent'),
-        { params: Promise.resolve({ projectId: 'project1', sessionId: 'nonexistent' }) }
+        createActionArgs(
+          new Request('http://localhost/api/projects/project1/sessions/nonexistent'),
+          {
+            projectId: 'project1',
+            sessionId: 'nonexistent',
+          }
+        )
       );
 
       const data = await parseResponse<{ error: string }>(response);
@@ -363,8 +388,10 @@ describe('Individual session API endpoints', () => {
       });
 
       const response = await DELETE(
-        new Request('http://localhost/api/projects/project1/sessions/session1'),
-        { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
+        createActionArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
+          projectId: 'project1',
+          sessionId: 'session1',
+        })
       );
 
       const data = await parseResponse<{ error: string }>(response);
