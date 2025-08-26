@@ -1,7 +1,6 @@
 // ABOUTME: Test suite for individual session API endpoints - GET/PATCH/DELETE operations
 // ABOUTME: Tests session ownership validation and proper CRUD operations within project context
 
-import { NextRequest } from 'next/server';
 import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest';
 import {
   loader as GET,
@@ -51,7 +50,7 @@ describe('Individual session API endpoints', () => {
       mockProject.getSession.mockReturnValue(mockSession);
 
       const response = await GET(
-        new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
+        new Request('http://localhost/api/projects/project1/sessions/session1'),
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
@@ -75,7 +74,7 @@ describe('Individual session API endpoints', () => {
       mockedGetById.mockReturnValue(null);
 
       const response = await GET(
-        new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
+        new Request('http://localhost/api/projects/project1/sessions/session1'),
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
@@ -89,7 +88,7 @@ describe('Individual session API endpoints', () => {
       mockProject.getSession.mockReturnValue(null);
 
       const response = await GET(
-        new NextRequest('http://localhost/api/projects/project1/sessions/nonexistent'),
+        new Request('http://localhost/api/projects/project1/sessions/nonexistent'),
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'nonexistent' }) }
       );
 
@@ -103,7 +102,7 @@ describe('Individual session API endpoints', () => {
       mockProject.getSession.mockReturnValue(mockSession);
 
       const response = await GET(
-        new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
+        new Request('http://localhost/api/projects/project1/sessions/session1'),
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
@@ -129,7 +128,7 @@ describe('Individual session API endpoints', () => {
       mockProject.getSession.mockReturnValue(mockSession);
 
       const response = await GET(
-        new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
+        new Request('http://localhost/api/projects/project1/sessions/session1'),
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
@@ -146,7 +145,7 @@ describe('Individual session API endpoints', () => {
       });
 
       const response = await GET(
-        new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
+        new Request('http://localhost/api/projects/project1/sessions/session1'),
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
@@ -169,7 +168,7 @@ describe('Individual session API endpoints', () => {
 
       mockProject.updateSession.mockReturnValue(updatedSession);
 
-      const request = new NextRequest('http://localhost/api/projects/project1/sessions/session1', {
+      const request = new Request('http://localhost/api/projects/project1/sessions/session1', {
         method: 'PATCH',
         body: JSON.stringify({
           name: 'Updated Session',
@@ -201,7 +200,7 @@ describe('Individual session API endpoints', () => {
       const mockedGetById = vi.mocked(Project.getById) as MockedFunction<typeof Project.getById>;
       mockedGetById.mockReturnValue(null);
 
-      const request = new NextRequest('http://localhost/api/projects/project1/sessions/session1', {
+      const request = new Request('http://localhost/api/projects/project1/sessions/session1', {
         method: 'PATCH',
         body: JSON.stringify({
           name: 'Updated Session',
@@ -221,15 +220,12 @@ describe('Individual session API endpoints', () => {
     it('should return 404 when session does not exist', async () => {
       mockProject.updateSession.mockReturnValue(null);
 
-      const request = new NextRequest(
-        'http://localhost/api/projects/project1/sessions/nonexistent',
-        {
-          method: 'PATCH',
-          body: JSON.stringify({
-            name: 'Updated Session',
-          }),
-        }
-      );
+      const request = new Request('http://localhost/api/projects/project1/sessions/nonexistent', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: 'Updated Session',
+        }),
+      });
 
       const response = await PATCH(request, {
         params: Promise.resolve({ projectId: 'project1', sessionId: 'nonexistent' }),
@@ -242,7 +238,7 @@ describe('Individual session API endpoints', () => {
     });
 
     it('should validate request data', async () => {
-      const request = new NextRequest('http://localhost/api/projects/project1/sessions/session1', {
+      const request = new Request('http://localhost/api/projects/project1/sessions/session1', {
         method: 'PATCH',
         body: JSON.stringify({
           name: '', // Empty name should fail validation
@@ -269,7 +265,7 @@ describe('Individual session API endpoints', () => {
 
       mockProject.updateSession.mockReturnValue(updatedSession);
 
-      const request = new NextRequest('http://localhost/api/projects/project1/sessions/session1', {
+      const request = new Request('http://localhost/api/projects/project1/sessions/session1', {
         method: 'PATCH',
         body: JSON.stringify({
           name: 'Partially Updated Session',
@@ -299,7 +295,7 @@ describe('Individual session API endpoints', () => {
         throw new Error('Database error');
       });
 
-      const request = new NextRequest('http://localhost/api/projects/project1/sessions/session1', {
+      const request = new Request('http://localhost/api/projects/project1/sessions/session1', {
         method: 'PATCH',
         body: JSON.stringify({
           name: 'Updated Session',
@@ -322,7 +318,7 @@ describe('Individual session API endpoints', () => {
       mockProject.deleteSession.mockReturnValue(true);
 
       const response = await DELETE(
-        new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
+        new Request('http://localhost/api/projects/project1/sessions/session1'),
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
@@ -337,7 +333,7 @@ describe('Individual session API endpoints', () => {
       mockedGetById.mockReturnValue(null);
 
       const response = await DELETE(
-        new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
+        new Request('http://localhost/api/projects/project1/sessions/session1'),
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
@@ -351,7 +347,7 @@ describe('Individual session API endpoints', () => {
       mockProject.deleteSession.mockReturnValue(false);
 
       const response = await DELETE(
-        new NextRequest('http://localhost/api/projects/project1/sessions/nonexistent'),
+        new Request('http://localhost/api/projects/project1/sessions/nonexistent'),
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'nonexistent' }) }
       );
 
@@ -367,7 +363,7 @@ describe('Individual session API endpoints', () => {
       });
 
       const response = await DELETE(
-        new NextRequest('http://localhost/api/projects/project1/sessions/session1'),
+        new Request('http://localhost/api/projects/project1/sessions/session1'),
         { params: Promise.resolve({ projectId: 'project1', sessionId: 'session1' }) }
       );
 
