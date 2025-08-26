@@ -2,7 +2,6 @@
 // ABOUTME: Verifies instance listing and creation with real implementations
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { NextRequest } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loader as GET, action as POST } from '@/app/routes/api.provider.instances';
@@ -46,7 +45,7 @@ describe('Provider Instances API', () => {
         JSON.stringify(config, null, 2)
       );
 
-      const mockRequest = {} as NextRequest;
+      const mockRequest = {} as Request;
       const response = await GET({ request: mockRequest });
       const data = await parseResponse<InstancesResponse>(response);
 
@@ -68,7 +67,7 @@ describe('Provider Instances API', () => {
     });
 
     it('should handle empty instances list when no config file exists', async () => {
-      const mockRequest = {} as NextRequest;
+      const mockRequest = {} as Request;
       const response = await GET({ request: mockRequest });
       const data = await parseResponse<InstancesResponse>(response);
 
@@ -80,7 +79,7 @@ describe('Provider Instances API', () => {
       // Write invalid JSON
       fs.writeFileSync(path.join(tempDir, 'provider-instances.json'), 'invalid json{');
 
-      const mockRequest = {} as NextRequest;
+      const mockRequest = {} as Request;
       const response = await GET({ request: mockRequest });
       const data = await parseResponse<InstancesResponse>(response);
 
@@ -117,7 +116,7 @@ describe('Provider Instances API', () => {
         JSON.stringify({ apiKey: 'test-key' }, null, 2)
       );
 
-      const mockRequest = {} as NextRequest;
+      const mockRequest = {} as Request;
       const response = await GET({ request: mockRequest });
       const data = await parseResponse<InstancesResponse>(response);
 
@@ -158,7 +157,7 @@ describe('Provider Instances API', () => {
         JSON.stringify(config, null, 2)
       );
 
-      const mockRequest = {} as NextRequest;
+      const mockRequest = {} as Request;
       const response = await GET({ request: mockRequest });
       const data = await parseResponse<InstancesResponse>(response);
 
@@ -192,7 +191,7 @@ describe('Provider Instances API', () => {
 
       const mockRequest = {
         json: async () => requestBody,
-      } as NextRequest;
+      } as Request;
 
       const response = await POST({ request: mockRequest });
       const data = await parseResponse<CreateInstanceResponse>(response);
@@ -224,7 +223,7 @@ describe('Provider Instances API', () => {
       });
 
       // Verify instance appears in GET with correct contract
-      const getResponse = await GET({ request: {} as NextRequest });
+      const getResponse = await GET({ request: {} as Request });
       const getData = await parseResponse<InstancesResponse>(getResponse);
 
       expect(getData.instances).toHaveLength(1);
@@ -246,7 +245,7 @@ describe('Provider Instances API', () => {
 
       const mockRequest = {
         json: async () => invalidBody,
-      } as NextRequest;
+      } as Request;
 
       const response = await POST({ request: mockRequest });
       const data = await parseResponse<{ error: string }>(response);
@@ -265,7 +264,7 @@ describe('Provider Instances API', () => {
 
       const mockRequest = {
         json: async () => requestBody,
-      } as NextRequest;
+      } as Request;
 
       const response = await POST({ request: mockRequest });
       const data = await parseResponse<{ error: string }>(response);
@@ -300,7 +299,7 @@ describe('Provider Instances API', () => {
 
       const mockRequest = {
         json: async () => requestBody,
-      } as NextRequest;
+      } as Request;
 
       const response = await POST({ request: mockRequest });
       const data = await parseResponse<{ error: string }>(response);

@@ -2,7 +2,6 @@
 // ABOUTME: Tests GET, PATCH, DELETE operations on specific projects without mocking behavior
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
   createTestProviderInstance,
@@ -64,7 +63,7 @@ describe('Individual Project API Integration Tests', () => {
 
   describe('GET /api/projects/:projectId', () => {
     it('should return project when it exists', async () => {
-      const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`);
+      const request = new Request(`http://localhost/api/projects/${testProject.getId()}`);
       const response = await loader({
         request,
         params: { projectId: testProject.getId() },
@@ -93,7 +92,7 @@ describe('Individual Project API Integration Tests', () => {
         projectId: testProject.getId(),
       });
 
-      const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`);
+      const request = new Request(`http://localhost/api/projects/${testProject.getId()}`);
       const response = await loader({
         request,
         params: { projectId: testProject.getId() },
@@ -106,7 +105,7 @@ describe('Individual Project API Integration Tests', () => {
 
     it('should return 404 when project does not exist', async () => {
       const nonExistentId = 'd7af6313-2caa-4645-966e-05447d1524d1';
-      const request = new NextRequest(`http://localhost/api/projects/${nonExistentId}`);
+      const request = new Request(`http://localhost/api/projects/${nonExistentId}`);
       const response = await loader({
         request,
         params: { projectId: nonExistentId },
@@ -121,7 +120,7 @@ describe('Individual Project API Integration Tests', () => {
   describe('PATCH /api/projects/:projectId', () => {
     it('should update project name', async () => {
       const updateData = { name: 'Updated Project Name' };
-      const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`, {
+      const request = new Request(`http://localhost/api/projects/${testProject.getId()}`, {
         method: 'PATCH',
         body: JSON.stringify(updateData),
         headers: { 'Content-Type': 'application/json' },
@@ -146,7 +145,7 @@ describe('Individual Project API Integration Tests', () => {
 
     it('should update project description', async () => {
       const updateData = { description: 'Updated description' };
-      const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`, {
+      const request = new Request(`http://localhost/api/projects/${testProject.getId()}`, {
         method: 'PATCH',
         body: JSON.stringify(updateData),
         headers: { 'Content-Type': 'application/json' },
@@ -170,7 +169,7 @@ describe('Individual Project API Integration Tests', () => {
 
     it('should update working directory', async () => {
       const updateData = { workingDirectory: '/updated/path' };
-      const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`, {
+      const request = new Request(`http://localhost/api/projects/${testProject.getId()}`, {
         method: 'PATCH',
         body: JSON.stringify(updateData),
         headers: { 'Content-Type': 'application/json' },
@@ -193,7 +192,7 @@ describe('Individual Project API Integration Tests', () => {
 
     it('should update configuration', async () => {
       const updateData = { configuration: { newKey: 'newValue', another: 'config' } };
-      const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`, {
+      const request = new Request(`http://localhost/api/projects/${testProject.getId()}`, {
         method: 'PATCH',
         body: JSON.stringify(updateData),
         headers: { 'Content-Type': 'application/json' },
@@ -215,7 +214,7 @@ describe('Individual Project API Integration Tests', () => {
 
     it('should archive project', async () => {
       const updateData = { isArchived: true };
-      const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`, {
+      const request = new Request(`http://localhost/api/projects/${testProject.getId()}`, {
         method: 'PATCH',
         body: JSON.stringify(updateData),
         headers: { 'Content-Type': 'application/json' },
@@ -241,7 +240,7 @@ describe('Individual Project API Integration Tests', () => {
       testProject.archive();
 
       const updateData = { isArchived: false };
-      const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`, {
+      const request = new Request(`http://localhost/api/projects/${testProject.getId()}`, {
         method: 'PATCH',
         body: JSON.stringify(updateData),
         headers: { 'Content-Type': 'application/json' },
@@ -271,7 +270,7 @@ describe('Individual Project API Integration Tests', () => {
         configuration: { multi: 'update' },
       };
 
-      const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`, {
+      const request = new Request(`http://localhost/api/projects/${testProject.getId()}`, {
         method: 'PATCH',
         body: JSON.stringify(updateData),
         headers: { 'Content-Type': 'application/json' },
@@ -302,7 +301,7 @@ describe('Individual Project API Integration Tests', () => {
     it('should return 404 when project does not exist', async () => {
       const nonExistentId = 'd7af6313-2caa-4645-966e-05447d1524d1';
       const updateData = { name: 'Updated Name' };
-      const request = new NextRequest(`http://localhost/api/projects/${nonExistentId}`, {
+      const request = new Request(`http://localhost/api/projects/${nonExistentId}`, {
         method: 'PATCH',
         body: JSON.stringify(updateData),
         headers: { 'Content-Type': 'application/json' },
@@ -320,7 +319,7 @@ describe('Individual Project API Integration Tests', () => {
 
     it('should validate update data', async () => {
       const updateData = { name: '' }; // Empty name should be invalid
-      const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`, {
+      const request = new Request(`http://localhost/api/projects/${testProject.getId()}`, {
         method: 'PATCH',
         body: JSON.stringify(updateData),
         headers: { 'Content-Type': 'application/json' },
@@ -341,7 +340,7 @@ describe('Individual Project API Integration Tests', () => {
   describe('DELETE /api/projects/:projectId', () => {
     it('should delete project successfully', async () => {
       const projectId = testProject.getId();
-      const request = new NextRequest(`http://localhost/api/projects/${projectId}`, {
+      const request = new Request(`http://localhost/api/projects/${projectId}`, {
         method: 'DELETE',
       });
 
@@ -377,7 +376,7 @@ describe('Individual Project API Integration Tests', () => {
       });
 
       const projectId = testProject.getId();
-      const request = new NextRequest(`http://localhost/api/projects/${projectId}`, {
+      const request = new Request(`http://localhost/api/projects/${projectId}`, {
         method: 'DELETE',
       });
 
@@ -395,7 +394,7 @@ describe('Individual Project API Integration Tests', () => {
 
     it('should return 404 when project does not exist', async () => {
       const nonExistentId = 'd7af6313-2caa-4645-966e-05447d1524d1';
-      const request = new NextRequest(`http://localhost/api/projects/${nonExistentId}`, {
+      const request = new Request(`http://localhost/api/projects/${nonExistentId}`, {
         method: 'DELETE',
       });
 

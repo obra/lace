@@ -5,7 +5,6 @@
  * @vitest-environment node
  */
 
-import { NextRequest, NextResponse } from 'next/server';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   loader as GET,
@@ -109,7 +108,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
 
   describe('GET', () => {
     it('should return specific task', async () => {
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
       );
       const context = {
@@ -120,7 +119,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await GET(request, context)) as NextResponse;
+      const response = (await GET(request, context)) as Response;
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ task: Task }>(response);
@@ -129,7 +128,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     });
 
     it('should return detailed validation error for invalid parameters', async () => {
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/invalid-uuid/sessions/invalid-session/tasks/${testTaskId}`
       );
       const context = {
@@ -140,7 +139,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await GET(request, context)) as NextResponse;
+      const response = (await GET(request, context)) as Response;
       expect(response.status).toBe(500);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -151,7 +150,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
 
     it('should return 404 for non-existent project', async () => {
       const nonExistentProjectId = '00000000-0000-0000-0000-000000000000';
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${nonExistentProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
       );
       const context = {
@@ -162,7 +161,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await GET(request, context)) as NextResponse;
+      const response = (await GET(request, context)) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -171,7 +170,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
 
     it('should return 404 for non-existent session', async () => {
       const nonExistentSessionId = 'lace_20000101_000000';
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${nonExistentSessionId}/tasks/${testTaskId}`
       );
       const context = {
@@ -182,7 +181,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await GET(request, context)) as NextResponse;
+      const response = (await GET(request, context)) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -190,7 +189,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     });
 
     it('should return 404 for non-existent task', async () => {
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/nonexistent`
       );
       const context = {
@@ -201,7 +200,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await GET(request, context)) as NextResponse;
+      const response = (await GET(request, context)) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -213,7 +212,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     it('should update task properties', async () => {
       const updateData = { title: 'Updated Title', status: 'in_progress' as const };
 
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`,
         {
           method: 'PATCH',
@@ -230,7 +229,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await action(request, context)) as NextResponse;
+      const response = (await action(request, context)) as Response;
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ task: Task }>(response);
@@ -240,7 +239,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
 
     it('should return 404 for non-existent project', async () => {
       const nonExistentProjectId = '00000000-0000-0000-0000-000000000000';
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${nonExistentProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`,
         {
           method: 'PATCH',
@@ -257,7 +256,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await action(request, context)) as NextResponse;
+      const response = (await action(request, context)) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -265,7 +264,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     });
 
     it('should handle partial updates', async () => {
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`,
         {
           method: 'PATCH',
@@ -282,7 +281,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await action(request, context)) as NextResponse;
+      const response = (await action(request, context)) as Response;
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ task: Task }>(response);
@@ -293,7 +292,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
 
   describe('DELETE', () => {
     it('should delete task successfully', async () => {
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
       );
       const context = {
@@ -304,7 +303,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await action(request, context)) as NextResponse;
+      const response = (await action(request, context)) as Response;
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ message: string }>(response);
@@ -313,7 +312,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
 
     it('should return 404 for non-existent project', async () => {
       const nonExistentProjectId = '00000000-0000-0000-0000-000000000000';
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${nonExistentProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
       );
       const context = {
@@ -324,7 +323,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await action(request, context)) as NextResponse;
+      const response = (await action(request, context)) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -334,7 +333,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     it('should return 404 for non-existent task', async () => {
       // First delete the task, then try to delete it again
       await action(
-        new NextRequest(
+        new Request(
           `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
         ),
         {
@@ -347,7 +346,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       );
 
       // Now try to delete the already-deleted task
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
       );
       const context = {
@@ -358,7 +357,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await action(request, context)) as NextResponse;
+      const response = (await action(request, context)) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
