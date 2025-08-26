@@ -1283,7 +1283,16 @@ export class Agent extends EventEmitter {
           toolName: toolCall.name,
           toolCallId: toolCall.id,
         });
-        return; // Silently skip tool execution if agent is stopped
+        
+        // Clean up tracking state to prevent deadlock
+        this._activeToolCalls.delete(toolCall.id);
+        this._pendingToolCount--;
+        
+        if (this._pendingToolCount === 0) {
+          this._handleBatchComplete();
+        }
+        
+        return; // Skip tool execution if agent is stopped
       }
 
       // Get session for security policy enforcement
@@ -1388,7 +1397,7 @@ export class Agent extends EventEmitter {
         errorType: 'tool_execution' as ErrorType,
         toolName: toolCall.name,
         toolCallId: toolCall.id,
-        isRetryable: false,
+        isRetryable: this.isRetryableError(toolError),
         retryCount: 0,
       });
 

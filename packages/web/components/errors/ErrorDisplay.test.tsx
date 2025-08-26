@@ -153,7 +153,7 @@ describe('Error Display Components', () => {
         />
       );
       
-      const retryButton = screen.getByTitle('Retry');
+      const retryButton = screen.getByRole('button', { name: /retry/i });
       expect(retryButton).toBeInTheDocument();
       
       fireEvent.click(retryButton);

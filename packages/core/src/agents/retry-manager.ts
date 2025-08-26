@@ -21,6 +21,8 @@ export class RetryManager {
     const newAttempts = currentAttempts + 1;
 
     if (newAttempts > this.MAX_RETRIES) {
+      // Clear retry tracking to prevent map growth
+      this.retryAttempts.delete(key);
       return { success: false, error: 'Maximum retry attempts exceeded' };
     }
 
@@ -70,14 +72,14 @@ export class RetryManager {
       logger.info('RetryManager: Agent retry succeeded', {
         threadId: agent.threadId,
         errorType,
-        totalAttempts: currentAttempts + 1,
+        totalAttempts: newAttempts,
       });
       return { success: true };
     } catch (error) {
       logger.warn('RetryManager: Agent retry failed', {
         threadId: agent.threadId,
         errorType,
-        attempt: currentAttempts + 1,
+        attempt: newAttempts,
         error: error instanceof Error ? error.message : String(error),
       });
       return {
@@ -97,6 +99,8 @@ export class RetryManager {
     const newAttempts = currentAttempts + 1;
 
     if (newAttempts > this.MAX_RETRIES) {
+      // Clear retry tracking to prevent map growth
+      this.retryAttempts.delete(key);
       return { success: false, error: 'Maximum retry attempts exceeded' };
     }
 
