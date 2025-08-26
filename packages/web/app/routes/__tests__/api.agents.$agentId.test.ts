@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { loader, action } from '@/app/routes/api.agents.$agentId';
 import { parseResponse } from '@/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
   createTestProviderInstance,
@@ -110,10 +111,9 @@ describe('Agent API', () => {
   describe('GET /api/agents/:agentId', () => {
     it('should return agent details when found', async () => {
       const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1');
-      const response = await loader({
-        request,
-        params: { agentId: 'lace_20241122_abc123.1' },
-      });
+      const response = await loader(
+        createLoaderArgs(request, { agentId: 'lace_20241122_abc123.1' })
+      );
       const data = await parseResponse<AgentWithTokenUsage>(response);
 
       expect(response.status).toBe(200);
@@ -147,10 +147,9 @@ describe('Agent API', () => {
       });
 
       const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1');
-      const response = await loader({
-        request,
-        params: { agentId: 'lace_20241122_abc123.1' },
-      });
+      const response = await loader(
+        createLoaderArgs(request, { agentId: 'lace_20241122_abc123.1' })
+      );
       const data = await parseResponse<AgentWithTokenUsage>(response);
 
       expect(response.status).toBe(200);
@@ -161,7 +160,7 @@ describe('Agent API', () => {
 
     it('should return 400 for invalid agent ID', async () => {
       const request = new Request('http://localhost/api/agents/invalid-id');
-      const response = await loader({ request, params: { agentId: 'invalid-id' } });
+      const response = await loader(createLoaderArgs(request, { agentId: 'invalid-id' }));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -172,10 +171,9 @@ describe('Agent API', () => {
       mockSessionService.getSession.mockResolvedValue(null);
 
       const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1');
-      const response = await loader({
-        request,
-        params: { agentId: 'lace_20241122_abc123.1' },
-      });
+      const response = await loader(
+        createLoaderArgs(request, { agentId: 'lace_20241122_abc123.1' })
+      );
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
@@ -186,10 +184,9 @@ describe('Agent API', () => {
       mockSession.getAgent.mockReturnValue(null);
 
       const request = new Request('http://localhost/api/agents/lace_20241122_abc123.99');
-      const response = await loader({
-        request,
-        params: { agentId: 'lace_20241122_abc123.99' },
-      });
+      const response = await loader(
+        createLoaderArgs(request, { agentId: 'lace_20241122_abc123.99' })
+      );
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
@@ -210,10 +207,9 @@ describe('Agent API', () => {
       mockAgent.getTokenUsage = vi.fn().mockReturnValue(mockTokenUsage);
 
       const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1');
-      const response = await loader({
-        request,
-        params: { agentId: 'lace_20241122_abc123.1' },
-      });
+      const response = await loader(
+        createLoaderArgs(request, { agentId: 'lace_20241122_abc123.1' })
+      );
       const data = await parseResponse<AgentWithTokenUsage>(response);
 
       expect(response.status).toBe(200);
@@ -233,10 +229,11 @@ describe('Agent API', () => {
 
       mockAgent.getTokenUsage = vi.fn().mockReturnValue(defaultTokenUsage);
 
-      const response = await loader({
-        request: new Request('http://localhost/api/agents/lace_20241122_abc123.1'),
-        params: { agentId: 'lace_20241122_abc123.1' },
-      });
+      const response = await loader(
+        createLoaderArgs(new Request('http://localhost/api/agents/lace_20241122_abc123.1'), {
+          agentId: 'lace_20241122_abc123.1',
+        })
+      );
       const data = await parseResponse<AgentWithTokenUsage>(response);
 
       expect(data.tokenUsage).toEqual(defaultTokenUsage);
@@ -246,10 +243,9 @@ describe('Agent API', () => {
       mockSessionService.getSession.mockRejectedValue(new Error('Database error'));
 
       const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1');
-      const response = await loader({
-        request,
-        params: { agentId: 'lace_20241122_abc123.1' },
-      });
+      const response = await loader(
+        createLoaderArgs(request, { agentId: 'lace_20241122_abc123.1' })
+      );
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
@@ -275,10 +271,9 @@ describe('Agent API', () => {
       mockSessionService.getSession.mockResolvedValue(mockSession);
       mockSession.getAgent.mockReturnValue(mockAgent);
 
-      const response = await action({
-        request,
-        params: { agentId: 'lace_20241122_abc123.1' },
-      });
+      const response = await action(
+        createActionArgs(request, { agentId: 'lace_20241122_abc123.1' })
+      );
       const data = await parseResponse<AgentWithTokenUsage>(response);
 
       expect(response.status).toBe(200);
@@ -318,10 +313,9 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { agentId: 'lace_20241122_abc123.1' },
-      });
+      const response = await action(
+        createActionArgs(request, { agentId: 'lace_20241122_abc123.1' })
+      );
 
       expect(response.status).toBe(200);
       expect(mockAgent.updateThreadMetadata).toHaveBeenCalledWith({
@@ -338,10 +332,9 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { agentId: 'lace_20241122_abc123.1' },
-      });
+      const response = await action(
+        createActionArgs(request, { agentId: 'lace_20241122_abc123.1' })
+      );
 
       expect(response.status).toBe(200);
       expect(mockAgent.updateThreadMetadata).not.toHaveBeenCalled();
@@ -358,7 +351,7 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({ request, params: { agentId: 'invalid-id' } });
+      const response = await action(createActionArgs(request, { agentId: 'invalid-id' }));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -378,10 +371,9 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { agentId: 'lace_20241122_abc123.1' },
-      });
+      const response = await action(
+        createActionArgs(request, { agentId: 'lace_20241122_abc123.1' })
+      );
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -402,10 +394,9 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { agentId: 'lace_20241122_abc123.1' },
-      });
+      const response = await action(
+        createActionArgs(request, { agentId: 'lace_20241122_abc123.1' })
+      );
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
@@ -425,10 +416,9 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { agentId: 'lace_20241122_abc123.99' },
-      });
+      const response = await action(
+        createActionArgs(request, { agentId: 'lace_20241122_abc123.99' })
+      );
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
@@ -442,10 +432,9 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { agentId: 'lace_20241122_abc123.1' },
-      });
+      const response = await action(
+        createActionArgs(request, { agentId: 'lace_20241122_abc123.1' })
+      );
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
@@ -467,10 +456,9 @@ describe('Agent API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { agentId: 'lace_20241122_abc123.1' },
-      });
+      const response = await action(
+        createActionArgs(request, { agentId: 'lace_20241122_abc123.1' })
+      );
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
