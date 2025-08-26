@@ -23,7 +23,7 @@ export interface URLActions {
 export function useURLState(): URLState & URLActions {
   const navigate = useNavigate();
   const params = useParams();
-  const location = useLocation();
+  const _location = useLocation();
 
   // Extract current state from URL params
   const project = (params?.projectId as string) || null;
