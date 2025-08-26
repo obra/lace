@@ -14,6 +14,7 @@ import {
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 import { Session } from '@/lib/server/lace-imports';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 
 // ✅ ESSENTIAL MOCK - Next.js server-side module compatibility in test environment
 // Required for Next.js framework compatibility during testing
@@ -120,9 +121,7 @@ describe('Session Detail API Route', () => {
       const sessionId = session.id;
 
       const request = new Request(`http://localhost:3005/api/sessions/${sessionId}`);
-      const response = await GET(request, {
-        params: Promise.resolve({ sessionId: String(sessionId) }),
-      });
+      const response = await GET(createLoaderArgs(request, { sessionId: String(sessionId) }));
 
       expect(response.status).toBe(200);
 
@@ -149,9 +148,7 @@ describe('Session Detail API Route', () => {
       const invalidSessionId = 'non_existent';
 
       const request = new Request(`http://localhost:3005/api/sessions/${invalidSessionId}`);
-      const response = await GET(request, {
-        params: Promise.resolve({ sessionId: invalidSessionId }),
-      });
+      const response = await GET(createLoaderArgs(request, { sessionId: invalidSessionId }));
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
@@ -162,9 +159,7 @@ describe('Session Detail API Route', () => {
       const invalidSessionId = 'invalid_session_id';
 
       const request = new Request(`http://localhost:3005/api/sessions/${invalidSessionId}`);
-      const response = await GET(request, {
-        params: Promise.resolve({ sessionId: invalidSessionId }),
-      });
+      const response = await GET(createLoaderArgs(request, { sessionId: invalidSessionId }));
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
@@ -206,9 +201,7 @@ describe('Session Detail API Route', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, {
-        params: Promise.resolve({ sessionId: String(sessionId) }),
-      });
+      const response = await PATCH(createActionArgs(request, { sessionId: String(sessionId) }));
 
       if (response.status !== 200) {
         const errorData = await parseResponse<{ error: string }>(response);
@@ -238,9 +231,7 @@ describe('Session Detail API Route', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, {
-        params: Promise.resolve({ sessionId: invalidSessionId }),
-      });
+      const response = await PATCH(createActionArgs(request, { sessionId: invalidSessionId }));
 
       const data = await parseResponse<{ error: string }>(response);
       expect(response.status).toBe(400);
@@ -279,9 +270,7 @@ describe('Session Detail API Route', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, {
-        params: Promise.resolve({ sessionId: String(sessionId) }),
-      });
+      const response = await PATCH(createActionArgs(request, { sessionId: String(sessionId) }));
 
       const data = await parseResponse<{ error: string; details?: unknown }>(response);
       expect(response.status).toBe(400);
@@ -321,9 +310,7 @@ describe('Session Detail API Route', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, {
-        params: Promise.resolve({ sessionId: String(sessionId) }),
-      });
+      const response = await PATCH(createActionArgs(request, { sessionId: String(sessionId) }));
 
       expect(response.status).toBe(200);
 
@@ -345,9 +332,7 @@ describe('Session Detail API Route', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH(request, {
-        params: Promise.resolve({ sessionId: invalidSessionId }),
-      });
+      const response = await PATCH(createActionArgs(request, { sessionId: invalidSessionId }));
 
       const data = await parseResponse<{ error: string }>(response);
       expect(response.status).toBe(400);
@@ -396,9 +381,7 @@ describe('Session Detail API Route', () => {
       });
 
       // This should FAIL initially because route still uses sessionService.getSessionData
-      await PATCH(request, {
-        params: Promise.resolve({ sessionId: session.id }),
-      });
+      await PATCH(createActionArgs(request, { sessionId: session.id }));
 
       // Verify Session.getSession was called directly (not through sessionService.getSessionData)
       expect(sessionGetSpy).toHaveBeenCalledWith(session.id);
