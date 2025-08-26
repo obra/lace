@@ -73,10 +73,10 @@ function classifyAgentError(error: unknown): { errorType: ErrorType; phase: Erro
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ agentId: string }> }
+  { params }: { params: { agentId: string } }
 ): Promise<NextResponse> {
   try {
-    const { agentId: agentIdParam } = await params;
+    const { agentId: agentIdParam } = params;
 
     // Validate agent ID format
     if (!isValidThreadId(agentIdParam)) {
@@ -86,7 +86,12 @@ export async function POST(
     const agentId = asThreadId(agentIdParam);
 
     // Parse and validate request body
-    const body: unknown = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return createErrorResponse('Invalid JSON body', 400, { code: 'VALIDATION_FAILED' });
+    }
     const validation = messageSchema.safeParse(body);
 
     if (!validation.success) {
