@@ -3,7 +3,7 @@
 
 import { NextRequest } from 'next/server';
 import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest';
-import { GET, PATCH, DELETE } from '@/app/api/projects/[projectId]/sessions/[sessionId]/route';
+import { GET, PATCH, DELETE } from '@/app/routes/api.projects.$projectId.sessions.$sessionId';
 import { Project } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 
