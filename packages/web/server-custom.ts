@@ -97,9 +97,9 @@ async function startLaceServer() {
     const build = await import('./build/server/index.js');
     const express = await import('express');
 
-    const app = express.default();
+    const app = (express as { default: () => unknown }).default();
     const requestHandler = createRequestHandler({
-      build: ((build as { default?: unknown }).default || build) as unknown,
+      build: (build as { default?: unknown }).default || build,
     });
 
     app.use(requestHandler);
