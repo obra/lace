@@ -15,9 +15,9 @@ const UpdateProjectSchema = z.object({
   isArchived: z.boolean().optional(),
 });
 
-export async function loader({ request, params }: Route.LoaderArgs) {
+export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const { projectId } = params;
+    const { projectId } = params as { projectId: string };
     const project = Project.getById(projectId);
 
     if (!project) {
@@ -37,12 +37,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  const method = request.method;
+  const method = (request as Request).method;
 
   if (method === 'PATCH') {
     try {
-      const { projectId } = params;
-      const body = (await request.json()) as Record<string, unknown>;
+      const { projectId } = params as { projectId: string };
+      const body = (await (request as Request).json()) as Record<string, unknown>;
       const validatedData = UpdateProjectSchema.parse(body);
 
       const project = Project.getById(projectId);
@@ -74,7 +74,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (method === 'DELETE') {
     try {
-      const { projectId } = params;
+      const { projectId } = params as { projectId: string };
       const project = Project.getById(projectId);
 
       if (!project) {
