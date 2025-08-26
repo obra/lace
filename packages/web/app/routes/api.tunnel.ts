@@ -3,6 +3,7 @@
 
 import { logger } from '~/utils/logger';
 import type { Route } from './+types/api.tunnel';
+import { api } from '@/lib/api-client';
 
 const SENTRY_HOST = 'o543459.ingest.us.sentry.io';
 const SENTRY_PROJECT_ID = '4509844023279616';
@@ -52,42 +53,34 @@ export async function action({ request }: Route.ActionArgs) {
     const sentryUrl = `https://${SENTRY_HOST}/api/${SENTRY_PROJECT_ID}/envelope/`;
     logger.debug('🚀 Forwarding to Sentry', { url: sentryUrl });
 
-    const sentryResponse = await fetch(sentryUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-sentry-envelope',
-      },
-      body: envelope,
-    });
+    try {
+      // Use api client for the request - it will handle errors properly
+      // Note: Passing the envelope as the body, overriding content-type for Sentry format
+      await api.post<void>(sentryUrl, envelope, {
+        headers: {
+          'Content-Type': 'application/x-sentry-envelope',
+        },
+      });
 
-    // Log response details, including error body for non-200 responses
-    const responseLog: {
-      status: number;
-      statusText: string;
-      headers: Record<string, string>;
-      errorBody?: string;
-    } = {
-      status: sentryResponse.status,
-      statusText: sentryResponse.statusText,
-      headers: Object.fromEntries(sentryResponse.headers.entries()),
-    };
-
-    // If error response, try to get the error details
-    if (sentryResponse.status >= 400) {
-      try {
-        const errorBody = await sentryResponse.text();
-        responseLog.errorBody = errorBody;
-        logger.warn('🔴 Sentry error response', responseLog);
-      } catch (_error) {
-        logger.warn('🔴 Sentry error response (could not read body)', responseLog);
+      logger.info('✅ Sentry envelope forwarded successfully');
+      return new Response(null, { status: 200 });
+    } catch (error) {
+      // Api client throws structured errors - handle HttpError for status codes
+      if (error && typeof error === 'object' && 'status' in error && 'message' in error) {
+        const httpError = error as { status: number; message: string };
+        logger.warn('🔴 Sentry error response', {
+          status: httpError.status,
+          message: httpError.message,
+        });
+        return new Response(null, { status: httpError.status });
       }
-    } else {
-      logger.info('✅ Sentry response received', responseLog);
-    }
 
-    return new Response(null, {
-      status: sentryResponse.status,
-    });
+      // Handle other error types (NetworkError, ParseError, etc.)
+      logger.warn('🔴 Sentry forwarding failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return new Response(null, { status: 500 });
+    }
   } catch (error) {
     logger.error('💥 Sentry tunnel error occurred', {
       error: error instanceof Error ? error.message : String(error),
