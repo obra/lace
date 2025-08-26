@@ -8,6 +8,8 @@ import { useSearchParams } from 'next/navigation';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFile, faDownload, faCopy, faSpinner, faExclamationTriangle } from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
+import { formatFileSize } from '@/lib/format-file-size';
+import { encodePathSegments } from '@/lib/path-utils';
 import type { SessionFileContentResponse } from '@/types/session-files';
 import hljs from 'highlight.js';
 import DOMPurify from 'dompurify';
@@ -20,45 +22,63 @@ interface FileViewerContentProps {
   filePath: string;
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
 
 function FileViewerContent({ sessionId, filePath }: FileViewerContentProps) {
   const [fileContent, setFileContent] = useState<SessionFileContentResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [highlightedContent, setHighlightedContent] = useState<string>('');
+  const [copied, setCopied] = useState(false);
+  const copyTimerRef = React.useRef<number | null>(null);
 
   // Load file content
   useEffect(() => {
+    const abortController = new AbortController();
+    
     const loadFileContent = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const encodedPath = filePath
-          .split('/')
-          .map((segment) => encodeURIComponent(segment))
-          .join('/');
+        const encodedPath = encodePathSegments(filePath);
         const response = await api.get<SessionFileContentResponse>(
-          `/api/sessions/${sessionId}/files/${encodedPath}`
+          `/api/sessions/${sessionId}/files/${encodedPath}`,
+          { signal: abortController.signal }
         );
-        setFileContent(response);
+        if (!abortController.signal.aborted) {
+          setFileContent(response);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load file content');
-        setFileContent(null);
+        if (err instanceof Error && err.name === 'AbortError') {
+          // Ignore aborted requests
+          return;
+        }
+        if (!abortController.signal.aborted) {
+          setError(err instanceof Error ? err.message : 'Failed to load file content');
+          setFileContent(null);
+        }
       } finally {
-        setIsLoading(false);
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     };
 
     void loadFileContent();
+    
+    return () => {
+      abortController.abort();
+    };
   }, [sessionId, filePath]);
+  
+  // Cleanup copy timer on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+    };
+  }, []);
 
   // Syntax highlighting effect
   useEffect(() => {
@@ -98,15 +118,13 @@ function FileViewerContent({ sessionId, filePath }: FileViewerContentProps) {
 
     try {
       await navigator.clipboard.writeText(fileContent.content);
-      // Simple feedback - could be enhanced with toast
-      const button = document.getElementById('copy-button');
-      if (button) {
-        const originalText = button.textContent;
-        button.textContent = 'Copied!';
-        setTimeout(() => {
-          button.textContent = originalText;
-        }, 2000);
+      setCopied(true);
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
       }
+      copyTimerRef.current = window.setTimeout(() => {
+        setCopied(false);
+      }, 2000);
     } catch (err) {
       console.error('Failed to copy content:', err);
     }
@@ -171,13 +189,12 @@ function FileViewerContent({ sessionId, filePath }: FileViewerContentProps) {
             </div>
 
             <button
-              id="copy-button"
               onClick={handleCopy}
               className="btn btn-ghost btn-sm"
               title="Copy content to clipboard"
             >
               <FontAwesomeIcon icon={faCopy} className="w-4 h-4 mr-2" />
-              Copy
+              {copied ? 'Copied!' : 'Copy'}
             </button>
 
             <button
