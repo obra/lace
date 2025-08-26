@@ -6,7 +6,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { loader as GET } from '@/app/routes/api.sessions.$sessionId.history';
 import { getSessionService } from '@/lib/server/session-service';
 import type { LaceEvent } from '@/types/core';
@@ -68,7 +67,7 @@ describe('Session History API', () => {
 
   describe('GET /api/sessions/[sessionId]/history', () => {
     it('should return empty history for new session', async () => {
-      const request = new NextRequest(`http://localhost/api/sessions/${realSessionId}/history`);
+      const request = new Request(`http://localhost/api/sessions/${realSessionId}/history`);
       const response = await GET(request, {
         params: Promise.resolve({ sessionId: realSessionId }),
       });
@@ -86,7 +85,7 @@ describe('Session History API', () => {
 
     it('should return 404 for non-existent session', async () => {
       const nonExistentId = 'lace_20240101_fake12'; // Valid format, but non-existent
-      const request = new NextRequest(`http://localhost/api/sessions/${nonExistentId}/history`);
+      const request = new Request(`http://localhost/api/sessions/${nonExistentId}/history`);
       const response = await GET(request, {
         params: Promise.resolve({ sessionId: nonExistentId }),
       });
@@ -103,7 +102,7 @@ describe('Session History API', () => {
 
       // Create a route that will fail by providing a malformed request
       const invalidParams = { params: Promise.reject(new Error('Params parsing failed')) };
-      const request = new NextRequest(`http://localhost/api/sessions/${realSessionId}/history`);
+      const request = new Request(`http://localhost/api/sessions/${realSessionId}/history`);
 
       const response = await GET(
         request,
@@ -121,7 +120,7 @@ describe('Session History API', () => {
     it('should handle invalid session ID format', async () => {
       // Test with malformed session ID
       const malformedId = 'invalid-session-format';
-      const request = new NextRequest(`http://localhost/api/sessions/${malformedId}/history`);
+      const request = new Request(`http://localhost/api/sessions/${malformedId}/history`);
       const response = await GET(request, {
         params: Promise.resolve({ sessionId: malformedId }),
       });
@@ -140,7 +139,7 @@ describe('Session History API', () => {
       const agent = session!.getAgent(asThreadId(realSessionId));
       expect(agent).toBeDefined();
 
-      const request = new NextRequest(`http://localhost/api/sessions/${realSessionId}/history`);
+      const request = new Request(`http://localhost/api/sessions/${realSessionId}/history`);
       const response = await GET(request, {
         params: Promise.resolve({ sessionId: realSessionId }),
       });

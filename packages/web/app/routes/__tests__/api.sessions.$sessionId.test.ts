@@ -2,7 +2,6 @@
 // ABOUTME: Tests getting specific session information using real functionality
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { loader as GET, action as PATCH } from '@/app/routes/api.sessions.$sessionId';
 import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
@@ -120,7 +119,7 @@ describe('Session Detail API Route', () => {
       const session = sessionInstance.getInfo()!;
       const sessionId = session.id;
 
-      const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`);
+      const request = new Request(`http://localhost:3005/api/sessions/${sessionId}`);
       const response = await GET(request, {
         params: Promise.resolve({ sessionId: String(sessionId) }),
       });
@@ -149,7 +148,7 @@ describe('Session Detail API Route', () => {
     it('should return 400 for invalid session ID format', async () => {
       const invalidSessionId = 'non_existent';
 
-      const request = new NextRequest(`http://localhost:3005/api/sessions/${invalidSessionId}`);
+      const request = new Request(`http://localhost:3005/api/sessions/${invalidSessionId}`);
       const response = await GET(request, {
         params: Promise.resolve({ sessionId: invalidSessionId }),
       });
@@ -162,7 +161,7 @@ describe('Session Detail API Route', () => {
     it('should handle invalid session ID format gracefully', async () => {
       const invalidSessionId = 'invalid_session_id';
 
-      const request = new NextRequest(`http://localhost:3005/api/sessions/${invalidSessionId}`);
+      const request = new Request(`http://localhost:3005/api/sessions/${invalidSessionId}`);
       const response = await GET(request, {
         params: Promise.resolve({ sessionId: invalidSessionId }),
       });
@@ -201,7 +200,7 @@ describe('Session Detail API Route', () => {
         status: 'archived',
       };
 
-      const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`, {
+      const request = new Request(`http://localhost:3005/api/sessions/${sessionId}`, {
         method: 'PATCH',
         body: JSON.stringify(updates),
         headers: { 'Content-Type': 'application/json' },
@@ -233,7 +232,7 @@ describe('Session Detail API Route', () => {
     it('should return 400 for invalid session ID format', async () => {
       const invalidSessionId = 'non_existent';
 
-      const request = new NextRequest(`http://localhost:3005/api/sessions/${invalidSessionId}`, {
+      const request = new Request(`http://localhost:3005/api/sessions/${invalidSessionId}`, {
         method: 'PATCH',
         body: JSON.stringify({ name: 'Updated Name' }),
         headers: { 'Content-Type': 'application/json' },
@@ -274,7 +273,7 @@ describe('Session Detail API Route', () => {
         status: 'invalid-status', // Invalid status should be invalid
       };
 
-      const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`, {
+      const request = new Request(`http://localhost:3005/api/sessions/${sessionId}`, {
         method: 'PATCH',
         body: JSON.stringify(invalidUpdates),
         headers: { 'Content-Type': 'application/json' },
@@ -316,7 +315,7 @@ describe('Session Detail API Route', () => {
         name: 'Partially Updated Session',
       };
 
-      const request = new NextRequest(`http://localhost:3005/api/sessions/${sessionId}`, {
+      const request = new Request(`http://localhost:3005/api/sessions/${sessionId}`, {
         method: 'PATCH',
         body: JSON.stringify(partialUpdates),
         headers: { 'Content-Type': 'application/json' },
@@ -340,7 +339,7 @@ describe('Session Detail API Route', () => {
     it('should handle invalid session ID format in updates', async () => {
       const invalidSessionId = 'invalid_session_id';
 
-      const request = new NextRequest(`http://localhost:3005/api/sessions/${invalidSessionId}`, {
+      const request = new Request(`http://localhost:3005/api/sessions/${invalidSessionId}`, {
         method: 'PATCH',
         body: JSON.stringify({ name: 'Updated Name' }),
         headers: { 'Content-Type': 'application/json' },
@@ -390,7 +389,7 @@ describe('Session Detail API Route', () => {
       });
       const session = sessionInstance.getInfo()!;
 
-      const request = new NextRequest(`http://localhost:3005/api/sessions/${session.id}`, {
+      const request = new Request(`http://localhost:3005/api/sessions/${session.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ name: 'Updated Session' }),
         headers: { 'Content-Type': 'application/json' },
