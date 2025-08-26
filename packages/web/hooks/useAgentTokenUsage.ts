@@ -2,7 +2,7 @@
 // ABOUTME: Loads token data from agent API + real-time updates from SSE events
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useEventStream } from '@/hooks/useEventStream';
+import { useSessionEvents } from '@/components/providers/EventStreamProvider';
 import type { ThreadId, CombinedTokenUsage, ThreadTokenUsage } from '@/types/core';
 import type { LaceEvent } from '@/types/core';
 import type { AgentWithTokenUsage } from '@/types/api';
@@ -95,15 +95,21 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
     [agentId]
   );
 
-  // Set up SSE event listener for real-time updates
-  useEventStream({
-    threadIds: [agentId],
-    onAgentMessage: handleAgentMessage,
-    onAgentError: (event: LaceEvent) => {
-      console.warn('[useAgentTokenUsage] Agent error event received:', event);
-      // This hook doesn't handle errors - just log for debugging
-    },
-  });
+  // Use shared event stream context for real-time updates
+  const { events } = useSessionEvents();
+  
+  // Filter and handle agent messages for this specific agent
+  useEffect(() => {
+    const agentEvents = events.filter(event => 
+      event.threadId === agentId && event.type === 'AGENT_MESSAGE'
+    );
+    
+    // Process the latest agent message for token updates
+    const latestMessage = agentEvents[agentEvents.length - 1];
+    if (latestMessage) {
+      handleAgentMessage(latestMessage);
+    }
+  }, [events, agentId, handleAgentMessage]);
 
   // Initial load on mount or agentId change
   useEffect(() => {

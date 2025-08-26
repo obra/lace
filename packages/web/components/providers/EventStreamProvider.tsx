@@ -85,8 +85,6 @@ export function EventStreamProvider({
   agentId,
   onAgentStateChange,
 }: EventStreamProviderProps) {
-  const instanceId = React.useRef(Math.random().toString(36).substring(2, 8)).current;
-  console.log(`[EventStreamProvider:${instanceId}] Component render start for session:`, sessionId);
   
   // Get tool approval handlers from ToolApprovalProvider
   const { handleApprovalRequest, handleApprovalResponse } = useToolApprovalContext();
@@ -159,16 +157,11 @@ export function EventStreamProvider({
   }, []);
 
   const handleAgentError = useCallback((event: LaceEvent) => {
-    console.warn(`[EventStreamProvider:${instanceId}] Agent error event received:`, event);
+    console.warn('Agent error event received:', event);
     // TODO: Integrate with error display UI
     // For now, just log to console so we can see it's working
-  }, [instanceId]);
+  }, []);
 
-  // Debug: Log when component renders with the handler
-  console.log(`[EventStreamProvider:${instanceId}] Component render - handleAgentError exists:`, !!handleAgentError);
-  
-  // Force useMemo to re-run by adding a timestamp (temporary debug)
-  const forceUpdate = Date.now();
 
   // Agent message handler to clear streaming content when complete
   const stableAddAgentEventWithStreaming = useCallback(
@@ -226,7 +219,6 @@ export function EventStreamProvider({
       onCompactionComplete: handleCompactionComplete,
       };
       
-      console.log(`[EventStreamProvider:${instanceId}] Creating eventStreamOptions with onAgentError:`, !!options.onAgentError);
       return options;
     },
     [
@@ -242,7 +234,6 @@ export function EventStreamProvider({
       handleCompactionStart,
       handleCompactionComplete,
       handleAgentError,
-      forceUpdate, // Force useMemo to re-run (temporary debug)
     ]
   );
 
@@ -310,12 +301,12 @@ export function useEventStreamContext(): EventStreamContextType {
   return context;
 }
 
-// Convenience hooks for specific functionality
-export function useEventStream() {
+// Convenience hooks for specific functionality  
+export function useEventStreamConnection() {
   const context = useContext(EventStreamContext);
 
   if (!context) {
-    throw new Error('useEventStream must be used within EventStreamProvider');
+    throw new Error('useEventStreamConnection must be used within EventStreamProvider');
   }
 
   return {

@@ -134,7 +134,6 @@ export interface UseEventStreamResult {
 }
 
 export function useEventStream(options: UseEventStreamOptions): UseEventStreamResult {
-  const instanceId = React.useRef(Math.random().toString(36).substring(2, 8)).current;
   const [lastEvent, setLastEvent] = useState<LaceEvent>();
   const subscriptionIdRef = useRef<string | null>(null);
   const optionsRef = useRef(options);
@@ -257,14 +256,7 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
             break;
           // Add error event handling
           case 'AGENT_ERROR':
-            console.warn(`[useEventStream:${instanceId}] Processing AGENT_ERROR event:`, event);
-            console.warn(`[useEventStream:${instanceId}] onAgentError handler exists:`, !!currentOptions.onAgentError);
-            if (currentOptions.onAgentError) {
-              console.warn(`[useEventStream:${instanceId}] Calling onAgentError handler`);
-              currentOptions.onAgentError(event);
-            } else {
-              console.warn(`[useEventStream:${instanceId}] No onAgentError handler registered`);
-            }
+            currentOptions.onAgentError?.(event);
             const errorData = event.data as { message?: string };
             currentOptions.onError?.(new Error(errorData.message || 'Unknown agent error'));
             break;
