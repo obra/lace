@@ -270,7 +270,7 @@ describe('TDD: Direct Session Usage', () => {
 
   it('should use SessionService.getSession() which calls session.getEffectiveConfiguration() directly', async () => {
     const request = new Request(`http://localhost/api/sessions/${testSessionId}/configuration`);
-    const response = await GET(request, { params: Promise.resolve({ sessionId: testSessionId }) });
+    const response = await GET(createLoaderArgs(request, { sessionId: testSessionId }));
 
     // This verifies that the route successfully calls the session's getEffectiveConfiguration method
     // (not a duplicated SessionService method that we removed)
@@ -338,7 +338,7 @@ describe('TDD: Direct Session Configuration Update', () => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    const response = await PUT(request, { params: Promise.resolve({ sessionId: testSessionId }) });
+    const response = await PUT(createActionArgs(request, { sessionId: testSessionId }));
 
     // This verifies that the route successfully calls session.updateConfiguration() directly
     // (not a duplicated SessionService method that we removed)
