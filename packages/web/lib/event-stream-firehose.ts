@@ -222,6 +222,12 @@ class EventStreamFirehose {
 
     // Check thread ID filter
     if (filter.threadIds?.length && !filter.threadIds.includes(event.threadId)) {
+      if (process.env.NODE_ENV === 'development' && event.type === 'AGENT_ERROR') {
+        console.log('[FIREHOSE] AGENT_ERROR filtered out by threadId:', {
+          eventThreadId: event.threadId,
+          filterThreadIds: filter.threadIds,
+        });
+      }
       return false;
     }
 
