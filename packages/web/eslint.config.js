@@ -18,14 +18,16 @@ const compat = new FlatCompat({
 
 const config = [
   reactHooks.configs['recommended-latest'],
-  settings: {
-    'import/resolver': {
-      typescript: { project: './tsconfig.json' },
+  {
+    settings: {
+      'import/resolver': {
+        typescript: { project: './tsconfig.json' },
+      },
     },
   },
 
   {
-    ignores: ['.next/**/*', 'node_modules/**/*', 'stories_parked/**/*', 'temp/**/*',    '.react-router/**/*', 
+    ignores: ['.next/**/*', 'node_modules/**/*', 'stories_parked/**/*', 'temp/**/*',    '.react-router/**/*',  'build/**/*'
 ],
   },
   // Remove Next.js configuration - using React Router v7 now
