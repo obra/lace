@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET } from '@/app/routes/api.threads.$threadId.approvals.pending';
+import { loader as GET } from '@/app/routes/api.threads.$threadId.approvals.pending';
 import { getSessionService } from '@/lib/server/session-service';
 import { parseResponse } from '@/lib/serialization';
 
