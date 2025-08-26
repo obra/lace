@@ -9,8 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   loader as GET,
-  action as PATCH,
-  action as DELETE,
+  action,
 } from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId';
 import { asThreadId } from '@/types/core';
 import { Project, Session } from '@/lib/server/lace-imports';
