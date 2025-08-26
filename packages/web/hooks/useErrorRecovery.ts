@@ -1,7 +1,7 @@
 // ABOUTME: Hook for handling error recovery actions like retry and resolution
 // ABOUTME: Manages retry state and communicates with backend for error recovery
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { api } from '@/lib/api-client';
 import type { ErrorType } from '@/types/core';
 
@@ -13,6 +13,27 @@ interface RetryState {
 
 export function useErrorRecovery() {
   const [retryStates, setRetryStates] = useState<Record<string, RetryState>>({});
+
+  // Memoized typed retry messages
+  const retryMessages = useMemo(() => ({
+    provider_failure: 'Please retry the last request. The provider connection has been restored.',
+    timeout: 'Please retry the last operation. The timeout issue may be resolved.',
+    streaming_error: 'Please retry the last request. The streaming connection has been reset.',
+    processing_error: 'Please retry the last operation. The processing issue may be resolved.',
+    tool_execution: 'Please retry the last tool operation with the same parameters.',
+  } as const satisfies Record<ErrorType, string>), []);
+
+  // Helper to mark retry completion and update state
+  const markRetryComplete = useCallback((key: string, currentRetryCount: number) => {
+    setRetryStates(prev => ({
+      ...prev,
+      [key]: {
+        retrying: false,
+        lastRetryAt: new Date(),
+        retryCount: currentRetryCount + 1,
+      },
+    }));
+  }, []);
 
   const retryAgentOperation = useCallback(async (
     threadId: string,
@@ -45,39 +66,17 @@ export function useErrorRecovery() {
     }
 
     try {
-      // Send retry message specific to error type
-      const retryMessages = {
-        provider_failure: 'Please retry the last request. The provider connection has been restored.',
-        timeout: 'Please retry the last operation. The timeout issue may be resolved.',
-        streaming_error: 'Please retry the last request. The streaming connection has been reset.',
-        processing_error: 'Please retry the last operation. The processing issue may be resolved.',
-        tool_execution: 'Please retry the last tool operation with the same parameters.',
-      };
-      
+      // Send retry message specific to error type  
       const result = await api.post(`/api/agents/${threadId}/message`, {
-        content: retryMessages[errorType] || 'Please retry the last operation.',
-        context: { errorType, isRetry: true, originalError: 'retry-attempt' },
+        content: retryMessages[errorType],
+        context: { errorType, isRetry: true },
       });
       
-      setRetryStates(prev => ({
-        ...prev,
-        [threadId]: {
-          retrying: false,
-          lastRetryAt: new Date(),
-          retryCount: currentRetryCount + 1,
-        },
-      }));
+      markRetryComplete(threadId, currentRetryCount);
 
       return Boolean(result);
     } catch (_error) {
-      setRetryStates(prev => ({
-        ...prev,
-        [threadId]: {
-          retrying: false,
-          lastRetryAt: new Date(),
-          retryCount: currentRetryCount + 1,
-        },
-      }));
+      markRetryComplete(threadId, currentRetryCount);
       return false;
     }
   }, []);
@@ -122,25 +121,11 @@ export function useErrorRecovery() {
         context: { toolCallId, isRetry: true },
       });
       
-      setRetryStates(prev => ({
-        ...prev,
-        [key]: {
-          retrying: false,
-          lastRetryAt: new Date(),
-          retryCount: currentRetryCount + 1,
-        },
-      }));
+      markRetryComplete(key, currentRetryCount);
 
       return Boolean(result);
     } catch (_error) {
-      setRetryStates(prev => ({
-        ...prev,
-        [key]: {
-          retrying: false,
-          lastRetryAt: new Date(),
-          retryCount: currentRetryCount + 1,
-        },
-      }));
+      markRetryComplete(key, currentRetryCount);
       return false;
     }
   }, []);
