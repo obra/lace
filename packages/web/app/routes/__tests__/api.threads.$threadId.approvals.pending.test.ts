@@ -2,7 +2,6 @@
 // ABOUTME: Verifies recovery query integration with core ThreadManager
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { loader as GET } from '@/app/routes/api.threads.$threadId.approvals.pending';
 import { getSessionService } from '@/lib/server/session-service';
 import { parseResponse } from '@/lib/serialization';
@@ -121,9 +120,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
 
     mockAgent.getPendingApprovals.mockReturnValue(mockPendingApprovals);
 
-    const request = new NextRequest(
-      `http://localhost:3000/api/threads/${threadId}/approvals/pending`
-    );
+    const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
     const params = Promise.resolve({ threadId });
 
     const response = await GET(request, { params });
@@ -142,9 +139,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
 
     mockAgent.getPendingApprovals.mockReturnValue([]);
 
-    const request = new NextRequest(
-      `http://localhost:3000/api/threads/${threadId}/approvals/pending`
-    );
+    const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
     const params = Promise.resolve({ threadId });
 
     const response = await GET(request, { params });
@@ -162,9 +157,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     // Mock agent not found
     mockSession.getAgent.mockReturnValue(null);
 
-    const request = new NextRequest(
-      `http://localhost:3000/api/threads/${threadId}/approvals/pending`
-    );
+    const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
     const params = Promise.resolve({ threadId });
 
     const response = await GET(request, { params });
@@ -263,9 +256,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
 
     mockAgent.getPendingApprovals.mockReturnValue(mockPendingApprovals);
 
-    const request = new NextRequest(
-      `http://localhost:3000/api/threads/${threadId}/approvals/pending`
-    );
+    const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
     const params = Promise.resolve({ threadId });
 
     const response = await GET(request, { params });
@@ -283,9 +274,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
       throw new Error('Database connection failed');
     });
 
-    const request = new NextRequest(
-      `http://localhost:3000/api/threads/${threadId}/approvals/pending`
-    );
+    const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
     const params = Promise.resolve({ threadId });
 
     const response = await GET(request, { params });
