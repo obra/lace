@@ -65,7 +65,9 @@ export function ErrorLogEntry({
             {showTimestamp && (
               <>
                 <FontAwesomeIcon icon={faClock} className="text-xs opacity-50" />
-                <TimestampDisplay timestamp={error.timestamp} />
+                <span data-testid="timestamp">
+                  <TimestampDisplay timestamp={error.timestamp} />
+                </span>
               </>
             )}
             {error.isRetryable && (

@@ -58,14 +58,14 @@ export function ErrorDisplay({
       try {
         // Handle objects/arrays with circular reference protection
         const seen = new Set();
-        const result = JSON.stringify(value, (key, val) => {
+        const result = JSON.stringify(value, (key, val: unknown) => {
           if (typeof val === 'object' && val !== null) {
             if (seen.has(val)) {
               return '[Circular Reference]';
             }
             seen.add(val);
           }
-          return val;
+          return val as string | number | boolean | null;
         }, 2);
         
         // Truncate very long JSON
@@ -87,7 +87,7 @@ export function ErrorDisplay({
           <div className="text-sm opacity-80">{error.message}</div>
         </div>
         {error.isRetryable && onRetry && (
-          <button type="button" className="btn btn-sm btn-ghost" onClick={onRetry}>
+          <button type="button" data-testid="retry-button" className="btn btn-sm btn-ghost" onClick={onRetry}>
             <FontAwesomeIcon icon={faRedo} />
           </button>
         )}
@@ -138,7 +138,7 @@ export function ErrorDisplay({
       
       <div className="flex gap-2">
         {error.isRetryable && onRetry && (
-          <button type="button" className="btn btn-sm btn-primary" onClick={onRetry}>
+          <button type="button" data-testid="retry-button" className="btn btn-sm btn-primary" onClick={onRetry}>
             <FontAwesomeIcon icon={faRedo} className="mr-1" />
             Retry
           </button>
