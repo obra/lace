@@ -18,7 +18,7 @@ import type { ProjectInfo } from '@/types/core';
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
 
-import { GET, POST } from '@/app/routes/api.projects';
+import { loader as GET, action as POST } from '@/app/routes/api.projects';
 
 interface ErrorResponse {
   error: string;
