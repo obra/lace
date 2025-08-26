@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { action as POST } from '@/app/routes/api.agents.$agentId.stop';
+import { action } from '@/app/routes/api.agents.$agentId.stop';
 
 // Mock only the external dependencies we need
 vi.mock('@/lib/server/session-service');
@@ -42,7 +42,7 @@ describe('/api/agents/[agentId]/stop', () => {
 
   it('should stop agent successfully', async () => {
     const agentId = 'lace_20250801_abc123.1';
-    const params = Promise.resolve({ agentId });
+    const params = { agentId };
 
     const mockAgent: MockAgent = {
       abort: vi.fn().mockReturnValue(true),
@@ -61,7 +61,7 @@ describe('/api/agents/[agentId]/stop', () => {
     const mockResponse = { status: 200 };
     mockCreateSuperjsonResponse.mockReturnValue(mockResponse as never);
 
-    const result = await POST({ request: mockRequest, params: await params });
+    const result = await action({ request: mockRequest, params });
 
     expect(mockSessionService.getSession).toHaveBeenCalledWith('lace_20250801_abc123');
     expect(mockSession.getAgent).toHaveBeenCalledWith(agentId);
@@ -77,7 +77,7 @@ describe('/api/agents/[agentId]/stop', () => {
 
   it('should handle agent not currently processing', async () => {
     const agentId = 'lace_20250801_def456.2';
-    const params = Promise.resolve({ agentId });
+    const params = { agentId };
 
     const mockAgent: MockAgent = {
       abort: vi.fn().mockReturnValue(false), // Not processing
@@ -96,7 +96,7 @@ describe('/api/agents/[agentId]/stop', () => {
     const mockResponse = { status: 200 };
     mockCreateSuperjsonResponse.mockReturnValue(mockResponse as never);
 
-    const result = await POST({ request: mockRequest, params: await params });
+    const result = await action({ request: mockRequest, params });
 
     expect(mockAgent.abort).toHaveBeenCalled();
     expect(mockCreateSuperjsonResponse).toHaveBeenCalledWith({
@@ -110,12 +110,12 @@ describe('/api/agents/[agentId]/stop', () => {
 
   it('should return error for invalid agent ID format', async () => {
     const agentId = 'invalid-agent-id';
-    const params = Promise.resolve({ agentId });
+    const params = { agentId };
 
     const mockErrorResponse = { status: 400 };
     mockCreateErrorResponse.mockReturnValue(mockErrorResponse as never);
 
-    const result = await POST({ request: mockRequest, params: await params });
+    const result = await action({ request: mockRequest, params });
 
     expect(mockCreateErrorResponse).toHaveBeenCalledWith('Invalid agent ID format', 400, {
       code: 'VALIDATION_FAILED',
@@ -126,7 +126,7 @@ describe('/api/agents/[agentId]/stop', () => {
   it('should return error for malformed session ID in agent ID', async () => {
     // Mock the isValidThreadId to pass for agent but fail for session
     const agentId = 'lace_20250801_abc123.1';
-    const params = Promise.resolve({ agentId });
+    const params = { agentId };
 
     // We need to mock the validation to simulate edge case
     // Let's use a different approach and test a real edge case
@@ -142,7 +142,7 @@ describe('/api/agents/[agentId]/stop', () => {
     const mockErrorResponse = { status: 500 };
     mockCreateErrorResponse.mockReturnValue(mockErrorResponse as never);
 
-    const result = await POST({ request: mockRequest, params: await params });
+    const result = await action({ request: mockRequest, params });
 
     expect(mockCreateErrorResponse).toHaveBeenCalledWith('Invalid session format', 500, {
       code: 'INTERNAL_SERVER_ERROR',
@@ -152,7 +152,7 @@ describe('/api/agents/[agentId]/stop', () => {
 
   it('should return error for session not found', async () => {
     const agentId = 'lace_20250801_xyz789.1';
-    const params = Promise.resolve({ agentId });
+    const params = { agentId };
 
     const mockSessionService: MockSessionService = {
       getSession: vi.fn().mockResolvedValue(null), // Session not found
@@ -163,7 +163,7 @@ describe('/api/agents/[agentId]/stop', () => {
     const mockErrorResponse = { status: 404 };
     mockCreateErrorResponse.mockReturnValue(mockErrorResponse as never);
 
-    const result = await POST({ request: mockRequest, params: await params });
+    const result = await action({ request: mockRequest, params });
 
     expect(mockSessionService.getSession).toHaveBeenCalledWith('lace_20250801_xyz789');
     expect(mockCreateErrorResponse).toHaveBeenCalledWith('Session not found', 404, {
@@ -174,7 +174,7 @@ describe('/api/agents/[agentId]/stop', () => {
 
   it('should return error for agent not found', async () => {
     const agentId = 'lace_20250801_abcdef.3';
-    const params = Promise.resolve({ agentId });
+    const params = { agentId };
 
     const mockSession: MockSession = {
       getAgent: vi.fn().mockReturnValue(null), // Agent not found
@@ -189,7 +189,7 @@ describe('/api/agents/[agentId]/stop', () => {
     const mockErrorResponse = { status: 404 };
     mockCreateErrorResponse.mockReturnValue(mockErrorResponse as never);
 
-    const result = await POST({ request: mockRequest, params: await params });
+    const result = await action({ request: mockRequest, params });
 
     expect(mockSession.getAgent).toHaveBeenCalledWith(agentId);
     expect(mockCreateErrorResponse).toHaveBeenCalledWith('Agent not found', 404, {
@@ -200,7 +200,7 @@ describe('/api/agents/[agentId]/stop', () => {
 
   it('should handle internal server errors gracefully', async () => {
     const agentId = 'lace_20250801_xyz123.1';
-    const params = Promise.resolve({ agentId });
+    const params = { agentId };
 
     const mockSessionService: MockSessionService = {
       getSession: vi.fn().mockRejectedValue(new Error('Database connection failed')),
@@ -211,7 +211,7 @@ describe('/api/agents/[agentId]/stop', () => {
     const mockErrorResponse = { status: 500 };
     mockCreateErrorResponse.mockReturnValue(mockErrorResponse as never);
 
-    const result = await POST({ request: mockRequest, params: await params });
+    const result = await action({ request: mockRequest, params });
 
     expect(mockCreateErrorResponse).toHaveBeenCalledWith('Database connection failed', 500, {
       code: 'INTERNAL_SERVER_ERROR',
