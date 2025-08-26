@@ -8,8 +8,11 @@ const SENTRY_HOST = 'o543459.ingest.us.sentry.io';
 const SENTRY_PROJECT_ID = '4509844023279616';
 
 export async function action({ request }: Route.ActionArgs) {
-  if (request.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+  switch (request.method) {
+    case 'POST':
+      break;
+    default:
+      return new Response('Method not allowed', { status: 405 });
   }
 
   try {
