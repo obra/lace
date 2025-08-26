@@ -33,10 +33,7 @@ interface _RouteContext {
 
 export async function action({ request, params }: Route.ActionArgs) {
   try {
-    const { projectId, sessionId, taskId } = await validateRouteParams(
-      params as Record<string, string>,
-      NotesRouteParamsSchema
-    );
+    const { projectId, sessionId, taskId } = validateRouteParams(params, NotesRouteParamsSchema);
 
     const body = (await (request as Request).json()) as Record<string, unknown>;
     let validatedBody;
