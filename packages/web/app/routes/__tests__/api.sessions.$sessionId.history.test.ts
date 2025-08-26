@@ -98,7 +98,7 @@ describe('Session History API', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       // Create a route that will fail by providing a malformed request
-      const invalidParams = { params: Promise.reject(new Error('Params parsing failed')) };
+      const _invalidParams = { params: Promise.reject(new Error('Params parsing failed')) };
       const request = new Request(`http://localhost/api/sessions/${realSessionId}/history`);
 
       // Note: This test is checking error handling, but with the new pattern we need to provide valid structure
