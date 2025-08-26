@@ -18,6 +18,7 @@ import type { ProjectInfo } from '@/types/core';
 vi.mock('server-only', () => ({}));
 
 import { loader, action } from '@/app/routes/api.projects';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 
 interface ErrorResponse {
   error: string;
@@ -75,10 +76,9 @@ describe('Projects API Integration Tests', () => {
         projectId: project1.getId(),
       });
 
-      const response = await loader({
-        request: new Request('http://localhost/api/projects'),
-        params: {},
-      });
+      const response = await loader(
+        createLoaderArgs(new Request('http://localhost/api/projects'), {})
+      );
       const data = await parseResponse<ProjectInfo[]>(response);
 
       expect(response.status).toBe(200);
@@ -102,10 +102,9 @@ describe('Projects API Integration Tests', () => {
     });
 
     it('should return empty projects array when no projects exist', async () => {
-      const response = await loader({
-        request: new Request('http://localhost/api/projects'),
-        params: {},
-      });
+      const response = await loader(
+        createLoaderArgs(new Request('http://localhost/api/projects'), {})
+      );
       const data = await parseResponse<ProjectInfo[]>(response);
 
       expect(response.status).toBe(200);
@@ -128,7 +127,7 @@ describe('Projects API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({ request, params: {} });
+      const response = await action(createActionArgs(request, {}));
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(201);
@@ -162,7 +161,7 @@ describe('Projects API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({ request, params: {} });
+      const response = await action(createActionArgs(request, {}));
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(201);
@@ -190,7 +189,7 @@ describe('Projects API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({ request, params: {} });
+      const response = await action(createActionArgs(request, {}));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -210,7 +209,7 @@ describe('Projects API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({ request, params: {} });
+      const response = await action(createActionArgs(request, {}));
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(201);
@@ -230,7 +229,7 @@ describe('Projects API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({ request, params: {} });
+      const response = await action(createActionArgs(request, {}));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -245,7 +244,7 @@ describe('Projects API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({ request, params: {} });
+      const response = await action(createActionArgs(request, {}));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
@@ -271,18 +270,17 @@ describe('Projects API Integration Tests', () => {
       });
 
       // Create first project
-      const response1 = await action({ request: request1, params: {} });
+      const response1 = await action(createActionArgs(request1, {}));
       expect(response1.status).toBe(201);
 
       // Create second project with same name (should succeed - names don't need to be unique)
-      const response2 = await action({ request: request2, params: {} });
+      const response2 = await action(createActionArgs(request2, {}));
       expect(response2.status).toBe(201);
 
       // Verify both projects exist
-      const getResponse = await loader({
-        request: new Request('http://localhost/api/projects'),
-        params: {},
-      });
+      const getResponse = await loader(
+        createLoaderArgs(new Request('http://localhost/api/projects'), {})
+      );
       const data = await parseResponse<ProjectInfo[]>(getResponse);
       const duplicateProjects = data.filter((p) => p.name === 'Duplicate Project');
       expect(duplicateProjects).toHaveLength(2);
