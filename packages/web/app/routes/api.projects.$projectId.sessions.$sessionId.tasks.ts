@@ -25,7 +25,10 @@ const RouteParamsSchema = z.object({
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   try {
-    const { projectId, sessionId } = await validateRouteParams(params, RouteParamsSchema);
+    const { projectId, sessionId } = await validateRouteParams(
+      params as Record<string, string>,
+      RouteParamsSchema
+    );
 
     // Get project first to verify it exists
     const project = Project.getById(projectId);
@@ -49,7 +52,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     const taskManager = session.getTaskManager();
 
     // Build filters from query params
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = new URL((request as Request).url);
     const filters: Partial<TaskFilters> = {};
     const status = searchParams.get('status') as TaskStatus | null;
     const priority = searchParams.get('priority') as TaskPriority | null;
@@ -76,9 +79,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 export async function action({ request, params }: Route.ActionArgs) {
   try {
-    const { projectId, sessionId } = await validateRouteParams(params, RouteParamsSchema);
+    const { projectId, sessionId } = await validateRouteParams(
+      params as Record<string, string>,
+      RouteParamsSchema
+    );
 
-    const body = (await request.json()) as Record<string, unknown>;
+    const body = (await (request as Request).json()) as Record<string, unknown>;
     let validatedBody;
     try {
       validatedBody = validateRequestBody(body, CreateTaskSchema);
