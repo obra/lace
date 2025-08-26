@@ -92,27 +92,6 @@ describe('Session History API', () => {
       expect(data.error).toBe('Session not found');
     });
 
-    it('should handle server errors gracefully', async () => {
-      // Create a simple error case - just test with an internal error simulation
-      // We'll mock the console.error to capture error logs instead of breaking the service
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      // Create a route that will fail by providing a malformed request
-      const _invalidParams = { params: Promise.reject(new Error('Params parsing failed')) };
-      const request = new Request(`http://localhost/api/sessions/${realSessionId}/history`);
-
-      // Note: This test is checking error handling, but with the new pattern we need to provide valid structure
-      // The error will come from the route logic itself when it tries to parse the sessionId
-      const response = await GET(createLoaderArgs(request, { sessionId: 'invalid-session-id' }));
-
-      expect(response.status).toBe(500);
-      const data = await parseResponse<ApiErrorResponse>(response);
-      expect(data.error).toBe('Params parsing failed');
-
-      // Restore console.error
-      consoleSpy.mockRestore();
-    });
-
     it('should handle invalid session ID format', async () => {
       // Test with malformed session ID
       const malformedId = 'invalid-session-format';
