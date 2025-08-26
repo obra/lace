@@ -16,22 +16,22 @@ const messageSchema = z.object({
 });
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if (request.method !== 'POST') {
+  if ((request as Request).method !== 'POST') {
     return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
   }
 
   try {
-    const { agentId: agentIdParam } = params;
+    const { agentId: agentIdParam } = params as { agentId: string };
 
     // Validate agent ID format
-    if (!isValidThreadId(agentIdParam)) {
+    if (!isValidThreadId(agentIdParam as string)) {
       return createErrorResponse('Invalid agent ID format', 400, { code: 'VALIDATION_FAILED' });
     }
 
     const agentId = asThreadId(agentIdParam);
 
     // Parse and validate request body
-    const body: unknown = await request.json();
+    const body: unknown = await (request as Request).json();
     const validation = messageSchema.safeParse(body);
 
     if (!validation.success) {
