@@ -1,7 +1,6 @@
 // ABOUTME: Test suite for session API endpoints under projects hierarchy
 // ABOUTME: Tests CRUD operations with real Project and Session classes, not mocks
 
-import { NextRequest } from 'next/server';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { loader as GET, action as POST } from '@/app/routes/api.projects.$projectId.sessions';
 import { parseResponse } from '@/lib/serialization';
@@ -69,7 +68,7 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await GET(
-        new NextRequest(`http://localhost/api/projects/${projectId}/sessions`),
+        new Request(`http://localhost/api/projects/${projectId}/sessions`),
         {
           params: Promise.resolve({ projectId }),
         }
@@ -94,7 +93,7 @@ describe('Session API endpoints under projects', () => {
     it('should return sessions when only default session exists', async () => {
       // Project.create() auto-creates a default session
       const response = await GET(
-        new NextRequest(`http://localhost/api/projects/${projectId}/sessions`),
+        new Request(`http://localhost/api/projects/${projectId}/sessions`),
         {
           params: Promise.resolve({ projectId }),
         }
@@ -108,7 +107,7 @@ describe('Session API endpoints under projects', () => {
 
     it('should return 404 when project not found', async () => {
       const response = await GET(
-        new NextRequest('http://localhost/api/projects/nonexistent/sessions'),
+        new Request('http://localhost/api/projects/nonexistent/sessions'),
         {
           params: Promise.resolve({ projectId: 'nonexistent' }),
         }
@@ -123,7 +122,7 @@ describe('Session API endpoints under projects', () => {
 
   describe('POST /api/projects/:projectId/sessions', () => {
     it('should create session in project', async () => {
-      const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
+      const request = new Request(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         body: JSON.stringify({
           name: 'New Session',
@@ -144,7 +143,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should return 404 when project not found', async () => {
-      const request = new NextRequest('http://localhost/api/projects/nonexistent/sessions', {
+      const request = new Request('http://localhost/api/projects/nonexistent/sessions', {
         method: 'POST',
         body: JSON.stringify({
           name: 'New Session',
@@ -163,7 +162,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should validate required fields', async () => {
-      const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
+      const request = new Request(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         body: JSON.stringify({
           name: '', // Empty name should fail validation
@@ -179,7 +178,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should handle missing request body', async () => {
-      const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
+      const request = new Request(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         body: JSON.stringify({}),
       });
@@ -192,7 +191,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should use default values for optional fields', async () => {
-      const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
+      const request = new Request(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         body: JSON.stringify({
           name: 'Minimal Session',
@@ -211,7 +210,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     it('should create session using providerInstanceId and modelId', async () => {
-      const request = new NextRequest(`http://localhost/api/projects/${projectId}/sessions`, {
+      const request = new Request(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         body: JSON.stringify({
           name: 'Provider Instance Session',
