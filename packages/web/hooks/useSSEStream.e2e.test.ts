@@ -7,10 +7,10 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET as sseStream } from '@/app/api/events/stream/route';
-import { POST as createProjectSession } from '@/app/api/projects/[projectId]/sessions/route';
-import { POST as spawnAgent } from '@/app/api/sessions/[sessionId]/agents/route';
-import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
+import { GET as sseStream } from '@/app/routes/api.events.stream';
+import { POST as createProjectSession } from '@/app/routes/api.projects.$projectId.sessions';
+import { POST as spawnAgent } from '@/app/routes/api.sessions.$sessionId.agents';
+import { POST as sendMessage } from '@/app/routes/api.threads.$threadId.message';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 import type { SessionInfo } from '@/types/core';
