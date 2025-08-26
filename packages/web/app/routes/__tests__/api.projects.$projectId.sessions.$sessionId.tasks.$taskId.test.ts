@@ -333,7 +333,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
 
     it('should return 404 for non-existent task', async () => {
       // First delete the task, then try to delete it again
-      await DELETE(
+      await action(
         new NextRequest(
           `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
         ),
