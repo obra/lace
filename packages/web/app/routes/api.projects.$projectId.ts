@@ -37,61 +37,62 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  const method = (request as Request).method;
+  switch ((request as Request).method) {
+    case 'PATCH':
+      try {
+        const { projectId } = params as { projectId: string };
+        const body = (await (request as Request).json()) as Record<string, unknown>;
+        const validatedData = UpdateProjectSchema.parse(body);
 
-  if (method === 'PATCH') {
-    try {
-      const { projectId } = params as { projectId: string };
-      const body = (await (request as Request).json()) as Record<string, unknown>;
-      const validatedData = UpdateProjectSchema.parse(body);
+        const project = Project.getById(projectId);
 
-      const project = Project.getById(projectId);
+        if (!project) {
+          return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+        }
 
-      if (!project) {
-        return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+        project.updateInfo(validatedData);
+
+        const updatedProjectInfo = project.getInfo();
+
+        return createSuperjsonResponse(updatedProjectInfo);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return createErrorResponse('Invalid request data', 400, {
+            code: 'VALIDATION_FAILED',
+            details: error.errors,
+          });
+        }
+
+        return createErrorResponse(
+          error instanceof Error ? error.message : 'Failed to update project',
+          500,
+          { code: 'INTERNAL_SERVER_ERROR' }
+        );
       }
+      break;
 
-      project.updateInfo(validatedData);
+    case 'DELETE':
+      try {
+        const { projectId } = params as { projectId: string };
+        const project = Project.getById(projectId);
 
-      const updatedProjectInfo = project.getInfo();
+        if (!project) {
+          return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+        }
 
-      return createSuperjsonResponse(updatedProjectInfo);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return createErrorResponse('Invalid request data', 400, {
-          code: 'VALIDATION_FAILED',
-          details: error.errors,
-        });
+        project.delete();
+
+        return createSuperjsonResponse({ success: true });
+      } catch (error) {
+        return createErrorResponse(
+          error instanceof Error ? error.message : 'Failed to delete project',
+          500,
+          { code: 'INTERNAL_SERVER_ERROR' }
+        );
       }
+      break;
 
-      return createErrorResponse(
-        error instanceof Error ? error.message : 'Failed to update project',
-        500,
-        { code: 'INTERNAL_SERVER_ERROR' }
-      );
-    }
+    default:
+      return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
   }
-
-  if (method === 'DELETE') {
-    try {
-      const { projectId } = params as { projectId: string };
-      const project = Project.getById(projectId);
-
-      if (!project) {
-        return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
-      }
-
-      project.delete();
-
-      return createSuperjsonResponse({ success: true });
-    } catch (error) {
-      return createErrorResponse(
-        error instanceof Error ? error.message : 'Failed to delete project',
-        500,
-        { code: 'INTERNAL_SERVER_ERROR' }
-      );
-    }
-  }
-
-  return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
 }
