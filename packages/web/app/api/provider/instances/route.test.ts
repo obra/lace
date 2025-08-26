@@ -5,11 +5,14 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
-import { GET, POST } from './route';
+import { GET, POST } from '@/app/routes/api.provider.instances';
 import { parseResponse } from '@/lib/serialization';
 import type { ProviderInstancesConfig } from '@/lib/server/lace-imports';
 import type { ConfiguredInstance } from '@/lib/server/lace-imports';
-import type { InstancesResponse, CreateInstanceResponse } from './route';
+import type {
+  InstancesResponse,
+  CreateInstanceResponse,
+} from '@/app/routes/api.provider.instances';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 
 describe('Provider Instances API', () => {
