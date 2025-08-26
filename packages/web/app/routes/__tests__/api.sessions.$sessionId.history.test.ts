@@ -18,6 +18,7 @@ import {
   cleanupTestProviderInstances,
 } from '@/lib/server/lace-imports';
 import { Project, Session } from '@/lib/server/lace-imports';
+import { createLoaderArgs } from '@/test-utils/route-test-helpers';
 import { parseResponse } from '@/lib/serialization';
 
 describe('Session History API', () => {
@@ -68,9 +69,7 @@ describe('Session History API', () => {
   describe('GET /api/sessions/[sessionId]/history', () => {
     it('should return empty history for new session', async () => {
       const request = new Request(`http://localhost/api/sessions/${realSessionId}/history`);
-      const response = await GET(request, {
-        params: Promise.resolve({ sessionId: realSessionId }),
-      });
+      const response = await GET(createLoaderArgs(request, { sessionId: realSessionId }));
 
       expect(response.status).toBe(200);
       const data = await parseResponse<LaceEvent[]>(response);
@@ -86,9 +85,7 @@ describe('Session History API', () => {
     it('should return 404 for non-existent session', async () => {
       const nonExistentId = 'lace_20240101_fake12'; // Valid format, but non-existent
       const request = new Request(`http://localhost/api/sessions/${nonExistentId}/history`);
-      const response = await GET(request, {
-        params: Promise.resolve({ sessionId: nonExistentId }),
-      });
+      const response = await GET(createLoaderArgs(request, { sessionId: nonExistentId }));
 
       expect(response.status).toBe(404);
       const data = await parseResponse<ApiErrorResponse>(response);
@@ -121,9 +118,7 @@ describe('Session History API', () => {
       // Test with malformed session ID
       const malformedId = 'invalid-session-format';
       const request = new Request(`http://localhost/api/sessions/${malformedId}/history`);
-      const response = await GET(request, {
-        params: Promise.resolve({ sessionId: malformedId }),
-      });
+      const response = await GET(createLoaderArgs(request, { sessionId: malformedId }));
 
       expect(response.status).toBe(400);
       const data = await parseResponse<ApiErrorResponse>(response);
@@ -140,9 +135,7 @@ describe('Session History API', () => {
       expect(agent).toBeDefined();
 
       const request = new Request(`http://localhost/api/sessions/${realSessionId}/history`);
-      const response = await GET(request, {
-        params: Promise.resolve({ sessionId: realSessionId }),
-      });
+      const response = await GET(createLoaderArgs(request, { sessionId: realSessionId }));
 
       expect(response.status).toBe(200);
       const data = await parseResponse<LaceEvent[]>(response);
