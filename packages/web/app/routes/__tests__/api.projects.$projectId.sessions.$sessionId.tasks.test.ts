@@ -5,7 +5,6 @@
  * @vitest-environment node
  */
 
-import { NextRequest } from 'next/server';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   loader as GET,
@@ -106,7 +105,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
 
   describe('GET', () => {
     it('should return tasks for valid project/session', async () => {
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks`
       );
       const context = {
@@ -126,7 +125,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     it('should return 404 for non-existent project', async () => {
       const nonExistentProjectId = '550e8400-e29b-41d4-a716-446655440001';
 
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${nonExistentProjectId}/sessions/${testSessionId}/tasks`
       );
       const context = {
@@ -143,7 +142,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     it('should return 404 for non-existent session', async () => {
       const nonExistentSessionId = 'lace_20250724_nonext';
 
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${nonExistentSessionId}/tasks`
       );
       const context = {
@@ -158,7 +157,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     });
 
     it('should apply status filter', async () => {
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks?status=pending`
       );
       const context = {
@@ -174,7 +173,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     });
 
     it('should apply priority filter', async () => {
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks?priority=medium`
       );
       const context = {
@@ -190,7 +189,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     });
 
     it('should apply multiple filters', async () => {
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks?status=pending&priority=medium&assignedTo=human`
       );
       const context = {
@@ -214,7 +213,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
         projectId: testProjectId,
       });
 
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${newSession.getId()}/tasks`
       );
       const context = {
@@ -237,7 +236,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
         priority: 'high' as const,
       };
 
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks`,
         {
           method: 'POST',
@@ -261,7 +260,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     });
 
     it('should validate required fields', async () => {
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks`,
         {
           method: 'POST',
@@ -284,7 +283,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     it('should return 404 for non-existent project', async () => {
       const nonExistentProjectId = '550e8400-e29b-41d4-a716-446655440002';
 
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${nonExistentProjectId}/sessions/${testSessionId}/tasks`,
         {
           method: 'POST',
@@ -307,7 +306,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
     it('should return 404 for non-existent session', async () => {
       const nonExistentSessionId = 'lace_20250724_nonex2';
 
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${nonExistentSessionId}/tasks`,
         {
           method: 'POST',
@@ -336,7 +335,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
         assignedTo: 'specific-user',
       };
 
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks`,
         {
           method: 'POST',
@@ -366,7 +365,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
         priority: 'low' as const,
       };
 
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks`,
         {
           method: 'POST',

@@ -2,7 +2,6 @@
 // ABOUTME: Tests real functionality with actual sessions, no mocking
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { loader as GET, action as PUT } from '@/app/routes/api.sessions.$sessionId.configuration';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
@@ -81,7 +80,7 @@ describe('Session Configuration API', () => {
 
   describe('GET /api/sessions/:sessionId/configuration', () => {
     it('should return session effective configuration when found', async () => {
-      const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/configuration`);
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/configuration`);
       const response = await GET(request, { params: Promise.resolve({ sessionId }) });
       const data = await parseResponse<ConfigurationResponse>(response);
 
@@ -101,7 +100,7 @@ describe('Session Configuration API', () => {
     });
 
     it('should return 400 for invalid session ID format', async () => {
-      const request = new NextRequest('http://localhost/api/sessions/nonexistent/configuration');
+      const request = new Request('http://localhost/api/sessions/nonexistent/configuration');
       const response = await GET(request, {
         params: Promise.resolve({ sessionId: 'nonexistent' }),
       });
@@ -114,7 +113,7 @@ describe('Session Configuration API', () => {
     it('should return 404 when session not found', async () => {
       // Use a valid thread ID format that doesn't exist in the database
       const nonExistentSessionId = 'lace_20250101_sess01';
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/sessions/${nonExistentSessionId}/configuration`
       );
       const response = await GET(request, {
@@ -139,7 +138,7 @@ describe('Session Configuration API', () => {
         },
       };
 
-      const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/configuration`, {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/configuration`, {
         method: 'PUT',
         body: JSON.stringify(updates),
         headers: { 'Content-Type': 'application/json' },
@@ -156,7 +155,7 @@ describe('Session Configuration API', () => {
     });
 
     it('should return 400 for invalid session ID format', async () => {
-      const request = new NextRequest('http://localhost/api/sessions/nonexistent/configuration', {
+      const request = new Request('http://localhost/api/sessions/nonexistent/configuration', {
         method: 'PUT',
         body: JSON.stringify({
           providerInstanceId: 'test-provider',
@@ -177,7 +176,7 @@ describe('Session Configuration API', () => {
     it('should return 404 when session not found', async () => {
       // Use a valid thread ID format that doesn't exist in the database
       const nonExistentSessionId = 'lace_20250101_sess02';
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/sessions/${nonExistentSessionId}/configuration`,
         {
           method: 'PUT',
@@ -206,7 +205,7 @@ describe('Session Configuration API', () => {
         },
       };
 
-      const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/configuration`, {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/configuration`, {
         method: 'PUT',
         body: JSON.stringify(invalidUpdates),
         headers: { 'Content-Type': 'application/json' },
@@ -222,7 +221,7 @@ describe('Session Configuration API', () => {
 
     it('should handle JSON parsing errors', async () => {
       // Test with malformed JSON
-      const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/configuration`, {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/configuration`, {
         method: 'PUT',
         body: 'invalid json',
         headers: { 'Content-Type': 'application/json' },
@@ -277,7 +276,7 @@ describe('TDD: Direct Session Usage', () => {
   });
 
   it('should use SessionService.getSession() which calls session.getEffectiveConfiguration() directly', async () => {
-    const request = new NextRequest(`http://localhost/api/sessions/${testSessionId}/configuration`);
+    const request = new Request(`http://localhost/api/sessions/${testSessionId}/configuration`);
     const response = await GET(request, { params: Promise.resolve({ sessionId: testSessionId }) });
 
     // This verifies that the route successfully calls the session's getEffectiveConfiguration method
@@ -340,14 +339,11 @@ describe('TDD: Direct Session Configuration Update', () => {
       },
     };
 
-    const request = new NextRequest(
-      `http://localhost/api/sessions/${testSessionId}/configuration`,
-      {
-        method: 'PUT',
-        body: JSON.stringify(configUpdate),
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+    const request = new Request(`http://localhost/api/sessions/${testSessionId}/configuration`, {
+      method: 'PUT',
+      body: JSON.stringify(configUpdate),
+      headers: { 'Content-Type': 'application/json' },
+    });
 
     const response = await PUT(request, { params: Promise.resolve({ sessionId: testSessionId }) });
 
