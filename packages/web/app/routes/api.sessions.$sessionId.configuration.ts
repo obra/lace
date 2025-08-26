@@ -24,9 +24,9 @@ const ConfigurationSchema = z.object({
   environmentVariables: z.record(z.string()).optional(),
 });
 
-export async function loader({ request, params }: Route.LoaderArgs) {
+export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const { sessionId: sessionIdParam } = params;
+    const { sessionId: sessionIdParam } = params as { sessionId: string };
 
     if (!isValidThreadId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
@@ -53,19 +53,19 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if (request.method !== 'PUT') {
+  if ((request as Request).method !== 'PUT') {
     return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
   }
 
   try {
-    const { sessionId: sessionIdParam } = params;
+    const { sessionId: sessionIdParam } = params as { sessionId: string };
 
     if (!isValidThreadId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
     const sessionId = sessionIdParam;
-    const body = (await request.json()) as Record<string, unknown>;
+    const body = (await (request as Request).json()) as Record<string, unknown>;
     const validatedData = ConfigurationSchema.parse(body);
 
     const sessionService = getSessionService();
