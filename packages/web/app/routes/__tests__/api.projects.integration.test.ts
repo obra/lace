@@ -18,7 +18,7 @@ import type { ProjectInfo } from '@/types/core';
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
 
-import { loader as GET, action as POST } from '@/app/routes/api.projects';
+import { loader, action } from '@/app/routes/api.projects';
 
 interface ErrorResponse {
   error: string;
@@ -76,7 +76,10 @@ describe('Projects API Integration Tests', () => {
         projectId: project1.getId(),
       });
 
-      const response = await GET();
+      const response = await loader({
+        request: new NextRequest('http://localhost/api/projects'),
+        params: {},
+      });
       const data = await parseResponse<ProjectInfo[]>(response);
 
       expect(response.status).toBe(200);
@@ -100,7 +103,10 @@ describe('Projects API Integration Tests', () => {
     });
 
     it('should return empty projects array when no projects exist', async () => {
-      const response = await GET();
+      const response = await loader({
+        request: new NextRequest('http://localhost/api/projects'),
+        params: {},
+      });
       const data = await parseResponse<ProjectInfo[]>(response);
 
       expect(response.status).toBe(200);
@@ -123,7 +129,7 @@ describe('Projects API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await POST(request);
+      const response = await action({ request, params: {} });
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(201);
@@ -157,7 +163,7 @@ describe('Projects API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await POST(request);
+      const response = await action({ request, params: {} });
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(201);
@@ -185,7 +191,7 @@ describe('Projects API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await POST(request);
+      const response = await action({ request, params: {} });
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -205,7 +211,7 @@ describe('Projects API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await POST(request);
+      const response = await action({ request, params: {} });
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(201);
@@ -225,7 +231,7 @@ describe('Projects API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await POST(request);
+      const response = await action({ request, params: {} });
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -240,7 +246,7 @@ describe('Projects API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await POST(request);
+      const response = await action({ request, params: {} });
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
@@ -266,15 +272,18 @@ describe('Projects API Integration Tests', () => {
       });
 
       // Create first project
-      const response1 = await POST(request1);
+      const response1 = await action({ request: request1, params: {} });
       expect(response1.status).toBe(201);
 
       // Create second project with same name (should succeed - names don't need to be unique)
-      const response2 = await POST(request2);
+      const response2 = await action({ request: request2, params: {} });
       expect(response2.status).toBe(201);
 
       // Verify both projects exist
-      const getResponse = await GET();
+      const getResponse = await loader({
+        request: new NextRequest('http://localhost/api/projects'),
+        params: {},
+      });
       const data = await parseResponse<ProjectInfo[]>(getResponse);
       const duplicateProjects = data.filter((p) => p.name === 'Duplicate Project');
       expect(duplicateProjects).toHaveLength(2);
