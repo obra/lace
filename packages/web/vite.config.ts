@@ -3,6 +3,7 @@
 
 import { defineConfig } from 'vite';
 import { reactRouter } from '@react-router/dev/vite';
+import tsconfigPaths from 'vite-tsconfig-paths';
 import path from 'path';
 
 export default defineConfig({
@@ -10,8 +11,8 @@ export default defineConfig({
     reactRouter({
       ssr: false,
       prerender: false,
-      buildDirectory: 'build',
     }),
+    tsconfigPaths(),
   ],
   build: {
     rollupOptions: {

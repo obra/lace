@@ -1,11 +1,10 @@
 {
   "compilerOptions": {
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
     "baseUrl": ".",
+    "rootDirs": [
+      ".",
+      "./.react-router/types"
+    ],
     "paths": {
       "@/*": [
         "./*"
@@ -32,13 +31,12 @@
     "esModuleInterop": true,
     "moduleResolution": "Bundler",
     "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
   },
   "include": [
-    "next-env.d.ts",
-    ".next/types/**/*.ts",
     "**/*.ts",
-    "**/*.tsx"
+    "**/*.tsx",
+    ".react-router/types/**/*"
   ],
   "exclude": [
     "node_modules",
