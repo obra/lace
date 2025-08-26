@@ -21,7 +21,7 @@ import { parseResponse } from '@/lib/serialization';
 import { loader as getAgent } from '@/app/routes/api.agents.$agentId';
 import { loader as getSession } from '@/app/routes/api.projects.$projectId.sessions.$sessionId';
 
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
+import { createLoaderArgs } from '@/test-utils/route-test-helpers';
 import type { ThreadId, SessionInfo } from '@/types/core';
 import type { AgentWithTokenUsage } from '@/types/api';
 

@@ -99,7 +99,7 @@ async function startLaceServer() {
 
     const app = express.default();
     const requestHandler = createRequestHandler({
-      build: build.default || build,
+      build: ((build as { default?: unknown }).default || build) as unknown,
     });
 
     app.use(requestHandler);
