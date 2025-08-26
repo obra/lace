@@ -11,7 +11,7 @@ export interface CatalogResponse {
   providers: CatalogProvider[];
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request: _request }: Route.LoaderArgs) {
   try {
     const registry = ProviderRegistry.getInstance();
 
