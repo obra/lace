@@ -184,7 +184,12 @@ export function EventStreamProvider({
       addAgentEvent(errorTimelineEvent);
     } else {
       // TODO: Show toast for non-active agent errors
-      console.warn('Agent error for non-active agent - should show toast:', event);
+      // For now, just log that we received an error for a different agent
+      console.warn('Agent error for non-active agent (would show toast):', {
+        errorType: errorData.errorType,
+        message: errorData.message,
+        threadId: event.threadId,
+      });
     }
   }, [agentId, addAgentEvent]);
 
@@ -221,10 +226,7 @@ export function EventStreamProvider({
       projectId: projectId || undefined,
       sessionId: sessionId || undefined,
       threadIds,
-      // DEBUG: Log the subscription filter
       onConnect: () => {
-        console.log('EventStreamProvider subscribed with filter:', { projectId, sessionId, threadIds });
-        console.log('EventStreamProvider agentId:', agentId);
         // Event stream connected
       },
       onError: (error: unknown) => {

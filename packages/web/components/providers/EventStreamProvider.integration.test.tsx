@@ -258,7 +258,7 @@ describe('EventStreamProvider Integration', () => {
           <TestComponentWithoutProvider />
         </ThemeProvider>
       );
-    }).toThrow('useEventStream must be used within EventStreamProvider');
+    }).toThrow('useEventStreamConnection must be used within EventStreamProvider');
 
     consoleSpy.mockRestore();
   });
