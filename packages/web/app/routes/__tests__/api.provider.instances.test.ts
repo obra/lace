@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { loader as GET, action as POST } from '@/app/routes/api.provider.instances';
 import { parseResponse } from '@/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 import type { ProviderInstancesConfig } from '@/lib/server/lace-imports';
 import type { ConfiguredInstance } from '@/lib/server/lace-imports';
 import type {
@@ -46,7 +47,7 @@ describe('Provider Instances API', () => {
       );
 
       const mockRequest = {} as Request;
-      const response = await GET({ request: mockRequest });
+      const response = await GET(createLoaderArgs(mockRequest, {}));
       const data = await parseResponse<InstancesResponse>(response);
 
       expect(response.status).toBe(200);
@@ -68,7 +69,7 @@ describe('Provider Instances API', () => {
 
     it('should handle empty instances list when no config file exists', async () => {
       const mockRequest = {} as Request;
-      const response = await GET({ request: mockRequest });
+      const response = await GET(createLoaderArgs(mockRequest, {}));
       const data = await parseResponse<InstancesResponse>(response);
 
       expect(response.status).toBe(200);
@@ -80,7 +81,7 @@ describe('Provider Instances API', () => {
       fs.writeFileSync(path.join(tempDir, 'provider-instances.json'), 'invalid json{');
 
       const mockRequest = {} as Request;
-      const response = await GET({ request: mockRequest });
+      const response = await GET(createLoaderArgs(mockRequest, {}));
       const data = await parseResponse<InstancesResponse>(response);
 
       expect(response.status).toBe(200);
@@ -117,7 +118,7 @@ describe('Provider Instances API', () => {
       );
 
       const mockRequest = {} as Request;
-      const response = await GET({ request: mockRequest });
+      const response = await GET(createLoaderArgs(mockRequest, {}));
       const data = await parseResponse<InstancesResponse>(response);
 
       expect(response.status).toBe(200);
@@ -158,7 +159,7 @@ describe('Provider Instances API', () => {
       );
 
       const mockRequest = {} as Request;
-      const response = await GET({ request: mockRequest });
+      const response = await GET(createLoaderArgs(mockRequest, {}));
       const data = await parseResponse<InstancesResponse>(response);
 
       expect(response.status).toBe(200);
