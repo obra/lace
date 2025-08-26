@@ -221,7 +221,9 @@ export function EventStreamProvider({
       projectId: projectId || undefined,
       sessionId: sessionId || undefined,
       threadIds,
+      // DEBUG: Log the subscription filter
       onConnect: () => {
+        console.log('EventStreamProvider subscribed with filter:', { projectId, sessionId, threadIds });
         // Event stream connected
       },
       onError: (error: unknown) => {
