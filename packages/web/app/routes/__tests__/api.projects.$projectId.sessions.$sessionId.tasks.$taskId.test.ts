@@ -283,7 +283,8 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
   describe('DELETE', () => {
     it('should delete task successfully', async () => {
       const request = new Request(
-        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`,
+        { method: 'DELETE' }
       );
 
       const response = (await action(
@@ -302,7 +303,8 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     it('should return 404 for non-existent project', async () => {
       const nonExistentProjectId = '00000000-0000-0000-0000-000000000000';
       const request = new Request(
-        `http://localhost/api/projects/${nonExistentProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
+        `http://localhost/api/projects/${nonExistentProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`,
+        { method: 'DELETE' }
       );
 
       const response = (await action(
@@ -323,7 +325,8 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       await action(
         createActionArgs(
           new Request(
-            `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
+            `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`,
+            { method: 'DELETE' }
           ),
           {
             projectId: testProjectId,
@@ -335,7 +338,8 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
 
       // Now try to delete the already-deleted task
       const request = new Request(
-        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
+        `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`,
+        { method: 'DELETE' }
       );
 
       const response = (await action(
