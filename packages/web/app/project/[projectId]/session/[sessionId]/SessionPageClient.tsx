@@ -51,8 +51,6 @@ function SessionRedirect({ projectId, sessionId }: { projectId: string; sessionI
 }
 
 export function SessionPageClient({ projectId, sessionId }: SessionPageClientProps) {
-  console.log('SessionPageClient called with:', { projectId, sessionId });
-
   return (
     <UIProvider>
       <ProjectProvider
