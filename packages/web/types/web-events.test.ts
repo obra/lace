@@ -1,8 +1,8 @@
 // ABOUTME: Test error entry and error log entry interface validation
 // ABOUTME: Ensures error UI types are properly structured for frontend display
 
-import { describe, it, expect, vitest } from 'vitest';
-import type { ErrorEntry, ErrorLogEntry, TimelineEntry } from './web-events';
+import { describe, it, expect, vi } from 'vitest';
+import type { ErrorEntry, ErrorLogEntry, TimelineEntry } from '@/types/web-events';
 
 describe('Error Web Event Types', () => {
   describe('ErrorEntry', () => {
@@ -66,7 +66,7 @@ describe('Error Web Event Types', () => {
     });
 
     it('should support retry handler function', () => {
-      const mockRetryHandler = vitest.fn();
+      const mockRetryHandler = vi.fn();
       
       const errorEntry: ErrorEntry = {
         id: 'error-123',

@@ -2,7 +2,7 @@
 // ABOUTME: Verifies error events reach frontend with correct data structure and broadcasting
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EventStreamManager } from './event-stream-manager';
+import { EventStreamManager } from '@/lib/event-stream-manager';
 import { Session, Project } from '@/lib/server/lace-imports';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
