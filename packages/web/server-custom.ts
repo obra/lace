@@ -95,10 +95,14 @@ async function startLaceServer() {
     // Production mode - use built React Router app
     const { createRequestHandler } = await import('@react-router/express');
     const build = await import('./build/server/index.js');
-    const { createServer } = await import('http');
+    const express = await import('express');
 
-    const requestHandler = createRequestHandler({ build });
-    const app = createServer(requestHandler);
+    const app = express.default();
+    const requestHandler = createRequestHandler({
+      build: build.default || build,
+    });
+
+    app.use(requestHandler);
 
     await new Promise<void>((resolve, reject) => {
       app.listen(port, hostname, (err?: Error) => {
