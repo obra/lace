@@ -1283,15 +1283,15 @@ export class Agent extends EventEmitter {
           toolName: toolCall.name,
           toolCallId: toolCall.id,
         });
-        
+
         // Clean up tracking state to prevent deadlock
         this._activeToolCalls.delete(toolCall.id);
         this._pendingToolCount--;
-        
+
         if (this._pendingToolCount === 0) {
           this._handleBatchComplete();
         }
-        
+
         return; // Skip tool execution if agent is stopped
       }
 
