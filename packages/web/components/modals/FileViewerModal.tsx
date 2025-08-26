@@ -8,6 +8,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFile, faDownload, faExternalLinkAlt, faCopy, faSpinner } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { api } from '@/lib/api-client';
+import { formatFileSize } from '@/lib/format-file-size';
+import { encodePathSegments } from '@/lib/path-utils';
 import type { SessionFileContentResponse } from '@/types/session-files';
 import hljs from 'highlight.js';
 import DOMPurify from 'dompurify';
@@ -23,17 +25,21 @@ interface FileViewerModalProps {
 interface FileViewerHeaderProps {
   fileName: string;
   filePath: string;
+  fileContent: SessionFileContentResponse | null;
   onDownload: () => void;
   onPopOut: () => void;
   onCopy: () => void;
+  copyDisabled?: boolean;
 }
 
 function FileViewerHeader({
   fileName,
   filePath,
+  fileContent,
   onDownload,
   onPopOut,
   onCopy,
+  copyDisabled = false,
 }: FileViewerHeaderProps) {
   return (
     <div className="flex items-center justify-between">
@@ -46,7 +52,18 @@ function FileViewerHeader({
       </div>
 
       <div className="flex items-center gap-2">
-        <button onClick={onCopy} className="btn btn-ghost btn-sm" title="Copy content">
+        {fileContent && (
+          <div className="text-sm text-base-content/60">
+            {fileContent.mimeType} • {formatFileSize(fileContent.size)}
+          </div>
+        )}
+        
+        <button 
+          onClick={onCopy} 
+          className="btn btn-ghost btn-sm" 
+          title="Copy content"
+          disabled={copyDisabled}
+        >
           <FontAwesomeIcon icon={faCopy} className="w-4 h-4" />
         </button>
 
@@ -75,6 +92,13 @@ function FileContent({ fileContent, isLoading, error }: FileContentProps) {
   useEffect(() => {
     if (!fileContent?.content) {
       setHighlightedContent('');
+      return;
+    }
+
+    // Check if content is binary/non-text
+    const isBinary = !fileContent.mimeType.startsWith('text/') && fileContent.mimeType !== 'application/json';
+    if (isBinary) {
+      setHighlightedContent(DOMPurify.sanitize('Cannot preview binary file'));
       return;
     }
 
@@ -118,13 +142,6 @@ function FileContent({ fileContent, isLoading, error }: FileContentProps) {
 
   return (
     <div className="h-96 overflow-auto border border-base-300 rounded">
-      {/* File info header */}
-      <div className="bg-base-200 px-3 py-2 border-b border-base-300 text-sm text-base-content/60">
-        <div className="flex justify-between">
-          <span>{fileContent.mimeType}</span>
-          <span>{formatFileSize(fileContent.size)}</span>
-        </div>
-      </div>
 
       {/* Code content with syntax highlighting */}
       <div className="p-4">
@@ -136,14 +153,6 @@ function FileContent({ fileContent, isLoading, error }: FileContentProps) {
   );
 }
 
-// Helper function to format file size
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
 
 export function FileViewerModal({
   isOpen,
@@ -164,28 +173,43 @@ export function FileViewerModal({
       return;
     }
 
+    const abortController = new AbortController();
+
     const loadFileContent = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const encodedPath = filePath
-          .split('/')
-          .map((segment) => encodeURIComponent(segment))
-          .join('/');
+        const encodedPath = encodePathSegments(filePath);
         const response = await api.get<SessionFileContentResponse>(
-          `/api/sessions/${sessionId}/files/${encodedPath}`
+          `/api/sessions/${sessionId}/files/${encodedPath}`,
+          { signal: abortController.signal }
         );
-        setFileContent(response);
+        
+        if (!abortController.signal.aborted) {
+          setFileContent(response);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load file content');
-        setFileContent(null);
+        if (err instanceof Error && err.name === 'AbortError') {
+          // Ignore aborted requests
+          return;
+        }
+        if (!abortController.signal.aborted) {
+          setError(err instanceof Error ? err.message : 'Failed to load file content');
+          setFileContent(null);
+        }
       } finally {
-        setIsLoading(false);
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     };
 
     void loadFileContent();
+
+    return () => {
+      abortController.abort();
+    };
   }, [isOpen, sessionId, filePath]);
 
   // Action handlers
@@ -222,10 +246,11 @@ export function FileViewerModal({
     const popoutWindow = window.open(
       popoutUrl.toString(),
       'file-viewer',
-      'width=1200,height=800,location=no,menubar=no,toolbar=no,status=no,resizable=yes,scrollbars=yes'
+      'width=1200,height=800,location=no,menubar=no,toolbar=no,status=no,resizable=yes,scrollbars=yes,noopener,noreferrer'
     );
 
     if (popoutWindow) {
+      popoutWindow.opener = null;
       popoutWindow.focus();
     }
   };
@@ -239,9 +264,11 @@ export function FileViewerModal({
         <FileViewerHeader
           fileName={fileName}
           filePath={filePath}
+          fileContent={fileContent}
           onDownload={handleDownload}
           onPopOut={handlePopOut}
           onCopy={handleCopy}
+          copyDisabled={!fileContent || (!fileContent.mimeType.startsWith('text/') && fileContent.mimeType !== 'application/json')}
         />
       }
     >

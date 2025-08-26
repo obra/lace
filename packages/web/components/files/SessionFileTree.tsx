@@ -14,6 +14,7 @@ import {
   faSpinner,
 } from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
+import { formatFileSize } from '@/lib/format-file-size';
 import type { SessionDirectoryResponse, SessionFileEntry } from '@/types/session-files';
 
 interface FileTreeNode extends SessionFileEntry {
@@ -32,7 +33,6 @@ interface SessionFileTreeProps {
 interface FileTreeItemProps {
   node: FileTreeNode;
   depth: number;
-  sessionId: string;
   onFileSelect: (filePath: string, fileName: string) => void;
   onDirectoryToggle: (path: string) => void;
   searchTerm?: string;
@@ -61,24 +61,26 @@ function getFileIcon(
 function highlightSearchTerm(text: string, searchTerm: string): React.ReactNode {
   if (!searchTerm || searchTerm.length < 2) return text;
 
-  const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  const escapedTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${escapedTerm})`, 'i'); // Remove global flag
   const parts = text.split(regex);
 
-  return parts.map((part, index) =>
-    regex.test(part) ? (
-      <mark key={index} className="bg-yellow-200 text-yellow-900 px-0.5 rounded">
-        {part}
-      </mark>
-    ) : (
-      part
-    )
-  );
+  return parts.map((part, index) => {
+    // Highlight odd-indexed parts (captured groups)
+    if (index % 2 === 1) {
+      return (
+        <mark key={index} className="bg-yellow-200 text-yellow-900 px-0.5 rounded">
+          {part}
+        </mark>
+      );
+    }
+    return part;
+  });
 }
 
 function FileTreeItem({
   node,
   depth,
-  sessionId,
   onFileSelect,
   onDirectoryToggle,
   searchTerm,
@@ -93,8 +95,19 @@ function FileTreeItem({
 
   const shouldShowInSearch = useMemo(() => {
     if (!searchTerm || searchTerm.length < 2) return true;
-    return node.name.toLowerCase().includes(searchTerm.toLowerCase());
-  }, [node.name, searchTerm]);
+    // Check if this node or any loaded children match
+    const nodeMatches = node.name.toLowerCase().includes(searchTerm.toLowerCase());
+    if (nodeMatches) return true;
+    
+    // For directories, check if any loaded children match
+    if (node.type === 'directory' && node.children) {
+      return node.children.some(child => 
+        child.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    return false;
+  }, [node.name, node.type, node.children, searchTerm]);
 
   if (!shouldShowInSearch) return null;
 
@@ -107,6 +120,16 @@ function FileTreeItem({
         `}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={handleClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleClick();
+          }
+        }}
+        role="treeitem"
+        tabIndex={0}
+        aria-expanded={node.type === 'directory' ? node.isExpanded : undefined}
+        aria-selected={false}
       >
         {/* Expand/collapse indicator for directories */}
         {node.type === 'directory' && (
@@ -135,7 +158,7 @@ function FileTreeItem({
         </span>
 
         {/* File size for files */}
-        {node.type === 'file' && node.size && (
+        {node.type === 'file' && typeof node.size === 'number' && (
           <span className="text-xs text-base-content/40">{formatFileSize(node.size)}</span>
         )}
       </div>
@@ -148,7 +171,6 @@ function FileTreeItem({
               key={child.path}
               node={child}
               depth={depth + 1}
-              sessionId={sessionId}
               onFileSelect={onFileSelect}
               onDirectoryToggle={onDirectoryToggle}
               searchTerm={searchTerm}
@@ -160,14 +182,6 @@ function FileTreeItem({
   );
 }
 
-// Helper function to format file size
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
 
 export function SessionFileTree({
   sessionId,
@@ -328,13 +342,12 @@ export function SessionFileTree({
   }
 
   return (
-    <div className={`overflow-y-auto ${className}`}>
+    <div className={`overflow-y-auto ${className}`} role="tree">
       {fileTree.map((node) => (
         <FileTreeItem
           key={node.path}
           node={node}
           depth={0}
-          sessionId={sessionId}
           onFileSelect={onFileSelect}
           onDirectoryToggle={handleDirectoryToggle}
           searchTerm={searchTerm}

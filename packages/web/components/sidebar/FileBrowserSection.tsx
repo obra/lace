@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFolder, faSearch } from '@/lib/fontawesome';
+import { faSearch } from '@/lib/fontawesome';
 import SidebarSection from '@/components/ui/SidebarSection';
 import { AccentInput } from '@/components/ui/AccentInput';
 import { SessionFileTree } from '@/components/files/SessionFileTree';
@@ -43,17 +43,14 @@ export function FileBrowserSection({
     setSearchTerm(event.target.value);
   }, []);
 
-  // Don't render if no working directory is configured
-  if (!workingDirectory) {
-    return null;
-  }
 
   return (
     <>
       <SidebarSection
         title="Files"
         isExpanded={isExpanded}
-        onToggle={() => setIsExpanded(!isExpanded)}
+        onToggle={() => setIsExpanded(prev => !prev)}
+        className={className}
       >
         {/* Search input */}
         <div className="px-2 pb-3">
@@ -63,10 +60,13 @@ export function FileBrowserSection({
               value={searchTerm}
               onChange={handleSearchChange}
               className="text-sm"
+              type="search"
+              aria-label="Search files"
             />
             <FontAwesomeIcon
               icon={faSearch}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 w-3 h-3 text-base-content/40 pointer-events-none"
+              aria-hidden="true"
             />
           </div>
         </div>
