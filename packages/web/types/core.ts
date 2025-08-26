@@ -11,6 +11,7 @@ export type {
   AgentStateChangeData,
   ErrorType,
   ErrorPhase,
+  AgentErrorData,
 } from '~/threads/types';
 
 export type { CombinedTokenUsage, ThreadTokenUsage } from '~/token-management/types';

@@ -290,7 +290,7 @@ export type ErrorPhase =
   | 'initialization';
 
 // Agent error data
-interface AgentErrorData {
+export interface AgentErrorData {
   errorType: ErrorType;
   message: string;
   stack?: string;
