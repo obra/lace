@@ -29,6 +29,7 @@ export function useOnboarding(
       await reloadProjects();
 
       // Navigate directly to the agent chat
+      console.log('Onboarding: navigating to agent', { projectId, sessionId, agentId });
       navigateToAgent(projectId, asThreadId(sessionId), asThreadId(agentId));
 
       // Clear auto-open state
