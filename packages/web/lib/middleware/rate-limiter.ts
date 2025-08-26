@@ -1,12 +1,10 @@
 // ABOUTME: Simple in-memory rate limiter for API endpoints
 // ABOUTME: Tracks request counts per IP/session to prevent abuse
 
-import { NextRequest, NextResponse } from 'next/server';
-
 interface RateLimitConfig {
   windowMs: number; // Time window in milliseconds
   maxRequests: number; // Max requests per window
-  keyGenerator?: (req: NextRequest) => string; // Custom key generator
+  keyGenerator?: (req: Request) => string; // Custom key generator
 }
 
 interface RateLimitEntry {
@@ -30,7 +28,7 @@ setInterval(() => {
 function createRateLimiter(config: RateLimitConfig) {
   const { windowMs, maxRequests, keyGenerator } = config;
 
-  return function rateLimiter(req: NextRequest): NextResponse | null {
+  return function rateLimiter(req: Request): Response | null {
     // Generate key for rate limiting (default to IP address)
     const defaultKey =
       req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? 'unknown';
@@ -51,18 +49,16 @@ function createRateLimiter(config: RateLimitConfig) {
     if (entry.count >= maxRequests) {
       // Rate limit exceeded
       const retryAfter = Math.ceil((entry.resetTime - now) / 1000);
-      return NextResponse.json(
-        { error: 'Too many requests. Please try again later.' },
-        {
-          status: 429,
-          headers: {
-            'Retry-After': retryAfter.toString(),
-            'X-RateLimit-Limit': maxRequests.toString(),
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': new Date(entry.resetTime).toISOString(),
-          },
-        }
-      );
+      return new Response(JSON.stringify({ error: 'Too many requests. Please try again later.' }), {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': retryAfter.toString(),
+          'X-RateLimit-Limit': maxRequests.toString(),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': new Date(entry.resetTime).toISOString(),
+        },
+      });
     }
 
     // Increment count
