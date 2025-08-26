@@ -12,8 +12,7 @@ import {
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
 
-import { loader as GET, action as PATCH } from '@/app/routes/api.projects.$projectId';
-const DELETE = PATCH; // Both PATCH and DELETE use the same action function
+import { loader, action } from '@/app/routes/api.projects.$projectId';
 import { parseResponse } from '@/lib/serialization';
 import { Session } from '@/lib/server/lace-imports';
 import type { ProjectInfo } from '@/types/core';
@@ -66,7 +65,7 @@ describe('Individual Project API Integration Tests', () => {
   describe('GET /api/projects/:projectId', () => {
     it('should return project when it exists', async () => {
       const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`);
-      const response = await GET({
+      const response = await loader({
         request,
         params: { projectId: testProject.getId() },
       });
@@ -95,7 +94,7 @@ describe('Individual Project API Integration Tests', () => {
       });
 
       const request = new NextRequest(`http://localhost/api/projects/${testProject.getId()}`);
-      const response = await GET({
+      const response = await loader({
         request,
         params: { projectId: testProject.getId() },
       });
@@ -108,7 +107,7 @@ describe('Individual Project API Integration Tests', () => {
     it('should return 404 when project does not exist', async () => {
       const nonExistentId = 'd7af6313-2caa-4645-966e-05447d1524d1';
       const request = new NextRequest(`http://localhost/api/projects/${nonExistentId}`);
-      const response = await GET({
+      const response = await loader({
         request,
         params: { projectId: nonExistentId },
       });
@@ -128,7 +127,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH({
+      const response = await action({
         request,
         params: { projectId: testProject.getId() },
       });
@@ -153,7 +152,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH({
+      const response = await action({
         request,
         params: { projectId: testProject.getId() },
       });
@@ -177,7 +176,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH({
+      const response = await action({
         request,
         params: { projectId: testProject.getId() },
       });
@@ -200,7 +199,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH({
+      const response = await action({
         request,
         params: { projectId: testProject.getId() },
       });
@@ -222,7 +221,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH({
+      const response = await action({
         request,
         params: { projectId: testProject.getId() },
       });
@@ -248,7 +247,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH({
+      const response = await action({
         request,
         params: { projectId: testProject.getId() },
       });
@@ -278,7 +277,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH({
+      const response = await action({
         request,
         params: { projectId: testProject.getId() },
       });
@@ -309,7 +308,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH({
+      const response = await action({
         request,
         params: { projectId: nonExistentId },
       });
@@ -327,7 +326,7 @@ describe('Individual Project API Integration Tests', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH({
+      const response = await action({
         request,
         params: { projectId: testProject.getId() },
       });
@@ -346,7 +345,7 @@ describe('Individual Project API Integration Tests', () => {
         method: 'DELETE',
       });
 
-      const response = await DELETE({ request, params: { projectId } });
+      const response = await action({ request, params: { projectId } });
       const data = await parseResponse<SuccessResponse>(response);
 
       expect(response.status).toBe(200);
@@ -382,7 +381,7 @@ describe('Individual Project API Integration Tests', () => {
         method: 'DELETE',
       });
 
-      const response = await DELETE({ request, params: { projectId } });
+      const response = await action({ request, params: { projectId } });
       const data = await parseResponse<SuccessResponse>(response);
 
       expect(response.status).toBe(200);
@@ -400,7 +399,7 @@ describe('Individual Project API Integration Tests', () => {
         method: 'DELETE',
       });
 
-      const response = await DELETE({
+      const response = await action({
         request,
         params: { projectId: nonExistentId },
       });
