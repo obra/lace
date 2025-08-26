@@ -6,10 +6,7 @@ import type { NextRequest } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import {
-  loader as GET,
-  action as DELETE_PUT,
-} from '@/app/routes/api.provider.instances.$instanceId';
+import { loader as GET, action as ACTION } from '@/app/routes/api.provider.instances.$instanceId';
 import { parseResponse } from '@/lib/serialization';
 import { ProviderRegistry } from '@/lib/server/lace-imports';
 import type { ProviderInstancesConfig } from '@/lib/server/lace-imports';
@@ -67,8 +64,9 @@ describe('Provider Instance Detail API', () => {
       );
 
       const mockRequest = {} as NextRequest;
-      const response = await GET(mockRequest, {
-        params: Promise.resolve({ instanceId: 'test-instance' }),
+      const response = await GET({
+        request: mockRequest,
+        params: { instanceId: 'test-instance' },
       });
       const data = await parseResponse<InstanceDetailResponse>(response);
 
@@ -85,8 +83,9 @@ describe('Provider Instance Detail API', () => {
 
     it('should return 404 for non-existent instance', async () => {
       const mockRequest = {} as NextRequest;
-      const response = await GET(mockRequest, {
-        params: Promise.resolve({ instanceId: 'nonexistent' }),
+      const response = await GET({
+        request: mockRequest,
+        params: { instanceId: 'nonexistent' },
       });
       const data = await parseResponse<{ error: string }>(response);
 
