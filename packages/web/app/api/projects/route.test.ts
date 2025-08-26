@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET, POST } from '@/app/api/projects/route';
+import { GET, POST } from '@/app/routes/api.projects';
 import { parseResponse } from '@/lib/serialization';
 import type { ProjectInfo } from '@/types/core';
 
