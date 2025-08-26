@@ -12,7 +12,7 @@ import type { Route } from './+types/api.filesystem.list';
 
 export async function loader({ request }: Route.LoaderArgs) {
   try {
-    const url = new URL(request.url);
+    const url = new URL((request as Request).url);
     const rawPath = url.searchParams.get('path') || homedir();
 
     // Validate input
