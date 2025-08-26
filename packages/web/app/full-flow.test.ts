@@ -9,10 +9,13 @@ vi.mock('server-only', () => ({}));
 
 // Note: ApprovalManager has been removed and replaced with event-based approval system
 
-import { POST as createProjectSession } from '@/app/routes/api.projects.$projectId.sessions';
-import { POST as spawnAgent, GET as listAgents } from '@/app/routes/api.sessions.$sessionId.agents';
-import { POST as sendMessage } from '@/app/routes/api.threads.$threadId.message';
-import { GET as streamEvents } from '@/app/routes/api.events.stream';
+import { action as createProjectSession } from '@/app/routes/api.projects.$projectId.sessions';
+import {
+  action as spawnAgent,
+  loader as listAgents,
+} from '@/app/routes/api.sessions.$sessionId.agents';
+import { action as sendMessage } from '@/app/routes/api.threads.$threadId.message';
+import { loader as streamEvents } from '@/app/routes/api.events.stream';
 import type { SessionInfo, ThreadId } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
