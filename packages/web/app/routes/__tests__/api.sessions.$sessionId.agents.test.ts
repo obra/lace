@@ -12,6 +12,7 @@ import {
   cleanupTestProviderInstances,
 } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -117,7 +118,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response = await POST({ request, params: { sessionId } });
+      const response = await POST(createActionArgs(request, { sessionId }));
       expect(response.status).toBe(201);
 
       const data = await parseResponse<AgentWithTokenUsage>(response);
@@ -145,7 +146,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response = await POST({ request, params: { sessionId } });
+      const response = await POST(createActionArgs(request, { sessionId }));
       expect(response.status).toBe(201);
 
       const data = await parseResponse<AgentWithTokenUsage>(response);
@@ -164,7 +165,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response = await POST({ request, params: { sessionId } });
+      const response = await POST(createActionArgs(request, { sessionId }));
       expect(response.status).toBe(201);
 
       const data = await parseResponse<AgentWithTokenUsage>(response);
@@ -183,7 +184,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response = await POST({ request, params: { sessionId } });
+      const response = await POST(createActionArgs(request, { sessionId }));
       expect(response.status).toBe(201);
 
       const data = await parseResponse<AgentWithTokenUsage>(response);
@@ -314,7 +315,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response = await POST({ request, params: { sessionId } });
+      const response = await POST(createActionArgs(request, { sessionId }));
       expect(response.status).toBe(201);
 
       const data = await parseResponse<AgentWithTokenUsage>(response);
