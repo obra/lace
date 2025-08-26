@@ -3,7 +3,6 @@
 
 import { describe, it, expect } from 'vitest';
 import { loader } from '@/app/routes/api.filesystem.list';
-import { NextRequest } from 'next/server';
 import { homedir } from 'os';
 import { join } from 'path';
 import { promises as fs } from 'fs';
@@ -12,7 +11,7 @@ import type { ListDirectoryResponse } from '@/types/filesystem';
 
 describe('/api/filesystem/list', () => {
   it('should list home directory contents', async () => {
-    const request = new NextRequest(`http://localhost/api/filesystem/list?path=${homedir()}`);
+    const request = new Request(`http://localhost/api/filesystem/list?path=${homedir()}`);
     const response = await loader({ request, params: {} });
 
     expect(response.status).toBe(200);
@@ -23,7 +22,7 @@ describe('/api/filesystem/list', () => {
   });
 
   it('should reject paths outside home directory', async () => {
-    const request = new NextRequest('http://localhost/api/filesystem/list?path=/etc');
+    const request = new Request('http://localhost/api/filesystem/list?path=/etc');
     const response = await loader({ request, params: {} });
 
     expect(response.status).toBe(403);
@@ -33,7 +32,7 @@ describe('/api/filesystem/list', () => {
 
   it('should handle non-existent directories', async () => {
     const invalidPath = join(homedir(), 'definitely-does-not-exist-12345');
-    const request = new NextRequest(`http://localhost/api/filesystem/list?path=${invalidPath}`);
+    const request = new Request(`http://localhost/api/filesystem/list?path=${invalidPath}`);
     const response = await loader({ request, params: {} });
 
     expect(response.status).toBe(404);
@@ -42,7 +41,7 @@ describe('/api/filesystem/list', () => {
   });
 
   it('should only return directories', async () => {
-    const request = new NextRequest(`http://localhost/api/filesystem/list?path=${homedir()}`);
+    const request = new Request(`http://localhost/api/filesystem/list?path=${homedir()}`);
     const response = await loader({ request, params: {} });
 
     const data = await parseResponse<ListDirectoryResponse>(response);
@@ -52,7 +51,7 @@ describe('/api/filesystem/list', () => {
   });
 
   it('should default to home directory when no path provided', async () => {
-    const request = new NextRequest('http://localhost/api/filesystem/list');
+    const request = new Request('http://localhost/api/filesystem/list');
     const response = await loader({ request, params: {} });
 
     expect(response.status).toBe(200);
@@ -62,7 +61,7 @@ describe('/api/filesystem/list', () => {
 
   it('should handle path traversal attempts', async () => {
     const maliciousPath = join(homedir(), '../../../etc');
-    const request = new NextRequest(`http://localhost/api/filesystem/list?path=${maliciousPath}`);
+    const request = new Request(`http://localhost/api/filesystem/list?path=${maliciousPath}`);
     const response = await loader({ request, params: {} });
 
     expect(response.status).toBe(403);
@@ -71,7 +70,7 @@ describe('/api/filesystem/list', () => {
   });
 
   it('should include permission information in entries', async () => {
-    const request = new NextRequest(`http://localhost/api/filesystem/list?path=${homedir()}`);
+    const request = new Request(`http://localhost/api/filesystem/list?path=${homedir()}`);
     const response = await loader({ request, params: {} });
 
     const data = await parseResponse<ListDirectoryResponse>(response);
@@ -84,7 +83,7 @@ describe('/api/filesystem/list', () => {
   });
 
   it('should sort directories alphabetically', async () => {
-    const request = new NextRequest(`http://localhost/api/filesystem/list?path=${homedir()}`);
+    const request = new Request(`http://localhost/api/filesystem/list?path=${homedir()}`);
     const response = await loader({ request, params: {} });
 
     const data = await parseResponse<ListDirectoryResponse>(response);
@@ -102,7 +101,7 @@ describe('/api/filesystem/list', () => {
     try {
       await fs.writeFile(tempFilePath, 'test content');
 
-      const request = new NextRequest(`http://localhost/api/filesystem/list?path=${tempFilePath}`);
+      const request = new Request(`http://localhost/api/filesystem/list?path=${tempFilePath}`);
       const response = await loader({ request, params: {} });
 
       // Should be 400 (not a directory) since we created a file
