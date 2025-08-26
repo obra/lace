@@ -2,7 +2,6 @@
 // ABOUTME: Tests actual behavior without mocking the Project class - uses real database operations
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 
 // CRITICAL: Setup test isolation BEFORE any imports that might initialize persistence
@@ -77,7 +76,7 @@ describe('Projects API Integration Tests', () => {
       });
 
       const response = await loader({
-        request: new NextRequest('http://localhost/api/projects'),
+        request: new Request('http://localhost/api/projects'),
         params: {},
       });
       const data = await parseResponse<ProjectInfo[]>(response);
@@ -104,7 +103,7 @@ describe('Projects API Integration Tests', () => {
 
     it('should return empty projects array when no projects exist', async () => {
       const response = await loader({
-        request: new NextRequest('http://localhost/api/projects'),
+        request: new Request('http://localhost/api/projects'),
         params: {},
       });
       const data = await parseResponse<ProjectInfo[]>(response);
@@ -123,7 +122,7 @@ describe('Projects API Integration Tests', () => {
         configuration: { key: 'value' },
       };
 
-      const request = new NextRequest('http://localhost/api/projects', {
+      const request = new Request('http://localhost/api/projects', {
         method: 'POST',
         body: JSON.stringify(requestBody),
         headers: { 'Content-Type': 'application/json' },
@@ -157,7 +156,7 @@ describe('Projects API Integration Tests', () => {
         workingDirectory: '/minimal/path',
       };
 
-      const request = new NextRequest('http://localhost/api/projects', {
+      const request = new Request('http://localhost/api/projects', {
         method: 'POST',
         body: JSON.stringify(requestBody),
         headers: { 'Content-Type': 'application/json' },
@@ -185,7 +184,7 @@ describe('Projects API Integration Tests', () => {
         description: 'Missing name and workingDirectory',
       };
 
-      const request = new NextRequest('http://localhost/api/projects', {
+      const request = new Request('http://localhost/api/projects', {
         method: 'POST',
         body: JSON.stringify(requestBody),
         headers: { 'Content-Type': 'application/json' },
@@ -205,7 +204,7 @@ describe('Projects API Integration Tests', () => {
         workingDirectory: '/test/my-awesome-project',
       };
 
-      const request = new NextRequest('http://localhost/api/projects', {
+      const request = new Request('http://localhost/api/projects', {
         method: 'POST',
         body: JSON.stringify(requestBody),
         headers: { 'Content-Type': 'application/json' },
@@ -225,7 +224,7 @@ describe('Projects API Integration Tests', () => {
         workingDirectory: '',
       };
 
-      const request = new NextRequest('http://localhost/api/projects', {
+      const request = new Request('http://localhost/api/projects', {
         method: 'POST',
         body: JSON.stringify(requestBody),
         headers: { 'Content-Type': 'application/json' },
@@ -240,7 +239,7 @@ describe('Projects API Integration Tests', () => {
     });
 
     it('should handle invalid JSON in request body', async () => {
-      const request = new NextRequest('http://localhost/api/projects', {
+      const request = new Request('http://localhost/api/projects', {
         method: 'POST',
         body: 'invalid json',
         headers: { 'Content-Type': 'application/json' },
@@ -259,13 +258,13 @@ describe('Projects API Integration Tests', () => {
         workingDirectory: '/duplicate/path',
       };
 
-      const request1 = new NextRequest('http://localhost/api/projects', {
+      const request1 = new Request('http://localhost/api/projects', {
         method: 'POST',
         body: JSON.stringify(requestBody),
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const request2 = new NextRequest('http://localhost/api/projects', {
+      const request2 = new Request('http://localhost/api/projects', {
         method: 'POST',
         body: JSON.stringify(requestBody),
         headers: { 'Content-Type': 'application/json' },
@@ -281,7 +280,7 @@ describe('Projects API Integration Tests', () => {
 
       // Verify both projects exist
       const getResponse = await loader({
-        request: new NextRequest('http://localhost/api/projects'),
+        request: new Request('http://localhost/api/projects'),
         params: {},
       });
       const data = await parseResponse<ProjectInfo[]>(getResponse);
