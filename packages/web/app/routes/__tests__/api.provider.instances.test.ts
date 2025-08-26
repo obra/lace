@@ -224,7 +224,7 @@ describe('Provider Instances API', () => {
       });
 
       // Verify instance appears in GET with correct contract
-      const getResponse = await GET({ request: {} as Request });
+      const getResponse = await GET(createLoaderArgs({} as Request, {}));
       const getData = await parseResponse<InstancesResponse>(getResponse);
 
       expect(getData.instances).toHaveLength(1);
