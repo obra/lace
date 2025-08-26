@@ -7,8 +7,6 @@ import SessionPage from '@/app/project/[projectId]/session/[sessionId]/page';
 export default function ProjectSession() {
   const { projectId, sessionId } = useParams();
 
-  console.log('ProjectSession route called with:', { projectId, sessionId });
-
   // Pass params as props to maintain compatibility
   return <SessionPage params={{ projectId: projectId!, sessionId: sessionId! }} />;
 }
