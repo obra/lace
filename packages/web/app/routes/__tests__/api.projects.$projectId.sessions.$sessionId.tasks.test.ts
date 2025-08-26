@@ -21,6 +21,7 @@ import {
 } from '@/lib/server/lace-imports';
 import type { Task } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 
 // Mock external dependencies only
 vi.mock('server-only', () => ({}));
@@ -108,11 +109,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks`
       );
-      const context = {
-        params: Promise.resolve({ projectId: testProjectId, sessionId: testSessionId }),
-      };
-
-      const response = await GET(request, context);
+      const response = await GET(
+        createLoaderArgs(request, { projectId: testProjectId, sessionId: testSessionId })
+      );
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ tasks: Task[] }>(response);
@@ -128,11 +127,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const request = new Request(
         `http://localhost/api/projects/${nonExistentProjectId}/sessions/${testSessionId}/tasks`
       );
-      const context = {
-        params: Promise.resolve({ projectId: nonExistentProjectId, sessionId: testSessionId }),
-      };
-
-      const response = await GET(request, context);
+      const response = await GET(
+        createLoaderArgs(request, { projectId: nonExistentProjectId, sessionId: testSessionId })
+      );
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -145,11 +142,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${nonExistentSessionId}/tasks`
       );
-      const context = {
-        params: Promise.resolve({ projectId: testProjectId, sessionId: nonExistentSessionId }),
-      };
-
-      const response = await GET(request, context);
+      const response = await GET(
+        createLoaderArgs(request, { projectId: testProjectId, sessionId: nonExistentSessionId })
+      );
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -160,11 +155,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks?status=pending`
       );
-      const context = {
-        params: Promise.resolve({ projectId: testProjectId, sessionId: testSessionId }),
-      };
-
-      const response = await GET(request, context);
+      const response = await GET(
+        createLoaderArgs(request, { projectId: testProjectId, sessionId: testSessionId })
+      );
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ tasks: Task[] }>(response);
@@ -176,11 +169,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks?priority=medium`
       );
-      const context = {
-        params: Promise.resolve({ projectId: testProjectId, sessionId: testSessionId }),
-      };
-
-      const response = await GET(request, context);
+      const response = await GET(
+        createLoaderArgs(request, { projectId: testProjectId, sessionId: testSessionId })
+      );
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ tasks: Task[] }>(response);
@@ -192,11 +183,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks?status=pending&priority=medium&assignedTo=human`
       );
-      const context = {
-        params: Promise.resolve({ projectId: testProjectId, sessionId: testSessionId }),
-      };
-
-      const response = await GET(request, context);
+      const response = await GET(
+        createLoaderArgs(request, { projectId: testProjectId, sessionId: testSessionId })
+      );
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ tasks: Task[] }>(response);
@@ -216,11 +205,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
       const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${newSession.getId()}/tasks`
       );
-      const context = {
-        params: Promise.resolve({ projectId: testProjectId, sessionId: newSession.getId() }),
-      };
-
-      const response = await GET(request, context);
+      const response = await GET(
+        createLoaderArgs(request, { projectId: testProjectId, sessionId: newSession.getId() })
+      );
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ tasks: Task[] }>(response);
@@ -245,11 +232,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
         }
       );
 
-      const context = {
-        params: Promise.resolve({ projectId: testProjectId, sessionId: testSessionId }),
-      };
-
-      const response = await POST(request, context);
+      const response = await POST(
+        createActionArgs(request, { projectId: testProjectId, sessionId: testSessionId })
+      );
       expect(response.status).toBe(201);
 
       const data = await parseResponse<{ task: Task }>(response);
@@ -269,11 +254,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
         }
       );
 
-      const context = {
-        params: Promise.resolve({ projectId: testProjectId, sessionId: testSessionId }),
-      };
-
-      const response = await POST(request, context);
+      const response = await POST(
+        createActionArgs(request, { projectId: testProjectId, sessionId: testSessionId })
+      );
       expect(response.status).toBe(400);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -292,11 +275,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
         }
       );
 
-      const context = {
-        params: Promise.resolve({ projectId: nonExistentProjectId, sessionId: testSessionId }),
-      };
-
-      const response = await POST(request, context);
+      const response = await POST(
+        createActionArgs(request, { projectId: nonExistentProjectId, sessionId: testSessionId })
+      );
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -315,11 +296,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
         }
       );
 
-      const context = {
-        params: Promise.resolve({ projectId: testProjectId, sessionId: nonExistentSessionId }),
-      };
-
-      const response = await POST(request, context);
+      const response = await POST(
+        createActionArgs(request, { projectId: testProjectId, sessionId: nonExistentSessionId })
+      );
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -344,11 +323,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
         }
       );
 
-      const context = {
-        params: Promise.resolve({ projectId: testProjectId, sessionId: testSessionId }),
-      };
-
-      const response = await POST(request, context);
+      const response = await POST(
+        createActionArgs(request, { projectId: testProjectId, sessionId: testSessionId })
+      );
       expect(response.status).toBe(201);
 
       const data = await parseResponse<{ task: Task }>(response);
@@ -374,11 +351,9 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks', () => {
         }
       );
 
-      const context = {
-        params: Promise.resolve({ projectId: testProjectId, sessionId: testSessionId }),
-      };
-
-      const response = await POST(request, context);
+      const response = await POST(
+        createActionArgs(request, { projectId: testProjectId, sessionId: testSessionId })
+      );
       expect(response.status).toBe(201);
 
       const data = await parseResponse<{ task: Task }>(response);
