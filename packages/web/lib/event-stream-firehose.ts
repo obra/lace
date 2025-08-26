@@ -185,17 +185,6 @@ class EventStreamFirehose {
     for (const subscription of this.subscriptions.values()) {
       const matches = this.eventMatchesFilter(event, subscription.filter);
 
-      // Debug why AGENT_ERROR events don't match
-      if (!matches && event.type === 'AGENT_ERROR') {
-        console.log('[FIREHOSE] AGENT_ERROR rejected by filter:', {
-          eventThreadId: event.threadId,
-          eventContext: event.context,
-          filterProjectIds: subscription.filter.projectIds,
-          filterSessionIds: subscription.filter.sessionIds,
-          filterThreadIds: subscription.filter.threadIds,
-          filterEventTypes: subscription.filter.eventTypes,
-        });
-      }
 
       if (matches) {
         try {
@@ -234,12 +223,6 @@ class EventStreamFirehose {
 
     // Check thread ID filter
     if (filter.threadIds?.length && !filter.threadIds.includes(event.threadId)) {
-      if (process.env.NODE_ENV === 'development' && event.type === 'AGENT_ERROR') {
-        console.log('[FIREHOSE] AGENT_ERROR filtered out by threadId:', {
-          eventThreadId: event.threadId,
-          filterThreadIds: filter.threadIds,
-        });
-      }
       return false;
     }
 
