@@ -27,6 +27,7 @@ import {
   action as deleteTask,
 } from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId';
 import { action as addNote } from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.notes';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 
 // Mock external dependencies only
 vi.mock('server-only', () => ({}));
@@ -106,21 +107,21 @@ describe('TaskAPIClient E2E Tests', () => {
             if (method === 'POST' && urlString.endsWith('/tasks')) {
               // Handle POST /api/projects/{projectId}/sessions/{sessionId}/tasks
               const request = new Request('http://localhost' + urlString, sanitizedInit);
-              return await createTask(request, {
-                params: Promise.resolve({
+              return await createTask(
+                createActionArgs(request, {
                   projectId: extractedProjectId!,
                   sessionId: extractedSessionId!,
-                }),
-              });
+                })
+              );
             } else if (method === 'GET' && urlParts.length === tasksIndex + 1) {
               // Handle GET /api/projects/{projectId}/sessions/{sessionId}/tasks[?params]
               const request = new Request('http://localhost' + urlString, sanitizedInit);
-              return await listTasks(request, {
-                params: Promise.resolve({
+              return await listTasks(
+                createLoaderArgs(request, {
                   projectId: extractedProjectId!,
                   sessionId: extractedSessionId!,
-                }),
-              });
+                })
+              );
             } else if (
               method === 'GET' &&
               urlParts.length > tasksIndex + 1 &&
@@ -129,13 +130,13 @@ describe('TaskAPIClient E2E Tests', () => {
               // Handle GET /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}
               const taskId = urlParts[tasksIndex + 1];
               const request = new Request('http://localhost' + urlString, sanitizedInit);
-              const response = await getTask(request, {
-                params: Promise.resolve({
+              const response = await getTask(
+                createLoaderArgs(request, {
                   projectId: extractedProjectId!,
                   sessionId: extractedSessionId!,
                   taskId: taskId!,
-                }),
-              });
+                })
+              );
               const responseText = await response.text();
               return new Response(responseText, {
                 status: response.status,
@@ -149,13 +150,13 @@ describe('TaskAPIClient E2E Tests', () => {
               // Handle PATCH /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}
               const taskId = urlParts[tasksIndex + 1];
               const request = new Request('http://localhost' + urlString, sanitizedInit);
-              return await updateTask(request, {
-                params: Promise.resolve({
+              return await updateTask(
+                createActionArgs(request, {
                   projectId: extractedProjectId!,
                   sessionId: extractedSessionId!,
                   taskId: taskId!,
-                }),
-              });
+                })
+              );
             } else if (
               method === 'DELETE' &&
               urlParts.length > tasksIndex + 1 &&
@@ -164,24 +165,24 @@ describe('TaskAPIClient E2E Tests', () => {
               // Handle DELETE /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}
               const taskId = urlParts[tasksIndex + 1];
               const request = new Request('http://localhost' + urlString, sanitizedInit);
-              return await deleteTask(request, {
-                params: Promise.resolve({
+              return await deleteTask(
+                createActionArgs(request, {
                   projectId: extractedProjectId!,
                   sessionId: extractedSessionId!,
                   taskId: taskId!,
-                }),
-              });
+                })
+              );
             } else if (method === 'POST' && urlString.includes('/notes')) {
               // Handle POST /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}/notes
               const taskId = urlParts[tasksIndex + 1];
               const request = new Request('http://localhost' + urlString, sanitizedInit);
-              return await addNote(request, {
-                params: Promise.resolve({
+              return await addNote(
+                createActionArgs(request, {
                   projectId: extractedProjectId!,
                   sessionId: extractedSessionId!,
                   taskId: taskId!,
-                }),
-              });
+                })
+              );
             }
           }
 
