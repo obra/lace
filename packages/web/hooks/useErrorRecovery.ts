@@ -156,7 +156,7 @@ export function useErrorRecovery() {
 
   const getRetryState = useCallback((errorId: string): RetryState => {
     return retryStates[errorId] || { retrying: false, retryCount: 0 };
-  }, []);
+  }, [retryStates]);
 
   const canRetry = useCallback((errorId: string, errorType: ErrorType): boolean => {
     const state = getRetryState(errorId);

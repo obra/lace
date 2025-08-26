@@ -10,11 +10,66 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { logger } from '~/utils/logger';
 import { EventStreamManager } from '@/lib/event-stream-manager';
+import type { ErrorType, ErrorPhase } from '@/types/core';
 
 // Request validation schema
 const messageSchema = z.object({
   message: z.string().min(1, 'Message cannot be empty'),
 });
+
+// Utility function to classify agent errors for better categorization
+function classifyAgentError(error: unknown): { errorType: ErrorType; phase: ErrorPhase; isRetryable: boolean } {
+  const message = error instanceof Error ? error.message : String(error);
+  const stack = error instanceof Error ? error.stack : undefined;
+
+  // Network/connection errors (timeout, connection issues)
+  if (message.includes('ECONNREFUSED') || message.includes('ECONNRESET') || message.includes('ETIMEDOUT')) {
+    return { errorType: 'timeout', phase: 'provider_response', isRetryable: true };
+  }
+
+  // Authentication errors (provider issues)
+  if (message.includes('401') || message.includes('unauthorized') || message.includes('invalid_key')) {
+    return { errorType: 'provider_failure', phase: 'initialization', isRetryable: false };
+  }
+
+  // Rate limiting (provider issues)
+  if (message.includes('429') || message.includes('rate limit') || message.includes('too many requests')) {
+    return { errorType: 'provider_failure', phase: 'provider_response', isRetryable: true };
+  }
+
+  // Validation errors (processing issues)
+  if (message.includes('validation') || message.includes('invalid') || message.includes('malformed')) {
+    return { errorType: 'processing_error', phase: 'conversation_processing', isRetryable: false };
+  }
+
+  // Tool execution errors
+  if (message.includes('tool') && (message.includes('failed') || message.includes('error'))) {
+    return { errorType: 'tool_execution', phase: 'tool_execution', isRetryable: true };
+  }
+
+  // Provider/model errors
+  if (message.includes('model') || message.includes('provider') || message.includes('backend')) {
+    return { errorType: 'provider_failure', phase: 'provider_response', isRetryable: true };
+  }
+
+  // Streaming errors
+  if (message.includes('stream') || message.includes('streaming')) {
+    return { errorType: 'streaming_error', phase: 'provider_response', isRetryable: true };
+  }
+
+  // Check stack trace for more context
+  if (stack) {
+    if (stack.includes('fetch') || stack.includes('http')) {
+      return { errorType: 'timeout', phase: 'provider_response', isRetryable: true };
+    }
+    if (stack.includes('auth') || stack.includes('token')) {
+      return { errorType: 'provider_failure', phase: 'initialization', isRetryable: false };
+    }
+  }
+
+  // Default classification for unknown errors
+  return { errorType: 'provider_failure', phase: 'initialization', isRetryable: true };
+}
 
 export async function POST(
   request: NextRequest,
@@ -78,6 +133,9 @@ export async function POST(
         error: error instanceof Error ? error.message : String(error),
       });
 
+      // Use classifyAgentError utility for better error categorization
+      const errorClassification = classifyAgentError(error);
+
       // Emit API-level error event for initialization/validation failures
       const eventStreamManager = EventStreamManager.getInstance();
       eventStreamManager.broadcast({
@@ -85,17 +143,17 @@ export async function POST(
         threadId: agentId,
         timestamp: new Date(),
         data: {
-          errorType: 'provider_failure' as const,
+          errorType: errorClassification.errorType,
           message: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
           context: {
-            phase: 'initialization' as const,
+            phase: errorClassification.phase,
             // Get provider context from agent
             providerInstanceId: agent.getInfo().providerInstanceId,
             modelId: agent.getInfo().modelId,
             providerName: agent.providerInstance?.providerName,
           },
-          isRetryable: true, // Provider instance issues are usually retryable
+          isRetryable: errorClassification.isRetryable,
           retryCount: 0,
         },
         transient: true,

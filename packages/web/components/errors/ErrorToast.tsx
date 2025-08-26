@@ -7,9 +7,8 @@ import {
   faExclamationTriangle, 
   faRedo, 
   faTimes,
-  faExclamationCircle,
-  faInfoCircle
-} from '@fortawesome/free-solid-svg-icons';
+  faInfo
+} from '@/lib/fontawesome';
 import type { ErrorType } from '@/types/core';
 
 interface ErrorToastProps {
@@ -50,9 +49,9 @@ export function ErrorToast({
   const getToastIcon = () => {
     switch (severity) {
       case 'critical': return faExclamationTriangle;
-      case 'error': return faExclamationCircle;
-      case 'warning': return faInfoCircle;
-      default: return faInfoCircle;
+      case 'error': return faExclamationTriangle;
+      case 'warning': return faExclamationTriangle;
+      default: return faInfo;
     }
   };
 
@@ -71,7 +70,7 @@ export function ErrorToast({
     }
   };
 
-  const formatErrorType = (type: string) => {
+  const formatErrorType = (type: ErrorType) => {
     return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 

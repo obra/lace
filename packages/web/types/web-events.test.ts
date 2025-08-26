@@ -2,7 +2,7 @@
 // ABOUTME: Ensures error UI types are properly structured for frontend display
 
 import { describe, it, expect, vi } from 'vitest';
-import type { ErrorEntry, ErrorLogEntry, TimelineEntry } from '@/types/web-events';
+import type { ErrorEntry, AgentErrorLogEntry, TimelineEntry } from '@/types/web-events';
 
 describe('Error Web Event Types', () => {
   describe('ErrorEntry', () => {
@@ -11,8 +11,8 @@ describe('Error Web Event Types', () => {
         id: 'error-123',
         type: 'error',
         errorType: 'provider_failure',
-        errorMessage: 'Provider API failed',
-        errorContext: { providerName: 'anthropic' },
+        message: 'Provider API failed',
+        context: { providerName: 'anthropic' },
         isRetryable: true,
         retryCount: 1,
         canRetry: true,
@@ -40,7 +40,7 @@ describe('Error Web Event Types', () => {
           id: `error-${errorType}`,
           type: 'error',
           errorType,
-          errorMessage: `Test ${errorType} error`,
+          message: `Test ${errorType} error`,
           isRetryable: false,
           timestamp: new Date(),
         };
@@ -54,12 +54,12 @@ describe('Error Web Event Types', () => {
         id: 'error-123',
         type: 'error',
         errorType: 'tool_execution',
-        errorMessage: 'Tool failed',
+        message: 'Tool failed',
         isRetryable: true,
         timestamp: new Date(),
       };
 
-      expect(errorEntry.errorContext).toBeUndefined();
+      expect(errorEntry.context).toBeUndefined();
       expect(errorEntry.retryCount).toBeUndefined();
       expect(errorEntry.canRetry).toBeUndefined();
       expect(errorEntry.retryHandler).toBeUndefined();
@@ -72,7 +72,7 @@ describe('Error Web Event Types', () => {
         id: 'error-123',
         type: 'error',
         errorType: 'provider_failure',
-        errorMessage: 'Provider failed',
+        message: 'Provider failed',
         isRetryable: true,
         canRetry: true,
         retryHandler: mockRetryHandler,
@@ -84,9 +84,9 @@ describe('Error Web Event Types', () => {
     });
   });
 
-  describe('ErrorLogEntry', () => {
+  describe('AgentErrorLogEntry', () => {
     it('should validate complete error log entry', () => {
-      const errorLogEntry: ErrorLogEntry = {
+      const errorLogEntry: AgentErrorLogEntry = {
         id: 'log-error-123',
         timestamp: new Date(),
         errorType: 'provider_failure',
@@ -117,7 +117,7 @@ describe('Error Web Event Types', () => {
       const severities = ['warning', 'error', 'critical'] as const;
 
       severities.forEach(severity => {
-        const errorLogEntry: ErrorLogEntry = {
+        const errorLogEntry: AgentErrorLogEntry = {
           id: `log-${severity}`,
           timestamp: new Date(),
           errorType: 'processing_error',
@@ -133,7 +133,7 @@ describe('Error Web Event Types', () => {
     });
 
     it('should handle optional fields correctly', () => {
-      const minimalErrorLogEntry: ErrorLogEntry = {
+      const minimalErrorLogEntry: AgentErrorLogEntry = {
         id: 'minimal-error',
         timestamp: new Date(),
         errorType: 'timeout',
@@ -168,7 +168,7 @@ describe('Error Web Event Types', () => {
         },
       };
 
-      const errorLogEntry: ErrorLogEntry = {
+      const errorLogEntry: AgentErrorLogEntry = {
         id: 'complex-error',
         timestamp: new Date(),
         errorType: 'tool_execution',

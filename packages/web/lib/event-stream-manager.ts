@@ -10,7 +10,7 @@ import { logger } from '~/utils/logger';
 import { stringify } from '@/lib/serialization';
 
 // Interface for AGENT_ERROR event data
-interface AgentErrorEventData {
+export interface AgentErrorEventData {
   errorType: ErrorType;
   message: string;
   stack?: string;
@@ -221,6 +221,13 @@ export class EventStreamManager {
     projectId: string, 
     sessionId: string
   ): void {
+    // Prevent duplicate error listeners on the same Agent instance
+    if (EventStreamManager.registeredAgents.has(agent)) {
+      return;
+    }
+    
+    EventStreamManager.registeredAgents.add(agent);
+    
     agent.on('error', (errorEvent: { error: Error; context: Record<string, unknown> }) => {
       const { error, context } = errorEvent;
       
@@ -271,6 +278,8 @@ export class EventStreamManager {
 
   // WeakSet to track registered TaskManager instances
   private static registeredTaskManagers = new WeakSet<object>();
+  // WeakSet to track agents that already have error listeners registered
+  private static registeredAgents = new WeakSet<Agent>();
 
   static getInstance(): EventStreamManager {
     if (!global.eventStreamManager) {

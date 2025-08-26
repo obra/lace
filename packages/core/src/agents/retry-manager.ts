@@ -94,20 +94,25 @@ export class RetryManager {
   ): Promise<{ success: boolean; result?: ToolResult; error?: string }> {
     const key = `tool-${toolCall.id}`;
     const currentAttempts = this.retryAttempts.get(key) || 0;
+    const newAttempts = currentAttempts + 1;
 
-    if (currentAttempts >= this.MAX_RETRIES) {
+    if (newAttempts > this.MAX_RETRIES) {
       return { success: false, error: 'Maximum retry attempts exceeded' };
     }
 
-    const delay = this.BASE_DELAY * Math.pow(2, currentAttempts);
-    await new Promise((resolve) => setTimeout(resolve, delay));
+    // Pre-increment to prevent race conditions
+    this.retryAttempts.set(key, newAttempts);
 
-    this.retryAttempts.set(key, currentAttempts + 1);
+    // Calculate exponential backoff delay with jitter
+    const baseDelay = this.BASE_DELAY * Math.pow(2, newAttempts - 1);
+    const jitter = Math.random() * 0.1 * baseDelay; // 10% jitter
+    const delay = Math.floor(baseDelay + jitter);
+    await new Promise((resolve) => setTimeout(resolve, delay));
 
     logger.debug('RetryManager: Attempting tool retry', {
       toolCallId: toolCall.id,
       toolName: toolCall.name,
-      attempt: currentAttempts + 1,
+      attempt: newAttempts,
       delay,
     });
 
@@ -116,21 +121,26 @@ export class RetryManager {
       const result = await toolExecutor.executeTool(toolCall, context);
 
       if (result.status === 'failed') {
-        return { success: false, error: 'Tool execution failed on retry' };
+        // Inspect result for underlying error details from content
+        const errorDetails =
+          result.content.length > 0 && result.content[0].text
+            ? result.content[0].text
+            : 'Tool execution failed on retry';
+        return { success: false, error: errorDetails };
       }
 
       this.retryAttempts.delete(key);
       logger.info('RetryManager: Tool retry succeeded', {
         toolCallId: toolCall.id,
         toolName: toolCall.name,
-        totalAttempts: currentAttempts + 1,
+        totalAttempts: newAttempts,
       });
       return { success: true, result };
     } catch (error) {
       logger.warn('RetryManager: Tool retry failed', {
         toolCallId: toolCall.id,
         toolName: toolCall.name,
-        attempt: currentAttempts + 1,
+        attempt: newAttempts,
         error: error instanceof Error ? error.message : String(error),
       });
       return {
@@ -153,6 +163,7 @@ export class RetryManager {
   }
 
   getRetryHistory(): Record<string, number> {
-    return Object.fromEntries(this.retryAttempts);
+    // Return immutable copy to prevent external mutation
+    return Object.fromEntries(this.retryAttempts.entries());
   }
 }

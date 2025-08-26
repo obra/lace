@@ -291,22 +291,25 @@ export type ErrorPhase =
 
 // Runtime type guards
 export function isErrorType(value: unknown): value is ErrorType {
-  return typeof value === 'string' && [
-    'provider_failure',
-    'tool_execution', 
-    'processing_error',
-    'timeout',
-    'streaming_error'
-  ].includes(value);
+  return (
+    typeof value === 'string' &&
+    [
+      'provider_failure',
+      'tool_execution',
+      'processing_error',
+      'timeout',
+      'streaming_error',
+    ].includes(value)
+  );
 }
 
 export function isErrorPhase(value: unknown): value is ErrorPhase {
-  return typeof value === 'string' && [
-    'provider_response',
-    'tool_execution',
-    'conversation_processing',
-    'initialization'
-  ].includes(value);
+  return (
+    typeof value === 'string' &&
+    ['provider_response', 'tool_execution', 'conversation_processing', 'initialization'].includes(
+      value
+    )
+  );
 }
 
 // Agent error data
