@@ -2,8 +2,9 @@
 // ABOUTME: Provides secure file reading with MIME type detection, size limits, and path traversal protection
 
 import { NextRequest } from 'next/server';
-import { promises as fs } from 'fs';
-import { resolve, relative, extname } from 'path';
+import { promises as fs, constants as fsConstants } from 'fs';
+import { resolve, relative } from 'path';
+import mime from 'mime-types';
 import { createSuccessResponse, createErrorResponse } from '@/lib/server/api-utils';
 import { SessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
@@ -12,30 +13,12 @@ import {
   type SessionFileContentResponse,
 } from '@/types/session-files';
 
-// Simple MIME type detection based on file extension
+// File size limits as constants
+export const MAX_FILE_SIZE = 1024 * 1024; // 1MB
+
+// MIME type detection using mime-types library
 function getMimeType(filePath: string): string {
-  const ext = extname(filePath).toLowerCase();
-  const mimeTypes: Record<string, string> = {
-    '.js': 'text/javascript',
-    '.ts': 'text/typescript',
-    '.jsx': 'text/javascript',
-    '.tsx': 'text/typescript',
-    '.json': 'application/json',
-    '.md': 'text/markdown',
-    '.txt': 'text/plain',
-    '.html': 'text/html',
-    '.css': 'text/css',
-    '.py': 'text/x-python',
-    '.java': 'text/x-java',
-    '.go': 'text/x-go',
-    '.rs': 'text/x-rust',
-    '.cpp': 'text/x-c++',
-    '.c': 'text/x-c',
-    '.h': 'text/x-c',
-    '.yml': 'text/yaml',
-    '.yaml': 'text/yaml',
-  };
-  return mimeTypes[ext] || 'text/plain';
+  return mime.lookup(filePath) || 'text/plain';
 }
 
 // Check if file is likely text-based
@@ -45,15 +28,25 @@ function isTextFile(mimeType: string): boolean {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ sessionId: string; path: string[] }> }
+  { params }: { params: { sessionId: string; path: string[] } }
 ) {
   try {
-    // Await params before accessing properties
-    const { sessionId, path: pathSegments } = await params;
+    const { sessionId, path: pathSegments } = params;
     const filePath = pathSegments.join('/');
 
     // Validate request
-    const { path: requestedPath } = GetSessionFileRequestSchema.parse({ path: filePath });
+    const parseResult = GetSessionFileRequestSchema.safeParse({ path: filePath });
+    if (!parseResult.success) {
+      return createErrorResponse(
+        'Invalid request parameters',
+        400,
+        { 
+          code: 'INVALID_REQUEST',
+          details: parseResult.error.flatten()
+        }
+      );
+    }
+    const { path: requestedPath } = parseResult.data;
 
     // Get session and working directory
     const sessionService = new SessionService();
@@ -71,26 +64,47 @@ export async function GET(
       });
     }
 
-    // Security: Resolve paths and prevent traversal outside working directory
-    const absoluteWorkingDir = resolve(workingDirectory);
-    const absoluteFilePath = resolve(absoluteWorkingDir, requestedPath);
-    const relativePath = relative(absoluteWorkingDir, absoluteFilePath);
+    // Security: Use realpath to resolve symlinks and prevent traversal outside working directory
+    let realWorkingDir: string;
+    let realFilePath: string;
+    
+    try {
+      realWorkingDir = await fs.realpath(workingDirectory);
+      const tempFilePath = resolve(workingDirectory, requestedPath);
+      realFilePath = await fs.realpath(tempFilePath);
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+        // File doesn't exist, but we still need to check if it would be inside working dir
+        realWorkingDir = await fs.realpath(workingDirectory);
+        const tempFilePath = resolve(workingDirectory, requestedPath);
+        const relativePath = relative(realWorkingDir, tempFilePath);
+        if (relativePath.startsWith('..')) {
+          return createErrorResponse('Path access denied', 403, { code: 'PATH_ACCESS_DENIED' });
+        }
+        realFilePath = tempFilePath;
+      } else {
+        return createErrorResponse('Path access denied', 403, { code: 'PATH_ACCESS_DENIED' });
+      }
+    }
 
-    // Prevent path traversal attacks
-    if (
-      relativePath.startsWith('..') ||
-      resolve(absoluteWorkingDir, relativePath) !== absoluteFilePath
-    ) {
+    // Prevent path traversal attacks using real paths
+    const relativePath = relative(realWorkingDir, realFilePath);
+    if (relativePath.startsWith('..') || !realFilePath.startsWith(realWorkingDir + '/') && realFilePath !== realWorkingDir) {
       return createErrorResponse('Path access denied', 403, { code: 'PATH_ACCESS_DENIED' });
     }
 
-    // Check if file exists and is accessible
+    // Check if file exists and is accessible using lstat to avoid following symlinks
     let stats;
     try {
-      stats = await fs.stat(absoluteFilePath);
+      stats = await fs.lstat(realFilePath);
       if (stats.isDirectory()) {
         return createErrorResponse('Path is a directory, not a file', 400, {
           code: 'PATH_IS_DIRECTORY',
+        });
+      }
+      if (stats.isSymbolicLink()) {
+        return createErrorResponse('Symbolic links are not supported', 403, {
+          code: 'SYMLINK_NOT_SUPPORTED',
         });
       }
     } catch (error) {
@@ -105,8 +119,7 @@ export async function GET(
       throw error;
     }
 
-    // Check file size - limit to 1MB for text files
-    const MAX_FILE_SIZE = 1024 * 1024; // 1MB
+    // Check file size - limit using shared constant
     if (stats.size > MAX_FILE_SIZE) {
       return createErrorResponse('File too large to display', 413, {
         code: 'FILE_TOO_LARGE',
@@ -115,7 +128,7 @@ export async function GET(
     }
 
     // Determine MIME type and encoding
-    const mimeType = getMimeType(absoluteFilePath);
+    const mimeType = getMimeType(realFilePath);
     const isText = isTextFile(mimeType);
 
     if (!isText) {
@@ -128,8 +141,8 @@ export async function GET(
     // Read file content
     let content: string;
     try {
-      await fs.access(absoluteFilePath, fs.constants.R_OK);
-      content = await fs.readFile(absoluteFilePath, 'utf8');
+      await fs.access(realFilePath, fsConstants.R_OK);
+      content = await fs.readFile(realFilePath, 'utf8');
     } catch (error) {
       if (
         error instanceof Error &&
@@ -151,10 +164,11 @@ export async function GET(
 
     return createSuccessResponse(response);
   } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
     return createErrorResponse(
-      error instanceof Error ? error.message : 'Failed to read file',
+      'Failed to read file',
       500,
-      { code: 'INTERNAL_SERVER_ERROR' }
+      { code: 'INTERNAL_SERVER_ERROR', error: err }
     );
   }
 }
