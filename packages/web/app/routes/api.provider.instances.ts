@@ -40,7 +40,7 @@ const CreateInstanceSchema = z.object({
   }),
 });
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request: _request }: Route.LoaderArgs) {
   try {
     const registry = ProviderRegistry.getInstance();
 
@@ -57,12 +57,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  if (request.method !== 'POST') {
+  if ((request as Request).method !== 'POST') {
     return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
   }
 
   try {
-    const body = (await request.json()) as unknown;
+    const body = (await (request as Request).json()) as unknown;
     const validatedData = CreateInstanceSchema.parse(body);
 
     // Validate catalog provider exists
