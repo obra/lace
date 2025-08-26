@@ -100,6 +100,7 @@ export async function POST(
         },
         transient: true,
         context: {
+          projectId: session.getProjectId(),
           sessionId: sessionId,
           agentId: agentId,
         },
