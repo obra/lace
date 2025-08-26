@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { loader, action } from '@/app/routes/api.projects.$projectId.configuration';
 import { parseResponse } from '@/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 
 // Type interfaces for API responses
 interface ConfigurationResponse {
@@ -58,10 +59,7 @@ describe('Project Configuration API', () => {
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
       const request = new Request('http://localhost/api/projects/test-project/configuration');
-      const response = await loader({
-        request,
-        params: { projectId: 'test-project' },
-      });
+      const response = await loader(createLoaderArgs(request, { projectId: 'test-project' }));
       const data = await parseResponse<ConfigurationResponse>(response);
 
       expect(response.status).toBe(200);
@@ -84,10 +82,7 @@ describe('Project Configuration API', () => {
       Project.getById = vi.fn().mockReturnValue(null);
 
       const request = new Request('http://localhost/api/projects/nonexistent/configuration');
-      const response = await loader({
-        request,
-        params: { projectId: 'nonexistent' },
-      });
+      const response = await loader(createLoaderArgs(request, { projectId: 'nonexistent' }));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
@@ -101,10 +96,7 @@ describe('Project Configuration API', () => {
       });
 
       const request = new Request('http://localhost/api/projects/test-project/configuration');
-      const response = await loader({
-        request,
-        params: { projectId: 'test-project' },
-      });
+      const response = await loader(createLoaderArgs(request, { projectId: 'test-project' }));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
@@ -135,10 +127,7 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { projectId: 'test-project' },
-      });
+      const response = await action(createActionArgs(request, { projectId: 'test-project' }));
       const data = await parseResponse<ConfigurationResponse>(response);
 
       expect(response.status).toBe(200);
@@ -155,10 +144,7 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { projectId: 'nonexistent' },
-      });
+      const response = await action(createActionArgs(request, { projectId: 'nonexistent' }));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
@@ -182,10 +168,7 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { projectId: 'test-project' },
-      });
+      const response = await action(createActionArgs(request, { projectId: 'test-project' }));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -206,10 +189,7 @@ describe('Project Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await action({
-        request,
-        params: { projectId: 'test-project' },
-      });
+      const response = await action(createActionArgs(request, { projectId: 'test-project' }));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(500);
