@@ -1,13 +1,13 @@
 // ABOUTME: End-to-end tests for complete file browser functionality
 // ABOUTME: Tests file browsing, search, viewing, and pop-out functionality with real filesystem
 
-import { test, expect } from './mocks/setup';
+import { test, expect, type Page } from '@playwright/test';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
 // Helper function to create a project with test files
-async function createTestProject(page: any, projectName: string, testProjectDir: string) {
+async function createTestProject(page: Page, projectName: string, testProjectDir: string) {
   await page.getByRole('button', { name: /new project/i }).click();
   await page.getByLabel(/project name/i).fill(projectName);
   await page.getByLabel(/working directory/i).fill(testProjectDir);
@@ -41,9 +41,7 @@ test.describe('File Browser E2E Tests', () => {
       )
     );
 
-    await fs.writeFile(join(testProjectDir, 'README.md'), '# Test Project
-
-This is a test.');
+    await fs.writeFile(join(testProjectDir, 'README.md'), '# Test Project\n\nThis is a test.');
 
     await fs.writeFile(
       join(testProjectDir, 'src', 'index.ts'),

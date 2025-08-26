@@ -13,14 +13,12 @@ import { FileViewerModal } from '@/components/modals/FileViewerModal';
 
 interface FileBrowserSectionProps {
   sessionId: string;
-  workingDirectory?: string;
   defaultCollapsed?: boolean;
   className?: string;
 }
 
 export function FileBrowserSection({
   sessionId,
-  workingDirectory,
   defaultCollapsed = false,
   className = '',
 }: FileBrowserSectionProps) {
@@ -72,7 +70,7 @@ export function FileBrowserSection({
         </div>
 
         {/* File tree */}
-        <div className="px-1">
+        <div className="px-1" data-testid="file-tree-container">
           <SessionFileTree
             sessionId={sessionId}
             onFileSelect={handleFileSelect}

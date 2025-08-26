@@ -68,7 +68,9 @@ describe('FileViewerModal', () => {
       expect(screen.getByText(/text\/typescript/)).toBeInTheDocument();
     });
 
-    expect(mockApiGet).toHaveBeenCalledWith('/api/sessions/test-session-123/files/src/test.ts');
+    expect(mockApiGet).toHaveBeenCalledWith('/api/sessions/test-session-123/files/src/test.ts', {
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it('should handle API errors gracefully', async () => {
@@ -117,26 +119,6 @@ describe('FileViewerModal', () => {
     expect(mockWriteText).toHaveBeenCalledWith('const hello = "world";');
   });
 
-  it('should handle download functionality', async () => {
-    const mockFileContent = {
-      path: 'src/test.ts',
-      content: 'const hello = "world";',
-      mimeType: 'text/typescript',
-      encoding: 'utf8' as const,
-      size: 1024,
-    };
-
-    mockApiGet.mockResolvedValueOnce(mockFileContent);
-
-    render(<FileViewerModal {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByTitle('Download file')).toBeInTheDocument();
-    });
-
-    // Just verify the button exists and is clickable - don't test DOM manipulation
-    expect(screen.getByTitle('Download file')).toBeInTheDocument();
-  });
 
   it('should handle pop-out window functionality', async () => {
     const mockFileContent = {

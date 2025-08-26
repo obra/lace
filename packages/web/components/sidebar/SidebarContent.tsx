@@ -68,11 +68,8 @@ export const SidebarContent = memo(function SidebarContent({
         )}
 
         {/* FILE BROWSER */}
-        {sessionDetails && sessionDetails.id && selectedProject?.workingDirectory && (
-          <FileBrowserSection
-            sessionId={sessionDetails.id}
-            workingDirectory={selectedProject.workingDirectory}
-          />
+        {sessionDetails && sessionDetails.id && (
+          <FileBrowserSection sessionId={sessionDetails.id} />
         )}
 
         {/* TASK MANAGEMENT */}

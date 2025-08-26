@@ -33,19 +33,12 @@ import { FileBrowserSection } from '@/components/sidebar/FileBrowserSection';
 describe('FileBrowserSection', () => {
   const defaultProps = {
     sessionId: 'test-session-123',
-    workingDirectory: '/home/user/project',
   };
 
-  it('should not render when no working directory is provided', () => {
-    render(<FileBrowserSection sessionId="test-session" workingDirectory="" />);
-
-    expect(screen.queryByText('Files')).not.toBeInTheDocument();
-  });
-
-  it('should not render when working directory is undefined', () => {
+  it('should render file browser section', () => {
     render(<FileBrowserSection sessionId="test-session" />);
 
-    expect(screen.queryByText('Files')).not.toBeInTheDocument();
+    expect(screen.getByText('Files')).toBeInTheDocument();
   });
 
   it('should render file browser section with search and tree', () => {
@@ -106,13 +99,7 @@ describe('FileBrowserSection', () => {
   });
 
   it('should render correctly when not collapsed', () => {
-    render(
-      <FileBrowserSection
-        {...defaultProps}
-        workingDirectory="/very/long/path/to/project"
-        defaultCollapsed={false}
-      />
-    );
+    render(<FileBrowserSection {...defaultProps} defaultCollapsed={false} />);
 
     expect(screen.getByText('Files')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search files...')).toBeInTheDocument();
