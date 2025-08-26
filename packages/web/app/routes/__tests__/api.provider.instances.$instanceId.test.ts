@@ -14,7 +14,7 @@ import type {
   InstanceDetailResponse,
   DeleteInstanceResponse,
   UpdateInstanceResponse,
-} from './route';
+} from '@/app/routes/api.provider.instances.$instanceId';
 
 describe('Provider Instance Detail API', () => {
   let tempDir: string;
@@ -125,8 +125,9 @@ describe('Provider Instance Detail API', () => {
       );
 
       const mockRequest = {} as NextRequest;
-      const response = await DELETE(mockRequest, {
-        params: Promise.resolve({ instanceId: 'test-instance' }),
+      const response = await ACTION({
+        request: mockRequest,
+        params: { instanceId: 'test-instance' },
       });
       const data = await parseResponse<DeleteInstanceResponse>(response);
 
@@ -147,8 +148,9 @@ describe('Provider Instance Detail API', () => {
 
     it('should return 404 for non-existent instance', async () => {
       const mockRequest = {} as NextRequest;
-      const response = await DELETE(mockRequest, {
-        params: Promise.resolve({ instanceId: 'nonexistent' }),
+      const response = await ACTION({
+        request: mockRequest,
+        params: { instanceId: 'nonexistent' },
       });
       const data = await parseResponse<{ error: string }>(response);
 
@@ -174,8 +176,9 @@ describe('Provider Instance Detail API', () => {
       );
 
       const mockRequest = {} as NextRequest;
-      const response = await DELETE(mockRequest, {
-        params: Promise.resolve({ instanceId: 'test-instance' }),
+      const response = await ACTION({
+        request: mockRequest,
+        params: { instanceId: 'test-instance' },
       });
       const data = await parseResponse<DeleteInstanceResponse>(response);
 
@@ -220,8 +223,9 @@ describe('Provider Instance Detail API', () => {
         json: async () => updateData,
       } as NextRequest;
 
-      const response = await PUT(mockRequest, {
-        params: Promise.resolve({ instanceId: 'test-instance' }),
+      const response = await ACTION({
+        request: mockRequest,
+        params: { instanceId: 'test-instance' },
       });
       const data = await parseResponse<UpdateInstanceResponse>(response);
 
@@ -281,8 +285,9 @@ describe('Provider Instance Detail API', () => {
         json: async () => updateData,
       } as NextRequest;
 
-      const response = await PUT(mockRequest, {
-        params: Promise.resolve({ instanceId: 'test-instance' }),
+      const response = await ACTION({
+        request: mockRequest,
+        params: { instanceId: 'test-instance' },
       });
       const data = await parseResponse<UpdateInstanceResponse>(response);
 
@@ -310,8 +315,9 @@ describe('Provider Instance Detail API', () => {
         json: async () => updateData,
       } as NextRequest;
 
-      const response = await PUT(mockRequest, {
-        params: Promise.resolve({ instanceId: 'nonexistent' }),
+      const response = await ACTION({
+        request: mockRequest,
+        params: { instanceId: 'nonexistent' },
       });
       const data = await parseResponse<{ error: string }>(response);
 
@@ -344,8 +350,9 @@ describe('Provider Instance Detail API', () => {
         json: async () => updateData,
       } as NextRequest;
 
-      const response = await PUT(mockRequest, {
-        params: Promise.resolve({ instanceId: 'test-instance' }),
+      const response = await ACTION({
+        request: mockRequest,
+        params: { instanceId: 'test-instance' },
       });
 
       expect(response.status).toBe(400);
@@ -377,8 +384,9 @@ describe('Provider Instance Detail API', () => {
         json: async () => updateData,
       } as NextRequest;
 
-      const response = await PUT(mockRequest, {
-        params: Promise.resolve({ instanceId: 'test-instance' }),
+      const response = await ACTION({
+        request: mockRequest,
+        params: { instanceId: 'test-instance' },
       });
       const data = await parseResponse<UpdateInstanceResponse>(response);
 
