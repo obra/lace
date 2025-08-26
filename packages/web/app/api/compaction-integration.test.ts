@@ -20,6 +20,8 @@ import { setupWebTest } from '@/test-utils/web-test-setup';
 import { parseResponse } from '@/lib/serialization';
 import { loader as getAgent } from '@/app/routes/api.agents.$agentId';
 import { loader as getSession } from '@/app/routes/api.projects.$projectId.sessions.$sessionId';
+
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 import type { ThreadId, SessionInfo } from '@/types/core';
 import type { AgentWithTokenUsage } from '@/types/api';
 
@@ -121,10 +123,9 @@ describe('Token Usage Integration Tests', () => {
     const sessionRequest = new Request(
       `http://localhost:3000/api/projects/${projectId}/sessions/${sessionId}`
     );
-    const sessionResponse = await getSession({
-      request: sessionRequest,
-      params: { projectId, sessionId: sessionId as string },
-    });
+    const sessionResponse = await getSession(
+      createLoaderArgs(sessionRequest, { projectId, sessionId: sessionId as string })
+    );
 
     expect(sessionResponse.status).toBe(200);
     const sessionData = (await parseResponse(sessionResponse)) as SessionInfo;
@@ -139,10 +140,9 @@ describe('Token Usage Integration Tests', () => {
 
     // Test Agent API - should include token usage
     const agentRequest = new Request(`http://localhost:3000/api/agents/${sessionId}`);
-    const agentResponse = await getAgent({
-      request: agentRequest,
-      params: { agentId: sessionId as string },
-    });
+    const agentResponse = await getAgent(
+      createLoaderArgs(agentRequest, { agentId: sessionId as string })
+    );
 
     expect(agentResponse.status).toBe(200);
     const agentData = (await parseResponse(agentResponse)) as AgentWithTokenUsage;
@@ -209,10 +209,9 @@ describe('Token Usage Integration Tests', () => {
 
     // Check token usage via Agent API
     const agentRequest = new Request(`http://localhost:3000/api/agents/${sessionId}`);
-    const agentResponse = await getAgent({
-      request: agentRequest,
-      params: { agentId: sessionId as string },
-    });
+    const agentResponse = await getAgent(
+      createLoaderArgs(agentRequest, { agentId: sessionId as string })
+    );
 
     expect(agentResponse.status).toBe(200);
     const agentData = (await parseResponse(agentResponse)) as AgentWithTokenUsage;
@@ -232,10 +231,9 @@ describe('Token Usage Integration Tests', () => {
   it('should handle agents with no token usage gracefully', async () => {
     // Test agent without any conversation history
     const agentRequest = new Request(`http://localhost:3000/api/agents/${sessionId}`);
-    const agentResponse = await getAgent({
-      request: agentRequest,
-      params: { agentId: sessionId as string },
-    });
+    const agentResponse = await getAgent(
+      createLoaderArgs(agentRequest, { agentId: sessionId as string })
+    );
 
     expect(agentResponse.status).toBe(200);
     const agentData = (await parseResponse(agentResponse)) as AgentWithTokenUsage;
@@ -286,10 +284,9 @@ describe('Token Usage Integration Tests', () => {
 
     // Check token usage after compaction
     const agentRequest = new Request(`http://localhost:3000/api/agents/${sessionId}`);
-    const agentResponse = await getAgent({
-      request: agentRequest,
-      params: { agentId: sessionId as string },
-    });
+    const agentResponse = await getAgent(
+      createLoaderArgs(agentRequest, { agentId: sessionId as string })
+    );
 
     const agentData = (await parseResponse(agentResponse)) as AgentWithTokenUsage;
 
