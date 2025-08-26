@@ -23,7 +23,7 @@ const TaskRouteParamsSchema = z.object({
   taskId: TaskIdSchema,
 });
 
-export async function loader({ request, params }: Route.LoaderArgs) {
+export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
     const { projectId, sessionId, taskId } = await validateRouteParams(
       Promise.resolve(params),
