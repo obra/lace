@@ -2,7 +2,6 @@
 // ABOUTME: Tests session creation, agent spawning, messaging, and event streaming
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -103,7 +102,7 @@ describe('Full Conversation Flow', () => {
     );
     const projectId = project.getId();
 
-    const createSessionRequest = new NextRequest(
+    const createSessionRequest = new Request(
       `http://localhost:3000/api/projects/${projectId}/sessions`,
       {
         method: 'POST',
@@ -134,7 +133,7 @@ describe('Full Conversation Flow', () => {
     // 2. Spawn agent
     const agentName = 'assistant';
 
-    const spawnAgentRequest = new NextRequest(
+    const spawnAgentRequest = new Request(
       `http://localhost:3000/api/sessions/${sessionId}/agents`,
       {
         method: 'POST',
@@ -157,7 +156,7 @@ describe('Full Conversation Flow', () => {
     const agentThreadId: ThreadId = agentData.threadId as ThreadId;
 
     // 3. Connect to SSE stream
-    const streamRequest = new NextRequest(
+    const streamRequest = new Request(
       `http://localhost:3000/api/events/stream?sessions=${sessionId}`
     );
     const streamResponse = await streamEvents({
@@ -172,7 +171,7 @@ describe('Full Conversation Flow', () => {
     // 4. Send message
     const message = 'Hello, assistant!';
 
-    const messageRequest = new NextRequest(
+    const messageRequest = new Request(
       `http://localhost:3000/api/threads/${agentThreadId}/message`,
       {
         method: 'POST',
@@ -205,7 +204,7 @@ describe('Full Conversation Flow', () => {
       }
     );
     const projectId = project.getId();
-    const createSessionRequest = new NextRequest(
+    const createSessionRequest = new Request(
       `http://localhost:3000/api/projects/${projectId}/sessions`,
       {
         method: 'POST',
@@ -226,7 +225,7 @@ describe('Full Conversation Flow', () => {
     const sessionId: ThreadId = sessionData.id as ThreadId;
 
     // Spawn first agent
-    const spawnAgent1Request = new NextRequest(
+    const spawnAgent1Request = new Request(
       `http://localhost:3000/api/sessions/${sessionId}/agents`,
       {
         method: 'POST',
@@ -245,7 +244,7 @@ describe('Full Conversation Flow', () => {
     expect(agent1Response.status).toBe(201);
 
     // Spawn second agent
-    const spawnAgent2Request = new NextRequest(
+    const spawnAgent2Request = new Request(
       `http://localhost:3000/api/sessions/${sessionId}/agents`,
       {
         method: 'POST',
@@ -264,9 +263,7 @@ describe('Full Conversation Flow', () => {
     expect(agent2Response.status).toBe(201);
 
     // List agents
-    const listAgentsRequest = new NextRequest(
-      `http://localhost:3000/api/sessions/${sessionId}/agents`
-    );
+    const listAgentsRequest = new Request(`http://localhost:3000/api/sessions/${sessionId}/agents`);
     const listResponse = await listAgents({
       request: listAgentsRequest,
       params: { sessionId: sessionId as string },
@@ -303,7 +300,7 @@ describe('Full Conversation Flow', () => {
     const projectId2 = project2.getId();
 
     const session1Response = await createProjectSession({
-      request: new NextRequest(`http://localhost:3000/api/projects/${projectId1}/sessions`, {
+      request: new Request(`http://localhost:3000/api/projects/${projectId1}/sessions`, {
         method: 'POST',
         body: JSON.stringify({
           name: 'Session 1',
@@ -318,7 +315,7 @@ describe('Full Conversation Flow', () => {
     const session1Id: ThreadId = session1Data.id as ThreadId;
 
     const session2Response = await createProjectSession({
-      request: new NextRequest(`http://localhost:3000/api/projects/${projectId2}/sessions`, {
+      request: new Request(`http://localhost:3000/api/projects/${projectId2}/sessions`, {
         method: 'POST',
         body: JSON.stringify({
           name: 'Session 2',
@@ -334,12 +331,12 @@ describe('Full Conversation Flow', () => {
 
     // Connect to streams
     await streamEvents({
-      request: new NextRequest(`http://localhost:3000/api/events/stream?sessions=${session1Id}`),
+      request: new Request(`http://localhost:3000/api/events/stream?sessions=${session1Id}`),
       params: {},
     });
 
     await streamEvents({
-      request: new NextRequest(`http://localhost:3000/api/events/stream?sessions=${session2Id}`),
+      request: new Request(`http://localhost:3000/api/events/stream?sessions=${session2Id}`),
       params: {},
     });
 
