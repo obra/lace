@@ -7,7 +7,6 @@ import { getSessionService } from '@/lib/server/session-service';
 import { MessageResponse } from '@/types/api';
 import { asThreadId, type ThreadId } from '@/types/core';
 import { ThreadIdSchema, MessageRequestSchema } from '@/lib/validation/schemas';
-import { messageLimiter } from '@/lib/middleware/rate-limiter';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { logger } from '~/utils/logger';
