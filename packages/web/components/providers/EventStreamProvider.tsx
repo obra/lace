@@ -157,10 +157,36 @@ export function EventStreamProvider({
   }, []);
 
   const handleAgentError = useCallback((event: LaceEvent) => {
-    console.warn('Agent error event received:', event);
-    // TODO: Integrate with error display UI
-    // For now, just log to console so we can see it's working
-  }, []);
+    const errorData = event.data as {
+      errorType: string;
+      message: string;
+      isRetryable: boolean;
+      context: {
+        phase: string;
+        providerName?: string;
+        toolName?: string;
+      };
+    };
+
+    // Check if this error is for the currently active agent
+    const isActiveAgent = event.threadId === agentId;
+    
+    if (isActiveAgent) {
+      // Add error to timeline as a special error message
+      const errorTimelineEvent: LaceEvent = {
+        ...event,
+        type: 'AGENT_MESSAGE', // Display as agent message but with error content
+        data: {
+          content: `🚨 **${errorData.errorType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} Error**\n\n${errorData.message}\n\n**Phase**: ${errorData.context.phase}${errorData.context.providerName ? `\n**Provider**: ${errorData.context.providerName}` : ''}${errorData.context.toolName ? `\n**Tool**: ${errorData.context.toolName}` : ''}${errorData.isRetryable ? '\n\n✅ *This error can be retried by sending another message.*' : '\n\n❌ *This error cannot be automatically retried.*'}`,
+        },
+      };
+      
+      addAgentEvent(errorTimelineEvent);
+    } else {
+      // TODO: Show toast for non-active agent errors
+      console.warn('Agent error for non-active agent - should show toast:', event);
+    }
+  }, [agentId, addAgentEvent]);
 
 
   // Agent message handler to clear streaming content when complete
