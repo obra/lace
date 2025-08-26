@@ -118,7 +118,7 @@ describe('Provider Instance Detail API', () => {
         JSON.stringify({ apiKey: 'test-key' }, null, 2)
       );
 
-      const mockRequest = {} as Request;
+      const mockRequest = { method: 'DELETE' } as Request;
       const response = await action(createActionArgs(mockRequest, { instanceId: 'test-instance' }));
       const data = await parseResponse<DeleteInstanceResponse>(response);
 
@@ -138,7 +138,7 @@ describe('Provider Instance Detail API', () => {
     });
 
     it('should return 404 for non-existent instance', async () => {
-      const mockRequest = {} as Request;
+      const mockRequest = { method: 'DELETE' } as Request;
       const response = await action(createActionArgs(mockRequest, { instanceId: 'nonexistent' }));
       const data = await parseResponse<{ error: string }>(response);
 
@@ -163,7 +163,7 @@ describe('Provider Instance Detail API', () => {
         JSON.stringify(config, null, 2)
       );
 
-      const mockRequest = {} as Request;
+      const mockRequest = { method: 'DELETE' } as Request;
       const response = await action(createActionArgs(mockRequest, { instanceId: 'test-instance' }));
       const data = await parseResponse<DeleteInstanceResponse>(response);
 
@@ -205,6 +205,7 @@ describe('Provider Instance Detail API', () => {
       };
 
       const mockRequest = {
+        method: 'PUT',
         json: async () => updateData,
       } as Request;
 
@@ -264,6 +265,7 @@ describe('Provider Instance Detail API', () => {
       };
 
       const mockRequest = {
+        method: 'PUT',
         json: async () => updateData,
       } as Request;
 
@@ -291,6 +293,7 @@ describe('Provider Instance Detail API', () => {
       };
 
       const mockRequest = {
+        method: 'PUT',
         json: async () => updateData,
       } as Request;
 
@@ -323,6 +326,7 @@ describe('Provider Instance Detail API', () => {
       };
 
       const mockRequest = {
+        method: 'PUT',
         json: async () => updateData,
       } as Request;
 
@@ -354,6 +358,7 @@ describe('Provider Instance Detail API', () => {
       };
 
       const mockRequest = {
+        method: 'PUT',
         json: async () => updateData,
       } as Request;
 
