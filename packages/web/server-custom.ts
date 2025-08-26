@@ -1,10 +1,8 @@
-// ABOUTME: Custom wrapper around Next.js SINGLE PROCESS standalone server with enhanced CLI options
-// ABOUTME: Provides auto-port detection and better UX around standalone build
+// ABOUTME: Custom React Router v7 server with enhanced CLI options and port detection
+// ABOUTME: Provides single-process server with Lace-specific startup logic and port selection
 
 import { parseArgs } from 'util';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import module from 'module';
+// React Router v7 server imports will be added after port detection
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -30,7 +28,7 @@ const { values } = parseArgs({
 if (values.help) {
   // eslint-disable-next-line no-console -- Help text output is appropriate for CLI server
   console.log(`
-Lace Web Server
+Lace Web Server (React Router v7)
 
 Usage: npm start -- [options]
 
@@ -49,7 +47,7 @@ Examples:
   process.exit(0);
 }
 
-const userSpecifiedPort = !!values.port; // Track if user manually specified port
+const userSpecifiedPort = !!values.port;
 const requestedPort = parseInt(values.port || '31337', 10);
 const hostname = values.host || 'localhost';
 
@@ -68,281 +66,50 @@ if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
 `);
 }
 
-// Detect if we're running in development or production (standalone) mode
+// Detect mode
 const isDev = process.env.NODE_ENV !== 'production';
-const isStandalone = !isDev;
-const useTurbopack = process.env.TURBOPACK === '1' || process.env.TURBOPACK === 'true';
 
-// Setup Node.js module system for standalone build
-const _require = module.createRequire(import.meta.url);
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
-
-// Only set production environment if not already set
-if (!process.env.NODE_ENV) {
-  (process.env as Record<string, string>).NODE_ENV = isStandalone ? 'production' : 'development';
-}
-
-// In standalone mode, change to the standalone root directory for proper module resolution
-let webDir: string;
-if (isStandalone) {
-  const standaloneRoot = path.resolve(__dirname, '../..');
-  process.chdir(standaloneRoot);
-  webDir = path.join(standaloneRoot, 'packages/web');
-} else {
-  // In development mode, stay in the current directory
-  webDir = __dirname;
-}
-
-// Next.js configuration - only needed for standalone builds
-let nextConfig: unknown = undefined;
-
-if (isStandalone) {
-  nextConfig = {
-    env: {},
-    eslint: { ignoreDuringBuilds: false, dirs: ['app', 'components', 'lib'] },
-    typescript: { ignoreBuildErrors: false, tsconfigPath: 'tsconfig.json' },
-    distDir: './.next',
-    cleanDistDir: true,
-    assetPrefix: '',
-    cacheMaxMemorySize: 52428800,
-    configOrigin: 'next.config.ts',
-    useFileSystemPublicRoutes: true,
-    generateEtags: true,
-    pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
-    poweredByHeader: true,
-    compress: true,
-    images: {
-      deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
-      imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-      path: '/_next/image',
-      loader: 'default',
-      loaderFile: '',
-      domains: [],
-      disableStaticImages: false,
-      minimumCacheTTL: 60,
-      formats: ['image/webp'],
-      dangerouslyAllowSVG: false,
-      contentSecurityPolicy: "script-src 'none'; frame-src 'none'; sandbox;",
-      contentDispositionType: 'attachment',
-      remotePatterns: [],
-      unoptimized: false,
-    },
-    devIndicators: { position: 'bottom-left' },
-    onDemandEntries: { maxInactiveAge: 60000, pagesBufferLength: 5 },
-    amp: { canonicalBase: '' },
-    basePath: '',
-    sassOptions: {},
-    trailingSlash: false,
-    i18n: null,
-    productionBrowserSourceMaps: false,
-    excludeDefaultMomentLocales: true,
-    serverRuntimeConfig: {},
-    publicRuntimeConfig: {},
-    reactProductionProfiling: false,
-    reactStrictMode: null,
-    reactMaxHeadersLength: 6000,
-    httpAgentOptions: { keepAlive: true },
-    logging: {},
-    expireTime: 31536000,
-    staticPageGenerationTimeout: 60,
-    output: 'standalone',
-    modularizeImports: {
-      '@mui/icons-material': { transform: '@mui/icons-material/{{member}}' },
-      lodash: { transform: 'lodash/{{member}}' },
-    },
-    outputFileTracingRoot: process.cwd(),
-    experimental: {
-      nodeMiddleware: false,
-      cacheLife: {
-        default: { stale: 300, revalidate: 900, expire: 4294967294 },
-        seconds: { stale: 0, revalidate: 1, expire: 60 },
-        minutes: { stale: 300, revalidate: 60, expire: 3600 },
-        hours: { stale: 300, revalidate: 3600, expire: 86400 },
-        days: { stale: 300, revalidate: 86400, expire: 604800 },
-        weeks: { stale: 300, revalidate: 604800, expire: 2592000 },
-        max: { stale: 300, revalidate: 2592000, expire: 4294967294 },
-      },
-      cacheHandlers: {},
-      cssChunking: true,
-      multiZoneDraftMode: false,
-      appNavFailHandling: false,
-      prerenderEarlyExit: true,
-      serverMinification: true,
-      serverSourceMaps: false,
-      linkNoTouchStart: false,
-      caseSensitiveRoutes: false,
-      clientSegmentCache: false,
-      dynamicOnHover: false,
-      preloadEntriesOnStart: true,
-      clientRouterFilter: true,
-      clientRouterFilterRedirects: false,
-      fetchCacheKeyPrefix: '',
-      middlewarePrefetch: 'flexible',
-      optimisticClientCache: true,
-      manualClientBasePath: false,
-      cpus: 15,
-      memoryBasedWorkersCount: false,
-      imgOptConcurrency: null,
-      imgOptTimeoutInSeconds: 7,
-      imgOptMaxInputPixels: 268402689,
-      imgOptSequentialRead: null,
-      isrFlushToDisk: true,
-      workerThreads: false,
-      optimizeCss: false,
-      nextScriptWorkers: false,
-      scrollRestoration: false,
-      externalDir: false,
-      disableOptimizedLoading: false,
-      gzipSize: true,
-      craCompat: false,
-      esmExternals: true,
-      fullySpecified: false,
-      swcTraceProfiling: false,
-      forceSwcTransforms: false,
-      largePageDataBytes: 128000,
-      typedRoutes: false,
-      typedEnv: false,
-      parallelServerCompiles: false,
-      parallelServerBuildTraces: false,
-      ppr: false,
-      authInterrupts: false,
-      webpackMemoryOptimizations: false,
-      optimizeServerReact: true,
-      useEarlyImport: false,
-      viewTransition: false,
-      routerBFCache: false,
-      staleTimes: { dynamic: 0, static: 300 },
-      serverComponentsHmrCache: true,
-      staticGenerationMaxConcurrency: 8,
-      staticGenerationMinPagesPerWorker: 25,
-      dynamicIO: false,
-      inlineCss: false,
-      useCache: false,
-      optimizePackageImports: [
-        'lucide-react',
-        'date-fns',
-        'lodash-es',
-        'ramda',
-        'antd',
-        'react-bootstrap',
-        'ahooks',
-        '@ant-design/icons',
-        '@headlessui/react',
-        '@headlessui-float/react',
-        '@heroicons/react/20/solid',
-        '@heroicons/react/24/solid',
-        '@heroicons/react/24/outline',
-        '@visx/visx',
-        '@tremor/react',
-        'rxjs',
-        '@mui/material',
-        '@mui/icons-material',
-        'recharts',
-        'react-use',
-        'effect',
-        '@effect/schema',
-        '@effect/platform',
-        '@effect/platform-node',
-        '@effect/platform-browser',
-        '@effect/platform-bun',
-        '@effect/sql',
-        '@effect/sql-mssql',
-        '@effect/sql-mysql2',
-        '@effect/sql-pg',
-        '@effect/sql-squlite-node',
-        '@effect/sql-squlite-bun',
-        '@effect/sql-squlite-wasm',
-        '@effect/sql-squlite-react-native',
-        '@effect/rpc',
-        '@effect/rpc-http',
-        '@effect/typeclass',
-        '@effect/experimental',
-        '@effect/opentelemetry',
-        '@material-ui/core',
-        '@material-ui/icons',
-        '@tabler/icons-react',
-        'mui-core',
-        'react-icons/ai',
-        'react-icons/bi',
-        'react-icons/bs',
-        'react-icons/cg',
-        'react-icons/ci',
-        'react-icons/di',
-        'react-icons/fa',
-        'react-icons/fa6',
-        'react-icons/fc',
-        'react-icons/fi',
-        'react-icons/gi',
-        'react-icons/go',
-        'react-icons/gr',
-        'react-icons/hi',
-        'react-icons/hi2',
-        'react-icons/im',
-        'react-icons/io',
-        'react-icons/io5',
-        'react-icons/lia',
-        'react-icons/lib',
-        'react-icons/lu',
-        'react-icons/md',
-        'react-icons/pi',
-        'react-icons/ri',
-        'react-icons/rx',
-        'react-icons/si',
-        'react-icons/sl',
-        'react-icons/tb',
-        'react-icons/tfi',
-        'react-icons/ti',
-        'react-icons/vsc',
-        'react-icons/wi',
-      ],
-      trustHostHeader: false,
-      isExperimentalCompile: false,
-    },
-    htmlLimitedBots:
-      'Mediapartners-Google|Slurp|DuckDuckBot|baiduspider|yandex|sogou|bitlybot|tumblr|vkShare|quora link preview|redditbot|ia_archiver|Bingbot|BingPreview|applebot|facebookexternalhit|facebookcatalog|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|Yeti',
-    bundlePagesRouterDependencies: false,
-    configFileName: 'next.config.ts',
-    outputFileTracingIncludes: { '/': ['packages/web/server-custom.ts'] },
-    turbopack: {
-      resolveAlias: {
-        '~/': path.join(process.cwd(), 'packages/core/'),
-        '@/': path.join(process.cwd(), 'packages/web/'),
-      },
-      resolveExtensions: ['.js', '.jsx', '.ts', '.tsx'],
-      root: process.cwd(),
-    },
-  };
-
-  // Set the Next.js private config environment variable for standalone mode
-  process.env.__NEXT_PRIVATE_STANDALONE_CONFIG = JSON.stringify(nextConfig);
-}
-
-// Our enhanced server that replaces the standalone server
+// Enhanced server that wraps React Router v7
 async function startLaceServer() {
   // Do our port detection first
   const port = await findAvailablePort(requestedPort, userSpecifiedPort, hostname);
   const url = `http://${hostname}:${port}`;
 
   // eslint-disable-next-line no-console -- Server startup message is appropriate for server process
-  console.log(`🚀 Starting Lace server on ${url}...`);
+  console.log(`🚀 Starting Lace server (React Router v7) on ${url}...`);
 
-  // Use the same approach as the original Next.js standalone server
-  const { startServer } = await import('next/dist/server/lib/start-server');
+  if (isDev) {
+    // Development mode - use React Router dev server directly
+    const { createServer } = await import('vite');
 
-  try {
-    // Start the server with our detected port
-    await startServer({
-      dir: webDir,
-      isDev: isDev,
-      hostname: hostname,
-      port: port,
-      allowRetry: false,
-      keepAliveTimeout: undefined,
-      ...(useTurbopack && isDev && { turbopack: true }),
+    const vite = await createServer({
+      server: {
+        port: port,
+        host: hostname,
+      },
     });
 
-    // eslint-disable-next-line no-console -- Server ready message with URL/PID is appropriate for server process
-    console.log(`
+    await vite.listen();
+    vite.printUrls();
+  } else {
+    // Production mode - use built React Router app
+    const { createRequestHandler } = await import('@react-router/express');
+    const build = await import('./build/server/index.js');
+    const { createServer } = await import('http');
+
+    const requestHandler = createRequestHandler({ build });
+    const app = createServer(requestHandler);
+
+    await new Promise<void>((resolve, reject) => {
+      app.listen(port, hostname, (err?: Error) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  }
+
+  // eslint-disable-next-line no-console -- Server ready message with URL/PID is appropriate for server process
+  console.log(`
 ✅ Lace is ready!
    
    🌐 URL: ${url}
@@ -351,17 +118,14 @@ async function startLaceServer() {
    Press Ctrl+C to stop
 `);
 
-    // Signal the actual port to parent process (for menu bar app)
-    // eslint-disable-next-line no-console -- Port/URL signaling required for parent process communication
-    console.log(`LACE_SERVER_PORT:${port}`);
-    // eslint-disable-next-line no-console -- Port/URL signaling required for parent process communication
-    console.log(`LACE_SERVER_URL:${url}`);
-  } catch (error) {
-    throw new Error(`Failed to start server on ${url}: ${error}`);
-  }
+  // Signal the actual port to parent process (for menu bar app)
+  // eslint-disable-next-line no-console -- Port/URL signaling required for parent process communication
+  console.log(`LACE_SERVER_PORT:${port}`);
+  // eslint-disable-next-line no-console -- Port/URL signaling required for parent process communication
+  console.log(`LACE_SERVER_URL:${url}`);
 }
 
-// Function to find available port (extracted from the original logic)
+// Function to find available port (preserved from original)
 async function findAvailablePort(
   startPort: number,
   userSpecified: boolean,
@@ -369,7 +133,7 @@ async function findAvailablePort(
 ): Promise<number> {
   const { createServer } = await import('http');
 
-  // Function to test if a port is available (check all interfaces, not just hostname)
+  // Function to test if a port is available
   const testPort = (port: number): Promise<boolean> => {
     return new Promise((resolve) => {
       const server = createServer();
@@ -387,7 +151,6 @@ async function findAvailablePort(
         server.close(() => resolve(true));
       });
 
-      // Test binding to the specific hostname we want to use
       server.listen(port, hostname);
     });
   };
@@ -419,7 +182,7 @@ startLaceServer().catch((err) => {
   process.exit(1);
 });
 
-// Graceful shutdown
+// Graceful shutdown (preserved from original)
 process.on('SIGTERM', () => {
   // eslint-disable-next-line no-console -- Shutdown message is appropriate for server process lifecycle
   console.log('\nReceived SIGTERM, shutting down gracefully...');
