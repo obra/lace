@@ -61,8 +61,11 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if ((request as Request).method !== 'POST') {
-    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  switch (request.method) {
+    case 'POST':
+      break;
+    default:
+      return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
   }
 
   try {
@@ -76,7 +79,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const sessionId = asThreadId(sessionIdParam as string);
 
     // Parse and validate request body
-    const bodyData: unknown = await (request as Request).json();
+    const bodyData: unknown = await request.json();
 
     if (!isCreateAgentRequest(bodyData)) {
       return createErrorResponse('Invalid request body', 400, { code: 'VALIDATION_FAILED' });
