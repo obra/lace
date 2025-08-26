@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { GET, DELETE, PUT } from './route';
+import { GET, DELETE, PUT } from '@/app/routes/api.provider.instances.$instanceId';
 import { parseResponse } from '@/lib/serialization';
 import { ProviderRegistry } from '@/lib/server/lace-imports';
 import type { ProviderInstancesConfig } from '@/lib/server/lace-imports';
