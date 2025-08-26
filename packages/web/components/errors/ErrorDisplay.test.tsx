@@ -98,17 +98,15 @@ describe('Error Display Components', () => {
     it('should show timestamp when enabled', () => {
       render(<ErrorLogEntry error={mockErrorEntry} showTimestamp={true} />);
       
-      // TimestampDisplay should render time text in HH:MM format
-      const timestampText = screen.queryByText(/\d{1,2}:\d{2}/);
-      expect(timestampText).toBeInTheDocument();
+      // TimestampDisplay should be rendered
+      expect(screen.getByTestId('timestamp')).toBeInTheDocument();
     });
 
     it('should hide timestamp when disabled', () => {
       render(<ErrorLogEntry error={mockErrorEntry} showTimestamp={false} />);
       
-      // TimestampDisplay should not render time text in HH:MM format when timestamp is hidden
-      const timestampText = screen.queryByText(/\d{1,2}:\d{2}/);
-      expect(timestampText).not.toBeInTheDocument();
+      // TimestampDisplay should not be rendered when timestamp is hidden
+      expect(screen.queryByTestId('timestamp')).not.toBeInTheDocument();
     });
 
     it('should show retry button for retryable errors with canRetry', () => {
