@@ -19,6 +19,7 @@ import {
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { parseResponse } from '@/lib/serialization';
 import { loader as getAgent } from '@/app/routes/api.agents.$agentId';
+import { createLoaderArgs } from '@/test-utils/route-test-helpers';
 import type { AgentWithTokenUsage } from '@/types/api';
 import type { ThreadId } from '@/types/core';
 
@@ -169,10 +170,7 @@ describe('Compaction Integration Test', () => {
 
     // Check token usage via API
     const request = new Request(`http://localhost:3000/api/agents/${sessionId}`);
-    const response = await getAgent({
-      request,
-      params: { agentId: sessionId },
-    });
+    const response = await getAgent(createLoaderArgs(request, { agentId: sessionId }));
 
     expect(response.status).toBe(200);
     const agentData = (await parseResponse(response)) as AgentWithTokenUsage;
