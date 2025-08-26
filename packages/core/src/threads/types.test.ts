@@ -93,6 +93,25 @@ describe('LaceEvent token usage', () => {
   });
 });
 
+// Factory function for creating AGENT_ERROR test events
+function createAgentErrorEvent(overrides: Partial<LaceEvent> = {}): LaceEvent {
+  return {
+    id: 'evt_error_123',
+    threadId: 'test-thread-id',
+    timestamp: new Date('2023-01-01T10:00:00Z'),
+    type: 'AGENT_ERROR',
+    data: {
+      errorType: 'processing_error',
+      message: 'Test error message',
+      context: {
+        phase: 'provider_response',
+      },
+      isRetryable: false,
+    },
+    ...overrides,
+  };
+}
+
 describe('Error Event Types', () => {
   it('should include AGENT_ERROR in EVENT_TYPES array', () => {
     expect(EVENT_TYPES).toContain('AGENT_ERROR');
@@ -103,9 +122,7 @@ describe('Error Event Types', () => {
   });
 
   it('should validate AgentErrorData interface with valid error event', () => {
-    const validErrorEvent: LaceEvent = {
-      type: 'AGENT_ERROR',
-      threadId: 'test-thread-id',
+    const validErrorEvent = createAgentErrorEvent({
       data: {
         errorType: 'provider_failure',
         message: 'Test error message',
@@ -119,8 +136,7 @@ describe('Error Event Types', () => {
         isRetryable: true,
         retryCount: 0,
       },
-      timestamp: new Date(),
-    };
+    });
 
     expect(validErrorEvent.type).toBe('AGENT_ERROR');
     expect(validErrorEvent.data.errorType).toBe('provider_failure');
@@ -138,9 +154,7 @@ describe('Error Event Types', () => {
     ] as const;
 
     errorTypes.forEach(errorType => {
-      const errorEvent: LaceEvent = {
-        type: 'AGENT_ERROR',
-        threadId: 'test-thread-id',
+      const errorEvent = createAgentErrorEvent({
         data: {
           errorType,
           message: `Test ${errorType} error`,
@@ -149,7 +163,7 @@ describe('Error Event Types', () => {
           },
           isRetryable: false,
         },
-      };
+      });
 
       expect(errorEvent.data.errorType).toBe(errorType);
     });
@@ -164,9 +178,7 @@ describe('Error Event Types', () => {
     ] as const;
 
     phases.forEach(phase => {
-      const errorEvent: LaceEvent = {
-        type: 'AGENT_ERROR',
-        threadId: 'test-thread-id',
+      const errorEvent = createAgentErrorEvent({
         data: {
           errorType: 'processing_error',
           message: `Test ${phase} error`,
@@ -175,16 +187,14 @@ describe('Error Event Types', () => {
           },
           isRetryable: false,
         },
-      };
+      });
 
       expect(errorEvent.data.context.phase).toBe(phase);
     });
   });
 
   it('should handle optional context fields correctly', () => {
-    const errorEvent: LaceEvent = {
-      type: 'AGENT_ERROR',
-      threadId: 'test-thread-id',
+    const errorEvent = createAgentErrorEvent({
       data: {
         errorType: 'tool_execution',
         message: 'Tool execution failed',
@@ -198,7 +208,7 @@ describe('Error Event Types', () => {
         isRetryable: true,
         retryCount: 1,
       },
-    };
+    });
 
     expect(errorEvent.data.context.toolName).toBe('bash');
     expect(errorEvent.data.context.toolCallId).toBe('tool-call-123');
