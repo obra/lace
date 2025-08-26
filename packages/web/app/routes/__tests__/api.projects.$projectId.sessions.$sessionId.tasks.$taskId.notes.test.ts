@@ -5,7 +5,6 @@
  * @vitest-environment node
  */
 
-import { NextRequest, NextResponse } from 'next/server';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { action as POST } from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.notes';
 import { asThreadId } from '@/types/core';
@@ -115,7 +114,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         content: 'Test note content',
       };
 
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}/notes`,
         {
           method: 'POST',
@@ -132,7 +131,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }),
       };
 
-      const response = (await POST(request, context)) as NextResponse;
+      const response = (await POST(request, context)) as Response;
       expect(response.status).toBe(201);
 
       const data = await parseResponse<{ message: string; task: Task }>(response);
@@ -148,7 +147,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         author: 'agent',
       };
 
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}/notes`,
         {
           method: 'POST',
@@ -165,7 +164,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }),
       };
 
-      const response = (await POST(request, context)) as NextResponse;
+      const response = (await POST(request, context)) as Response;
       expect(response.status).toBe(201);
 
       const data = await parseResponse<{ message: string; task: Task }>(response);
@@ -176,7 +175,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
     });
 
     it('should return 400 for empty content', async () => {
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}/notes`,
         {
           method: 'POST',
@@ -193,7 +192,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }),
       };
 
-      const response = (await POST(request, context)) as NextResponse;
+      const response = (await POST(request, context)) as Response;
       expect(response.status).toBe(400);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -201,7 +200,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
     });
 
     it('should return 400 for missing content field', async () => {
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}/notes`,
         {
           method: 'POST',
@@ -218,7 +217,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }),
       };
 
-      const response = (await POST(request, context)) as NextResponse;
+      const response = (await POST(request, context)) as Response;
       expect(response.status).toBe(400);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -226,7 +225,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
     });
 
     it('should return detailed validation error for invalid parameters', async () => {
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/invalid-uuid/sessions/invalid-session/tasks/${testTaskId}/notes`,
         {
           method: 'POST',
@@ -243,7 +242,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }),
       };
 
-      const response = (await POST(request, context)) as NextResponse;
+      const response = (await POST(request, context)) as Response;
       expect(response.status).toBe(500);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -254,7 +253,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
 
     it('should return 404 for non-existent project', async () => {
       const nonExistentProjectId = '00000000-0000-0000-0000-000000000000';
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${nonExistentProjectId}/sessions/${testSessionId}/tasks/${testTaskId}/notes`,
         {
           method: 'POST',
@@ -271,7 +270,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }),
       };
 
-      const response = (await POST(request, context)) as NextResponse;
+      const response = (await POST(request, context)) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -280,7 +279,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
 
     it('should return 404 for non-existent session', async () => {
       const nonExistentSessionId = 'lace_20000101_000000';
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${nonExistentSessionId}/tasks/${testTaskId}/notes`,
         {
           method: 'POST',
@@ -297,7 +296,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }),
       };
 
-      const response = (await POST(request, context)) as NextResponse;
+      const response = (await POST(request, context)) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -305,7 +304,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
     });
 
     it('should return 404 for non-existent task', async () => {
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/nonexistent/notes`,
         {
           method: 'POST',
@@ -322,7 +321,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }),
       };
 
-      const response = (await POST(request, context)) as NextResponse;
+      const response = (await POST(request, context)) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -338,7 +337,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
       // Delete the task first to cause an error
       await taskManager.deleteTask(testTaskId, { actor: 'human', isHuman: true });
 
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}/notes`,
         {
           method: 'POST',
@@ -355,7 +354,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }),
       };
 
-      const response = (await POST(request, context)) as NextResponse;
+      const response = (await POST(request, context)) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -367,7 +366,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         content: 'Human note content',
       };
 
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}/notes`,
         {
           method: 'POST',
@@ -384,7 +383,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes', 
         }),
       };
 
-      const response = (await POST(request, context)) as NextResponse;
+      const response = (await POST(request, context)) as Response;
       expect(response.status).toBe(201);
 
       const data = await parseResponse<{ message: string; task: Task }>(response);
