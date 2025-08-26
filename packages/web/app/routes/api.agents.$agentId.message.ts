@@ -123,6 +123,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         },
         transient: true,
         context: {
+          projectId: session.getProjectId(),
           sessionId: sessionId,
           agentId: agentId,
         },
