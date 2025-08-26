@@ -12,6 +12,7 @@ import {
   cleanupTestProviderInstances,
 } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 
 // Type interfaces for API responses
 interface ConfigurationResponse {
@@ -81,7 +82,7 @@ describe('Session Configuration API', () => {
   describe('GET /api/sessions/:sessionId/configuration', () => {
     it('should return session effective configuration when found', async () => {
       const request = new Request(`http://localhost/api/sessions/${sessionId}/configuration`);
-      const response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      const response = await GET(createLoaderArgs(request, { sessionId }));
       const data = await parseResponse<ConfigurationResponse>(response);
 
       expect(response.status).toBe(200);
@@ -101,9 +102,7 @@ describe('Session Configuration API', () => {
 
     it('should return 400 for invalid session ID format', async () => {
       const request = new Request('http://localhost/api/sessions/nonexistent/configuration');
-      const response = await GET(request, {
-        params: Promise.resolve({ sessionId: 'nonexistent' }),
-      });
+      const response = await GET(createLoaderArgs(request, { sessionId: 'nonexistent' }));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -116,9 +115,7 @@ describe('Session Configuration API', () => {
       const request = new Request(
         `http://localhost/api/sessions/${nonExistentSessionId}/configuration`
       );
-      const response = await GET(request, {
-        params: Promise.resolve({ sessionId: nonExistentSessionId }),
-      });
+      const response = await GET(createLoaderArgs(request, { sessionId: nonExistentSessionId }));
 
       expect(response.status).toBe(404);
       const data = await parseResponse<ErrorResponse>(response);
@@ -144,7 +141,7 @@ describe('Session Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, { params: Promise.resolve({ sessionId }) });
+      const response = await PUT(createActionArgs(request, { sessionId }));
       const data = await parseResponse<ConfigurationResponse>(response);
 
       expect(response.status).toBe(200);
@@ -164,9 +161,7 @@ describe('Session Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, {
-        params: Promise.resolve({ sessionId: 'nonexistent' }),
-      });
+      const response = await PUT(createActionArgs(request, { sessionId: 'nonexistent' }));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -188,9 +183,7 @@ describe('Session Configuration API', () => {
         }
       );
 
-      const response = await PUT(request, {
-        params: Promise.resolve({ sessionId: nonExistentSessionId }),
-      });
+      const response = await PUT(createActionArgs(request, { sessionId: nonExistentSessionId }));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(404);
@@ -211,7 +204,7 @@ describe('Session Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, { params: Promise.resolve({ sessionId }) });
+      const response = await PUT(createActionArgs(request, { sessionId }));
       const data = await parseResponse<ErrorResponse>(response);
 
       expect(response.status).toBe(400);
@@ -227,7 +220,7 @@ describe('Session Configuration API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PUT(request, { params: Promise.resolve({ sessionId }) });
+      const response = await PUT(createActionArgs(request, { sessionId }));
 
       expect(response.status).toBe(500);
     });
