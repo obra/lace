@@ -77,15 +77,8 @@ export function ProjectProvider({
 
   // Compute derived state based on data + selection
   const foundProject = useMemo(() => {
-    console.log('ProjectProvider lookup:', {
-      selectedProject,
-      projectsLength: projects?.length || 0,
-      loading,
-      error,
-      firstProjectId: projects?.[0]?.id,
-    });
     return selectedProject ? (projects || []).find((p) => p.id === selectedProject) || null : null;
-  }, [selectedProject, projects, loading, error]);
+  }, [selectedProject, projects]);
 
   // Create fallback current project for UI needs
   const currentProject = useMemo(() => {
