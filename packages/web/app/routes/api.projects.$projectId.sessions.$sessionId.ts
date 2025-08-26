@@ -3,6 +3,7 @@
 
 import type { Route } from './+types/api.projects.$projectId.sessions.$sessionId';
 import { Project } from '@/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { z } from 'zod';
 
 const UpdateSessionSchema = z.object({
@@ -17,7 +18,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     const { projectId, sessionId } = params as { projectId: string; sessionId: string };
     const project = Project.getById(projectId);
     if (!project) {
-      return Response.json(
+      return createSuperjsonResponse(
         { error: 'Project not found', code: 'RESOURCE_NOT_FOUND' },
         { status: 404 }
       );
@@ -25,7 +26,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     const session = project.getSession(sessionId);
     if (!session) {
-      return Response.json(
+      return createSuperjsonResponse(
         {
           error: 'Session not found in this project',
           code: 'RESOURCE_NOT_FOUND',
@@ -34,9 +35,9 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       );
     }
 
-    return Response.json(session);
+    return createSuperjsonResponse(session);
   } catch (error: unknown) {
-    return Response.json(
+    return createSuperjsonResponse(
       {
         error: error instanceof Error ? error.message : 'Failed to fetch session',
         code: 'INTERNAL_SERVER_ERROR',
@@ -55,7 +56,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
       const project = Project.getById(projectId);
       if (!project) {
-        return Response.json(
+        return createSuperjsonResponse(
           { error: 'Project not found', code: 'RESOURCE_NOT_FOUND' },
           { status: 404 }
         );
@@ -63,7 +64,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
       const session = project.updateSession(sessionId, validatedData);
       if (!session) {
-        return Response.json(
+        return createSuperjsonResponse(
           {
             error: 'Session not found in this project',
             code: 'RESOURCE_NOT_FOUND',
@@ -72,10 +73,10 @@ export async function action({ request, params }: Route.ActionArgs) {
         );
       }
 
-      return Response.json(session);
+      return createSuperjsonResponse(session);
     } catch (error: unknown) {
       if (error instanceof z.ZodError) {
-        return Response.json(
+        return createSuperjsonResponse(
           {
             error: 'Invalid request data',
             code: 'VALIDATION_FAILED',
@@ -85,7 +86,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         );
       }
 
-      return Response.json(
+      return createSuperjsonResponse(
         {
           error: error instanceof Error ? error.message : 'Failed to update session',
           code: 'INTERNAL_SERVER_ERROR',
@@ -100,7 +101,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       const { projectId, sessionId } = params as { projectId: string; sessionId: string };
       const project = Project.getById(projectId);
       if (!project) {
-        return Response.json(
+        return createSuperjsonResponse(
           { error: 'Project not found', code: 'RESOURCE_NOT_FOUND' },
           { status: 404 }
         );
@@ -108,7 +109,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
       const success = project.deleteSession(sessionId);
       if (!success) {
-        return Response.json(
+        return createSuperjsonResponse(
           {
             error: 'Session not found in this project',
             code: 'RESOURCE_NOT_FOUND',
@@ -117,9 +118,9 @@ export async function action({ request, params }: Route.ActionArgs) {
         );
       }
 
-      return Response.json({ success: true });
+      return createSuperjsonResponse({ success: true });
     } catch (error: unknown) {
-      return Response.json(
+      return createSuperjsonResponse(
         {
           error: error instanceof Error ? error.message : 'Failed to delete session',
           code: 'INTERNAL_SERVER_ERROR',
@@ -129,5 +130,5 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
   }
 
-  return Response.json({ error: 'Method not allowed' }, { status: 405 });
+  return createSuperjsonResponse({ error: 'Method not allowed' }, { status: 405 });
 }
