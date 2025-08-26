@@ -25,7 +25,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 // Import the real API route handlers after mocks
-import { POST, GET } from '@/app/api/sessions/[sessionId]/agents/route';
+import { POST, GET } from '@/app/routes/api.sessions.$sessionId.agents';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
 import type { ThreadId, AgentInfo } from '@/types/core';
