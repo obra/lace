@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
-import { GET, POST } from '@/app/routes/api.provider.instances';
+import { loader as GET, action as POST } from '@/app/routes/api.provider.instances';
 import { parseResponse } from '@/lib/serialization';
 import type { ProviderInstancesConfig } from '@/lib/server/lace-imports';
 import type { ConfiguredInstance } from '@/lib/server/lace-imports';
@@ -47,7 +47,7 @@ describe('Provider Instances API', () => {
       );
 
       const mockRequest = {} as NextRequest;
-      const response = await GET(mockRequest);
+      const response = await GET({ request: mockRequest });
       const data = await parseResponse<InstancesResponse>(response);
 
       expect(response.status).toBe(200);
@@ -69,7 +69,7 @@ describe('Provider Instances API', () => {
 
     it('should handle empty instances list when no config file exists', async () => {
       const mockRequest = {} as NextRequest;
-      const response = await GET(mockRequest);
+      const response = await GET({ request: mockRequest });
       const data = await parseResponse<InstancesResponse>(response);
 
       expect(response.status).toBe(200);
@@ -81,7 +81,7 @@ describe('Provider Instances API', () => {
       fs.writeFileSync(path.join(tempDir, 'provider-instances.json'), 'invalid json{');
 
       const mockRequest = {} as NextRequest;
-      const response = await GET(mockRequest);
+      const response = await GET({ request: mockRequest });
       const data = await parseResponse<InstancesResponse>(response);
 
       expect(response.status).toBe(200);
@@ -118,7 +118,7 @@ describe('Provider Instances API', () => {
       );
 
       const mockRequest = {} as NextRequest;
-      const response = await GET(mockRequest);
+      const response = await GET({ request: mockRequest });
       const data = await parseResponse<InstancesResponse>(response);
 
       expect(response.status).toBe(200);
@@ -159,7 +159,7 @@ describe('Provider Instances API', () => {
       );
 
       const mockRequest = {} as NextRequest;
-      const response = await GET(mockRequest);
+      const response = await GET({ request: mockRequest });
       const data = await parseResponse<InstancesResponse>(response);
 
       expect(response.status).toBe(200);
@@ -194,7 +194,7 @@ describe('Provider Instances API', () => {
         json: async () => requestBody,
       } as NextRequest;
 
-      const response = await POST(mockRequest);
+      const response = await POST({ request: mockRequest });
       const data = await parseResponse<CreateInstanceResponse>(response);
 
       expect(response.status).toBe(201);
@@ -224,7 +224,7 @@ describe('Provider Instances API', () => {
       });
 
       // Verify instance appears in GET with correct contract
-      const getResponse = await GET({} as NextRequest);
+      const getResponse = await GET({ request: {} as NextRequest });
       const getData = await parseResponse<InstancesResponse>(getResponse);
 
       expect(getData.instances).toHaveLength(1);
@@ -248,7 +248,7 @@ describe('Provider Instances API', () => {
         json: async () => invalidBody,
       } as NextRequest;
 
-      const response = await POST(mockRequest);
+      const response = await POST({ request: mockRequest });
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
@@ -267,7 +267,7 @@ describe('Provider Instances API', () => {
         json: async () => requestBody,
       } as NextRequest;
 
-      const response = await POST(mockRequest);
+      const response = await POST({ request: mockRequest });
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
@@ -302,7 +302,7 @@ describe('Provider Instances API', () => {
         json: async () => requestBody,
       } as NextRequest;
 
-      const response = await POST(mockRequest);
+      const response = await POST({ request: mockRequest });
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
