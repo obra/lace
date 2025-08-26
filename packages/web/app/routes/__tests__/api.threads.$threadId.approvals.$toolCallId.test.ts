@@ -2,7 +2,6 @@
 // ABOUTME: Verifies integration with core ThreadManager approval system
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { action as POST } from '@/app/routes/api.threads.$threadId.approvals.$toolCallId';
 import { getSessionService } from '@/lib/server/session-service';
 import { parseResponse } from '@/lib/serialization';
@@ -65,7 +64,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const decision = 'allow_once';
 
     // Create mock request
-    const request = new NextRequest(
+    const request = new Request(
       `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
       {
         method: 'POST',
@@ -95,7 +94,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const decisions = ['allow_once', 'allow_session', 'deny'];
 
     for (const decision of decisions) {
-      const request = new NextRequest(
+      const request = new Request(
         `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
         {
           method: 'POST',
@@ -131,7 +130,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     // Mock agent not found
     mockSession.getAgent.mockReturnValue(null);
 
-    const request = new NextRequest(
+    const request = new Request(
       `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
       {
         method: 'POST',
@@ -155,7 +154,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
 
-    const request = new NextRequest(
+    const request = new Request(
       `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
       {
         method: 'POST',
@@ -176,7 +175,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     const threadId = 'lace_20250101_test12';
     const toolCallId = 'call_456';
 
-    const request = new NextRequest(
+    const request = new Request(
       `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
       {
         method: 'POST',
@@ -205,7 +204,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     mockAgent.handleApprovalResponse.mockResolvedValueOnce(undefined);
 
     // First request should succeed
-    const request1 = new NextRequest(
+    const request1 = new Request(
       `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
       {
         method: 'POST',
@@ -222,7 +221,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     expect(data1).toEqual({ success: true });
 
     // Second request (duplicate) should also succeed
-    const request2 = new NextRequest(
+    const request2 = new Request(
       `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
       {
         method: 'POST',
@@ -249,7 +248,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
     // Mock handleApprovalResponse to throw a non-constraint error
     mockAgent.handleApprovalResponse.mockRejectedValueOnce(new Error('Some other agent error'));
 
-    const request = new NextRequest(
+    const request = new Request(
       `http://localhost:3000/api/threads/${threadId}/approvals/${toolCallId}`,
       {
         method: 'POST',
