@@ -1,19 +1,19 @@
 // ABOUTME: Tests for SessionFileTree component
 // ABOUTME: Tests file tree rendering, expand/collapse functionality, search filtering, and API integration
 
-import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { SessionFileTree } from './SessionFileTree';
-import * as apiClient from '@/lib/api-client';
-
 // Mock the API client
 vi.mock('@/lib/api-client', () => ({
   api: {
     get: vi.fn(),
   },
 }));
+
+import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { SessionFileTree } from '@/components/files/SessionFileTree';
+import * as apiClient from '@/lib/api-client';
 
 const mockApiGet = vi.mocked(apiClient.api.get);
 

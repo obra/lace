@@ -1,12 +1,6 @@
 // ABOUTME: Tests for FileBrowserSection component
 // ABOUTME: Tests sidebar integration, search functionality, file selection, and modal interactions
 
-import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { FileBrowserSection } from './FileBrowserSection';
-
 // Mock child components
 vi.mock('@/components/files/SessionFileTree', () => ({
   SessionFileTree: vi.fn(({ onFileSelect, searchTerm }) => (
@@ -29,6 +23,12 @@ vi.mock('@/components/modals/FileViewerModal', () => ({
     ) : null
   ),
 }));
+
+import React from 'react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { FileBrowserSection } from '@/components/sidebar/FileBrowserSection';
 
 describe('FileBrowserSection', () => {
   const defaultProps = {
@@ -66,6 +66,9 @@ describe('FileBrowserSection', () => {
 
     // Verify the input value changed
     expect(searchInput).toHaveValue('test');
+    
+    // Verify the search term was passed to SessionFileTree
+    expect(screen.getByText('Search: test')).toBeInTheDocument();
   });
 
   it('should open file viewer modal when file is selected', async () => {
