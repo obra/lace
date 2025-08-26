@@ -62,8 +62,11 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if ((request as Request).method !== 'PATCH') {
-    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  switch (request.method) {
+    case 'PATCH':
+      break;
+    default:
+      return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
   }
 
   try {
@@ -83,7 +86,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     // Parse and validate request body
-    const bodyRaw: unknown = await (request as Request).json();
+    const bodyRaw: unknown = await request.json();
     const bodyResult = UpdateSessionSchema.safeParse(bodyRaw);
 
     if (!bodyResult.success) {
