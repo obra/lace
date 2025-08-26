@@ -45,10 +45,18 @@ export function useErrorRecovery() {
     }
 
     try {
-      // Send retry message to agent
+      // Send retry message specific to error type
+      const retryMessages = {
+        provider_failure: 'Please retry the last request. The provider connection has been restored.',
+        timeout: 'Please retry the last operation. The timeout issue may be resolved.',
+        streaming_error: 'Please retry the last request. The streaming connection has been reset.',
+        processing_error: 'Please retry the last operation. The processing issue may be resolved.',
+        tool_execution: 'Please retry the last tool operation with the same parameters.',
+      };
+      
       const result = await api.post(`/api/agents/${threadId}/message`, {
-        content: 'Please retry the last operation that failed',
-        context: { errorType, isRetry: true },
+        content: retryMessages[errorType] || 'Please retry the last operation.',
+        context: { errorType, isRetry: true, originalError: 'retry-attempt' },
       });
       
       setRetryStates(prev => ({
@@ -72,7 +80,7 @@ export function useErrorRecovery() {
       }));
       return false;
     }
-  }, [retryStates]);
+  }, [];
 
   const retryToolOperation = useCallback(async (
     threadId: string,
@@ -135,7 +143,7 @@ export function useErrorRecovery() {
       }));
       return false;
     }
-  }, [retryStates]);
+  }, [];
 
   const markErrorResolved = useCallback((errorId: string) => {
     // Remove retry state for resolved errors
@@ -148,7 +156,7 @@ export function useErrorRecovery() {
 
   const getRetryState = useCallback((errorId: string): RetryState => {
     return retryStates[errorId] || { retrying: false, retryCount: 0 };
-  }, [retryStates]);
+  }, [];
 
   const canRetry = useCallback((errorId: string, errorType: ErrorType): boolean => {
     const state = getRetryState(errorId);
