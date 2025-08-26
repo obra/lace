@@ -9,9 +9,9 @@ import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import type { Route } from './+types/api.agents.$agentId.history';
 
-export async function loader({ request, params }: Route.LoaderArgs) {
+export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const { agentId: agentIdParam } = params;
+    const { agentId: agentIdParam } = params as { agentId: string };
 
     // Validate agent ID format
     if (!isValidThreadId(agentIdParam)) {
