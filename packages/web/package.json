@@ -43,6 +43,7 @@
     "daisyui": "^5.0.46",
     "dompurify": "^3.2.6",
     "highlight.js": "^11.11.1",
+    "mime-types": "^2.1.35",
     "motion": "^12.23.12",
     "next": "^15.4.6",
     "react": "18.3.1",
@@ -52,8 +53,8 @@
     "remark-gfm": "^4.0.1",
     "server-only": "^0.0.1",
     "superjson": "^2.2.2",
-    "tsx": "^4.20.3",
     "tailwindcss": "^4.1.11",
+    "tsx": "^4.20.3",
     "zod": "^3.25.69"
   },
   "devDependencies": {
@@ -65,6 +66,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/dompurify": "^3.0.5",
+    "@types/mime-types": "^3.0.1",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
