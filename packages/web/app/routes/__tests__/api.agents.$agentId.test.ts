@@ -2,7 +2,6 @@
 // ABOUTME: Covers agent retrieval, updates with validation and error handling
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { loader, action } from '@/app/routes/api.agents.$agentId';
 import { parseResponse } from '@/lib/serialization';
 import { setupWebTest } from '@/test-utils/web-test-setup';
@@ -110,7 +109,7 @@ describe('Agent API', () => {
 
   describe('GET /api/agents/:agentId', () => {
     it('should return agent details when found', async () => {
-      const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1');
+      const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1');
       const response = await loader({
         request,
         params: { agentId: 'lace_20241122_abc123.1' },
@@ -147,7 +146,7 @@ describe('Agent API', () => {
         parentSessionId: 'lace_20241122_abc123',
       });
 
-      const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1');
+      const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1');
       const response = await loader({
         request,
         params: { agentId: 'lace_20241122_abc123.1' },
@@ -161,7 +160,7 @@ describe('Agent API', () => {
     });
 
     it('should return 400 for invalid agent ID', async () => {
-      const request = new NextRequest('http://localhost/api/agents/invalid-id');
+      const request = new Request('http://localhost/api/agents/invalid-id');
       const response = await loader({ request, params: { agentId: 'invalid-id' } });
       const data = await parseResponse<ErrorResponse>(response);
 
@@ -172,7 +171,7 @@ describe('Agent API', () => {
     it('should return 404 when session not found', async () => {
       mockSessionService.getSession.mockResolvedValue(null);
 
-      const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1');
+      const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1');
       const response = await loader({
         request,
         params: { agentId: 'lace_20241122_abc123.1' },
@@ -186,7 +185,7 @@ describe('Agent API', () => {
     it('should return 404 when agent not found in session', async () => {
       mockSession.getAgent.mockReturnValue(null);
 
-      const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.99');
+      const request = new Request('http://localhost/api/agents/lace_20241122_abc123.99');
       const response = await loader({
         request,
         params: { agentId: 'lace_20241122_abc123.99' },
@@ -210,7 +209,7 @@ describe('Agent API', () => {
 
       mockAgent.getTokenUsage = vi.fn().mockReturnValue(mockTokenUsage);
 
-      const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1');
+      const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1');
       const response = await loader({
         request,
         params: { agentId: 'lace_20241122_abc123.1' },
@@ -235,7 +234,7 @@ describe('Agent API', () => {
       mockAgent.getTokenUsage = vi.fn().mockReturnValue(defaultTokenUsage);
 
       const response = await loader({
-        request: new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1'),
+        request: new Request('http://localhost/api/agents/lace_20241122_abc123.1'),
         params: { agentId: 'lace_20241122_abc123.1' },
       });
       const data = await parseResponse<AgentWithTokenUsage>(response);
@@ -246,7 +245,7 @@ describe('Agent API', () => {
     it('should handle errors gracefully', async () => {
       mockSessionService.getSession.mockRejectedValue(new Error('Database error'));
 
-      const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1');
+      const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1');
       const response = await loader({
         request,
         params: { agentId: 'lace_20241122_abc123.1' },
@@ -266,7 +265,7 @@ describe('Agent API', () => {
         modelId: 'claude-3-5-haiku-20241022',
       };
 
-      const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1', {
+      const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1', {
         method: 'PUT',
         body: JSON.stringify(updateData),
         headers: { 'Content-Type': 'application/json' },
@@ -313,7 +312,7 @@ describe('Agent API', () => {
         name: 'Updated Agent Only',
       };
 
-      const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1', {
+      const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1', {
         method: 'PUT',
         body: JSON.stringify(updateData),
         headers: { 'Content-Type': 'application/json' },
@@ -333,7 +332,7 @@ describe('Agent API', () => {
     it('should skip update when no fields provided', async () => {
       const updateData = {};
 
-      const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1', {
+      const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1', {
         method: 'PUT',
         body: JSON.stringify(updateData),
         headers: { 'Content-Type': 'application/json' },
@@ -349,7 +348,7 @@ describe('Agent API', () => {
     });
 
     it('should return 400 for invalid agent ID', async () => {
-      const request = new NextRequest('http://localhost/api/agents/invalid-id', {
+      const request = new Request('http://localhost/api/agents/invalid-id', {
         method: 'PUT',
         body: JSON.stringify({
           name: 'Test',
@@ -373,7 +372,7 @@ describe('Agent API', () => {
         // Missing modelId
       };
 
-      const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1', {
+      const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1', {
         method: 'PUT',
         body: JSON.stringify(invalidData),
         headers: { 'Content-Type': 'application/json' },
@@ -393,7 +392,7 @@ describe('Agent API', () => {
     it('should return 404 when session not found', async () => {
       mockSessionService.getSession.mockResolvedValue(null);
 
-      const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1', {
+      const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1', {
         method: 'PUT',
         body: JSON.stringify({
           name: 'Test',
@@ -416,7 +415,7 @@ describe('Agent API', () => {
     it('should return 404 when agent not found', async () => {
       mockSession.getAgent.mockReturnValue(null);
 
-      const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.99', {
+      const request = new Request('http://localhost/api/agents/lace_20241122_abc123.99', {
         method: 'PUT',
         body: JSON.stringify({
           name: 'Test',
@@ -437,7 +436,7 @@ describe('Agent API', () => {
     });
 
     it('should handle JSON parsing errors', async () => {
-      const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1', {
+      const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1', {
         method: 'PUT',
         body: 'invalid json',
         headers: { 'Content-Type': 'application/json' },
@@ -458,7 +457,7 @@ describe('Agent API', () => {
         throw new Error('Update failed');
       });
 
-      const request = new NextRequest('http://localhost/api/agents/lace_20241122_abc123.1', {
+      const request = new Request('http://localhost/api/agents/lace_20241122_abc123.1', {
         method: 'PUT',
         body: JSON.stringify({
           name: 'Test',
