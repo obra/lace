@@ -20,9 +20,9 @@ export interface UpdateInstanceResponse {
   instance: ConfiguredInstance;
 }
 
-export async function loader({ request, params }: Route.LoaderArgs) {
+export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const { instanceId } = params;
+    const { instanceId } = params as { instanceId: string };
 
     const registry = ProviderRegistry.getInstance();
 
@@ -45,8 +45,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  const method = request.method;
-  const { instanceId } = params;
+  const method = (request as Request).method;
+  const { instanceId } = params as { instanceId: string };
 
   if (method === 'DELETE') {
     try {
@@ -75,7 +75,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (method === 'PUT') {
     try {
-      const requestBody = (await request.json()) as Record<string, unknown>;
+      const requestBody = (await (request as Request).json()) as Record<string, unknown>;
 
       const instanceManager = new ProviderInstanceManager();
       const config = await instanceManager.loadInstances();
