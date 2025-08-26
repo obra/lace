@@ -92,31 +92,18 @@ async function startLaceServer() {
     await vite.listen();
     vite.printUrls();
   } else {
-    // Production mode - use built React Router app
-    const { createRequestHandler } = await import('@react-router/express');
-    const build = await import('./build/server/index.js');
-    const express = await import('express');
+    // Production mode - use Vite dev server (single-process, works for production)
+    const { createServer } = await import('vite');
 
-    const app = (
-      express as {
-        default: () => {
-          use: (handler: unknown) => void;
-          listen: (port: number, host: string, cb: (err?: Error) => void) => void;
-        };
-      }
-    ).default();
-    const requestHandler = createRequestHandler({
-      build: ((build as { default?: unknown }).default || build) as { default?: unknown },
+    const vite = await createServer({
+      server: {
+        port: port,
+        host: hostname,
+      },
     });
 
-    app.use(requestHandler);
-
-    await new Promise<void>((resolve, reject) => {
-      app.listen(port, hostname, (err?: Error) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+    await vite.listen();
+    vite.printUrls();
   }
 
   // eslint-disable-next-line no-console -- Server ready message with URL/PID is appropriate for server process
