@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET, PUT } from '@/app/api/sessions/[sessionId]/configuration/route';
+import { GET, PUT } from '@/app/routes/api.sessions.$sessionId.configuration';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { setupWebTest } from '@/test-utils/web-test-setup';
