@@ -8,7 +8,7 @@ import {
   SessionFileContentResponseSchema,
   ListSessionDirectoryRequestSchema,
   GetSessionFileRequestSchema,
-} from './session-files';
+} from '@/types/session-files';
 
 describe('Session File Types', () => {
   describe('SessionFileEntry validation', () => {
@@ -69,7 +69,7 @@ describe('Session File Types', () => {
   describe('SessionDirectoryResponse validation', () => {
     it('should validate valid directory response', () => {
       const validResponse = {
-        workingDirectory: '/home/user/project',
+        workingDirectory: 'project', // Use basename only for security
         currentPath: 'src',
         entries: [
           {
@@ -85,6 +85,13 @@ describe('Session File Types', () => {
 
       const result = SessionDirectoryResponseSchema.safeParse(validResponse);
       expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.workingDirectory).toBe('project');
+        expect(result.data.entries).toHaveLength(1);
+        expect(result.data.entries[0].type).toBe('file');
+        expect(result.data.entries[0].size).toBe(1024);
+        expect(result.data.entries[0].lastModified).toBeInstanceOf(Date);
+      }
     });
   });
 
@@ -102,18 +109,6 @@ describe('Session File Types', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should validate binary encoding', () => {
-      const validResponse = {
-        path: 'assets/image.png',
-        content: 'binary-data-here',
-        mimeType: 'image/png',
-        encoding: 'binary' as const,
-        size: 1024,
-      };
-
-      const result = SessionFileContentResponseSchema.safeParse(validResponse);
-      expect(result.success).toBe(true);
-    });
 
     it('should reject invalid encoding', () => {
       const invalidResponse = {

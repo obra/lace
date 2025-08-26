@@ -3,28 +3,7 @@
 
 import { z } from 'zod';
 
-export interface SessionFileEntry {
-  name: string;
-  path: string; // Relative to session working directory
-  type: 'file' | 'directory';
-  size?: number;
-  lastModified: Date;
-  isReadable: boolean;
-}
-
-export interface SessionDirectoryResponse {
-  workingDirectory: string;
-  currentPath: string; // Relative to working directory
-  entries: SessionFileEntry[];
-}
-
-export interface SessionFileContentResponse {
-  path: string;
-  content: string;
-  mimeType: string;
-  encoding: 'utf8' | 'binary';
-  size: number;
-}
+// Zod schemas are the source of truth for types
 
 // Zod schemas for validation
 export const SessionFileEntrySchema = z.object({
@@ -32,12 +11,12 @@ export const SessionFileEntrySchema = z.object({
   path: z.string(),
   type: z.enum(['file', 'directory']),
   size: z.number().optional(),
-  lastModified: z.date(),
+  lastModified: z.coerce.date(),
   isReadable: z.boolean(),
 });
 
 export const SessionDirectoryResponseSchema = z.object({
-  workingDirectory: z.string(),
+  workingDirectory: z.string(), // Should be basename only for security
   currentPath: z.string(),
   entries: z.array(SessionFileEntrySchema),
 });
@@ -46,15 +25,26 @@ export const SessionFileContentResponseSchema = z.object({
   path: z.string(),
   content: z.string(),
   mimeType: z.string(),
-  encoding: z.enum(['utf8', 'binary']),
+  encoding: z.literal('utf8'), // Only support text files
   size: z.number(),
 });
 
-// Request schemas
+// Derive TypeScript types from schemas
+export type SessionFileEntry = z.infer<typeof SessionFileEntrySchema>;
+export type SessionDirectoryResponse = z.infer<typeof SessionDirectoryResponseSchema>;
+export type SessionFileContentResponse = z.infer<typeof SessionFileContentResponseSchema>;
+
+// Request schemas with path traversal protection
 export const ListSessionDirectoryRequestSchema = z.object({
-  path: z.string().optional().default(''), // Path relative to working directory
+  path: z.string().optional().default('').refine(
+    (path) => !path.includes('..') && !path.includes('\\') && !path.startsWith('/'),
+    { message: 'Path contains invalid characters or traversal attempts' }
+  ), // Path relative to working directory
 });
 
 export const GetSessionFileRequestSchema = z.object({
-  path: z.string().min(1, 'File path is required'),
+  path: z.string().min(1, 'File path is required').refine(
+    (path) => !path.includes('..') && !path.includes('\\') && !path.startsWith('/'),
+    { message: 'Path contains invalid characters or traversal attempts' }
+  ),
 });
