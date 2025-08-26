@@ -3,8 +3,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { loader as GET, action as PATCH } from '@/app/routes/api.projects.$projectId';
-const DELETE = PATCH; // Both PATCH and DELETE use the same action function
+import { loader, action } from '@/app/routes/api.projects.$projectId';
 import { parseResponse } from '@/lib/serialization';
 import type { ProjectInfo } from '@/types/core';
 
@@ -53,7 +52,7 @@ describe('Individual Project API', () => {
       const request = new NextRequest('http://localhost/api/projects/test-project', {
         method: 'DELETE',
       });
-      const response = await GET({
+      const response = await loader({
         request,
         params: { projectId: 'test-project' },
       });
@@ -77,7 +76,7 @@ describe('Individual Project API', () => {
       Project.getById = vi.fn().mockReturnValue(null);
 
       const request = new NextRequest('http://localhost/api/projects/nonexistent');
-      const response = await GET({
+      const response = await loader({
         request,
         params: { projectId: 'nonexistent' },
       });
@@ -96,7 +95,7 @@ describe('Individual Project API', () => {
       const request = new NextRequest('http://localhost/api/projects/test-project', {
         method: 'DELETE',
       });
-      const response = await GET({
+      const response = await loader({
         request,
         params: { projectId: 'test-project' },
       });
@@ -124,7 +123,7 @@ describe('Individual Project API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH({
+      const response = await action({
         request,
         params: { projectId: 'test-project' },
       });
@@ -144,7 +143,7 @@ describe('Individual Project API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH({
+      const response = await action({
         request,
         params: { projectId: 'nonexistent' },
       });
@@ -169,7 +168,7 @@ describe('Individual Project API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH({
+      const response = await action({
         request,
         params: { projectId: 'test-project' },
       });
@@ -193,7 +192,7 @@ describe('Individual Project API', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      const response = await PATCH({
+      const response = await action({
         request,
         params: { projectId: 'test-project' },
       });
@@ -212,7 +211,7 @@ describe('Individual Project API', () => {
       const request = new NextRequest('http://localhost/api/projects/test-project', {
         method: 'DELETE',
       });
-      const response = await DELETE({
+      const response = await action({
         request,
         params: { projectId: 'test-project' },
       });
@@ -229,7 +228,7 @@ describe('Individual Project API', () => {
       const request = new NextRequest('http://localhost/api/projects/nonexistent', {
         method: 'DELETE',
       });
-      const response = await DELETE({
+      const response = await action({
         request,
         params: { projectId: 'nonexistent' },
       });
@@ -249,7 +248,7 @@ describe('Individual Project API', () => {
       const request = new NextRequest('http://localhost/api/projects/test-project', {
         method: 'DELETE',
       });
-      const response = await DELETE({
+      const response = await action({
         request,
         params: { projectId: 'test-project' },
       });
