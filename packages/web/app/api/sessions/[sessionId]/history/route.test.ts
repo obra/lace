@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET } from '@/app/api/sessions/[sessionId]/history/route';
+import { GET } from '@/app/routes/api.sessions.$sessionId.history';
 import { getSessionService } from '@/lib/server/session-service';
 import type { LaceEvent } from '@/types/core';
 import type { ApiErrorResponse } from '@/types/api';
