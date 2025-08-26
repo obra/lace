@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET, PATCH } from '@/app/routes/api.sessions.$sessionId';
+import { loader as GET, action as PATCH } from '@/app/routes/api.sessions.$sessionId';
 import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { setupWebTest } from '@/test-utils/web-test-setup';
