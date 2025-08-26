@@ -230,7 +230,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await PATCH(request, context)) as NextResponse;
+      const response = (await action(request, context)) as NextResponse;
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ task: Task }>(response);
@@ -257,7 +257,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await PATCH(request, context)) as NextResponse;
+      const response = (await action(request, context)) as NextResponse;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -282,7 +282,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await PATCH(request, context)) as NextResponse;
+      const response = (await action(request, context)) as NextResponse;
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ task: Task }>(response);
@@ -304,7 +304,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await DELETE(request, context)) as NextResponse;
+      const response = (await action(request, context)) as NextResponse;
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ message: string }>(response);
@@ -324,7 +324,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await DELETE(request, context)) as NextResponse;
+      const response = (await action(request, context)) as NextResponse;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -358,7 +358,7 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }),
       };
 
-      const response = (await DELETE(request, context)) as NextResponse;
+      const response = (await action(request, context)) as NextResponse;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
