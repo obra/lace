@@ -7,7 +7,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { GET, PATCH, DELETE } from './route';
+import {
+  GET,
+  PATCH,
+  DELETE,
+} from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId';
 import { asThreadId } from '@/types/core';
 import { Project, Session } from '@/lib/server/lace-imports';
 import { getSessionService } from '@/lib/server/session-service';
