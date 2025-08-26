@@ -30,7 +30,11 @@ export function useOnboarding(
 
       // Navigate directly to the agent chat
       console.log('Onboarding: navigating to agent', { projectId, sessionId, agentId });
-      navigateToAgent(projectId, asThreadId(sessionId), asThreadId(agentId));
+
+      // Use setTimeout to ensure React Router v7 state updates have completed
+      setTimeout(() => {
+        navigateToAgent(projectId, asThreadId(sessionId), asThreadId(agentId));
+      }, 100);
 
       // Clear auto-open state
       setAutoOpenCreateProject(false);
