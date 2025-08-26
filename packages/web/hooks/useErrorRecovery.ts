@@ -79,7 +79,7 @@ export function useErrorRecovery() {
       markRetryComplete(threadId, currentRetryCount);
       return false;
     }
-  }, []);
+  }, [retryMessages, markRetryComplete]);
 
   const retryToolOperation = useCallback(async (
     threadId: string,
@@ -128,7 +128,7 @@ export function useErrorRecovery() {
       markRetryComplete(key, currentRetryCount);
       return false;
     }
-  }, []);
+  }, [markRetryComplete]);
 
   const markErrorResolved = useCallback((errorId: string) => {
     // Remove retry state for resolved errors

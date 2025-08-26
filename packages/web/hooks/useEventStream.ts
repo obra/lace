@@ -3,9 +3,21 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { EventStreamFirehose } from '@/lib/event-stream-firehose';
-import type { LaceEvent, Task } from '@/types/core';
+import type { LaceEvent, Task, AgentErrorData } from '@/types/core';
 import type { PendingApproval } from '@/types/api';
-import type { AgentErrorEventData } from '@/lib/event-stream-manager';
+
+// Runtime type guard for AgentErrorData
+function isAgentErrorData(value: unknown): value is AgentErrorData {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    'errorType' in value &&
+    'message' in value &&
+    'context' in value &&
+    'isRetryable' in value &&
+    typeof (value as Record<string, unknown>).message === 'string'
+  );
+}
 
 // Re-export types from original for compatibility
 export interface TaskEvent {
@@ -263,8 +275,11 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
             currentOptions.onAgentError?.(event);
             // Only call onError if treatAgentErrorAsGeneric is not disabled
             if (currentOptions.treatAgentErrorAsGeneric !== false) {
-              const errorData = event.data as AgentErrorEventData;
-              currentOptions.onError?.(new Error(errorData.message || 'Unknown agent error'));
+              if (isAgentErrorData(event.data)) {
+                currentOptions.onError?.(new Error(event.data.message || 'Unknown agent error'));
+              } else {
+                currentOptions.onError?.(new Error('Malformed agent error event'));
+              }
             }
             break;
           // Add other event type cases as needed

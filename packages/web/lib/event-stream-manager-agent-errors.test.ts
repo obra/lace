@@ -11,7 +11,7 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '@/lib/server/lace-imports';
-import type { LaceEvent, ErrorType, ErrorPhase, AgentErrorData } from '@/types/core';
+import type { LaceEvent, AgentErrorData } from '@/types/core';
 
 describe('EventStreamManager Agent Error Handling', () => {
   const tempLaceDir = setupWebTest(); // Handles temp LACE_DIR + persistence automatically
