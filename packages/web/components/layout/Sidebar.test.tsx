@@ -9,6 +9,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
+import { BrowserRouter } from 'react-router';
 import { Sidebar } from './Sidebar';
 
 describe('Sidebar', () => {
@@ -23,13 +24,21 @@ describe('Sidebar', () => {
   });
 
   it('renders when open', () => {
-    render(<Sidebar {...defaultProps} />);
+    render(
+      <BrowserRouter>
+        <Sidebar {...defaultProps} />
+      </BrowserRouter>
+    );
     expect(screen.getAllByText('Sidebar Content')).toHaveLength(2); // Both mobile and desktop versions
     expect(screen.getAllByText('Lace')).toHaveLength(2); // Both mobile and desktop headers
   });
 
   it('renders collapsed state when closed', () => {
-    render(<Sidebar {...defaultProps} open={false} />);
+    render(
+      <BrowserRouter>
+        <Sidebar {...defaultProps} open={false} />
+      </BrowserRouter>
+    );
     // Mobile version is hidden when closed, desktop shows collapsed state without content
     expect(screen.queryByText('Sidebar Content')).not.toBeInTheDocument();
     // Desktop collapsed state doesn't show "Lace" text, mobile is hidden
@@ -38,7 +47,11 @@ describe('Sidebar', () => {
 
   it('calls onToggle when toggle button clicked', () => {
     const mockOnToggle = vi.fn();
-    render(<Sidebar {...defaultProps} onToggle={mockOnToggle} />);
+    render(
+      <BrowserRouter>
+        <Sidebar {...defaultProps} onToggle={mockOnToggle} />
+      </BrowserRouter>
+    );
 
     // Use more specific query - there are two buttons, get the one without title
     const buttons = screen.getAllByRole('button');
@@ -52,7 +65,11 @@ describe('Sidebar', () => {
   // NEW TESTS FOR TASK 3 - These should fail initially
   it('calls onSettingsClick when settings button clicked (collapsed)', () => {
     const mockOnSettingsClick = vi.fn();
-    render(<Sidebar {...defaultProps} open={false} onSettingsClick={mockOnSettingsClick} />);
+    render(
+      <BrowserRouter>
+        <Sidebar {...defaultProps} open={false} onSettingsClick={mockOnSettingsClick} />
+      </BrowserRouter>
+    );
 
     // When collapsed, only desktop collapsed settings button is visible
     const settingsButton = screen.getByLabelText('Open settings');
@@ -62,7 +79,11 @@ describe('Sidebar', () => {
 
   it('calls onSettingsClick when settings button clicked (expanded)', () => {
     const mockOnSettingsClick = vi.fn();
-    render(<Sidebar {...defaultProps} open={true} onSettingsClick={mockOnSettingsClick} />);
+    render(
+      <BrowserRouter>
+        <Sidebar {...defaultProps} open={true} onSettingsClick={mockOnSettingsClick} />
+      </BrowserRouter>
+    );
 
     // When expanded, both mobile and desktop settings buttons exist, click the first one
     const settingsButtons = screen.getAllByLabelText('Open settings');
@@ -72,7 +93,11 @@ describe('Sidebar', () => {
   });
 
   it('does not render theme selector in footer', () => {
-    render(<Sidebar {...defaultProps} />);
+    render(
+      <BrowserRouter>
+        <Sidebar {...defaultProps} />
+      </BrowserRouter>
+    );
     // Theme selector should not be present
     expect(screen.queryByText('Theme')).not.toBeInTheDocument();
   });
@@ -80,24 +105,40 @@ describe('Sidebar', () => {
   it('does not require theme props', () => {
     // This test verifies the interface doesn't require theme props
     expect(() => {
-      render(<Sidebar {...defaultProps} />);
+      render(
+        <BrowserRouter>
+          <Sidebar {...defaultProps} />
+        </BrowserRouter>
+      );
     }).not.toThrow();
   });
 
   it('renders settings button in both expanded and collapsed states', () => {
     // Collapsed state
-    const { rerender } = render(<Sidebar {...defaultProps} open={false} />);
+    const { rerender } = render(
+      <BrowserRouter>
+        <Sidebar {...defaultProps} open={false} />
+      </BrowserRouter>
+    );
     expect(screen.getByLabelText('Open settings')).toBeInTheDocument();
 
     // Expanded state - now has multiple settings buttons (mobile + desktop)
-    rerender(<Sidebar {...defaultProps} open={true} />);
+    rerender(
+      <BrowserRouter>
+        <Sidebar {...defaultProps} open={true} />
+      </BrowserRouter>
+    );
     const settingsButtons = screen.getAllByLabelText('Open settings');
     expect(settingsButtons.length).toBeGreaterThan(0);
   });
 
   // REGRESSION TESTS - These should still pass
   it('maintains existing functionality after theme removal', () => {
-    render(<Sidebar {...defaultProps} />);
+    render(
+      <BrowserRouter>
+        <Sidebar {...defaultProps} />
+      </BrowserRouter>
+    );
 
     // Should still render content area (now in both mobile and desktop versions)
     expect(screen.getAllByText('Sidebar Content')).toHaveLength(2);
