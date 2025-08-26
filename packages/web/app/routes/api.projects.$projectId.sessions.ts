@@ -15,9 +15,9 @@ const CreateSessionSchema = z.object({
   configuration: z.record(z.unknown()).optional(),
 });
 
-export async function loader({ request, params }: Route.LoaderArgs) {
+export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const { projectId } = params;
+    const { projectId } = params as { projectId: string };
     const project = Project.getById(projectId);
     if (!project) {
       return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
@@ -45,13 +45,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if (request.method !== 'POST') {
+  if ((request as Request).method !== 'POST') {
     return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
   }
 
   try {
-    const { projectId } = params;
-    const body = (await request.json()) as Record<string, unknown>;
+    const { projectId } = params as { projectId: string };
+    const body = (await (request as Request).json()) as Record<string, unknown>;
     const validatedData = CreateSessionSchema.parse(body);
 
     const project = Project.getById(projectId);
@@ -65,7 +65,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const session = Session.create({
       name: validatedData.name,
       description: validatedData.description,
-      projectId,
+      projectId: projectId,
       configuration: {
         providerInstanceId: validatedData.providerInstanceId,
         modelId: validatedData.modelId,
