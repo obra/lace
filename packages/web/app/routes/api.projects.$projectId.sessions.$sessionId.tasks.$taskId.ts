@@ -25,10 +25,7 @@ const TaskRouteParamsSchema = z.object({
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const { projectId, sessionId, taskId } = await validateRouteParams(
-      Promise.resolve(params),
-      TaskRouteParamsSchema
-    );
+    const { projectId, sessionId, taskId } = validateRouteParams(params, TaskRouteParamsSchema);
 
     // Get project first to verify it exists
     const project = Project.getById(projectId);
@@ -73,10 +70,7 @@ async function handlePatch(
   params: { projectId: string; sessionId: string; taskId: string }
 ) {
   try {
-    const { projectId, sessionId, taskId } = await validateRouteParams(
-      Promise.resolve(params),
-      TaskRouteParamsSchema
-    );
+    const { projectId, sessionId, taskId } = validateRouteParams(params, TaskRouteParamsSchema);
 
     // Validate request body
     let validatedBody;
@@ -138,10 +132,7 @@ async function handleDelete(
   params: { projectId: string; sessionId: string; taskId: string }
 ) {
   try {
-    const { projectId, sessionId, taskId } = await validateRouteParams(
-      Promise.resolve(params),
-      TaskRouteParamsSchema
-    );
+    const { projectId, sessionId, taskId } = validateRouteParams(params, TaskRouteParamsSchema);
 
     // Get project first to verify it exists
     const project = Project.getById(projectId);
