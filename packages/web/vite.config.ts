@@ -12,7 +12,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 export default defineConfig({
   plugins: [
-    reactRouter({ ssr: false, prerender: false }),
+    reactRouter(),
     // Only use tsconfigPaths in dev to avoid sourcemap issues in build
     ...(isDev ? [tsconfigPaths()] : []),
   ],
