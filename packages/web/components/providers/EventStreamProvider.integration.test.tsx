@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import {
   EventStreamProvider,
-  useEventStream,
+  useEventStreamConnection,
   useSessionEvents,
   useAgentAPI,
 } from './EventStreamProvider';
@@ -39,7 +39,7 @@ import type { StreamConnection } from '@/types/stream-events';
 
 // Test component that consumes event stream state without receiving it through props
 function TestEventStreamConsumer() {
-  const { connection } = useEventStream();
+  const { connection } = useEventStreamConnection();
   const { events, loadingHistory } = useSessionEvents();
   const { sendMessage, stopAgent } = useAgentAPI();
 
@@ -67,7 +67,7 @@ function TestEventStreamConsumer() {
 
 // Test component that should fail without provider
 function TestComponentWithoutProvider() {
-  const { connection } = useEventStream();
+  const { connection } = useEventStreamConnection();
   return <div data-testid="connected">{connection.connected}</div>;
 }
 
