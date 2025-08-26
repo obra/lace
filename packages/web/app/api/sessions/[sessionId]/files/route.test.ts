@@ -32,8 +32,7 @@ describe('/api/sessions/[sessionId]/files', () => {
 
   beforeEach(async () => {
     // Create temporary test directory with real filesystem
-    testDir = join(tmpdir(), `lace-test-${Date.now()}`);
-    await fs.mkdir(testDir, { recursive: true });
+    testDir = await fs.mkdtemp(join(tmpdir(), 'lace-test-'));
 
     // Create test files and directories
     await fs.mkdir(join(testDir, 'src'));
@@ -131,7 +130,7 @@ describe('/api/sessions/[sessionId]/files', () => {
       params: { sessionId: 'invalid-session' },
     });
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(404);
     const data = await parseResponse<ApiErrorResponse>(response);
     expect(data.code).toBe('SESSION_NOT_FOUND');
   });
@@ -196,10 +195,9 @@ describe('/api/sessions/[sessionId]/files', () => {
   });
 
   it('should not follow symlinks that resolve outside working directory', async () => {
-    const outsideDir = join(tmpdir(), `outside-${Date.now()}`);
+    const outsideDir = await fs.mkdtemp(join(tmpdir(), 'outside-test-'));
     
     try {
-      await fs.mkdir(outsideDir, { recursive: true });
       await fs.writeFile(join(outsideDir, 'secret.txt'), 'secret content');
       
       const symlinkPath = join(testDir, 'malicious-link');

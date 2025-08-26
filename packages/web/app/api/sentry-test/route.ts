@@ -15,6 +15,13 @@ export async function POST() {
     const err = error instanceof Error ? error : new Error(String(error));
     Sentry.captureException(err);
 
+    // Wait for the event to be sent before returning
+    try {
+      await Sentry.flush(2000);
+    } catch {
+      // Don't block if flush fails
+    }
+
     return NextResponse.json({ error: 'Test server error triggered' }, { status: 500 });
   }
 }

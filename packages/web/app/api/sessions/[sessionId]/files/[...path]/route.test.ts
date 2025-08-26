@@ -32,8 +32,7 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
 
   beforeEach(async () => {
     // Create temporary test directory with real filesystem
-    testDir = join(tmpdir(), `lace-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
-    await fs.mkdir(testDir, { recursive: true });
+    testDir = await fs.mkdtemp(join(tmpdir(), 'lace-test-'));
 
     // Create test files with different content types
     await fs.writeFile(join(testDir, 'test.ts'), 'const hello = "world";');
@@ -235,10 +234,9 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
 
   it('should prevent symlink traversal attacks', async () => {
     // Create an outside directory and file
-    const outsideDir = join(tmpdir(), `outside-${Date.now()}`);
+    const outsideDir = await fs.mkdtemp(join(tmpdir(), 'outside-test-'));
     
     try {
-      await fs.mkdir(outsideDir, { recursive: true });
       await fs.writeFile(join(outsideDir, 'secret.txt'), 'secret content');
       
       // Try to create a symlink to the outside file

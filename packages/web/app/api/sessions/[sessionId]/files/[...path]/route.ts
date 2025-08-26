@@ -155,7 +155,7 @@ export async function GET(
     }
 
     const response: SessionFileContentResponse = {
-      path: relativePath,
+      path: relativePath.replace(/\\/g, '/'),
       content,
       mimeType,
       encoding: 'utf8',
