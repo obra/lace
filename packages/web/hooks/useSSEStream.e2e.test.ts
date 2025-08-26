@@ -216,8 +216,8 @@ describe('SSE Stream E2E Tests', () => {
     const request2 = new Request(`http://localhost/api/events/stream?sessions=${sessionId}`);
 
     const [response1, response2] = await Promise.all([
-      sseStream({ request: request1, params: {} }),
-      sseStream({ request: request2, params: {} }),
+      sseStream(createLoaderArgs(request1, {})),
+      sseStream(createLoaderArgs(request2, {})),
     ]);
 
     expect(response1.status).toBe(200);
