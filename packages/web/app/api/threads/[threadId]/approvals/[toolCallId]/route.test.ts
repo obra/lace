@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { POST } from './route';
+import { POST } from '@/app/routes/api.threads.$threadId.approvals.$toolCallId';
 import { getSessionService } from '@/lib/server/session-service';
 import { parseResponse } from '@/lib/serialization';
 
