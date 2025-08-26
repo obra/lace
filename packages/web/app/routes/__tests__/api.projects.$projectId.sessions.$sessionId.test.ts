@@ -3,7 +3,11 @@
 
 import { NextRequest } from 'next/server';
 import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest';
-import { GET, PATCH, DELETE } from '@/app/routes/api.projects.$projectId.sessions.$sessionId';
+import {
+  loader as GET,
+  action as PATCH,
+} from '@/app/routes/api.projects.$projectId.sessions.$sessionId';
+const DELETE = PATCH; // Both PATCH and DELETE use the same action function
 import { Project } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 
