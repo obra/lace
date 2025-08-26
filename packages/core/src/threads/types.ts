@@ -1,7 +1,7 @@
 // ABOUTME: Type definitions for thread events and thread management
 // ABOUTME: Events include user messages, agent messages, tool calls, and tool results
 
-import { ToolCall, ToolResult } from '~/tools/types';
+import type { ToolCall, ToolResult } from '~/tools/types';
 import type { CompactionData } from '~/threads/compaction/types';
 import type { ApprovalDecision } from '~/tools/approval-types';
 import type { CombinedTokenUsage } from '~/token-management/types';
