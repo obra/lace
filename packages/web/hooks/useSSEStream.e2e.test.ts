@@ -129,10 +129,7 @@ describe('SSE Stream E2E Tests', () => {
       }
     );
 
-    const agentResponse = await spawnAgent({
-      request: spawnAgentRequest,
-      params: { sessionId },
-    });
+    const agentResponse = await spawnAgent(createActionArgs(spawnAgentRequest, { sessionId }));
     expect(agentResponse.status).toBe(201);
 
     const agentData = await parseResponse<{ threadId: string }>(agentResponse);
@@ -140,10 +137,7 @@ describe('SSE Stream E2E Tests', () => {
 
     // Establish SSE connection
     const sseRequest = new Request(`http://localhost/api/events/stream?sessions=${sessionId}`);
-    const sseResponse = await sseStream({
-      request: sseRequest,
-      params: {},
-    });
+    const sseResponse = await sseStream(createLoaderArgs(sseRequest, {}));
     expect(sseResponse.status).toBe(200);
 
     // Get the stream reader
