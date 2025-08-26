@@ -50,7 +50,7 @@ export function useErrorRecovery() {
       }));
 
       return Boolean(result);
-    } catch (error) {
+    } catch (_error) {
       setRetryStates(prev => ({
         ...prev,
         [threadId]: {
@@ -101,7 +101,7 @@ export function useErrorRecovery() {
       }));
 
       return Boolean(result);
-    } catch (error) {
+    } catch (_error) {
       setRetryStates(prev => ({
         ...prev,
         [key]: {

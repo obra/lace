@@ -1,7 +1,7 @@
 // ABOUTME: New useEventStream hook using EventStreamFirehose singleton
 // ABOUTME: Maintains same API as original but uses shared EventSource connection
 
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { EventStreamFirehose } from '@/lib/event-stream-firehose';
 import type { LaceEvent, Task } from '@/types/core';
 import type { PendingApproval } from '@/types/api';
