@@ -68,10 +68,10 @@ export const SidebarContent = memo(function SidebarContent({
         )}
 
         {/* FILE BROWSER */}
-        {sessionDetails && agentContext?.selectedAgent && (
+        {sessionDetails && sessionDetails.id && selectedProject?.workingDirectory && (
           <FileBrowserSection
-            sessionId={agentContext.selectedAgent}
-            workingDirectory="/placeholder/working/directory"
+            sessionId={sessionDetails.id}
+            workingDirectory={selectedProject.workingDirectory}
           />
         )}
 
