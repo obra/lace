@@ -2,7 +2,6 @@
 // ABOUTME: Verifies stopping agent processing works correctly
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { action } from '@/app/routes/api.agents.$agentId.stop';
 
 // Mock only the external dependencies we need
@@ -36,7 +35,7 @@ describe('/api/agents/[agentId]/stop', () => {
     vi.clearAllMocks();
   });
 
-  const mockRequest = new NextRequest('http://localhost/api/agents/test/stop', {
+  const mockRequest = new Request('http://localhost/api/agents/test/stop', {
     method: 'POST',
   });
 
