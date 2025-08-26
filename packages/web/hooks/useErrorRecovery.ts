@@ -20,6 +20,7 @@ export function useErrorRecovery() {
   ): Promise<boolean> => {
     // Use atomic state update to prevent race conditions
     let shouldProceed = false;
+    let currentRetryCount = 0;
     setRetryStates(prev => {
       const currentState = prev[threadId] || { retrying: false, retryCount: 0 };
       
@@ -28,6 +29,7 @@ export function useErrorRecovery() {
       }
 
       shouldProceed = true;
+      currentRetryCount = currentState.retryCount;
       return {
         ...prev,
         [threadId]: {
@@ -54,7 +56,7 @@ export function useErrorRecovery() {
         [threadId]: {
           retrying: false,
           lastRetryAt: new Date(),
-          retryCount: currentState.retryCount + 1,
+          retryCount: currentRetryCount + 1,
         },
       }));
 
@@ -65,7 +67,7 @@ export function useErrorRecovery() {
         [threadId]: {
           retrying: false,
           lastRetryAt: new Date(),
-          retryCount: currentState.retryCount + 1,
+          retryCount: currentRetryCount + 1,
         },
       }));
       return false;
@@ -78,20 +80,32 @@ export function useErrorRecovery() {
     toolName: string
   ): Promise<boolean> => {
     const key = `${threadId}-${toolCallId}`;
-    const currentState = retryStates[key] || { retrying: false, retryCount: 0 };
     
-    if (currentState.retrying) {
-      return false;
-    }
+    // Use atomic state update to prevent race conditions
+    let shouldProceed = false;
+    let currentRetryCount = 0;
+    setRetryStates(prev => {
+      const currentState = prev[key] || { retrying: false, retryCount: 0 };
+      
+      if (currentState.retrying) {
+        return prev; // Already retrying, no state change
+      }
 
-    setRetryStates(prev => ({
-      ...prev,
-      [key]: {
-        ...currentState,
-        retrying: true,
-        lastRetryAt: new Date(),
-      },
-    }));
+      shouldProceed = true;
+      currentRetryCount = currentState.retryCount;
+      return {
+        ...prev,
+        [key]: {
+          ...currentState,
+          retrying: true,
+          lastRetryAt: new Date(),
+        },
+      };
+    });
+
+    if (!shouldProceed) {
+      return false; // Already retrying
+    }
 
     try {
       // Send retry message for tool operation
@@ -105,7 +119,7 @@ export function useErrorRecovery() {
         [key]: {
           retrying: false,
           lastRetryAt: new Date(),
-          retryCount: currentState.retryCount + 1,
+          retryCount: currentRetryCount + 1,
         },
       }));
 
@@ -116,7 +130,7 @@ export function useErrorRecovery() {
         [key]: {
           retrying: false,
           lastRetryAt: new Date(),
-          retryCount: currentState.retryCount + 1,
+          retryCount: currentRetryCount + 1,
         },
       }));
       return false;
