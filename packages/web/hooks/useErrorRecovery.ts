@@ -80,7 +80,7 @@ export function useErrorRecovery() {
       }));
       return false;
     }
-  }, [];
+  }, []);
 
   const retryToolOperation = useCallback(async (
     threadId: string,
@@ -143,7 +143,7 @@ export function useErrorRecovery() {
       }));
       return false;
     }
-  }, [];
+  }, []);
 
   const markErrorResolved = useCallback((errorId: string) => {
     // Remove retry state for resolved errors
@@ -156,7 +156,7 @@ export function useErrorRecovery() {
 
   const getRetryState = useCallback((errorId: string): RetryState => {
     return retryStates[errorId] || { retrying: false, retryCount: 0 };
-  }, [];
+  }, []);
 
   const canRetry = useCallback((errorId: string, errorType: ErrorType): boolean => {
     const state = getRetryState(errorId);
