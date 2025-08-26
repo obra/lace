@@ -23,7 +23,7 @@ const NotesRouteParamsSchema = z.object({
   taskId: TaskIdSchema,
 });
 
-interface RouteContext {
+interface _RouteContext {
   params: Promise<{
     projectId: string;
     sessionId: string;
@@ -34,11 +34,11 @@ interface RouteContext {
 export async function action({ request, params }: Route.ActionArgs) {
   try {
     const { projectId, sessionId, taskId } = await validateRouteParams(
-      params,
+      params as Record<string, string>,
       NotesRouteParamsSchema
     );
 
-    const body = (await request.json()) as Record<string, unknown>;
+    const body = (await (request as Request).json()) as Record<string, unknown>;
     let validatedBody;
     try {
       validatedBody = validateRequestBody(body, AddNoteSchema);
