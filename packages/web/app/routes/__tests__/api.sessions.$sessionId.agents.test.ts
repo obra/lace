@@ -237,10 +237,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response = await POST({
-        request,
-        params: { sessionId: 'invalid-id' },
-      });
+      const response = await POST(createActionArgs(request, { sessionId: 'invalid-id' }));
       expect(response.status).toBe(400);
 
       const data = await parseResponse<ErrorResponse>(response);
@@ -260,10 +257,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response = await POST({
-        request,
-        params: { sessionId: nonExistentSessionId },
-      });
+      const response = await POST(createActionArgs(request, { sessionId: nonExistentSessionId }));
       expect(response.status).toBe(404);
 
       const data = await parseResponse<ErrorResponse>(response);
@@ -400,10 +394,7 @@ describe('Agent Spawning API E2E Tests', () => {
         method: 'GET',
       });
 
-      const response = await GET({
-        request,
-        params: { sessionId: nonExistentSessionId },
-      });
+      const response = await GET(createLoaderArgs(request, { sessionId: nonExistentSessionId }));
       expect(response.status).toBe(404);
 
       const data = await parseResponse<ErrorResponse>(response);
