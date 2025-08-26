@@ -20,13 +20,13 @@ import { Project, Session } from '@/lib/server/lace-imports';
 import {
   GET as listTasks,
   POST as createTask,
-} from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/route';
+} from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks';
 import {
   GET as getTask,
   PATCH as updateTask,
   DELETE as deleteTask,
-} from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/route';
-import { POST as addNote } from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes/route';
+} from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId';
+import { POST as addNote } from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.notes';
 import { NextRequest } from 'next/server';
 
 // Mock external dependencies only
