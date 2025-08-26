@@ -26,10 +26,10 @@ const UpdateSessionSchema = z.object({
   status: z.enum(['active', 'archived', 'completed']).optional(),
 });
 
-export async function loader({ request, params }: Route.LoaderArgs) {
+export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
     const sessionService = getSessionService();
-    const { sessionId: sessionIdParam } = params;
+    const { sessionId: sessionIdParam } = params as { sessionId: string };
 
     if (!isValidThreadId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
@@ -62,13 +62,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if (request.method !== 'PATCH') {
+  if ((request as Request).method !== 'PATCH') {
     return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
   }
 
   try {
     const sessionService = getSessionService();
-    const { sessionId: sessionIdParam } = params;
+    const { sessionId: sessionIdParam } = params as { sessionId: string };
 
     if (!isValidThreadId(sessionIdParam)) {
       return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
@@ -83,7 +83,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     // Parse and validate request body
-    const bodyRaw: unknown = await request.json();
+    const bodyRaw: unknown = await (request as Request).json();
     const bodyResult = UpdateSessionSchema.safeParse(bodyRaw);
 
     if (!bodyResult.success) {
