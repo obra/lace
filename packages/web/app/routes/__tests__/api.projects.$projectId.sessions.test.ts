@@ -12,6 +12,7 @@ import {
   cleanupTestProviderInstances,
 } from '@/lib/server/lace-imports';
 import { Session } from '@/lib/server/lace-imports';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -68,10 +69,9 @@ describe('Session API endpoints under projects', () => {
       });
 
       const response = await GET(
-        new Request(`http://localhost/api/projects/${projectId}/sessions`),
-        {
-          params: Promise.resolve({ projectId }),
-        }
+        createLoaderArgs(new Request(`http://localhost/api/projects/${projectId}/sessions`), {
+          projectId,
+        })
       );
 
       const data =
@@ -93,10 +93,9 @@ describe('Session API endpoints under projects', () => {
     it('should return sessions when only default session exists', async () => {
       // Project.create() auto-creates a default session
       const response = await GET(
-        new Request(`http://localhost/api/projects/${projectId}/sessions`),
-        {
-          params: Promise.resolve({ projectId }),
-        }
+        createLoaderArgs(new Request(`http://localhost/api/projects/${projectId}/sessions`), {
+          projectId,
+        })
       );
 
       const data = await parseResponse<SessionInfo[]>(response);
@@ -107,10 +106,9 @@ describe('Session API endpoints under projects', () => {
 
     it('should return 404 when project not found', async () => {
       const response = await GET(
-        new Request('http://localhost/api/projects/nonexistent/sessions'),
-        {
-          params: Promise.resolve({ projectId: 'nonexistent' }),
-        }
+        createLoaderArgs(new Request('http://localhost/api/projects/nonexistent/sessions'), {
+          projectId: 'nonexistent',
+        })
       );
 
       const data = await parseResponse<{ error: string }>(response);
@@ -133,7 +131,7 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ projectId }) });
+      const response = await POST(createActionArgs(request, { projectId }));
       const data = await parseResponse<SessionInfo>(response);
 
       expect(response.status).toBe(201);
@@ -152,9 +150,7 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, {
-        params: Promise.resolve({ projectId: 'nonexistent' }),
-      });
+      const response = await POST(createActionArgs(request, { projectId: 'nonexistent' }));
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(404);
@@ -169,7 +165,7 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ projectId }) });
+      const response = await POST(createActionArgs(request, { projectId }));
       const data = await parseResponse<{ error: string; details?: unknown }>(response);
 
       expect(response.status).toBe(400);
@@ -183,7 +179,7 @@ describe('Session API endpoints under projects', () => {
         body: JSON.stringify({}),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ projectId }) });
+      const response = await POST(createActionArgs(request, { projectId }));
       const data = await parseResponse<{ error: string }>(response);
 
       expect(response.status).toBe(400);
@@ -200,7 +196,7 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ projectId }) });
+      const response = await POST(createActionArgs(request, { projectId }));
       const data = await parseResponse<SessionInfo>(response);
 
       expect(response.status).toBe(201);
@@ -220,7 +216,7 @@ describe('Session API endpoints under projects', () => {
         }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ projectId }) });
+      const response = await POST(createActionArgs(request, { projectId }));
       const data = await parseResponse<SessionInfo>(response);
 
       expect(response.status).toBe(201);
