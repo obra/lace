@@ -21,6 +21,7 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '@/lib/server/lace-imports';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 
 // Mock external dependencies only
 vi.mock('server-only', () => ({}));
@@ -111,15 +112,14 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
       );
-      const context = {
-        params: Promise.resolve({
+
+      const response = (await GET(
+        createLoaderArgs(request, {
           projectId: testProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await GET(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ task: Task }>(response);
@@ -131,15 +131,14 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const request = new Request(
         `http://localhost/api/projects/invalid-uuid/sessions/invalid-session/tasks/${testTaskId}`
       );
-      const context = {
-        params: Promise.resolve({
+
+      const response = (await GET(
+        createLoaderArgs(request, {
           projectId: 'invalid-uuid',
           sessionId: 'invalid-session',
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await GET(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(500);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -153,15 +152,14 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const request = new Request(
         `http://localhost/api/projects/${nonExistentProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
       );
-      const context = {
-        params: Promise.resolve({
+
+      const response = (await GET(
+        createLoaderArgs(request, {
           projectId: nonExistentProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await GET(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -173,15 +171,14 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${nonExistentSessionId}/tasks/${testTaskId}`
       );
-      const context = {
-        params: Promise.resolve({
+
+      const response = (await GET(
+        createLoaderArgs(request, {
           projectId: testProjectId,
           sessionId: nonExistentSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await GET(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -192,15 +189,14 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/nonexistent`
       );
-      const context = {
-        params: Promise.resolve({
+
+      const response = (await GET(
+        createLoaderArgs(request, {
           projectId: testProjectId,
           sessionId: testSessionId,
           taskId: 'nonexistent',
-        }),
-      };
-
-      const response = (await GET(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -221,15 +217,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }
       );
 
-      const context = {
-        params: Promise.resolve({
+      const response = (await action(
+        createActionArgs(request, {
           projectId: testProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await action(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ task: Task }>(response);
@@ -248,15 +242,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }
       );
 
-      const context = {
-        params: Promise.resolve({
+      const response = (await action(
+        createActionArgs(request, {
           projectId: nonExistentProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await action(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -273,15 +265,13 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
         }
       );
 
-      const context = {
-        params: Promise.resolve({
+      const response = (await action(
+        createActionArgs(request, {
           projectId: testProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await action(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ task: Task }>(response);
@@ -295,15 +285,14 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
       );
-      const context = {
-        params: Promise.resolve({
+
+      const response = (await action(
+        createActionArgs(request, {
           projectId: testProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await action(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(200);
 
       const data = await parseResponse<{ message: string }>(response);
@@ -315,15 +304,14 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
       const request = new Request(
         `http://localhost/api/projects/${nonExistentProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
       );
-      const context = {
-        params: Promise.resolve({
+
+      const response = (await action(
+        createActionArgs(request, {
           projectId: nonExistentProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await action(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
@@ -333,31 +321,30 @@ describe('/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]', () => 
     it('should return 404 for non-existent task', async () => {
       // First delete the task, then try to delete it again
       await action(
-        new Request(
-          `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
-        ),
-        {
-          params: Promise.resolve({
+        createActionArgs(
+          new Request(
+            `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
+          ),
+          {
             projectId: testProjectId,
             sessionId: testSessionId,
             taskId: testTaskId,
-          }),
-        }
+          }
+        )
       );
 
       // Now try to delete the already-deleted task
       const request = new Request(
         `http://localhost/api/projects/${testProjectId}/sessions/${testSessionId}/tasks/${testTaskId}`
       );
-      const context = {
-        params: Promise.resolve({
+
+      const response = (await action(
+        createActionArgs(request, {
           projectId: testProjectId,
           sessionId: testSessionId,
           taskId: testTaskId,
-        }),
-      };
-
-      const response = (await action(request, context)) as Response;
+        })
+      )) as Response;
       expect(response.status).toBe(404);
 
       const data = await parseResponse<{ error: string }>(response);
