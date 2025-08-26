@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExclamationTriangle, faClock, faRedo } from '@fortawesome/free-solid-svg-icons';
+import { faExclamationTriangle, faClock, faRedo } from '@/lib/fontawesome';
 import TimestampDisplay from '@/components/ui/TimestampDisplay';
 import type { ErrorEntry } from '@/types/web-events';
 

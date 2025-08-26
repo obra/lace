@@ -7,7 +7,7 @@ export type { AgentState, AgentInfo } from './agents/agent';
 
 // Thread management
 export { ThreadManager } from './threads/thread-manager';
-export type { ThreadId, LaceEvent, LaceEventType, ErrorType, ErrorPhase } from './threads/types';
+export type { ThreadId, LaceEvent, LaceEventType, ErrorType, ErrorPhase, AgentErrorData } from './threads/types';
 export { isErrorType, isErrorPhase } from './threads/types';
 
 // Provider system
