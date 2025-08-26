@@ -101,10 +101,9 @@ describe('Session History API', () => {
       const invalidParams = { params: Promise.reject(new Error('Params parsing failed')) };
       const request = new Request(`http://localhost/api/sessions/${realSessionId}/history`);
 
-      const response = await GET(
-        request,
-        invalidParams as { params: Promise<{ sessionId: string }> }
-      );
+      // Note: This test is checking error handling, but with the new pattern we need to provide valid structure
+      // The error will come from the route logic itself when it tries to parse the sessionId
+      const response = await GET(createLoaderArgs(request, { sessionId: 'invalid-session-id' }));
 
       expect(response.status).toBe(500);
       const data = await parseResponse<ApiErrorResponse>(response);
