@@ -191,6 +191,7 @@ describe('Provider Instances API', () => {
       };
 
       const mockRequest = {
+        method: 'POST',
         json: async () => requestBody,
       } as Request;
 
@@ -245,6 +246,7 @@ describe('Provider Instances API', () => {
       };
 
       const mockRequest = {
+        method: 'POST',
         json: async () => invalidBody,
       } as Request;
 
@@ -264,6 +266,7 @@ describe('Provider Instances API', () => {
       };
 
       const mockRequest = {
+        method: 'POST',
         json: async () => requestBody,
       } as Request;
 
@@ -299,6 +302,7 @@ describe('Provider Instances API', () => {
       };
 
       const mockRequest = {
+        method: 'POST',
         json: async () => requestBody,
       } as Request;
 
