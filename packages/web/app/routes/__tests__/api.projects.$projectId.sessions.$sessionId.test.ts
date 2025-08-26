@@ -334,10 +334,15 @@ describe('Individual session API endpoints', () => {
       mockProject.deleteSession.mockReturnValue(true);
 
       const response = await DELETE(
-        createActionArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
-          projectId: 'project1',
-          sessionId: 'session1',
-        })
+        createActionArgs(
+          new Request('http://localhost/api/projects/project1/sessions/session1', {
+            method: 'DELETE',
+          }),
+          {
+            projectId: 'project1',
+            sessionId: 'session1',
+          }
+        )
       );
 
       const data = await parseResponse<{ success: boolean }>(response);
@@ -351,10 +356,15 @@ describe('Individual session API endpoints', () => {
       mockedGetById.mockReturnValue(null);
 
       const response = await DELETE(
-        createActionArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
-          projectId: 'project1',
-          sessionId: 'session1',
-        })
+        createActionArgs(
+          new Request('http://localhost/api/projects/project1/sessions/session1', {
+            method: 'DELETE',
+          }),
+          {
+            projectId: 'project1',
+            sessionId: 'session1',
+          }
+        )
       );
 
       const data = await parseResponse<{ error: string }>(response);
@@ -368,7 +378,9 @@ describe('Individual session API endpoints', () => {
 
       const response = await DELETE(
         createActionArgs(
-          new Request('http://localhost/api/projects/project1/sessions/nonexistent'),
+          new Request('http://localhost/api/projects/project1/sessions/nonexistent', {
+            method: 'DELETE',
+          }),
           {
             projectId: 'project1',
             sessionId: 'nonexistent',
@@ -388,10 +400,15 @@ describe('Individual session API endpoints', () => {
       });
 
       const response = await DELETE(
-        createActionArgs(new Request('http://localhost/api/projects/project1/sessions/session1'), {
-          projectId: 'project1',
-          sessionId: 'session1',
-        })
+        createActionArgs(
+          new Request('http://localhost/api/projects/project1/sessions/session1', {
+            method: 'DELETE',
+          }),
+          {
+            projectId: 'project1',
+            sessionId: 'session1',
+          }
+        )
       );
 
       const data = await parseResponse<{ error: string }>(response);
