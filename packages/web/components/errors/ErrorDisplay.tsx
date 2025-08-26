@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExclamationTriangle, faRedo, faInfo } from '@fortawesome/free-solid-svg-icons';
+import { faExclamationTriangle, faRedo, faInfo } from '@/lib/fontawesome';
 import type { ErrorLogEntry } from '@/types/web-events';
 
 interface ErrorDisplayProps {

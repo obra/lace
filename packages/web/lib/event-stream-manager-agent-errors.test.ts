@@ -565,6 +565,13 @@ describe('EventStreamManager Agent Error Handling', () => {
     });
 
     it('should handle newly spawned agents correctly', async () => {
+      // Track agent:spawned events
+      const taskManager = session.getTaskManager();
+      const spawnedEvents: Array<{ agentThreadId: string }> = [];
+      taskManager.on('agent:spawned', (event) => {
+        spawnedEvents.push(event as { agentThreadId: string });
+      });
+
       // Spawn a new agent after registration
       const newAgent = session.spawnAgent({
         name: 'new-test-agent',
@@ -572,12 +579,34 @@ describe('EventStreamManager Agent Error Handling', () => {
         modelId: 'claude-3-5-haiku-20241022',
       });
 
-      // Note: This test shows limitation - newly spawned agents won't have error handlers
-      // unless EventStreamManager is re-registered or has dynamic agent discovery
-      
-      // For now, just verify the agent was created
+      // Verify agent was created
       expect(newAgent.threadId).toBeDefined();
       expect(newAgent.threadId).not.toBe(session.getId());
+
+      // Verify agent:spawned event was emitted
+      expect(spawnedEvents).toHaveLength(1);
+      expect(spawnedEvents[0].agentThreadId).toBe(newAgent.threadId);
+
+      // Verify the new agent gets error handlers by emitting an error
+      newAgent.emit('error', {
+        error: new Error('Test spawned agent error'),
+        context: {
+          phase: 'initialization',
+          threadId: newAgent.threadId,
+          errorType: 'provider_failure',
+          isRetryable: false,
+          retryCount: 0,
+        },
+      });
+
+      // Wait for event processing
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Verify error was captured (proves error handler was registered)
+      const spawnedAgentErrors = capturedEvents.filter(
+        event => event.type === 'AGENT_ERROR' && event.threadId === newAgent.threadId
+      );
+      expect(spawnedAgentErrors).toHaveLength(1);
     });
   });
 });

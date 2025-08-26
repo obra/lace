@@ -79,4 +79,7 @@ export {
   faChevronUp,
   faWaveSquare,
   faVolumeHigh,
+  // Error display icons (faExclamationTriangle already imported above)
+  faRedo,
+  faInfo,
 } from '@fortawesome/free-solid-svg-icons';
