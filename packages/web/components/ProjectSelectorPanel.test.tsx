@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
+import { BrowserRouter } from 'react-router-dom';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import type { ProjectInfo } from '@/types/core';
 import {
@@ -37,26 +38,11 @@ vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
   ProviderInstanceProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-// Mock Next.js App Router
-const mockPush = vi.fn();
-const mockReplace = vi.fn();
-const mockRefresh = vi.fn();
-const mockBack = vi.fn();
-const mockForward = vi.fn();
-const mockPrefetch = vi.fn();
+// Mock React Router
+const mockNavigate = vi.fn();
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
-    replace: mockReplace,
-    refresh: mockRefresh,
-    back: mockBack,
-    forward: mockForward,
-    prefetch: mockPrefetch,
-  }),
-  usePathname: () => '/',
-  useSearchParams: () => new URLSearchParams(),
-  useParams: () => ({}),
+vi.mock('react-router', () => ({
+  useNavigate: () => mockNavigate,
 }));
 
 // Import mocked hooks
@@ -110,12 +96,7 @@ describe('ProjectSelectorPanel', () => {
     vi.clearAllMocks();
 
     // Clear router mocks
-    mockPush.mockClear();
-    mockReplace.mockClear();
-    mockRefresh.mockClear();
-    mockBack.mockClear();
-    mockForward.mockClear();
-    mockPrefetch.mockClear();
+    mockNavigate.mockClear();
 
     // Mock fetch API for ProviderInstanceProvider
     global.fetch = vi.fn().mockImplementation((url: string) => {
@@ -221,7 +202,11 @@ describe('ProjectSelectorPanel', () => {
 
   it('should render project list', async () => {
     await act(async () => {
-      render(<ProjectSelectorPanel />);
+      render(
+        <BrowserRouter>
+          <ProjectSelectorPanel />
+        </BrowserRouter>
+      );
     });
 
     expect(screen.getByText('Test Project 1')).toBeInTheDocument();
@@ -232,7 +217,11 @@ describe('ProjectSelectorPanel', () => {
 
   it('should navigate to project page when project is clicked', async () => {
     await act(async () => {
-      render(<ProjectSelectorPanel />);
+      render(
+        <BrowserRouter>
+          <ProjectSelectorPanel />
+        </BrowserRouter>
+      );
     });
 
     // Find the clickable project card (parent of the project name)
@@ -243,7 +232,7 @@ describe('ProjectSelectorPanel', () => {
     expect(projectCard).toBeInTheDocument();
 
     await user.click(projectCard!);
-    expect(mockPush).toHaveBeenCalledWith('/project/project-1');
+    expect(mockNavigate).toHaveBeenCalledWith('/project/project-1');
   });
 
   it('should show selected project as active', async () => {
@@ -262,7 +251,11 @@ describe('ProjectSelectorPanel', () => {
     );
 
     await act(async () => {
-      render(<ProjectSelectorPanel />);
+      render(
+        <BrowserRouter>
+          <ProjectSelectorPanel />
+        </BrowserRouter>
+      );
     });
 
     // Check that the selected project has different styling (would need to check actual implementation)
@@ -272,7 +265,11 @@ describe('ProjectSelectorPanel', () => {
 
   it('should show create project button', async () => {
     await act(async () => {
-      render(<ProjectSelectorPanel />);
+      render(
+        <BrowserRouter>
+          <ProjectSelectorPanel />
+        </BrowserRouter>
+      );
     });
 
     expect(screen.getByTestId('create-project-button')).toBeInTheDocument();
@@ -280,7 +277,11 @@ describe('ProjectSelectorPanel', () => {
 
   it('should open create project modal when create button is clicked', async () => {
     await act(async () => {
-      render(<ProjectSelectorPanel />);
+      render(
+        <BrowserRouter>
+          <ProjectSelectorPanel />
+        </BrowserRouter>
+      );
     });
 
     await user.click(screen.getByTestId('create-project-button'));
@@ -303,7 +304,11 @@ describe('ProjectSelectorPanel', () => {
     );
 
     await act(async () => {
-      render(<ProjectSelectorPanel />);
+      render(
+        <BrowserRouter>
+          <ProjectSelectorPanel />
+        </BrowserRouter>
+      );
     });
 
     expect(screen.getByText(/No Projects Yet/i)).toBeInTheDocument();
@@ -325,7 +330,11 @@ describe('ProjectSelectorPanel', () => {
     );
 
     await act(async () => {
-      render(<ProjectSelectorPanel />);
+      render(
+        <BrowserRouter>
+          <ProjectSelectorPanel />
+        </BrowserRouter>
+      );
     });
 
     expect(screen.getByText('Loading projects...')).toBeInTheDocument();
