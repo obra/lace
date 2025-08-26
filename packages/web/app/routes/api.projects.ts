@@ -14,7 +14,7 @@ const CreateProjectSchema = z.object({
   configuration: z.record(z.unknown()).optional(),
 });
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request: _request }: Route.LoaderArgs) {
   try {
     const projects = Project.getAll();
 
@@ -30,7 +30,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   try {
-    const body = (await request.json()) as Record<string, unknown>;
+    const body = (await (request as Request).json()) as Record<string, unknown>;
     const validatedData = CreateProjectSchema.parse(body);
 
     const project = Project.create(
