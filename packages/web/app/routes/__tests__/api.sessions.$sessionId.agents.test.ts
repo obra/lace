@@ -6,7 +6,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
   createTestProviderInstance,
@@ -108,7 +107,7 @@ describe('Agent Spawning API E2E Tests', () => {
 
   describe('POST /api/sessions/{sessionId}/agents', () => {
     it('should spawn agent with real session service using provider instances', async () => {
-      const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -136,7 +135,7 @@ describe('Agent Spawning API E2E Tests', () => {
     });
 
     it('should support different provider instances and models', async () => {
-      const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -156,7 +155,7 @@ describe('Agent Spawning API E2E Tests', () => {
     });
 
     it('should auto-generate agent name when missing', async () => {
-      const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -174,7 +173,7 @@ describe('Agent Spawning API E2E Tests', () => {
     });
 
     it('should auto-generate agent name when empty', async () => {
-      const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -194,7 +193,7 @@ describe('Agent Spawning API E2E Tests', () => {
 
     it('should increment agent threadIds sequentially', async () => {
       // First agent
-      const request1 = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      const request1 = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -211,7 +210,7 @@ describe('Agent Spawning API E2E Tests', () => {
       expect(data1.threadId).toBe(`${sessionId}.1`);
 
       // Second agent
-      const request2 = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      const request2 = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -227,7 +226,7 @@ describe('Agent Spawning API E2E Tests', () => {
     });
 
     it('should return 400 for invalid sessionId format', async () => {
-      const request = new NextRequest('http://localhost/api/sessions/invalid-id/agents', {
+      const request = new Request('http://localhost/api/sessions/invalid-id/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -250,18 +249,15 @@ describe('Agent Spawning API E2E Tests', () => {
     it('should return 404 for non-existent session', async () => {
       // Use valid ThreadId format but non-existent session
       const nonExistentSessionId = 'lace_20250101_abc999';
-      const request = new NextRequest(
-        `http://localhost/api/sessions/${nonExistentSessionId}/agents`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: 'test',
-            providerInstanceId: anthropicInstanceId,
-            modelId: 'claude-3-5-haiku-20241022',
-          }),
-        }
-      );
+      const request = new Request(`http://localhost/api/sessions/${nonExistentSessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'test',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      });
 
       const response = await POST({
         request,
@@ -275,7 +271,7 @@ describe('Agent Spawning API E2E Tests', () => {
 
     it('should return 400 for missing required fields', async () => {
       // Test missing providerInstanceId
-      const request1 = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      const request1 = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -291,7 +287,7 @@ describe('Agent Spawning API E2E Tests', () => {
       expect(data1.error).toBe('Invalid request body');
 
       // Test missing modelId
-      const request2 = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      const request2 = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -308,7 +304,7 @@ describe('Agent Spawning API E2E Tests', () => {
     });
 
     it('should create agent with non-existent provider instance (validation deferred to runtime)', async () => {
-      const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -331,7 +327,7 @@ describe('Agent Spawning API E2E Tests', () => {
   describe('GET /api/sessions/{sessionId}/agents', () => {
     it('should list all agents in session', async () => {
       // First spawn an agent
-      const spawnRequest = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      const spawnRequest = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -344,7 +340,7 @@ describe('Agent Spawning API E2E Tests', () => {
       await POST({ request: spawnRequest, params: { sessionId } });
 
       // Then list agents
-      const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'GET',
       });
 
@@ -362,7 +358,7 @@ describe('Agent Spawning API E2E Tests', () => {
     });
 
     it('should include agent threadIds and metadata', async () => {
-      const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'GET',
       });
 
@@ -385,7 +381,7 @@ describe('Agent Spawning API E2E Tests', () => {
     });
 
     it('should return 400 for invalid session ID format', async () => {
-      const request = new NextRequest('http://localhost/api/sessions/invalid-id/agents', {
+      const request = new Request('http://localhost/api/sessions/invalid-id/agents', {
         method: 'GET',
       });
 
@@ -399,12 +395,9 @@ describe('Agent Spawning API E2E Tests', () => {
     it('should return 404 for non-existent session', async () => {
       // Use valid ThreadId format but non-existent session
       const nonExistentSessionId = 'lace_20250101_abc999';
-      const request = new NextRequest(
-        `http://localhost/api/sessions/${nonExistentSessionId}/agents`,
-        {
-          method: 'GET',
-        }
-      );
+      const request = new Request(`http://localhost/api/sessions/${nonExistentSessionId}/agents`, {
+        method: 'GET',
+      });
 
       const response = await GET({
         request,
@@ -420,7 +413,7 @@ describe('Agent Spawning API E2E Tests', () => {
   describe('Integration: Real Session and Agent Management', () => {
     it('should properly integrate with session service', async () => {
       // Spawn agent via API
-      const spawnRequest = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      const spawnRequest = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -446,7 +439,7 @@ describe('Agent Spawning API E2E Tests', () => {
       expect(createdAgent!.name).toBe('integration-agent');
 
       // Verify via API as well
-      const listRequest = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
+      const listRequest = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'GET',
       });
 
