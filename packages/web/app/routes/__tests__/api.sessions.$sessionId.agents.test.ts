@@ -25,7 +25,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 // Import the real API route handlers after mocks
-import { POST, GET } from '@/app/routes/api.sessions.$sessionId.agents';
+import { action as POST, loader as GET } from '@/app/routes/api.sessions.$sessionId.agents';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
 import type { ThreadId, AgentInfo } from '@/types/core';
@@ -118,7 +118,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ sessionId }) });
+      const response = await POST({ request, params: { sessionId } });
       expect(response.status).toBe(201);
 
       const data = await parseResponse<AgentWithTokenUsage>(response);
@@ -146,7 +146,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ sessionId }) });
+      const response = await POST({ request, params: { sessionId } });
       expect(response.status).toBe(201);
 
       const data = await parseResponse<AgentWithTokenUsage>(response);
@@ -165,7 +165,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ sessionId }) });
+      const response = await POST({ request, params: { sessionId } });
       expect(response.status).toBe(201);
 
       const data = await parseResponse<AgentWithTokenUsage>(response);
@@ -184,7 +184,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ sessionId }) });
+      const response = await POST({ request, params: { sessionId } });
       expect(response.status).toBe(201);
 
       const data = await parseResponse<AgentWithTokenUsage>(response);
@@ -204,7 +204,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response1 = await POST(request1, { params: Promise.resolve({ sessionId }) });
+      const response1 = await POST({ request: request1, params: { sessionId } });
       const data1 = await parseResponse<AgentWithTokenUsage>(response1);
 
       // Should be .1 since session already has a coordinator at .0
@@ -221,7 +221,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response2 = await POST(request2, { params: Promise.resolve({ sessionId }) });
+      const response2 = await POST({ request: request2, params: { sessionId } });
       const data2 = await parseResponse<AgentWithTokenUsage>(response2);
       expect(data2.threadId).toBe(`${sessionId}.2`);
     });
@@ -237,8 +237,9 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response = await POST(request, {
-        params: Promise.resolve({ sessionId: 'invalid-id' }),
+      const response = await POST({
+        request,
+        params: { sessionId: 'invalid-id' },
       });
       expect(response.status).toBe(400);
 
@@ -262,8 +263,9 @@ describe('Agent Spawning API E2E Tests', () => {
         }
       );
 
-      const response = await POST(request, {
-        params: Promise.resolve({ sessionId: nonExistentSessionId }),
+      const response = await POST({
+        request,
+        params: { sessionId: nonExistentSessionId },
       });
       expect(response.status).toBe(404);
 
@@ -282,7 +284,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response1 = await POST(request1, { params: Promise.resolve({ sessionId }) });
+      const response1 = await POST({ request: request1, params: { sessionId } });
       expect(response1.status).toBe(400);
 
       const data1 = await parseResponse<ErrorResponse>(response1);
@@ -298,7 +300,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response2 = await POST(request2, { params: Promise.resolve({ sessionId }) });
+      const response2 = await POST({ request: request2, params: { sessionId } });
       expect(response2.status).toBe(400);
 
       const data2 = await parseResponse<ErrorResponse>(response2);
@@ -316,7 +318,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const response = await POST(request, { params: Promise.resolve({ sessionId }) });
+      const response = await POST({ request, params: { sessionId } });
       expect(response.status).toBe(201);
 
       const data = await parseResponse<AgentWithTokenUsage>(response);
@@ -339,14 +341,14 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      await POST(spawnRequest, { params: Promise.resolve({ sessionId }) });
+      await POST({ request: spawnRequest, params: { sessionId } });
 
       // Then list agents
       const request = new NextRequest(`http://localhost/api/sessions/${sessionId}/agents`, {
         method: 'GET',
       });
 
-      const response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      const response = await GET({ request, params: { sessionId } });
       expect(response.status).toBe(200);
 
       const data = await parseResponse<AgentInfo[]>(response);
@@ -364,7 +366,7 @@ describe('Agent Spawning API E2E Tests', () => {
         method: 'GET',
       });
 
-      const response = await GET(request, { params: Promise.resolve({ sessionId }) });
+      const response = await GET({ request, params: { sessionId } });
       expect(response.status).toBe(200);
 
       const data = await parseResponse<AgentInfo[]>(response);
@@ -387,7 +389,7 @@ describe('Agent Spawning API E2E Tests', () => {
         method: 'GET',
       });
 
-      const response = await GET(request, { params: Promise.resolve({ sessionId: 'invalid-id' }) });
+      const response = await GET({ request, params: { sessionId: 'invalid-id' } });
       expect(response.status).toBe(400);
 
       const data = await parseResponse<ErrorResponse>(response);
@@ -404,8 +406,9 @@ describe('Agent Spawning API E2E Tests', () => {
         }
       );
 
-      const response = await GET(request, {
-        params: Promise.resolve({ sessionId: nonExistentSessionId }),
+      const response = await GET({
+        request,
+        params: { sessionId: nonExistentSessionId },
       });
       expect(response.status).toBe(404);
 
@@ -427,7 +430,7 @@ describe('Agent Spawning API E2E Tests', () => {
         }),
       });
 
-      const spawnResponse = await POST(spawnRequest, { params: Promise.resolve({ sessionId }) });
+      const spawnResponse = await POST({ request: spawnRequest, params: { sessionId } });
       expect(spawnResponse.status).toBe(201);
 
       const spawnData = await parseResponse<AgentWithTokenUsage>(spawnResponse);
@@ -447,7 +450,7 @@ describe('Agent Spawning API E2E Tests', () => {
         method: 'GET',
       });
 
-      const listResponse = await GET(listRequest, { params: Promise.resolve({ sessionId }) });
+      const listResponse = await GET({ request: listRequest, params: { sessionId } });
       const listData = await parseResponse<AgentInfo[]>(listResponse);
 
       const apiAgent = listData.find((a) => a.threadId === agentThreadId);
