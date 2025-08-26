@@ -45,14 +45,14 @@ export function ErrorDisplay({
 
   if (compact) {
     return (
-      <div className={`alert ${getAlertClass()} compact`}>
+      <div className={`alert ${getAlertClass()} compact`} role="alert">
         <FontAwesomeIcon icon={getErrorIcon()} />
         <div>
           <div className="font-medium">{formatErrorType(error.errorType)}</div>
           <div className="text-sm opacity-80">{error.message}</div>
         </div>
         {error.isRetryable && onRetry && (
-          <button className="btn btn-sm btn-ghost" onClick={onRetry}>
+          <button type="button" className="btn btn-sm btn-ghost" onClick={onRetry}>
             <FontAwesomeIcon icon={faRedo} />
           </button>
         )}
@@ -61,7 +61,7 @@ export function ErrorDisplay({
   }
 
   return (
-    <div className={`alert ${getAlertClass()}`}>
+    <div className={`alert ${getAlertClass()}`} role="alert">
       <FontAwesomeIcon icon={getErrorIcon()} />
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-1">
@@ -103,13 +103,13 @@ export function ErrorDisplay({
       
       <div className="flex gap-2">
         {error.isRetryable && onRetry && (
-          <button className="btn btn-sm btn-primary" onClick={onRetry}>
+          <button type="button" className="btn btn-sm btn-primary" onClick={onRetry}>
             <FontAwesomeIcon icon={faRedo} className="mr-1" />
             Retry
           </button>
         )}
         {onDismiss && (
-          <button className="btn btn-sm btn-ghost" onClick={onDismiss}>
+          <button type="button" className="btn btn-sm btn-ghost" onClick={onDismiss}>
             Dismiss
           </button>
         )}

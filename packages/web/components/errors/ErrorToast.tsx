@@ -86,7 +86,7 @@ export function ErrorToast({
 
   return (
     <div className={getToastClass()}>
-      <div className={`alert ${getAlertClass()} shadow-lg max-w-sm`}>
+      <div className={`alert ${getAlertClass()} shadow-lg max-w-sm`} role="alert" aria-live="assertive" aria-atomic="true">
         <FontAwesomeIcon icon={getToastIcon()} />
         
         <div className="flex-1 min-w-0">
@@ -103,17 +103,21 @@ export function ErrorToast({
         <div className="flex gap-1">
           {isRetryable && onRetry && (
             <button 
+              type="button"
               className="btn btn-xs btn-ghost"
               onClick={onRetry}
               title="Retry"
+              aria-label="Retry error"
             >
               <FontAwesomeIcon icon={faRedo} />
             </button>
           )}
           <button 
+            type="button"
             className="btn btn-xs btn-ghost"
             onClick={handleDismiss}
             title="Dismiss"
+            aria-label="Dismiss notification"
           >
             <FontAwesomeIcon icon={faTimes} />
           </button>

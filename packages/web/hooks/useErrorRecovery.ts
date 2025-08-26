@@ -18,20 +18,29 @@ export function useErrorRecovery() {
     threadId: string,
     errorType: ErrorType
   ): Promise<boolean> => {
-    const currentState = retryStates[threadId] || { retrying: false, retryCount: 0 };
-    
-    if (currentState.retrying) {
+    // Use atomic state update to prevent race conditions
+    let shouldProceed = false;
+    setRetryStates(prev => {
+      const currentState = prev[threadId] || { retrying: false, retryCount: 0 };
+      
+      if (currentState.retrying) {
+        return prev; // Already retrying, no state change
+      }
+
+      shouldProceed = true;
+      return {
+        ...prev,
+        [threadId]: {
+          ...currentState,
+          retrying: true,
+          lastRetryAt: new Date(),
+        },
+      };
+    });
+
+    if (!shouldProceed) {
       return false; // Already retrying
     }
-
-    setRetryStates(prev => ({
-      ...prev,
-      [threadId]: {
-        ...currentState,
-        retrying: true,
-        lastRetryAt: new Date(),
-      },
-    }));
 
     try {
       // Send retry message to agent
