@@ -15,6 +15,7 @@ import {
 } from '@/app/routes/api.sessions.$sessionId.agents';
 import { action as sendMessage } from '@/app/routes/api.threads.$threadId.message';
 import { loader as streamEvents } from '@/app/routes/api.events.stream';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 import type { SessionInfo, ThreadId } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
@@ -115,10 +116,9 @@ describe('Full Conversation Flow', () => {
       }
     );
 
-    const sessionResponse = await createProjectSession({
-      request: createSessionRequest,
-      params: { projectId },
-    });
+    const sessionResponse = await createProjectSession(
+      createActionArgs(createSessionRequest, { projectId })
+    );
 
     if (sessionResponse.status !== 201) {
       const errorData = await parseResponse<{ error: string }>(sessionResponse);
@@ -146,10 +146,9 @@ describe('Full Conversation Flow', () => {
       }
     );
 
-    const agentResponse = await spawnAgent({
-      request: spawnAgentRequest,
-      params: { sessionId: sessionId as string },
-    });
+    const agentResponse = await spawnAgent(
+      createActionArgs(spawnAgentRequest, { sessionId: sessionId as string })
+    );
     expect(agentResponse.status).toBe(201);
     const agentData = await parseResponse<{ threadId: ThreadId; name: string }>(agentResponse);
     expect(agentData.name).toBe(agentName);
@@ -159,10 +158,7 @@ describe('Full Conversation Flow', () => {
     const streamRequest = new Request(
       `http://localhost:3000/api/events/stream?sessions=${sessionId}`
     );
-    const streamResponse = await streamEvents({
-      request: streamRequest,
-      params: {},
-    });
+    const streamResponse = await streamEvents(createLoaderArgs(streamRequest, {}));
 
     expect(streamResponse.status).toBe(200);
     expect(streamResponse.headers.get('Content-Type')).toBe('text/event-stream');
@@ -180,10 +176,9 @@ describe('Full Conversation Flow', () => {
       }
     );
 
-    const messageResponse = await sendMessage({
-      request: messageRequest,
-      params: { threadId: agentThreadId as string },
-    });
+    const messageResponse = await sendMessage(
+      createActionArgs(messageRequest, { threadId: agentThreadId as string })
+    );
     expect(messageResponse.status).toBe(202);
     const messageData = await parseResponse<{ status: string }>(messageResponse);
     expect(messageData.status).toBe('accepted');
@@ -216,10 +211,9 @@ describe('Full Conversation Flow', () => {
         headers: { 'Content-Type': 'application/json' },
       }
     );
-    const sessionResponse = await createProjectSession({
-      request: createSessionRequest,
-      params: { projectId },
-    });
+    const sessionResponse = await createProjectSession(
+      createActionArgs(createSessionRequest, { projectId })
+    );
     expect(sessionResponse.status).toBe(201);
     const sessionData = await parseResponse<SessionInfo>(sessionResponse);
     const sessionId: ThreadId = sessionData.id as ThreadId;
@@ -264,10 +258,9 @@ describe('Full Conversation Flow', () => {
 
     // List agents
     const listAgentsRequest = new Request(`http://localhost:3000/api/sessions/${sessionId}/agents`);
-    const listResponse = await listAgents({
-      request: listAgentsRequest,
-      params: { sessionId: sessionId as string },
-    });
+    const listResponse = await listAgents(
+      createLoaderArgs(listAgentsRequest, { sessionId: sessionId as string })
+    );
     expect(listResponse.status).toBe(200);
     const agents = await parseResponse<Array<{ name: string }>>(listResponse);
 
