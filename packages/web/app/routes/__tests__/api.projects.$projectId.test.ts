@@ -2,7 +2,6 @@
 // ABOUTME: Tests HTTP behavior, response data, and error handling rather than mock interactions
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { loader, action } from '@/app/routes/api.projects.$projectId';
 import { parseResponse } from '@/lib/serialization';
 import type { ProjectInfo } from '@/types/core';
@@ -49,7 +48,7 @@ describe('Individual Project API', () => {
       const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
-      const request = new NextRequest('http://localhost/api/projects/test-project', {
+      const request = new Request('http://localhost/api/projects/test-project', {
         method: 'DELETE',
       });
       const response = await loader({
@@ -75,7 +74,7 @@ describe('Individual Project API', () => {
       const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(null);
 
-      const request = new NextRequest('http://localhost/api/projects/nonexistent');
+      const request = new Request('http://localhost/api/projects/nonexistent');
       const response = await loader({
         request,
         params: { projectId: 'nonexistent' },
@@ -92,7 +91,7 @@ describe('Individual Project API', () => {
         throw new Error('Database error');
       });
 
-      const request = new NextRequest('http://localhost/api/projects/test-project', {
+      const request = new Request('http://localhost/api/projects/test-project', {
         method: 'DELETE',
       });
       const response = await loader({
@@ -117,7 +116,7 @@ describe('Individual Project API', () => {
         isArchived: true,
       };
 
-      const request = new NextRequest('http://localhost/api/projects/test-project', {
+      const request = new Request('http://localhost/api/projects/test-project', {
         method: 'PATCH',
         body: JSON.stringify(updates),
         headers: { 'Content-Type': 'application/json' },
@@ -137,7 +136,7 @@ describe('Individual Project API', () => {
       const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(null);
 
-      const request = new NextRequest('http://localhost/api/projects/nonexistent', {
+      const request = new Request('http://localhost/api/projects/nonexistent', {
         method: 'PATCH',
         body: JSON.stringify({ name: 'Updated' }),
         headers: { 'Content-Type': 'application/json' },
@@ -162,7 +161,7 @@ describe('Individual Project API', () => {
         workingDirectory: '', // Empty working directory should be invalid
       };
 
-      const request = new NextRequest('http://localhost/api/projects/test-project', {
+      const request = new Request('http://localhost/api/projects/test-project', {
         method: 'PATCH',
         body: JSON.stringify(invalidUpdates),
         headers: { 'Content-Type': 'application/json' },
@@ -186,7 +185,7 @@ describe('Individual Project API', () => {
         throw new Error('Update failed');
       });
 
-      const request = new NextRequest('http://localhost/api/projects/test-project', {
+      const request = new Request('http://localhost/api/projects/test-project', {
         method: 'PATCH',
         body: JSON.stringify({ name: 'Updated' }),
         headers: { 'Content-Type': 'application/json' },
@@ -208,7 +207,7 @@ describe('Individual Project API', () => {
       const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
-      const request = new NextRequest('http://localhost/api/projects/test-project', {
+      const request = new Request('http://localhost/api/projects/test-project', {
         method: 'DELETE',
       });
       const response = await action({
@@ -225,7 +224,7 @@ describe('Individual Project API', () => {
       const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(null);
 
-      const request = new NextRequest('http://localhost/api/projects/nonexistent', {
+      const request = new Request('http://localhost/api/projects/nonexistent', {
         method: 'DELETE',
       });
       const response = await action({
@@ -245,7 +244,7 @@ describe('Individual Project API', () => {
         throw new Error('Deletion failed');
       });
 
-      const request = new NextRequest('http://localhost/api/projects/test-project', {
+      const request = new Request('http://localhost/api/projects/test-project', {
         method: 'DELETE',
       });
       const response = await action({
