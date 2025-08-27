@@ -30,8 +30,25 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const agentId = asThreadId(agentIdParam);
 
+    // Validate content type
+    const req = request as Request;
+    const contentType = req.headers.get('content-type') ?? '';
+    if (!contentType.toLowerCase().includes('application/json')) {
+      return createErrorResponse('Unsupported Media Type', 415, {
+        code: 'UNSUPPORTED_MEDIA_TYPE',
+      });
+    }
+
     // Parse and validate request body
-    const body: unknown = await (request as Request).json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return createErrorResponse('Invalid JSON', 400, {
+        code: 'VALIDATION_FAILED',
+      });
+    }
+
     const validation = messageSchema.safeParse(body);
 
     if (!validation.success) {
@@ -49,7 +66,13 @@ export async function action({ request, params }: Route.ActionArgs) {
     let sessionId = agentId;
     if (agentId.includes('.')) {
       // Extract session ID from delegate agent ID (e.g., "session.1" -> "session")
-      sessionId = asThreadId(agentId.split('.')[0]!);
+      const sessionIdStr = agentId.split('.')[0];
+      if (!sessionIdStr || !isValidThreadId(sessionIdStr)) {
+        return createErrorResponse('Invalid session ID derived from agent ID', 400, {
+          code: 'VALIDATION_FAILED',
+        });
+      }
+      sessionId = asThreadId(sessionIdStr);
     }
 
     const session = await sessionService.getSession(sessionId);
