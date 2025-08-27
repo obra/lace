@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { InfrastructureHelper } from './infrastructure-helper';
 import { GlobalConfigManager } from '~/config/global-config';
-import { ProviderRegistry } from '~/providers/registry';
+import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
 import { Tool } from '~/tools/tool';
@@ -12,7 +12,7 @@ import * as fs from 'fs';
 // Mock modules
 vi.mock('fs');
 vi.mock('~/config/global-config');
-vi.mock('~/providers/registry');
+vi.mock('~/providers/instance/manager');
 
 // Create a mock provider that supports multiple queued responses
 class QueuedMockProvider extends TestProvider {
@@ -84,11 +84,11 @@ describe('InfrastructureHelper', () => {
     // Setup mock provider
     mockProvider = new QueuedMockProvider({});
 
-    // Mock provider registry
-    const mockRegistry = {
-      createProviderFromInstanceAndModel: vi.fn().mockResolvedValue(mockProvider)
+    // Mock provider instance manager
+    const mockInstanceManager = {
+      getInstance: vi.fn().mockResolvedValue(mockProvider)
     };
-    vi.mocked(ProviderRegistry.getInstance).mockReturnValue(mockRegistry as any);
+    vi.mocked(ProviderInstanceManager).mockImplementation(() => mockInstanceManager as any);
   });
 
   afterEach(() => {
@@ -192,6 +192,156 @@ describe('InfrastructureHelper', () => {
         expect.objectContaining({ name: 'test_tool' }),
         expect.any(Object)
       );
+    });
+
+    it('should use custom working directory in tool context', async () => {
+      const helper = new InfrastructureHelper({
+        model: 'fast',
+        tools: ['test_tool'],
+        workingDirectory: '/custom/work/dir'
+      });
+      helper['toolExecutor'] = toolExecutor;
+
+      const executeSpy = vi.spyOn(toolExecutor, 'executeApprovedTool');
+
+      mockProvider.addMockResponse({
+        content: 'Using tool with custom directory',
+        toolCalls: [{
+          id: 'call_1',
+          name: 'test_tool',
+          arguments: { input: 'test' }
+        }]
+      });
+
+      mockProvider.addMockResponse({
+        content: 'Done',
+        toolCalls: []
+      });
+
+      await helper.execute('Test custom working directory');
+
+      // Should pass working directory in context
+      expect(executeSpy).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({
+          workingDirectory: '/custom/work/dir'
+        })
+      );
+    });
+
+    it('should handle empty tool list', async () => {
+      const helper = new InfrastructureHelper({
+        model: 'fast',
+        tools: [] // Empty tool list
+      });
+
+      mockProvider.addMockResponse({
+        content: 'I want to use a tool',
+        toolCalls: [{
+          id: 'call_1',
+          name: 'test_tool',
+          arguments: { input: 'test' }
+        }]
+      });
+
+      mockProvider.addMockResponse({
+        content: 'No tools available',
+        toolCalls: []
+      });
+
+      const result = await helper.execute('Try to use tools');
+
+      // Should block all tool calls due to empty whitelist
+      expect(result.toolResults[0].status).toBe('failed');
+      expect(result.toolResults[0].content[0].text).toContain('not in whitelist');
+    });
+
+    it('should resolve fast vs smart models correctly', async () => {
+      // Test fast model
+      vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValueOnce('fast-instance:fast-model');
+      
+      const fastHelper = new InfrastructureHelper({
+        model: 'fast',
+        tools: ['test_tool']
+      });
+
+      const fastModel = await fastHelper['getModel']();
+      expect(fastModel).toBe('fast-model');
+      expect(GlobalConfigManager.getDefaultModel).toHaveBeenCalledWith('fast');
+
+      // Test smart model
+      vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValueOnce('smart-instance:smart-model');
+      
+      const smartHelper = new InfrastructureHelper({
+        model: 'smart',
+        tools: ['test_tool']
+      });
+
+      const smartModel = await smartHelper['getModel']();
+      expect(smartModel).toBe('smart-model');
+      expect(GlobalConfigManager.getDefaultModel).toHaveBeenCalledWith('smart');
+    });
+
+    it('should handle abort signal during execution', async () => {
+      const helper = new InfrastructureHelper({
+        model: 'fast',
+        tools: ['test_tool']
+      });
+
+      const abortController = new AbortController();
+      
+      // Abort before execution starts
+      abortController.abort();
+
+      // Should throw when abort signal is already set
+      await expect(helper.execute('Test abort', abortController.signal))
+        .rejects.toThrow('Helper execution aborted');
+    });
+
+    it('should handle provider not found error', async () => {
+      // Mock getInstance to return null
+      const mockInstanceManager = {
+        getInstance: vi.fn().mockResolvedValue(null)
+      };
+      vi.mocked(ProviderInstanceManager).mockImplementation(() => mockInstanceManager as any);
+
+      const helper = new InfrastructureHelper({
+        model: 'fast',
+        tools: ['test_tool']
+      });
+
+      await expect(helper['getProvider']()).rejects.toThrow('Provider instance not found');
+    });
+
+    it('should handle tool execution errors gracefully', async () => {
+      const helper = new InfrastructureHelper({
+        model: 'fast',
+        tools: ['test_tool']
+      });
+      helper['toolExecutor'] = toolExecutor;
+
+      // Mock executeApprovedTool to throw error
+      vi.spyOn(toolExecutor, 'executeApprovedTool').mockRejectedValue(new Error('Tool execution failed'));
+
+      mockProvider.addMockResponse({
+        content: 'Using tool',
+        toolCalls: [{
+          id: 'call_1',
+          name: 'test_tool',
+          arguments: { input: 'test' }
+        }]
+      });
+
+      mockProvider.addMockResponse({
+        content: 'Done',
+        toolCalls: []
+      });
+
+      const result = await helper.execute('Test error handling');
+
+      // Should capture error as failed tool result
+      expect(result.toolResults[0].status).toBe('failed');
+      expect(result.toolResults[0].content[0].text).toContain('Tool execution failed');
     });
   });
 });

@@ -12,6 +12,8 @@ import {
   CredentialSchema,
   ProviderInstance,
 } from '~/providers/catalog/types';
+import { ProviderRegistry } from '~/providers/registry';
+import { AIProvider } from '~/providers/base-provider';
 
 export class ProviderInstanceManager {
   private configPath: string;
@@ -196,5 +198,32 @@ export class ProviderInstanceManager {
       providerInstanceId: defaultInstanceId,
       modelId: defaultModelId,
     };
+  }
+
+  /**
+   * Get a provider instance by ID, with default model from catalog
+   * Used by helper agents for programmatic provider access
+   */
+  async getInstance(instanceId: string): Promise<AIProvider | null> {
+    const config = await this.loadInstances();
+    const instance = config.instances[instanceId];
+    
+    if (!instance) {
+      return null;
+    }
+
+    // Get the default model for this provider from catalog
+    let modelId: string;
+    if (instance.catalogProviderId === 'anthropic') {
+      modelId = 'claude-3-5-haiku-20241022'; // Default small model
+    } else if (instance.catalogProviderId === 'openai') {
+      modelId = 'gpt-4o'; // Default model
+    } else {
+      modelId = 'default-model';
+    }
+
+    // Create provider using registry
+    const registry = ProviderRegistry.getInstance();
+    return await registry.createProviderFromInstanceAndModel(instanceId, modelId);
   }
 }

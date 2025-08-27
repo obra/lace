@@ -3,7 +3,7 @@
 
 import { BaseHelper } from './base-helper';
 import { GlobalConfigManager } from '~/config/global-config';
-import { ProviderRegistry } from '~/providers/registry';
+import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { parseProviderModel } from '~/providers/provider-utils';
 import { ToolExecutor } from '~/tools/executor';
 import { Tool } from '~/tools/tool';
@@ -59,12 +59,12 @@ export class InfrastructureHelper extends BaseHelper {
       modelId
     });
 
-    // Get provider instance using registry
-    const registry = ProviderRegistry.getInstance();
-    const instance = await registry.createProviderFromInstanceAndModel(instanceId, modelId);
+    // Get provider instance
+    const instanceManager = new ProviderInstanceManager();
+    const instance = await instanceManager.getInstance(instanceId);
     
     if (!instance) {
-      throw new Error(`Failed to create provider instance: ${instanceId}:${modelId}`);
+      throw new Error(`Provider instance not found: ${instanceId}`);
     }
 
     this.provider = instance;
