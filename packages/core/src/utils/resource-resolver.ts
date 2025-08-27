@@ -94,6 +94,132 @@ export function resolveTemplateDirectory(importMetaUrl: string): string {
 }
 
 /**
+ * Try to read a file from Bun's embedded files, fallback to file system
+ */
+export async function tryReadEmbeddedFile(
+  filename: string,
+  fallbackPath?: string
+): Promise<string | null> {
+  // Try Bun embedded files first
+  try {
+    // @ts-ignore - Bun.embeddedFiles may not exist in Node.js
+    if (typeof Bun !== 'undefined' && Bun.embeddedFiles) {
+      for (const file of Bun.embeddedFiles) {
+        if (file.name === filename) {
+          return await file.text();
+        }
+      }
+    }
+  } catch {
+    // Bun API not available
+  }
+
+  // Fallback to file system if provided
+  if (fallbackPath) {
+    try {
+      const fs = await import('fs/promises');
+      return await fs.readFile(fallbackPath, 'utf-8');
+    } catch {
+      // File system read failed
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get list of embedded files matching a pattern (e.g., '*.json')
+ */
+export function getEmbeddedFiles(pattern: string): string[] {
+  try {
+    // @ts-ignore - Bun.embeddedFiles may not exist in Node.js
+    if (typeof Bun !== 'undefined' && Bun.embeddedFiles) {
+      const regex = new RegExp(pattern.replace('*', '.*'));
+      return Array.from(Bun.embeddedFiles)
+        .map((file) => file.name)
+        .filter((name) => regex.test(name));
+    }
+  } catch {
+    // Bun API not available
+  }
+
+  return [];
+}
+
+/**
+ * Load files from a directory, works with both embedded files and file system
+ */
+export async function loadFilesFromDirectory(
+  dirPath: string,
+  fileExtension: string
+): Promise<Array<{ name: string; content: string }>> {
+  const { logger } = await import('~/utils/logger');
+  const files: Array<{ name: string; content: string }> = [];
+
+  // Try Bun embedded files first
+  try {
+    if (typeof Bun !== 'undefined' && Bun.embeddedFiles) {
+      logger.debug('resource.load.checking_embedded', {
+        dirPath,
+        fileExtension,
+        totalEmbedded: Bun.embeddedFiles.length,
+      });
+
+      // Log all embedded files for debugging
+      Array.from(Bun.embeddedFiles).forEach((file, i) => {
+        logger.debug('resource.load.embedded_file', { index: i, name: file.name });
+      });
+
+      const embeddedFiles = Array.from(Bun.embeddedFiles).filter(
+        (file) => file.name.includes(`../${dirPath}`) && file.name.endsWith(fileExtension)
+      );
+
+      logger.debug('resource.load.filtered_embedded', {
+        dirPath,
+        fileExtension,
+        matchingCount: embeddedFiles.length,
+      });
+      embeddedFiles.forEach((file) =>
+        logger.debug('resource.load.embedded_match', { name: file.name })
+      );
+
+      if (embeddedFiles.length > 0) {
+        for (const file of embeddedFiles) {
+          const content = await file.text();
+          const name = path.basename(file.name, fileExtension);
+          files.push({ name, content });
+          logger.debug('resource.load.embedded_loaded', { filePath: file.name, name });
+        }
+        return files;
+      }
+    }
+  } catch (e) {
+    logger.debug('resource.load.bun_error', { error: String(e) });
+  }
+
+  // Fallback to file system approach
+  logger.debug('resource.load.fallback_filesystem', { dirPath });
+  try {
+    const fs = await import('fs/promises');
+    const fileList = await fs.readdir(dirPath);
+    logger.debug('resource.load.filesystem_files', { dirPath, count: fileList.length });
+
+    for (const filename of fileList.filter((f) => f.endsWith(fileExtension))) {
+      const filePath = path.join(dirPath, filename);
+      const content = await fs.readFile(filePath, 'utf-8');
+      const name = path.basename(filename, fileExtension);
+      files.push({ name, content });
+      logger.debug('resource.load.filesystem_loaded', { filePath, name });
+    }
+  } catch (e) {
+    logger.debug('resource.load.filesystem_error', { dirPath, error: String(e) });
+  }
+
+  logger.debug('resource.load.complete', { dirPath, fileExtension, totalLoaded: files.length });
+  return files;
+}
+
+/**
  * Check if we're running in standalone production mode
  */
 export function isStandaloneMode(): boolean {

@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { TemplateEngine } from '~/config/template-engine';
-import { resolveResourcePath } from '~/utils/resource-resolver';
+import { resolveResourcePath, loadFilesFromDirectory } from '~/utils/resource-resolver';
 import {
   VariableProviderManager,
   SystemVariableProvider,
@@ -82,7 +82,6 @@ export class PromptManager {
   private getTemplateDirsWithOverlay(): string[] {
     const userTemplateDir = this.getUserTemplateDir();
     const embeddedTemplateDir = this.getEmbeddedTemplateDir();
-
     return [userTemplateDir, embeddedTemplateDir];
   }
 
