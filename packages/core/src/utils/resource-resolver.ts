@@ -16,13 +16,36 @@ import { fileURLToPath } from 'url';
  * @returns Absolute path that works in both development and production
  */
 export function resolveResourcePath(importMetaUrl: string, relativePath: string): string {
-  if (process.env.NODE_ENV === 'production') {
+  const moduleDir = path.dirname(fileURLToPath(importMetaUrl));
+
+  // Check if running from a bundled build (React Router 7 style)
+  if (importMetaUrl.includes('/build/server/assets/')) {
+    // Running from bundle - find project root from the bundle path
+    const buildIndex = importMetaUrl.indexOf('/packages/web/build/');
+    if (buildIndex === -1) {
+      throw new Error(`Cannot determine project root from bundle path: ${importMetaUrl}`);
+    }
+
+    const projectRoot = importMetaUrl.substring(0, buildIndex);
+
+    // Map known resource requests to their actual locations
+    if (relativePath === 'data') {
+      return path.resolve(
+        projectRoot.replace('file://', ''),
+        'packages/core/src/providers/catalog/data'
+      );
+    } else if (relativePath === 'prompts') {
+      return path.resolve(projectRoot.replace('file://', ''), 'packages/core/src/config/prompts');
+    } else {
+      throw new Error(
+        `Unknown resource path '${relativePath}' in bundled mode. Add explicit mapping.`
+      );
+    }
+  } else if (process.env.NODE_ENV === 'production') {
     // In production (standalone), resolve relative to the working directory
     // The standalone structure is: standalone/src/... so we need to find the equivalent path
 
     // Convert the development module path to its standalone equivalent
-    const moduleDir = path.dirname(fileURLToPath(importMetaUrl));
-
     // Find the src/ directory in the module path to determine the relative path from src/
     // Handle both monorepo structure (packages/core/src/) and original structure (src/)
     let srcIndex = moduleDir.indexOf('/packages/core/src/');
