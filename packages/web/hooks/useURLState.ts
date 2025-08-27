@@ -47,9 +47,7 @@ export function useURLState(): URLState & URLActions {
 
   const navigateToAgent = useCallback(
     (projectId: string, sessionId: ThreadId, agentId: ThreadId) => {
-      const url = `/project/${projectId}/session/${sessionId}/agent/${agentId}`;
-      console.log('URLState: navigating to agent', { projectId, sessionId, agentId, url });
-      navigate(url);
+      navigate(`/project/${projectId}/session/${sessionId}/agent/${agentId}`);
     },
     [navigate]
   );
