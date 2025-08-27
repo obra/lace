@@ -1,4 +1,4 @@
-// ABOUTME: Direct React Router v7 server without ZIP extraction complexity  
+// ABOUTME: Direct React Router v7 server without ZIP extraction complexity
 // ABOUTME: Uses Bun's bundler to include all dependencies directly
 
 import { parseArgs } from 'util';
@@ -44,7 +44,7 @@ async function startLaceServer() {
   const requestedPort = parseInt(values.port || '31337', 10);
   const hostname = values.host || 'localhost';
 
-  // Find available port  
+  // Find available port
   const port = await findAvailablePort(requestedPort, userSpecifiedPort, hostname);
   const url = `http://${hostname}:${port}`;
 
@@ -53,10 +53,10 @@ async function startLaceServer() {
   // Start React Router v7 server directly
   const { createRequestHandler } = await import('@react-router/express');
   const express = await import('express');
-  
+
   // Import the built server
   const build = await import('../packages/web/build/server/index.js');
-  
+
   const app = express.default();
   const requestHandler = createRequestHandler({
     build: build.default || build,
@@ -64,7 +64,7 @@ async function startLaceServer() {
 
   // Serve static files from build/client
   app.use(express.static('../packages/web/build/client'));
-  
+
   // Handle all requests through React Router
   app.use(requestHandler);
 
@@ -133,7 +133,7 @@ async function findAvailablePort(
   process.exit(1);
 }
 
-startLaceServer().catch((err) => {
+void startLaceServer().catch((err) => {
   console.error('Error starting server:', err);
   process.exit(1);
 });

@@ -119,7 +119,7 @@ async function buildReactRouterExecutable(options: BuildOptions = {}) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const options = parseArgs();
-  buildReactRouterExecutable(options).catch((error) => {
+  void buildReactRouterExecutable(options).catch((error) => {
     console.error('❌ Build failed:', error);
     process.exit(1);
   });
