@@ -1,5 +1,5 @@
-// ABOUTME: Client component wrapper for project page with providers
-// ABOUTME: Handles interactive logic and provider setup for project dashboard
+// ABOUTME: Project page content component - extracted for clean routing
+// ABOUTME: Contains the project dashboard UI with sidebar and session config panel
 
 'use client';
 
@@ -8,24 +8,17 @@ import { motion } from 'motion/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars } from '@/lib/fontawesome';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { ProjectProvider } from '@/components/providers/ProjectProvider';
-import { SessionProvider } from '@/components/providers/SessionProvider';
-import { AgentProvider } from '@/components/providers/AgentProvider';
-import { TaskProvider } from '@/components/providers/TaskProvider';
 import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
-import { UIProvider, useUIContext } from '@/components/providers/UIProvider';
+import { useUIContext } from '@/components/providers/UIProvider';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
 
-interface ProjectPageClientProps {
+interface ProjectPageContentProps {
   projectId: string;
 }
 
-// Define stable callback functions outside component to prevent re-renders
-const noOpCallback = () => {};
-
-function ProjectPageContent({ projectId }: { projectId: string }) {
+export function ProjectPageContent({ projectId }: ProjectPageContentProps) {
   const { sidebarOpen, toggleSidebar } = useUIContext();
   const { currentProject } = useProjectContext();
 
@@ -91,29 +84,5 @@ function ProjectPageContent({ projectId }: { projectId: string }) {
         </div>
       </motion.div>
     </motion.div>
-  );
-}
-
-export function ProjectPageClient({ projectId }: ProjectPageClientProps) {
-  return (
-    <UIProvider>
-      <ProjectProvider
-        selectedProject={projectId}
-        onProjectSelect={noOpCallback} // No-op for individual project page
-        onProjectChange={noOpCallback} // No-op for individual project page
-      >
-        <SessionProvider projectId={projectId} selectedSessionId={null}>
-          <AgentProvider sessionId={null} selectedAgentId={null} onAgentChange={noOpCallback}>
-            <TaskProvider
-              projectId={projectId}
-              sessionId={null}
-              agents={[]} // No agents on project page
-            >
-              <ProjectPageContent projectId={projectId} />
-            </TaskProvider>
-          </AgentProvider>
-        </SessionProvider>
-      </ProjectProvider>
-    </UIProvider>
   );
 }
