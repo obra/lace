@@ -32,6 +32,11 @@ interface _RouteContext {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
+  // Add method guard
+  if (request.method !== 'POST') {
+    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  }
+
   try {
     const { projectId, sessionId, taskId } = validateRouteParams(params, NotesRouteParamsSchema);
 
