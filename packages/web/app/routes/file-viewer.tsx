@@ -1,7 +1,7 @@
 // ABOUTME: Standalone file viewer page for pop-out file viewing functionality
 // ABOUTME: Provides full-screen file content viewing with syntax highlighting and download/copy actions
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFile, faDownload, faCopy, faSpinner, faExclamationTriangle } from '@/lib/fontawesome';
@@ -221,8 +221,8 @@ function FileViewerContent({ sessionId, filePath }: FileViewerContentProps) {
 
 function FileViewerPage() {
   const searchParams = useSearchParams();
-  const sessionId = searchParams.get('session');
-  const filePath = searchParams.get('file');
+  const sessionId = searchParams.get('session') as string | null;
+  const filePath = searchParams.get('file') as string | null;
 
   if (!sessionId || !filePath) {
     return (

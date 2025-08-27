@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { loader } from '@/app/routes/api.sessions.$sessionId.files.$path';
 import { createLoaderArgs } from '@/test-utils/route-test-helpers';
 import { promises as fs } from 'fs';
-import { join, basename } from 'path';
+import { join } from 'path';
 import { tmpdir } from 'os';
 import { parseResponse } from '@/lib/serialization';
 import type { SessionFileContentResponse } from '@/types/session-files';
