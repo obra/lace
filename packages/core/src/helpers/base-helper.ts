@@ -9,6 +9,12 @@ import { AIProvider, ProviderMessage } from '~/providers/base-provider';
 import { CombinedTokenUsage } from '~/token-management/types';
 import { logger } from '~/utils/logger';
 
+interface MessageTokenUsage {
+  promptTokens: number;
+  completionTokens: number; 
+  totalTokens: number;
+}
+
 /**
  * Base class for helper agents
  * Provides the core multi-turn execution loop
@@ -84,7 +90,7 @@ export abstract class BaseHelper {
         conversationLength: conversation.length
       });
 
-      // Get LLM response
+      // Get LLM response  
       const response = await provider.createResponse(conversation, tools, model);
 
       // Add assistant response to conversation
@@ -98,14 +104,34 @@ export abstract class BaseHelper {
       if (response.usage) {
         if (!totalUsage) {
           totalUsage = {
+            message: {
+              promptTokens: response.usage.promptTokens,
+              completionTokens: response.usage.completionTokens,
+              totalTokens: response.usage.totalTokens
+            },
+            thread: {
+              totalPromptTokens: response.usage.promptTokens,
+              totalCompletionTokens: response.usage.completionTokens,
+              totalTokens: response.usage.totalTokens,
+              contextLimit: 100000, // Default reasonable limit
+              percentUsed: 0,
+              nearLimit: false
+            }
+          };
+        } else {
+          // Update message usage for current response
+          totalUsage.message = {
             promptTokens: response.usage.promptTokens,
             completionTokens: response.usage.completionTokens,
             totalTokens: response.usage.totalTokens
           };
-        } else {
-          totalUsage.promptTokens += response.usage.promptTokens;
-          totalUsage.completionTokens += response.usage.completionTokens;
-          totalUsage.totalTokens += response.usage.totalTokens;
+          
+          // Aggregate to thread totals
+          totalUsage.thread.totalPromptTokens += response.usage.promptTokens;
+          totalUsage.thread.totalCompletionTokens += response.usage.completionTokens;
+          totalUsage.thread.totalTokens += response.usage.totalTokens;
+          totalUsage.thread.percentUsed = (totalUsage.thread.totalTokens / totalUsage.thread.contextLimit) * 100;
+          totalUsage.thread.nearLimit = totalUsage.thread.percentUsed > 80;
         }
       }
 
@@ -136,19 +162,13 @@ export abstract class BaseHelper {
       allToolCalls.push(...response.toolCalls);
       allToolResults.push(...toolResults);
 
-      // Add tool results to conversation
-      for (let i = 0; i < response.toolCalls.length; i++) {
-        const toolCall = response.toolCalls[i];
-        const toolResult = toolResults[i];
-        
-        if (toolResult) {
-          // Convert tool result to conversation message
-          conversation.push({
-            role: 'tool',
-            content: toolResult.content.map(block => block.text || '').join('\n'),
-            toolResultId: toolCall.id
-          });
-        }
+      // Add tool results to conversation as user message
+      if (toolResults.length > 0) {
+        conversation.push({
+          role: 'user',
+          content: '', // Empty content since tool results are in toolResults field
+          toolResults: toolResults
+        });
       }
     }
   }
