@@ -1,7 +1,6 @@
 // ABOUTME: Project session agent page route for React Router v7
 // ABOUTME: Agent chat page with all providers and context setup
 
-'use client';
 
 import { useParams } from 'react-router';
 import { UIProvider } from '@/components/providers/UIProvider';

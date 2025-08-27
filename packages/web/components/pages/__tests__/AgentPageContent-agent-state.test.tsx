@@ -62,32 +62,6 @@ vi.mock('@/components/providers/ToolApprovalProvider', () => ({
   }),
 }));
 
-// Mock Next.js App Router
-const mockPush = vi.fn();
-const mockReplace = vi.fn();
-const mockRefresh = vi.fn();
-const mockBack = vi.fn();
-const mockForward = vi.fn();
-const mockPrefetch = vi.fn();
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
-    replace: mockReplace,
-    refresh: mockRefresh,
-    back: mockBack,
-    forward: mockForward,
-    prefetch: mockPrefetch,
-  }),
-  usePathname: () =>
-    '/project/test-project/session/lace_20250101_sess01/agent/lace_20250101_agent1',
-  useSearchParams: () => new URLSearchParams(),
-  useParams: () => ({
-    projectId: 'test-project',
-    sessionId: 'lace_20250101_sess01',
-    agentId: 'lace_20250101_agent1',
-  }),
-}));
 
 // Mock useURLState to provide navigation
 const mockNavigateToAgent = vi.fn();
@@ -157,7 +131,7 @@ vi.mock('@/components/sidebar/SidebarContent', () => ({
 }));
 
 vi.mock('@/components/modals/ToolApprovalModal', () => ({
-  ToolApprovalModal: () => <div>Tool Approval Modal</div>,
+  ToolApprovalModal: () => <div data-testid="tool-approval-modal">Tool Approval Modal</div>,
 }));
 
 vi.mock('@/components/settings/SettingsContainer', () => ({
@@ -182,14 +156,6 @@ const defaultProps = {
 describe('AgentPageContent agent state handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Clear router mocks
-    mockPush.mockClear();
-    mockReplace.mockClear();
-    mockRefresh.mockClear();
-    mockBack.mockClear();
-    mockForward.mockClear();
-    mockPrefetch.mockClear();
   });
 
   afterEach(() => {
@@ -212,12 +178,9 @@ describe('AgentPageContent agent state handling', () => {
     // The component should be rendered without errors
     expect(screen.getByTestId('chat')).toBeInTheDocument();
 
-    // Mock agent selection would trigger navigation
-    await act(async () => {
-      // This would normally be triggered by sidebar interaction
-      // The navigation logic should use asThreadId conversion
-      expect(mockNavigateToAgent).not.toHaveBeenCalled(); // Not called on render
-    });
+    // This would normally be triggered by sidebar interaction
+    // The navigation logic should use asThreadId conversion
+    expect(mockNavigateToAgent).not.toHaveBeenCalled(); // Not called on render
   });
 
   it('should provide proper project switching functionality', async () => {

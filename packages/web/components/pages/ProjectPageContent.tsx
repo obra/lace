@@ -1,9 +1,8 @@
 // ABOUTME: Project page content component - extracted for clean routing
 // ABOUTME: Contains the project dashboard UI with sidebar and session config panel
 
-'use client';
-
 import { useCallback } from 'react';
+import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars } from '@/lib/fontawesome';
@@ -21,11 +20,12 @@ interface ProjectPageContentProps {
 export function ProjectPageContent({ projectId }: ProjectPageContentProps) {
   const { sidebarOpen, toggleSidebar } = useUIContext();
   const { currentProject } = useProjectContext();
+  const navigate = useNavigate();
 
   const handleSwitchProject = useCallback(() => {
     // Navigate to root to show project selection
-    window.location.href = '/';
-  }, []);
+    navigate('/');
+  }, [navigate]);
 
   return (
     <motion.div
@@ -41,11 +41,11 @@ export function ProjectPageContent({ projectId }: ProjectPageContentProps) {
             <Sidebar
               open={sidebarOpen}
               onToggle={toggleSidebar}
-              onSettingsClick={onOpenSettings as () => void}
+              onSettingsClick={() => onOpenSettings()}
             >
               <SidebarContent
                 isMobile={false} // Component now handles mobile/desktop internally
-                onCloseMobileNav={toggleSidebar as () => void}
+                onCloseMobileNav={() => toggleSidebar()}
                 onSwitchProject={handleSwitchProject}
                 onAgentSelect={() => {}} // No agent navigation on project page
                 onClearAgent={() => {}} // No agent clearing on project page
@@ -64,7 +64,7 @@ export function ProjectPageContent({ projectId }: ProjectPageContentProps) {
           <div className="flex items-center justify-between p-4 lg:px-6">
             <div className="flex items-center gap-3">
               <motion.button
-                onClick={toggleSidebar as () => void}
+                onClick={() => toggleSidebar()}
                 className="p-2 hover:bg-base-200 rounded-lg lg:hidden"
               >
                 <FontAwesomeIcon icon={faBars} className="w-6 h-6" />
