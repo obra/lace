@@ -12,7 +12,7 @@ export class TransientEventError extends Error {
     const contextSuffix = context ? ` (${context})` : '';
     super(`${eventType} events are transient and should not be persisted${contextSuffix}`);
     this.name = 'TransientEventError';
-    
+
     // Fix prototype chain for proper instanceof checks across transpile targets
     Object.setPrototypeOf(this, TransientEventError.prototype);
   }
