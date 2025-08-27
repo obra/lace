@@ -78,7 +78,12 @@ export async function action({ request, params }: Route.ActionArgs) {
   try {
     const { projectId, sessionId } = validateRouteParams(params, RouteParamsSchema);
 
-    const body = (await (request as Request).json()) as Record<string, unknown>;
+    let body: unknown;
+    try {
+      body = (await (request as Request).json()) as Record<string, unknown>;
+    } catch {
+      return createErrorResponse('Invalid JSON', 400, { code: 'VALIDATION_FAILED' });
+    }
     let validatedBody;
     try {
       validatedBody = validateRequestBody(body, CreateTaskSchema);

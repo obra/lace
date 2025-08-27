@@ -18,6 +18,11 @@ function isError(error: unknown): error is Error {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
+  // Add method guard
+  if (request.method !== 'POST') {
+    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  }
+
   // Apply rate limiting - need to adapt this for RR7
   // const rateLimitResponse = messageLimiter(request);
   // if (rateLimitResponse) {
