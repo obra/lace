@@ -217,24 +217,24 @@ export class EventStreamManager {
   // Extract agent error handler registration into reusable method
   private registerAgentErrorHandler(
     agent: Agent,
-    agentThreadId: string, 
-    projectId: string, 
+    agentThreadId: string,
+    projectId: string,
     sessionId: string
   ): void {
     // Prevent duplicate error listeners on the same Agent instance
     if (EventStreamManager.registeredAgents.has(agent)) {
       return;
     }
-    
+
     EventStreamManager.registeredAgents.add(agent);
-    
+
     agent.on('error', (errorEvent: { error: Error; context: Record<string, unknown> }) => {
       const { error, context } = errorEvent;
-      
+
       logger.debug(
         `[EVENT_STREAM] Agent ${agentThreadId} error occurred, broadcasting AGENT_ERROR`
       );
-      
+
       this.broadcast({
         type: 'AGENT_ERROR',
         threadId: agentThreadId,
@@ -257,10 +257,10 @@ export class EventStreamManager {
           retryCount: context.retryCount as number,
         },
         transient: true,
-        context: { 
-          projectId, 
-          sessionId, 
-          agentId: agentThreadId 
+        context: {
+          projectId,
+          sessionId,
+          agentId: agentThreadId,
         },
       });
     });
