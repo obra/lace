@@ -72,8 +72,6 @@ packages/web/.next/
 # Next.js cache
 .next/
 
-# React Router v7 generated types
-packages/web/.react-router/
 
 # Storybook
 storybook-static/
