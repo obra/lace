@@ -203,7 +203,7 @@ export async function cleanupTestEnvironment(env: TestEnvironment) {
     delete process.env.LACE_DIR;
   }
 
-  delete process.env.ANTHROPIC_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
 
   // Clean up temp directory
   if (

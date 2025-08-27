@@ -108,7 +108,7 @@ const config = [
       'lib/api-client.ts', // Contains the fetch implementation - legitimately needs fetch
       'lib/console-forward/client.ts', // Browser console forwarding to server - external communication
       'lib/metaScraper.ts', // External URL fetching - not our API
-      'app/api/tunnel/route.ts', // Server-side tunneling - proxy functionality
+      'app/routes/api.tunnel.ts', // Server-side tunneling - proxy functionality
       'app/sentry-test/page.tsx', // Test page - not production code
     ],
     rules: {
