@@ -29,6 +29,13 @@ describe('SessionFileTree', () => {
   });
 
   it('should render loading state initially', () => {
+    // Mock with empty response to avoid undefined entries error
+    mockApiGet.mockResolvedValueOnce({
+      workingDirectory: '/test/dir',
+      currentPath: '',
+      entries: [],
+    });
+
     render(<SessionFileTree {...defaultProps} />);
     expect(screen.getByText('Loading files...')).toBeInTheDocument();
   });
@@ -185,13 +192,26 @@ describe('SessionFileTree', () => {
   });
 
   it('should handle API errors gracefully', async () => {
-    mockApiGet.mockRejectedValueOnce(new Error('Network error'));
+    mockApiGet
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValueOnce({
+        workingDirectory: '/test/dir',
+        currentPath: '',
+        entries: [],
+      });
 
     render(<SessionFileTree {...defaultProps} />);
 
     await waitFor(() => {
       expect(screen.getByText('Network error')).toBeInTheDocument();
       expect(screen.getByText('Retry')).toBeInTheDocument();
+    });
+
+    // Test retry functionality
+    await userEvent.click(screen.getByText('Retry'));
+
+    await waitFor(() => {
+      expect(mockApiGet).toHaveBeenCalledTimes(2);
     });
   });
 
