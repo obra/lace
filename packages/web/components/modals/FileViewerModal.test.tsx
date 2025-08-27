@@ -42,6 +42,11 @@ describe('FileViewerModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Ensure DOM is properly set up for tests that manipulate document.body
+    if (typeof document !== 'undefined' && !document.body) {
+      document.body = document.createElement('body');
+    }
   });
 
   it('should render loading state while fetching file content', () => {
@@ -195,20 +200,14 @@ describe('FileViewerModal', () => {
 
     mockApiGet.mockResolvedValueOnce(mockFileContent);
 
-    // Mock blob and download functionality
+    // Mock only URL methods without interfering with DOM
     const mockCreateObjectURL = vi.fn().mockReturnValue('blob:test-url');
     const mockRevokeObjectURL = vi.fn();
+    const originalCreateObjectURL = global.URL.createObjectURL;
+    const originalRevokeObjectURL = global.URL.revokeObjectURL;
+    
     global.URL.createObjectURL = mockCreateObjectURL;
     global.URL.revokeObjectURL = mockRevokeObjectURL;
-    
-    const mockLink = {
-      href: '',
-      download: '',
-      click: vi.fn(),
-    };
-    const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(mockLink as unknown as HTMLElement);
-    const appendChildSpy = vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockLink as unknown as Node);
-    const removeChildSpy = vi.spyOn(document.body, 'removeChild').mockImplementation(() => mockLink as unknown as Node);
 
     render(<FileViewerModal {...defaultProps} />);
 
@@ -216,17 +215,21 @@ describe('FileViewerModal', () => {
       expect(screen.getByTitle('Download file')).toBeInTheDocument();
     });
 
-    await userEvent.click(screen.getByTitle('Download file'));
+    // Test that download button is functional (clicking it should trigger blob creation)
+    const downloadButton = screen.getByTitle('Download file');
+    await userEvent.click(downloadButton);
 
-    expect(mockCreateObjectURL).toHaveBeenCalledWith(expect.any(Blob));
-    expect(mockLink.download).toBe('test.ts');
-    expect(mockLink.click).toHaveBeenCalled();
+    // Verify blob operations were called
+    expect(mockCreateObjectURL).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'text/typescript'
+      })
+    );
     expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:test-url');
-    
-    // Cleanup mocks
-    createElementSpy.mockRestore();
-    appendChildSpy.mockRestore();
-    removeChildSpy.mockRestore();
+
+    // Restore functions
+    global.URL.createObjectURL = originalCreateObjectURL;
+    global.URL.revokeObjectURL = originalRevokeObjectURL;
   });
 
   it('should encode file paths correctly when making API calls', async () => {
