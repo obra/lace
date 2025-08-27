@@ -47,7 +47,15 @@ export async function action({ request, params }: Route.ActionArgs) {
           );
         }
 
-        const body: unknown = await (request as Request).json();
+        let body: unknown;
+        try {
+          body = await (request as Request).json();
+        } catch {
+          return Response.json(
+            { error: 'Invalid JSON', code: 'VALIDATION_FAILED' },
+            { status: 400 }
+          );
+        }
         const validatedData = SetEnvironmentVariablesSchema.parse(body);
 
         project.setEnvironmentVariables(
