@@ -41,7 +41,7 @@ describe('/api/sessions/[sessionId]/files', () => {
     await fs.writeFile(join(testDir, 'README.md'), '# Test Project');
     await fs.writeFile(join(testDir, 'src', 'index.ts'), 'console.log("hello");');
 
-    testSessionId = 'test-session-123';
+    testSessionId = 'lace_20250827_test01';
 
     // Mock session with working directory
     mockSession = {

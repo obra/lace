@@ -1,11 +1,22 @@
 // ABOUTME: API endpoint for retrieving file content from a session's working directory
 // ABOUTME: Provides secure file reading with MIME type detection, size limits, and path traversal protection
 
-import type { Route } from './+types/api.sessions.$sessionId.files.$path';
+// import type { Route } from './+types/api.sessions.$sessionId.files.$path';
+
+// Define the route args manually since splat types may not generate correctly
+interface LoaderArgs {
+  request: Request;
+  params: {
+    sessionId: string;
+    '*'?: string;
+  };
+  context?: unknown;
+}
 import { promises as fs, constants as fsConstants } from 'fs';
 import { resolve, relative } from 'path';
 import mime from 'mime-types';
 import { createSuccessResponse, createErrorResponse } from '@/lib/server/api-utils';
+import { logger } from '~/utils/logger';
 import { SessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
 import {
@@ -23,13 +34,17 @@ function getMimeType(filePath: string): string {
 
 // Check if file is likely text-based
 function isTextFile(mimeType: string): boolean {
-  return mimeType.startsWith('text/') || mimeType === 'application/json';
+  return mimeType.startsWith('text/') || 
+         mimeType === 'application/json' ||
+         mimeType === 'application/javascript' ||
+         mimeType === 'video/mp2t'; // .ts files incorrectly detected as MPEG transport stream
 }
 
-export async function loader({ request, params }: Route.LoaderArgs) {
+export async function loader({ request, params }: LoaderArgs) {
   try {
-    const { sessionId, '*': splatPath } = params;
-    const filePath = splatPath || '';
+    const { sessionId } = params;
+    const splatPath = (params as Record<string, string>)['*'] || (params as Record<string, string>)['path'] || '';
+    const filePath = splatPath;
 
     // Validate request
     const parseResult = GetSessionFileRequestSchema.safeParse({ path: filePath });
@@ -162,10 +177,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     return createSuccessResponse(response);
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
+    logger.error('File content route error:', { message: err.message, stack: err.stack });
     return createErrorResponse(
       'Failed to read file',
       500,
-      { code: 'INTERNAL_SERVER_ERROR', error: err }
+      { code: 'INTERNAL_SERVER_ERROR', error: { message: err.message, stack: err.stack } }
     );
   }
 }

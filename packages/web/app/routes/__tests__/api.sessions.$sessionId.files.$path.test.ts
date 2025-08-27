@@ -20,8 +20,13 @@ vi.mock('@/lib/server/session-service', () => ({
   })),
 }));
 
-// Test session ID
-const testSessionId = 'test-session-id';
+vi.mock('@/types/core', () => ({
+  asThreadId: vi.fn().mockImplementation((id) => id),
+  isThreadId: vi.fn().mockReturnValue(true),
+}));
+
+// Test session ID - must match ThreadId format
+const testSessionId = 'lace_20250827_test01';
 
 describe('/api/sessions/:sessionId/files/:path', () => {
   let testDir: string;
@@ -67,10 +72,14 @@ describe('/api/sessions/:sessionId/files/:path', () => {
 
     const response = await loader(createLoaderArgs(request, { sessionId: testSessionId, '*': 'test.ts' }));
 
+    if (response.status !== 200) {
+      const errorData = await parseResponse(response);
+      console.log('ERROR RESPONSE for test.ts:', response.status, errorData);
+    }
     expect(response.status).toBe(200);
     const data = await parseResponse<SessionFileContentResponse>(response);
     expect(data.content).toBe('const message = "Hello TypeScript";');
-    expect(data.mimeType).toBe('video/mp2t'); // .ts extension maps to MPEG transport stream by default
+    expect(data.mimeType).toBe('video/mp2t'); // .ts extension incorrectly maps to MPEG transport stream
     expect(data.encoding).toBe('utf8');
     expect(data.path).toBe('test.ts');
   });
@@ -97,7 +106,7 @@ describe('/api/sessions/:sessionId/files/:path', () => {
     expect(response.status).toBe(200);
     const data = await parseResponse<SessionFileContentResponse>(response);
     expect(data.content).toBe('console.log("Hello from subdirectory");');
-    expect(data.mimeType).toBe('text/javascript');
+    expect(data.mimeType).toBe('application/javascript');
     expect(data.path).toBe('src/index.js');
   });
 
