@@ -19,7 +19,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         const connectionId = manager.addConnection(controller, subscription);
 
         // Handle connection cleanup
-        (request as Request).signal?.addEventListener('abort', () => {
+        request.signal?.addEventListener('abort', () => {
           manager.removeConnection(connectionId);
         });
 

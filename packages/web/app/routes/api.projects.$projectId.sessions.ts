@@ -45,13 +45,13 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if ((request as Request).method !== 'POST') {
+  if (request.method !== 'POST') {
     return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
   }
 
   try {
     const { projectId } = params as { projectId: string };
-    const body = (await (request as Request).json()) as Record<string, unknown>;
+    const body = (await request.json()) as Record<string, unknown>;
     const validatedData = CreateSessionSchema.parse(body);
 
     const project = Project.getById(projectId);

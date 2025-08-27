@@ -35,7 +35,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  switch ((request as Request).method) {
+  switch (request.method) {
     case 'PUT':
       try {
         const { projectId } = params as { projectId: string };
@@ -49,7 +49,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
         let body: unknown;
         try {
-          body = await (request as Request).json();
+          body = await request.json();
         } catch {
           return Response.json(
             { error: 'Invalid JSON', code: 'VALIDATION_FAILED' },
@@ -99,7 +99,7 @@ export async function action({ request, params }: Route.ActionArgs) {
           );
         }
 
-        const url = new URL((request as Request).url);
+        const url = new URL(request.url);
         const key = url.searchParams.get('key');
 
         if (!key) {

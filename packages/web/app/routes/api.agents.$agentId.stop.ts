@@ -9,7 +9,7 @@ import { createErrorResponse } from '@/lib/server/api-utils';
 import type { Route } from './+types/api.agents.$agentId.stop';
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if ((request as Request).method !== 'POST') {
+  if (request.method !== 'POST') {
     return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
   }
 

@@ -81,7 +81,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if ((request as Request).method !== 'PUT') {
+  if (request.method !== 'PUT') {
     return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
   }
 
@@ -92,7 +92,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       return createErrorResponse('Invalid agent ID', 400, { code: 'VALIDATION_FAILED' });
     }
 
-    const body = (await (request as Request).json()) as Record<string, unknown>;
+    const body = (await request.json()) as Record<string, unknown>;
 
     let validatedData;
     try {

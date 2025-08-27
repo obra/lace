@@ -16,7 +16,7 @@ const messageSchema = z.object({
 });
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if ((request as Request).method !== 'POST') {
+  if (request.method !== 'POST') {
     return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
   }
 
@@ -31,8 +31,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const agentId = asThreadId(agentIdParam);
 
     // Validate content type
-    const req = request as Request;
-    const contentType = req.headers.get('content-type') ?? '';
+    const contentType = request.headers.get('content-type') ?? '';
     if (!contentType.toLowerCase().includes('application/json')) {
       return createErrorResponse('Unsupported Media Type', 415, {
         code: 'UNSUPPORTED_MEDIA_TYPE',

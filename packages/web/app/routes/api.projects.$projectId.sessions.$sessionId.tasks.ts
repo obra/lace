@@ -49,7 +49,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     const taskManager = session.getTaskManager();
 
     // Build filters from query params
-    const { searchParams } = new URL((request as Request).url);
+    const { searchParams } = new URL(request.url);
     const filters: Partial<TaskFilters> = {};
     const status = searchParams.get('status') as TaskStatus | null;
     const priority = searchParams.get('priority') as TaskPriority | null;
@@ -85,7 +85,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     let body: unknown;
     try {
-      body = (await (request as Request).json()) as Record<string, unknown>;
+      body = (await request.json()) as Record<string, unknown>;
     } catch {
       return createErrorResponse('Invalid JSON', 400, { code: 'VALIDATION_FAILED' });
     }

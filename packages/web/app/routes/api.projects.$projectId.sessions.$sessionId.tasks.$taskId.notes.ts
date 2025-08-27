@@ -34,7 +34,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     let body: unknown;
     try {
-      body = (await (request as Request).json()) as Record<string, unknown>;
+      body = (await request.json()) as Record<string, unknown>;
     } catch {
       return createErrorResponse('Invalid JSON', 400, { code: 'VALIDATION_FAILED' });
     }

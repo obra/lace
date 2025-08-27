@@ -45,7 +45,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  const method = (request as Request).method;
+  const method = request.method;
   const { instanceId } = params as { instanceId: string };
 
   if (method === 'DELETE') {
@@ -75,7 +75,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (method === 'PUT') {
     try {
-      const requestBody = (await (request as Request).json()) as Record<string, unknown>;
+      const requestBody = (await request.json()) as Record<string, unknown>;
 
       const instanceManager = new ProviderInstanceManager();
       const config = await instanceManager.loadInstances();

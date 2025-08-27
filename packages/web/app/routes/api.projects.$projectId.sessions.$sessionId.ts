@@ -48,10 +48,10 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  if ((request as Request).method === 'PATCH') {
+  if (request.method === 'PATCH') {
     try {
       const { projectId, sessionId } = params as { projectId: string; sessionId: string };
-      const body = (await (request as Request).json()) as Record<string, unknown>;
+      const body = (await request.json()) as Record<string, unknown>;
       const validatedData = UpdateSessionSchema.parse(body);
 
       const project = Project.getById(projectId);
@@ -96,7 +96,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
   }
 
-  if ((request as Request).method === 'DELETE') {
+  if (request.method === 'DELETE') {
     try {
       const { projectId, sessionId } = params as { projectId: string; sessionId: string };
       const project = Project.getById(projectId);

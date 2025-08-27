@@ -20,13 +20,13 @@ function isArgsArray(data: unknown): data is unknown[] {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  if ((request as Request).method !== 'POST') {
+  if (request.method !== 'POST') {
     return Response.json({ error: 'Method not allowed' }, { status: 405 });
   }
 
   try {
     // Handle empty or malformed request bodies gracefully
-    const text = await (request as Request).text();
+    const text = await request.text();
     if (!text || text.trim() === '') {
       // Silent return for empty requests - common during race conditions
       return Response.json({ success: true, processed: 0 });

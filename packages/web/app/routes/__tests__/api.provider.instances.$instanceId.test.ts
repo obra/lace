@@ -63,7 +63,7 @@ describe('Provider Instance Detail API', () => {
         JSON.stringify(config, null, 2)
       );
 
-      const mockRequest = {} as Request;
+      const mockRequest = new Request('http://localhost');
       const response = await loader(createLoaderArgs(mockRequest, { instanceId: 'test-instance' }));
       const data = await parseResponse<InstanceDetailResponse>(response);
 
@@ -79,7 +79,7 @@ describe('Provider Instance Detail API', () => {
     });
 
     it('should return 404 for non-existent instance', async () => {
-      const mockRequest = {} as Request;
+      const mockRequest = new Request('http://localhost');
       const response = await loader(createLoaderArgs(mockRequest, { instanceId: 'nonexistent' }));
       const data = await parseResponse<{ error: string }>(response);
 
@@ -118,7 +118,7 @@ describe('Provider Instance Detail API', () => {
         JSON.stringify({ apiKey: 'test-key' }, null, 2)
       );
 
-      const mockRequest = { method: 'DELETE' } as Request;
+      const mockRequest = new Request('http://localhost', { method: 'DELETE' });
       const response = await action(createActionArgs(mockRequest, { instanceId: 'test-instance' }));
       const data = await parseResponse<DeleteInstanceResponse>(response);
 
@@ -138,7 +138,7 @@ describe('Provider Instance Detail API', () => {
     });
 
     it('should return 404 for non-existent instance', async () => {
-      const mockRequest = { method: 'DELETE' } as Request;
+      const mockRequest = new Request('http://localhost', { method: 'DELETE' });
       const response = await action(createActionArgs(mockRequest, { instanceId: 'nonexistent' }));
       const data = await parseResponse<{ error: string }>(response);
 
@@ -163,7 +163,7 @@ describe('Provider Instance Detail API', () => {
         JSON.stringify(config, null, 2)
       );
 
-      const mockRequest = { method: 'DELETE' } as Request;
+      const mockRequest = new Request('http://localhost', { method: 'DELETE' });
       const response = await action(createActionArgs(mockRequest, { instanceId: 'test-instance' }));
       const data = await parseResponse<DeleteInstanceResponse>(response);
 
@@ -204,10 +204,11 @@ describe('Provider Instance Detail API', () => {
         endpoint: 'https://custom.openai.com/v1',
       };
 
-      const mockRequest = {
+      const mockRequest = new Request('http://localhost', {
         method: 'PUT',
-        json: async () => updateData,
-      } as Request;
+        body: JSON.stringify(updateData),
+        headers: { 'Content-Type': 'application/json' },
+      });
 
       const response = await action(createActionArgs(mockRequest, { instanceId: 'test-instance' }));
       const data = await parseResponse<UpdateInstanceResponse>(response);
@@ -264,10 +265,11 @@ describe('Provider Instance Detail API', () => {
         credential: { apiKey: 'new-api-key' },
       };
 
-      const mockRequest = {
+      const mockRequest = new Request('http://localhost', {
         method: 'PUT',
-        json: async () => updateData,
-      } as Request;
+        body: JSON.stringify(updateData),
+        headers: { 'Content-Type': 'application/json' },
+      });
 
       const response = await action(createActionArgs(mockRequest, { instanceId: 'test-instance' }));
       const data = await parseResponse<UpdateInstanceResponse>(response);
@@ -292,10 +294,11 @@ describe('Provider Instance Detail API', () => {
         displayName: 'Updated Name',
       };
 
-      const mockRequest = {
+      const mockRequest = new Request('http://localhost', {
         method: 'PUT',
-        json: async () => updateData,
-      } as Request;
+        body: JSON.stringify(updateData),
+        headers: { 'Content-Type': 'application/json' },
+      });
 
       const response = await action(createActionArgs(mockRequest, { instanceId: 'nonexistent' }));
       const data = await parseResponse<{ error: string }>(response);
@@ -325,10 +328,11 @@ describe('Provider Instance Detail API', () => {
         displayName: '', // Invalid: empty string
       };
 
-      const mockRequest = {
+      const mockRequest = new Request('http://localhost', {
         method: 'PUT',
-        json: async () => updateData,
-      } as Request;
+        body: JSON.stringify(updateData),
+        headers: { 'Content-Type': 'application/json' },
+      });
 
       const response = await action(createActionArgs(mockRequest, { instanceId: 'test-instance' }));
 
@@ -357,10 +361,11 @@ describe('Provider Instance Detail API', () => {
         catalogProviderId: 'anthropic', // Should be ignored
       };
 
-      const mockRequest = {
+      const mockRequest = new Request('http://localhost', {
         method: 'PUT',
-        json: async () => updateData,
-      } as Request;
+        body: JSON.stringify(updateData),
+        headers: { 'Content-Type': 'application/json' },
+      });
 
       const response = await action(createActionArgs(mockRequest, { instanceId: 'test-instance' }));
       const data = await parseResponse<UpdateInstanceResponse>(response);

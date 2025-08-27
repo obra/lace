@@ -46,7 +46,7 @@ describe('Provider Instances API', () => {
         JSON.stringify(config, null, 2)
       );
 
-      const mockRequest = {} as Request;
+      const mockRequest = new Request('http://localhost');
       const response = await GET(createLoaderArgs(mockRequest, {}));
       const data = await parseResponse<InstancesResponse>(response);
 
@@ -68,7 +68,7 @@ describe('Provider Instances API', () => {
     });
 
     it('should handle empty instances list when no config file exists', async () => {
-      const mockRequest = {} as Request;
+      const mockRequest = new Request('http://localhost');
       const response = await GET(createLoaderArgs(mockRequest, {}));
       const data = await parseResponse<InstancesResponse>(response);
 
@@ -80,7 +80,7 @@ describe('Provider Instances API', () => {
       // Write invalid JSON
       fs.writeFileSync(path.join(tempDir, 'provider-instances.json'), 'invalid json{');
 
-      const mockRequest = {} as Request;
+      const mockRequest = new Request('http://localhost');
       const response = await GET(createLoaderArgs(mockRequest, {}));
       const data = await parseResponse<InstancesResponse>(response);
 
@@ -117,7 +117,7 @@ describe('Provider Instances API', () => {
         JSON.stringify({ apiKey: 'test-key' }, null, 2)
       );
 
-      const mockRequest = {} as Request;
+      const mockRequest = new Request('http://localhost');
       const response = await GET(createLoaderArgs(mockRequest, {}));
       const data = await parseResponse<InstancesResponse>(response);
 
@@ -158,7 +158,7 @@ describe('Provider Instances API', () => {
         JSON.stringify(config, null, 2)
       );
 
-      const mockRequest = {} as Request;
+      const mockRequest = new Request('http://localhost');
       const response = await GET(createLoaderArgs(mockRequest, {}));
       const data = await parseResponse<InstancesResponse>(response);
 
@@ -190,10 +190,11 @@ describe('Provider Instances API', () => {
         timeout: 30000,
       };
 
-      const mockRequest = {
+      const mockRequest = new Request('http://localhost', {
         method: 'POST',
-        json: async () => requestBody,
-      } as Request;
+        body: JSON.stringify(requestBody),
+        headers: { 'Content-Type': 'application/json' },
+      });
 
       const response = await POST(createActionArgs(mockRequest, {}));
       const data = await parseResponse<CreateInstanceResponse>(response);
@@ -225,7 +226,7 @@ describe('Provider Instances API', () => {
       });
 
       // Verify instance appears in GET with correct contract
-      const getResponse = await GET(createLoaderArgs({} as Request, {}));
+      const getResponse = await GET(createLoaderArgs(new Request('http://localhost'), {}));
       const getData = await parseResponse<InstancesResponse>(getResponse);
 
       expect(getData.instances).toHaveLength(1);
@@ -245,10 +246,11 @@ describe('Provider Instances API', () => {
         catalogProviderId: 'openai',
       };
 
-      const mockRequest = {
+      const mockRequest = new Request('http://localhost', {
         method: 'POST',
-        json: async () => invalidBody,
-      } as Request;
+        body: JSON.stringify(invalidBody),
+        headers: { 'Content-Type': 'application/json' },
+      });
 
       const response = await POST(createActionArgs(mockRequest, {}));
       const data = await parseResponse<{ error: string }>(response);
@@ -265,10 +267,11 @@ describe('Provider Instances API', () => {
         credential: { apiKey: 'test' },
       };
 
-      const mockRequest = {
+      const mockRequest = new Request('http://localhost', {
         method: 'POST',
-        json: async () => requestBody,
-      } as Request;
+        body: JSON.stringify(requestBody),
+        headers: { 'Content-Type': 'application/json' },
+      });
 
       const response = await POST(createActionArgs(mockRequest, {}));
       const data = await parseResponse<{ error: string }>(response);
@@ -301,10 +304,11 @@ describe('Provider Instances API', () => {
         credential: { apiKey: 'test' },
       };
 
-      const mockRequest = {
+      const mockRequest = new Request('http://localhost', {
         method: 'POST',
-        json: async () => requestBody,
-      } as Request;
+        body: JSON.stringify(requestBody),
+        headers: { 'Content-Type': 'application/json' },
+      });
 
       const response = await POST(createActionArgs(mockRequest, {}));
       const data = await parseResponse<{ error: string }>(response);

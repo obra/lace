@@ -50,7 +50,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  switch ((request as Request).method) {
+  switch (request.method) {
     case 'PATCH':
       try {
         // Validate params
@@ -63,7 +63,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         }
 
         const { projectId } = validationResult.data;
-        const body = (await (request as Request).json()) as Record<string, unknown>;
+        const body = (await request.json()) as Record<string, unknown>;
         const validatedData = UpdateProjectSchema.parse(body);
 
         const project = Project.getById(projectId);
