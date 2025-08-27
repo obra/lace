@@ -68,7 +68,7 @@ export function useErrorRecovery() {
     try {
       // Send retry message specific to error type  
       const result = await api.post(`/api/agents/${threadId}/message`, {
-        content: retryMessages[errorType],
+        message: retryMessages[errorType],
         context: { errorType, isRetry: true },
       });
       
@@ -117,7 +117,7 @@ export function useErrorRecovery() {
     try {
       // Send retry message for tool operation
       const result = await api.post(`/api/agents/${threadId}/message`, {
-        content: `Please retry the ${toolName} tool operation`,
+        message: `Please retry the ${toolName} tool operation`,
         context: { toolCallId, isRetry: true },
       });
       

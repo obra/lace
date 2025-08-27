@@ -3,14 +3,17 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import type { ErrorEntry, AgentErrorLogEntry, TimelineEntry } from '@/types/web-events';
+import { getErrorOrigin } from '@/types/web-events';
 
 describe('Error Web Event Types', () => {
   describe('ErrorEntry', () => {
     it('should extend TimelineEntry correctly', () => {
+      const errorType = 'provider_failure';
       const errorEntry: ErrorEntry = {
         id: 'error-123',
         type: 'error',
-        errorType: 'provider_failure',
+        errorType,
+        origin: getErrorOrigin(errorType),
         message: 'Provider API failed',
         context: { providerName: 'anthropic' },
         isRetryable: true,
