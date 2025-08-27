@@ -76,7 +76,12 @@ export async function action({ request, params }: Route.ActionArgs): Promise<Res
         );
       }
 
-      const body: unknown = await request.json();
+      let body: unknown;
+      try {
+        body = await request.json();
+      } catch {
+        return Response.json({ error: 'Invalid JSON', code: 'VALIDATION_FAILED' }, { status: 400 });
+      }
       const validatedData = RenderTemplateSchema.parse(body);
 
       const renderedContent = project.renderPromptTemplate(templateId, validatedData.variables);
