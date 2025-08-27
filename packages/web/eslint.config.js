@@ -7,6 +7,7 @@ import noRelativeImportPaths from 'eslint-plugin-no-relative-import-paths';
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 import importPlugin from 'eslint-plugin-import';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -16,13 +17,20 @@ const compat = new FlatCompat({
 });
 
 const config = [
+  reactHooks.configs['recommended-latest'],
   {
-    ignores: ['.next/**/*', 'node_modules/**/*', 'stories_parked/**/*', 'temp/**/*'],
+    settings: {
+      'import/resolver': {
+        typescript: { project: './tsconfig.json' },
+      },
+    },
   },
-  // Add Next.js specific configuration
-  ...compat.config({
-    extends: ['next/core-web-vitals'],
-  }),
+
+  {
+    ignores: ['.next/**/*', 'node_modules/**/*', 'stories_parked/**/*', 'temp/**/*',    '.react-router/**/*',  'build/**/*'
+],
+  },
+  // Remove Next.js configuration - using React Router v7 now
   // Extend selected rules from root config
   {
     files: ['**/*.ts', '**/*.tsx'],
@@ -100,7 +108,7 @@ const config = [
       'lib/api-client.ts', // Contains the fetch implementation - legitimately needs fetch
       'lib/console-forward/client.ts', // Browser console forwarding to server - external communication
       'lib/metaScraper.ts', // External URL fetching - not our API
-      'app/api/tunnel/route.ts', // Server-side tunneling - proxy functionality
+      'app/routes/api.tunnel.ts', // Server-side tunneling - proxy functionality
       'app/sentry-test/page.tsx', // Test page - not production code
     ],
     rules: {

@@ -6,7 +6,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import { getSessionService } from '@/lib/server/session-service';
 import {
@@ -19,7 +18,8 @@ import {
 } from '@/lib/server/lace-imports';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { parseResponse } from '@/lib/serialization';
-import { GET as getAgent } from '@/app/api/agents/[agentId]/route';
+import { loader as getAgent } from '@/app/routes/api.agents.$agentId';
+import { createLoaderArgs } from '@/test-utils/route-test-helpers';
 import type { AgentWithTokenUsage } from '@/types/api';
 import type { ThreadId } from '@/types/core';
 
@@ -169,10 +169,8 @@ describe('Compaction Integration Test', () => {
     await agent.start();
 
     // Check token usage via API
-    const request = new NextRequest(`http://localhost:3000/api/agents/${sessionId}`);
-    const response = await getAgent(request, {
-      params: Promise.resolve({ agentId: sessionId }),
-    });
+    const request = new Request(`http://localhost:3000/api/agents/${sessionId}`);
+    const response = await getAgent(createLoaderArgs(request, { agentId: sessionId }));
 
     expect(response.status).toBe(200);
     const agentData = (await parseResponse(response)) as AgentWithTokenUsage;

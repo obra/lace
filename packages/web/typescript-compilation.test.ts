@@ -19,8 +19,8 @@ describe('Web Package TypeScript Compilation', () => {
 
   it('should pass Next.js linting', () => {
     expect(() => {
-      // Run Next.js linting with zero warnings allowed
-      execSync('npx next lint --max-warnings 0', {
+      // Run linting with zero warnings allowed
+      execSync('npx eslint --max-warnings 0', {
         stdio: 'pipe',
         encoding: 'utf8',
         cwd: process.cwd(),

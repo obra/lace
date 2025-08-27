@@ -81,8 +81,22 @@ export function ProjectProvider({
   }, [selectedProject, projects]);
 
   // Create fallback current project for UI needs
-  const currentProject = useMemo(
-    () =>
+  const currentProject = useMemo(() => {
+    // If we have a selectedProject but projects are still loading, show loading state
+    if (selectedProject && loading) {
+      return {
+        id: selectedProject,
+        name: 'Loading project...',
+        description: 'Please wait while we load your project data',
+        workingDirectory: '/',
+        isArchived: false,
+        createdAt: new Date(),
+        lastUsedAt: new Date(),
+        sessionCount: 0,
+      };
+    }
+
+    return (
       foundProject || {
         id: '',
         name: 'No project selected',
@@ -92,9 +106,9 @@ export function ProjectProvider({
         createdAt: new Date(),
         lastUsedAt: new Date(),
         sessionCount: 0,
-      },
-    [foundProject]
-  );
+      }
+    );
+  }, [foundProject, selectedProject, loading]);
 
   // Transform projects for sidebar display
   const projectsForSidebar = useMemo(

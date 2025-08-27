@@ -2,17 +2,20 @@
 // ABOUTME: Tests session creation, agent spawning, messaging, and event streaming
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 // Note: ApprovalManager has been removed and replaced with event-based approval system
 
-import { POST as createProjectSession } from '@/app/api/projects/[projectId]/sessions/route';
-import { POST as spawnAgent, GET as listAgents } from '@/app/api/sessions/[sessionId]/agents/route';
-import { POST as sendMessage } from '@/app/api/threads/[threadId]/message/route';
-import { GET as streamEvents } from '@/app/api/events/stream/route';
+import { action as createProjectSession } from '@/app/routes/api.projects.$projectId.sessions';
+import {
+  action as spawnAgent,
+  loader as listAgents,
+} from '@/app/routes/api.sessions.$sessionId.agents';
+import { action as sendMessage } from '@/app/routes/api.threads.$threadId.message';
+import { loader as streamEvents } from '@/app/routes/api.events.stream';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 import type { SessionInfo, ThreadId } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
@@ -100,7 +103,7 @@ describe('Full Conversation Flow', () => {
     );
     const projectId = project.getId();
 
-    const createSessionRequest = new NextRequest(
+    const createSessionRequest = new Request(
       `http://localhost:3000/api/projects/${projectId}/sessions`,
       {
         method: 'POST',
@@ -113,9 +116,9 @@ describe('Full Conversation Flow', () => {
       }
     );
 
-    const sessionResponse = await createProjectSession(createSessionRequest, {
-      params: Promise.resolve({ projectId }),
-    });
+    const sessionResponse = await createProjectSession(
+      createActionArgs(createSessionRequest, { projectId })
+    );
 
     if (sessionResponse.status !== 201) {
       const errorData = await parseResponse<{ error: string }>(sessionResponse);
@@ -130,7 +133,7 @@ describe('Full Conversation Flow', () => {
     // 2. Spawn agent
     const agentName = 'assistant';
 
-    const spawnAgentRequest = new NextRequest(
+    const spawnAgentRequest = new Request(
       `http://localhost:3000/api/sessions/${sessionId}/agents`,
       {
         method: 'POST',
@@ -143,19 +146,19 @@ describe('Full Conversation Flow', () => {
       }
     );
 
-    const agentResponse = await spawnAgent(spawnAgentRequest, {
-      params: Promise.resolve({ sessionId: sessionId as string }),
-    });
+    const agentResponse = await spawnAgent(
+      createActionArgs(spawnAgentRequest, { sessionId: sessionId as string })
+    );
     expect(agentResponse.status).toBe(201);
     const agentData = await parseResponse<{ threadId: ThreadId; name: string }>(agentResponse);
     expect(agentData.name).toBe(agentName);
     const agentThreadId: ThreadId = agentData.threadId as ThreadId;
 
     // 3. Connect to SSE stream
-    const streamRequest = new NextRequest(
+    const streamRequest = new Request(
       `http://localhost:3000/api/events/stream?sessions=${sessionId}`
     );
-    const streamResponse = await streamEvents(streamRequest);
+    const streamResponse = await streamEvents(createLoaderArgs(streamRequest, {}));
 
     expect(streamResponse.status).toBe(200);
     expect(streamResponse.headers.get('Content-Type')).toBe('text/event-stream');
@@ -164,7 +167,7 @@ describe('Full Conversation Flow', () => {
     // 4. Send message
     const message = 'Hello, assistant!';
 
-    const messageRequest = new NextRequest(
+    const messageRequest = new Request(
       `http://localhost:3000/api/threads/${agentThreadId}/message`,
       {
         method: 'POST',
@@ -173,9 +176,9 @@ describe('Full Conversation Flow', () => {
       }
     );
 
-    const messageResponse = await sendMessage(messageRequest, {
-      params: Promise.resolve({ threadId: agentThreadId as string }),
-    });
+    const messageResponse = await sendMessage(
+      createActionArgs(messageRequest, { threadId: agentThreadId as string })
+    );
     expect(messageResponse.status).toBe(202);
     const messageData = await parseResponse<{ status: string }>(messageResponse);
     expect(messageData.status).toBe('accepted');
@@ -196,7 +199,7 @@ describe('Full Conversation Flow', () => {
       }
     );
     const projectId = project.getId();
-    const createSessionRequest = new NextRequest(
+    const createSessionRequest = new Request(
       `http://localhost:3000/api/projects/${projectId}/sessions`,
       {
         method: 'POST',
@@ -208,15 +211,15 @@ describe('Full Conversation Flow', () => {
         headers: { 'Content-Type': 'application/json' },
       }
     );
-    const sessionResponse = await createProjectSession(createSessionRequest, {
-      params: Promise.resolve({ projectId }),
-    });
+    const sessionResponse = await createProjectSession(
+      createActionArgs(createSessionRequest, { projectId })
+    );
     expect(sessionResponse.status).toBe(201);
     const sessionData = await parseResponse<SessionInfo>(sessionResponse);
     const sessionId: ThreadId = sessionData.id as ThreadId;
 
     // Spawn first agent
-    const spawnAgent1Request = new NextRequest(
+    const spawnAgent1Request = new Request(
       `http://localhost:3000/api/sessions/${sessionId}/agents`,
       {
         method: 'POST',
@@ -228,13 +231,13 @@ describe('Full Conversation Flow', () => {
         headers: { 'Content-Type': 'application/json' },
       }
     );
-    const agent1Response = await spawnAgent(spawnAgent1Request, {
-      params: Promise.resolve({ sessionId: sessionId as string }),
-    });
+    const agent1Response = await spawnAgent(
+      createActionArgs(spawnAgent1Request, { sessionId: sessionId as string })
+    );
     expect(agent1Response.status).toBe(201);
 
     // Spawn second agent
-    const spawnAgent2Request = new NextRequest(
+    const spawnAgent2Request = new Request(
       `http://localhost:3000/api/sessions/${sessionId}/agents`,
       {
         method: 'POST',
@@ -246,18 +249,16 @@ describe('Full Conversation Flow', () => {
         headers: { 'Content-Type': 'application/json' },
       }
     );
-    const agent2Response = await spawnAgent(spawnAgent2Request, {
-      params: Promise.resolve({ sessionId: sessionId as string }),
-    });
+    const agent2Response = await spawnAgent(
+      createActionArgs(spawnAgent2Request, { sessionId: sessionId as string })
+    );
     expect(agent2Response.status).toBe(201);
 
     // List agents
-    const listAgentsRequest = new NextRequest(
-      `http://localhost:3000/api/sessions/${sessionId}/agents`
+    const listAgentsRequest = new Request(`http://localhost:3000/api/sessions/${sessionId}/agents`);
+    const listResponse = await listAgents(
+      createLoaderArgs(listAgentsRequest, { sessionId: sessionId as string })
     );
-    const listResponse = await listAgents(listAgentsRequest, {
-      params: Promise.resolve({ sessionId: sessionId as string }),
-    });
     expect(listResponse.status).toBe(200);
     const agents = await parseResponse<Array<{ name: string }>>(listResponse);
 
@@ -290,42 +291,52 @@ describe('Full Conversation Flow', () => {
     const projectId2 = project2.getId();
 
     const session1Response = await createProjectSession(
-      new NextRequest(`http://localhost:3000/api/projects/${projectId1}/sessions`, {
-        method: 'POST',
-        body: JSON.stringify({
-          name: 'Session 1',
-          providerInstanceId: anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
+      createActionArgs(
+        new Request(`http://localhost:3000/api/projects/${projectId1}/sessions`, {
+          method: 'POST',
+          body: JSON.stringify({
+            name: 'Session 1',
+            providerInstanceId: anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
+          }),
+          headers: { 'Content-Type': 'application/json' },
         }),
-        headers: { 'Content-Type': 'application/json' },
-      }),
-      { params: Promise.resolve({ projectId: projectId1 }) }
+        { projectId: projectId1 }
+      )
     );
     const session1Data = await parseResponse<SessionInfo>(session1Response);
     const session1Id: ThreadId = session1Data.id as ThreadId;
 
     const session2Response = await createProjectSession(
-      new NextRequest(`http://localhost:3000/api/projects/${projectId2}/sessions`, {
-        method: 'POST',
-        body: JSON.stringify({
-          name: 'Session 2',
-          providerInstanceId: anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
+      createActionArgs(
+        new Request(`http://localhost:3000/api/projects/${projectId2}/sessions`, {
+          method: 'POST',
+          body: JSON.stringify({
+            name: 'Session 2',
+            providerInstanceId: anthropicInstanceId,
+            modelId: 'claude-3-5-haiku-20241022',
+          }),
+          headers: { 'Content-Type': 'application/json' },
         }),
-        headers: { 'Content-Type': 'application/json' },
-      }),
-      { params: Promise.resolve({ projectId: projectId2 }) }
+        { projectId: projectId2 }
+      )
     );
     const session2Data = await parseResponse<SessionInfo>(session2Response);
     const session2Id: ThreadId = session2Data.id as ThreadId;
 
     // Connect to streams
     await streamEvents(
-      new NextRequest(`http://localhost:3000/api/events/stream?sessions=${session1Id}`)
+      createLoaderArgs(
+        new Request(`http://localhost:3000/api/events/stream?sessions=${session1Id}`),
+        {}
+      )
     );
 
     await streamEvents(
-      new NextRequest(`http://localhost:3000/api/events/stream?sessions=${session2Id}`)
+      createLoaderArgs(
+        new Request(`http://localhost:3000/api/events/stream?sessions=${session2Id}`),
+        {}
+      )
     );
 
     // Verify each session has its own connection

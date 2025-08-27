@@ -2,7 +2,7 @@
 // ABOUTME: Provides buttons to trigger client and server-side errors for testing
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
+import * as Sentry from '@sentry/react';
 
 export default function SentryTestPage() {
   const triggerClientError = () => {

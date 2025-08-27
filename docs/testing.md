@@ -251,6 +251,167 @@ If you see errors like "Failed to resolve provider instance" or "Provider instan
 **Good**: "When I create a session with name 'My Session', it appears in the session list"  
 **Bad**: "When I call createSession(), it calls Session.create() with the right parameters"
 
+## Strict Test Failure Philosophy
+
+**CRITICAL PRINCIPLE**: Tests must fail loudly and immediately when conditions are not met. Never mask failures with warnings, console logs, or soft assertions.
+
+### Fail Fast, Fail Loud ⚡
+
+Tests should behave like smoke detectors - they must alarm immediately when something is wrong, not politely mention there might be a problem.
+
+**✅ GOOD - Strict Assertions**:
+```typescript
+// Test fails immediately if sessionData is undefined or malformed
+expect(sessionData).toBeDefined();
+expect('tokenUsage' in sessionData).toBe(false);
+```
+
+**❌ BAD - Warn and Continue**:
+```typescript
+// This masks real failures and lets broken code pass
+if (sessionData) {
+  expect('tokenUsage' in sessionData).toBe(false);
+} else {
+  console.warn('Session data is undefined - needs investigation');
+}
+```
+
+### Why Strict Failure Matters
+
+1. **Prevents Silent Regressions**: Soft failures let bugs slip into production
+2. **Forces Real Fixes**: Developers must address root causes, not symptoms  
+3. **Maintains Code Quality**: Broken code can't masquerade as working code
+4. **Builds Confidence**: Passing tests guarantee system integrity
+5. **Speeds Debugging**: Clear failures point directly to problems
+
+### Common Anti-Patterns to Avoid
+
+#### 1. Conditional Assertions
+```typescript
+// ❌ Don't do this - hides real issues
+if (result) {
+  expect(result.status).toBe('success');
+} else {
+  console.warn('No result received');
+}
+
+// ✅ Do this - ensures expected conditions
+expect(result).toBeDefined();
+expect(result.status).toBe('success');
+```
+
+#### 2. Try-Catch Swallowing
+```typescript
+// ❌ Don't do this - silences important failures  
+try {
+  const data = await riskyOperation();
+  expect(data.value).toBe(42);
+} catch (error) {
+  console.log('Operation failed, but test continues...');
+  expect(true).toBeTruthy(); // Meaningless assertion
+}
+
+// ✅ Do this - let failures propagate or test them explicitly
+const data = await riskyOperation(); // Will throw if it should
+expect(data.value).toBe(42);
+
+// OR if failure is expected:
+await expect(riskyOperation()).rejects.toThrow('Expected error message');
+```
+
+#### 3. Fallback Assertions
+```typescript
+// ❌ Don't do this - accepts broken state as acceptable
+expect(actualValue === expectedValue || actualValue === fallbackValue).toBeTruthy();
+
+// ✅ Do this - demands correct behavior
+expect(actualValue).toBe(expectedValue);
+```
+
+#### 4. Optional Test Steps
+```typescript
+// ❌ Don't do this - lets incomplete tests pass
+const optionalElement = await page.locator('#optional').isVisible().catch(() => false);
+if (optionalElement) {
+  await expect(page.locator('#optional')).toHaveText('Expected text');
+}
+
+// ✅ Do this - test what the system should do
+await expect(page.locator('#optional')).toBeVisible();
+await expect(page.locator('#optional')).toHaveText('Expected text');
+```
+
+### When Warnings Are Appropriate
+
+The **ONLY** acceptable use of warnings in tests is for documenting known limitations while working toward fixes:
+
+```typescript
+// ✅ Acceptable - documents current broken state while working on fix
+test('documents current session loading behavior - TODO: fix in issue #123', async () => {
+  const response = await sessionAPI.getSession(sessionId);
+  
+  if (!response.data) {
+    console.warn('BUG: Session API returns null data - tracked in issue #123');
+    // Test documents the broken behavior
+    expect(response.data).toBeNull();
+  } else {
+    // Test verifies it works when fixed
+    expect(response.data.id).toBe(sessionId);
+  }
+});
+```
+
+**Requirements for warning-based tests**:
+1. Must reference a specific issue/ticket being worked on
+2. Must have a concrete timeline for fixing
+3. Must still make meaningful assertions about current behavior
+4. Should be converted to strict assertions once fixed
+
+### Refactoring Soft Failures
+
+When you encounter warn-and-continue patterns:
+
+**STEP 1**: Investigate why the condition might fail
+```typescript
+// Original soft failure
+if (sessionData) {
+  expect('tokenUsage' in sessionData).toBe(false);
+} else {
+  console.warn('Session data is undefined - needs investigation');
+}
+```
+
+**STEP 2**: Add strict assertion and run tests
+```typescript
+// Make it strict - will fail if there's a real issue
+expect(sessionData).toBeDefined();
+expect('tokenUsage' in sessionData).toBe(false);
+```
+
+**STEP 3**: If tests fail, fix the root cause, don't revert to soft assertion
+
+### Test Code Review Checklist
+
+When reviewing test code, reject any PR that contains:
+- [ ] `console.warn()` or `console.log()` instead of proper assertions
+- [ ] Conditional assertions that can be bypassed  
+- [ ] Try-catch blocks that swallow test failures
+- [ ] Comments like "TODO: investigate" without failing the test
+- [ ] `expect(true).toBeTruthy()` as fallback assertions
+
+### Integration with CI/CD
+
+Strict test failures are essential for CI/CD pipeline integrity:
+- **Green builds mean ready to deploy** - no exceptions
+- **Red builds block deployment** - no bypassing
+- **Flaky tests get fixed immediately** - no "ignore for now"
+
+### Summary
+
+**Tests are guardians of code quality.** They must be uncompromising, strict, and intolerant of unexpected conditions. A test that lets broken code pass is worse than no test at all, because it provides false confidence while allowing bugs to reach production.
+
+**Remember**: If your test isn't certain enough to fail the build, it's not providing real protection.
+
 ## Code Standards
 
 ### Test File Setup Requirements

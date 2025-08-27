@@ -88,7 +88,7 @@ async function startTestServer(
       LACE_DIR: tempDir,
       ANTHROPIC_API_KEY: 'test-anthropic-key-for-e2e',
       LACE_DB_PATH: path.join(tempDir, 'lace.db'),
-      NODE_ENV: 'production', // Use production mode for faster E2E tests
+      NODE_ENV: 'development', // Use development mode for React Router v7 compatibility
       E2E_TOOL_APPROVAL_MOCK: 'true',
       LACE_LOG_LEVEL: 'debug',
       LACE_LOG_STDERR: 'true',
@@ -203,7 +203,7 @@ export async function cleanupTestEnvironment(env: TestEnvironment) {
     delete process.env.LACE_DIR;
   }
 
-  delete process.env.ANTHROPIC_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
 
   // Clean up temp directory
   if (

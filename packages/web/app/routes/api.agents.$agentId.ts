@@ -1,0 +1,218 @@
+// ABOUTME: REST API endpoints for individual agent management - GET, PUT for agent updates
+// ABOUTME: Handles agent configuration updates including provider and model changes
+
+import { getSessionService } from '@/lib/server/session-service';
+import { asThreadId } from '@/types/core';
+import { isValidThreadId } from '@/lib/validation/thread-id-validation';
+import { createSuperjsonResponse } from '@/lib/server/serialization';
+import { createErrorResponse } from '@/lib/server/api-utils';
+import { z } from 'zod';
+import { ProviderRegistry } from '@/lib/server/lace-imports';
+import type { Route } from './+types/api.agents.$agentId';
+
+const AgentUpdateSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    providerInstanceId: z.string().min(1).optional(),
+    modelId: z.string().min(1).optional(),
+  })
+  .refine(
+    (data) => {
+      // If either providerInstanceId or modelId is provided, both must be provided
+      if (data.providerInstanceId || data.modelId) {
+        return data.providerInstanceId && data.modelId;
+      }
+      return true;
+    },
+    {
+      message: 'Both providerInstanceId and modelId must be provided together',
+    }
+  );
+
+export async function loader({ request: _request, params }: Route.LoaderArgs) {
+  try {
+    const { agentId } = params as { agentId: string };
+
+    if (!isValidThreadId(agentId as string)) {
+      return createErrorResponse('Invalid agent ID', 400, { code: 'VALIDATION_FAILED' });
+    }
+
+    const agentThreadId = asThreadId(agentId);
+
+    // Extract sessionId from agentId (agents are child threads like sessionId.1)
+    const sessionId = asThreadId(agentThreadId.split('.')[0]);
+
+    const sessionService = getSessionService();
+    const session = await sessionService.getSession(sessionId);
+
+    if (!session) {
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+    }
+
+    const agent = session.getAgent(agentThreadId);
+
+    if (!agent) {
+      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+    }
+
+    const metadata = agent.getThreadMetadata();
+    const tokenUsage = agent.getTokenUsage();
+
+    const agentResponse = {
+      threadId: agent.threadId,
+      name: (metadata?.name as string) || 'Agent ' + agent.threadId,
+      provider: (metadata?.provider as string) || agent.providerName,
+      model: (metadata?.model as string) || (metadata?.modelId as string) || agent.model,
+      providerInstanceId: (metadata?.providerInstanceId as string) || '',
+      modelId: (metadata?.modelId as string) || (metadata?.model as string) || agent.model,
+      status: agent.getCurrentState(),
+      tokenUsage,
+      createdAt: (metadata?.createdAt as Date) || undefined,
+    };
+
+    return createSuperjsonResponse(agentResponse);
+  } catch (error: unknown) {
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to fetch agent',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
+    );
+  }
+}
+
+export async function action({ request, params }: Route.ActionArgs) {
+  if (request.method !== 'PUT') {
+    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  }
+
+  try {
+    const { agentId } = params as { agentId: string };
+
+    if (!isValidThreadId(agentId as string)) {
+      return createErrorResponse('Invalid agent ID', 400, { code: 'VALIDATION_FAILED' });
+    }
+
+    const body = (await request.json()) as Record<string, unknown>;
+
+    let validatedData;
+    try {
+      validatedData = AgentUpdateSchema.parse(body);
+    } catch (zodError) {
+      if (zodError instanceof z.ZodError) {
+        const details = zodError.errors.map((e) => ({
+          path: e.path.join('.'),
+          message: e.message,
+          received: body[e.path[0] as keyof typeof body],
+        }));
+        return createErrorResponse(
+          `Validation failed: ${details.map((d) => `${d.path}: ${d.message}`).join(', ')}`,
+          400,
+          {
+            code: 'VALIDATION_FAILED',
+            details: { errors: details, receivedData: body },
+          }
+        );
+      }
+      throw zodError;
+    }
+
+    const agentThreadId = asThreadId(agentId);
+
+    // Extract sessionId from agentId (agents are child threads like sessionId.1)
+    const sessionId = asThreadId(agentThreadId.split('.')[0]);
+
+    const sessionService = getSessionService();
+    const session = await sessionService.getSession(sessionId);
+
+    if (!session) {
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+    }
+
+    const agent = session.getAgent(agentThreadId);
+
+    if (!agent) {
+      return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+    }
+
+    // Validate provider instance if provided
+    if (validatedData.providerInstanceId) {
+      const registry = ProviderRegistry.getInstance();
+
+      const configuredInstances = await registry.getConfiguredInstances();
+      const instance = configuredInstances.find(
+        (inst) => inst.id === validatedData.providerInstanceId
+      );
+
+      if (!instance) {
+        return createErrorResponse('Provider instance not found', 400, {
+          code: 'VALIDATION_FAILED',
+          details: {
+            availableInstances: configuredInstances.map((i) => ({
+              id: i.id,
+              name: (i as { name?: string; displayName: string }).name || i.displayName,
+            })),
+          },
+        });
+      }
+    }
+
+    // Update agent properties via thread metadata
+    const updates: Record<string, unknown> = {};
+
+    if (validatedData.name !== undefined) {
+      updates.name = validatedData.name;
+    }
+
+    // Update provider instance and model if provided
+    if (validatedData.providerInstanceId !== undefined) {
+      updates.providerInstanceId = validatedData.providerInstanceId;
+    }
+    if (validatedData.modelId !== undefined) {
+      updates.modelId = validatedData.modelId;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      agent.updateThreadMetadata(updates);
+
+      // Special case: If this is the session agent (Lace), also update session configuration
+      // The session agent's threadId equals the sessionId
+      if (agentThreadId === sessionId) {
+        const configUpdates: Record<string, unknown> = {};
+        if (validatedData.providerInstanceId !== undefined) {
+          configUpdates.providerInstanceId = validatedData.providerInstanceId;
+        }
+        if (validatedData.modelId !== undefined) {
+          configUpdates.modelId = validatedData.modelId;
+        }
+        if (Object.keys(configUpdates).length > 0) {
+          session.updateConfiguration(configUpdates);
+        }
+      }
+    }
+
+    const metadata = agent.getThreadMetadata();
+    const tokenUsage = agent.getTokenUsage();
+
+    const agentResponse = {
+      threadId: agent.threadId,
+      name: (metadata?.name as string) || 'Agent ' + agent.threadId,
+      provider: (metadata?.provider as string) || agent.providerName,
+      model: (metadata?.model as string) || (metadata?.modelId as string) || agent.model,
+      providerInstanceId: (metadata?.providerInstanceId as string) || '',
+      modelId: (metadata?.modelId as string) || (metadata?.model as string) || agent.model,
+      status: agent.getCurrentState(),
+      tokenUsage,
+      createdAt: (metadata?.createdAt as Date) || undefined,
+    };
+
+    return createSuperjsonResponse(agentResponse);
+  } catch (error: unknown) {
+    // Zod errors are now handled above with better messages
+
+    return createErrorResponse(
+      error instanceof Error ? error.message : 'Failed to update agent',
+      500,
+      { code: 'INTERNAL_SERVER_ERROR' }
+    );
+  }
+}

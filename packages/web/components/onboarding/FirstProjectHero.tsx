@@ -4,7 +4,7 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
+import { Link } from 'react-router';
 
 interface FirstProjectHeroProps {
   onCreateFirstProject: () => void;
@@ -35,7 +35,7 @@ export function FirstProjectHero({ onCreateFirstProject }: FirstProjectHeroProps
             </button>
             <Link
               className="btn btn-outline border-white/20 text-white hover:border-white/40 focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
-              href="/docs"
+              to="/docs"
               target="_blank"
               rel="noreferrer"
             >

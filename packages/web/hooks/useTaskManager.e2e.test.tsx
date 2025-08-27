@@ -20,16 +20,17 @@ import { TaskAPIClient } from '@/lib/client/task-api';
 
 // Import API routes to test against
 import {
-  GET as listTasks,
-  POST as createTask,
-} from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/route';
+  loader as listTasks,
+  action as createTask,
+} from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks';
 import {
-  GET as getTask,
-  PATCH as updateTask,
-  DELETE as deleteTask,
-} from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/route';
-import { POST as addNote } from '@/app/api/projects/[projectId]/sessions/[sessionId]/tasks/[taskId]/notes/route';
-import { NextRequest } from 'next/server';
+  loader as getTask,
+  action as updateTask,
+  action as deleteTask,
+} from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId';
+import { action as addNote } from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.notes';
+// Use standard Request instead of Request
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 
 // Mock external dependencies only
 vi.mock('server-only', () => ({}));
@@ -88,7 +89,7 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
       .mockImplementation(async (url: RequestInfo | URL, init?: RequestInit) => {
         const urlString = typeof url === 'string' ? url : url.toString();
         const method = init?.method || 'GET';
-        // Convert null signal to undefined for NextRequest compatibility
+        // Convert null signal to undefined for Request compatibility
         const sanitizedInit = init
           ? {
               ...init,
@@ -125,28 +126,34 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
               throw new Error(`Missing projectId or sessionId in route: ${urlString}`);
             }
 
-            const request = new NextRequest('http://localhost' + urlString, sanitizedInit);
+            const request = new Request('http://localhost' + urlString, sanitizedInit);
 
             if (urlPath.includes('/notes') && method === 'POST' && taskIdFromUrl) {
               // Handle POST /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}/notes
-              return await addNote(request, {
-                params: Promise.resolve({
+              return await addNote(
+                createActionArgs(request, {
                   projectId: routeProjectId,
                   sessionId: routeSessionId,
                   taskId: taskIdFromUrl,
-                }),
-              });
+                })
+              );
             } else if (taskIdFromUrl && !urlPath.includes('/notes')) {
               // Handle individual task operations: GET/PATCH/DELETE /api/projects/{projectId}/sessions/{sessionId}/tasks/{taskId}
-              const response = await (
-                method === 'GET' ? getTask : method === 'PATCH' ? updateTask : deleteTask
-              )(request, {
-                params: Promise.resolve({
-                  projectId: routeProjectId,
-                  sessionId: routeSessionId,
-                  taskId: taskIdFromUrl,
-                }),
-              });
+              const response = await (method === 'GET'
+                ? getTask(
+                    createLoaderArgs(request, {
+                      projectId: routeProjectId,
+                      sessionId: routeSessionId,
+                      taskId: taskIdFromUrl,
+                    })
+                  )
+                : (method === 'PATCH' ? updateTask : deleteTask)(
+                    createActionArgs(request, {
+                      projectId: routeProjectId,
+                      sessionId: routeSessionId,
+                      taskId: taskIdFromUrl,
+                    })
+                  ));
 
               if (method === 'GET') {
                 const responseText = await response.text();
@@ -159,20 +166,20 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
               return response;
             } else if (method === 'POST' && urlPath.endsWith('/tasks')) {
               // Handle POST /api/projects/{projectId}/sessions/{sessionId}/tasks
-              return await createTask(request, {
-                params: Promise.resolve({
+              return await createTask(
+                createActionArgs(request, {
                   projectId: routeProjectId,
                   sessionId: routeSessionId,
-                }),
-              });
+                })
+              );
             } else if (method === 'GET' && urlPath.endsWith('/tasks')) {
               // Handle GET /api/projects/{projectId}/sessions/{sessionId}/tasks
-              return await listTasks(request, {
-                params: Promise.resolve({
+              return await listTasks(
+                createLoaderArgs(request, {
                   projectId: routeProjectId,
                   sessionId: routeSessionId,
-                }),
-              });
+                })
+              );
             }
           }
 

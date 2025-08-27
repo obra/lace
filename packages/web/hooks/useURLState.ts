@@ -1,9 +1,9 @@
-// ABOUTME: Next.js App Router URL state management hook
+// ABOUTME: React Router v7 URL state management hook
 // ABOUTME: Provides clean navigation with automatic cascade clearing through route structure
 
 'use client';
 
-import { useParams, useRouter, usePathname } from 'next/navigation';
+import { useParams, useNavigate, useLocation } from 'react-router';
 import { useCallback } from 'react';
 import type { ThreadId } from '@/types/core';
 
@@ -21,9 +21,9 @@ export interface URLActions {
 }
 
 export function useURLState(): URLState & URLActions {
-  const router = useRouter();
+  const navigate = useNavigate();
   const params = useParams();
-  const _pathname = usePathname();
+  const _location = useLocation();
 
   // Extract current state from URL params
   const project = (params?.projectId as string) || null;
@@ -33,28 +33,28 @@ export function useURLState(): URLState & URLActions {
   // Navigation functions with automatic cascade clearing
   const navigateToProject = useCallback(
     (projectId: string) => {
-      router.push(`/project/${projectId}`);
+      navigate(`/project/${projectId}`);
     },
-    [router]
+    [navigate]
   );
 
   const navigateToSession = useCallback(
     (projectId: string, sessionId: ThreadId) => {
-      router.push(`/project/${projectId}/session/${sessionId}`);
+      navigate(`/project/${projectId}/session/${sessionId}`);
     },
-    [router]
+    [navigate]
   );
 
   const navigateToAgent = useCallback(
     (projectId: string, sessionId: ThreadId, agentId: ThreadId) => {
-      router.push(`/project/${projectId}/session/${sessionId}/agent/${agentId}`);
+      navigate(`/project/${projectId}/session/${sessionId}/agent/${agentId}`);
     },
-    [router]
+    [navigate]
   );
 
   const navigateToRoot = useCallback(() => {
-    router.push('/');
-  }, [router]);
+    navigate('/');
+  }, [navigate]);
 
   return {
     // Current state

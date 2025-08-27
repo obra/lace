@@ -4,6 +4,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { BrowserRouter } from 'react-router-dom';
 import { ProjectSelectorPanel } from './ProjectSelectorPanel';
 import { createMockResponse } from '@/test-utils/mock-fetch';
 import {
@@ -34,26 +35,11 @@ vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
   ProviderInstanceProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-// Mock Next.js App Router
-const mockPush = vi.fn();
-const mockReplace = vi.fn();
-const mockRefresh = vi.fn();
-const mockBack = vi.fn();
-const mockForward = vi.fn();
-const mockPrefetch = vi.fn();
+// Mock React Router
+const mockNavigate = vi.fn();
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
-    replace: mockReplace,
-    refresh: mockRefresh,
-    back: mockBack,
-    forward: mockForward,
-    prefetch: mockPrefetch,
-  }),
-  usePathname: () => '/',
-  useSearchParams: () => new URLSearchParams(),
-  useParams: () => ({}),
+vi.mock('react-router', () => ({
+  useNavigate: () => mockNavigate,
 }));
 
 // Import mocked hooks
@@ -102,12 +88,7 @@ describe('ProjectSelectorPanel', () => {
     vi.clearAllMocks();
 
     // Clear router mocks
-    mockPush.mockClear();
-    mockReplace.mockClear();
-    mockRefresh.mockClear();
-    mockBack.mockClear();
-    mockForward.mockClear();
-    mockPrefetch.mockClear();
+    mockNavigate.mockClear();
 
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
       createMockResponse({ project: { id: '1', name: 'Test' } })
@@ -178,7 +159,11 @@ describe('ProjectSelectorPanel', () => {
       })
     );
 
-    render(<ProjectSelectorPanel />);
+    render(
+      <BrowserRouter>
+        <ProjectSelectorPanel />
+      </BrowserRouter>
+    );
 
     // In simplified onboarding flow, modal opens directly at directory step (step 2)
     expect(await screen.findByText('Create New Project')).toBeInTheDocument();
@@ -199,7 +184,11 @@ describe('ProjectSelectorPanel', () => {
       })
     );
 
-    render(<ProjectSelectorPanel />);
+    render(
+      <BrowserRouter>
+        <ProjectSelectorPanel />
+      </BrowserRouter>
+    );
 
     // In simplified onboarding flow, modal opens directly at directory step
     await waitFor(() => {
@@ -223,7 +212,11 @@ describe('ProjectSelectorPanel', () => {
       })
     );
 
-    render(<ProjectSelectorPanel />);
+    render(
+      <BrowserRouter>
+        <ProjectSelectorPanel />
+      </BrowserRouter>
+    );
 
     await waitFor(() => {
       expect(screen.getByText('Advanced setup')).toBeInTheDocument();

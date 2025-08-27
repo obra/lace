@@ -1,0 +1,446 @@
+// ABOUTME: E2E tests for agent spawning API endpoints using real services
+// ABOUTME: Tests full agent spawning workflow from API calls to real session management
+
+/**
+ * @vitest-environment node
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
+import { parseResponse } from '@/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
+
+// Mock server-only module
+vi.mock('server-only', () => ({}));
+
+// Mock only external dependencies, not core functionality
+vi.mock('@/lib/server/approval-manager', () => ({
+  getApprovalManager: () => ({
+    requestApproval: vi.fn().mockResolvedValue('allow_once'),
+  }),
+}));
+
+// Import the real API route handlers after mocks
+import { action as POST, loader as GET } from '@/app/routes/api.sessions.$sessionId.agents';
+import { getSessionService, SessionService } from '@/lib/server/session-service';
+import { Project, Session } from '@/lib/server/lace-imports';
+import type { ThreadId, AgentInfo } from '@/types/core';
+import type { AgentWithTokenUsage } from '@/types/api';
+
+// Helper to escape special regex characters to prevent injection
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+interface ErrorResponse {
+  error: string;
+}
+
+// Note: parseResponse is imported from @/lib/serialization
+
+describe('Agent Spawning API E2E Tests', () => {
+  const _tempLaceDir = setupWebTest();
+  let sessionService: SessionService;
+  let testProject: Project;
+  let sessionId: string;
+  let anthropicInstanceId: string;
+  let openaiInstanceId: string;
+
+  beforeEach(async () => {
+    // Set up environment for session service
+    process.env = {
+      ...process.env,
+      ANTHROPIC_KEY: 'test-key',
+      OPENAI_API_KEY: 'test-openai-key',
+      LACE_DB_PATH: ':memory:',
+    };
+
+    // Create test provider instances
+    anthropicInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    openaiInstanceId = await createTestProviderInstance({
+      catalogId: 'openai',
+      models: ['gpt-4o'],
+      displayName: 'Test OpenAI Instance',
+      apiKey: 'test-openai-key',
+    });
+
+    // Create real project and session using the session service
+    testProject = Project.create(
+      'Agent Spawning E2E Test Project',
+      '/test/path',
+      'Test project for agent spawning E2E testing',
+      {
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
+
+    sessionService = getSessionService();
+    const sessionInstance = Session.create({
+      name: 'Agent Test Session',
+      projectId: testProject.getId(),
+    });
+    const session = sessionInstance.getInfo()!;
+    sessionId = session.id as string;
+  });
+
+  afterEach(async () => {
+    // Clean up agents before tearing down persistence
+    if (sessionService) {
+      sessionService.clearActiveSessions();
+    }
+
+    // Cleanup test provider instances
+    await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
+
+    vi.clearAllMocks();
+  });
+
+  describe('POST /api/sessions/{sessionId}/agents', () => {
+    it('should spawn agent with real session service using provider instances', async () => {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'architect',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-sonnet-20241022',
+        }),
+      });
+
+      const response = await POST(createActionArgs(request, { sessionId }));
+      expect(response.status).toBe(201);
+
+      const data = await parseResponse<AgentWithTokenUsage>(response);
+
+      // Verify agent was created with correct properties
+      expect(data).toMatchObject({
+        name: 'architect',
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-sonnet-20241022',
+        status: 'idle',
+      });
+
+      // ThreadId should follow sessionId.N pattern
+      expect(data.threadId).toMatch(new RegExp(`^${escapeRegExp(sessionId)}\\.\\d+$`));
+    });
+
+    it('should support different provider instances and models', async () => {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'openai-agent',
+          providerInstanceId: openaiInstanceId,
+          modelId: 'gpt-4o',
+        }),
+      });
+
+      const response = await POST(createActionArgs(request, { sessionId }));
+      expect(response.status).toBe(201);
+
+      const data = await parseResponse<AgentWithTokenUsage>(response);
+      expect(data.providerInstanceId).toBe(openaiInstanceId);
+      expect(data.modelId).toBe('gpt-4o');
+      expect(data.name).toBe('openai-agent');
+    });
+
+    it('should auto-generate agent name when missing', async () => {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      });
+
+      const response = await POST(createActionArgs(request, { sessionId }));
+      expect(response.status).toBe(201);
+
+      const data = await parseResponse<AgentWithTokenUsage>(response);
+      // Delegates should get thread-based names, not 'Lace'
+      expect(data.name).toMatch(/^Agent-\d+$/);
+    });
+
+    it('should auto-generate agent name when empty', async () => {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: '',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      });
+
+      const response = await POST(createActionArgs(request, { sessionId }));
+      expect(response.status).toBe(201);
+
+      const data = await parseResponse<AgentWithTokenUsage>(response);
+      // Delegates should get thread-based names, not 'Lace'
+      expect(data.name).toMatch(/^Agent-\d+$/);
+    });
+
+    it('should increment agent threadIds sequentially', async () => {
+      // First agent
+      const request1 = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'agent1',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      });
+
+      const response1 = await POST(createActionArgs(request1, { sessionId }));
+      const data1 = await parseResponse<AgentWithTokenUsage>(response1);
+
+      // Should be .1 since session already has a coordinator at .0
+      expect(data1.threadId).toBe(`${sessionId}.1`);
+
+      // Second agent
+      const request2 = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'agent2',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      });
+
+      const response2 = await POST(createActionArgs(request2, { sessionId }));
+      const data2 = await parseResponse<AgentWithTokenUsage>(response2);
+      expect(data2.threadId).toBe(`${sessionId}.2`);
+    });
+
+    it('should return 400 for invalid sessionId format', async () => {
+      const request = new Request('http://localhost/api/sessions/invalid-id/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'test',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      });
+
+      const response = await POST(createActionArgs(request, { sessionId: 'invalid-id' }));
+      expect(response.status).toBe(400);
+
+      const data = await parseResponse<ErrorResponse>(response);
+      expect(data.error).toBe('Invalid session ID');
+    });
+
+    it('should return 404 for non-existent session', async () => {
+      // Use valid ThreadId format but non-existent session
+      const nonExistentSessionId = 'lace_20250101_abc999';
+      const request = new Request(`http://localhost/api/sessions/${nonExistentSessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'test',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      });
+
+      const response = await POST(createActionArgs(request, { sessionId: nonExistentSessionId }));
+      expect(response.status).toBe(404);
+
+      const data = await parseResponse<ErrorResponse>(response);
+      expect(data.error).toBe('Session not found');
+    });
+
+    it('should return 400 for missing required fields', async () => {
+      // Test missing providerInstanceId
+      const request1 = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Missing Provider Instance',
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      });
+
+      const response1 = await POST(createActionArgs(request1, { sessionId }));
+      expect(response1.status).toBe(400);
+
+      const data1 = await parseResponse<ErrorResponse>(response1);
+      expect(data1.error).toBe('Invalid request body');
+
+      // Test missing modelId
+      const request2 = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Missing Model ID',
+          providerInstanceId: anthropicInstanceId,
+        }),
+      });
+
+      const response2 = await POST(createActionArgs(request2, { sessionId }));
+      expect(response2.status).toBe(400);
+
+      const data2 = await parseResponse<ErrorResponse>(response2);
+      expect(data2.error).toBe('Invalid request body');
+    });
+
+    it('should create agent with non-existent provider instance (validation deferred to runtime)', async () => {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Non-existent Instance Agent',
+          providerInstanceId: 'non-existent-instance',
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      });
+
+      const response = await POST(createActionArgs(request, { sessionId }));
+      expect(response.status).toBe(201);
+
+      const data = await parseResponse<AgentWithTokenUsage>(response);
+      expect(data.name).toBe('Non-existent Instance Agent');
+      expect(data.providerInstanceId).toBe('non-existent-instance');
+      // Provider validation happens during agent initialization/operation, not at creation time
+    });
+  });
+
+  describe('GET /api/sessions/{sessionId}/agents', () => {
+    it('should list all agents in session', async () => {
+      // First spawn an agent
+      const spawnRequest = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'test-agent',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+        }),
+      });
+
+      await POST(createActionArgs(spawnRequest, { sessionId }));
+
+      // Then list agents
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'GET',
+      });
+
+      const response = await GET(createLoaderArgs(request, { sessionId }));
+      expect(response.status).toBe(200);
+
+      const data = await parseResponse<AgentInfo[]>(response);
+
+      // Should have coordinator (id .0) + spawned agent (id .1)
+      expect(data).toHaveLength(2);
+
+      const spawnedAgent = data.find((a) => a.name === 'test-agent');
+      expect(spawnedAgent).toBeDefined();
+      expect(spawnedAgent?.threadId).toBe(`${sessionId}.1`);
+    });
+
+    it('should include agent threadIds and metadata', async () => {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'GET',
+      });
+
+      const response = await GET(createLoaderArgs(request, { sessionId }));
+      expect(response.status).toBe(200);
+
+      const data = await parseResponse<AgentInfo[]>(response);
+
+      // Should have at least the coordinator agent
+      expect(data.length).toBeGreaterThanOrEqual(1);
+
+      // Each agent should have required fields
+      data.forEach((agent) => {
+        expect(agent.threadId).toBeDefined();
+        expect(agent.name).toBeDefined();
+        expect(agent.providerInstanceId).toBeDefined();
+        expect(agent.modelId).toBeDefined();
+        expect(agent.status).toBeDefined();
+      });
+    });
+
+    it('should return 400 for invalid session ID format', async () => {
+      const request = new Request('http://localhost/api/sessions/invalid-id/agents', {
+        method: 'GET',
+      });
+
+      const response = await GET(createLoaderArgs(request, { sessionId: 'invalid-id' }));
+      expect(response.status).toBe(400);
+
+      const data = await parseResponse<ErrorResponse>(response);
+      expect(data.error).toBe('Invalid session ID');
+    });
+
+    it('should return 404 for non-existent session', async () => {
+      // Use valid ThreadId format but non-existent session
+      const nonExistentSessionId = 'lace_20250101_abc999';
+      const request = new Request(`http://localhost/api/sessions/${nonExistentSessionId}/agents`, {
+        method: 'GET',
+      });
+
+      const response = await GET(createLoaderArgs(request, { sessionId: nonExistentSessionId }));
+      expect(response.status).toBe(404);
+
+      const data = await parseResponse<ErrorResponse>(response);
+      expect(data.error).toBe('Session not found');
+    });
+  });
+
+  describe('Integration: Real Session and Agent Management', () => {
+    it('should properly integrate with session service', async () => {
+      // Spawn agent via API
+      const spawnRequest = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'integration-agent',
+          providerInstanceId: anthropicInstanceId,
+          modelId: 'claude-3-5-sonnet-20241022',
+        }),
+      });
+
+      const spawnResponse = await POST(createActionArgs(spawnRequest, { sessionId }));
+      expect(spawnResponse.status).toBe(201);
+
+      const spawnData = await parseResponse<AgentWithTokenUsage>(spawnResponse);
+      const agentThreadId = spawnData.threadId;
+
+      // Verify agent exists in session service
+      const session = await sessionService.getSession(sessionId as ThreadId);
+      expect(session).toBeDefined();
+
+      const agents = session!.getAgents();
+      const createdAgent = agents.find((a) => a.threadId === agentThreadId);
+      expect(createdAgent).toBeDefined();
+      expect(createdAgent!.name).toBe('integration-agent');
+
+      // Verify via API as well
+      const listRequest = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {
+        method: 'GET',
+      });
+
+      const listResponse = await GET(createLoaderArgs(listRequest, { sessionId }));
+      const listData = await parseResponse<AgentInfo[]>(listResponse);
+
+      const apiAgent = listData.find((a) => a.threadId === agentThreadId);
+      expect(apiAgent).toBeDefined();
+      expect(apiAgent!.name).toBe('integration-agent');
+    });
+  });
+});

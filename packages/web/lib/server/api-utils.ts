@@ -36,19 +36,15 @@ export const AddNoteSchema = z.object({
 });
 
 // Validation helper
-export async function validateRouteParams<T>(
-  params: Promise<unknown>,
-  schema: z.ZodSchema<T>
-): Promise<T> {
+export function validateRouteParams<T>(params: unknown, schema: z.ZodSchema<T>): T {
   try {
-    const resolvedParams = await params;
-    return schema.parse(resolvedParams);
+    return schema.parse(params);
   } catch (error) {
     if (error instanceof z.ZodError) {
       const messages = error.errors
         .map((err) => `${err.path.join('.')}: ${err.message}`)
         .join(', ');
-      logger.error('Route parameter validation failed', { error: messages, params: await params });
+      logger.error('Route parameter validation failed', { error: messages, params });
       throw new Error(`Invalid route parameters: ${messages}`);
     }
     logger.error('Route parameter validation failed', { error, params });
