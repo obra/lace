@@ -11,13 +11,13 @@ import { CombinedTokenUsage } from '~/token-management/types';
 export interface HelperResult {
   /** The final text response from the LLM */
   content: string;
-  
+
   /** All tool calls made during execution */
   toolCalls: ToolCall[];
-  
+
   /** Results from those tool calls */
   toolResults: ToolResult[];
-  
+
   /** Total token usage across all LLM calls */
   tokenUsage?: CombinedTokenUsage;
 }

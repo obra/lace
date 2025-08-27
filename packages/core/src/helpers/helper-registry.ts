@@ -1,9 +1,9 @@
 // ABOUTME: Centralized registry for managing active helper agent instances
 // ABOUTME: Tracks helper lifecycle and provides lookup/management functionality
 
-import { InfrastructureHelper, InfrastructureHelperOptions } from './infrastructure-helper';
-import { SessionHelper, SessionHelperOptions } from './session-helper';
-import { BaseHelper } from './base-helper';
+import { InfrastructureHelper, InfrastructureHelperOptions } from '~/helpers/infrastructure-helper';
+import { SessionHelper, SessionHelperOptions } from '~/helpers/session-helper';
+import { BaseHelper } from '~/helpers/base-helper';
 
 type HelperType = 'infrastructure' | 'session';
 
@@ -25,14 +25,17 @@ export class HelperRegistry {
    * @param options Configuration for the infrastructure helper
    * @returns The created infrastructure helper
    */
-  createInfrastructureHelper(id: string, options: InfrastructureHelperOptions): InfrastructureHelper {
+  createInfrastructureHelper(
+    id: string,
+    options: InfrastructureHelperOptions
+  ): InfrastructureHelper {
     if (this.helpers.has(id)) {
       throw new Error(`Helper with id "${id}" already exists`);
     }
 
     const helper = new InfrastructureHelper(options);
     this.helpers.set(id, { helper, type: 'infrastructure' });
-    
+
     return helper;
   }
 
@@ -49,7 +52,7 @@ export class HelperRegistry {
 
     const helper = new SessionHelper(options);
     this.helpers.set(id, { helper, type: 'session' });
-    
+
     return helper;
   }
 

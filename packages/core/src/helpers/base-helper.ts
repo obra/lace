@@ -1,19 +1,13 @@
 // ABOUTME: Base class for helper agents providing common multi-turn execution logic
 // ABOUTME: Extended by InfrastructureHelper and SessionHelper for specific use cases
 
-import { HelperResult } from './types';
+import { HelperResult } from '~/helpers/types';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { AIProvider, ProviderMessage } from '~/providers/base-provider';
 import { CombinedTokenUsage } from '~/token-management/types';
 import { logger } from '~/utils/logger';
-
-interface MessageTokenUsage {
-  promptTokens: number;
-  completionTokens: number; 
-  totalTokens: number;
-}
 
 /**
  * Base class for helper agents
@@ -31,12 +25,12 @@ export abstract class BaseHelper {
   /**
    * Get the tools available to this helper
    */
-  protected abstract getTools(): Promise<Tool[]>;
+  protected abstract getTools(): Tool[];
 
   /**
    * Get the tool executor for this helper
    */
-  protected abstract getToolExecutor(): Promise<ToolExecutor>;
+  protected abstract getToolExecutor(): ToolExecutor;
 
   /**
    * Execute tool calls according to the helper's security model
@@ -50,7 +44,7 @@ export abstract class BaseHelper {
   /**
    * Get the model to use for this helper
    */
-  protected abstract getModel(): Promise<string>;
+  protected abstract getModel(): string;
 
   /**
    * Execute a prompt and return the complete result
@@ -58,13 +52,11 @@ export abstract class BaseHelper {
    */
   async execute(prompt: string, signal?: AbortSignal): Promise<HelperResult> {
     const provider = await this.getProvider();
-    const tools = await this.getTools();
-    const model = await this.getModel();
-    
+    const tools = this.getTools();
+    const model = this.getModel();
+
     // Build initial conversation
-    const conversation: ProviderMessage[] = [
-      { role: 'user', content: prompt }
-    ];
+    const conversation: ProviderMessage[] = [{ role: 'user', content: prompt }];
 
     // Track all tool usage
     const allToolCalls: ToolCall[] = [];
@@ -73,7 +65,7 @@ export abstract class BaseHelper {
 
     // Multi-turn execution loop
     let turnCount = 0;
-    
+
     while (true) {
       // Check abort signal
       if (signal?.aborted) {
@@ -87,17 +79,17 @@ export abstract class BaseHelper {
 
       logger.debug('Helper executing turn', {
         turnCount,
-        conversationLength: conversation.length
+        conversationLength: conversation.length,
       });
 
-      // Get LLM response  
+      // Get LLM response
       const response = await provider.createResponse(conversation, tools, model);
 
       // Add assistant response to conversation
       conversation.push({
         role: 'assistant',
         content: response.content,
-        toolCalls: response.toolCalls
+        toolCalls: response.toolCalls,
       });
 
       // Aggregate token usage
@@ -107,7 +99,7 @@ export abstract class BaseHelper {
             message: {
               promptTokens: response.usage.promptTokens,
               completionTokens: response.usage.completionTokens,
-              totalTokens: response.usage.totalTokens
+              totalTokens: response.usage.totalTokens,
             },
             thread: {
               totalPromptTokens: response.usage.promptTokens,
@@ -115,22 +107,23 @@ export abstract class BaseHelper {
               totalTokens: response.usage.totalTokens,
               contextLimit: 100000, // Default reasonable limit
               percentUsed: 0,
-              nearLimit: false
-            }
+              nearLimit: false,
+            },
           };
         } else {
           // Update message usage for current response
           totalUsage.message = {
             promptTokens: response.usage.promptTokens,
             completionTokens: response.usage.completionTokens,
-            totalTokens: response.usage.totalTokens
+            totalTokens: response.usage.totalTokens,
           };
-          
+
           // Aggregate to thread totals
           totalUsage.thread.totalPromptTokens += response.usage.promptTokens;
           totalUsage.thread.totalCompletionTokens += response.usage.completionTokens;
           totalUsage.thread.totalTokens += response.usage.totalTokens;
-          totalUsage.thread.percentUsed = (totalUsage.thread.totalTokens / totalUsage.thread.contextLimit) * 100;
+          totalUsage.thread.percentUsed =
+            (totalUsage.thread.totalTokens / totalUsage.thread.contextLimit) * 100;
           totalUsage.thread.nearLimit = totalUsage.thread.percentUsed > 80;
         }
       }
@@ -139,25 +132,25 @@ export abstract class BaseHelper {
       if (!response.toolCalls || response.toolCalls.length === 0) {
         logger.debug('Helper completed', {
           turnCount,
-          toolCallsTotal: allToolCalls.length
+          toolCallsTotal: allToolCalls.length,
         });
 
         return {
           content: response.content,
           toolCalls: allToolCalls,
           toolResults: allToolResults,
-          tokenUsage: totalUsage
+          tokenUsage: totalUsage,
         };
       }
 
       // Execute tool calls
       logger.debug('Helper executing tool calls', {
         turnCount,
-        toolCount: response.toolCalls.length
+        toolCount: response.toolCalls.length,
       });
 
       const toolResults = await this.executeToolCalls(response.toolCalls, signal);
-      
+
       // Track tool usage
       allToolCalls.push(...response.toolCalls);
       allToolResults.push(...toolResults);
@@ -167,7 +160,7 @@ export abstract class BaseHelper {
         conversation.push({
           role: 'user',
           content: '', // Empty content since tool results are in toolResults field
-          toolResults: toolResults
+          toolResults: toolResults,
         });
       }
     }

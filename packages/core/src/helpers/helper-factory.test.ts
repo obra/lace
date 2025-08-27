@@ -70,48 +70,36 @@ describe('HelperFactory', () => {
 
   describe('type safety', () => {
     it('should enforce valid model tiers', () => {
-      // These should compile
-      HelperFactory.createInfrastructureHelper({
+      // These should compile and create helpers
+      const fastHelper = HelperFactory.createInfrastructureHelper({
         model: 'fast',
         tools: []
       });
+      expect(fastHelper).toBeInstanceOf(InfrastructureHelper);
 
-      HelperFactory.createInfrastructureHelper({
+      const smartHelper = HelperFactory.createInfrastructureHelper({
         model: 'smart',
         tools: []
       });
-
-      // Invalid model would cause TypeScript error
-      // HelperFactory.createInfrastructureHelper({
-      //   model: 'invalid',  // TypeScript error
-      //   tools: []
-      // });
+      expect(smartHelper).toBeInstanceOf(InfrastructureHelper);
     });
 
     it('should require tools array for infrastructure helpers', () => {
-      // This should compile
-      HelperFactory.createInfrastructureHelper({
+      // This should compile and create helper with tools
+      const helper = HelperFactory.createInfrastructureHelper({
         model: 'fast',
         tools: ['tool1', 'tool2']
       });
-
-      // Missing tools would cause TypeScript error
-      // HelperFactory.createInfrastructureHelper({
-      //   model: 'fast'  // TypeScript error - missing tools
-      // });
+      expect(helper).toBeInstanceOf(InfrastructureHelper);
     });
 
     it('should require parent agent for session helpers', () => {
-      // This should compile
-      HelperFactory.createSessionHelper({
+      // This should compile and create helper with parent agent
+      const helper = HelperFactory.createSessionHelper({
         model: 'fast',
         parentAgent: mockAgent
       });
-
-      // Missing parent agent would cause TypeScript error
-      // HelperFactory.createSessionHelper({
-      //   model: 'fast'  // TypeScript error - missing parentAgent
-      // });
+      expect(helper).toBeInstanceOf(SessionHelper);
     });
   });
 });

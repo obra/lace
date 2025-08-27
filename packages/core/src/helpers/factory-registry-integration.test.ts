@@ -68,12 +68,12 @@ describe('HelperFactory and HelperRegistry Integration', () => {
         tools: ['tool1']
       });
 
-      const infraHelper2 = registry.createInfrastructureHelper('infra-2', {
+      const _infraHelper2 = registry.createInfrastructureHelper('infra-2', {
         model: 'smart', 
         tools: ['tool2']
       });
 
-      const sessionHelper1 = registry.createSessionHelper('session-1', {
+      const _sessionHelper1 = registry.createSessionHelper('session-1', {
         model: 'fast',
         parentAgent: mockAgent
       });

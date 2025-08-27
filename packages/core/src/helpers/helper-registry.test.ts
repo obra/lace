@@ -135,11 +135,11 @@ describe('HelperRegistry', () => {
 
   describe('helper type tracking', () => {
     it('should track helper types correctly', () => {
-      const infraHelper = registry.createInfrastructureHelper('infra-1', { 
+      const _infraHelper = registry.createInfrastructureHelper('infra-1', { 
         model: 'fast', 
         tools: [] 
       });
-      const sessionHelper = registry.createSessionHelper('session-1', { 
+      const _sessionHelper = registry.createSessionHelper('session-1', { 
         model: 'smart', 
         parentAgent: mockAgent 
       });

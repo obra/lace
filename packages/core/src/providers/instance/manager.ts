@@ -207,7 +207,7 @@ export class ProviderInstanceManager {
   async getInstance(instanceId: string): Promise<AIProvider | null> {
     const config = await this.loadInstances();
     const instance = config.instances[instanceId];
-    
+
     if (!instance) {
       return null;
     }

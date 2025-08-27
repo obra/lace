@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { BaseHelper } from './base-helper';
-import { HelperResult } from './types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider';

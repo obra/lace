@@ -7,10 +7,8 @@ import { TestProvider } from '~/test-utils/test-provider';
 import { Tool } from '~/tools/tool';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { z } from 'zod';
-import * as fs from 'fs';
 
 // Mock modules
-vi.mock('fs');
 vi.mock('~/config/global-config');
 vi.mock('~/providers/instance/manager');
 
@@ -49,8 +47,8 @@ class TestTool extends Tool {
   description = 'Test tool';
   schema = z.object({ input: z.string() });
   
-  protected async executeValidated(args: { input: string }) {
-    return this.createResult(`Result: ${args.input}`);
+  protected async executeValidated(_args: { input: string }) {
+    return this.createResult(`Result: ${_args.input}`);
   }
 }
 
@@ -59,7 +57,7 @@ class UnapprovedTool extends Tool {
   description = 'Tool not in whitelist';
   schema = z.object({ input: z.string() });
   
-  protected async executeValidated(args: { input: string }) {
+  protected async executeValidated(_args: { input: string }) {
     return this.createResult(`Should not execute`);
   }
 }
@@ -116,49 +114,36 @@ describe('InfrastructureHelper', () => {
   });
 
   describe('execute', () => {
-    it('should execute with whitelisted tools only', async () => {
+    it('should block non-whitelisted tools', async () => {
       const helper = new InfrastructureHelper({
         model: 'fast',
-        tools: ['test_tool'] // Only test_tool is allowed
+        tools: [] // Empty whitelist - all tools blocked
       });
 
-      // Set tool executor on helper (normally done in constructor)
-      helper['toolExecutor'] = toolExecutor;
-
-      // Mock provider responses
+      // Mock provider response with tool call
       mockProvider.addMockResponse({
-        content: 'I will use both tools',
+        content: 'I will try to use a tool',
         toolCalls: [
           {
             id: 'call_1',
-            name: 'test_tool',
-            arguments: { input: 'allowed' }
-          },
-          {
-            id: 'call_2', 
-            name: 'unapproved_tool',
-            arguments: { input: 'not allowed' }
+            name: 'some_tool',
+            arguments: { input: 'test' }
           }
         ]
       });
 
       mockProvider.addMockResponse({
-        content: 'Done with tools',
+        content: 'Tool was blocked',
         toolCalls: []
       });
 
-      const result = await helper.execute('Test tool whitelist');
+      const result = await helper.execute('Test tool blocking');
 
-      // Should execute allowed tool
-      expect(result.toolCalls).toHaveLength(2);
-      expect(result.toolResults).toHaveLength(2);
-      
-      // First tool should succeed
-      expect(result.toolResults[0].status).toBe('completed');
-      
-      // Second tool should be denied
-      expect(result.toolResults[1].status).toBe('failed');
-      expect(result.toolResults[1].content[0].text).toContain('not in whitelist');
+      // Tool should be blocked
+      expect(result.toolCalls).toHaveLength(1);
+      expect(result.toolResults).toHaveLength(1);
+      expect(result.toolResults[0].status).toBe('failed');
+      expect(result.toolResults[0].content[0].text).toContain('not in whitelist');
     });
 
     it('should bypass approval for whitelisted tools', async () => {
@@ -265,7 +250,7 @@ describe('InfrastructureHelper', () => {
         tools: ['test_tool']
       });
 
-      const fastModel = await fastHelper['getModel']();
+      const fastModel = fastHelper['getModel']();
       expect(fastModel).toBe('fast-model');
       expect(GlobalConfigManager.getDefaultModel).toHaveBeenCalledWith('fast');
 
@@ -277,7 +262,7 @@ describe('InfrastructureHelper', () => {
         tools: ['test_tool']
       });
 
-      const smartModel = await smartHelper['getModel']();
+      const smartModel = smartHelper['getModel']();
       expect(smartModel).toBe('smart-model');
       expect(GlobalConfigManager.getDefaultModel).toHaveBeenCalledWith('smart');
     });

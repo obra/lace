@@ -1,7 +1,7 @@
 // ABOUTME: Infrastructure helper for Lace's internal systems to execute LLM tasks
 // ABOUTME: Bypasses user approval with programmatic tool whitelist for trusted operations
 
-import { BaseHelper } from './base-helper';
+import { BaseHelper } from '~/helpers/base-helper';
 import { GlobalConfigManager } from '~/config/global-config';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { parseProviderModel } from '~/providers/provider-utils';
@@ -14,16 +14,16 @@ import { logger } from '~/utils/logger';
 export interface InfrastructureHelperOptions {
   /** Model tier to use - 'fast' or 'smart' */
   model: 'fast' | 'smart';
-  
+
   /** Explicit whitelist of tool names that can be used */
   tools: string[];
-  
+
   /** Optional working directory for file operations */
   workingDirectory?: string;
-  
+
   /** Optional environment variables for subprocess execution */
   processEnv?: NodeJS.ProcessEnv;
-  
+
   /** Optional abort signal for cancellation */
   abortSignal?: AbortSignal;
 }
@@ -37,7 +37,7 @@ export class InfrastructureHelper extends BaseHelper {
   private provider: AIProvider | null = null;
   private toolExecutor: ToolExecutor;
   private availableTools: Tool[] = [];
-  
+
   constructor(private options: InfrastructureHelperOptions) {
     super();
     this.toolExecutor = new ToolExecutor();
@@ -56,13 +56,13 @@ export class InfrastructureHelper extends BaseHelper {
     logger.debug('InfrastructureHelper resolving provider', {
       tier: this.options.model,
       instanceId,
-      modelId
+      modelId,
     });
 
     // Get provider instance
     const instanceManager = new ProviderInstanceManager();
     const instance = await instanceManager.getInstance(instanceId);
-    
+
     if (!instance) {
       throw new Error(`Provider instance not found: ${instanceId}`);
     }
@@ -71,29 +71,29 @@ export class InfrastructureHelper extends BaseHelper {
     return instance;
   }
 
-  protected async getTools(): Promise<Tool[]> {
+  protected getTools(): Tool[] {
     if (this.availableTools.length > 0) {
       return this.availableTools;
     }
 
     // Get tool instances for whitelisted names
     this.availableTools = this.options.tools
-      .map(name => this.toolExecutor.getTool(name))
+      .map((name) => this.toolExecutor.getTool(name))
       .filter((tool): tool is Tool => tool !== undefined);
 
     logger.debug('InfrastructureHelper resolved tools', {
       requested: this.options.tools,
-      available: this.availableTools.map(t => t.name)
+      available: this.availableTools.map((t) => t.name),
     });
 
     return this.availableTools;
   }
 
-  protected async getToolExecutor(): Promise<ToolExecutor> {
+  protected getToolExecutor(): ToolExecutor {
     return this.toolExecutor;
   }
 
-  protected async getModel(): Promise<string> {
+  protected getModel(): string {
     // Extract model ID from provider model string
     const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
     const { modelId } = parseProviderModel(providerModel);
@@ -117,13 +117,10 @@ export class InfrastructureHelper extends BaseHelper {
       if (!this.options.tools.includes(toolCall.name)) {
         logger.warn('InfrastructureHelper blocked non-whitelisted tool', {
           toolName: toolCall.name,
-          whitelist: this.options.tools
+          whitelist: this.options.tools,
         });
-        
-        results.push(createErrorResult(
-          `Tool '${toolCall.name}' not in whitelist`,
-          toolCall.id
-        ));
+
+        results.push(createErrorResult(`Tool '${toolCall.name}' not in whitelist`, toolCall.id));
         continue;
       }
 
@@ -138,7 +135,7 @@ export class InfrastructureHelper extends BaseHelper {
       logger.debug('InfrastructureHelper executing tool', {
         toolName: toolCall.name,
         hasWorkingDir: !!context.workingDirectory,
-        hasProcessEnv: !!context.processEnv
+        hasProcessEnv: !!context.processEnv,
       });
 
       try {
@@ -148,13 +145,15 @@ export class InfrastructureHelper extends BaseHelper {
       } catch (error) {
         logger.error('InfrastructureHelper tool execution failed', {
           toolName: toolCall.name,
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
-        
-        results.push(createErrorResult(
-          `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`,
-          toolCall.id
-        ));
+
+        results.push(
+          createErrorResult(
+            `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`,
+            toolCall.id
+          )
+        );
       }
     }
 

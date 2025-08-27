@@ -237,7 +237,7 @@ describe('SessionHelper', () => {
         parentAgent: mockAgent
       });
 
-      const tools = await helper['getTools']();
+      const tools = helper['getTools']();
 
       expect(mockAgent.getAvailableTools).toHaveBeenCalled();
       expect(tools).toEqual([testTool]);
@@ -252,7 +252,7 @@ describe('SessionHelper', () => {
         parentAgent: mockAgent
       });
 
-      const fastModel = await fastHelper['getModel']();
+      const fastModel = fastHelper['getModel']();
       expect(fastModel).toBe('fast-model');
       expect(GlobalConfigManager.getDefaultModel).toHaveBeenCalledWith('fast');
 
@@ -264,7 +264,7 @@ describe('SessionHelper', () => {
         parentAgent: mockAgent
       });
 
-      const smartModel = await smartHelper['getModel']();
+      const smartModel = smartHelper['getModel']();
       expect(smartModel).toBe('smart-model');
       expect(GlobalConfigManager.getDefaultModel).toHaveBeenCalledWith('smart');
     });

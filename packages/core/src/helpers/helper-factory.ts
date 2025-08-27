@@ -1,8 +1,8 @@
 // ABOUTME: Factory for creating helper agents with simplified configuration
 // ABOUTME: Provides static methods to create InfrastructureHelper and SessionHelper instances
 
-import { InfrastructureHelper, InfrastructureHelperOptions } from './infrastructure-helper';
-import { SessionHelper, SessionHelperOptions } from './session-helper';
+import { InfrastructureHelper, InfrastructureHelperOptions } from '~/helpers/infrastructure-helper';
+import { SessionHelper, SessionHelperOptions } from '~/helpers/session-helper';
 
 /**
  * Factory for creating helper agents

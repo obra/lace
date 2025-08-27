@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GlobalConfigManager } from './global-config';
 import * as fs from 'fs';
-import { getLaceFilePath } from '~/config/lace-dir';
 
 // Mock fs module
 vi.mock('fs');
