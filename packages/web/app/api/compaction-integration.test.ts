@@ -131,12 +131,8 @@ describe('Token Usage Integration Tests', () => {
     const sessionData = (await parseResponse(sessionResponse)) as SessionInfo;
 
     // CRITICAL: Session should NOT have token usage data
-    // TODO: Fix session data parsing issue in React Router v7 migration
-    if (sessionData) {
-      expect('tokenUsage' in sessionData).toBe(false);
-    } else {
-      console.warn('Session data is undefined - needs investigation');
-    }
+    expect(sessionData).toBeDefined();
+    expect('tokenUsage' in sessionData).toBe(false);
 
     // Test Agent API - should include token usage
     const agentRequest = new Request(`http://localhost:3000/api/agents/${sessionId}`);
