@@ -67,9 +67,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       description: validatedData.description,
       projectId: projectId,
       configuration: {
+        ...validatedData.configuration,
         providerInstanceId: validatedData.providerInstanceId,
         modelId: validatedData.modelId,
-        ...validatedData.configuration,
       },
     });
 
