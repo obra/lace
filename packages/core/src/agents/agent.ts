@@ -15,6 +15,7 @@ import {
   ThreadId,
   asThreadId,
   isTransientEventType,
+  type ErrorType,
 } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
@@ -195,6 +196,15 @@ export class Agent extends EventEmitter {
       if (event && event.type === 'TOOL_APPROVAL_RESPONSE') {
         this._handleToolApprovalResponse(event);
       }
+    });
+
+    // Default error handler to prevent unhandled error crashes
+    this.on('error', ({ error, context }) => {
+      logger.error('Agent error event emitted', {
+        error: error.message,
+        context,
+        threadId: this._threadId,
+      });
     });
 
     // Events are emitted through _addEventAndEmit() helper method
@@ -753,9 +763,12 @@ export class Agent extends EventEmitter {
           providerName: this.providerInstance?.providerName || 'missing',
         });
 
-        this.emit('error', {
-          error: error instanceof Error ? error : new Error(String(error)),
-          context: { phase: 'provider_response', threadId: this._threadId },
+        this._emitError(error, {
+          phase: 'provider_response',
+          threadId: this._threadId,
+          errorType: 'provider_failure' as ErrorType,
+          isRetryable: this.isRetryableError(error),
+          retryCount: 0,
         });
 
         // Complete turn tracking even when provider error occurs
@@ -835,9 +848,12 @@ export class Agent extends EventEmitter {
         stack: error instanceof Error ? error.stack : undefined,
       });
 
-      this.emit('error', {
-        error: error instanceof Error ? error : new Error(String(error)),
-        context: { phase: 'conversation_processing', threadId: this._threadId },
+      this._emitError(error, {
+        phase: 'conversation_processing',
+        threadId: this._threadId,
+        errorType: 'processing_error' as ErrorType,
+        isRetryable: false,
+        retryCount: 0,
       });
 
       // Complete turn tracking even when error occurs
@@ -921,11 +937,13 @@ export class Agent extends EventEmitter {
     };
 
     const errorListener = ({ error }: { error: Error }) => {
-      // Don't re-emit AbortErrors from streaming - they're already handled by main catch block
       if (error.name !== 'AbortError') {
-        this.emit('error', {
-          error,
-          context: { phase: 'streaming_response', threadId: this._threadId },
+        this._emitError(error, {
+          phase: 'provider_response',
+          threadId: this._threadId,
+          errorType: 'streaming_error' as ErrorType,
+          isRetryable: this.isRetryableError(error),
+          retryCount: 0,
         });
       }
     };
@@ -1258,6 +1276,25 @@ export class Agent extends EventEmitter {
     try {
       const workingDirectory = this._getWorkingDirectory();
 
+      // Check if agent has been stopped before attempting tool execution
+      if (!this._initialized) {
+        logger.debug('Tool execution skipped - agent has been stopped', {
+          threadId: this._threadId,
+          toolName: toolCall.name,
+          toolCallId: toolCall.id,
+        });
+
+        // Clean up tracking state to prevent deadlock
+        this._activeToolCalls.delete(toolCall.id);
+        this._pendingToolCount--;
+
+        if (this._pendingToolCount === 0) {
+          this._handleBatchComplete();
+        }
+
+        return; // Skip tool execution if agent is stopped
+      }
+
       // Get session for security policy enforcement
       const session = await this.getFullSession();
       if (!session) {
@@ -1345,6 +1382,23 @@ export class Agent extends EventEmitter {
         toolCallId: toolCall.id,
         toolName: toolCall.name,
         error: error instanceof Error ? error.message : String(error),
+      });
+
+      // Emit error event for tool failures
+      const toolError =
+        error instanceof Error
+          ? error
+          : new Error(
+              `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`
+            );
+      this._emitError(toolError, {
+        phase: 'tool_execution',
+        threadId: this._threadId,
+        errorType: 'tool_execution' as ErrorType,
+        toolName: toolCall.name,
+        toolCallId: toolCall.id,
+        isRetryable: this.isRetryableError(toolError),
+        retryCount: 0,
       });
 
       // Only handle error if thread still exists
@@ -2001,6 +2055,35 @@ export class Agent extends EventEmitter {
         const estimatedOutputTokens = this._estimateTokens(response.content);
         this._addTokensToCurrentTurn('out', estimatedOutputTokens);
       }
+    }
+  }
+
+  /**
+   * Helper method to emit error events with enhanced context, with fallback for getInfo() failures
+   */
+  private _emitError(error: unknown, baseContext: Record<string, unknown>): void {
+    try {
+      const agentInfo = this.getInfo();
+      this.emit('error', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        context: {
+          ...baseContext,
+          providerName: this.providerInstance?.providerName,
+          providerInstanceId: agentInfo.providerInstanceId,
+          modelId: agentInfo.modelId,
+        },
+      });
+    } catch (_infoError) {
+      // If getInfo() fails, emit basic error without agent info
+      this.emit('error', {
+        error: error instanceof Error ? error : new Error(String(error)),
+        context: {
+          ...baseContext,
+          providerName: this.providerInstance?.providerName,
+          providerInstanceId: 'unknown',
+          modelId: 'unknown',
+        },
+      });
     }
   }
 
@@ -2851,6 +2934,26 @@ export class Agent extends EventEmitter {
       }
     }
 
+    return false;
+  }
+
+  private isRetryableError(error: unknown): boolean {
+    if (error instanceof Error) {
+      const message = error.message.toLowerCase();
+
+      // Network errors are typically retryable
+      if (message.includes('network') || message.includes('timeout')) {
+        return true;
+      }
+      // Rate limit errors are retryable
+      if (message.includes('rate limit') || message.includes('quota')) {
+        return true;
+      }
+      // 5xx HTTP errors are retryable
+      if (message.includes('500') || message.includes('502') || message.includes('503')) {
+        return true;
+      }
+    }
     return false;
   }
 }

@@ -2,11 +2,31 @@
 // ABOUTME: Manages global event distribution with client-side filtering
 
 // StreamEvent removed - using LaceEvent directly
-import type { Task, TaskContext, ThreadId, LaceEvent } from '@/types/core';
-import type { Session } from '@/lib/server/lace-imports';
+import type { Task, TaskContext, ThreadId, LaceEvent, ErrorType, ErrorPhase } from '@/types/core';
+import { asThreadId } from '@/types/core';
+import type { Session, Agent } from '@/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
 import { logger } from '~/utils/logger';
 import { stringify } from '@/lib/serialization';
+
+// Interface for AGENT_ERROR event data
+export interface AgentErrorEventData {
+  errorType: ErrorType;
+  message: string;
+  stack?: string;
+  context: {
+    phase: ErrorPhase;
+    providerName?: string;
+    providerInstanceId?: string;
+    modelId?: string;
+    toolName?: string;
+    toolCallId?: string;
+    workingDirectory?: string;
+    retryAttempt?: number;
+  };
+  isRetryable: boolean;
+  retryCount: number;
+}
 
 // Type guard for errors with code property (Web Streams API errors)
 function hasErrorCode(error: unknown): error is Error & { code: string } {
@@ -174,10 +194,92 @@ export class EventStreamManager {
         transient: true,
       });
     });
+
+    // Handle agent spawning events to register error handlers for new agents
+    taskManager.on('agent:spawned', (event: unknown) => {
+      const e = event as { agentThreadId: string };
+      const newAgent = session.getAgent(asThreadId(e.agentThreadId));
+      if (newAgent) {
+        this.registerAgentErrorHandler(newAgent, e.agentThreadId, projectId || '', sessionId || '');
+      }
+    });
+
+    // Handle agent errors for existing agents
+    const agents = session.getAgents();
+    for (const agentInfo of agents) {
+      const agent = session.getAgent(agentInfo.threadId);
+      if (agent) {
+        this.registerAgentErrorHandler(agent, agentInfo.threadId, projectId || '', sessionId || '');
+      }
+    }
+  }
+
+  // Extract agent error handler registration into reusable method
+  private registerAgentErrorHandler(
+    agent: Agent,
+    agentThreadId: string, 
+    projectId: string, 
+    sessionId: string
+  ): void {
+    // Prevent duplicate error listeners on the same Agent instance
+    if (EventStreamManager.registeredAgents.has(agent)) {
+      return;
+    }
+    
+    EventStreamManager.registeredAgents.add(agent);
+    
+    agent.on('error', (errorEvent: { error: Error; context: Record<string, unknown> }) => {
+      const { error, context } = errorEvent;
+      
+      logger.debug(
+        `[EVENT_STREAM] Agent ${agentThreadId} error occurred, broadcasting AGENT_ERROR`
+      );
+      
+      this.broadcast({
+        type: 'AGENT_ERROR',
+        threadId: agentThreadId,
+        timestamp: new Date(),
+        data: {
+          errorType: context.errorType as ErrorType,
+          message: error.message,
+          stack: error.stack,
+          context: {
+            phase: context.phase as ErrorPhase,
+            providerName: context.providerName as string | undefined,
+            providerInstanceId: context.providerInstanceId as string | undefined,
+            modelId: context.modelId as string | undefined,
+            toolName: context.toolName as string | undefined,
+            toolCallId: context.toolCallId as string | undefined,
+            workingDirectory: context.workingDirectory as string | undefined,
+            retryAttempt: context.retryAttempt as number | undefined,
+          },
+          isRetryable: context.isRetryable as boolean,
+          retryCount: context.retryCount as number,
+        },
+        transient: true,
+        context: { 
+          projectId, 
+          sessionId, 
+          agentId: agentThreadId 
+        },
+      });
+    });
+  }
+
+  // Method to register error handlers for newly spawned agents (for manual spawning)
+  registerAgentErrorHandlers(session: Session, agentThreadId: string): void {
+    const agent = session.getAgent(asThreadId(agentThreadId));
+    if (agent) {
+      const projectId = session.getProjectId();
+      const sessionId = session.getId();
+      this.registerAgentErrorHandler(agent, agentThreadId, projectId || '', sessionId || '');
+    }
   }
 
   // WeakSet to track registered TaskManager instances
   private static registeredTaskManagers = new WeakSet<object>();
+  // WeakSet to track agents that already have error listeners registered
+  private static registeredAgents = new WeakSet<Agent>();
 
   static getInstance(): EventStreamManager {
     if (!global.eventStreamManager) {
@@ -265,6 +367,35 @@ export class EventStreamManager {
     // Debug logging for event broadcasting
     if (process.env.NODE_ENV === 'development') {
       // Development debug info
+    }
+
+    // Optional: Add debug logging for error events
+    if (fullEvent.type === 'AGENT_ERROR') {
+      // Runtime guard for safe error data access
+      const data = fullEvent.data;
+      if (
+        data &&
+        typeof data === 'object' &&
+        'errorType' in data &&
+        'context' in data &&
+        'isRetryable' in data &&
+        data.context &&
+        typeof data.context === 'object' &&
+        'phase' in data.context
+      ) {
+        const errorData = data as AgentErrorEventData;
+        logger.debug('[EVENT_STREAM] Broadcasting agent error event', {
+          threadId: fullEvent.threadId,
+          errorType: errorData.errorType,
+          phase: errorData.context.phase,
+          isRetryable: errorData.isRetryable,
+        });
+      } else {
+        logger.debug('[EVENT_STREAM] Broadcasting agent error event with invalid data shape', {
+          threadId: fullEvent.threadId,
+          rawData: data,
+        });
+      }
     }
 
     const deadConnections: string[] = [];

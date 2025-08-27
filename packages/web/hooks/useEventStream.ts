@@ -3,8 +3,21 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { EventStreamFirehose } from '@/lib/event-stream-firehose';
-import type { LaceEvent, Task } from '@/types/core';
+import type { LaceEvent, Task, AgentErrorData } from '@/types/core';
 import type { PendingApproval } from '@/types/api';
+
+// Runtime type guard for AgentErrorData
+function isAgentErrorData(value: unknown): value is AgentErrorData {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    'errorType' in value &&
+    'message' in value &&
+    'context' in value &&
+    'isRetryable' in value &&
+    typeof (value as Record<string, unknown>).message === 'string'
+  );
+}
 
 // Re-export types from original for compatibility
 export interface TaskEvent {
@@ -100,6 +113,9 @@ interface EventHandlers {
   onGlobalEvent?: (event: GlobalEvent) => void;
   onSystemNotification?: (event: GlobalEvent) => void;
 
+  // Error event handlers
+  onAgentError?: (event: LaceEvent) => void;
+
   // Connection events (deprecated but kept for compatibility)
   onConnect?: () => void;
   onDisconnect?: () => void;
@@ -111,6 +127,9 @@ export interface UseEventStreamOptions extends EventHandlers {
   sessionId?: string;
   threadIds?: string[];
   includeGlobal?: boolean;
+  
+  // Prevents calling onError for AGENT_ERROR events to avoid duplicate handling
+  treatAgentErrorAsGeneric?: boolean;
 
   // These are now ignored but kept for API compatibility
   autoReconnect?: boolean;
@@ -250,6 +269,18 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
             break;
           case 'COMPACTION_COMPLETE':
             currentOptions.onCompactionComplete?.(event);
+            break;
+          // Add error event handling
+          case 'AGENT_ERROR':
+            currentOptions.onAgentError?.(event);
+            // Only call onError if treatAgentErrorAsGeneric is not disabled
+            if (currentOptions.treatAgentErrorAsGeneric !== false) {
+              if (isAgentErrorData(event.data)) {
+                currentOptions.onError?.(new Error(event.data.message || 'Unknown agent error'));
+              } else {
+                currentOptions.onError?.(new Error('Malformed agent error event'));
+              }
+            }
             break;
           // Add other event type cases as needed
         }

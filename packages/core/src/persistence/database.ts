@@ -3,6 +3,21 @@
 
 import { getTaskStatusDBConstraint } from '~/tasks/task-status';
 
+// Custom error for transient event persistence attempts
+export class TransientEventError extends Error {
+  constructor(eventType: string, eventId?: string, threadId?: string) {
+    const context = [eventId && `eventId: ${eventId}`, threadId && `threadId: ${threadId}`]
+      .filter(Boolean)
+      .join(', ');
+    const contextSuffix = context ? ` (${context})` : '';
+    super(`${eventType} events are transient and should not be persisted${contextSuffix}`);
+    this.name = 'TransientEventError';
+
+    // Fix prototype chain for proper instanceof checks across transpile targets
+    Object.setPrototypeOf(this, TransientEventError.prototype);
+  }
+}
+
 // Common SQLite interface that both better-sqlite3 and bun:sqlite implement
 interface SQLiteDatabase {
   prepare(sql: string): {
@@ -82,6 +97,7 @@ import {
   ThreadId,
   AssigneeId,
   AgentMessageData,
+  isTransientEventType,
 } from '~/threads/types';
 import type { ToolCall, ToolResult } from '~/tools/types';
 import {
@@ -169,6 +185,10 @@ function createLaceEventFromDb(
     // System events are transient
     case 'SYSTEM_NOTIFICATION':
       throw new Error('SYSTEM_NOTIFICATION events are transient and should not be persisted');
+
+    // Error events are transient
+    case 'AGENT_ERROR':
+      throw new Error('AGENT_ERROR events are transient and should not be persisted');
 
     default: {
       const _exhaustive: never = type;
@@ -506,6 +526,11 @@ export class DatabasePersistence {
 
   saveEvent(event: LaceEvent): boolean {
     if (this._closed || this._disabled || !this.db) return false;
+
+    // Guard against attempting to persist transient events
+    if (isTransientEventType(event.type)) {
+      throw new TransientEventError(event.type, event.id, event.threadId);
+    }
 
     try {
       const stmt = this.db.prepare(`

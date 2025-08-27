@@ -1,7 +1,7 @@
 // ABOUTME: Type definitions for thread events and thread management
 // ABOUTME: Events include user messages, agent messages, tool calls, and tool results
 
-import { ToolCall, ToolResult } from '~/tools/types';
+import type { ToolCall, ToolResult } from '~/tools/types';
 import type { CompactionData } from '~/threads/compaction/types';
 import type { ApprovalDecision } from '~/tools/approval-types';
 import type { CombinedTokenUsage } from '~/token-management/types';
@@ -39,6 +39,8 @@ export const EVENT_TYPES = [
   'PROJECT_DELETED',
   // System events (transient)
   'SYSTEM_NOTIFICATION',
+  // Error events (transient)
+  'AGENT_ERROR',
 ] as const;
 
 // Derive LaceEventType union from the array
@@ -66,6 +68,8 @@ export function isTransientEventType(type: LaceEventType): boolean {
     'PROJECT_DELETED',
     // System events
     'SYSTEM_NOTIFICATION',
+    // Error events
+    'AGENT_ERROR',
   ].includes(type);
 }
 
@@ -272,6 +276,64 @@ interface SystemNotificationData {
   type: 'system:notification'; // For compatibility
 }
 
+// Error type definitions - centralized for reuse
+export type ErrorType =
+  | 'provider_failure'
+  | 'tool_execution'
+  | 'processing_error'
+  | 'timeout'
+  | 'streaming_error';
+export type ErrorPhase =
+  | 'provider_response'
+  | 'tool_execution'
+  | 'conversation_processing'
+  | 'initialization';
+
+// Runtime type guards
+export function isErrorType(value: unknown): value is ErrorType {
+  return (
+    typeof value === 'string' &&
+    [
+      'provider_failure',
+      'tool_execution',
+      'processing_error',
+      'timeout',
+      'streaming_error',
+    ].includes(value)
+  );
+}
+
+export function isErrorPhase(value: unknown): value is ErrorPhase {
+  return (
+    typeof value === 'string' &&
+    ['provider_response', 'tool_execution', 'conversation_processing', 'initialization'].includes(
+      value
+    )
+  );
+}
+
+// Agent error data
+export interface AgentErrorData {
+  errorType: ErrorType;
+  message: string;
+  stack?: string;
+  context: {
+    phase: ErrorPhase;
+    // Available from Agent
+    providerName?: string; // From this.providerInstance?.providerName
+    providerInstanceId?: string; // From thread metadata
+    modelId?: string; // From thread metadata
+    // For tool-related errors
+    toolName?: string; // When phase === 'tool_execution'
+    toolCallId?: string; // When phase === 'tool_execution'
+    // Additional context
+    workingDirectory?: string;
+    retryAttempt?: number;
+  };
+  isRetryable: boolean;
+  retryCount?: number;
+}
+
 // Discriminated union for type-safe event handling
 export type LaceEvent =
   | (BaseLaceEvent & {
@@ -369,6 +431,10 @@ export type LaceEvent =
   | (BaseLaceEvent & {
       type: 'SYSTEM_NOTIFICATION';
       data: SystemNotificationData;
+    })
+  | (BaseLaceEvent & {
+      type: 'AGENT_ERROR';
+      data: AgentErrorData;
     });
 
 export interface Thread {

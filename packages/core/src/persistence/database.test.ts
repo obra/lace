@@ -467,4 +467,44 @@ describe('tool approval unique constraint', () => {
       );
     }).not.toThrow();
   });
+
+  describe('TransientEventError', () => {
+    it('should throw TransientEventError when attempting to save AGENT_ERROR event', () => {
+      const transientEvent = {
+        id: 'transient-evt',
+        threadId: 'thread-123',
+        type: 'AGENT_ERROR',
+        timestamp: new Date(),
+        data: {
+          errorType: 'provider_failure',
+          message: 'Test error',
+          context: { phase: 'provider_response' },
+          isRetryable: true,
+          retryCount: 0,
+        },
+      };
+
+      expect(() => {
+        db.saveEvent(transientEvent);
+      }).toThrow('AGENT_ERROR events are transient and should not be persisted');
+    });
+
+    it('should throw TransientEventError for all transient event types', () => {
+      const transientTypes = ['AGENT_ERROR', 'AGENT_STREAMING', 'AGENT_STATE_CHANGE', 'SYSTEM_NOTIFICATION'];
+      
+      transientTypes.forEach(eventType => {
+        const event = {
+          id: `evt-${eventType}`,
+          threadId: 'thread-test',
+          type: eventType,
+          timestamp: new Date(),
+          data: {},
+        };
+
+        expect(() => {
+          db.saveEvent(event);
+        }).toThrow(`${eventType} events are transient and should not be persisted`);
+      });
+    });
+  });
 });

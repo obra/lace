@@ -7,7 +7,7 @@ import { renderHook, act } from '@testing-library/react';
 import { stringify } from '@/lib/serialization';
 import {
   EventStreamProvider,
-  useEventStream,
+  useEventStreamConnection,
   useSessionEvents,
   useAgentAPI,
 } from './EventStreamProvider';
@@ -145,7 +145,7 @@ describe('EventStreamProvider', () => {
   });
 
   it('provides event stream context to children', async () => {
-    const { result } = renderHook(() => useEventStream(), { wrapper });
+    const { result } = renderHook(() => useEventStreamConnection(), { wrapper });
 
     await act(async () => {
       // Wait for any async effects to complete
@@ -232,7 +232,7 @@ describe('EventStreamProvider', () => {
       reconnect: vi.fn(),
     });
 
-    const { result } = renderHook(() => useEventStream(), { wrapper });
+    const { result } = renderHook(() => useEventStreamConnection(), { wrapper });
 
     await act(async () => {
       // Wait for any async effects to complete
@@ -266,7 +266,7 @@ describe('EventStreamProvider', () => {
   });
 
   it('passes correct parameters to underlying hooks', async () => {
-    renderHook(() => useEventStream(), { wrapper });
+    renderHook(() => useEventStreamConnection(), { wrapper });
 
     await act(async () => {
       // Wait for any async effects to complete
@@ -279,6 +279,7 @@ describe('EventStreamProvider', () => {
       threadIds: ['lace_20250101_abc123.1'],
       onConnect: expect.any(Function),
       onError: expect.any(Function),
+      onAgentError: expect.any(Function),
       onUserMessage: expect.any(Function),
       onAgentMessage: expect.any(Function),
       onAgentToken: expect.any(Function),
@@ -297,8 +298,8 @@ describe('EventStreamProvider', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     expect(() => {
-      renderHook(() => useEventStream());
-    }).toThrow('useEventStream must be used within EventStreamProvider');
+      renderHook(() => useEventStreamConnection());
+    }).toThrow('useEventStreamConnection must be used within EventStreamProvider');
 
     expect(() => {
       renderHook(() => useSessionEvents());
@@ -317,7 +318,7 @@ describe('EventStreamProvider', () => {
   });
 
   it('calls underlying hooks with correct parameters', async () => {
-    renderHook(() => useEventStream(), { wrapper });
+    renderHook(() => useEventStreamConnection(), { wrapper });
 
     await act(async () => {
       // Wait for any async effects to complete
@@ -331,6 +332,7 @@ describe('EventStreamProvider', () => {
       threadIds: ['lace_20250101_abc123.1'],
       onConnect: expect.any(Function),
       onError: expect.any(Function),
+      onAgentError: expect.any(Function),
       onUserMessage: expect.any(Function),
       onAgentMessage: expect.any(Function),
       onAgentToken: expect.any(Function),
@@ -359,7 +361,7 @@ describe('EventStreamProvider', () => {
       </AgentProvider>
     );
 
-    renderHook(() => useEventStream(), { wrapper: wrapperWithoutAgent });
+    renderHook(() => useEventStreamConnection(), { wrapper: wrapperWithoutAgent });
 
     await act(async () => {
       // Wait for any async effects to complete
@@ -371,6 +373,7 @@ describe('EventStreamProvider', () => {
       threadIds: undefined,
       onConnect: expect.any(Function),
       onError: expect.any(Function),
+      onAgentError: expect.any(Function),
       onUserMessage: expect.any(Function),
       onAgentMessage: expect.any(Function),
       onAgentToken: expect.any(Function),

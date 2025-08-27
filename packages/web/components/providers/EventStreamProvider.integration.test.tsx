@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import {
   EventStreamProvider,
-  useEventStream,
+  useEventStreamConnection,
   useSessionEvents,
   useAgentAPI,
 } from './EventStreamProvider';
@@ -39,7 +39,7 @@ import type { StreamConnection } from '@/types/stream-events';
 
 // Test component that consumes event stream state without receiving it through props
 function TestEventStreamConsumer() {
-  const { connection } = useEventStream();
+  const { connection } = useEventStreamConnection();
   const { events, loadingHistory } = useSessionEvents();
   const { sendMessage, stopAgent } = useAgentAPI();
 
@@ -67,7 +67,7 @@ function TestEventStreamConsumer() {
 
 // Test component that should fail without provider
 function TestComponentWithoutProvider() {
-  const { connection } = useEventStream();
+  const { connection } = useEventStreamConnection();
   return <div data-testid="connected">{connection.connected}</div>;
 }
 
@@ -258,7 +258,7 @@ describe('EventStreamProvider Integration', () => {
           <TestComponentWithoutProvider />
         </ThemeProvider>
       );
-    }).toThrow('useEventStream must be used within EventStreamProvider');
+    }).toThrow('useEventStreamConnection must be used within EventStreamProvider');
 
     consoleSpy.mockRestore();
   });
@@ -352,6 +352,7 @@ describe('EventStreamProvider Integration', () => {
       threadIds: ['lace_20250101_xyz789'],
       onConnect: expect.any(Function),
       onError: expect.any(Function),
+      onAgentError: expect.any(Function),
       onUserMessage: expect.any(Function),
       onAgentMessage: expect.any(Function),
       onAgentToken: expect.any(Function),
@@ -395,6 +396,7 @@ describe('EventStreamProvider Integration', () => {
       threadIds: undefined,
       onConnect: expect.any(Function),
       onError: expect.any(Function),
+      onAgentError: expect.any(Function),
       onUserMessage: expect.any(Function),
       onAgentMessage: expect.any(Function),
       onAgentToken: expect.any(Function),
