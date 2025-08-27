@@ -71,6 +71,7 @@ export {
   faClipboard,
   faClock,
   faSave,
+  faDownload,
   faGlobe,
   faExclamationTriangle,
   faSpinner,

@@ -9,6 +9,7 @@ import { ProjectSection } from '@/components/sidebar/ProjectSection';
 import { SessionSection } from '@/components/sidebar/SessionSection';
 import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
 import { FeedbackSection } from '@/components/sidebar/FeedbackSection';
+import { FileBrowserSection } from '@/components/sidebar/FileBrowserSection';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
 
@@ -64,6 +65,11 @@ export const SidebarContent = memo(function SidebarContent({
             onConfigureAgent={onConfigureAgent}
             onConfigureSession={onConfigureSession}
           />
+        )}
+
+        {/* FILE BROWSER */}
+        {sessionDetails && sessionDetails.id && (
+          <FileBrowserSection sessionId={sessionDetails.id} />
         )}
 
         {/* TASK MANAGEMENT */}
