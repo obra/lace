@@ -5,6 +5,11 @@ import type { Route } from './+types/api.projects.$projectId.templates.$template
 import { Project } from '@/lib/server/lace-imports';
 import { z } from 'zod';
 
+const RouteParamsSchema = z.object({
+  projectId: z.string().min(1, 'projectId is required'),
+  templateId: z.string().min(1, 'templateId is required'),
+});
+
 const RenderTemplateSchema = z.object({
   variables: z.record(z.string()),
 });
@@ -15,7 +20,20 @@ function isError(error: unknown): error is Error {
 
 export async function loader({ params }: Route.LoaderArgs): Promise<Response> {
   try {
-    const { projectId, templateId } = params;
+    // Validate params
+    const validationResult = RouteParamsSchema.safeParse(params);
+    if (!validationResult.success) {
+      return Response.json(
+        {
+          error: 'Invalid route parameters',
+          code: 'VALIDATION_FAILED',
+          details: validationResult.error.errors,
+        },
+        { status: 400 }
+      );
+    }
+
+    const { projectId, templateId } = validationResult.data;
     const project = Project.getById(projectId);
     if (!project) {
       return Response.json(
@@ -41,7 +59,21 @@ export async function loader({ params }: Route.LoaderArgs): Promise<Response> {
 
 export async function action({ request, params }: Route.ActionArgs): Promise<Response> {
   const method = request.method;
-  const { projectId, templateId } = params;
+
+  // Validate params
+  const validationResult = RouteParamsSchema.safeParse(params);
+  if (!validationResult.success) {
+    return Response.json(
+      {
+        error: 'Invalid route parameters',
+        code: 'VALIDATION_FAILED',
+        details: validationResult.error.errors,
+      },
+      { status: 400 }
+    );
+  }
+
+  const { projectId, templateId } = validationResult.data;
 
   if (method === 'DELETE') {
     try {
