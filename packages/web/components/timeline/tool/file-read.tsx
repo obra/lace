@@ -5,8 +5,8 @@
 
 import React from 'react';
 import { faFileCode } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import FileRenderer from '@/components/ui/FileRenderer';
+import FileModalButton from '@/components/ui/FileModalButton';
 import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
 import type { ToolAggregatedEventData } from '@/types/web-events';
 import { Alert } from '@/components/ui/Alert';
@@ -16,20 +16,79 @@ import { Alert } from '@/components/ui/Alert';
  * and display optimized for file reading operations with content preview
  */
 export const fileReadRenderer: ToolRenderer = {
-  getSummary: (args: unknown): string => {
+  getSummary: (args: unknown, result?: ToolResult): string => {
+    let baseName = 'Read file';
+
     if (typeof args === 'object' && args !== null && 'path' in args) {
       const path = (args as { path?: unknown }).path;
       if (typeof path === 'string' && path.trim()) {
-        // Show full path for summary
-        return `Read ${path}`;
+        baseName = `Read ${path}`;
       }
     }
-    return 'Read file';
+
+    // Check if this is a line range read operation
+    const argsObj = args as Record<string, unknown> | null;
+    const startLine = argsObj?.startLine;
+    const endLine = argsObj?.endLine;
+
+    if (typeof startLine === 'number' && typeof endLine === 'number') {
+      return `${baseName} (lines ${startLine}-${endLine})`;
+    }
+
+    // Add file metadata if available and not a line range operation
+    if (result?.metadata) {
+      const metadata = result.metadata as
+        | {
+            totalLines?: number;
+            fileSize?: string;
+          }
+        | undefined;
+
+      if (metadata) {
+        const parts = [];
+        if (metadata.totalLines) parts.push(`${metadata.totalLines} lines`);
+        if (metadata.fileSize) parts.push(metadata.fileSize);
+
+        if (parts.length > 0) {
+          return `${baseName} (${parts.join(' • ')})`;
+        }
+      }
+    }
+
+    return baseName;
   },
 
   isError: (result: ToolResult): boolean => {
     // Trust the tool's own error flag - it knows if it failed
     return result.status !== 'completed';
+  },
+
+  getAction: (result?: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {
+    if (!result?.content || result.content.length === 0) {
+      return null;
+    }
+
+    const content = result.content.map((block) => block.text || '').join('');
+    const lines = content.split('\n');
+    const needsExpansion = lines.length > 10; // Match FileRenderer's logic
+
+    if (!needsExpansion) {
+      return null;
+    }
+
+    // Extract file path and line info from arguments
+    const args = metadata?.arguments as { path?: string; startLine?: number } | undefined;
+    const filePath = args?.path;
+    const startLine = args?.startLine;
+
+    return (
+      <FileModalButton
+        content={content}
+        filePath={filePath}
+        result={result}
+        startLineNumber={startLine || 1}
+      />
+    );
   },
 
   renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {
@@ -50,11 +109,12 @@ export const fileReadRenderer: ToolRenderer = {
 
     const content = result.content.map((block) => block.text || '').join('');
 
-    // Extract file path from arguments
-    const filePath =
-      typeof metadata?.arguments === 'object' && metadata?.arguments !== null
-        ? (metadata.arguments as { path?: string }).path
-        : undefined;
+    // Extract file path and line range from arguments
+    const args = metadata?.arguments as
+      | { path?: string; startLine?: number; endLine?: number }
+      | undefined;
+    const filePath = args?.path;
+    const startLine = args?.startLine;
 
     // Extract result metadata
     const resultMetadata = result.metadata as
@@ -65,23 +125,17 @@ export const fileReadRenderer: ToolRenderer = {
         }
       | undefined;
 
-    // Extract filename for display
-    const filename = filePath ? filePath.split('/').pop() || filePath : undefined;
-
     return (
-      <div className="bg-primary/5 border border-primary/20 rounded-lg">
-        {/* Content display with syntax highlighting and modal expansion */}
-        <div className="p-3">
-          <FileRenderer
-            content={content}
-            filename={filePath}
-            fileSize={resultMetadata?.fileSize}
-            maxLines={10}
-            showLineNumbers={false}
-            showCopyButton={true}
-          />
-        </div>
-      </div>
+      <FileRenderer
+        content={content}
+        filename={filePath}
+        fileSize={resultMetadata?.fileSize}
+        maxLines={10}
+        showLineNumbers={true}
+        startLineNumber={startLine || 1}
+        showCopyButton={true}
+        hideFooter={true}
+      />
     );
   },
 

@@ -15,8 +15,10 @@ interface FileRendererProps {
   fileSize?: string;
   maxLines?: number;
   showLineNumbers?: boolean;
+  startLineNumber?: number;
   showCopyButton?: boolean;
   className?: string;
+  hideFooter?: boolean;
 }
 
 const INLINE_PREVIEW_LINES = 10;
@@ -27,8 +29,10 @@ export default function FileRenderer({
   fileSize,
   maxLines = INLINE_PREVIEW_LINES,
   showLineNumbers = false,
+  startLineNumber = 1,
   showCopyButton = true,
   className = '',
+  hideFooter = false,
 }: FileRendererProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -68,6 +72,7 @@ export default function FileRenderer({
           code={previewContent}
           filename={filename}
           showLineNumbers={showLineNumbers}
+          startLineNumber={startLineNumber}
           showCopyButton={false}
           showLanguageLabel={false}
           showHeader={false}
@@ -76,7 +81,7 @@ export default function FileRenderer({
         />
 
         {/* Footer with file info and expansion */}
-        {(needsExpansion || fileSize) && (
+        {!hideFooter && (needsExpansion || fileSize) && (
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-base-300">
             <div className="text-xs text-base-content/60">
               {totalLines} lines{fileSize && ` • ${fileSize}`}
@@ -141,6 +146,7 @@ export default function FileRenderer({
               code={content}
               filename={filename}
               showLineNumbers={true}
+              startLineNumber={startLineNumber}
               showCopyButton={false}
               showLanguageLabel={true}
               showHeader={false}

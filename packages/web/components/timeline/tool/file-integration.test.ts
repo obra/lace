@@ -68,7 +68,7 @@ describe('File Tool Renderer Integration', () => {
         'Read /home/user/test.txt'
       );
       expect(renderer.getSummary?.({ path: 'README.md', startLine: 1, endLine: 10 })).toBe(
-        'Read README.md'
+        'Read README.md (lines 1-10)'
       );
     });
   });

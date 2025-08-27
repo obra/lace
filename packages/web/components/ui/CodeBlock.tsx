@@ -14,6 +14,7 @@ interface CodeBlockProps {
   language?: string;
   filename?: string;
   showLineNumbers?: boolean;
+  startLineNumber?: number;
   showCopyButton?: boolean;
   showLanguageLabel?: boolean;
   showHeader?: boolean;
@@ -29,6 +30,7 @@ export default function CodeBlock({
   language,
   filename,
   showLineNumbers = false,
+  startLineNumber = 1,
   showCopyButton = true,
   showLanguageLabel = true,
   showHeader = true,
@@ -148,7 +150,7 @@ export default function CodeBlock({
       <div className="line-numbers">
         {lines.map((_, index) => (
           <div key={index} className="text-right">
-            {index + 1}
+            {startLineNumber + index}
           </div>
         ))}
       </div>

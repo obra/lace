@@ -15,6 +15,8 @@ import {
   faEdit,
   faList,
   faGlobe,
+  faChevronDown,
+  faChevronRight,
 } from '@/lib/fontawesome';
 import { MessageHeader } from '@/components/ui';
 import { getToolRenderer, type ToolResult } from '@/components/timeline/tool';
@@ -47,43 +49,16 @@ export const getToolIcon = (toolName: string) => {
   return faCog;
 };
 
-// Add near the top of the file, after imports
+// Generic fallback for tools without specific renderers
 export function createDefaultToolSummary(toolName: string, args: unknown): string {
   if (!args || typeof args !== 'object') return `Executed ${toolName}`;
 
+  // For unknown tools, extract all parameters in a readable format
   const argsObj = args as Record<string, unknown>;
-
-  switch (toolName.toLowerCase()) {
-    case 'file_list':
-      return `Listed files in ${argsObj.path || 'directory'}`;
-
-    case 'file_read':
-      return `Read file: ${argsObj.file_path || argsObj.path || 'unknown'}`;
-
-    case 'file_write':
-      return `Wrote file: ${argsObj.file_path || argsObj.path || 'unknown'}`;
-
-    case 'bash':
-    case 'shell':
-      const command = String(argsObj.command || '').substring(0, 50);
-      return `Ran command: ${command}${command.length >= 50 ? '...' : ''}`;
-
-    case 'search':
-    case 'grep':
-      return `Searched for: ${argsObj.pattern || argsObj.query || 'pattern'}`;
-
-    case 'url_fetch':
-      return `Fetched: ${argsObj.url || 'URL'}`;
-
-    default:
-      // For unknown tools, extract all parameters in a readable format
-      const params = Object.entries(argsObj)
-        .map(
-          ([key, value]) => `${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`
-        )
-        .join(', ');
-      return params ? `${toolName} (${params})` : `Executed ${toolName}`;
-  }
+  const params = Object.entries(argsObj)
+    .map(([key, value]) => `${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`)
+    .join(', ');
+  return params ? `${toolName} (${params})` : `Executed ${toolName}`;
 }
 
 function isDefaultError(result: ToolResult): boolean {
@@ -159,12 +134,10 @@ export function ToolCallDisplay({
   const hasArgs: boolean = Boolean(
     args && typeof args === 'object' && args !== null && Object.keys(args).length > 0
   );
-  const toolSummary = renderer.getSummary?.(args) ?? createDefaultToolSummary(tool, args);
-  // For file_read and file_write, use the summary as the display name since it contains the full path
+  const toolSummary = renderer.getSummary?.(args, result) ?? createDefaultToolSummary(tool, args);
+  // Use toolSummary by default, fall back to getDisplayName, then tool name
   const toolDisplayName =
-    tool === 'file_read' || tool === 'file_write'
-      ? toolSummary
-      : (renderer.getDisplayName?.(tool, result || undefined) ?? tool);
+    toolSummary || renderer.getDisplayName?.(tool, result || undefined) || tool;
 
   // Create a proper ToolAggregatedEventData object if we need it for renderResult
   const aggregatedData: ToolAggregatedEventData | undefined = metadata
@@ -212,38 +185,30 @@ export function ToolCallDisplay({
       </div>
 
       <div className="flex-1 min-w-0">
-        <MessageHeader name={toolDisplayName} timestamp={timestamp} icon={statusIcon} />
+        <MessageHeader
+          name={toolDisplayName}
+          timestamp={timestamp}
+          icon={statusIcon}
+          hideTimestamp={true}
+          action={
+            <div className="flex items-center gap-1">
+              {renderer.getAction?.(result, aggregatedData)}
+              {hasArgs && (
+                <button
+                  onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                  className="text-base-content/50 hover:text-base-content p-1 rounded hover:bg-base-200 flex-shrink-0"
+                >
+                  <FontAwesomeIcon
+                    icon={showTechnicalDetails ? faChevronDown : faChevronRight}
+                    className="text-xs"
+                  />
+                </button>
+              )}
+            </div>
+          }
+        />
 
         <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
-          {/* Only show the header bar if we have content to display */}
-          {(tool !== 'file_read' || hasArgs) && (
-            <div className="p-3 bg-base-50 border-b border-base-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  {tool.toLowerCase() === 'bash' &&
-                  args &&
-                  typeof args === 'object' &&
-                  'command' in args ? (
-                    <code className="text-sm font-mono bg-base-300 px-2 py-1 rounded text-base-content break-all">
-                      $ {String((args as { command: unknown }).command)}
-                    </code>
-                  ) : tool !== 'file_read' && tool !== 'file_write' ? (
-                    <span className="text-sm text-base-content/80">{String(toolSummary)}</span>
-                  ) : null}
-                </div>
-
-                {hasArgs && (
-                  <button
-                    onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-                    className="text-xs text-base-content/50 hover:text-base-content px-2 py-1 rounded hover:bg-base-200 flex-shrink-0"
-                  >
-                    {showTechnicalDetails ? 'Hide' : 'Show'} Details
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Technical Details (when expanded) */}
           {showTechnicalDetails && hasArgs && (
             <div className="px-3 py-2 bg-base-50 border-b border-base-200">
