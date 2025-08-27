@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { action as POST } from '@/app/routes/api.threads.$threadId.approvals.$toolCallId';
 import { getSessionService } from '@/lib/server/session-service';
 import { parseResponse } from '@/lib/serialization';
+import { createActionArgs } from '@/test-utils/route-test-helpers';
 
 // Mock the session service
 vi.mock('@/lib/server/session-service');
@@ -73,11 +74,8 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       }
     );
 
-    // Mock params
-    const params = Promise.resolve({ threadId, toolCallId });
-
     // Call the API route
-    const response = await POST(request, { params });
+    const response = await POST(createActionArgs(request, { threadId, toolCallId }));
 
     // Verify Agent.handleApprovalResponse was called correctly
     expect(mockAgent.handleApprovalResponse).toHaveBeenCalledWith(toolCallId, decision);
@@ -103,8 +101,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
         }
       );
 
-      const params = Promise.resolve({ threadId, toolCallId });
-      const response = await POST(request, { params });
+      const response = await POST(createActionArgs(request, { threadId, toolCallId }));
 
       expect(mockAgent.handleApprovalResponse).toHaveBeenCalledWith(toolCallId, decision);
 
@@ -139,8 +136,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       }
     );
 
-    const params = Promise.resolve({ threadId, toolCallId });
-    const response = await POST(request, { params });
+    const response = await POST(createActionArgs(request, { threadId, toolCallId }));
 
     // Should not call handleApprovalResponse if agent not found
     expect(mockAgent.handleApprovalResponse).not.toHaveBeenCalled();
@@ -163,8 +159,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       }
     );
 
-    const params = Promise.resolve({ threadId, toolCallId });
-    const response = await POST(request, { params });
+    const response = await POST(createActionArgs(request, { threadId, toolCallId }));
 
     expect(response.status).toBe(400);
     const data = await parseResponse<{ error: string }>(response);
@@ -184,8 +179,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       }
     );
 
-    const params = Promise.resolve({ threadId, toolCallId });
-    const response = await POST(request, { params });
+    const response = await POST(createActionArgs(request, { threadId, toolCallId }));
 
     expect(response.status).toBe(400);
     const data = await parseResponse<{ error: string }>(response);
@@ -213,8 +207,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       }
     );
 
-    const params = Promise.resolve({ threadId, toolCallId });
-    const response1 = await POST(request1, { params });
+    const response1 = await POST(createActionArgs(request1, { threadId, toolCallId }));
 
     expect(response1.status).toBe(200);
     const data1 = await parseResponse<{ success: boolean }>(response1);
@@ -230,7 +223,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       }
     );
 
-    const response2 = await POST(request2, { params });
+    const response2 = await POST(createActionArgs(request2, { threadId, toolCallId }));
 
     expect(response2.status).toBe(200);
     const data2 = await parseResponse<{ success: boolean }>(response2);
@@ -257,8 +250,7 @@ describe('POST /api/threads/[threadId]/approvals/[toolCallId]', () => {
       }
     );
 
-    const params = Promise.resolve({ threadId, toolCallId });
-    const response = await POST(request, { params });
+    const response = await POST(createActionArgs(request, { threadId, toolCallId }));
 
     expect(response.status).toBe(500);
     const data = await parseResponse<{ error: string; code?: string }>(response);
