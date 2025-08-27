@@ -3,7 +3,12 @@
 
 import * as Sentry from '@sentry/node';
 
-export async function action() {
+export async function action({ request }: { request: Request }) {
+  // Add method guard
+  if (request.method !== 'POST') {
+    return Response.json({ error: 'Method not allowed' }, { status: 405 });
+  }
+
   try {
     // Capture a message first
     Sentry.captureMessage('Test server API called', 'info');
