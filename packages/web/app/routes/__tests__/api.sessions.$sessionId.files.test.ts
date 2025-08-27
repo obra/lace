@@ -2,8 +2,8 @@
 // ABOUTME: Tests filesystem operations, security controls, and error handling with real filesystem
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
-import { GET } from '@/app/api/sessions/[sessionId]/files/route';
+import { loader } from '@/app/routes/api.sessions.$sessionId.files';
+import { createLoaderArgs } from '@/test-utils/route-test-helpers';
 import { promises as fs } from 'fs';
 import { join, basename } from 'path';
 import { tmpdir } from 'os';
@@ -64,9 +64,9 @@ describe('/api/sessions/[sessionId]/files', () => {
   });
 
   it('should list files and directories in session working directory', async () => {
-    const request = new NextRequest(`http://localhost/api/sessions/${testSessionId}/files`);
+    const request = new Request(`http://localhost/api/sessions/${testSessionId}/files`);
 
-    const response = await GET(request, { params: { sessionId: testSessionId } });
+    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId }));
 
     expect(response.status).toBe(200);
     const data = await parseResponse<SessionDirectoryResponse>(response);
@@ -93,11 +93,11 @@ describe('/api/sessions/[sessionId]/files', () => {
   });
 
   it('should list files in subdirectory when path is specified', async () => {
-    const request = new NextRequest(
+    const request = new Request(
       `http://localhost/api/sessions/${testSessionId}/files?path=src`
     );
 
-    const response = await GET(request, { params: { sessionId: testSessionId } });
+    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId }));
 
     expect(response.status).toBe(200);
     const data = await parseResponse<SessionDirectoryResponse>(response);
@@ -110,11 +110,11 @@ describe('/api/sessions/[sessionId]/files', () => {
   });
 
   it('should prevent path traversal attacks', async () => {
-    const request = new NextRequest(
+    const request = new Request(
       `http://localhost/api/sessions/${testSessionId}/files?path=../../../etc`
     );
 
-    const response = await GET(request, { params: { sessionId: testSessionId } });
+    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId }));
 
     expect(response.status).toBe(400);
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -124,11 +124,9 @@ describe('/api/sessions/[sessionId]/files', () => {
   it('should handle non-existent session', async () => {
     mockGetSession.mockResolvedValue(null);
 
-    const request = new NextRequest('http://localhost/api/sessions/invalid-session/files');
+    const request = new Request('http://localhost/api/sessions/invalid-session/files');
 
-    const response = await GET(request, {
-      params: { sessionId: 'invalid-session' },
-    });
+    const response = await loader(createLoaderArgs(request, { sessionId: 'invalid-session' }));
 
     expect(response.status).toBe(404);
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -138,9 +136,9 @@ describe('/api/sessions/[sessionId]/files', () => {
   it('should handle session without working directory', async () => {
     mockSession.getWorkingDirectory.mockReturnValue(null);
 
-    const request = new NextRequest(`http://localhost/api/sessions/${testSessionId}/files`);
+    const request = new Request(`http://localhost/api/sessions/${testSessionId}/files`);
 
-    const response = await GET(request, { params: { sessionId: testSessionId } });
+    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId }));
 
     expect(response.status).toBe(400);
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -148,11 +146,11 @@ describe('/api/sessions/[sessionId]/files', () => {
   });
 
   it('should handle non-existent directory', async () => {
-    const request = new NextRequest(
+    const request = new Request(
       `http://localhost/api/sessions/${testSessionId}/files?path=non-existent`
     );
 
-    const response = await GET(request, { params: { sessionId: testSessionId } });
+    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId }));
 
     expect(response.status).toBe(403);
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -160,11 +158,11 @@ describe('/api/sessions/[sessionId]/files', () => {
   });
 
   it('should handle path that is not a directory', async () => {
-    const request = new NextRequest(
+    const request = new Request(
       `http://localhost/api/sessions/${testSessionId}/files?path=package.json`
     );
 
-    const response = await GET(request, { params: { sessionId: testSessionId } });
+    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId }));
 
     expect(response.status).toBe(400);
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -181,9 +179,9 @@ describe('/api/sessions/[sessionId]/files', () => {
       // Skip if chmod not supported
     }
 
-    const request = new NextRequest(`http://localhost/api/sessions/${testSessionId}/files`);
+    const request = new Request(`http://localhost/api/sessions/${testSessionId}/files`);
 
-    const response = await GET(request, { params: { sessionId: testSessionId } });
+    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId }));
 
     expect(response.status).toBe(200);
     const data = await parseResponse<SessionDirectoryResponse>(response);
@@ -204,8 +202,8 @@ describe('/api/sessions/[sessionId]/files', () => {
       try {
         await fs.symlink(join(outsideDir, 'secret.txt'), symlinkPath);
         
-        const request = new NextRequest(`http://localhost/api/sessions/${testSessionId}/files`);
-        const response = await GET(request, { params: { sessionId: testSessionId } });
+        const request = new Request(`http://localhost/api/sessions/${testSessionId}/files`);
+        const response = await loader(createLoaderArgs(request, { sessionId: testSessionId }));
         
         expect(response.status).toBe(200);
         const data = await parseResponse<SessionDirectoryResponse>(response);

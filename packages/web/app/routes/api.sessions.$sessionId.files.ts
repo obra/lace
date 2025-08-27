@@ -1,7 +1,7 @@
 // ABOUTME: API endpoint for listing files in a session's working directory
 // ABOUTME: Provides session-scoped file browsing with path traversal protection and proper error handling
 
-import { NextRequest } from 'next/server';
+import type { Route } from './+types/api.sessions.$sessionId.files';
 import { promises as fs, constants as fsConstants } from 'fs';
 import { join, resolve, relative, basename } from 'path';
 import { createSuccessResponse, createErrorResponse } from '@/lib/server/api-utils';
@@ -13,10 +13,7 @@ import {
   type SessionFileEntry,
 } from '@/types/session-files';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { sessionId: string } }
-) {
+export async function loader({ request, params }: Route.LoaderArgs) {
   try {
     const { searchParams } = new URL(request.url);
     const rawPath = searchParams.get('path') || '';

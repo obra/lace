@@ -1,10 +1,8 @@
 // ABOUTME: Standalone file viewer page for pop-out file viewing functionality
 // ABOUTME: Provides full-screen file content viewing with syntax highlighting and download/copy actions
 
-'use client';
-
 import React, { useEffect, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'react-router';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFile, faDownload, faCopy, faSpinner, faExclamationTriangle } from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
@@ -243,17 +241,6 @@ function FileViewerPage() {
   return <FileViewerContent sessionId={sessionId} filePath={filePath} />;
 }
 
-// Wrap in Suspense since we're using useSearchParams
 export default function FileViewerPageWrapper() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-base-100">
-          <FontAwesomeIcon icon={faSpinner} className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      }
-    >
-      <FileViewerPage />
-    </Suspense>
-  );
+  return <FileViewerPage />;
 }

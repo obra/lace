@@ -11,6 +11,7 @@ export default [
   route('font-test', 'routes/font-test.tsx'),
   route('speech-demo', 'routes/speech-demo.tsx'),
   route('sentry-test', 'routes/sentry-test.tsx'),
+  route('file-viewer', 'routes/file-viewer.tsx'),
   route('project/:projectId', 'routes/project.$projectId.tsx'),
   route(
     'project/:projectId/session/:sessionId',
@@ -66,6 +67,8 @@ export default [
   route('api/sessions/:sessionId/agents', 'routes/api.sessions.$sessionId.agents.ts'),
   route('api/sessions/:sessionId/configuration', 'routes/api.sessions.$sessionId.configuration.ts'),
   route('api/sessions/:sessionId/history', 'routes/api.sessions.$sessionId.history.ts'),
+  route('api/sessions/:sessionId/files', 'routes/api.sessions.$sessionId.files.ts'),
+  route('api/sessions/:sessionId/files/*', 'routes/api.sessions.$sessionId.files.$path.ts'),
 
   // Provider management routes
   route('api/provider/catalog', 'routes/api.provider.catalog.ts'),

@@ -1,7 +1,7 @@
 // ABOUTME: API endpoint for retrieving file content from a session's working directory
 // ABOUTME: Provides secure file reading with MIME type detection, size limits, and path traversal protection
 
-import { NextRequest } from 'next/server';
+import type { Route } from './+types/api.sessions.$sessionId.files.$path';
 import { promises as fs, constants as fsConstants } from 'fs';
 import { resolve, relative } from 'path';
 import mime from 'mime-types';
@@ -26,13 +26,10 @@ function isTextFile(mimeType: string): boolean {
   return mimeType.startsWith('text/') || mimeType === 'application/json';
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { sessionId: string; path: string[] } }
-) {
+export async function loader({ request, params }: Route.LoaderArgs) {
   try {
-    const { sessionId, path: pathSegments } = params;
-    const filePath = pathSegments.join('/');
+    const { sessionId, '*': splatPath } = params;
+    const filePath = splatPath || '';
 
     // Validate request
     const parseResult = GetSessionFileRequestSchema.safeParse({ path: filePath });
