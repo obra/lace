@@ -40,6 +40,14 @@ export async function loader({ params }: Route.LoaderArgs): Promise<Response> {
 }
 
 export async function action({ request, params }: Route.ActionArgs): Promise<Response> {
+  // Add method guard
+  if (request.method !== 'POST') {
+    return Response.json(
+      { error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' },
+      { status: 405 }
+    );
+  }
+
   try {
     const { projectId } = params;
     const project = Project.getById(projectId);
@@ -50,7 +58,15 @@ export async function action({ request, params }: Route.ActionArgs): Promise<Res
       );
     }
 
-    const body: unknown = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json(
+        { error: 'Invalid JSON body', code: 'VALIDATION_FAILED' },
+        { status: 400 }
+      );
+    }
     const validatedData = CreateTemplateSchema.parse(body);
 
     const template = project.createPromptTemplate({
