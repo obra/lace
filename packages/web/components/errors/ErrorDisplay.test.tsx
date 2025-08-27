@@ -5,7 +5,7 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ErrorDisplay, ErrorLogEntry, ErrorToast } from '@/components/errors';
-import type { AgentErrorLogEntry as AgentErrorLogEntryType, ErrorEntry } from '@/types/web-events';
+import type { AgentErrorLogEntry as AgentErrorLogEntryType, ErrorEntry, getErrorOrigin } from '@/types/web-events';
 
 describe('Error Display Components', () => {
   describe('ErrorDisplay', () => {
@@ -13,6 +13,7 @@ describe('Error Display Components', () => {
       id: 'error-123',
       timestamp: new Date(),
       errorType: 'provider_failure',
+      origin: getErrorOrigin('provider_failure'),
       severity: 'error',
       message: 'Provider API rate limit exceeded',
       context: {

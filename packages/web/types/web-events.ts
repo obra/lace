@@ -4,6 +4,22 @@
 import type { ToolResult, ToolAnnotations, ToolCall, ErrorType } from '@/types/core';
 import type { CarouselItem, GoogleDocAttachment } from '@/types/design-system';
 
+// Helper to derive origin from errorType
+export function getErrorOrigin(errorType: ErrorType): 'agent' | 'tool' | 'provider' | 'system' {
+  switch (errorType) {
+    case 'tool_execution':
+      return 'tool';
+    case 'provider_failure':
+    case 'streaming_error':
+    case 'timeout':
+      return 'provider';
+    case 'processing_error':
+      return 'agent';
+    default:
+      return 'system';
+  }
+}
+
 // Event data structures shared between API and SSE streaming
 // These are the payloads contained within events, not the events themselves
 // Note: USER_MESSAGE uses string directly, not an object wrapper
@@ -65,6 +81,7 @@ export interface TimelineEntry {
 export interface ErrorEntry extends TimelineEntry {
   type: 'error';
   errorType: ErrorType;
+  origin: 'agent' | 'tool' | 'provider' | 'system';
   message: string;
   context?: Record<string, unknown>;
   isRetryable: boolean;
@@ -77,6 +94,7 @@ export interface AgentErrorLogEntry {
   id: string;
   timestamp: Date;
   errorType: ErrorType;
+  origin: 'agent' | 'tool' | 'provider' | 'system';
   severity: 'warning' | 'error' | 'critical';
   message: string;
   context: Record<string, unknown>;
