@@ -71,12 +71,7 @@ export function TimelineMessage({
         <div className={`${isGrouped && !isFirstInGroup ? 'mt-0.5' : isGrouped ? 'mt-2' : 'mt-3'}`}>
           {/* Only show header for first message in group */}
           {isFirstInGroup && (
-            <MessageHeader
-              name={agentName}
-              timestamp={timestamp}
-              role="assistant"
-              badge={{ text: agentName, variant: 'primary' }}
-            />
+            <MessageHeader name={agentName} timestamp={timestamp} role="assistant" />
           )}
           <div className={`ml-11 ${isLastInGroup ? 'mb-1' : ''}`}>
             <MessageText content={event.data.content} className="!leading-normal" />
@@ -89,12 +84,7 @@ export function TimelineMessage({
         <div className={`${isGrouped && !isFirstInGroup ? 'mt-0.5' : isGrouped ? 'mt-2' : 'mt-3'}`}>
           {/* Only show header for first message in group */}
           {isFirstInGroup && (
-            <MessageHeader
-              name={agentName}
-              timestamp={timestamp}
-              role="assistant"
-              badge={{ text: agentName, variant: 'primary' }}
-            />
+            <MessageHeader name={agentName} timestamp={timestamp} role="assistant" />
           )}
           <div className={`ml-11 ${isLastInGroup ? 'mb-1' : ''}`}>
             <MessageText content={event.data.content} className="!leading-normal" />
@@ -127,11 +117,7 @@ export function TimelineMessage({
             </div>
           </div>
           <div className="flex-1 min-w-0">
-            <MessageHeader
-              name="Tool"
-              timestamp={timestamp}
-              badge={{ text: event.data.name, variant: 'info' }}
-            />
+            <MessageHeader name="Tool" timestamp={timestamp} />
             <div className="text-sm font-mono bg-base-200 rounded-lg p-3 border border-base-300">
               <div className="text-base-content/80 mb-2 font-mono">$ {event.data.name}</div>
               <div className="text-base-content/60 text-xs whitespace-pre-wrap font-mono">

@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUser, faFileText } from '@/lib/fontawesome';
+import { faFileText } from '@/lib/fontawesome';
 import { formatTime } from '@/lib/format';
 import MarkdownRenderer from '@/components/ui/MarkdownRenderer';
 
@@ -31,10 +31,6 @@ export function UserSystemPromptEntry({
         <div className="flex items-center gap-2 mb-2">
           <span className="font-medium text-sm text-base-content">User System Prompt</span>
           <span className="text-xs text-base-content/50">{formatTime(timestamp)}</span>
-          <div className="badge badge-primary badge-xs">
-            <FontAwesomeIcon icon={faUser} className="w-2 h-2 mr-1" />
-            User
-          </div>
         </div>
         <MarkdownRenderer content={content} maxLines={10} isRecentMessage={isRecentMessage} />
       </div>
