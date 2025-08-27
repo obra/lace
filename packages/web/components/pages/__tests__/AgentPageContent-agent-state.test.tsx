@@ -9,7 +9,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { AgentPageContent } from '@/app/project/[projectId]/session/[sessionId]/agent/[agentId]/AgentPageContent';
+import { AgentPageContent } from '@/components/pages/AgentPageContent';
 import { asThreadId } from '@/types/core';
 
 // Mock the providers
