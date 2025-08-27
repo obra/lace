@@ -33,7 +33,7 @@
     "knip:ci": "npx knip --isolate-workspaces --reporter json > knip-report.json || true",
     "prepare": "husky",
     "test": "npm run test --workspace=packages/core && npm run test --workspace=packages/web",
-    "test:run": "npm run test:run --workspace=packages/core && npm run test:run --workspace=packages/web",
+    "test:run": "npm -ws --if-present run test:run",
     "test:watch": "npm run test:watch --workspace=packages/core",
     "test:coverage": "npm run test:coverage --workspace=packages/core && npm run test:coverage --workspace=packages/web",
     "update-catalogs": "npx tsx scripts/update-provider-catalogs.ts"
