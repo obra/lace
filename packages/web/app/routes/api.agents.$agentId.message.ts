@@ -41,7 +41,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     // Parse and validate request body
     let body: unknown;
     try {
-      body = await req.json();
+      body = await request.json();
     } catch {
       return createErrorResponse('Invalid JSON', 400, {
         code: 'VALIDATION_FAILED',
