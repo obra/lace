@@ -2,7 +2,6 @@
 // ABOUTME: Provides single-process server with Lace-specific startup logic and port selection
 
 import { parseArgs } from 'util';
-// React Router v7 server imports will be added after port detection
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -66,8 +65,8 @@ if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
 `);
 }
 
-// Detect mode
-const isDev = process.env.NODE_ENV !== 'production';
+// Detect mode - default to development unless explicitly set to production
+const DEVELOPMENT = process.env.NODE_ENV !== 'production';
 
 // Enhanced server that wraps React Router v7
 async function startLaceServer() {
@@ -78,49 +77,72 @@ async function startLaceServer() {
   // eslint-disable-next-line no-console -- Server startup message is appropriate for server process
   console.log(`🚀 Starting Lace server (React Router v7) on ${url}...`);
 
-  if (isDev) {
-    // Development mode - use React Router dev server directly
-    const { createServer } = await import('vite');
+  // Create Express app with static file serving and React Router
+  const express = await import('express');
+  const compression = await import('compression');
 
-    const vite = await createServer({
-      server: {
-        port: port,
-        host: hostname,
-      },
+  const app = express.default();
+
+  // Express middleware
+  app.use(compression.default());
+  app.disable('x-powered-by');
+
+  if (DEVELOPMENT) {
+    console.log('Starting development server with Vite middleware');
+
+    // Development mode - use Vite middleware
+    const viteDevServer = await import('vite').then((vite) =>
+      vite.createServer({
+        server: { middlewareMode: true },
+      })
+    );
+
+    app.use(viteDevServer.middlewares);
+
+    // Handle all routes through React Router with SSR loading
+    app.use(async (req, res, next) => {
+      try {
+        const source = await viteDevServer.ssrLoadModule('./server/app.ts');
+        return await source.app(req, res, next);
+      } catch (error) {
+        if (typeof error === 'object' && error instanceof Error) {
+          viteDevServer.ssrFixStacktrace(error);
+        }
+        next(error);
+      }
     });
-
-    await vite.listen();
-    vite.printUrls();
   } else {
-    // Production mode - use Vite dev server (single-process, works for production)
-    const { createServer } = await import('vite');
+    console.log('Starting production server with static file serving');
+    const morgan = await import('morgan');
 
-    const vite = await createServer({
-      server: {
-        port: port,
-        host: hostname,
-      },
-    });
+    // Production mode - static assets FIRST, exactly like React Router template
+    app.use('/assets', express.static('build/client/assets', { immutable: true, maxAge: '1y' }));
+    app.use(morgan.default('tiny'));
+    app.use(express.static('build/client', { maxAge: '1h' }));
 
-    await vite.listen();
-    vite.printUrls();
+    // Import and mount React Router app last
+    const serverApp = await import('./server/app.ts');
+    app.use(serverApp.app);
   }
 
-  // eslint-disable-next-line no-console -- Server ready message with URL/PID is appropriate for server process
-  console.log(`
+  app.listen(port, hostname, () => {
+    // eslint-disable-next-line no-console -- Server ready message with URL/PID is appropriate for server process
+    console.log(`
 ✅ Lace is ready!
    
    🌐 URL: ${url}
    🔒 PID: ${process.pid}
+   📦 Mode: ${DEVELOPMENT ? 'development' : 'production'}
    
    Press Ctrl+C to stop
 `);
 
-  // Signal the actual port to parent process (for menu bar app)
-  // eslint-disable-next-line no-console -- Port/URL signaling required for parent process communication
-  console.log(`LACE_SERVER_PORT:${port}`);
-  // eslint-disable-next-line no-console -- Port/URL signaling required for parent process communication
-  console.log(`LACE_SERVER_URL:${url}`);
+    // Signal the actual port to parent process (for menu bar app)
+    // eslint-disable-next-line no-console -- Port/URL signaling required for parent process communication
+    console.log(`LACE_SERVER_PORT:${port}`);
+    // eslint-disable-next-line no-console -- Port/URL signaling required for parent process communication
+    console.log(`LACE_SERVER_URL:${url}`);
+  });
 }
 
 // Function to find available port (preserved from original)
