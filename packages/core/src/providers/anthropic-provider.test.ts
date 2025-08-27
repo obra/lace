@@ -130,7 +130,7 @@ describe('AnthropicProvider', () => {
         {
           id: 'call_123',
           name: 'test_tool',
-          input: { action: 'test' },
+          arguments: { action: 'test' },
         },
       ]);
     });
@@ -297,7 +297,7 @@ describe('AnthropicProvider', () => {
         {
           id: 'stream_call_456',
           name: 'test_tool',
-          input: { action: 'stream_action' },
+          arguments: { action: 'stream_action' },
         },
       ]);
     });

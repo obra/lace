@@ -56,7 +56,7 @@ class MockConversationProvider extends BaseMockProvider {
         {
           id: 'call_1',
           name: 'file_list',
-          input: { path: '.' },
+          arguments: { path: '.' },
         },
       ],
       stopReason: 'tool_use',
@@ -84,7 +84,7 @@ class MockConversationProvider extends BaseMockProvider {
         {
           id: 'call_2',
           name: 'file_read',
-          input: { file_path: 'package.json' },
+          arguments: { file_path: 'package.json' },
         },
       ],
       stopReason: 'tool_use',
@@ -97,7 +97,7 @@ class MockConversationProvider extends BaseMockProvider {
         {
           id: 'call_3',
           name: 'bash',
-          input: { command: 'echo hello world' },
+          arguments: { command: 'echo hello world' },
         },
       ],
       stopReason: 'tool_use',

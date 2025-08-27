@@ -6,9 +6,9 @@ import { Agent, AgentConfig } from '~/agents/agent';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { MockSlowTool } from '~/test-utils/mock-slow-tool';
 import { BashTool } from '~/tools/implementations/bash';
-import { ProviderMessage, ProviderResponse, ProviderToolCall } from '~/providers/base-provider';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
-import type { ToolResult } from '~/tools/types';
+import type { ToolResult, ToolCall } from '~/tools/types';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
@@ -25,9 +25,9 @@ import {
 import { ApprovalDecision } from '~/tools/approval-types';
 
 class MockProviderWithTools extends BaseMockProvider {
-  private mockToolCalls: ProviderToolCall[];
+  private mockToolCalls: ToolCall[];
 
-  constructor(mockToolCalls: ProviderToolCall[]) {
+  constructor(mockToolCalls: ToolCall[]) {
     super({});
     this.mockToolCalls = mockToolCalls;
   }
@@ -134,7 +134,7 @@ describe('Agent Tool Abort Functionality', () => {
       {
         id: 'call_1',
         name: 'mock_slow',
-        input: { delay: 2000, message: 'Should not see this' },
+        arguments: { delay: 2000, message: 'Should not see this' },
       },
     ];
 
@@ -194,17 +194,17 @@ describe('Agent Tool Abort Functionality', () => {
       {
         id: 'call_1',
         name: 'mock_slow',
-        input: { delay: 2000, message: 'First tool' },
+        arguments: { delay: 2000, message: 'First tool' },
       },
       {
         id: 'call_2',
         name: 'mock_slow',
-        input: { delay: 3000, message: 'Second tool' },
+        arguments: { delay: 3000, message: 'Second tool' },
       },
       {
         id: 'call_3',
         name: 'mock_slow',
-        input: { delay: 1000, message: 'Third tool' },
+        arguments: { delay: 1000, message: 'Third tool' },
       },
     ];
 
@@ -258,7 +258,7 @@ describe('Agent Tool Abort Functionality', () => {
       {
         id: 'call_slow_partial',
         name: 'mock_slow',
-        input: { delay: 3000, message: 'This should be interrupted' },
+        arguments: { delay: 3000, message: 'This should be interrupted' },
       },
     ];
 
@@ -318,12 +318,12 @@ describe('Agent Tool Abort Functionality', () => {
       {
         id: 'call_fast',
         name: 'mock_slow',
-        input: { delay: 100, message: 'Fast tool completed' }, // Completes quickly
+        arguments: { delay: 100, message: 'Fast tool completed' }, // Completes quickly
       },
       {
         id: 'call_slow',
         name: 'mock_slow',
-        input: { delay: 5000, message: 'Should be cancelled' }, // Will be aborted
+        arguments: { delay: 5000, message: 'Should be cancelled' }, // Will be aborted
       },
     ];
 
@@ -384,7 +384,7 @@ describe('Agent Tool Abort Functionality', () => {
       {
         id: 'call_1',
         name: 'mock_slow',
-        input: { delay: 2000, message: 'First message' },
+        arguments: { delay: 2000, message: 'First message' },
       },
     ];
 
@@ -392,7 +392,7 @@ describe('Agent Tool Abort Functionality', () => {
       {
         id: 'call_2',
         name: 'mock_slow',
-        input: { delay: 100, message: 'Second message completed' },
+        arguments: { delay: 100, message: 'Second message completed' },
       },
     ];
 
@@ -489,17 +489,17 @@ describe('Agent Tool Abort Functionality', () => {
       {
         id: 'call_1',
         name: 'mock_slow',
-        input: { delay: 1000, message: 'Tool 1' },
+        arguments: { delay: 1000, message: 'Tool 1' },
       },
       {
         id: 'call_2',
         name: 'mock_slow',
-        input: { delay: 1000, message: 'Tool 2' },
+        arguments: { delay: 1000, message: 'Tool 2' },
       },
       {
         id: 'call_3',
         name: 'mock_slow',
-        input: { delay: 1000, message: 'Tool 3' },
+        arguments: { delay: 1000, message: 'Tool 3' },
       },
     ];
 

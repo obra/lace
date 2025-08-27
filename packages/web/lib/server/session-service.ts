@@ -148,18 +148,18 @@ export class SessionService {
       'tool_call_start',
       ({
         toolName,
-        input,
+        arguments: args,
         callId,
       }: {
         toolName: string;
-        input: Record<string, unknown>;
+        arguments: Record<string, unknown>;
         callId: string;
       }) => {
         sseManager.broadcast({
           type: 'TOOL_CALL',
           threadId,
           timestamp: new Date(),
-          data: { id: callId, name: toolName, arguments: input },
+          data: { id: callId, name: toolName, arguments: args },
           context: {
             sessionId,
             projectId,

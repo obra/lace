@@ -160,7 +160,7 @@ describe('Agent Token Management', () => {
             {
               id: 'call_1',
               name: 'test_tool',
-              input: { test: 'value' },
+              arguments: { test: 'value' },
             },
           ],
           usage: {
@@ -298,7 +298,7 @@ describe('Agent Token Management', () => {
             {
               id: 'call_1',
               name: 'test_tool',
-              input: { test: 'value' },
+              arguments: { test: 'value' },
             },
           ],
           usage: {

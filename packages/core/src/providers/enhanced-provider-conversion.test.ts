@@ -22,7 +22,7 @@ describe('Provider-Specific Format Conversion', () => {
         {
           id: 'toolu_123',
           name: 'file_read',
-          input: { path: 'src/tools/types.ts' },
+          arguments: { path: 'src/tools/types.ts' },
         },
       ],
     },
@@ -98,7 +98,7 @@ describe('Provider-Specific Format Conversion', () => {
             {
               id: 'toolu_456',
               name: 'bash',
-              input: { command: 'ls -la' },
+              arguments: { command: 'ls -la' },
             },
           ],
         },
@@ -261,7 +261,7 @@ describe('Provider-Specific Format Conversion', () => {
             {
               id: 'toolu_error',
               name: 'bash',
-              input: { command: 'invalid-cmd' },
+              arguments: { command: 'invalid-cmd' },
             },
           ],
         },
@@ -303,12 +303,12 @@ describe('Provider-Specific Format Conversion', () => {
             {
               id: 'toolu_file1',
               name: 'file_read',
-              input: { path: 'file1.txt' },
+              arguments: { path: 'file1.txt' },
             },
             {
               id: 'toolu_file2',
               name: 'file_read',
-              input: { path: 'file2.txt' },
+              arguments: { path: 'file2.txt' },
             },
           ],
         },

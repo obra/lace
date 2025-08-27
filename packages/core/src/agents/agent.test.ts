@@ -8,7 +8,6 @@ import {
   ProviderMessage,
   ProviderResponse,
   ProviderConfig,
-  ProviderToolCall,
 } from '~/providers/base-provider';
 import { ToolCall, ToolResult, ToolContext } from '~/tools/types';
 import { Tool } from '~/tools/tool';
@@ -144,7 +143,7 @@ describe('Enhanced Agent', () => {
 
   // Helper function to create a provider that returns tool calls only once
   function createOneTimeToolProvider(
-    toolCalls: ProviderToolCall[],
+    toolCalls: ToolCall[],
     content = 'I will use the tool.'
   ) {
     let callCount = 0;
@@ -451,7 +450,7 @@ describe('Enhanced Agent', () => {
           {
             id: 'call_123',
             name: 'mock_tool',
-            input: { action: 'test' },
+            arguments: { action: 'test' },
           },
         ],
       });
@@ -466,7 +465,7 @@ describe('Enhanced Agent', () => {
               {
                 id: 'call_123',
                 name: 'mock_tool',
-                input: { action: 'test' },
+                arguments: { action: 'test' },
               },
             ],
           });
@@ -488,7 +487,7 @@ describe('Enhanced Agent', () => {
         data?:
           | {
               toolName: string;
-              input: Record<string, unknown>;
+              arguments: Record<string, unknown>;
               callId: string;
               result?: ToolResult;
             }
@@ -497,7 +496,7 @@ describe('Enhanced Agent', () => {
 
       agent.on('tool_call_start', (data) => events.push({ type: 'tool_call_start', data }));
       agent.on('tool_call_complete', (data) =>
-        events.push({ type: 'tool_call_complete', data: { ...data, input: {} } })
+        events.push({ type: 'tool_call_complete', data: { ...data, arguments: {} } })
       );
       agent.on('state_change', ({ from, to }) =>
         events.push({ type: 'state_change', data: `${from}->${to}` })
@@ -520,7 +519,7 @@ describe('Enhanced Agent', () => {
         type: 'tool_call_start',
         data: {
           toolName: 'mock_tool',
-          input: { action: 'test' },
+          arguments: { action: 'test' },
           callId: 'call_123',
         },
       });
@@ -608,7 +607,7 @@ describe('Enhanced Agent', () => {
               {
                 id: 'call_123',
                 name: 'mock_tool',
-                input: { action: 'test' },
+                arguments: { action: 'test' },
               },
             ],
           });
@@ -637,8 +636,8 @@ describe('Enhanced Agent', () => {
     it('should stay in tool_execution state until tools complete', async () => {
       const mockProviderForTest = createOneTimeToolProvider(
         [
-          { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
-          { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
+          { id: 'call_1', name: 'mock_tool', arguments: { action: 'test1' } },
+          { id: 'call_2', name: 'mock_tool', arguments: { action: 'test2' } },
         ],
         'I will execute the tool.'
       );
@@ -674,7 +673,7 @@ describe('Enhanced Agent', () => {
 
     it('should create tool call events without executing tools', async () => {
       const mockProviderForTest = createOneTimeToolProvider(
-        [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
+        [{ id: 'call_1', name: 'mock_tool', arguments: { action: 'test' } }],
         'I will execute the tool.'
       );
 
@@ -683,7 +682,7 @@ describe('Enhanced Agent', () => {
       vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
       await agent.start();
 
-      const toolStartEvents: Array<{ toolName: string; input: unknown; callId: string }> = [];
+      const toolStartEvents: Array<{ toolName: string; arguments: unknown; callId: string }> = [];
       const toolCompleteEvents: unknown[] = [];
 
       agent.on('tool_call_start', (data) => toolStartEvents.push(data));
@@ -697,7 +696,7 @@ describe('Enhanced Agent', () => {
 
       expect(toolStartEvents[0]).toEqual({
         toolName: 'mock_tool',
-        input: { action: 'test' },
+        arguments: { action: 'test' },
         callId: 'call_1',
       });
 
@@ -717,9 +716,9 @@ describe('Enhanced Agent', () => {
     it('should create multiple tool call events for multiple tool calls', async () => {
       const mockProviderForTest = createOneTimeToolProvider(
         [
-          { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
-          { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
-          { id: 'call_3', name: 'mock_tool', input: { action: 'test3' } },
+          { id: 'call_1', name: 'mock_tool', arguments: { action: 'test1' } },
+          { id: 'call_2', name: 'mock_tool', arguments: { action: 'test2' } },
+          { id: 'call_3', name: 'mock_tool', arguments: { action: 'test3' } },
         ],
         'I will execute multiple tools.'
       );
@@ -729,7 +728,7 @@ describe('Enhanced Agent', () => {
       vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
       await agent.start();
 
-      const toolStartEvents: Array<{ toolName: string; input: unknown; callId: string }> = [];
+      const toolStartEvents: Array<{ toolName: string; arguments: unknown; callId: string }> = [];
       agent.on('tool_call_start', (data) => toolStartEvents.push(data));
 
       await agent.sendMessage('Run multiple commands');
@@ -769,7 +768,7 @@ describe('Enhanced Agent', () => {
     it('should execute tool when TOOL_APPROVAL_RESPONSE event received', async () => {
       // Create a provider that returns tool calls only once
       const mockProviderForTest = createOneTimeToolProvider(
-        [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
+        [{ id: 'call_1', name: 'mock_tool', arguments: { action: 'test' } }],
         'I will execute the tool.'
       );
 
@@ -835,7 +834,7 @@ describe('Enhanced Agent', () => {
     it('should create error result when tool is denied', async () => {
       // Create tool call
       const mockProviderForTest = createOneTimeToolProvider(
-        [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
+        [{ id: 'call_1', name: 'mock_tool', arguments: { action: 'test' } }],
         'I will execute the tool.'
       );
 
@@ -883,9 +882,9 @@ describe('Enhanced Agent', () => {
       // Create multiple tool calls with one-time provider to prevent infinite recursion
       const mockProviderForTest = createOneTimeToolProvider(
         [
-          { id: 'call_1', name: 'mock_tool', input: { action: 'test1' } },
-          { id: 'call_2', name: 'mock_tool', input: { action: 'test2' } },
-          { id: 'call_3', name: 'mock_tool', input: { action: 'test3' } },
+          { id: 'call_1', name: 'mock_tool', arguments: { action: 'test1' } },
+          { id: 'call_2', name: 'mock_tool', arguments: { action: 'test2' } },
+          { id: 'call_3', name: 'mock_tool', arguments: { action: 'test3' } },
         ],
         'I will execute multiple tools.'
       );
@@ -942,7 +941,7 @@ describe('Enhanced Agent', () => {
 
     it('should emit tool_call_complete events when tools execute', async () => {
       const mockProviderForTest = createOneTimeToolProvider(
-        [{ id: 'call_1', name: 'mock_tool', input: { action: 'test' } }],
+        [{ id: 'call_1', name: 'mock_tool', arguments: { action: 'test' } }],
         'I will execute the tool.'
       );
 
@@ -1005,7 +1004,7 @@ describe('Enhanced Agent', () => {
       const executeToolSpy = vi.spyOn(toolExecutor, 'executeApprovedTool');
 
       const mockProviderForTest = createOneTimeToolProvider(
-        [{ id: 'call_immediate', name: 'mock_tool', input: { action: 'test' } }],
+        [{ id: 'call_immediate', name: 'mock_tool', arguments: { action: 'test' } }],
         'I will execute the tool.'
       );
 
@@ -1047,8 +1046,8 @@ describe('Enhanced Agent', () => {
     it('should handle pending tool results without completing batch tracking', async () => {
       const mockProviderForTest = createOneTimeToolProvider(
         [
-          { id: 'call_pending', name: 'mock_tool', input: { action: 'test' } },
-          { id: 'call_pending2', name: 'mock_tool', input: { action: 'test2' } },
+          { id: 'call_pending', name: 'mock_tool', arguments: { action: 'test' } },
+          { id: 'call_pending2', name: 'mock_tool', arguments: { action: 'test2' } },
         ],
         'I will execute tools.'
       );
@@ -1122,7 +1121,7 @@ describe('Enhanced Agent', () => {
 
       const mockProvider = new MockProviderOnce({
         content: 'I will execute tools.',
-        toolCalls: [{ id: 'call_complete', name: 'mock_tool', input: { action: 'test' } }],
+        toolCalls: [{ id: 'call_complete', name: 'mock_tool', arguments: { action: 'test' } }],
       });
 
       agent = createAgent({ tools: [mockTool] });
@@ -1178,7 +1177,7 @@ describe('Enhanced Agent', () => {
 
       const mockProvider = new MockProviderOnce({
         content: 'I will execute tools.',
-        toolCalls: [{ id: 'call_approval', name: 'mock_tool', input: { action: 'test' } }],
+        toolCalls: [{ id: 'call_approval', name: 'mock_tool', arguments: { action: 'test' } }],
       });
 
       agent = createAgent({ tools: [mockTool] });
@@ -1247,7 +1246,7 @@ describe('Enhanced Agent', () => {
       toolExecutor.registerTool('bash', bashTool);
 
       const mockProviderForTest = createOneTimeToolProvider(
-        [{ id: 'bash_call_1', name: 'bash', input: { command: 'echo "test"' } }],
+        [{ id: 'bash_call_1', name: 'bash', arguments: { command: 'echo "test"' } }],
         'I will run the bash command.'
       );
 
@@ -1575,8 +1574,8 @@ describe('Enhanced Agent', () => {
       mockProvider = new MockProvider({
         content: 'Using multiple tools',
         toolCalls: [
-          { id: 'call_1', name: 'tool_1', input: { action: 'first' } },
-          { id: 'call_2', name: 'tool_2', input: { action: 'second' } },
+          { id: 'call_1', name: 'tool_1', arguments: { action: 'first' } },
+          { id: 'call_2', name: 'tool_2', arguments: { action: 'second' } },
         ],
       });
 
@@ -1587,8 +1586,8 @@ describe('Enhanced Agent', () => {
           return Promise.resolve({
             content: 'Using multiple tools',
             toolCalls: [
-              { id: 'call_1', name: 'tool_1', input: { action: 'first' } },
-              { id: 'call_2', name: 'tool_2', input: { action: 'second' } },
+              { id: 'call_1', name: 'tool_1', arguments: { action: 'first' } },
+              { id: 'call_2', name: 'tool_2', arguments: { action: 'second' } },
             ],
           });
         } else {
@@ -1608,7 +1607,7 @@ describe('Enhanced Agent', () => {
     it('should execute multiple tools in sequence', async () => {
       const toolStartEvents: Array<{
         toolName: string;
-        input: Record<string, unknown>;
+        arguments: Record<string, unknown>;
         callId: string;
       }> = [];
       const toolCompleteEvents: Array<{ toolName: string; result: ToolResult; callId: string }> =
@@ -2202,7 +2201,7 @@ describe('Enhanced Agent', () => {
               {
                 id: 'call_123',
                 name: 'mock_tool',
-                input: { action: 'test' },
+                arguments: { action: 'test' },
               },
             ],
           });

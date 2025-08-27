@@ -2,7 +2,7 @@
 // ABOUTME: Defines the common interface and provides base functionality for providers
 
 import { EventEmitter } from 'events';
-import { ToolResult } from '~/tools/types';
+import { ToolResult, ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 
 export interface ProviderConfig {
@@ -14,7 +14,7 @@ export interface ProviderConfig {
 
 export interface ProviderResponse {
   content: string;
-  toolCalls: ProviderToolCall[];
+  toolCalls: ToolCall[];
   stopReason?: string; // Normalized: "max_tokens" | "stop" | "tool_use" | "error"
   usage?: {
     promptTokens: number;
@@ -388,17 +388,11 @@ export abstract class AIProvider extends EventEmitter {
   }
 }
 
-export interface ProviderToolCall {
-  id: string;
-  name: string;
-  input: Record<string, unknown>;
-}
-
 // Use ToolResult directly from types.ts instead of maintaining a separate type
 
 export interface ProviderMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
-  toolCalls?: ProviderToolCall[]; // For assistant messages with tool calls
+  toolCalls?: ToolCall[]; // For assistant messages with tool calls
   toolResults?: ToolResult[]; // For user messages with tool results - using our internal type
 }

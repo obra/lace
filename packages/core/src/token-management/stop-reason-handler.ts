@@ -1,7 +1,8 @@
 // ABOUTME: Handles provider stop reasons and filters incomplete tool calls
 // ABOUTME: Prevents broken tool calls from crashing the system when max_tokens is reached
 
-import { ProviderResponse, ProviderToolCall } from '~/providers/base-provider';
+import { ProviderResponse } from '~/providers/base-provider';
+import { ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
 
@@ -51,8 +52,8 @@ export class StopReasonHandler {
           removedCount,
           removedToolCalls: response.toolCalls.slice(completedToolCalls.length).map((tc) => ({
             name: tc.name,
-            hasInput: !!tc.input,
-            inputKeys: Object.keys(tc.input || {}),
+            hasInput: !!tc.arguments,
+            inputKeys: Object.keys(tc.arguments || {}),
           })),
         });
       }
@@ -71,9 +72,9 @@ export class StopReasonHandler {
    * Filters out tool calls that are missing required parameters
    */
   private _filterIncompleteToolCalls(
-    toolCalls: ProviderToolCall[],
+    toolCalls: ToolCall[],
     availableTools: Tool[]
-  ): ProviderToolCall[] {
+  ): ToolCall[] {
     if (!this._config.requireAllParameters) {
       return toolCalls;
     }
@@ -93,7 +94,7 @@ export class StopReasonHandler {
       if (!isComplete) {
         logger.debug('Tool call incomplete, filtering out', {
           toolName: toolCall.name,
-          providedInput: toolCall.input,
+          providedInput: toolCall.arguments,
           requiredSchema: tool.inputSchema,
         });
       }
@@ -105,8 +106,8 @@ export class StopReasonHandler {
   /**
    * Checks if a tool call has all required parameters based on the tool's schema
    */
-  private _isToolCallComplete(toolCall: ProviderToolCall, tool: Tool): boolean {
-    if (!toolCall.input || typeof toolCall.input !== 'object') {
+  private _isToolCallComplete(toolCall: ToolCall, tool: Tool): boolean {
+    if (!toolCall.arguments || typeof toolCall.arguments !== 'object') {
       return false;
     }
 
@@ -115,9 +116,9 @@ export class StopReasonHandler {
     if (schema && schema.required && Array.isArray(schema.required)) {
       for (const requiredParam of schema.required) {
         if (
-          !(requiredParam in toolCall.input) ||
-          toolCall.input[requiredParam] === null ||
-          toolCall.input[requiredParam] === undefined
+          !(requiredParam in toolCall.arguments) ||
+          toolCall.arguments[requiredParam] === null ||
+          toolCall.arguments[requiredParam] === undefined
         ) {
           return false;
         }
@@ -128,7 +129,7 @@ export class StopReasonHandler {
     if (schema && schema.properties) {
       for (const [paramName, paramDef] of Object.entries(schema.properties)) {
         const isRequired = schema.required?.includes(paramName);
-        const value = toolCall.input[paramName];
+        const value = toolCall.arguments[paramName];
 
         if (isRequired && typeof paramDef === 'object' && paramDef !== null) {
           const paramDefObj = paramDef as { type?: string };

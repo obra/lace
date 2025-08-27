@@ -92,7 +92,7 @@ class MockProvider extends BaseMockProvider {
           {
             id: 'delegation_task_complete',
             name: 'task_complete',
-            input: {
+            arguments: {
               id: taskId,
               message: 'Mock delegation completed successfully',
             },

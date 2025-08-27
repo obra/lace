@@ -7,10 +7,10 @@ import {
   ProviderMessage,
   ProviderResponse,
   ProviderConfig,
-  ProviderToolCall,
   ProviderInfo,
   ModelInfo,
 } from '~/providers/base-provider';
+import { ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
 import { convertToAnthropicFormat } from '~/providers/format-converters';
@@ -185,7 +185,7 @@ export class AnthropicProvider extends AIProvider {
           .map((contentBlock) => contentBlock.text)
           .join('');
 
-        const toolCalls = response.content
+        const toolCalls: ToolCall[] = response.content
           .filter(
             (contentBlock): contentBlock is Anthropic.ToolUseBlock =>
               contentBlock.type === 'tool_use'
@@ -193,7 +193,7 @@ export class AnthropicProvider extends AIProvider {
           .map((contentBlock) => ({
             id: contentBlock.id,
             name: contentBlock.name,
-            input: contentBlock.input as Record<string, unknown>,
+            arguments: contentBlock.input as Record<string, unknown>,
           }));
 
         const normalizedUsage = response.usage
@@ -260,7 +260,7 @@ export class AnthropicProvider extends AIProvider {
         // Mark that stream is created to prevent retries after this point
         streamCreated = true;
 
-        let toolCalls: ProviderToolCall[] = [];
+        let toolCalls: ToolCall[] = [];
 
         try {
           // Handle streaming events - use the 'text' event for token-by-token streaming
@@ -332,7 +332,7 @@ export class AnthropicProvider extends AIProvider {
             .map((content) => ({
               id: content.id,
               name: content.name,
-              input: content.input as Record<string, unknown>,
+              arguments: content.input as Record<string, unknown>,
             }));
 
           // Log full response for debugging
@@ -345,7 +345,7 @@ export class AnthropicProvider extends AIProvider {
             provider: 'anthropic',
             contentLength: textContent.length,
             toolCallCount: toolCalls.length,
-            toolCallNames: toolCalls.map((tc: ProviderToolCall) => tc.name),
+            toolCallNames: toolCalls.map((tc: ToolCall) => tc.name),
             usage: finalMessage.usage,
           });
 

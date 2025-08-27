@@ -204,7 +204,7 @@ describe('SessionService approval event forwarding', () => {
             {
               id: 'test-call-123',
               name: 'file_write',
-              input: { file_path: '/test/file.txt', content: 'test content' },
+              arguments: { file_path: '/test/file.txt', content: 'test content' },
             },
           ],
           stopReason: 'tool_use',

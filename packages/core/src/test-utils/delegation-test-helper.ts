@@ -16,9 +16,9 @@ import {
   ModelInfo,
   ProviderMessage,
   ProviderResponse,
-  ProviderToolCall,
   ProviderConfig,
 } from '~/providers/base-provider';
+import { ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 
 export interface DelegationTestSetup {
@@ -114,10 +114,10 @@ export async function createDelegationTestSetup(options?: {
 
         // Check if we're in blocked mode
         if (globalMockState.isBlockedMode) {
-          const toolCall: ProviderToolCall = {
+          const toolCall: ToolCall = {
             id: 'task_update_call',
             name: 'task_update',
-            input: { taskId, status: 'blocked' },
+            arguments: { taskId, status: 'blocked' },
           };
           return Promise.resolve({
             content: 'I encountered an issue and cannot complete this task.',
@@ -128,10 +128,10 @@ export async function createDelegationTestSetup(options?: {
 
         const response = this.getNextResponse();
 
-        const toolCall: ProviderToolCall = {
+        const toolCall: ToolCall = {
           id: 'delegation_task_complete',
           name: 'task_complete',
-          input: { id: taskId, message: response },
+          arguments: { id: taskId, message: response },
         };
         return Promise.resolve({
           content: `I'll complete this task: ${response}`,

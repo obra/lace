@@ -10,6 +10,7 @@ import {
   ProviderInfo,
   ModelInfo,
 } from '~/providers/base-provider';
+import { ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
 
@@ -193,7 +194,7 @@ export class OllamaProvider extends AIProvider {
         const toolCalls = (response.message?.tool_calls || []).map((tc, index: number) => ({
           id: `call_${index + 1}`,
           name: tc.function.name,
-          input: tc.function.arguments,
+          arguments: tc.function.arguments,
         }));
 
         logger.debug('Parsed Ollama response', {
@@ -324,7 +325,7 @@ export class OllamaProvider extends AIProvider {
         }
 
         let content = '';
-        let toolCalls: { id: string; name: string; input: Record<string, unknown> }[] = [];
+        let toolCalls: ToolCall[] = [];
         let finalMessage: OllamaMessage | null = null;
         let estimatedOutputTokens = 0;
 
@@ -377,7 +378,7 @@ export class OllamaProvider extends AIProvider {
             toolCalls = finalMessage.tool_calls.map((tc: OllamaToolCall, index: number) => ({
               id: `call_${index + 1}`,
               name: tc.function.name,
-              input: tc.function.arguments,
+              arguments: tc.function.arguments,
             }));
           }
 

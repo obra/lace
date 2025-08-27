@@ -39,7 +39,7 @@ import type { Agent } from '~/agents/agent';
 // Mock approval interface for testing
 class MockApprovalInterface implements ApprovalCallback {
   private responses: Map<string, ApprovalDecision> = new Map();
-  public callLog: Array<{ toolName: string; input: unknown }> = [];
+  public callLog: Array<{ toolName: string; arguments: unknown }> = [];
 
   setResponse(toolName: string, decision: ApprovalDecision): void {
     this.responses.set(toolName, decision);
@@ -50,7 +50,7 @@ class MockApprovalInterface implements ApprovalCallback {
     name: string;
     arguments: unknown;
   }): Promise<ApprovalDecision> {
-    this.callLog.push({ toolName: toolCall.name, input: toolCall.arguments });
+    this.callLog.push({ toolName: toolCall.name, arguments: toolCall.arguments });
     const response = this.responses.get(toolCall.name);
     if (!response) {
       return Promise.resolve(ApprovalDecision.DENY); // Default to deny if no response set
@@ -170,7 +170,7 @@ describe('Tool Approval System Integration', () => {
       expect(mockInterface.callLog).toHaveLength(1);
       expect(mockInterface.callLog[0]).toEqual({
         toolName: 'bash',
-        input: { command: 'echo "test"' },
+        arguments: { command: 'echo "test"' },
       });
     });
 
