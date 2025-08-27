@@ -25,11 +25,11 @@ export class GlobalConfigManager {
     }
 
     const configPath = getLaceFilePath('config.json');
-    
+
     if (!fs.existsSync(configPath)) {
       throw new Error(
         `Global config not found at ${configPath}. ` +
-        `Please create this file with a 'defaultModels' section containing 'fast' and 'smart' model configurations.`
+          `Please create this file with a 'defaultModels' section containing 'fast' and 'smart' model configurations.`
       );
     }
 
@@ -52,20 +52,20 @@ export class GlobalConfigManager {
    */
   static getDefaultModel(tier: 'fast' | 'smart'): string {
     const config = this.loadConfig();
-    
+
     if (!config.defaultModels) {
       throw new Error(
         `Global config is missing 'defaultModels' section. ` +
-        `Please add a 'defaultModels' object with 'fast' and 'smart' model configurations.`
+          `Please add a 'defaultModels' object with 'fast' and 'smart' model configurations.`
       );
     }
 
     const model = config.defaultModels[tier];
-    
+
     if (!model) {
       throw new Error(
         `No default model configured for '${tier}'. ` +
-        `Please add a '${tier}' entry to the 'defaultModels' section of your global config.`
+          `Please add a '${tier}' entry to the 'defaultModels' section of your global config.`
       );
     }
 

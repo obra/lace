@@ -71,10 +71,7 @@ export class StopReasonHandler {
   /**
    * Filters out tool calls that are missing required parameters
    */
-  private _filterIncompleteToolCalls(
-    toolCalls: ToolCall[],
-    availableTools: Tool[]
-  ): ToolCall[] {
+  private _filterIncompleteToolCalls(toolCalls: ToolCall[], availableTools: Tool[]): ToolCall[] {
     if (!this._config.requireAllParameters) {
       return toolCalls;
     }
