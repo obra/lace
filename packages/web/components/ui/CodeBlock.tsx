@@ -14,6 +14,7 @@ interface CodeBlockProps {
   language?: string;
   filename?: string;
   showLineNumbers?: boolean;
+  startLineNumber?: number;
   showCopyButton?: boolean;
   showLanguageLabel?: boolean;
   showHeader?: boolean;

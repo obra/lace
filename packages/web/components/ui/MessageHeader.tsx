@@ -91,7 +91,9 @@ export default function MessageHeader({
           </div>
           <div className="flex items-center gap-2">
             {!hideTimestamp && (
-              <span className="text-xs text-base-content/50">{formatTime(timestamp)}</span>
+              <span className="text-xs text-base-content/50">
+                {formatTime(typeof timestamp === 'string' ? new Date(timestamp) : timestamp)}
+              </span>
             )}
             {action}
           </div>
