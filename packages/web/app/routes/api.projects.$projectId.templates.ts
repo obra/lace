@@ -5,6 +5,10 @@ import type { Route } from './+types/api.projects.$projectId.templates';
 import { Project } from '@/lib/server/lace-imports';
 import { z } from 'zod';
 
+const RouteParamsSchema = z.object({
+  projectId: z.string().min(1, 'projectId is required'),
+});
+
 const CreateTemplateSchema = z.object({
   id: z.string().min(1, 'Template ID is required'),
   name: z.string().min(1, 'Template name is required'),
@@ -21,7 +25,20 @@ function isError(error: unknown): error is Error {
 
 export async function loader({ params }: Route.LoaderArgs): Promise<Response> {
   try {
-    const { projectId } = params;
+    // Validate params
+    const validationResult = RouteParamsSchema.safeParse(params);
+    if (!validationResult.success) {
+      return Response.json(
+        {
+          error: 'Invalid route parameters',
+          code: 'VALIDATION_FAILED',
+          details: validationResult.error.errors,
+        },
+        { status: 400 }
+      );
+    }
+
+    const { projectId } = validationResult.data;
     const project = Project.getById(projectId);
     if (!project) {
       return Response.json(
@@ -49,7 +66,20 @@ export async function action({ request, params }: Route.ActionArgs): Promise<Res
   }
 
   try {
-    const { projectId } = params;
+    // Validate params
+    const validationResult = RouteParamsSchema.safeParse(params);
+    if (!validationResult.success) {
+      return Response.json(
+        {
+          error: 'Invalid route parameters',
+          code: 'VALIDATION_FAILED',
+          details: validationResult.error.errors,
+        },
+        { status: 400 }
+      );
+    }
+
+    const { projectId } = validationResult.data;
     const project = Project.getById(projectId);
     if (!project) {
       return Response.json(
