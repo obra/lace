@@ -29,6 +29,11 @@ export async function loader({ request: _request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  // Add method guard
+  if (request.method !== 'POST') {
+    return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+  }
+
   try {
     const body = (await (request as Request).json()) as Record<string, unknown>;
     const validatedData = CreateProjectSchema.parse(body);
