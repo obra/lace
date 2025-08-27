@@ -23,14 +23,6 @@ const NotesRouteParamsSchema = z.object({
   taskId: TaskIdSchema,
 });
 
-interface _RouteContext {
-  params: Promise<{
-    projectId: string;
-    sessionId: string;
-    taskId: string;
-  }>;
-}
-
 export async function action({ request, params }: Route.ActionArgs) {
   // Add method guard
   if (request.method !== 'POST') {
