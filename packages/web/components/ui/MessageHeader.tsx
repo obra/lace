@@ -24,6 +24,8 @@ interface MessageHeaderProps {
   icon?: ReactNode;
   role?: 'user' | 'assistant';
   className?: string;
+  action?: ReactNode;
+  hideTimestamp?: boolean;
 }
 
 export default function MessageHeader({
@@ -34,6 +36,8 @@ export default function MessageHeader({
   icon,
   role,
   className = '',
+  action,
+  hideTimestamp = false,
 }: MessageHeaderProps) {
   const getBadgeClasses = (variant: string = 'default') => {
     const baseClasses = 'text-xs px-1.5 py-0.5 rounded';
@@ -72,17 +76,25 @@ export default function MessageHeader({
 
       {/* Header content */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          {icon && <span className="text-sm">{icon}</span>}
-          <span className="font-medium text-sm text-base-content">{name}</span>
-          {badge &&
-            (isLLMModel(badge.text) ? (
-              <LLMModelBadge model={badge.text} className={badge.className} />
-            ) : (
-              <span className={badge.className || getBadgeClasses(badge.variant)}>
-                {badge.text}
-              </span>
-            ))}
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            {icon && <span className="text-sm">{icon}</span>}
+            <span className="font-medium text-sm text-base-content">{name}</span>
+            {badge &&
+              (isLLMModel(badge.text) ? (
+                <LLMModelBadge model={badge.text} className={badge.className} />
+              ) : (
+                <span className={badge.className || getBadgeClasses(badge.variant)}>
+                  {badge.text}
+                </span>
+              ))}
+          </div>
+          <div className="flex items-center gap-2">
+            {!hideTimestamp && (
+              <span className="text-xs text-base-content/50">{formatTime(timestamp)}</span>
+            )}
+            {action}
+          </div>
         </div>
       </div>
     </div>

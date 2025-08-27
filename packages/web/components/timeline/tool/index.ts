@@ -8,6 +8,9 @@ import { delegateRenderer } from './delegate';
 import { fileWriteRenderer } from './file-write';
 import { fileReadRenderer } from './file-read';
 import { fileEditRenderer } from './file-edit';
+import { fileListRenderer } from './file-list';
+import { searchRenderer } from './search';
+import { urlFetchRenderer } from './url-fetch';
 
 // Registry of tool renderers - add new tools here
 const toolRenderers: Record<string, ToolRenderer> = {
@@ -30,6 +33,14 @@ const toolRenderers: Record<string, ToolRenderer> = {
   file_write: fileWriteRenderer,
   file_read: fileReadRenderer,
   file_edit: fileEditRenderer,
+  file_list: fileListRenderer,
+
+  // Search tools
+  search: searchRenderer,
+  grep: searchRenderer,
+
+  // Web tools
+  url_fetch: urlFetchRenderer,
 };
 
 /**
