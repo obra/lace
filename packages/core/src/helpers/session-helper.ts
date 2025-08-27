@@ -3,7 +3,7 @@
 
 import { BaseHelper } from './base-helper';
 import { GlobalConfigManager } from '~/config/global-config';
-import { ProviderInstanceManager } from '~/providers/instance/manager';
+import { ProviderRegistry } from '~/providers/registry';
 import { parseProviderModel } from '~/providers/provider-utils';
 import { ToolExecutor } from '~/tools/executor';
 import { Tool } from '~/tools/tool';
@@ -42,37 +42,23 @@ export class SessionHelper extends BaseHelper {
       return this.provider;
     }
 
-    try {
-      // Try to get provider from parent agent first
-      this.provider = await this.options.parentAgent.getProvider();
-      if (this.provider) {
-        // Clone the provider and set our model
-        const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
-        const { modelId } = parseProviderModel(providerModel);
-        // Note: setModelId method may not exist on all providers, but this is the pattern from the plan
-        return this.provider;
-      }
-    } catch (error) {
-      logger.debug('SessionHelper could not get provider from parent agent', {
-        error: error instanceof Error ? error.message : String(error)
-      });
-    }
-
-    // Fallback: create new provider instance
+    // Get the model we want to use
     const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
     const { instanceId, modelId } = parseProviderModel(providerModel);
 
-    logger.debug('SessionHelper creating new provider', {
+    logger.debug('SessionHelper creating provider', {
       tier: this.options.model,
       instanceId,
       modelId
     });
 
-    const instanceManager = new ProviderInstanceManager();
-    const instance = await instanceManager.getInstance(instanceId);
+    // Create provider instance with the correct model using registry
+    // This ensures we get a provider configured for the right model
+    const registry = ProviderRegistry.getInstance();
+    const instance = await registry.createProviderFromInstanceAndModel(instanceId, modelId);
     
     if (!instance) {
-      throw new Error(`Provider instance not found: ${instanceId}`);
+      throw new Error(`Failed to create provider instance: ${instanceId}:${modelId}`);
     }
 
     this.provider = instance;

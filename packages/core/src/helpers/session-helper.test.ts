@@ -3,6 +3,7 @@ import { SessionHelper } from './session-helper';
 import { Agent } from '~/agents/agent';
 import { Session } from '~/sessions/session';
 import { GlobalConfigManager } from '~/config/global-config';
+import { ProviderRegistry } from '~/providers/registry';
 import { TestProvider } from '~/test-utils/test-provider';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
@@ -11,6 +12,7 @@ import { z } from 'zod';
 
 // Mock modules
 vi.mock('~/config/global-config');
+vi.mock('~/providers/registry');
 
 // Create a mock provider that supports multiple queued responses
 class QueuedMockProvider extends TestProvider {
@@ -78,13 +80,18 @@ describe('SessionHelper', () => {
     // Mock agent
     mockAgent = {
       getFullSession: vi.fn().mockResolvedValue(mockSession),
-      getProvider: vi.fn().mockResolvedValue(mockProvider),
       getAvailableTools: vi.fn().mockReturnValue([testTool]),
       toolExecutor
     } as any;
 
     // Mock global config
     vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue('test-instance:test-model');
+
+    // Mock provider registry
+    const mockRegistry = {
+      createProviderFromInstanceAndModel: vi.fn().mockResolvedValue(mockProvider)
+    };
+    vi.mocked(ProviderRegistry.getInstance).mockReturnValue(mockRegistry as any);
   });
 
   describe('constructor', () => {
@@ -211,7 +218,7 @@ describe('SessionHelper', () => {
       expect(result.toolResults[0].content[0].text).toBe('Permission denied');
     });
 
-    it('should inherit provider from parent agent', async () => {
+    it('should create provider with correct model tier', async () => {
       const helper = new SessionHelper({
         model: 'fast',
         parentAgent: mockAgent
@@ -219,7 +226,8 @@ describe('SessionHelper', () => {
 
       const provider = await helper['getProvider']();
       
-      expect(mockAgent.getProvider).toHaveBeenCalled();
+      expect(GlobalConfigManager.getDefaultModel).toHaveBeenCalledWith('fast');
+      expect(ProviderRegistry.getInstance).toHaveBeenCalled();
       expect(provider).toBe(mockProvider);
     });
 
