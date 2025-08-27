@@ -17,6 +17,7 @@
     "lint:fix": "eslint --fix",
     "format": "prettier --write app components e2e hooks lib public scripts test-utils types",
     "test": "vitest run",
+    "test:run": "npm run test",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "pretest:playwright": "echo 'Using dev server for E2E tests'",
