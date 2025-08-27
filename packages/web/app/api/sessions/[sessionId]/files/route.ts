@@ -124,8 +124,8 @@ export async function GET(
           await fs.access(entryPath, fsConstants.X_OK);
         }
 
-        // Calculate relative path from working directory
-        const relativeEntryPath = relative(realWorkingDir, entryPath);
+        // Calculate relative path from working directory and normalize to POSIX
+        const relativeEntryPath = relative(realWorkingDir, entryPath).replace(/\\/g, '/');
 
         entries.push({
           name: dirent.name,
@@ -151,7 +151,7 @@ export async function GET(
 
     const response: SessionDirectoryResponse = {
       workingDirectory: basename(realWorkingDir),
-      currentPath: relativePath,
+      currentPath: relativePath.replace(/\\/g, '/'),
       entries,
     };
 
