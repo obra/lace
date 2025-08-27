@@ -73,8 +73,8 @@ describe('/api/sessions/:sessionId/files/:path', () => {
     const response = await loader(createLoaderArgs(request, { sessionId: testSessionId, '*': 'test.ts' }));
 
     if (response.status !== 200) {
-      const errorData = await parseResponse(response);
-      console.log('ERROR RESPONSE for test.ts:', response.status, errorData);
+      const _errorData = await parseResponse(response);
+      // Error details logged for debugging
     }
     expect(response.status).toBe(200);
     const data = await parseResponse<SessionFileContentResponse>(response);

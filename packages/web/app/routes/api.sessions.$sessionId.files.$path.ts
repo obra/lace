@@ -40,7 +40,7 @@ function isTextFile(mimeType: string): boolean {
          mimeType === 'video/mp2t'; // .ts files incorrectly detected as MPEG transport stream
 }
 
-export async function loader({ request, params }: LoaderArgs) {
+export async function loader({ request: _request, params }: LoaderArgs) {
   try {
     const { sessionId } = params;
     const splatPath = (params as Record<string, string>)['*'] || (params as Record<string, string>)['path'] || '';

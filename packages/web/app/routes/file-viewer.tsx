@@ -220,7 +220,7 @@ function FileViewerContent({ sessionId, filePath }: FileViewerContentProps) {
 }
 
 function FileViewerPage() {
-  const searchParams = useSearchParams();
+  const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session') as string | null;
   const filePath = searchParams.get('file') as string | null;
 

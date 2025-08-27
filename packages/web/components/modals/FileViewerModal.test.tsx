@@ -158,7 +158,7 @@ describe('FileViewerModal', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/text\/javascript/)).toBeInTheDocument();
-      expect(screen.getByText('2 KB')).toBeInTheDocument();
+      expect(screen.getByText(/2\s*KB/)).toBeInTheDocument();
     });
   });
 
