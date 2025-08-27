@@ -29,8 +29,6 @@ export function useOnboarding(
       await reloadProjects();
 
       // Navigate directly to the agent chat
-      console.log('Onboarding: navigating to agent', { projectId, sessionId, agentId });
-
       // Use setTimeout to ensure React Router v7 state updates have completed
       setTimeout(() => {
         navigateToAgent(projectId, asThreadId(sessionId), asThreadId(agentId));
