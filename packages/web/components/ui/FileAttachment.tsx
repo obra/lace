@@ -311,7 +311,7 @@ function FileCarousel({
 
       <div className="relative">
         <div
-          className="flex gap-3 overflow-x-auto scroll-smooth pb-2"
+          className="flex gap-3 overflow-x-auto scroll-smooth pb-2 [&::-webkit-scrollbar]:hidden"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {attachedFiles.map((file) => (
@@ -325,11 +325,6 @@ function FileCarousel({
             </div>
           ))}
         </div>
-        <style jsx>{`
-          div::-webkit-scrollbar {
-            display: none;
-          }
-        `}</style>
       </div>
 
       {/* File Content Modal */}
