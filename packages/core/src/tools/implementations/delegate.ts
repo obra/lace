@@ -9,13 +9,17 @@ import type { TaskManager } from '~/tasks/task-manager';
 import type { Task, TaskContext } from '~/tasks/types';
 import { isNewAgentSpec } from '~/threads/types';
 import { logger } from '~/utils/logger';
+import { parseProviderModel } from '~/providers/provider-utils';
 
 // Model format validation - requires provider instance ID
 const ModelFormat = z.string().refine(
   (value) => {
-    const [providerInstanceId, modelName] = value.split(':');
-    // Provider instance IDs typically start with 'pi_'
-    return providerInstanceId && modelName;
+    try {
+      const { instanceId, modelId } = parseProviderModel(value);
+      return instanceId && modelId;
+    } catch {
+      return false;
+    }
   },
   {
     message:

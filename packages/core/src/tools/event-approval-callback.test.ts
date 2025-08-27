@@ -179,7 +179,7 @@ describe('EventApprovalCallback Integration Tests', () => {
         {
           id: 'call_test',
           name: 'bash',
-          input: { command: 'ls' },
+          arguments: { command: 'ls' },
         },
       ],
     });
@@ -242,7 +242,7 @@ describe('EventApprovalCallback Integration Tests', () => {
         {
           id: 'call_deny',
           name: 'bash',
-          input: { command: 'rm -rf /' },
+          arguments: { command: 'rm -rf /' },
         },
       ],
     });
@@ -297,12 +297,12 @@ describe('EventApprovalCallback Integration Tests', () => {
         {
           id: 'call_multi_1',
           name: 'bash',
-          input: { command: 'ls' },
+          arguments: { command: 'ls' },
         },
         {
           id: 'call_multi_2',
           name: 'bash',
-          input: { command: 'pwd' },
+          arguments: { command: 'pwd' },
         },
       ],
     });
@@ -406,7 +406,7 @@ describe('EventApprovalCallback Integration Tests', () => {
         {
           id: 'call_recovery',
           name: 'bash',
-          input: { command: 'echo "recovery test"' },
+          arguments: { command: 'echo "recovery test"' },
         },
       ],
     });
@@ -430,7 +430,7 @@ describe('EventApprovalCallback Integration Tests', () => {
         {
           id: 'call_emit_test',
           name: 'bash',
-          input: { command: 'echo "test"' },
+          arguments: { command: 'echo "test"' },
         },
       ],
     });

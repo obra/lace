@@ -10,6 +10,7 @@ import {
   ProviderInfo,
   ModelInfo,
 } from '~/providers/base-provider';
+import { ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
 
@@ -311,7 +312,7 @@ export class LMStudioProvider extends AIProvider {
             type: 'function',
             function: {
               name: toolCall.name,
-              arguments: JSON.stringify(toolCall.input),
+              arguments: JSON.stringify(toolCall.arguments),
             },
           })),
         });
@@ -431,7 +432,7 @@ export class LMStudioProvider extends AIProvider {
 
     return new Promise((resolve, reject) => {
       let allContent = '';
-      const toolCalls: Array<{ id: string; name: string; input: Record<string, unknown> }> = [];
+      const toolCalls: ToolCall[] = [];
       let chunkCount = 0;
       let resolved = false;
       let estimatedOutputTokens = 0;
@@ -537,7 +538,7 @@ export class LMStudioProvider extends AIProvider {
                 toolCalls.push({
                   id: toolCallRequest.id || `call_${toolCalls.length + 1}`,
                   name: toolName,
-                  input: toolArgs,
+                  arguments: toolArgs,
                 });
 
                 logger.debug('LMStudio tool call detected - returning immediately', {

@@ -1,7 +1,8 @@
 // ABOUTME: Provider-specific format conversion functions for enhanced ProviderMessage format
 // ABOUTME: Converts generic tool call format to provider-specific native formats
 
-import { ProviderMessage, ProviderToolCall } from '~/providers/base-provider';
+import { ProviderMessage } from '~/providers/base-provider';
+import { ToolCall } from '~/tools/types';
 import Anthropic from '@anthropic-ai/sdk';
 
 /**
@@ -52,12 +53,12 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
           }
 
           // Add tool calls
-          msg.toolCalls.forEach((toolCall: ProviderToolCall) => {
+          msg.toolCalls.forEach((toolCall: ToolCall) => {
             content.push({
               type: 'tool_use',
               id: toolCall.id,
               name: toolCall.name,
-              input: toolCall.input,
+              input: toolCall.arguments,
             });
           });
 
@@ -121,12 +122,12 @@ export function convertToOpenAIFormat(messages: ProviderMessage[]): Record<strin
             {
               role: 'assistant',
               content: msg.content || null,
-              tool_calls: msg.toolCalls.map((toolCall: ProviderToolCall) => ({
+              tool_calls: msg.toolCalls.map((toolCall: ToolCall) => ({
                 id: toolCall.id,
                 type: 'function',
                 function: {
                   name: toolCall.name,
-                  arguments: JSON.stringify(toolCall.input),
+                  arguments: JSON.stringify(toolCall.arguments),
                 },
               })),
             },
@@ -177,7 +178,7 @@ export function convertToTextOnlyFormat(messages: ProviderMessage[]): ProviderMe
       // Convert tool calls to text descriptions
       const toolCallTexts = msg.toolCalls.map(
         (toolCall) =>
-          `[Called tool: ${toolCall.name} with input: ${JSON.stringify(toolCall.input)}]`
+          `[Called tool: ${toolCall.name} with input: ${JSON.stringify(toolCall.arguments)}]`
       );
 
       const combinedContent = [msg.content, ...toolCallTexts].filter(Boolean).join('\n\n');

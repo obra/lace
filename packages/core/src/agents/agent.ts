@@ -3,7 +3,7 @@
 
 import { EventEmitter } from 'events';
 import { resolve } from 'path';
-import { AIProvider, ProviderMessage, ProviderToolCall } from '~/providers/base-provider';
+import { AIProvider, ProviderMessage } from '~/providers/base-provider';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
@@ -42,9 +42,14 @@ export interface AgentConfig {
   };
 }
 
+/**
+ * Internal type representing the raw response from an AI provider call.
+ * This contains what the LLM said it wants to do, before any tool execution happens.
+ * Used internally by Agent to process the LLM response and determine next actions.
+ */
 interface AgentMessageResult {
   content: string;
-  toolCalls: ProviderToolCall[];
+  toolCalls: ToolCall[];
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -1141,7 +1146,7 @@ export class Agent extends EventEmitter {
     }
   }
 
-  private _executeToolCalls(toolCalls: ProviderToolCall[]): void {
+  private _executeToolCalls(toolCalls: ToolCall[]): void {
     this._setState('tool_execution');
 
     logger.debug('AGENT: Processing tool calls', {
@@ -1167,11 +1172,11 @@ export class Agent extends EventEmitter {
         toolName: providerToolCall.name,
       });
 
-      // Convert ProviderToolCall to ToolCall format
+      // Convert ToolCall to ToolCall format
       const toolCall: ToolCall = {
         id: providerToolCall.id,
         name: providerToolCall.name,
-        arguments: providerToolCall.input,
+        arguments: providerToolCall.arguments,
       };
 
       // Track active tool call
@@ -1187,7 +1192,7 @@ export class Agent extends EventEmitter {
       // Emit tool call start event for UI
       this.emit('tool_call_start', {
         toolName: providerToolCall.name,
-        input: providerToolCall.input,
+        input: providerToolCall.arguments,
         callId: providerToolCall.id,
       });
 
@@ -1646,7 +1651,7 @@ export class Agent extends EventEmitter {
         });
       } else if (event.type === 'AGENT_MESSAGE') {
         // Look ahead to see if there are immediate tool calls after this message
-        const toolCallsForThisMessage: ProviderToolCall[] = [];
+        const toolCallsForThisMessage: ToolCall[] = [];
 
         // Find tool calls that should be grouped with this agent message
         let nextIndex = i + 1;
@@ -1664,7 +1669,7 @@ export class Agent extends EventEmitter {
             toolCallsForThisMessage.push({
               id: eventToolCall.id,
               name: eventToolCall.name,
-              input: eventToolCall.arguments,
+              arguments: eventToolCall.arguments,
             });
             processedEventIndices.add(nextIndex); // Mark as processed
           }
@@ -1696,7 +1701,7 @@ export class Agent extends EventEmitter {
             {
               id: toolCall.id,
               name: toolCall.name,
-              input: toolCall.arguments,
+              arguments: toolCall.arguments,
             },
           ],
         });
@@ -1759,7 +1764,7 @@ export class Agent extends EventEmitter {
                 {
                   id: toolCallData.id,
                   name: toolCallData.name,
-                  input: toolCallData.arguments,
+                  arguments: toolCallData.arguments,
                 },
               ],
             };
@@ -1978,7 +1983,7 @@ export class Agent extends EventEmitter {
         if (message.toolCalls) {
           for (const toolCall of message.toolCalls) {
             try {
-              totalTokens += this._estimateTokens(JSON.stringify(toolCall.input));
+              totalTokens += this._estimateTokens(JSON.stringify(toolCall.arguments));
               totalTokens += 10; // Tool call structure overhead
             } catch {
               // Handle circular references or other JSON errors

@@ -8,10 +8,10 @@ import {
   ProviderMessage,
   ProviderResponse,
   ProviderConfig,
-  ProviderToolCall,
   ProviderInfo,
   ModelInfo,
 } from '~/providers/base-provider';
+import { ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
 import { convertToOpenAIFormat } from '~/providers/format-converters';
@@ -217,13 +217,13 @@ export class OpenAIProvider extends AIProvider {
 
         const textContent = choice.message.content || '';
 
-        const toolCalls: ProviderToolCall[] =
+        const toolCalls: ToolCall[] =
           choice.message.tool_calls?.map((toolCall: OpenAI.Chat.ChatCompletionMessageToolCall) => {
             try {
               return {
                 id: toolCall.id,
                 name: toolCall.function.name,
-                input: JSON.parse(toolCall.function.arguments) as Record<string, unknown>,
+                arguments: JSON.parse(toolCall.function.arguments) as Record<string, unknown>,
               };
             } catch (error) {
               logger.error('Failed to parse tool call arguments', {
@@ -326,7 +326,7 @@ export class OpenAIProvider extends AIProvider {
           streamCreated = true;
 
           let content = '';
-          let toolCalls: ProviderToolCall[] = [];
+          let toolCalls: ToolCall[] = [];
           let stopReason: string | undefined;
           let usage: OpenAI.CompletionUsage | undefined;
 
@@ -413,7 +413,7 @@ export class OpenAIProvider extends AIProvider {
               return {
                 id: partial.id,
                 name: partial.name,
-                input: JSON.parse(partial.arguments) as Record<string, unknown>,
+                arguments: JSON.parse(partial.arguments) as Record<string, unknown>,
               };
             } catch (error) {
               logger.error('Failed to parse streaming tool call arguments', {

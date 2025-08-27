@@ -190,7 +190,7 @@ describe('Tool Batch Completion Behavior', () => {
         {
           id: 'call_fail',
           name: 'test_tool',
-          input: { action: 'fail_test' },
+          arguments: { action: 'fail_test' },
         },
       ],
     });
@@ -242,7 +242,7 @@ describe('Tool Batch Completion Behavior', () => {
         {
           id: 'call_deny',
           name: 'test_tool',
-          input: { action: 'deny_test' },
+          arguments: { action: 'deny_test' },
         },
       ],
     });
@@ -295,12 +295,12 @@ describe('Tool Batch Completion Behavior', () => {
         {
           id: 'call_success',
           name: 'test_tool',
-          input: { action: 'success_test' },
+          arguments: { action: 'success_test' },
         },
         {
           id: 'call_fail',
           name: 'test_tool',
-          input: { action: 'fail_test' },
+          arguments: { action: 'fail_test' },
         },
       ],
     });
