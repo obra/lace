@@ -1,7 +1,7 @@
 // ABOUTME: Project dashboard page - shows sessions for a specific project
 // ABOUTME: Loads project data and displays SessionConfigPanel
 
-import { ProjectPageClient } from './ProjectPageClient';
+import { ProjectPageClient } from '@/app/project/[projectId]/ProjectPageClient';
 
 interface ProjectPageProps {
   params: {

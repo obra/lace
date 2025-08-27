@@ -1,7 +1,7 @@
 // ABOUTME: Server-side Sentry configuration for Node.js runtime error tracking
 // ABOUTME: Captures server errors, API route errors, and performance data
 import * as Sentry from '@sentry/node';
-import { SENTRY_CONFIG } from './lib/sentry-config';
+import { SENTRY_CONFIG } from '@/lib/sentry-config';
 
 Sentry.init({
   ...SENTRY_CONFIG,
