@@ -2,10 +2,10 @@
 // ABOUTME: Provides custom display logic for search and pattern matching tools
 
 import { faSearch } from '@fortawesome/free-solid-svg-icons';
-import type { ToolRenderer } from './types';
+import type { ToolRenderer, ToolResult } from './types';
 
 export const searchRenderer: ToolRenderer = {
-  getSummary: (args: unknown): string => {
+  getSummary: (args: unknown, result?: ToolResult): string => {
     if (typeof args === 'object' && args !== null) {
       const argsObj = args as Record<string, unknown>;
       const pattern = argsObj.pattern || argsObj.query;

@@ -2,10 +2,10 @@
 // ABOUTME: Provides custom display logic for URL fetching and web content retrieval
 
 import { faGlobe } from '@fortawesome/free-solid-svg-icons';
-import type { ToolRenderer } from './types';
+import type { ToolRenderer, ToolResult } from './types';
 
 export const urlFetchRenderer: ToolRenderer = {
-  getSummary: (args: unknown): string => {
+  getSummary: (args: unknown, result?: ToolResult): string => {
     if (typeof args === 'object' && args !== null && 'url' in args) {
       const url = (args as { url?: unknown }).url;
       if (typeof url === 'string' && url.trim()) {

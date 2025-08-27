@@ -134,12 +134,10 @@ export function ToolCallDisplay({
   const hasArgs: boolean = Boolean(
     args && typeof args === 'object' && args !== null && Object.keys(args).length > 0
   );
-  const toolSummary = renderer.getSummary?.(args) ?? createDefaultToolSummary(tool, args);
-  // For file_read and file_write, use the summary as the display name since it contains the full path
+  const toolSummary = renderer.getSummary?.(args, result) ?? createDefaultToolSummary(tool, args);
+  // Use toolSummary by default, fall back to getDisplayName, then tool name
   const toolDisplayName =
-    tool === 'file_read' || tool === 'file_write'
-      ? toolSummary
-      : (renderer.getDisplayName?.(tool, result || undefined) ?? tool);
+    toolSummary || renderer.getDisplayName?.(tool, result || undefined) || tool;
 
   // Create a proper ToolAggregatedEventData object if we need it for renderResult
   const aggregatedData: ToolAggregatedEventData | undefined = metadata
@@ -193,39 +191,24 @@ export function ToolCallDisplay({
           icon={statusIcon}
           hideTimestamp={true}
           action={
-            hasArgs ? (
-              <button
-                onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-                className="text-base-content/50 hover:text-base-content p-1 rounded hover:bg-base-200 flex-shrink-0"
-              >
-                <FontAwesomeIcon
-                  icon={showTechnicalDetails ? faChevronDown : faChevronRight}
-                  className="text-xs"
-                />
-              </button>
-            ) : undefined
+            <div className="flex items-center gap-1">
+              {renderer.getAction?.(result, aggregatedData)}
+              {hasArgs && (
+                <button
+                  onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                  className="text-base-content/50 hover:text-base-content p-1 rounded hover:bg-base-200 flex-shrink-0"
+                >
+                  <FontAwesomeIcon
+                    icon={showTechnicalDetails ? faChevronDown : faChevronRight}
+                    className="text-xs"
+                  />
+                </button>
+              )}
+            </div>
           }
         />
 
         <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
-          {/* Only show the header bar if we have content to display */}
-          {(tool !== 'file_read' || hasArgs) && (
-            <div className="p-3 bg-base-50 border-b border-base-200">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                {tool.toLowerCase() === 'bash' &&
-                args &&
-                typeof args === 'object' &&
-                'command' in args ? (
-                  <code className="text-sm font-mono bg-base-300 px-2 py-1 rounded text-base-content break-all">
-                    $ {String((args as { command: unknown }).command)}
-                  </code>
-                ) : tool !== 'file_read' && tool !== 'file_write' ? (
-                  <span className="text-sm text-base-content/80">{String(toolSummary)}</span>
-                ) : null}
-              </div>
-            </div>
-          )}
-
           {/* Technical Details (when expanded) */}
           {showTechnicalDetails && hasArgs && (
             <div className="px-3 py-2 bg-base-50 border-b border-base-200">

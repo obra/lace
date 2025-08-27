@@ -13,7 +13,7 @@ import { Alert } from '@/components/ui/Alert';
  * and command display optimized for shell operations
  */
 export const bashRenderer: ToolRenderer = {
-  getSummary: (args: unknown): string => {
+  getSummary: (args: unknown, result?: ToolResult): string => {
     if (typeof args === 'object' && args !== null && 'command' in args) {
       const command = (args as { command?: unknown }).command;
       if (typeof command === 'string') {
