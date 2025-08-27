@@ -14,7 +14,7 @@
   "scripts": {
     "build": "npm run build --workspace=packages/core && npm run build --workspace=packages/web",
     "build:standalone": "bun scripts/build-clean.ts",
-    "prebuild:standalone:clean": "rm -rf build packages/web/build scripts/generated-client-assets.ts",
+    "prebuild:standalone:clean": "rm -rf build packages/web/build",
     "build:standalone:clean": "bun scripts/build-clean.ts",
     "build:macos": "bun scripts/build-clean.ts --target bun-darwin-arm64 --name Lace",
     "build:macos:signed": "bun scripts/build-clean.ts --target bun-darwin-arm64 --name Lace --sign",

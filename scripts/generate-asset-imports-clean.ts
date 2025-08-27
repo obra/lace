@@ -1,7 +1,7 @@
 // ABOUTME: Generate imports for ALL React Router build assets using Bun's file loader
 // ABOUTME: Creates imports that work with --loader flags instead of VFS hacks
 
-import { readdirSync, statSync, writeFileSync } from 'fs';
+import { readdirSync, statSync, writeFileSync, mkdirSync } from 'fs';
 import { join, relative, posix } from 'path';
 
 interface AssetFile {
@@ -93,9 +93,11 @@ console.log(\`📦 Loaded \${assetPaths.length} embedded assets\`);
 // CLI usage
 if (import.meta.url === `file://${process.argv[1]}`) {
   const buildClientDir = 'packages/web/build/client';
-  const outputFile = 'scripts/generated-client-assets.ts';
+  const outputFile = 'build/temp/generated-client-assets.ts';
 
   try {
+    // Ensure temp directory exists
+    mkdirSync('build/temp', { recursive: true });
     generateAssetImports(buildClientDir, outputFile);
   } catch (error) {
     console.error('❌ Failed to generate client asset imports:', error);

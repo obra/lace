@@ -2,7 +2,7 @@
 // ABOUTME: Uses --loader flags to embed JSON/MD files as assets with no temp extraction
 
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 interface BuildOptions {
@@ -81,24 +81,38 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
 
   // Step 2: Generate fresh client asset imports
   console.log('2️⃣ Generating client asset imports...');
-  if (existsSync('scripts/generated-client-assets.ts')) {
-    execSync('rm scripts/generated-client-assets.ts', { stdio: 'pipe' });
+  if (existsSync('build/temp')) {
+    execSync('rm -rf build/temp', { stdio: 'pipe' });
   }
   execSync('bun scripts/generate-asset-imports-clean.ts', { stdio: 'inherit' });
-  console.log('✅ Client asset imports generated\n');
+
+  // Create a minimal server wrapper that just imports client assets
+  const serverWrapper = `// ABOUTME: Minimal wrapper for Bun asset embedding
+// ABOUTME: Imports client assets and runs existing server-custom.ts
+
+// Import client assets (triggers embedding for web files)
+import { assetMap } from './generated-client-assets';
+
+// Run the existing server - catalog/prompt loading happens dynamically via Bun.embeddedFiles
+import '../packages/web/server-custom';
+`;
+
+  writeFileSync('build/temp/server-with-assets.ts', serverWrapper);
+  console.log('✅ Client asset imports and server wrapper generated\n');
 
   // Step 3: Compile with Bun asset loading
   console.log('3️⃣ Compiling with Bun asset loading...');
   mkdirSync(outdir, { recursive: true });
   const outputPath = join(outdir, name);
 
-  // Build command with explicit imports + asset naming to preserve directory structure
-  const compileCmd = `bun build --compile --outfile=${outputPath} --target=${target} --minify --sourcemap=none --loader .json:file --loader .md:file --asset-naming="[dir]/[name].[ext]" scripts/server-clean.ts`;
+  // Build command with glob patterns for JSON/MD embedding + client assets
+  const compileCmd = `bun build --compile --outfile=${outputPath} --target=${target} --minify --sourcemap=none --asset-naming="[dir]/[name].[ext]" build/temp/server-with-assets.ts packages/core/src/providers/catalog/data/*.json packages/core/src/config/prompts/**/*.md`;
 
   console.log(`🔧 Running: ${compileCmd}`);
-  console.log('   🖥️  Server: packages/web/server-custom.ts');
-  console.log('   📋 Catalogs: packages/core/src/providers/catalog/data/');
-  console.log('   📄 Prompts: packages/core/src/config/prompts/');
+  console.log('   🖥️  Server: packages/web/server-custom.ts (via wrapper)');
+  console.log('   📋 JSON: packages/core/src/providers/catalog/data/*.json');
+  console.log('   📄 MD: packages/core/src/config/prompts/**/*.md');
+  console.log('   🎨 Client assets: embedded via imports');
 
   execSync(compileCmd, { stdio: 'inherit' });
 

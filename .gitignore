@@ -110,4 +110,4 @@ src/vfs/lace-database.ts
 
 # Build artifacts that get regenerated
 packages/web/server-dependencies.json
-scripts/generated-client-assets.ts
+build/temp/
