@@ -16,6 +16,7 @@
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src\"",
     "test": "vitest run",
+    "test:run": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
