@@ -471,6 +471,15 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
                     : 'border-base-300 hover:border-primary/50'
                 }`}
                 onClick={() => navigate(`/project/${project.id}`)}
+                role="button"
+                tabIndex={0}
+                aria-label={`Open project ${project.name}`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(`/project/${project.id}`);
+                  }
+                }}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
