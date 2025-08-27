@@ -487,7 +487,7 @@ describe('Enhanced Agent', () => {
         data?:
           | {
               toolName: string;
-              input: Record<string, unknown>;
+              arguments: Record<string, unknown>;
               callId: string;
               result?: ToolResult;
             }
@@ -682,7 +682,7 @@ describe('Enhanced Agent', () => {
       vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
       await agent.start();
 
-      const toolStartEvents: Array<{ toolName: string; input: unknown; callId: string }> = [];
+      const toolStartEvents: Array<{ toolName: string; arguments: unknown; callId: string }> = [];
       const toolCompleteEvents: unknown[] = [];
 
       agent.on('tool_call_start', (data) => toolStartEvents.push(data));
@@ -728,7 +728,7 @@ describe('Enhanced Agent', () => {
       vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
       await agent.start();
 
-      const toolStartEvents: Array<{ toolName: string; input: unknown; callId: string }> = [];
+      const toolStartEvents: Array<{ toolName: string; arguments: unknown; callId: string }> = [];
       agent.on('tool_call_start', (data) => toolStartEvents.push(data));
 
       await agent.sendMessage('Run multiple commands');
@@ -1607,7 +1607,7 @@ describe('Enhanced Agent', () => {
     it('should execute multiple tools in sequence', async () => {
       const toolStartEvents: Array<{
         toolName: string;
-        input: Record<string, unknown>;
+        arguments: Record<string, unknown>;
         callId: string;
       }> = [];
       const toolCompleteEvents: Array<{ toolName: string; result: ToolResult; callId: string }> =

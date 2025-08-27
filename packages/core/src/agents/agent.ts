@@ -89,7 +89,7 @@ interface AgentEvents {
   compaction_start: [{ auto: boolean }];
   compaction_complete: [{ success: boolean }];
   agent_response_complete: [{ content: string; tokenUsage?: CombinedTokenUsage }]; // Clean content with thinking blocks removed, plus token usage
-  tool_call_start: [{ toolName: string; input: Record<string, unknown>; callId: string }];
+  tool_call_start: [{ toolName: string; arguments: Record<string, unknown>; callId: string }];
   tool_call_complete: [{ toolName: string; result: ToolResult; callId: string }];
   state_change: [{ from: AgentState; to: AgentState }];
   error: [{ error: Error; context: Record<string, unknown> }];
@@ -1192,7 +1192,7 @@ export class Agent extends EventEmitter {
       // Emit tool call start event for UI
       this.emit('tool_call_start', {
         toolName: providerToolCall.name,
-        input: providerToolCall.arguments,
+        arguments: providerToolCall.arguments,
         callId: providerToolCall.id,
       });
 

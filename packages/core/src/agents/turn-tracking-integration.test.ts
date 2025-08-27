@@ -447,7 +447,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
             {
               id: 'call_1',
               name: 'mock_tool',
-              input: { text: 'test input' },
+              arguments: { text: 'test input' },
             },
           ],
           usage: { promptTokens: 30, completionTokens: 20, totalTokens: 50 },

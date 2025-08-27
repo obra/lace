@@ -173,7 +173,7 @@ describe('Tool Approval Race Condition Integration Tests', () => {
           {
             id: 'tool-counter',
             name: 'bash',
-            input: { command: 'echo "test"' },
+            arguments: { command: 'echo "test"' },
           },
         ],
       });

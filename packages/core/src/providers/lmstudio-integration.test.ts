@@ -91,7 +91,7 @@ conditionalDescribe('LMStudio Provider Integration Tests', () => {
           {
             id: 'call_1',
             name: 'mock_tool',
-            input: { action: 'initial' },
+            arguments: { action: 'initial' },
           },
         ],
       },

@@ -65,7 +65,7 @@ class MockProvider extends BaseMockProvider {
           {
             id: 'complete_task_call',
             name: 'task_complete',
-            input: {
+            arguments: {
               id: taskId,
               message:
                 'Successfully analyzed the project structure and found key patterns: TypeScript configuration, modular architecture, and comprehensive testing setup.',
