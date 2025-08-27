@@ -7,6 +7,10 @@ import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId';
 
+const RouteParamsSchema = z.object({
+  projectId: z.string().min(1, 'projectId is required'),
+});
+
 const UpdateProjectSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
@@ -17,7 +21,16 @@ const UpdateProjectSchema = z.object({
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const { projectId } = params as { projectId: string };
+    // Validate params
+    const validationResult = RouteParamsSchema.safeParse(params);
+    if (!validationResult.success) {
+      return createErrorResponse('Invalid route parameters', 400, {
+        code: 'VALIDATION_FAILED',
+        details: validationResult.error.errors,
+      });
+    }
+
+    const { projectId } = validationResult.data;
     const project = Project.getById(projectId);
 
     if (!project) {
@@ -40,7 +53,16 @@ export async function action({ request, params }: Route.ActionArgs) {
   switch ((request as Request).method) {
     case 'PATCH':
       try {
-        const { projectId } = params as { projectId: string };
+        // Validate params
+        const validationResult = RouteParamsSchema.safeParse(params);
+        if (!validationResult.success) {
+          return createErrorResponse('Invalid route parameters', 400, {
+            code: 'VALIDATION_FAILED',
+            details: validationResult.error.errors,
+          });
+        }
+
+        const { projectId } = validationResult.data;
         const body = (await (request as Request).json()) as Record<string, unknown>;
         const validatedData = UpdateProjectSchema.parse(body);
 
@@ -73,7 +95,16 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     case 'DELETE':
       try {
-        const { projectId } = params as { projectId: string };
+        // Validate params
+        const validationResult = RouteParamsSchema.safeParse(params);
+        if (!validationResult.success) {
+          return createErrorResponse('Invalid route parameters', 400, {
+            code: 'VALIDATION_FAILED',
+            details: validationResult.error.errors,
+          });
+        }
+
+        const { projectId } = validationResult.data;
         const project = Project.getById(projectId);
 
         if (!project) {
