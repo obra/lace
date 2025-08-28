@@ -90,46 +90,67 @@ export class TemplateEngine {
       out += content.slice(lastIndex, m.index);
       lastIndex = includeRegex.lastIndex;
 
-      // Locate include file across templateDirs
+      // Try embedded files first (Bun executable)
+      let foundContent: string | null = null;
+      if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
+        const targetPath = `packages/core/src/config/prompts/${includePath}`;
+        
+        for (const file of Bun.embeddedFiles) {
+          if (file.name.endsWith(targetPath)) {
+            try {
+              foundContent = fs.readFileSync(file.name, 'utf-8');
+              break;
+            } catch (e) {
+              // Continue to next file
+            }
+          }
+        }
+      }
+      
+      // Fallback: locate include file across templateDirs
       let foundPath: string | null = null;
       let foundTemplateDir = '';
-      for (const templateDir of this.templateDirs) {
-        const fullIncludePath = path.resolve(templateDir, currentDir, includePath);
-        const normalizedPath = path.normalize(fullIncludePath);
-        if (fs.existsSync(normalizedPath)) {
-          foundPath = normalizedPath;
-          foundTemplateDir = templateDir;
-          break;
+      if (!foundContent) {
+        for (const templateDir of this.templateDirs) {
+          const fullIncludePath = path.resolve(templateDir, currentDir, includePath);
+          const normalizedPath = path.normalize(fullIncludePath);
+          if (fs.existsSync(normalizedPath)) {
+            foundPath = normalizedPath;
+            foundTemplateDir = templateDir;
+            break;
+          }
         }
       }
 
-      if (!foundPath) {
+      if (!foundContent && !foundPath) {
         logger.warn('Include file not found', { includePath, searchedDirs: this.templateDirs });
         out += `<!-- Include not found: ${includePath} -->`;
         continue;
       }
 
-      if (this.processedIncludes.has(foundPath)) {
-        logger.warn('Circular include detected', { includePath, foundPath });
+      const checkPath = foundPath || `embedded:${includePath}`;
+      if (this.processedIncludes.has(checkPath)) {
+        logger.warn('Circular include detected', { includePath, foundPath: checkPath });
         out += `<!-- Circular include: ${includePath} -->`;
         continue;
       }
 
       try {
-        this.processedIncludes.add(foundPath);
-        const includeContent = fs.readFileSync(foundPath, 'utf-8');
-        const includeDir = path.dirname(path.relative(foundTemplateDir, foundPath));
+        this.processedIncludes.add(checkPath);
+        
+        const includeContent = foundContent || fs.readFileSync(foundPath!, 'utf-8');
+        const includeDir = foundTemplateDir ? path.dirname(path.relative(foundTemplateDir, foundPath!)) : path.dirname(includePath);
         const processed = await this.processIncludes(includeContent, includeDir);
         out += processed;
       } catch (error) {
         logger.error('Failed to process include', {
           includePath,
-          foundPath,
+          foundPath: checkPath,
           error: error instanceof Error ? error.message : String(error),
         });
         out += `<!-- Include error: ${includePath} -->`;
       } finally {
-        this.processedIncludes.delete(foundPath);
+        this.processedIncludes.delete(checkPath);
       }
     }
     out += content.slice(lastIndex);
