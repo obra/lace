@@ -21,11 +21,11 @@ export class TemplateEngine {
   /**
    * Render a template with the provided context
    */
-  render(templatePath: string, context: TemplateContext): string {
+  async render(templatePath: string, context: TemplateContext): Promise<string> {
     try {
       this.processedIncludes.clear();
-      const templateContent = this.loadTemplateSync(templatePath);
-      const processedContent = this.processIncludes(templateContent, path.dirname(templatePath));
+      const templateContent = await this.loadTemplate(templatePath);
+      const processedContent = await this.processIncludes(templateContent, path.dirname(templatePath));
       return mustache.render(processedContent, context);
     } catch (error) {
       logger.error('Failed to render template', {
@@ -37,9 +37,9 @@ export class TemplateEngine {
   }
 
   /**
-   * Load template content from embedded files or file system (synchronous)
+   * Load template content from embedded files or file system
    */
-  private loadTemplateSync(templatePath: string): string {
+  private async loadTemplate(templatePath: string): Promise<string> {
     // First try embedded files - check for the template path directly
     try {
       if (typeof Bun !== 'undefined' && Bun.embeddedFiles) {
@@ -80,7 +80,7 @@ export class TemplateEngine {
   /**
    * Process {{include:file.md}} directives with recursion protection
    */
-  private processIncludes(content: string, currentDir: string): string {
+  private async processIncludes(content: string, currentDir: string): Promise<string> {
     const includeRegex = /\{\{include:([^}]+)\}\}/g;
 
     return content.replace(includeRegex, (match, includePath: string) => {

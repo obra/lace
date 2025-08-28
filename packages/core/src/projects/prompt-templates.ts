@@ -123,7 +123,7 @@ export class PromptTemplateManager {
     return Array.from(projectTemplates.values());
   }
 
-  renderTemplate(projectId: string, templateId: string, variables: Record<string, string>): string {
+  async renderTemplate(projectId: string, templateId: string, variables: Record<string, string>): Promise<string> {
     const template = this.getTemplate(projectId, templateId);
     if (!template) {
       throw new Error(`Template not found: ${templateId}`);
@@ -135,7 +135,7 @@ export class PromptTemplateManager {
     if (template.getParentTemplateId()) {
       const parentTemplate = this.getTemplate(projectId, template.getParentTemplateId()!);
       if (parentTemplate) {
-        const parentContent = parentTemplate.render(variables);
+        const parentContent = await parentTemplate.render(variables);
         renderedContent = renderedContent.replace(/\{\{parent\}\}/g, parentContent);
       }
     }
@@ -149,7 +149,7 @@ export class PromptTemplateManager {
       content: renderedContent,
     });
 
-    return tempTemplate.render(variables);
+    return await tempTemplate.render(variables);
   }
 
   deleteTemplate(projectId: string, templateId: string): boolean {

@@ -119,8 +119,7 @@ export async function tryReadEmbeddedFile(
 ): Promise<string | null> {
   // Try Bun embedded files first
   try {
-    // @ts-ignore - Bun.embeddedFiles may not exist in Node.js
-    if (typeof Bun !== 'undefined' && Bun.embeddedFiles) {
+    if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
       for (const file of Bun.embeddedFiles) {
         if (file.name === filename) {
           return await file.text();
@@ -149,9 +148,15 @@ export async function tryReadEmbeddedFile(
  */
 export function getEmbeddedFiles(pattern: string): string[] {
   try {
-    // @ts-ignore - Bun.embeddedFiles may not exist in Node.js
-    if (typeof Bun !== 'undefined' && Bun.embeddedFiles) {
-      const regex = new RegExp(pattern.replace('*', '.*'));
+    if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
+      const regex = new RegExp(
+        '^' +
+          pattern
+            .split('*')
+            .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+            .join('.*') +
+          '$'
+      );
       return Array.from(Bun.embeddedFiles)
         .map((file) => file.name)
         .filter((name) => regex.test(name));
