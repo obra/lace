@@ -1,6 +1,8 @@
 // ABOUTME: Unified resource path resolution for development and production (standalone) modes
 // ABOUTME: Handles the difference between import.meta.url and extracted standalone directory structure
 
+/// <reference path="../../../../types/bun-embedded.d.ts" />
+
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { readFile, readdir } from 'node:fs/promises';
@@ -246,13 +248,13 @@ export async function loadFilesFromDirectory(
  */
 export async function loadFileFromEmbeddedOrFilesystem(filePath: string): Promise<string | null> {
   const { logger } = await import('~/utils/logger');
-  
+
   // Try Bun embedded files first - look for files that end with the relative path
   try {
     if (typeof Bun !== 'undefined' && Bun.embeddedFiles) {
       // Normalize the file path for comparison (remove leading ./ and ../)
       const normalizedPath = filePath.replace(/^\.\.?\//, '');
-      
+
       for (const file of Bun.embeddedFiles) {
         if (file.name.endsWith(normalizedPath)) {
           logger.debug('resource.load.embedded_file_found', { filePath, embeddedName: file.name });

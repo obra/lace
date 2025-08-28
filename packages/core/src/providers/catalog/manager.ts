@@ -27,11 +27,14 @@ async function loadBuiltinProviderCatalogs(): Promise<CatalogProvider[]> {
           const provider = CatalogProviderSchema.parse(JSON.parse(content));
           catalogs.push(provider);
         } catch (error) {
-          logger.warn('catalog.load.embedded_failed', { fileName: file.name, error: String(error) });
+          logger.warn('catalog.load.embedded_failed', {
+            fileName: file.name,
+            error: String(error),
+          });
         }
       }
     }
-    
+
     if (catalogs.length > 0) {
       logger.info('catalog.load.complete', { count: catalogs.length, mode: 'embedded' });
       return catalogs;

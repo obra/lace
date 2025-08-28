@@ -1,6 +1,8 @@
 // ABOUTME: Orchestrates template engine and variable providers for system prompt generation
 // ABOUTME: Handles template loading, variable provision, and rendering with fallbacks
 
+/// <reference path="../../../../types/bun-embedded.d.ts" />
+
 import * as fs from 'fs';
 import * as path from 'path';
 import { TemplateEngine } from '~/config/template-engine';
