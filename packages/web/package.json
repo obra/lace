@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20.18"
+    "node": ">=20.18",
+    "bun": ">=1.2.21"
   },
   "scripts": {
     "dev": "NODE_ENV=development tsx server-custom.ts",

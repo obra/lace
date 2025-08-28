@@ -2,7 +2,7 @@
 // ABOUTME: Uses --loader flags to embed JSON/MD files as assets with no temp extraction
 
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 async function createAppBundle(
@@ -88,7 +88,9 @@ function parseArgs(): BuildOptions {
         break;
       case '--help':
         console.log(`
-Usage: npm run build:clean [options]
+Usage:
+  bun scripts/build-macos-app.ts [options]
+  npm run build:macos [-- --sign] [-- --bundle]
 
 Options:
   --target <target>    Bun target (default: bun-darwin-arm64)
@@ -99,10 +101,10 @@ Options:
   --help               Show this help
 
 Examples:
-  npm run build:clean
-  npm run build:clean -- --target bun-linux-x64 --name lace-linux
-  npm run build:clean -- --sign
-  npm run build:clean -- --bundle --sign
+  npm run build:macos
+  npm run build:macos:signed
+  npm run build:macos:app
+  bun scripts/build-macos-app.ts --target bun-linux-x64 --name lace-linux
 
 This creates a fully standalone executable with:
 - All React Router client assets embedded
@@ -166,7 +168,7 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   if (sign && process.platform === 'darwin') {
     console.log('🔏 Starting signing and notarization...');
     try {
-      execSync(`npx tsx scripts/sign-and-notarize.ts --binary "${outputPath}"`, {
+      void execSync(`npx tsx scripts/sign-and-notarize.ts --binary "${outputPath}"`, {
         stdio: 'inherit',
       });
     } catch (error) {
@@ -176,8 +178,8 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   } else if (process.platform === 'darwin') {
     console.log('🔏 Applying basic ad-hoc signing (macOS)...');
     try {
-      execSync(`codesign --remove-signature "${outputPath}"`, { stdio: 'pipe' });
-      execSync(`codesign -s - --deep --force "${outputPath}"`, { stdio: 'pipe' });
+      void execSync(`codesign --remove-signature "${outputPath}"`, { stdio: 'pipe' });
+      void execSync(`codesign -s - --deep --force "${outputPath}"`, { stdio: 'pipe' });
       console.log('✅ Ad-hoc signing completed');
     } catch (error) {
       console.warn('⚠️  Warning: Ad-hoc signing failed, but executable may still work');

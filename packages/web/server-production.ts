@@ -49,7 +49,8 @@ if (!Number.isInteger(requestedPort) || requestedPort < 1 || requestedPort > 655
 
 async function startLaceServer() {
   const port = await findAvailablePort(requestedPort, userSpecifiedPort, hostname);
-  const url = `http://${hostname}:${port}`;
+  const safeHost = hostname.includes(':') ? `[${hostname}]` : hostname;
+  const url = `http://${safeHost}:${port}`;
 
   console.log(`🚀 Starting Lace server (production) on ${url}...`);
 
@@ -72,7 +73,7 @@ async function startLaceServer() {
 
   app.use(requestHandler);
 
-  app.listen(port, hostname, () => {
+  const server = app.listen(port, hostname, () => {
     console.log(`
 ✅ Lace is ready!
    
@@ -86,6 +87,23 @@ async function startLaceServer() {
     console.log(`LACE_SERVER_PORT:${port}`);
     console.log(`LACE_SERVER_URL:${url}`);
   });
+
+  // Graceful shutdown handlers
+  const gracefulShutdown = () => {
+    console.log('\nReceived shutdown signal, closing server...');
+    server.close((err) => {
+      if (err) {
+        console.error('Error closing server:', err);
+        process.exit(1);
+      } else {
+        console.log('Server closed gracefully');
+        process.exit(0);
+      }
+    });
+  };
+
+  process.on('SIGTERM', gracefulShutdown);
+  process.on('SIGINT', gracefulShutdown);
 }
 
 // Port detection function (from server-custom.ts)

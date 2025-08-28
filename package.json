@@ -6,7 +6,8 @@
   "description": "Lace AI coding assistant monorepo",
   "author": "Jesse Vincent <jesse@fsck.com>",
   "engines": {
-    "node": ">=20.18.3"
+    "node": ">=20.18.3",
+    "bun": ">=1.2.21"
   },
   "workspaces": [
     "packages/*"

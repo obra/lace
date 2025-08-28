@@ -19,11 +19,26 @@ async function loadBuiltinProviderCatalogs(): Promise<CatalogProvider[]> {
   const catalogs: CatalogProvider[] = [];
   const catalogDir = resolveDataDirectory(import.meta.url);
 
-  // Use centralized file loading - handles both Bun embedded and file system
-  const catalogFiles = await loadFilesFromDirectory(
-    'packages/core/src/providers/catalog/data',
-    '.json'
-  );
+  // First try embedded files with hardcoded path
+  const embeddedCatalogFiles = await loadFilesFromDirectory('packages/core/src/providers/catalog/data', '.json');
+  
+  if (embeddedCatalogFiles.length > 0) {
+    for (const { name, content } of embeddedCatalogFiles) {
+      try {
+        const provider = CatalogProviderSchema.parse(JSON.parse(content));
+        catalogs.push(provider);
+        logger.debug('catalog.load.success', { name });
+      } catch (error) {
+        logger.warn('catalog.load.parse_failed', { name, error: String(error) });
+      }
+    }
+    
+    logger.info('catalog.load.complete', { count: catalogs.length, mode: 'embedded' });
+    return catalogs;
+  }
+
+  // Fallback to file system approach using resolved directory
+  const catalogFiles = await loadFilesFromDirectory(catalogDir, '.json');
 
   for (const { name, content } of catalogFiles) {
     try {

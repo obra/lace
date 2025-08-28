@@ -1,8 +1,12 @@
 // ABOUTME: Generate imports for all JSON and MD files that need embedding  
 // ABOUTME: Creates explicit imports that Bun needs for file embedding
 
-import { readdirSync, statSync, writeFileSync, mkdirSync } from 'fs';
-import { join, relative } from 'path';
+import { readdirSync, writeFileSync, mkdirSync } from 'fs';
+import { join, relative, resolve } from 'path';
+import { pathToFileURL } from 'url';
+
+// Central output directory for generated embed file
+const OUTPUT_DIR = 'build/temp';
 
 interface EmbeddedFile {
   importName: string;
@@ -77,9 +81,9 @@ import '../../packages/web/server-production';
 `;
 
   // Ensure output directory exists
-  mkdirSync('build/temp', { recursive: true });
+  mkdirSync(OUTPUT_DIR, { recursive: true });
   
-  const outputFile = 'build/temp/embed-all-files.ts';
+  const outputFile = join(OUTPUT_DIR, 'embed-all-files.ts');
   writeFileSync(outputFile, generatedCode);
   
   console.log(`✅ Generated ${outputFile} with ${allFiles.length} imports`);
@@ -88,11 +92,13 @@ import '../../packages/web/server-production';
 }
 
 // CLI usage
-if (import.meta.url === `file://${process.argv[1]}`) {
+const mainModuleHref = process.argv[1] ? pathToFileURL(process.argv[1]).href : '';
+if (import.meta.url === mainModuleHref) {
   try {
     generateAllImports();
-  } catch (error) {
-    console.error('❌ Failed to generate imports:', error);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? `${error.message}\n${error.stack ?? ''}` : String(error);
+    console.error('❌ Failed to generate imports:', msg);
     process.exit(1);
   }
 }

@@ -3,6 +3,7 @@
 
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { readFile, readdir } from 'node:fs/promises';
 
 /**
  * Resolves paths to bundled resources (data files, templates, etc.) that work in both
@@ -25,6 +26,8 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
       return '__BUN_EMBEDDED_DATA__';
     } else if (relativePath === 'prompts') {
       return '__BUN_EMBEDDED_PROMPTS__';
+    } else if (relativePath === 'templates') {
+      return '__BUN_EMBEDDED_TEMPLATES__';
     } else {
       throw new Error(
         `Unknown resource path '${relativePath}' in Bun executable mode. Add explicit mapping.`

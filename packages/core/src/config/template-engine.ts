@@ -5,7 +5,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import mustache from 'mustache';
 import { logger } from '~/utils/logger';
-import { loadFileFromEmbeddedOrFilesystem } from '~/utils/resource-resolver';
 
 export interface TemplateContext {
   [key: string]: unknown;

@@ -8,7 +8,7 @@ Lace uses a clean Bun compilation system to create standalone executables with e
 
 ### Prerequisites
 
-- **Bun 1.2.21+** - Required for asset embedding and `Bun.embeddedFiles` API
+- **Bun 1.2.21+** - Required for asset embedding and `Bun.embeddedFiles` API (enforced via package.json "engines")
 - **macOS** (for signed app bundles)
 - **Xcode** (for Swift menu bar app compilation)
 

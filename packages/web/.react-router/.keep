@@ -1,3 +1,0 @@
-# This file ensures the .react-router directory is tracked by git
-# The directory contains generated TypeScript types from React Router  
-# that should not be committed but the directory structure should exist

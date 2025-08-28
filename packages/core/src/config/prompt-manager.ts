@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { TemplateEngine } from '~/config/template-engine';
-import { resolveResourcePath, loadFilesFromDirectory } from '~/utils/resource-resolver';
+import { resolveResourcePath } from '~/utils/resource-resolver';
 import {
   VariableProviderManager,
   SystemVariableProvider,
