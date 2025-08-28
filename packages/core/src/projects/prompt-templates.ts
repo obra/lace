@@ -122,7 +122,7 @@ export class PromptTemplateManager {
     return Array.from(projectTemplates.values());
   }
 
-  async renderTemplate(projectId: string, templateId: string, variables: Record<string, string>): Promise<string> {
+  renderTemplate(projectId: string, templateId: string, variables: Record<string, string>): string {
     const template = this.getTemplate(projectId, templateId);
     if (!template) {
       throw new Error(`Template not found: ${templateId}`);

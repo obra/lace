@@ -21,11 +21,11 @@ export class TemplateEngine {
   /**
    * Render a template with the provided context
    */
-  async render(templatePath: string, context: TemplateContext): Promise<string> {
+  render(templatePath: string, context: TemplateContext): string {
     try {
       this.processedIncludes.clear();
-      const templateContent = await this.loadTemplate(templatePath);
-      const processedContent = await this.processIncludes(templateContent, path.dirname(templatePath));
+      const templateContent = this.loadTemplate(templatePath);
+      const processedContent = this.processIncludes(templateContent, path.dirname(templatePath));
       return mustache.render(processedContent, context);
     } catch (error) {
       logger.error('Failed to render template', {
@@ -39,7 +39,7 @@ export class TemplateEngine {
   /**
    * Load template content from embedded files or file system
    */
-  private async loadTemplate(templatePath: string): Promise<string> {
+  private loadTemplate(templatePath: string): string {
     // First try embedded files - check for the template path directly
     try {
       if (typeof Bun !== 'undefined' && Bun.embeddedFiles) {
@@ -49,7 +49,9 @@ export class TemplateEngine {
           if (file.name.endsWith(targetPath)) {
             logger.debug('Loading template from embedded files', { templatePath, embeddedName: file.name });
             try {
-              const content = await file.text();
+              // Use sync file reading for embedded files 
+              const fs = require('fs');
+              const content = fs.readFileSync(file.name, 'utf-8');
               return content;
             } catch (fileError) {
               logger.debug('Failed to read embedded file', { fileName: file.name, error: String(fileError) });
@@ -78,7 +80,7 @@ export class TemplateEngine {
   /**
    * Process {{include:file.md}} directives with recursion protection
    */
-  private async processIncludes(content: string, currentDir: string): Promise<string> {
+  private processIncludes(content: string, currentDir: string): string {
     const includeRegex = /\{\{include:([^}]+)\}\}/g;
     let out = '';
     let lastIndex = 0;
@@ -96,7 +98,8 @@ export class TemplateEngine {
         for (const file of Bun.embeddedFiles) {
           if (file.name.endsWith(targetPath)) {
             try {
-              foundContent = await file.text();
+              const fs = require('fs');
+              foundContent = fs.readFileSync(file.name, 'utf-8');
               break;
             } catch (e) {
               // Continue to next file
@@ -138,7 +141,7 @@ export class TemplateEngine {
         
         const includeContent = foundContent || fs.readFileSync(foundPath!, 'utf-8');
         const includeDir = foundTemplateDir ? path.dirname(path.relative(foundTemplateDir, foundPath!)) : path.dirname(includePath);
-        const processed = await this.processIncludes(includeContent, includeDir);
+        const processed = this.processIncludes(includeContent, includeDir);
         out += processed;
       } catch (error) {
         logger.error('Failed to process include', {

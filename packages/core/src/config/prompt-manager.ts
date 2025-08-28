@@ -59,7 +59,7 @@ export class PromptManager {
       logger.debug('Generating system prompt using template system');
 
       const context = await this.variableManager.getTemplateContext();
-      const prompt = await this.templateEngine.render('system.md', context);
+      const prompt = this.templateEngine.render('system.md', context);
 
       logger.debug('System prompt generated successfully', {
         contextKeys: Object.keys(context),
