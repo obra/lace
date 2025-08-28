@@ -7,6 +7,7 @@ import { ApprovalDecision } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import type { ThreadId } from '@/types/core';
 import { EventStreamManager } from '@/lib/event-stream-manager';
+import { setupAgentApprovals } from './agent-utils';
 import { logger } from '~/utils/logger';
 
 export class SessionService {
@@ -25,7 +26,6 @@ export class SessionService {
       for (const agentInfo of agents) {
         const agent = session.getAgent(agentInfo.threadId);
         if (agent) {
-          const { setupAgentApprovals } = await import('./agent-utils');
           setupAgentApprovals(agent, sessionId);
           await this.setupAgentEventHandlers(agent);
         }
