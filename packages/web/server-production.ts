@@ -84,6 +84,9 @@ async function startLaceServer() {
   app.disable('x-powered-by');
   app.use(morgan('tiny'));
 
+  // Create static middleware once
+  const staticMiddleware = express.static('build/client', { maxAge: '1h' });
+
   // Serve assets from embedded files or fallback to file system
   app.use((req, res, next) => {
     // Try embedded files first (Bun executable)
@@ -115,7 +118,7 @@ async function startLaceServer() {
     }
 
     // Fallback to file system (development)
-    express.static('build/client', { maxAge: '1h' })(req, res, next);
+    staticMiddleware(req, res, next);
   });
 
   function getContentType(path: string): string {
