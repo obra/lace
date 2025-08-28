@@ -6,6 +6,7 @@ import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
+import { Session } from '@/lib/server/lace-imports';
 import { z } from 'zod';
 import type { Route } from './+types/api.sessions.$sessionId';
 
@@ -116,7 +117,6 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     // Get updated session data directly from database to ensure we have the latest values
-    const { Session } = await import('@/lib/server/lace-imports');
     const updatedSessionData = Session.getSession(sessionId);
     if (!updatedSessionData) {
       return createErrorResponse('Session not found after update', 500, {
