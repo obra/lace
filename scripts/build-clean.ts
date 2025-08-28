@@ -79,42 +79,29 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   execSync('npm run build --workspace=packages/web', { stdio: 'inherit' });
   console.log('✅ Fresh React Router build ready\n');
 
-  // Step 2: Generate fresh client asset imports
-  console.log('2️⃣ Generating client asset imports...');
+  // Step 2: Generate all imports for embedding
+  console.log('2️⃣ Generating file imports...');
   if (existsSync('build/temp')) {
     execSync('rm -rf build/temp', { stdio: 'pipe' });
   }
-  execSync('bun scripts/generate-asset-imports-clean.ts', { stdio: 'inherit' });
-
-  // Create a minimal server wrapper that just imports client assets
-  const serverWrapper = `// ABOUTME: Minimal wrapper for Bun asset embedding
-// ABOUTME: Imports client assets and runs existing server-custom.ts
-
-// Import client assets (triggers embedding for web files)
-import { assetMap } from './generated-client-assets';
-
-// Run the existing server - catalog/prompt loading happens dynamically via Bun.embeddedFiles
-import '../packages/web/server-custom';
-`;
-
-  writeFileSync('build/temp/server-with-assets.ts', serverWrapper);
-  console.log('✅ Client asset imports and server wrapper generated\n');
+  execSync('bun scripts/generate-all-imports.ts', { stdio: 'inherit' });
+  console.log('✅ File imports generated\n');
 
   // Step 3: Compile with Bun asset loading
   console.log('3️⃣ Compiling with Bun asset loading...');
   mkdirSync(outdir, { recursive: true });
   const outputPath = join(outdir, name);
 
-  // Build command with glob patterns for JSON/MD embedding + client assets
-  const compileCmd = `bun build --compile --outfile=${outputPath} --target=${target} --minify --sourcemap=none --asset-naming="[dir]/[name].[ext]" build/temp/server-with-assets.ts packages/core/src/providers/catalog/data/*.json packages/core/src/config/prompts/**/*.md`;
+  // Build command with explicit imports + production server
+  const compileCmd = `bun build --compile --outfile=${outputPath} --target=${target} --sourcemap=none build/temp/embed-all-files.ts`;
 
   console.log(`🔧 Running: ${compileCmd}`);
-  console.log('   🖥️  Server: packages/web/server-custom.ts (via wrapper)');
-  console.log('   📋 JSON: packages/core/src/providers/catalog/data/*.json');
-  console.log('   📄 MD: packages/core/src/config/prompts/**/*.md');
-  console.log('   🎨 Client assets: embedded via imports');
+  console.log('   📦 Imports: build/temp/embed-all-files.ts (dynamic)');
+  console.log('   🖥️  Server: packages/web/server-production.ts');
 
-  execSync(compileCmd, { stdio: 'inherit' });
+  // Set NODE_ENV=production for the build to avoid dev dependencies
+  const env = { ...process.env, NODE_ENV: 'production' };
+  execSync(compileCmd, { stdio: 'inherit', env });
 
   // Step 4: Handle code signing
   if (sign && process.platform === 'darwin') {

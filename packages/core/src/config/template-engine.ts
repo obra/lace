@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import mustache from 'mustache';
 import { logger } from '~/utils/logger';
+import { loadFileFromEmbeddedOrFilesystem } from '~/utils/resource-resolver';
 
 export interface TemplateContext {
   [key: string]: unknown;
@@ -24,7 +25,7 @@ export class TemplateEngine {
   render(templatePath: string, context: TemplateContext): string {
     try {
       this.processedIncludes.clear();
-      const templateContent = this.loadTemplate(templatePath);
+      const templateContent = this.loadTemplateSync(templatePath);
       const processedContent = this.processIncludes(templateContent, path.dirname(templatePath));
       return mustache.render(processedContent, context);
     } catch (error) {
@@ -37,19 +38,44 @@ export class TemplateEngine {
   }
 
   /**
-   * Load template content from file, checking directories in priority order
+   * Load template content from embedded files or file system (synchronous)
    */
-  private loadTemplate(templatePath: string): string {
+  private loadTemplateSync(templatePath: string): string {
+    // First try embedded files - check for the template path directly
+    try {
+      if (typeof Bun !== 'undefined' && Bun.embeddedFiles) {
+        const targetPath = `packages/core/src/config/prompts/${templatePath}`;
+        
+        for (const file of Bun.embeddedFiles) {
+          if (file.name.endsWith(targetPath)) {
+            logger.debug('Loading template from embedded files', { templatePath, embeddedName: file.name });
+            // For embedded files, try reading with Node's sync fs
+            // The embedded files are accessible as regular file paths in Bun executables
+            try {
+              const content = fs.readFileSync(file.name, 'utf-8');
+              return content;
+            } catch (fileError) {
+              logger.debug('Failed to read embedded file', { fileName: file.name, error: String(fileError) });
+              // Continue to try other files
+            }
+          }
+        }
+      }
+    } catch (e) {
+      logger.debug('Embedded template load failed, falling back to file system', { templatePath, error: String(e) });
+    }
+
+    // Fallback to file system approach (development)
     for (const templateDir of this.templateDirs) {
       const fullPath = path.resolve(templateDir, templatePath);
 
       if (fs.existsSync(fullPath)) {
-        logger.debug('Loading template', { templatePath, templateDir });
+        logger.debug('Loading template from file system', { templatePath, templateDir });
         return fs.readFileSync(fullPath, 'utf-8');
       }
     }
 
-    throw new Error(`Template file not found in any directory: ${templatePath}`);
+    throw new Error(`Template file not found in embedded files or directories: ${templatePath}`);
   }
 
   /**

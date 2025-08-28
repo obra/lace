@@ -18,6 +18,20 @@ import { fileURLToPath } from 'url';
 export function resolveResourcePath(importMetaUrl: string, relativePath: string): string {
   const moduleDir = path.dirname(fileURLToPath(importMetaUrl));
 
+  // Check if running from Bun executable (importMetaUrl contains $bunfs)
+  if (importMetaUrl.includes('$bunfs')) {
+    // Running from Bun executable - return special markers for embedded file loading
+    if (relativePath === 'data') {
+      return '__BUN_EMBEDDED_DATA__';
+    } else if (relativePath === 'prompts') {
+      return '__BUN_EMBEDDED_PROMPTS__';
+    } else {
+      throw new Error(
+        `Unknown resource path '${relativePath}' in Bun executable mode. Add explicit mapping.`
+      );
+    }
+  }
+
   // Check if running from a bundled build (React Router 7 style)
   if (importMetaUrl.includes('/build/server/assets/')) {
     // Running from bundle - find project root from the bundle path
@@ -217,6 +231,42 @@ export async function loadFilesFromDirectory(
 
   logger.debug('resource.load.complete', { dirPath, fileExtension, totalLoaded: files.length });
   return files;
+}
+
+/**
+ * Load a specific file by path from embedded files or file system
+ */
+export async function loadFileFromEmbeddedOrFilesystem(filePath: string): Promise<string | null> {
+  const { logger } = await import('~/utils/logger');
+  
+  // Try Bun embedded files first - look for files that end with the relative path
+  try {
+    if (typeof Bun !== 'undefined' && Bun.embeddedFiles) {
+      // Normalize the file path for comparison (remove leading ./ and ../)
+      const normalizedPath = filePath.replace(/^\.\.?\//, '');
+      
+      for (const file of Bun.embeddedFiles) {
+        if (file.name.endsWith(normalizedPath)) {
+          logger.debug('resource.load.embedded_file_found', { filePath, embeddedName: file.name });
+          return await file.text();
+        }
+      }
+    }
+  } catch (e) {
+    logger.debug('resource.load.embedded_file_error', { filePath, error: String(e) });
+  }
+
+  // Fallback to file system
+  try {
+    const fs = await import('fs/promises');
+    const content = await fs.readFile(filePath, 'utf-8');
+    logger.debug('resource.load.filesystem_file_found', { filePath });
+    return content;
+  } catch (e) {
+    logger.debug('resource.load.filesystem_file_not_found', { filePath, error: String(e) });
+  }
+
+  return null;
 }
 
 /**

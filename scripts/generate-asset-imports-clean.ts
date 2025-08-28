@@ -47,8 +47,8 @@ function generateAssetImports(buildClientDir: string, outputFile: string) {
   // Generate imports - these will be resolved by Bun's file loader
   const imports = assets
     .map((asset) => {
-      // Use relative path from output file location
-      const relativePath = relative(join(process.cwd(), 'scripts'), asset.filePath).replace(
+      // Use relative path from output file location (build/temp/)
+      const relativePath = relative(join(process.cwd(), 'build/temp'), asset.filePath).replace(
         /\\/g,
         '/'
       );
