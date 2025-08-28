@@ -2,7 +2,9 @@
 // ABOUTME: Wraps OpenAI SDK in the common provider interface
 
 import OpenAI, { ClientOptions } from 'openai';
-import { get_encoding, encoding_for_model, type Tiktoken } from 'tiktoken';
+
+// Dynamic tiktoken import to handle WASM loading failures gracefully
+type Tiktoken = import('tiktoken').Tiktoken;
 import { AIProvider } from '~/providers/base-provider';
 import {
   ProviderMessage,
@@ -73,6 +75,7 @@ export class OpenAIProvider extends AIProvider {
   }
 
   // Provider-specific token counting using tiktoken for OpenAI-compatible models
+  // Returns 0 when tiktoken WASM fails to load, allowing graceful degradation
   countTokens(messages: ProviderMessage[], tools: Tool[] = [], model?: string): number | null {
     if (!model) {
       return null; // Can't count without model
@@ -84,14 +87,29 @@ export class OpenAIProvider extends AIProvider {
       if (this._encoderCache.has(model)) {
         encoding = this._encoderCache.get(model)!;
       } else {
+        // Synchronous require() in try-catch to handle WASM loading gracefully
+        let tiktoken: typeof import('tiktoken');
         try {
-          encoding = encoding_for_model(model as Parameters<typeof encoding_for_model>[0]);
+          // eslint-disable-next-line @typescript-eslint/no-require-imports -- Dynamic loading for WASM graceful degradation
+          tiktoken = require('tiktoken') as typeof import('tiktoken');
+        } catch (importError) {
+          // WASM loading failed - tiktoken unavailable
+          logger.debug('Tiktoken WASM failed to load, token counting disabled', {
+            error: importError,
+          });
+          return 0;
+        }
+
+        try {
+          encoding = tiktoken.encoding_for_model(
+            model as Parameters<typeof tiktoken.encoding_for_model>[0]
+          );
         } catch (error) {
           // Fallback for unknown/custom/OpenAI-compatible models
           logger.debug(`Model ${model} not recognized by tiktoken, using default encoding`, {
             error,
           });
-          encoding = get_encoding('cl100k_base'); // Default for most OpenAI-compatible models
+          encoding = tiktoken.get_encoding('cl100k_base'); // Default for most OpenAI-compatible models
         }
         this._encoderCache.set(model, encoding);
       }
@@ -128,8 +146,8 @@ export class OpenAIProvider extends AIProvider {
 
       return totalTokens;
     } catch (error) {
-      logger.debug('Token counting failed, falling back to estimation', { error });
-      return null; // Fall back to estimation
+      logger.debug('Token counting failed, gracefully degrading', { error });
+      return 0; // Return 0 when tiktoken fails entirely
     }
   }
 
