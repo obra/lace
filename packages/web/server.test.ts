@@ -406,3 +406,128 @@ describe('Error Logging', () => {
     );
   });
 });
+
+describe('LACE_DIR initialization', () => {
+  const { spawn } = require('child_process');
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+
+  let originalLaceDir: string | undefined;
+
+  beforeEach(() => {
+    originalLaceDir = process.env.LACE_DIR;
+  });
+
+  afterEach(() => {
+    if (originalLaceDir !== undefined) {
+      process.env.LACE_DIR = originalLaceDir;
+    } else {
+      delete process.env.LACE_DIR;
+    }
+  });
+
+  test('should create LACE_DIR when development server starts', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-dev-test-'));
+    const testLaceDir = path.join(tempDir, 'nonexistent-lace-dir');
+
+    try {
+      // Ensure the test LACE_DIR doesn't exist
+      expect(fs.existsSync(testLaceDir)).toBe(false);
+
+      // Start development server with the non-existent LACE_DIR
+      const serverProcess = spawn('npm', ['run', 'dev'], {
+        env: { ...process.env, LACE_DIR: testLaceDir, NODE_ENV: 'development' },
+        cwd: process.cwd(),
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+
+      // Wait for server to start and create directory
+      await new Promise<void>((resolve, reject) => {
+        let output = '';
+        const timeout = setTimeout(() => {
+          serverProcess.kill('SIGTERM');
+          reject(new Error('Server startup timeout'));
+        }, 10000);
+
+        serverProcess.stdout?.on('data', (data) => {
+          output += data.toString();
+          if (output.includes('Lace is ready!')) {
+            clearTimeout(timeout);
+            serverProcess.kill('SIGTERM');
+            resolve();
+          }
+        });
+
+        serverProcess.stderr?.on('data', (data) => {
+          output += data.toString();
+        });
+
+        serverProcess.on('error', (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
+      });
+
+      // The LACE_DIR should now exist
+      expect(fs.existsSync(testLaceDir)).toBe(true);
+    } finally {
+      // Clean up
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  }, 15000);
+
+  test('should create LACE_DIR when production server starts', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-prod-test-'));
+    const testLaceDir = path.join(tempDir, 'nonexistent-lace-dir');
+
+    try {
+      // Ensure the test LACE_DIR doesn't exist
+      expect(fs.existsSync(testLaceDir)).toBe(false);
+
+      // Start production server with the non-existent LACE_DIR
+      const serverProcess = spawn('npm', ['start'], {
+        env: { ...process.env, LACE_DIR: testLaceDir, NODE_ENV: 'production' },
+        cwd: process.cwd(),
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+
+      // Wait for server to start and create directory
+      await new Promise<void>((resolve, reject) => {
+        let output = '';
+        const timeout = setTimeout(() => {
+          serverProcess.kill('SIGTERM');
+          reject(new Error('Server startup timeout'));
+        }, 10000);
+
+        serverProcess.stdout?.on('data', (data) => {
+          output += data.toString();
+          if (output.includes('Lace is ready!')) {
+            clearTimeout(timeout);
+            serverProcess.kill('SIGTERM');
+            resolve();
+          }
+        });
+
+        serverProcess.stderr?.on('data', (data) => {
+          output += data.toString();
+        });
+
+        serverProcess.on('error', (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
+      });
+
+      // The LACE_DIR should now exist
+      expect(fs.existsSync(testLaceDir)).toBe(true);
+    } finally {
+      // Clean up
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  }, 15000);
+});

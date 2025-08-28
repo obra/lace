@@ -3,6 +3,7 @@
 
 import { parseArgs } from 'util';
 import path from 'node:path';
+import './lib/server/data-dir-init';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -126,7 +127,7 @@ async function startLaceServer() {
     app.use(express.static(clientRoot, { maxAge: '1h' }));
 
     // Import and mount React Router app last
-    const serverApp = await import('./server/app.ts');
+    const serverApp = await import('./server/app');
     app.use(serverApp.app);
   }
 

@@ -9,6 +9,7 @@ import type { ServerBuild } from 'react-router';
 import express from 'express';
 import compression from 'compression';
 import morgan from 'morgan';
+import './lib/server/data-dir-init';
 
 // Parse command line arguments
 const { values } = parseArgs({
