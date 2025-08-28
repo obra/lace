@@ -1,8 +1,11 @@
 // ABOUTME: Custom React Router v7 server with enhanced CLI options and port detection
 // ABOUTME: Provides single-process server with Lace-specific startup logic and port selection
 
+import './lib/server/data-dir-init';
 import { parseArgs } from 'util';
 import path from 'node:path';
+import { createRequestHandler } from '@react-router/express';
+import type { ServerBuild } from 'react-router';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -101,19 +104,15 @@ async function startLaceServer() {
     app.use(viteDevServer.middlewares);
 
     // Handle all routes through React Router with SSR loading
-    app.use(async (req, res, next) => {
-      try {
-        const source = await viteDevServer.ssrLoadModule('./server/app.ts');
-        return await (
-          source as { app: (req: unknown, res: unknown, next: unknown) => Promise<unknown> }
-        ).app(req, res, next);
-      } catch (error) {
-        if (typeof error === 'object' && error instanceof Error) {
-          viteDevServer.ssrFixStacktrace(error);
-        }
-        next(error);
-      }
+    const requestHandler = createRequestHandler({
+      build: () => import('virtual:react-router/server-build'),
+      getLoadContext() {
+        return {
+          // Add any context needed by your routes here
+        };
+      },
     });
+    app.use(requestHandler);
   } else {
     console.error('Starting production server with static file serving');
     const morgan = await import('morgan');
@@ -126,8 +125,16 @@ async function startLaceServer() {
     app.use(express.static(clientRoot, { maxAge: '1h' }));
 
     // Import and mount React Router app last
-    const serverApp = await import('./server/app.ts');
-    app.use(serverApp.app);
+    const requestHandler = createRequestHandler({
+      build: () =>
+        import(/* @vite-ignore */ './build/server/index.js') as unknown as Promise<ServerBuild>,
+      getLoadContext() {
+        return {
+          // Add any context needed by your routes here
+        };
+      },
+    });
+    app.use(requestHandler);
   }
 
   app.listen(port, hostname, () => {

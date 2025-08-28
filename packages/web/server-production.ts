@@ -3,6 +3,7 @@
 
 /* eslint-disable no-console -- Server startup and logging is appropriate for server process */
 
+import './lib/server/data-dir-init';
 import { parseArgs } from 'util';
 import { createRequestHandler } from '@react-router/express';
 import type { ServerBuild } from 'react-router';
@@ -83,6 +84,9 @@ async function startLaceServer() {
   app.disable('x-powered-by');
   app.use(morgan('tiny'));
 
+  // Create static middleware once
+  const staticMiddleware = express.static('build/client', { maxAge: '1h' });
+
   // Serve assets from embedded files or fallback to file system
   app.use((req, res, next) => {
     // Try embedded files first (Bun executable)
@@ -114,7 +118,7 @@ async function startLaceServer() {
     }
 
     // Fallback to file system (development)
-    express.static('build/client', { maxAge: '1h' })(req, res, next);
+    staticMiddleware(req, res, next);
   });
 
   function getContentType(path: string): string {
@@ -136,7 +140,8 @@ async function startLaceServer() {
 
   // React Router request handler
   const requestHandler = createRequestHandler({
-    build: () => import('./build/server/index.js') as unknown as Promise<ServerBuild>,
+    build: () =>
+      import(/* @vite-ignore */ './build/server/index.js') as unknown as Promise<ServerBuild>,
     getLoadContext() {
       return {};
     },
