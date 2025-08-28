@@ -132,7 +132,7 @@ async function startLaceServer() {
 
   // React Router request handler
   const requestHandler = createRequestHandler({
-    build: async () => serverBuild,
+    build: () => import('./build/server/index.js') as Promise<any>,
     getLoadContext() {
       return {};
     },

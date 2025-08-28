@@ -152,7 +152,7 @@ describe('useSessionAPI', () => {
 
       expect(agent).toEqual(mockAgent);
       // Verify correct agent creation request was made
-      const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const fetchCall = (global.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(fetchCall[0]).toBe(`/api/sessions/${sessionId}/agents`);
       expect(fetchCall[1]).toEqual({
         method: 'POST',
@@ -219,7 +219,7 @@ describe('useSessionAPI', () => {
 
       expect(agents).toEqual(mockAgents);
       // Verify agents list request was made correctly
-      const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+      const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
       const requestUrl = fetchMock.mock.calls[0][0] as string;
       expect(requestUrl).toBe(`/api/sessions/${sessionId}/agents`);
     });

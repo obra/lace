@@ -66,7 +66,7 @@ describe('EventStreamProvider', () => {
     vi.clearAllMocks();
 
     // Mock fetch API responses with proper superjson serialized content
-    mockFetch.mockImplementation((url: string) => {
+    (mockFetch as any).mockImplementation((url: string) => {
       // Handle tool approval endpoints
       if (url.includes('/approvals/pending')) {
         const response = stringify([]);

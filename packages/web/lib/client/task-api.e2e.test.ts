@@ -407,7 +407,7 @@ describe('TaskAPIClient E2E Tests', () => {
     it('should handle network errors gracefully', async () => {
       // Temporarily break the fetch function to simulate network error
       const originalFetch = global.fetch;
-      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network error')) as unknown as typeof fetch;
 
       await expect(client.listTasks(projectId, sessionId)).rejects.toThrow();
 

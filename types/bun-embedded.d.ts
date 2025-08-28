@@ -1,6 +1,19 @@
-// ABOUTME: Type definitions for Bun embedded files API
-// ABOUTME: Eliminates need for @ts-ignore comments when using Bun.embeddedFiles
+// ABOUTME: Global type augmentation for Bun embedded files API
+// ABOUTME: Provides types for Bun.embeddedFiles in TypeScript projects
 
-declare const Bun: {
-  embeddedFiles?: ReadonlyArray<{ name: string; text(): Promise<string> }>;
-};
+// This file extends the global Bun namespace for embedded file support
+// Required for projects that use both Bun and Node.js environments
+
+declare global {
+  namespace Bun {
+    interface EmbeddedFile {
+      name: string;
+      text(): Promise<string>;
+    }
+    
+    const embeddedFiles: ReadonlyArray<EmbeddedFile> | undefined;
+  }
+}
+
+// Mark this as a module to enable global augmentation
+export {};
