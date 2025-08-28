@@ -177,33 +177,54 @@ async function findAvailablePort(
 ): Promise<number> {
   const { createServer } = await import('http');
 
-  const testPort = (port: number): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const server = createServer();
+  const testPort = async (port: number): Promise<boolean> => {
+    // Test both IPv4 and IPv6 to ensure port is completely free
+    const testInterface = (testHostname: string): Promise<boolean> => {
+      return new Promise((resolve) => {
+        const server = createServer();
 
-      server.once('error', (err: NodeJS.ErrnoException) => {
-        if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
-          resolve(false);
-        } else {
-          console.error(`Server error on port ${port} (${err.code || 'unknown'}):`, err.message);
-          process.exit(1);
-        }
+        server.once('error', (err: NodeJS.ErrnoException) => {
+          if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
+            resolve(false);
+          } else {
+            console.error(`Server error on port ${port} (${err.code || 'unknown'}):`, err.message);
+            resolve(false);
+          }
+        });
+
+        server.once('listening', () => {
+          server.close(() => resolve(true));
+        });
+
+        server.listen(port, testHostname);
       });
+    };
 
-      server.once('listening', () => {
-        server.close(() => resolve(true));
-      });
+    // Test IPv4 
+    const ipv4Available = await testInterface('127.0.0.1');
+    if (!ipv4Available) {
+      return false;
+    }
 
-      server.listen(port, hostname);
-    });
+    // Test IPv6 (if hostname is localhost)
+    if (hostname === 'localhost') {
+      const ipv6Available = await testInterface('::1');
+      if (!ipv6Available) {
+        return false;
+      }
+    }
+
+    return true;
   };
 
   if (userSpecified) {
+    console.log(`Checking if port ${startPort} is available...`);
     const available = await testPort(startPort);
     if (!available) {
-      console.error(`Error: Port ${startPort} is already in use`);
+      console.error(`❌ Error: Port ${startPort} is already in use`);
       process.exit(1);
     }
+    console.log(`✅ Port ${startPort} is available`);
     return startPort;
   }
 
