@@ -4,11 +4,13 @@
 import { EventEmitter } from 'events';
 import { ToolResult, ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
+import type { CatalogProvider } from '~/providers/catalog/types';
 
 export interface ProviderConfig {
   maxTokens?: number;
   systemPrompt?: string;
   streaming?: boolean; // Enable token-by-token streaming
+  catalogProvider?: CatalogProvider; // Catalog data for this provider instance
   [key: string]: unknown; // Allow provider-specific config
 }
 
@@ -49,6 +51,7 @@ export interface ProviderInfo {
 export abstract class AIProvider extends EventEmitter {
   protected readonly _config: ProviderConfig;
   protected _systemPrompt: string = '';
+  protected _catalogData?: CatalogProvider;
 
   // Retry configuration - can be modified in tests but must be validated
   private _retryConfig = {
@@ -130,9 +133,10 @@ export abstract class AIProvider extends EventEmitter {
     }
   }
 
-  constructor(config: ProviderConfig) {
+  constructor(config: ProviderConfig = {}) {
     super();
     this._config = config;
+    this._catalogData = config.catalogProvider;
   }
 
   abstract createResponse(
@@ -176,7 +180,77 @@ export abstract class AIProvider extends EventEmitter {
 
   // Provider metadata - must be implemented by each provider
   abstract getProviderInfo(): ProviderInfo;
-  abstract getAvailableModels(): ModelInfo[];
+
+  // Default implementation uses catalog data - providers can override if needed
+  getAvailableModels(): ModelInfo[] {
+    if (!this._catalogData) {
+      // Fallback to empty array if no catalog data
+      return [];
+    }
+
+    return this._catalogData.models.map((catalogModel) => ({
+      id: catalogModel.id,
+      displayName: catalogModel.name,
+      description: undefined, // Catalog doesn't have description field
+      contextWindow: catalogModel.context_window,
+      maxOutputTokens: catalogModel.default_max_tokens,
+      capabilities: this.mapCapabilities(catalogModel),
+      isDefault: catalogModel.id === this._catalogData?.default_large_model_id,
+    }));
+  }
+
+  // Helper to map catalog model capabilities - providers can override
+  protected mapCapabilities(catalogModel: {
+    supports_attachments?: boolean;
+  }): string[] | undefined {
+    return catalogModel.supports_attachments ? ['attachments'] : undefined;
+  }
+
+  // Set catalog data (to be called by provider implementations)
+  protected setCatalogData(catalogData: CatalogProvider): void {
+    this._catalogData = catalogData;
+  }
+
+  // Get model context window from catalog or fallback
+  protected getModelContextWindow(modelId: string, fallback: number = 200000): number {
+    if (!this._catalogData) {
+      return fallback;
+    }
+
+    const catalogModel = this._catalogData.models.find((m) => m.id === modelId);
+    return catalogModel?.context_window || fallback;
+  }
+
+  // Get model max output tokens from catalog or fallback
+  protected getModelMaxOutputTokens(modelId: string, fallback: number = 8192): number {
+    if (!this._catalogData) {
+      return fallback;
+    }
+
+    const catalogModel = this._catalogData.models.find((m) => m.id === modelId);
+    return catalogModel?.default_max_tokens || fallback;
+  }
+
+  // Helper method to create ModelInfo with fallback to hardcoded values
+  protected createModel(model: {
+    id: string;
+    displayName: string;
+    description?: string;
+    contextWindow?: number;
+    maxOutputTokens?: number;
+    capabilities?: string[];
+    isDefault?: boolean;
+  }): ModelInfo {
+    return {
+      id: model.id,
+      displayName: model.displayName,
+      description: model.description,
+      contextWindow: model.contextWindow || 200000, // Fallback to 200k
+      maxOutputTokens: model.maxOutputTokens || 8192,
+      capabilities: model.capabilities,
+      isDefault: model.isDefault,
+    };
+  }
 
   // Check if provider is properly configured
   abstract isConfigured(): boolean;
