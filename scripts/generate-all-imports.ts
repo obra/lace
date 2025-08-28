@@ -72,8 +72,6 @@ export const embeddedFiles = {
 ${exportMap}
 };
 
-console.log('📦 Embedded files loaded:', Object.keys(embeddedFiles).length);
-
 // Start the production server
 import '../../packages/web/server-production';
 `;
