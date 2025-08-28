@@ -54,49 +54,52 @@ async function startLaceServer() {
 
   console.log(`🚀 Starting Lace server (production) on ${url}...`);
 
-  // Show embedded files at startup for debugging
-  if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
-    console.log('\n📦 Embedded files in bundle:');
-    console.log(`   Total: ${Bun.embeddedFiles.length} files`);
-    
-    console.log('\n🔍 All embedded files:');
-    Array.from(Bun.embeddedFiles).forEach((f, i) => {
-      console.log(`   [${i}] ${f.name}`);
-    });
-    
-    const catalogs = Array.from(Bun.embeddedFiles).filter(f => 
-      f.name.includes('providers/catalog/data') && f.name.endsWith('.json')
-    );
-    console.log(`\n📋 Provider catalogs (${catalogs.length}):`);
-    catalogs.forEach(f => {
-      const name = f.name.split('/').pop()?.replace('.json', '') || f.name;
-      console.log(`   - ${name} (${f.name})`);
-    });
-    
-    const prompts = Array.from(Bun.embeddedFiles).filter(f => 
-      f.name.includes('config/prompts') && f.name.endsWith('.md')
-    );
-    console.log(`\n📄 Prompt templates (${prompts.length}):`);
-    prompts.forEach(f => {
-      const name = f.name.split('/').pop()?.replace('.md', '') || f.name;
-      console.log(`   - ${name} (${f.name})`);
-    });
-    console.log('');
-  } else {
-    console.log('\n❌ No Bun.embeddedFiles available');
-    console.log(`   typeof Bun: ${typeof Bun}`);
-    console.log(`   'embeddedFiles' in Bun: ${'embeddedFiles' in (globalThis as any).Bun || 'N/A'}`);
-    console.log('');
-  }
 
   const app = express();
   app.use(compression());
   app.disable('x-powered-by');
   app.use(morgan('tiny'));
 
-  // Serve static assets from build directory (development fallback)
-  // In standalone executable, this won't be used since files are embedded
-  app.use(express.static('build/client', { maxAge: '1h' }));
+  // Serve assets from embedded files or fallback to file system
+  app.use((req, res, next) => {
+    // Try embedded files first (Bun executable)
+    if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
+      // Look for client assets - they have paths like ../../packages/web/build/client/assets/...
+      const assetFile = Array.from(Bun.embeddedFiles).find(f => 
+        f.name.includes('/build/client') && req.path === f.name.split('/build/client')[1]
+      );
+      
+      if (assetFile) {
+        assetFile.text().then(content => {
+          const contentType = getContentType(req.path);
+          res.setHeader('content-type', contentType);
+          res.setHeader('cache-control', 'public, max-age=31536000');
+          res.send(content);
+        }).catch(() => next());
+        return;
+      }
+    }
+    
+    // Fallback to file system (development)
+    express.static('build/client', { maxAge: '1h' })(req, res, next);
+  });
+
+  function getContentType(path: string): string {
+    const ext = path.split('.').pop()?.toLowerCase();
+    const types: Record<string, string> = {
+      'js': 'application/javascript',
+      'css': 'text/css', 
+      'html': 'text/html',
+      'json': 'application/json',
+      'png': 'image/png',
+      'jpg': 'image/jpeg',
+      'svg': 'image/svg+xml',
+      'woff': 'font/woff',
+      'woff2': 'font/woff2',
+      'ttf': 'font/ttf'
+    };
+    return types[ext || ''] || 'application/octet-stream';
+  }
 
   // React Router request handler
   const requestHandler = createRequestHandler({

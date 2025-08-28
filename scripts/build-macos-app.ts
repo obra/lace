@@ -137,14 +137,16 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   if (existsSync('packages/web/build')) {
     execSync('rm -rf packages/web/build packages/web/.react-router', { stdio: 'pipe' });
   }
-  execSync('npm run build --workspace=packages/web', { stdio: 'inherit' });
-  console.log('✅ Fresh React Router build ready\n');
-
-  // Step 2: Generate all imports for embedding
-  console.log('2️⃣ Generating file imports...');
+  // First clean any old generated files
   if (existsSync('build/temp')) {
     execSync('rm -rf build/temp', { stdio: 'pipe' });
   }
+  
+  execSync('npm run build --workspace=packages/web', { stdio: 'inherit' });
+  console.log('✅ Fresh React Router build ready\n');
+
+  // Step 2: Generate all imports for embedding (AFTER React Router build)
+  console.log('2️⃣ Generating file imports...');
   execSync('bun scripts/generate-all-imports.ts', { stdio: 'inherit' });
   console.log('✅ File imports generated\n');
 

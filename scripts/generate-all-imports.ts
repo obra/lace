@@ -55,7 +55,11 @@ function generateAllImports() {
   const mdFiles = scanForFiles('packages/core/src/config/prompts', '.md', 'prompt');
   console.log(`📄 Found ${mdFiles.length} prompt files`);
   
-  const allFiles = [...jsonFiles, ...mdFiles];
+  // Scan for client assets
+  const clientAssets = scanForFiles('packages/web/build/client', '', 'asset');
+  console.log(`🎨 Found ${clientAssets.length} client asset files`);
+  
+  const allFiles = [...jsonFiles, ...mdFiles, ...clientAssets];
   
   // Generate imports
   const imports = allFiles
@@ -89,6 +93,7 @@ import '../../packages/web/server-production';
   console.log(`✅ Generated ${outputFile} with ${allFiles.length} imports`);
   console.log(`   📋 ${jsonFiles.length} JSON catalogs`);
   console.log(`   📄 ${mdFiles.length} MD prompts`);
+  console.log(`   🎨 ${clientAssets.length} client assets`);
 }
 
 // CLI usage
