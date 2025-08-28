@@ -3,6 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { spawnSync } from 'child_process';
 import mustache from 'mustache';
 import { logger } from '~/utils/logger';
 
@@ -56,7 +57,7 @@ export class TemplateEngine {
               // This is not ideal but maintains the sync API for compatibility
               let content = '';
               let resolved = false;
-              let error: any = null;
+              let error: Error | null = null;
 
               file
                 .text()
@@ -65,18 +66,17 @@ export class TemplateEngine {
                   resolved = true;
                 })
                 .catch((err) => {
-                  error = err;
+                  error = err instanceof Error ? err : new Error(String(err));
                   resolved = true;
                 });
 
               // Busy wait for the promise (not ideal but maintains sync compatibility)
               while (!resolved) {
                 // Wait for async operation to complete
-                // eslint-disable-next-line @typescript-eslint/no-require-imports -- Sync operation needed for compatibility
-                require('child_process').spawnSync('sleep', ['0.001']);
+                spawnSync('sleep', ['0.001']);
               }
 
-              if (error) throw error;
+              if (error) throw new Error(String(error));
               return content;
             } catch (fileError) {
               logger.debug('Failed to read embedded file', {
@@ -132,7 +132,7 @@ export class TemplateEngine {
               // Use the same sync-over-async approach for consistency
               let content = '';
               let resolved = false;
-              let error: any = null;
+              let error: Error | null = null;
 
               file
                 .text()
@@ -141,19 +141,19 @@ export class TemplateEngine {
                   resolved = true;
                 })
                 .catch((err) => {
-                  error = err;
+                  error = err instanceof Error ? err : new Error(String(err));
                   resolved = true;
                 });
 
               // Busy wait for the promise
               while (!resolved) {
-                require('child_process').spawnSync('sleep', ['0.001']);
+                spawnSync('sleep', ['0.001']);
               }
 
-              if (error) throw error;
+              if (error) throw new Error(String(error));
               foundContent = content;
               break;
-            } catch (e) {
+            } catch (_e) {
               // Continue to next file
             }
           }

@@ -1,14 +1,14 @@
-// ABOUTME: Production-only Lace server for standalone executables  
+// ABOUTME: Production-only Lace server for standalone executables
 // ABOUTME: No dev dependencies - uses only production React Router build
+
+/* eslint-disable no-console -- Server startup and logging is appropriate for server process */
 
 import { parseArgs } from 'util';
 import { createRequestHandler } from '@react-router/express';
+import type { ServerBuild } from 'react-router';
 import express from 'express';
 import compression from 'compression';
 import morgan from 'morgan';
-
-// Import the production React Router server build
-import * as serverBuild from './build/server/index.js';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -57,18 +57,19 @@ async function startLaceServer() {
   // Show embedded files at startup for debugging
   if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
     console.log(`\n📦 Embedded files: ${Bun.embeddedFiles.length} total`);
-    
-    const catalogs = Array.from(Bun.embeddedFiles).filter(f => 
-      (f as File).name.includes('providers/catalog/data') && (f as File).name.endsWith('.json')
+
+    const catalogs = Array.from(Bun.embeddedFiles).filter(
+      (f) =>
+        (f as File).name.includes('providers/catalog/data') && (f as File).name.endsWith('.json')
     );
     console.log(`📋 Provider catalogs: ${catalogs.length}`);
-    
-    const prompts = Array.from(Bun.embeddedFiles).filter(f => 
-      (f as File).name.includes('config/prompts') && (f as File).name.endsWith('.md')
+
+    const prompts = Array.from(Bun.embeddedFiles).filter(
+      (f) => (f as File).name.includes('config/prompts') && (f as File).name.endsWith('.md')
     );
     console.log(`📄 Prompt templates: ${prompts.length}`);
-    
-    const assets = Array.from(Bun.embeddedFiles).filter(f => 
+
+    const assets = Array.from(Bun.embeddedFiles).filter((f) =>
       (f as File).name.includes('/build/client/')
     );
     console.log(`🎨 Client assets: ${assets.length}`);
@@ -87,28 +88,31 @@ async function startLaceServer() {
     // Try embedded files first (Bun executable)
     if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
       // Look for client assets by matching the request path to embedded file paths
-      const assetFile = Array.from(Bun.embeddedFiles).find(f => {
+      const assetFile = Array.from(Bun.embeddedFiles).find((f) => {
         if (!(f as File).name.includes('/build/client')) return false;
-        
+
         // Extract the path after /build/client from the embedded (file as File).name
         const clientPath = (f as File).name.split('/build/client')[1];
         return clientPath === req.path;
       });
-      
+
       if (assetFile) {
-        assetFile.text().then(content => {
-          const contentType = getContentType(req.path);
-          res.setHeader('content-type', contentType);
-          res.setHeader('cache-control', 'public, max-age=31536000');
-          res.send(content);
-        }).catch(err => {
-          console.error('Failed to read embedded asset:', req.path, err);
-          next();
-        });
+        assetFile
+          .text()
+          .then((content) => {
+            const contentType = getContentType(req.path);
+            res.setHeader('content-type', contentType);
+            res.setHeader('cache-control', 'public, max-age=31536000');
+            res.send(content);
+          })
+          .catch((err) => {
+            console.error('Failed to read embedded asset:', req.path, err);
+            next();
+          });
         return;
       }
     }
-    
+
     // Fallback to file system (development)
     express.static('build/client', { maxAge: '1h' })(req, res, next);
   });
@@ -116,23 +120,23 @@ async function startLaceServer() {
   function getContentType(path: string): string {
     const ext = path.split('.').pop()?.toLowerCase();
     const types: Record<string, string> = {
-      'js': 'application/javascript',
-      'css': 'text/css', 
-      'html': 'text/html',
-      'json': 'application/json',
-      'png': 'image/png',
-      'jpg': 'image/jpeg',
-      'svg': 'image/svg+xml',
-      'woff': 'font/woff',
-      'woff2': 'font/woff2',
-      'ttf': 'font/ttf'
+      js: 'application/javascript',
+      css: 'text/css',
+      html: 'text/html',
+      json: 'application/json',
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      svg: 'image/svg+xml',
+      woff: 'font/woff',
+      woff2: 'font/woff2',
+      ttf: 'font/ttf',
     };
     return types[ext || ''] || 'application/octet-stream';
   }
 
   // React Router request handler
   const requestHandler = createRequestHandler({
-    build: () => import('./build/server/index.js') as Promise<any>,
+    build: () => import('./build/server/index.js') as unknown as Promise<ServerBuild>,
     getLoadContext() {
       return {};
     },
@@ -204,7 +208,7 @@ async function findAvailablePort(
       });
     };
 
-    // Test IPv4 
+    // Test IPv4
     const ipv4Available = await testInterface('127.0.0.1');
     if (!ipv4Available) {
       return false;

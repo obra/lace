@@ -66,7 +66,7 @@ describe('EventStreamProvider', () => {
     vi.clearAllMocks();
 
     // Mock fetch API responses with proper superjson serialized content
-    (mockFetch as any).mockImplementation((url: string) => {
+    (mockFetch as unknown as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       // Handle tool approval endpoints
       if (url.includes('/approvals/pending')) {
         const response = stringify([]);
@@ -90,7 +90,7 @@ describe('EventStreamProvider', () => {
         clone: function () {
           return this;
         },
-      } as Response) 
+      } as Response);
     });
 
     // Set up default mock return values

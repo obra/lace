@@ -1,0 +1,338 @@
+// ABOUTME: Vitest integration test for production build validation
+// ABOUTME: Comprehensive test suite validating the complete Bun compilation system
+
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { execSync, spawn, type ChildProcess } from 'node:child_process';
+import { existsSync, statSync } from 'node:fs';
+import { setTimeout } from 'node:timers/promises';
+
+describe('Production Build Integration', () => {
+  const servers: ChildProcess[] = [];
+  const testPorts = [31500, 31501, 31502];
+
+  beforeAll(async () => {
+    // Clean any existing build
+    try {
+      const cleanOutput = execSync('rm -f ../../build/Lace', {
+        stdio: 'pipe',
+        encoding: 'utf-8',
+      });
+      console.error('Clean output:', cleanOutput);
+    } catch (error) {
+      console.error("Clean failed (expected if file doesn't exist):", error);
+    }
+
+    // Build the production executable
+    console.error('Building production executable...');
+    try {
+      const buildOutput = execSync('npm run build:macos', {
+        stdio: 'pipe',
+        encoding: 'utf-8',
+        timeout: 120000,
+        cwd: '../..',
+      });
+      console.error('Build stdout:', buildOutput);
+    } catch (error: unknown) {
+      console.error('Build failed - stdout:', (error as { stdout?: string }).stdout);
+      console.error('Build failed - stderr:', (error as { stderr?: string }).stderr);
+      throw error;
+    }
+
+    // Verify executable was created
+    expect(existsSync('../../build/Lace')).toBe(true);
+  });
+
+  afterAll(async () => {
+    // Clean up all test servers
+    for (const server of servers) {
+      if (server && !server.killed) {
+        server.kill('SIGTERM');
+      }
+    }
+
+    // Wait for graceful shutdown
+    await setTimeout(2000);
+
+    // Force cleanup any remaining processes
+    try {
+      const killOutput = execSync('pkill -f "build/Lace"', {
+        stdio: 'pipe',
+        encoding: 'utf-8',
+      });
+      console.error('Process cleanup output:', killOutput);
+    } catch (error: unknown) {
+      console.error(
+        'Process cleanup failed (expected if no processes found):',
+        (error as { stderr?: string; message?: string }).stderr ||
+          (error as { message?: string }).message
+      );
+    }
+  });
+
+  it('should create a properly sized executable', () => {
+    const stats = statSync('../../build/Lace');
+    const sizeMB = stats.size / 1024 / 1024;
+
+    expect(stats.size).toBeGreaterThan(50 * 1024 * 1024); // At least 50MB
+    expect(stats.size).toBeLessThan(100 * 1024 * 1024); // Less than 100MB
+    console.error(`   📏 Executable size: ${sizeMB.toFixed(1)}MB`);
+  });
+
+  it('should properly detect port conflicts', { timeout: 15000 }, async () => {
+    // Start first server
+    const server1 = spawn('../../build/Lace', ['--port', testPorts[0].toString()], {
+      stdio: 'pipe',
+      cwd: '../..',
+    });
+    servers.push(server1);
+
+    let server1Stdout = '';
+    let server1Stderr = '';
+    server1.stdout?.on('data', (data) => {
+      server1Stdout += data.toString();
+    });
+    server1.stderr?.on('data', (data) => {
+      server1Stderr += data.toString();
+    });
+
+    // Wait for first server to start
+    await setTimeout(4000);
+    console.error(`Server 1 startup stdout:`, server1Stdout.slice(-500)); // Last 500 chars
+    console.error(`Server 1 startup stderr:`, server1Stderr);
+
+    // Try to start second server on same port - should fail quickly
+    const server2 = spawn('../../build/Lace', ['--port', testPorts[0].toString()], {
+      stdio: 'pipe',
+      cwd: '../..',
+    });
+
+    let exitCode: number | null = null;
+    let server2Stdout = '';
+    let server2Stderr = '';
+
+    server2.stdout?.on('data', (data) => {
+      server2Stdout += data.toString();
+    });
+    server2.stderr?.on('data', (data) => {
+      server2Stderr += data.toString();
+    });
+
+    const exitPromise = new Promise<void>((resolve) => {
+      server2.on('exit', (code) => {
+        exitCode = code;
+        resolve();
+      });
+    });
+
+    await Promise.race([exitPromise, setTimeout(8000)]);
+
+    console.error(`Server 2 (conflict) stdout:`, server2Stdout);
+    console.error(`Server 2 (conflict) stderr:`, server2Stderr);
+
+    expect(exitCode).toBe(1); // Should exit with error code 1
+    expect(server2Stderr).toContain('already in use'); // Should show port conflict message
+  });
+
+  it('should support multiple instances on different ports', async () => {
+    // Start second server on different port
+    const server2 = spawn('../../build/Lace', ['--port', testPorts[1].toString()], {
+      stdio: 'pipe',
+      cwd: '../..',
+    });
+    servers.push(server2);
+
+    let server2Stdout = '';
+    let server2Stderr = '';
+    server2.stdout?.on('data', (data) => {
+      server2Stdout += data.toString();
+    });
+    server2.stderr?.on('data', (data) => {
+      server2Stderr += data.toString();
+    });
+
+    await setTimeout(4000);
+
+    console.error(`Server 2 startup stdout:`, server2Stdout.slice(-500)); // Last 500 chars
+    console.error(`Server 2 startup stderr:`, server2Stderr);
+
+    // Both servers should be responsive
+    const health1 = await fetch(`http://localhost:${testPorts[0]}/api/health`);
+    const health2 = await fetch(`http://localhost:${testPorts[1]}/api/health`);
+
+    expect(health1.status).toBe(200);
+    expect(health2.status).toBe(200);
+  });
+
+  it('should serve health API correctly', async () => {
+    const response = await fetch(`http://localhost:${testPorts[0]}/api/health`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('application/json');
+  });
+
+  it('should load all 13 provider catalogs', async () => {
+    const response = await fetch(`http://localhost:${testPorts[0]}/api/provider/catalog`);
+    expect(response.status).toBe(200);
+
+    const data = await response.json();
+    const providers = data.json?.providers || [];
+
+    expect(providers).toHaveLength(13);
+    expect(providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'anthropic' }),
+        expect.objectContaining({ id: 'openai' }),
+        expect.objectContaining({ id: 'gemini' }),
+      ])
+    );
+
+    console.error(
+      `   📋 Provider catalogs: ${providers.map((p: { id: string }) => p.id).join(', ')}`
+    );
+  });
+
+  it('should serve index.html with proper content', async () => {
+    const response = await fetch(`http://localhost:${testPorts[0]}/`);
+    expect(response.status).toBe(200);
+
+    const html = await response.text();
+    expect(html).toContain('<html');
+    expect(html).toContain('Lace');
+    expect(html).toContain('<title>');
+
+    console.error('   🏠 Index page loads with proper HTML structure');
+  });
+
+  it('should serve all assets referenced in index.html from embedded files', async () => {
+    // Get index.html and discover all asset references (use testPorts[1] which has fresh assets)
+    const indexResponse = await fetch(`http://localhost:${testPorts[1]}/`);
+    expect(indexResponse.status).toBe(200);
+
+    const html = await indexResponse.text();
+
+    // Extract all asset URLs from the HTML
+    const cssMatches = [...html.matchAll(/href="([^"]+\.css)"/g)];
+    const jsMatches = [...html.matchAll(/src="([^"]+\.js)"/g)];
+
+    const assetUrls = [...cssMatches.map((m) => m[1]), ...jsMatches.map((m) => m[1])].filter(
+      (url) => url.startsWith('/assets') || url.startsWith('/fonts')
+    );
+
+    expect(assetUrls.length).toBeGreaterThan(0);
+    console.error(`   🔍 Found ${assetUrls.length} asset references in HTML`);
+
+    // Test each discovered asset (use testPorts[1] which has fresh assets)
+    let servedCount = 0;
+    for (const assetUrl of assetUrls) {
+      const response = await fetch(`http://localhost:${testPorts[1]}${assetUrl}`);
+
+      expect(response.status, `Asset ${assetUrl} should be served`).toBe(200);
+      expect(response.headers.get('cache-control')).toContain('max-age=31536000');
+
+      const content = await response.text();
+      expect(content.length, `Asset ${assetUrl} should have content`).toBeGreaterThan(0);
+
+      servedCount++;
+    }
+
+    console.error(
+      `   ✅ All ${servedCount} referenced assets served correctly from embedded files`
+    );
+  });
+
+  it('should work when moved to different location', async () => {
+    // Copy executable to /tmp
+    try {
+      const copyOutput = execSync('cp ../../build/Lace /tmp/Lace-portability-test', {
+        stdio: 'pipe',
+        encoding: 'utf-8',
+      });
+      console.error('Copy output:', copyOutput);
+    } catch (error: unknown) {
+      console.error('Copy failed - stdout:', (error as { stdout?: string }).stdout);
+      console.error('Copy failed - stderr:', (error as { stderr?: string }).stderr);
+      throw error;
+    }
+
+    try {
+      // Start from /tmp
+      const tempServer = spawn('/tmp/Lace-portability-test', ['--port', testPorts[2].toString()], {
+        stdio: 'pipe',
+        cwd: '/tmp',
+      });
+
+      let tempStdout = '';
+      let tempStderr = '';
+      tempServer.stdout?.on('data', (data) => {
+        tempStdout += data.toString();
+      });
+      tempServer.stderr?.on('data', (data) => {
+        tempStderr += data.toString();
+      });
+
+      await setTimeout(4000);
+
+      console.error(`Temp server startup stdout:`, tempStdout.slice(-500)); // Last 500 chars
+      console.error(`Temp server startup stderr:`, tempStderr);
+
+      // Test that it works from different location
+      const response = await fetch(`http://localhost:${testPorts[2]}/api/health`);
+      expect(response.status).toBe(200);
+
+      // Test provider catalogs still work
+      const catalogResponse = await fetch(`http://localhost:${testPorts[2]}/api/provider/catalog`);
+      const catalogData = await catalogResponse.json();
+      expect(catalogData.json?.providers).toHaveLength(13);
+
+      tempServer.kill();
+    } finally {
+      // Clean up temp file
+      try {
+        const cleanupOutput = execSync('rm -f /tmp/Lace-portability-test', {
+          stdio: 'pipe',
+          encoding: 'utf-8',
+        });
+        console.error('Temp file cleanup output:', cleanupOutput);
+      } catch (error: unknown) {
+        console.error(
+          'Temp file cleanup failed:',
+          (error as { stderr?: string; message?: string }).stderr ||
+            (error as { message?: string }).message
+        );
+      }
+    }
+
+    console.error('   📱 Executable works correctly from any location');
+  });
+
+  it('should have proper embedded file counts in startup output', async () => {
+    // Start server and capture startup output
+    const server = spawn('../../build/Lace', ['--port', '31503'], {
+      stdio: 'pipe',
+      cwd: '../..',
+    });
+
+    let startupStdout = '';
+    let startupStderr = '';
+    server.stdout?.on('data', (data) => {
+      startupStdout += data.toString();
+    });
+    server.stderr?.on('data', (data) => {
+      startupStderr += data.toString();
+    });
+
+    await setTimeout(4000);
+    server.kill();
+
+    console.error('Embedded files test - stdout:', startupStdout);
+    console.error('Embedded files test - stderr:', startupStderr);
+
+    // Verify embedded file counts from startup instrumentation
+    expect(startupStdout).toContain('📦 Embedded files: 115 total');
+    expect(startupStdout).toContain('📋 Provider catalogs: 13');
+    expect(startupStdout).toContain('📄 Prompt templates: 11');
+    expect(startupStdout).toContain('🎨 Client assets: 91');
+
+    console.error('   📦 Embedded file counts verified from startup output');
+  });
+});

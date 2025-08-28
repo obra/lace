@@ -257,7 +257,9 @@ describe('useSessionManagement', () => {
   it('handles API errors gracefully', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const networkError = new Error('Network error');
-    (mockFetch as any).mockRejectedValueOnce(networkError).mockRejectedValueOnce(networkError);
+    (mockFetch as unknown as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(networkError)
+      .mockRejectedValueOnce(networkError);
 
     // parseResponse won't be called for network errors, no need to mock
 
