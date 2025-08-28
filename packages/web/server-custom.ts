@@ -127,6 +127,7 @@ async function startLaceServer() {
     // Import and mount React Router app last
     const requestHandler = createRequestHandler({
       build: () =>
+        // @ts-ignore
         import(/* @vite-ignore */ './build/server/index.js') as unknown as Promise<ServerBuild>,
       getLoadContext() {
         return {

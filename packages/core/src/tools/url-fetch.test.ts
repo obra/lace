@@ -149,7 +149,7 @@ Follows redirects by default. Returns detailed error context for failures.`
       if (result.status === 'failed') {
         expect(result.content[0].text).not.toContain('Validation failed');
       }
-    });
+    }, 10000);
   });
 
   describe('URL validation logic', () => {

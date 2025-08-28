@@ -104,7 +104,7 @@ export class ProviderRegistry {
 
     for (const [instanceId, instance] of Object.entries(config.instances)) {
       // Check if credentials exist without loading them
-      const hasCredentials = this.instanceManager.loadCredential(instanceId) !== null;
+      const hasCredentials = this.instanceManager.loadCredential(instanceId) != null;
 
       instances.push({
         id: instanceId,
@@ -155,6 +155,7 @@ export class ProviderRegistry {
       ...(credentials.additionalAuth || {}),
       ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
+      catalogProvider, // Pass catalog data to provider
     };
 
     // Create provider using the existing createProvider method
@@ -203,6 +204,7 @@ export class ProviderRegistry {
       ...(credentials.additionalAuth || {}),
       ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
+      catalogProvider, // Pass catalog data to provider
     };
 
     // Create provider using the existing createProvider method
@@ -252,6 +254,7 @@ export class ProviderRegistry {
         if (tempProvider) {
           const info = tempProvider.getProviderInfo();
           const models = tempProvider.getAvailableModels();
+          tempProvider.cleanup();
           results.push({ info, models, configured: false });
         }
       }
@@ -263,14 +266,23 @@ export class ProviderRegistry {
   // Helper to get provider instance for metadata without full instantiation
   private getProviderForMetadata(providerName: string): AIProvider | null {
     try {
+      // Try to get catalog data for this provider
+      const catalogProvider = this.catalogManager.getProvider(providerName);
+
       switch (providerName.toLowerCase()) {
         case 'anthropic': {
-          // Create temporary instance for metadata access only - not for API calls
-          return new AnthropicProvider({ apiKey: 'dummy' });
+          // Metadata-only instance (no API calls); include catalog for models
+          return new AnthropicProvider({
+            apiKey: null,
+            ...(catalogProvider ? { catalogProvider } : {}),
+          });
         }
         case 'openai': {
-          // Create temporary instance for metadata access only - not for API calls
-          return new OpenAIProvider({ apiKey: 'dummy' });
+          // Metadata-only instance (no API calls); include catalog for models
+          return new OpenAIProvider({
+            apiKey: null,
+            ...(catalogProvider ? { catalogProvider } : {}),
+          });
         }
         case 'lmstudio': {
           return new LMStudioProvider({ baseURL: 'http://localhost:1234' });
@@ -306,7 +318,7 @@ export class ProviderRegistry {
         });
         return new AnthropicProvider({
           ...config,
-          apiKey: (config.apiKey as string) || null,
+          apiKey: typeof config.apiKey === 'string' ? config.apiKey : null,
         });
       }
       case 'openai': {
@@ -315,7 +327,7 @@ export class ProviderRegistry {
         });
         return new OpenAIProvider({
           ...config,
-          apiKey: (config.apiKey as string) || null,
+          apiKey: typeof config.apiKey === 'string' ? config.apiKey : null,
         });
       }
       case 'lmstudio': {
