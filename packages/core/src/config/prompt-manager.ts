@@ -112,14 +112,17 @@ export class PromptManager {
    */
   isTemplateSystemAvailable(): boolean {
     try {
-      // Check if system.md exists in any of the configured template directories
-      for (const templateDir of this.templateDirs) {
-        const systemTemplatePath = path.join(templateDir, 'system.md');
-        if (fs.existsSync(systemTemplatePath)) {
-          return true;
+      // Check embedded first (Bun executable)
+      if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
+        for (const f of Bun.embeddedFiles) {
+          if (f.name.endsWith('/prompts/system.md')) return true;
         }
       }
-
+      // Fallback: check file system (dev)
+      for (const templateDir of this.templateDirs) {
+        const systemTemplatePath = path.join(templateDir, 'system.md');
+        if (fs.existsSync(systemTemplatePath)) return true;
+      }
       return false;
     } catch {
       return false;
