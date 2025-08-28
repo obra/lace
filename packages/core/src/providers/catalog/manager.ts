@@ -7,7 +7,7 @@ import { getLaceDir } from '~/config/lace-dir';
 import { CatalogProvider, CatalogProviderSchema, CatalogModel } from '~/providers/catalog/types';
 import { resolveDataDirectory } from '~/utils/resource-resolver';
 import { logger } from '~/utils/logger';
-import '../../../../types/bun-embedded';
+import '../types/bun-augmentation';
 // Helper function to read and validate provider catalog JSON
 async function readProviderCatalog(filePath: string): Promise<CatalogProvider> {
   const content = await fs.promises.readFile(filePath, 'utf-8');

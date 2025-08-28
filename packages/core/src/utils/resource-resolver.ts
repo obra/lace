@@ -3,7 +3,7 @@
 
 import path from 'path';
 import { fileURLToPath } from 'url';
-import '../../../../types/bun-embedded';
+import '../types/bun-augmentation';
 
 /**
  * Resolves paths to bundled resources (data files, templates, etc.) that work in both

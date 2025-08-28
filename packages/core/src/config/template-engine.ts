@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import mustache from 'mustache';
 import { logger } from '~/utils/logger';
-import '../../../../types/bun-embedded';
+import '../types/bun-augmentation';
 
 export interface TemplateContext {
   [key: string]: unknown;
