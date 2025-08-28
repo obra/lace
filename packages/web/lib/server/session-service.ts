@@ -10,8 +10,8 @@ import { EventStreamManager } from '@/lib/event-stream-manager';
 import { logger } from '~/utils/logger';
 
 export class SessionService {
-  // Track agents that already have event handlers set up to prevent duplicates
-  private registeredAgents = new WeakSet<Agent>();
+  // Track agents that already have event handlers set up to prevent duplicates across HMR
+  private static registeredAgents = new WeakSet<Agent>();
 
   constructor() {}
 
@@ -40,10 +40,10 @@ export class SessionService {
 
   async setupAgentEventHandlers(agent: Agent): Promise<void> {
     // Prevent duplicate event handler registration
-    if (this.registeredAgents.has(agent)) {
+    if (SessionService.registeredAgents.has(agent)) {
       return;
     }
-    this.registeredAgents.add(agent);
+    SessionService.registeredAgents.add(agent);
 
     // Get session from agent
     const session = await agent.getFullSession();

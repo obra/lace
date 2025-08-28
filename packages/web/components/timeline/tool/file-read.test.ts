@@ -56,7 +56,7 @@ describe('fileReadRenderer', () => {
   describe('getSummary', () => {
     test('should create concise summary for file read operations', () => {
       const summary = fileReadRenderer.getSummary?.(mockFileReadArgs);
-      expect(summary).toBe('Read /home/user/projects/lace/src/components/Button.tsx');
+      expect(summary).toBe('Read /home/user/projects/lace/src/components/Button.tsx (lines 1-10)');
     });
 
     test('should handle line ranges in summary', () => {
@@ -66,7 +66,7 @@ describe('fileReadRenderer', () => {
         endLine: 25,
       };
       const summary = fileReadRenderer.getSummary?.(rangeArgs);
-      expect(summary).toBe('Read /home/user/projects/lace/src/components/Button.tsx');
+      expect(summary).toBe('Read /home/user/projects/lace/src/components/Button.tsx (lines 15-25)');
     });
 
     test('should handle start line only', () => {
