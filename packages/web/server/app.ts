@@ -25,7 +25,7 @@ if (DEVELOPMENT) {
   // Production mode - use pre-built bundle
   app.use(
     createRequestHandler({
-      build: () => import(BUILD_PATH),
+      build: () => import(/* @vite-ignore */ BUILD_PATH),
       getLoadContext() {
         return {
           // Add any context needed by your routes here
