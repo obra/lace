@@ -1,12 +1,11 @@
 // ABOUTME: Template engine for system prompts using mustache with include functionality
 // ABOUTME: Handles variable substitution and template includes with error handling and fallbacks
 
-/// <reference path="../../../../types/bun-embedded.d.ts" />
-
 import * as fs from 'fs';
 import * as path from 'path';
 import mustache from 'mustache';
 import { logger } from '~/utils/logger';
+import '../../../../types/bun-embedded';
 
 export interface TemplateContext {
   [key: string]: unknown;
@@ -44,7 +43,7 @@ export class TemplateEngine {
   private loadTemplate(templatePath: string): string {
     // First try embedded files - check for the template path directly
     try {
-      if (typeof Bun !== 'undefined' && Bun.embeddedFiles) {
+      if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
         const targetPath = `packages/core/src/config/prompts/${templatePath}`;
 
         for (const file of Bun.embeddedFiles) {
@@ -74,6 +73,7 @@ export class TemplateEngine {
               // Busy wait for the promise (not ideal but maintains sync compatibility)
               while (!resolved) {
                 // Wait for async operation to complete
+                // eslint-disable-next-line @typescript-eslint/no-require-imports -- Sync operation needed for compatibility
                 require('child_process').spawnSync('sleep', ['0.001']);
               }
 

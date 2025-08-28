@@ -1,11 +1,9 @@
 // ABOUTME: Unified resource path resolution for development and production (standalone) modes
 // ABOUTME: Handles the difference between import.meta.url and extracted standalone directory structure
 
-/// <reference path="../../../../types/bun-embedded.d.ts" />
-
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { readFile, readdir } from 'node:fs/promises';
+import '../../../../types/bun-embedded';
 
 /**
  * Resolves paths to bundled resources (data files, templates, etc.) that work in both
