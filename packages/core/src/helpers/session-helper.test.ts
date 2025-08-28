@@ -88,10 +88,10 @@ describe('SessionHelper', () => {
     vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue('test-instance:test-model');
 
     // Mock provider registry
-    const mockRegistry = {
+    const mockRegistry: Partial<ProviderRegistry> = {
       createProviderFromInstanceAndModel: vi.fn().mockResolvedValue(mockProvider)
     };
-    vi.mocked(ProviderRegistry.getInstance).mockReturnValue(mockRegistry as any);
+    vi.mocked(ProviderRegistry.getInstance).mockReturnValue(mockRegistry as unknown as ProviderRegistry);
   });
 
   describe('constructor', () => {

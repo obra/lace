@@ -285,10 +285,10 @@ describe('InfrastructureHelper', () => {
 
     it('should handle provider not found error', async () => {
       // Mock getInstance to return null
-      const mockInstanceManager = {
+      const mockInstanceManager: Partial<ProviderInstanceManager> = {
         getInstance: vi.fn().mockResolvedValue(null)
       };
-      vi.mocked(ProviderInstanceManager).mockImplementation(() => mockInstanceManager as any);
+      vi.mocked(ProviderInstanceManager).mockImplementation(() => mockInstanceManager as unknown as ProviderInstanceManager);
 
       const helper = new InfrastructureHelper({
         model: 'fast',
