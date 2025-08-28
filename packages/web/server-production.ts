@@ -86,10 +86,14 @@ async function startLaceServer() {
   app.use((req, res, next) => {
     // Try embedded files first (Bun executable)
     if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
-      // Look for client assets - they have paths like ../../packages/web/build/client/assets/...
-      const assetFile = Array.from(Bun.embeddedFiles).find(f => 
-        f.name.includes('/build/client') && req.path === f.name.split('/build/client')[1]
-      );
+      // Look for client assets by matching the request path to embedded file paths
+      const assetFile = Array.from(Bun.embeddedFiles).find(f => {
+        if (!f.name.includes('/build/client')) return false;
+        
+        // Extract the path after /build/client from the embedded file name
+        const clientPath = f.name.split('/build/client')[1];
+        return clientPath === req.path;
+      });
       
       if (assetFile) {
         assetFile.text().then(content => {
