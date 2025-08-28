@@ -49,9 +49,27 @@ export class TemplateEngine {
           if (file.name.endsWith(targetPath)) {
             logger.debug('Loading template from embedded files', { templatePath, embeddedName: file.name });
             try {
-              // Use sync file reading for embedded files 
-              const fs = require('fs');
-              const content = fs.readFileSync(file.name, 'utf-8');
+              // For embedded files, use a sync approach by blocking on the Promise
+              // This is not ideal but maintains the sync API for compatibility
+              let content = '';
+              let resolved = false;
+              let error: any = null;
+              
+              file.text().then(text => {
+                content = text;
+                resolved = true;
+              }).catch(err => {
+                error = err;
+                resolved = true;
+              });
+              
+              // Busy wait for the promise (not ideal but maintains sync compatibility)
+              while (!resolved) {
+                // Wait for async operation to complete
+                require('child_process').spawnSync('sleep', ['0.001']);
+              }
+              
+              if (error) throw error;
               return content;
             } catch (fileError) {
               logger.debug('Failed to read embedded file', { fileName: file.name, error: String(fileError) });
@@ -98,8 +116,26 @@ export class TemplateEngine {
         for (const file of Bun.embeddedFiles) {
           if (file.name.endsWith(targetPath)) {
             try {
-              const fs = require('fs');
-              foundContent = fs.readFileSync(file.name, 'utf-8');
+              // Use the same sync-over-async approach for consistency
+              let content = '';
+              let resolved = false;
+              let error: any = null;
+              
+              file.text().then(text => {
+                content = text;
+                resolved = true;
+              }).catch(err => {
+                error = err;
+                resolved = true;
+              });
+              
+              // Busy wait for the promise
+              while (!resolved) {
+                require('child_process').spawnSync('sleep', ['0.001']);
+              }
+              
+              if (error) throw error;
+              foundContent = content;
               break;
             } catch (e) {
               // Continue to next file
