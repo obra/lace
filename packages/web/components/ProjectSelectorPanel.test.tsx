@@ -138,7 +138,7 @@ describe('ProjectSelectorPanel', () => {
           return this;
         },
       } as Response);
-    });
+    }) as unknown as typeof fetch;
 
     // Set up default mock returns
     mockUseProjectContext.mockReturnValue(

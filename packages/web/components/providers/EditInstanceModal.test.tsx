@@ -92,7 +92,7 @@ describe('EditInstanceModal', () => {
           return this;
         },
       } as Response);
-    });
+    }) as unknown as typeof fetch;
   });
 
   afterEach(() => {
@@ -141,7 +141,7 @@ describe('EditInstanceModal', () => {
           return this;
         },
       } as Response);
-    });
+    }) as unknown as typeof fetch;;
     global.fetch = mockFetch;
 
     await renderWithProvider();
@@ -203,7 +203,7 @@ describe('EditInstanceModal', () => {
           return this;
         },
       } as Response);
-    });
+    }) as unknown as typeof fetch;;
 
     await renderWithProvider();
 
@@ -280,7 +280,7 @@ describe('EditInstanceModal', () => {
           return this;
         },
       } as Response);
-    });
+    }) as unknown as typeof fetch;
 
     await renderWithProvider();
 
@@ -355,7 +355,7 @@ describe('EditInstanceModal', () => {
           100
         )
       );
-    });
+    }) as unknown as typeof fetch;
 
     mockParseResponse.mockResolvedValue({ instance: mockInstance });
 

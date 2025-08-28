@@ -2,6 +2,7 @@
 // ABOUTME: Provides single-process server with Lace-specific startup logic and port selection
 
 import { parseArgs } from 'util';
+import path from 'node:path';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -88,7 +89,7 @@ async function startLaceServer() {
   app.disable('x-powered-by');
 
   if (DEVELOPMENT) {
-    console.log('Starting development server with Vite middleware');
+    console.error('Starting development server with Vite middleware');
 
     // Development mode - use Vite middleware
     const viteDevServer = await import('vite').then((vite) =>
@@ -103,7 +104,9 @@ async function startLaceServer() {
     app.use(async (req, res, next) => {
       try {
         const source = await viteDevServer.ssrLoadModule('./server/app.ts');
-        return await source.app(req, res, next);
+        return await (
+          source as { app: (req: unknown, res: unknown, next: unknown) => Promise<unknown> }
+        ).app(req, res, next);
       } catch (error) {
         if (typeof error === 'object' && error instanceof Error) {
           viteDevServer.ssrFixStacktrace(error);
@@ -112,13 +115,15 @@ async function startLaceServer() {
       }
     });
   } else {
-    console.log('Starting production server with static file serving');
+    console.error('Starting production server with static file serving');
     const morgan = await import('morgan');
 
     // Production mode - static assets FIRST, exactly like React Router template
-    app.use('/assets', express.static('build/client/assets', { immutable: true, maxAge: '1y' }));
+    const clientRoot = path.resolve(process.cwd(), 'build', 'client');
+    const assetsRoot = path.join(clientRoot, 'assets');
+    app.use('/assets', express.static(assetsRoot, { immutable: true, maxAge: '1y' }));
     app.use(morgan.default('tiny'));
-    app.use(express.static('build/client', { maxAge: '1h' }));
+    app.use(express.static(clientRoot, { maxAge: '1h' }));
 
     // Import and mount React Router app last
     const serverApp = await import('./server/app.ts');

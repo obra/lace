@@ -14,10 +14,37 @@ async function readProviderCatalog(filePath: string): Promise<CatalogProvider> {
   return CatalogProviderSchema.parse(JSON.parse(content));
 }
 
-// Load builtin provider catalogs from filesystem (server-side)
+// Load builtin provider catalogs from embedded files or filesystem
 async function loadBuiltinProviderCatalogs(): Promise<CatalogProvider[]> {
   const catalogs: CatalogProvider[] = [];
 
+  // Try Bun embedded files first (only if available)
+  if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
+    for (const file of Bun.embeddedFiles) {
+      if (
+        (file as File).name.includes('providers/catalog/data') &&
+        (file as File).name.endsWith('.json')
+      ) {
+        try {
+          const content = await file.text();
+          const provider = CatalogProviderSchema.parse(JSON.parse(content));
+          catalogs.push(provider);
+        } catch (error) {
+          logger.warn('catalog.load.embedded_failed', {
+            fileName: (file as File).name,
+            error: String(error),
+          });
+        }
+      }
+    }
+
+    if (catalogs.length > 0) {
+      logger.info('catalog.load.complete', { count: catalogs.length, mode: 'embedded' });
+      return catalogs;
+    }
+  }
+
+  // Original working filesystem approach (Node.js/test/development)
   const catalogDir = resolveDataDirectory(import.meta.url);
 
   try {

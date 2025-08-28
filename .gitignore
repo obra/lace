@@ -72,6 +72,8 @@ packages/web/.next/
 # Next.js cache
 .next/
 
+# React Router generated types
+packages/web/.react-router/
 
 # Storybook
 storybook-static/
@@ -110,3 +112,4 @@ src/vfs/lace-database.ts
 
 # Build artifacts that get regenerated
 packages/web/server-dependencies.json
+build/temp/

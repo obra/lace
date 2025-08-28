@@ -45,7 +45,7 @@ const mockUseAgentManagement = vi.mocked(useAgentManagement);
 
 describe('EventStreamProvider', () => {
   // Mock fetch globally
-  const mockFetch = vi.fn();
+  const mockFetch = vi.fn() as unknown as typeof fetch;
   global.fetch = mockFetch;
 
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -66,7 +66,7 @@ describe('EventStreamProvider', () => {
     vi.clearAllMocks();
 
     // Mock fetch API responses with proper superjson serialized content
-    mockFetch.mockImplementation((url: string) => {
+    (mockFetch as unknown as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       // Handle tool approval endpoints
       if (url.includes('/approvals/pending')) {
         const response = stringify([]);

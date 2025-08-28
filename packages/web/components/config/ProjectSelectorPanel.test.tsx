@@ -81,7 +81,8 @@ const mockHandlers = {
   enableAgentAutoSelection: vi.fn(),
 };
 
-global.fetch = vi.fn();
+const mockFetch = vi.fn();
+global.fetch = mockFetch as unknown as typeof fetch;
 
 describe('ProjectSelectorPanel', () => {
   beforeEach(() => {
@@ -90,7 +91,7 @@ describe('ProjectSelectorPanel', () => {
     // Clear router mocks
     mockNavigate.mockClear();
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+    (mockFetch as ReturnType<typeof vi.fn>).mockResolvedValue(
       createMockResponse({ project: { id: '1', name: 'Test' } })
     );
 

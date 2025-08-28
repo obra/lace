@@ -18,6 +18,22 @@ import { fileURLToPath } from 'url';
 export function resolveResourcePath(importMetaUrl: string, relativePath: string): string {
   const moduleDir = path.dirname(fileURLToPath(importMetaUrl));
 
+  // Check if running from Bun executable (importMetaUrl contains $bunfs)
+  if (importMetaUrl.includes('$bunfs')) {
+    // Running from Bun executable - return special markers for embedded file loading
+    if (relativePath === 'data') {
+      return '__BUN_EMBEDDED_DATA__';
+    } else if (relativePath === 'prompts') {
+      return '__BUN_EMBEDDED_PROMPTS__';
+    } else if (relativePath === 'templates') {
+      return '__BUN_EMBEDDED_TEMPLATES__';
+    } else {
+      throw new Error(
+        `Unknown resource path '${relativePath}' in Bun executable mode. Add explicit mapping.`
+      );
+    }
+  }
+
   // Check if running from a bundled build (React Router 7 style)
   if (importMetaUrl.includes('/build/server/assets/')) {
     // Running from bundle - find project root from the bundle path
@@ -91,6 +107,178 @@ export function resolveDataDirectory(importMetaUrl: string): string {
  */
 export function resolveTemplateDirectory(importMetaUrl: string): string {
   return resolveResourcePath(importMetaUrl, 'templates');
+}
+
+/**
+ * Try to read a file from Bun's embedded files, fallback to file system
+ */
+export async function tryReadEmbeddedFile(
+  filename: string,
+  fallbackPath?: string
+): Promise<string | null> {
+  // Try Bun embedded files first
+  try {
+    if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
+      for (const file of Bun.embeddedFiles) {
+        if ((file as File).name === filename) {
+          return await file.text();
+        }
+      }
+    }
+  } catch {
+    // Bun API not available
+  }
+
+  // Fallback to file system if provided
+  if (fallbackPath) {
+    try {
+      const fs = await import('fs/promises');
+      return await fs.readFile(fallbackPath, 'utf-8');
+    } catch {
+      // File system read failed
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get list of embedded files matching a pattern (e.g., '*.json')
+ */
+export function getEmbeddedFiles(pattern: string): string[] {
+  try {
+    if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
+      const regex = new RegExp(
+        '^' +
+          pattern
+            .split('*')
+            .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+            .join('.*') +
+          '$'
+      );
+      return Array.from(Bun.embeddedFiles)
+        .map((file) => (file as File).name)
+        .filter((name) => regex.test(name));
+    }
+  } catch {
+    // Bun API not available
+  }
+
+  return [];
+}
+
+/**
+ * Load files from a directory, works with both embedded files and file system
+ */
+export async function loadFilesFromDirectory(
+  dirPath: string,
+  fileExtension: string
+): Promise<Array<{ name: string; content: string }>> {
+  const { logger } = await import('~/utils/logger');
+  const files: Array<{ name: string; content: string }> = [];
+
+  // Try Bun embedded files first
+  try {
+    if (typeof Bun !== 'undefined' && Bun.embeddedFiles) {
+      logger.debug('resource.load.checking_embedded', {
+        dirPath,
+        fileExtension,
+        totalEmbedded: Bun.embeddedFiles.length,
+      });
+
+      // Log all embedded files for debugging
+      Array.from(Bun.embeddedFiles).forEach((file, i) => {
+        logger.debug('resource.load.embedded_file', { index: i, name: (file as File).name });
+      });
+
+      const embeddedFiles = Array.from(Bun.embeddedFiles).filter(
+        (file) =>
+          (file as File).name.includes(`../${dirPath}`) &&
+          (file as File).name.endsWith(fileExtension)
+      );
+
+      logger.debug('resource.load.filtered_embedded', {
+        dirPath,
+        fileExtension,
+        matchingCount: embeddedFiles.length,
+      });
+      embeddedFiles.forEach((file) =>
+        logger.debug('resource.load.embedded_match', { name: (file as File).name })
+      );
+
+      if (embeddedFiles.length > 0) {
+        for (const file of embeddedFiles) {
+          const content = await file.text();
+          const name = path.basename((file as File).name, fileExtension);
+          files.push({ name, content });
+          logger.debug('resource.load.embedded_loaded', { filePath: (file as File).name, name });
+        }
+        return files;
+      }
+    }
+  } catch (e) {
+    logger.debug('resource.load.bun_error', { error: String(e) });
+  }
+
+  // Fallback to file system approach
+  logger.debug('resource.load.fallback_filesystem', { dirPath });
+  try {
+    const fs = await import('fs/promises');
+    const fileList = await fs.readdir(dirPath);
+    logger.debug('resource.load.filesystem_files', { dirPath, count: fileList.length });
+
+    for (const filename of fileList.filter((f) => f.endsWith(fileExtension))) {
+      const filePath = path.join(dirPath, filename);
+      const content = await fs.readFile(filePath, 'utf-8');
+      const name = path.basename(filename, fileExtension);
+      files.push({ name, content });
+      logger.debug('resource.load.filesystem_loaded', { filePath, name });
+    }
+  } catch (e) {
+    logger.debug('resource.load.filesystem_error', { dirPath, error: String(e) });
+  }
+
+  logger.debug('resource.load.complete', { dirPath, fileExtension, totalLoaded: files.length });
+  return files;
+}
+
+/**
+ * Load a specific file by path from embedded files or file system
+ */
+export async function loadFileFromEmbeddedOrFilesystem(filePath: string): Promise<string | null> {
+  const { logger } = await import('~/utils/logger');
+
+  // Try Bun embedded files first - look for files that end with the relative path
+  try {
+    if (typeof Bun !== 'undefined' && Bun.embeddedFiles) {
+      // Normalize the file path for comparison (remove leading ./ and ../)
+      const normalizedPath = filePath.replace(/^\.\.?\//, '');
+
+      for (const file of Bun.embeddedFiles) {
+        if ((file as File).name.endsWith(normalizedPath)) {
+          logger.debug('resource.load.embedded_file_found', {
+            filePath,
+            embeddedName: (file as File).name,
+          });
+          return await file.text();
+        }
+      }
+    }
+  } catch (e) {
+    logger.debug('resource.load.embedded_file_error', { filePath, error: String(e) });
+  }
+
+  // Fallback to file system
+  try {
+    const fs = await import('fs/promises');
+    const content = await fs.readFile(filePath, 'utf-8');
+    logger.debug('resource.load.filesystem_file_found', { filePath });
+    return content;
+  } catch (e) {
+    logger.debug('resource.load.filesystem_file_not_found', { filePath, error: String(e) });
+  }
+
+  return null;
 }
 
 /**

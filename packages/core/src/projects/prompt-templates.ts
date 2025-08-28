@@ -62,8 +62,7 @@ export class PromptTemplate {
 
     // Replace variables in content
     for (const [key, value] of Object.entries(variables)) {
-      const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-      content = content.replace(regex, value);
+      content = content.replaceAll(`{{${key}}}`, value);
     }
 
     // Check for unresolved variables

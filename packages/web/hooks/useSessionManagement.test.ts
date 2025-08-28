@@ -8,7 +8,7 @@ import { useSessionManagement } from './useSessionManagement';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+global.fetch = mockFetch as unknown as typeof fetch;
 
 // Mock parseResponse
 vi.mock('@/lib/serialization', () => ({
@@ -257,7 +257,9 @@ describe('useSessionManagement', () => {
   it('handles API errors gracefully', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const networkError = new Error('Network error');
-    mockFetch.mockRejectedValueOnce(networkError).mockRejectedValueOnce(networkError);
+    (mockFetch as unknown as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(networkError)
+      .mockRejectedValueOnce(networkError);
 
     // parseResponse won't be called for network errors, no need to mock
 

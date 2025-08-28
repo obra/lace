@@ -16,7 +16,7 @@ import type { SessionInfo, ThreadId } from '@/types/core';
 import { useAgentManagement } from './useAgentManagement';
 
 // Mock fetch globally using Vitest's stubbing API
-const mockFetch: MockedFunction<typeof fetch> = vi.fn();
+const mockFetch = vi.fn() as MockedFunction<typeof fetch>;
 
 beforeAll(() => {
   vi.stubGlobal('fetch', mockFetch);

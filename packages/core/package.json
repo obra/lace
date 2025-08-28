@@ -37,6 +37,7 @@
   "devDependencies": {
     "@eslint/js": "^9.16.0",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/bun": "^1.2.21",
     "@types/mustache": "^4.2.5",
     "@types/node": "^22.16.0",
     "@types/turndown": "^5.0.5",

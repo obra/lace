@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20.18"
+    "node": ">=20.18",
+    "bun": ">=1.2.21"
   },
   "scripts": {
     "dev": "NODE_ENV=development tsx server-custom.ts",
@@ -47,6 +48,7 @@
     "@sentry/node": "^10.5.0",
     "@sentry/react": "^10.5.0",
     "@sentry/vite-plugin": "^4.1.1",
+    "@types/bun": "^1.2.21",
     "@types/compression": "^1.8.1",
     "@types/express": "^5.0.3",
     "@types/morgan": "^1.9.10",
