@@ -3,6 +3,7 @@
 
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { logger } from '~/utils/logger';
 
 /**
  * Resolves paths to bundled resources (data files, templates, etc.) that work in both
@@ -174,7 +175,6 @@ export async function loadFilesFromDirectory(
   dirPath: string,
   fileExtension: string
 ): Promise<Array<{ name: string; content: string }>> {
-  const { logger } = await import('~/utils/logger');
   const files: Array<{ name: string; content: string }> = [];
 
   // Try Bun embedded files first
@@ -246,8 +246,6 @@ export async function loadFilesFromDirectory(
  * Load a specific file by path from embedded files or file system
  */
 export async function loadFileFromEmbeddedOrFilesystem(filePath: string): Promise<string | null> {
-  const { logger } = await import('~/utils/logger');
-
   // Try Bun embedded files first - look for files that end with the relative path
   try {
     if (typeof Bun !== 'undefined' && Bun.embeddedFiles) {
