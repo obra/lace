@@ -62,8 +62,7 @@ export class PromptTemplate {
 
     // Replace variables in content
     for (const [key, value] of Object.entries(variables)) {
-      const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-      content = content.replace(regex, value);
+      content = content.replaceAll(`{{${key}}}`, value);
     }
 
     // Check for unresolved variables
@@ -135,7 +134,7 @@ export class PromptTemplateManager {
     if (template.getParentTemplateId()) {
       const parentTemplate = this.getTemplate(projectId, template.getParentTemplateId()!);
       if (parentTemplate) {
-        const parentContent = await parentTemplate.render(variables);
+        const parentContent = parentTemplate.render(variables);
         renderedContent = renderedContent.replace(/\{\{parent\}\}/g, parentContent);
       }
     }
@@ -149,7 +148,7 @@ export class PromptTemplateManager {
       content: renderedContent,
     });
 
-    return await tempTemplate.render(variables);
+    return tempTemplate.render(variables);
   }
 
   deleteTemplate(projectId: string, templateId: string): boolean {

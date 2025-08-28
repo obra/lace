@@ -82,16 +82,20 @@ export class TemplateEngine {
    */
   private async processIncludes(content: string, currentDir: string): Promise<string> {
     const includeRegex = /\{\{include:([^}]+)\}\}/g;
+    let out = '';
+    let lastIndex = 0;
+    
+    for (let m: RegExpExecArray | null; (m = includeRegex.exec(content)); ) {
+      const includePath = m[1].trim();
+      out += content.slice(lastIndex, m.index);
+      lastIndex = includeRegex.lastIndex;
 
-    return content.replace(includeRegex, (match, includePath: string) => {
-      // Try to find the include file in any of the template directories
+      // Locate include file across templateDirs
       let foundPath: string | null = null;
       let foundTemplateDir = '';
-
       for (const templateDir of this.templateDirs) {
         const fullIncludePath = path.resolve(templateDir, currentDir, includePath);
         const normalizedPath = path.normalize(fullIncludePath);
-
         if (fs.existsSync(normalizedPath)) {
           foundPath = normalizedPath;
           foundTemplateDir = templateDir;
@@ -101,34 +105,35 @@ export class TemplateEngine {
 
       if (!foundPath) {
         logger.warn('Include file not found', { includePath, searchedDirs: this.templateDirs });
-        return `<!-- Include not found: ${includePath} -->`;
+        out += `<!-- Include not found: ${includePath} -->`;
+        continue;
       }
 
-      // Prevent infinite recursion
       if (this.processedIncludes.has(foundPath)) {
         logger.warn('Circular include detected', { includePath, foundPath });
-        return `<!-- Circular include: ${includePath} -->`;
+        out += `<!-- Circular include: ${includePath} -->`;
+        continue;
       }
 
       try {
         this.processedIncludes.add(foundPath);
-
         const includeContent = fs.readFileSync(foundPath, 'utf-8');
         const includeDir = path.dirname(path.relative(foundTemplateDir, foundPath));
-
-        // Recursively process includes in the included content
-        return this.processIncludes(includeContent, includeDir);
+        const processed = await this.processIncludes(includeContent, includeDir);
+        out += processed;
       } catch (error) {
         logger.error('Failed to process include', {
           includePath,
           foundPath,
           error: error instanceof Error ? error.message : String(error),
         });
-        return `<!-- Include error: ${includePath} -->`;
+        out += `<!-- Include error: ${includePath} -->`;
       } finally {
         this.processedIncludes.delete(foundPath);
       }
-    });
+    }
+    out += content.slice(lastIndex);
+    return out;
   }
 
   /**
