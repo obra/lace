@@ -32,5 +32,8 @@ export { Project } from './projects/project';
 // Configuration
 export { ensureLaceDir } from './config/lace-dir';
 
+// Helper system
+export * from './helpers';
+
 // Utilities
 export { logger } from './utils/logger';
