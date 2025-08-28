@@ -137,7 +137,8 @@ async function startLaceServer() {
 
   // React Router request handler
   const requestHandler = createRequestHandler({
-    build: () => import('./build/server/index.js') as unknown as Promise<ServerBuild>,
+    build: () =>
+      import(/* @vite-ignore */ './build/server/index.js') as unknown as Promise<ServerBuild>,
     getLoadContext() {
       return {};
     },

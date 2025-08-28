@@ -240,9 +240,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
 
       {/* Tool Approval Modal */}
       {pendingApprovals && pendingApprovals.length > 0 && (
-        <div data-testid="tool-approval-modal">
-          <ToolApprovalModal approvals={pendingApprovals} onDecision={handleApprovalDecision} />
-        </div>
+        <ToolApprovalModal approvals={pendingApprovals} onDecision={handleApprovalDecision} />
       )}
 
       {/* Agent Edit Modal */}
