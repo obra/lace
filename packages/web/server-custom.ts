@@ -2,6 +2,7 @@
 // ABOUTME: Provides single-process server with Lace-specific startup logic and port selection
 
 import { parseArgs } from 'util';
+import path from 'node:path';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -118,9 +119,11 @@ async function startLaceServer() {
     const morgan = await import('morgan');
 
     // Production mode - static assets FIRST, exactly like React Router template
-    app.use('/assets', express.static('build/client/assets', { immutable: true, maxAge: '1y' }));
+    const clientRoot = path.resolve(process.cwd(), 'build', 'client');
+    const assetsRoot = path.join(clientRoot, 'assets');
+    app.use('/assets', express.static(assetsRoot, { immutable: true, maxAge: '1y' }));
     app.use(morgan.default('tiny'));
-    app.use(express.static('build/client', { maxAge: '1h' }));
+    app.use(express.static(clientRoot, { maxAge: '1h' }));
 
     // Import and mount React Router app last
     const serverApp = await import('./server/app.ts');
