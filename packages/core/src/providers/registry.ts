@@ -155,6 +155,7 @@ export class ProviderRegistry {
       ...(credentials.additionalAuth || {}),
       ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
+      catalogProvider, // Pass catalog data to provider
     };
 
     // Create provider using the existing createProvider method
@@ -203,6 +204,7 @@ export class ProviderRegistry {
       ...(credentials.additionalAuth || {}),
       ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
+      catalogProvider, // Pass catalog data to provider
     };
 
     // Create provider using the existing createProvider method
