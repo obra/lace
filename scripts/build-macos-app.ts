@@ -1,7 +1,7 @@
 // ABOUTME: Clean Bun build script using asset loaders instead of ZIP/VFS complexity
 // ABOUTME: Uses --loader flags to embed JSON/MD files as assets with no temp extraction
 
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -181,7 +181,7 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   if (sign && process.platform === 'darwin') {
     console.log('🔏 Starting signing and notarization...');
     try {
-      void execSync(`npx tsx scripts/sign-and-notarize.ts --binary "${outputPath}"`, {
+      execFileSync('bunx', ['tsx', 'scripts/sign-and-notarize.ts', '--binary', outputPath], {
         stdio: 'inherit',
       });
     } catch (error) {
@@ -191,8 +191,8 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   } else if (process.platform === 'darwin') {
     console.log('🔏 Applying basic ad-hoc signing (macOS)...');
     try {
-      void execSync(`codesign --remove-signature "${outputPath}"`, { stdio: 'pipe' });
-      void execSync(`codesign -s - --deep --force "${outputPath}"`, { stdio: 'pipe' });
+      execFileSync('codesign', ['--remove-signature', outputPath], { stdio: 'pipe' });
+      execFileSync('codesign', ['-s', '-', '--deep', '--force', outputPath], { stdio: 'pipe' });
       console.log('✅ Ad-hoc signing completed');
     } catch (error) {
       console.warn('⚠️  Warning: Ad-hoc signing failed, but executable may still work');
