@@ -78,8 +78,8 @@ export class HelperRegistry {
    * Remove a helper from the registry
    * @param id The helper ID to remove
    */
-  removeHelper(id: string): void {
-    this.helpers.delete(id);
+  removeHelper(id: string): boolean {
+    return this.helpers.delete(id);
   }
 
   /**

@@ -1,3 +1,5 @@
+// ABOUTME: Tests InfrastructureHelper provider resolution, whitelist enforcement, error/abort handling, and model tier mapping
+// ABOUTME: Validates tool blocking, bypass approval, custom working directory, and graceful error handling
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { InfrastructureHelper } from './infrastructure-helper';
 import { GlobalConfigManager } from '~/config/global-config';
@@ -5,7 +7,7 @@ import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
 import { Tool } from '~/tools/tool';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import type { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { z } from 'zod';
 
 // Mock modules
@@ -83,10 +85,10 @@ describe('InfrastructureHelper', () => {
     mockProvider = new QueuedMockProvider({});
 
     // Mock provider instance manager
-    const mockInstanceManager = {
+    const mockInstanceManager: Pick<InstanceType<typeof ProviderInstanceManager>, 'getInstance'> = {
       getInstance: vi.fn().mockResolvedValue(mockProvider)
     };
-    vi.mocked(ProviderInstanceManager).mockImplementation(() => mockInstanceManager as any);
+    vi.mocked(ProviderInstanceManager).mockImplementation(() => mockInstanceManager as InstanceType<typeof ProviderInstanceManager>);
   });
 
   afterEach(() => {

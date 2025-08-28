@@ -1,12 +1,18 @@
+// ABOUTME: Tests HelperRegistry creation, duplicate protection, tracking, filtering, and counts
+// ABOUTME: Validates helper lifecycle management and type-based filtering
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HelperRegistry } from './helper-registry';
 import { InfrastructureHelper } from './infrastructure-helper';
 import { SessionHelper } from './session-helper';
-import { Agent } from '~/agents/agent';
+import type { Agent } from '~/agents/agent';
 
 // Mock modules
-vi.mock('./infrastructure-helper');
-vi.mock('./session-helper');
+vi.mock('./infrastructure-helper', () => ({
+  InfrastructureHelper: vi.fn(),
+}));
+vi.mock('./session-helper', () => ({
+  SessionHelper: vi.fn(),
+}));
 
 describe('HelperRegistry', () => {
   let registry: HelperRegistry;
@@ -14,7 +20,8 @@ describe('HelperRegistry', () => {
 
   beforeEach(() => {
     registry = new HelperRegistry();
-    mockAgent = {} as Agent;
+    const agentPartial: Partial<Agent> = {};
+    mockAgent = agentPartial as Agent;
     vi.clearAllMocks();
   });
 

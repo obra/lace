@@ -1,7 +1,9 @@
+// ABOUTME: Tests SessionHelper provider creation, inherited tools/workingDir, approval flow, and abort handling
+// ABOUTME: Validates working directory inheritance, tool approval workflow, and error handling
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SessionHelper } from './session-helper';
-import { Agent } from '~/agents/agent';
-import { Session } from '~/sessions/session';
+import type { Agent } from '~/agents/agent';
+import type { Session } from '~/sessions/session';
 import { GlobalConfigManager } from '~/config/global-config';
 import { ProviderRegistry } from '~/providers/registry';
 import { TestProvider } from '~/test-utils/test-provider';
@@ -71,18 +73,20 @@ describe('SessionHelper', () => {
     toolExecutor.registerTool(testTool.name, testTool);
 
     // Mock session
-    mockSession = {
+    const sessionPartial: Partial<Session> = {
       getToolPolicy: vi.fn().mockReturnValue('require-approval'),
       getWorkingDirectory: vi.fn().mockReturnValue('/session/dir'),
       getTools: vi.fn().mockReturnValue([testTool])
-    } as any;
+    };
+    mockSession = sessionPartial as Session;
 
     // Mock agent
-    mockAgent = {
+    const agentPartial: Partial<Agent> = {
       getFullSession: vi.fn().mockResolvedValue(mockSession),
       getAvailableTools: vi.fn().mockReturnValue([testTool]),
       toolExecutor
-    } as any;
+    };
+    mockAgent = agentPartial as Agent;
 
     // Mock global config
     vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue('test-instance:test-model');

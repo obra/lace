@@ -1,9 +1,11 @@
+// ABOUTME: Integration tests for HelperFactory + HelperRegistry lifecycle, collisions, and filtering
+// ABOUTME: Tests realistic usage scenarios including memory analysis and agent sub-tasks
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HelperFactory } from './helper-factory';
 import { HelperRegistry } from './helper-registry';
 import { InfrastructureHelper } from './infrastructure-helper';
 import { SessionHelper } from './session-helper';
-import { Agent } from '~/agents/agent';
+import type { Agent } from '~/agents/agent';
 
 // Test integration between factory and registry
 describe('HelperFactory and HelperRegistry Integration', () => {
@@ -12,7 +14,8 @@ describe('HelperFactory and HelperRegistry Integration', () => {
 
   beforeEach(() => {
     registry = new HelperRegistry();
-    mockAgent = {} as Agent;
+    const agentPartial: Partial<Agent> = {};
+    mockAgent = agentPartial as Agent;
     vi.clearAllMocks();
   });
 
@@ -30,12 +33,9 @@ describe('HelperFactory and HelperRegistry Integration', () => {
         parentAgent: mockAgent
       });
 
-      // Register them manually (in real usage, registry would create them)
-      expect(() => {
-        // This demonstrates the factory creates valid instances
-        expect(infraHelper).toBeInstanceOf(InfrastructureHelper);
-        expect(sessionHelper).toBeInstanceOf(SessionHelper);
-      }).not.toThrow();
+      // This demonstrates the factory creates valid instances
+      expect(infraHelper).toBeInstanceOf(InfrastructureHelper);
+      expect(sessionHelper).toBeInstanceOf(SessionHelper);
     });
 
     it('should demonstrate complete workflow pattern', () => {

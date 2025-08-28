@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+// ABOUTME: Tests BaseHelper multi-turn loop, tool execution, abort handling, and max-turn protection
+// ABOUTME: Validates provider resolution, conversation building, tool result processing, and execution limits
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BaseHelper } from './base-helper';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
-import { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import type { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { TestProvider } from '~/test-utils/test-provider';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { z } from 'zod';
@@ -200,8 +202,9 @@ describe('BaseHelper', () => {
     });
 
     it('should handle abort signal', async () => {
+      vi.useFakeTimers();
       const controller = new AbortController();
-      
+
       provider.addMockResponse({
         content: 'Starting',
         toolCalls: [{
@@ -211,12 +214,11 @@ describe('BaseHelper', () => {
         }]
       });
 
-      // Abort during execution
+      const promise = helper.execute('Test abort', controller.signal);
       setTimeout(() => controller.abort(), 10);
-
-      await expect(
-        helper.execute('Test abort', controller.signal)
-      ).rejects.toThrow();
+      vi.runAllTimers();
+      await expect(promise).rejects.toThrow();
+      vi.useRealTimers();
     });
   });
 });

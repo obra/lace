@@ -89,7 +89,8 @@ export class EnhancedAgent extends Agent {
           );
           summaries.push(`${url}: ${result.content}`);
         } catch (error) {
-          summaries.push(`${url}: Unable to fetch (${error})`);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          summaries.push(`${url}: Unable to fetch (${errorMessage})`);
         }
       }
 
@@ -118,18 +119,20 @@ export class EnhancedAgent extends Agent {
   }
 
   private extractUrls(message: string): string[] {
-    const urlRegex = /https?:\/\/[^\s]+/g;
-    return message.match(urlRegex) || [];
+    const urlRegex = /https?:\/\/[^\s)<>\]]+/g;
+    const raw = message.match(urlRegex) || [];
+    const cleaned = raw.map(u => u.replace(/[),.;!?]+$/, ''));
+    return Array.from(new Set(cleaned));
   }
 
-  private buildAnalysisPrompt(data: string, type: string): string {
-    const prompts = {
+  private buildAnalysisPrompt(data: string, analysisType: 'financial' | 'technical' | 'general'): string {
+    const prompts: Readonly<Record<'financial' | 'technical' | 'general', string>> = {
       financial: 'Analyze this financial data for trends, risks, and opportunities',
       technical: 'Analyze this technical data for patterns, anomalies, and insights', 
       general: 'Analyze this data and provide key insights and recommendations'
-    };
+    } as const;
     
-    return `${prompts[type]}:\n\n${data}`;
+    return `${prompts[analysisType]}:\n\n${data}`;
   }
 }
 
@@ -317,7 +320,7 @@ export class ErrorAnalysisSystem {
  */
 export class HelperManager {
   private registry = new HelperRegistry();
-  private activeOperations = new Map<string, Promise<any>>();
+  private activeOperations = new Map<string, { promise: Promise<unknown>; abort: AbortController }>();
 
   /**
    * Start a long-running analysis operation
@@ -327,14 +330,16 @@ export class HelperManager {
       throw new Error(`Analysis ${id} already in progress`);
     }
 
+    const controller = new AbortController();
     const helper = this.registry.createInfrastructureHelper(id, {
       model: 'smart',
       tools: ['file-list', 'file-read', 'ripgrep-search'],
-      workingDirectory: context
+      workingDirectory: context,
+      abortSignal: controller.signal
     });
 
-    const operation = this.executeAnalysis(helper, type);
-    this.activeOperations.set(id, operation);
+    const operation = this.executeAnalysis(helper, type, controller.signal);
+    this.activeOperations.set(id, { promise: operation, abort: controller });
 
     try {
       const result = await operation;
@@ -356,22 +361,22 @@ export class HelperManager {
    * Cancel an operation
    */
   async cancelOperation(id: string): Promise<void> {
-    const operation = this.activeOperations.get(id);
-    if (operation) {
-      // In a real implementation, you'd pass abort signals to helpers
+    const entry = this.activeOperations.get(id);
+    if (entry) {
+      entry.abort.abort();
       this.activeOperations.delete(id);
       this.registry.removeHelper(id);
     }
   }
 
-  private async executeAnalysis(helper: InfrastructureHelper, type: string): Promise<string> {
-    const prompts = {
+  private async executeAnalysis(helper: InfrastructureHelper, type: 'memory' | 'error' | 'performance', signal?: AbortSignal): Promise<string> {
+    const prompts: Readonly<Record<'memory' | 'error' | 'performance', string>> = {
       memory: 'Analyze conversation patterns for memory insights',
       error: 'Analyze error logs for critical issues and trends',
       performance: 'Analyze performance metrics and identify bottlenecks'
-    };
+    } as const;
 
-    const result = await helper.execute(prompts[type as keyof typeof prompts]);
+    const result = await helper.execute(prompts[type], signal);
     return result.content;
   }
 
@@ -380,7 +385,7 @@ export class HelperManager {
    */
   async cleanup(): Promise<void> {
     // Wait for active operations to complete
-    await Promise.allSettled(Array.from(this.activeOperations.values()));
+    await Promise.allSettled(Array.from(this.activeOperations.values()).map(entry => entry.promise));
     
     // Clear registry
     this.registry.clearAll();

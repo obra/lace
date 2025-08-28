@@ -1,18 +1,25 @@
+// ABOUTME: Unit tests for HelperFactory creating InfrastructureHelper and SessionHelper
+// ABOUTME: Tests type safety, parameter validation, and proper constructor calls
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HelperFactory } from './helper-factory';
 import { InfrastructureHelper } from './infrastructure-helper';
 import { SessionHelper } from './session-helper';
-import { Agent } from '~/agents/agent';
+import type { Agent } from '~/agents/agent';
 
 // Mock modules
-vi.mock('./infrastructure-helper');
-vi.mock('./session-helper');
+vi.mock('./infrastructure-helper', () => ({
+  InfrastructureHelper: vi.fn(),
+}));
+vi.mock('./session-helper', () => ({
+  SessionHelper: vi.fn(),
+}));
 
 describe('HelperFactory', () => {
   let mockAgent: Agent;
 
   beforeEach(() => {
-    mockAgent = {} as Agent;
+    const agentPartial: Partial<Agent> = {};
+    mockAgent = agentPartial as Agent;
     vi.clearAllMocks();
   });
 
