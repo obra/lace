@@ -4,6 +4,10 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createServer } from 'http';
 import type { Server } from 'http';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 
 // Mock the open package
 vi.mock('open', () => ({
@@ -408,11 +412,6 @@ describe('Error Logging', () => {
 });
 
 describe('LACE_DIR initialization', () => {
-  const { spawn } = require('child_process');
-  const fs = require('fs');
-  const path = require('path');
-  const os = require('os');
-
   let originalLaceDir: string | undefined;
 
   beforeEach(() => {

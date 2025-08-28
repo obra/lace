@@ -3,13 +3,13 @@
 
 /* eslint-disable no-console -- Server startup and logging is appropriate for server process */
 
+import './lib/server/data-dir-init';
 import { parseArgs } from 'util';
 import { createRequestHandler } from '@react-router/express';
 import type { ServerBuild } from 'react-router';
 import express from 'express';
 import compression from 'compression';
 import morgan from 'morgan';
-import './lib/server/data-dir-init';
 
 // Parse command line arguments
 const { values } = parseArgs({

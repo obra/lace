@@ -1,9 +1,9 @@
 // ABOUTME: Custom React Router v7 server with enhanced CLI options and port detection
 // ABOUTME: Provides single-process server with Lace-specific startup logic and port selection
 
+import './lib/server/data-dir-init';
 import { parseArgs } from 'util';
 import path from 'node:path';
-import './lib/server/data-dir-init';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -104,7 +104,7 @@ async function startLaceServer() {
     // Handle all routes through React Router with SSR loading
     app.use(async (req, res, next) => {
       try {
-        const source = await viteDevServer.ssrLoadModule('./server/app.ts');
+        const source = await viteDevServer.ssrLoadModule('./server/app');
         return await (
           source as { app: (req: unknown, res: unknown, next: unknown) => Promise<unknown> }
         ).app(req, res, next);
