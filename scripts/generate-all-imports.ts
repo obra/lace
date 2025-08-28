@@ -1,7 +1,7 @@
 // ABOUTME: Generate imports for all JSON and MD files that need embedding  
 // ABOUTME: Creates explicit imports that Bun needs for file embedding
 
-import { readdirSync, writeFileSync, mkdirSync } from 'fs';
+import { readdirSync, statSync, writeFileSync, mkdirSync } from 'fs';
 import { join, relative, resolve } from 'path';
 import { pathToFileURL } from 'url';
 

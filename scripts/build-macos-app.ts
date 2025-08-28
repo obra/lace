@@ -154,7 +154,7 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   const outputPath = join(outdir, name);
 
   // Build command with explicit imports + production server
-  const compileCmd = `bun build --compile --outfile=${outputPath} --target=${target} --sourcemap=none build/temp/embed-all-files.ts`;
+  const compileCmd = `bun build --compile --outfile=${outputPath} --target=${target} --sourcemap=none --asset-naming="[dir]/[name].[ext]" build/temp/embed-all-files.ts`;
 
   console.log(`🔧 Running: ${compileCmd}`);
   console.log('   📦 Imports: build/temp/embed-all-files.ts (dynamic)');
