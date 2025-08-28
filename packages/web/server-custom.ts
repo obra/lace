@@ -103,16 +103,20 @@ async function startLaceServer() {
 
     app.use(viteDevServer.middlewares);
 
-    // Handle all routes through React Router with SSR loading
-    const requestHandler = createRequestHandler({
-      build: () => import('virtual:react-router/server-build'),
-      getLoadContext() {
-        return {
-          // Add any context needed by your routes here
-        };
-      },
+    // Handle all routes using React Router template pattern
+    app.use(async (req, res, next) => {
+      try {
+        const source = await viteDevServer.ssrLoadModule('./server/app.ts');
+        return await (
+          source as { app: (req: unknown, res: unknown, next: unknown) => Promise<unknown> }
+        ).app(req, res, next);
+      } catch (error) {
+        if (typeof error === 'object' && error instanceof Error) {
+          viteDevServer.ssrFixStacktrace(error);
+        }
+        next(error);
+      }
     });
-    app.use(requestHandler);
   } else {
     console.error('Starting production server with static file serving');
     const morgan = await import('morgan');
@@ -127,7 +131,8 @@ async function startLaceServer() {
     // Import and mount React Router app last
     const requestHandler = createRequestHandler({
       build: () =>
-        import(/* @vite-ignore */ './build/server/index.js') as unknown as Promise<ServerBuild>,
+        // @ts-expect-error - Build file will exist in production
+        import('./build/server/index.js') as Promise<ServerBuild>,
       getLoadContext() {
         return {
           // Add any context needed by your routes here
