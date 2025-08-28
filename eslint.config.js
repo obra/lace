@@ -9,7 +9,7 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist/**/*', 'packages/**/*', 'vitest.config.ts', 'knip.config.ts', 'scripts/**/*'],
+    ignores: ['dist/**/*', 'packages/**/*', 'vitest.config.ts', 'knip.config.ts', 'scripts/**/*', 'production-build.test.ts'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map(config => ({
