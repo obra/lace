@@ -188,15 +188,17 @@ export abstract class AIProvider extends EventEmitter {
       return [];
     }
 
-    return this._catalogData.models.map((catalogModel) => ({
-      id: catalogModel.id,
-      displayName: catalogModel.name,
-      description: undefined, // Catalog doesn't have description field
-      contextWindow: catalogModel.context_window,
-      maxOutputTokens: catalogModel.default_max_tokens,
-      capabilities: this.mapCapabilities(catalogModel),
-      isDefault: catalogModel.id === this._catalogData?.default_large_model_id,
-    }));
+    return this._catalogData.models.map((catalogModel) =>
+      this.createModel({
+        id: catalogModel.id,
+        displayName: catalogModel.name,
+        description: undefined, // Catalog doesn't have description field
+        contextWindow: catalogModel.context_window,
+        maxOutputTokens: catalogModel.default_max_tokens,
+        capabilities: this.mapCapabilities(catalogModel),
+        isDefault: catalogModel.id === this._catalogData?.default_large_model_id,
+      })
+    );
   }
 
   // Helper to map catalog model capabilities - providers can override
