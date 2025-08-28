@@ -8,7 +8,6 @@ import {
   ProviderResponse,
   ProviderConfig,
   ProviderInfo,
-  ModelInfo,
 } from '~/providers/base-provider';
 import { ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
@@ -406,80 +405,6 @@ export class AnthropicProvider extends AIProvider {
       requiresApiKey: true,
       configurationHint: 'Set ANTHROPIC_KEY environment variable or pass apiKey in config',
     };
-  }
-
-  getAvailableModels(): ModelInfo[] {
-    return [
-      // Claude 4 Series (Latest - May 2025)
-      {
-        id: 'claude-sonnet-4-20250514',
-        displayName: 'Claude Sonnet 4',
-        description: 'Latest Sonnet model with hybrid reasoning capabilities',
-        contextWindow: 200000,
-        maxOutputTokens: 8192,
-        capabilities: ['vision', 'function-calling', 'reasoning'],
-        isDefault: true,
-      },
-      {
-        id: 'claude-opus-4-20250514',
-        displayName: 'Claude Opus 4',
-        description: "World's best coding model with sustained performance",
-        contextWindow: 200000,
-        maxOutputTokens: 8192,
-        capabilities: ['vision', 'function-calling', 'coding', 'reasoning'],
-      },
-      // Claude 3.7 Series (February 2025)
-      {
-        id: 'claude-3-7-sonnet-20250224',
-        displayName: 'Claude 3.7 Sonnet',
-        description: 'Pioneering hybrid AI reasoning model',
-        contextWindow: 200000,
-        maxOutputTokens: 8192,
-        capabilities: ['vision', 'function-calling', 'reasoning'],
-      },
-      // Claude 3.5 Series (Current Generation)
-      {
-        id: 'claude-3-5-sonnet-20241022',
-        displayName: 'Claude 3.5 Sonnet',
-        description: 'High-performance model with enhanced capabilities',
-        contextWindow: 200000,
-        maxOutputTokens: 8192,
-        capabilities: ['vision', 'function-calling'],
-      },
-      {
-        id: 'claude-3-5-haiku-20241022',
-        displayName: 'Claude 3.5 Haiku',
-        description: 'Fast model matching Claude 3 Opus performance',
-        contextWindow: 200000,
-        maxOutputTokens: 8192,
-        capabilities: ['function-calling'],
-      },
-      // Claude 3 Series (Legacy)
-      {
-        id: 'claude-3-opus-20240229',
-        displayName: 'Claude 3 Opus',
-        description: 'Powerful model for complex analysis',
-        contextWindow: 200000,
-        maxOutputTokens: 4096,
-        capabilities: ['vision', 'function-calling'],
-      },
-      {
-        id: 'claude-3-sonnet-20240229',
-        displayName: 'Claude 3 Sonnet (Legacy)',
-        description: 'Legacy model - use claude-sonnet-4-20250514 instead',
-        contextWindow: 200000,
-        maxOutputTokens: 4096,
-        capabilities: ['vision', 'function-calling'],
-      },
-      {
-        id: 'claude-3-haiku-20240307',
-        displayName: 'Claude 3 Haiku (Legacy)',
-        description: 'Legacy model - use claude-3-5-haiku-20241022 instead',
-        contextWindow: 200000,
-        maxOutputTokens: 4096,
-        capabilities: ['vision', 'function-calling'],
-      },
-    ];
   }
 
   isConfigured(): boolean {

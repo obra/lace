@@ -143,6 +143,7 @@ async function startLaceServer() {
     build: () =>
       // @ts-expect-error - Build file will exist in production
       import('./build/server/index.js') as Promise<ServerBuild>,
+
     getLoadContext() {
       return {};
     },
