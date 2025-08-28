@@ -5,6 +5,12 @@ import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+function runPackageTarget(workspace: string, target: string, description: string) {
+  console.log(`🔨 ${description}...`);
+  execSync(`bun run ${target}`, { cwd: workspace, stdio: 'inherit' });
+  console.log(`✅ ${description} completed\n`);
+}
+
 async function createAppBundle(
   executablePath: string,
   baseName: string,
@@ -132,26 +138,31 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   console.log(`   📝 Name: ${name}`);
   console.log(`   📁 Output: ${outdir}\n`);
 
-  // Step 1: Always rebuild React Router to ensure fresh code
-  console.log('1️⃣ Building fresh React Router...');
-  if (existsSync('packages/web/build')) {
-    execSync('rm -rf packages/web/build packages/web/.react-router', { stdio: 'pipe' });
-  }
-  // First clean any old generated files
-  if (existsSync('build/temp')) {
-    execSync('rm -rf build/temp', { stdio: 'pipe' });
-  }
-  
-  execSync('npm run build --workspace=packages/web', { stdio: 'inherit' });
-  console.log('✅ Fresh React Router build ready\n');
+  // Install dependencies
+  console.log('🔨 Installing dependencies...');
+  execSync('bun install', { stdio: 'inherit' });
+  console.log('✅ Dependencies installed\n');
 
-  // Step 2: Generate all imports for embedding (AFTER React Router build)
-  console.log('2️⃣ Generating file imports...');
+  // Clean previous builds using proper tooling
+  runPackageTarget('packages/core', 'build:clean', 'Cleaning core package');
+  console.log('🔨 Cleaning web and build directories...');
+  execSync('bun run prebuild:standalone:clean', { stdio: 'inherit' });
+  console.log('✅ Web and build directories cleaned\n');
+
+  console.log('🔨 Cleaning macOS platform...');
+  execSync('make clean', { cwd: 'platforms/macos', stdio: 'inherit' });
+  console.log('✅ macOS platform cleaned\n');
+
+  // Build fresh React Router
+  runPackageTarget('packages/web', 'build', 'Building React Router');
+
+  // Generate all imports for embedding (AFTER React Router build)
+  console.log('🔨 Generating file imports...');
   execSync('bun scripts/generate-all-imports.ts', { stdio: 'inherit' });
   console.log('✅ File imports generated\n');
 
-  // Step 3: Compile with Bun asset loading
-  console.log('3️⃣ Compiling with Bun asset loading...');
+  // Compile with Bun asset loading
+  console.log('🔨 Compiling with Bun asset loading...');
   mkdirSync(outdir, { recursive: true });
   const outputPath = join(outdir, name);
 
@@ -166,7 +177,7 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   const env = { ...process.env, NODE_ENV: 'production' };
   execSync(compileCmd, { stdio: 'inherit', env });
 
-  // Step 4: Handle code signing
+  // Handle code signing
   if (sign && process.platform === 'darwin') {
     console.log('🔏 Starting signing and notarization...');
     try {
@@ -190,8 +201,8 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
     console.log('ℹ️  Skipping code signing (non-macOS platform)');
   }
 
-  // Step 5: Check file size and validate
-  console.log('4️⃣ Validating executable...');
+  // Validate executable
+  console.log('🔨 Validating executable...');
   if (!existsSync(outputPath)) {
     throw new Error('Executable was not created');
   }
@@ -199,10 +210,10 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   const execStats = execSync(`wc -c ${outputPath}`, { encoding: 'utf8' });
   const execSize = parseInt(execStats.split(' ')[0]);
 
-  // Step 6: Create app bundle if requested
+  // Create app bundle if requested
   let appBundlePath = '';
   if (bundle && process.platform === 'darwin') {
-    console.log('5️⃣ Creating macOS app bundle...');
+    console.log('🔨 Creating macOS app bundle...');
     appBundlePath = await createAppBundle(outputPath, name, outdir);
     console.log(`✅ App bundle created: ${appBundlePath}`);
   }
