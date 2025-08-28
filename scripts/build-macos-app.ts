@@ -5,11 +5,64 @@ import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+async function createAppBundle(
+  executablePath: string,
+  baseName: string,
+  outdir: string
+): Promise<string> {
+  const appName = 'Lace';
+  const appBundlePath = join(outdir, `${appName}.app`);
+  const contentsPath = join(appBundlePath, 'Contents');
+  const macosPath = join(contentsPath, 'MacOS');
+  const resourcesPath = join(contentsPath, 'Resources');
+
+  // Create app bundle structure
+  mkdirSync(appBundlePath, { recursive: true });
+  mkdirSync(contentsPath, { recursive: true });
+  mkdirSync(macosPath, { recursive: true });
+  mkdirSync(resourcesPath, { recursive: true });
+
+  // Build the Swift menu bar app
+  console.log('📱 Building Swift menu bar app...');
+  execSync('make clean && make build', {
+    cwd: 'platforms/macos',
+    stdio: 'inherit',
+  });
+
+  // Copy the Swift app executable
+  const swiftAppPath = 'platforms/macos/build/Lace.app/Contents/MacOS/Lace';
+  if (!existsSync(swiftAppPath)) {
+    throw new Error(
+      `Swift app not found at ${swiftAppPath}. Make sure Swift compilation succeeded.`
+    );
+  }
+  execSync(`cp "${swiftAppPath}" "${join(macosPath, appName)}"`);
+
+  // Copy the lace server as 'lace-server'
+  execSync(`cp "${executablePath}" "${join(macosPath, 'lace-server')}"`);
+
+  // Copy Info.plist
+  execSync(`cp platforms/macos/Info.plist "${contentsPath}/"`);
+
+  // Copy app icon
+  if (existsSync('platforms/macos/AppIcon.icns')) {
+    execSync(`cp platforms/macos/AppIcon.icns "${resourcesPath}/"`);
+    console.log(`   🎨 App icon copied`);
+  }
+
+  console.log(`   📱 Swift menu bar app: ${appName}`);
+  console.log(`   🖥️  Server binary: lace-server`);
+  console.log(`   📄 Info.plist copied`);
+
+  return resolve(appBundlePath);
+}
+
 interface BuildOptions {
   target?: string;
   name?: string;
   outdir?: string;
   sign?: boolean;
+  bundle?: boolean;
 }
 
 function parseArgs(): BuildOptions {
@@ -30,6 +83,9 @@ function parseArgs(): BuildOptions {
       case '--sign':
         options.sign = true;
         break;
+      case '--bundle':
+        options.bundle = true;
+        break;
       case '--help':
         console.log(`
 Usage: npm run build:clean [options]
@@ -39,12 +95,14 @@ Options:
   --name <name>        Output executable name (default: lace)
   --outdir <outdir>    Output directory (default: build)
   --sign               Sign and notarize the binary (macOS only)
+  --bundle             Create macOS .app bundle (macOS only)
   --help               Show this help
 
 Examples:
   npm run build:clean
   npm run build:clean -- --target bun-linux-x64 --name lace-linux
   npm run build:clean -- --sign
+  npm run build:clean -- --bundle --sign
 
 This creates a fully standalone executable with:
 - All React Router client assets embedded
@@ -65,6 +123,7 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   const name = options.name || 'lace';
   const outdir = options.outdir || 'build';
   const sign = options.sign || false;
+  const bundle = options.bundle || false;
 
   console.log('🔨 Building clean standalone Lace executable...');
   console.log(`   🎯 Target: ${target}`);
@@ -136,13 +195,27 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   const execStats = execSync(`wc -c ${outputPath}`, { encoding: 'utf8' });
   const execSize = parseInt(execStats.split(' ')[0]);
 
+  // Step 6: Create app bundle if requested
+  let appBundlePath = '';
+  if (bundle && process.platform === 'darwin') {
+    console.log('5️⃣ Creating macOS app bundle...');
+    appBundlePath = await createAppBundle(outputPath, name, outdir);
+    console.log(`✅ App bundle created: ${appBundlePath}`);
+  }
+
   console.log('\n📊 Build Summary:');
   console.log(`   💾 Executable: ${(execSize / 1024 / 1024).toFixed(1)}MB`);
   console.log(`   📁 Location: ${resolve(outputPath)}`);
+  if (appBundlePath) {
+    console.log(`   📱 App Bundle: ${resolve(appBundlePath)}`);
+  }
   console.log(`   🗂️  Assets: Embedded (client files + JSON catalogs + MD prompts)`);
   console.log(`   🚀 Mode: Fully standalone - no file extraction, no temp dirs!`);
   console.log('\n🎉 Clean standalone executable ready!');
   console.log(`\nTo run: ./${outputPath}`);
+  if (appBundlePath) {
+    console.log(`App bundle: open ${appBundlePath}`);
+  }
   console.log(`\n✨ This executable can be copied to any compatible system and run`);
   console.log(`   without any dependencies or file extraction.`);
 }
