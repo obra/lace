@@ -97,7 +97,10 @@ async function startLaceServer() {
           res.setHeader('content-type', contentType);
           res.setHeader('cache-control', 'public, max-age=31536000');
           res.send(content);
-        }).catch(() => next());
+        }).catch(err => {
+          console.error('Failed to read embedded asset:', req.path, err);
+          next();
+        });
         return;
       }
     }

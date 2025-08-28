@@ -48,10 +48,8 @@ export class TemplateEngine {
         for (const file of Bun.embeddedFiles) {
           if (file.name.endsWith(targetPath)) {
             logger.debug('Loading template from embedded files', { templatePath, embeddedName: file.name });
-            // For embedded files, try reading with Node's sync fs
-            // The embedded files are accessible as regular file paths in Bun executables
             try {
-              const content = fs.readFileSync(file.name, 'utf-8');
+              const content = await file.text();
               return content;
             } catch (fileError) {
               logger.debug('Failed to read embedded file', { fileName: file.name, error: String(fileError) });
@@ -98,7 +96,7 @@ export class TemplateEngine {
         for (const file of Bun.embeddedFiles) {
           if (file.name.endsWith(targetPath)) {
             try {
-              foundContent = fs.readFileSync(file.name, 'utf-8');
+              foundContent = await file.text();
               break;
             } catch (e) {
               // Continue to next file
