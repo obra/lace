@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { getLaceDir } from '~/config/lace-dir';
 import { CatalogProvider, CatalogProviderSchema, CatalogModel } from '~/providers/catalog/types';
-import { resolveDataDirectory, loadFilesFromDirectory } from '~/utils/resource-resolver';
+import { resolveDataDirectory } from '~/utils/resource-resolver';
 import { logger } from '~/utils/logger';
 
 // Helper function to read and validate provider catalog JSON
@@ -14,49 +14,47 @@ async function readProviderCatalog(filePath: string): Promise<CatalogProvider> {
   return CatalogProviderSchema.parse(JSON.parse(content));
 }
 
-// Load builtin provider catalogs - works with both embedded files and file system
+// Load builtin provider catalogs from embedded files or filesystem
 async function loadBuiltinProviderCatalogs(): Promise<CatalogProvider[]> {
   const catalogs: CatalogProvider[] = [];
-  const catalogDir = resolveDataDirectory(import.meta.url);
 
-  // First try embedded files with hardcoded path
-  const embeddedCatalogFiles = await loadFilesFromDirectory('packages/core/src/providers/catalog/data', '.json');
-  
-  if (embeddedCatalogFiles.length > 0) {
-    for (const { name, content } of embeddedCatalogFiles) {
-      try {
-        const provider = CatalogProviderSchema.parse(JSON.parse(content));
-        catalogs.push(provider);
-        logger.debug('catalog.load.success', { name });
-      } catch (error) {
-        logger.warn('catalog.load.parse_failed', { name, error: String(error) });
+  // Try Bun embedded files first (only if available)
+  if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
+    for (const file of Bun.embeddedFiles) {
+      if (file.name.includes('providers/catalog/data') && file.name.endsWith('.json')) {
+        try {
+          const content = await file.text();
+          const provider = CatalogProviderSchema.parse(JSON.parse(content));
+          catalogs.push(provider);
+        } catch (error) {
+          logger.warn('catalog.load.embedded_failed', { fileName: file.name, error: String(error) });
+        }
       }
     }
     
-    logger.info('catalog.load.complete', { count: catalogs.length, mode: 'embedded' });
-    return catalogs;
-  }
-
-  // Fallback to file system approach using resolved directory
-  const catalogFiles = await loadFilesFromDirectory(catalogDir, '.json');
-
-  for (const { name, content } of catalogFiles) {
-    try {
-      const provider = CatalogProviderSchema.parse(JSON.parse(content));
-      catalogs.push(provider);
-      logger.debug('catalog.load.success', { name });
-    } catch (error) {
-      logger.warn('catalog.load.parse_failed', { name, error: String(error) });
+    if (catalogs.length > 0) {
+      logger.info('catalog.load.complete', { count: catalogs.length, mode: 'embedded' });
+      return catalogs;
     }
   }
 
-  if (catalogFiles.length === 0) {
-    logger.warn('catalog.load.no_files_found', { catalogDir });
-  } else {
-    logger.info('catalog.load.complete', {
-      count: catalogs.length,
-      mode: catalogDir.includes('$bunfs') ? 'embedded' : 'filesystem',
-    });
+  // Original working filesystem approach (Node.js/test/development)
+  const catalogDir = resolveDataDirectory(import.meta.url);
+
+  try {
+    const files = await fs.promises.readdir(catalogDir);
+
+    for (const file of files.filter((f) => f.endsWith('.json'))) {
+      try {
+        const filePath = path.join(catalogDir, file);
+        const provider = await readProviderCatalog(filePath);
+        catalogs.push(provider);
+      } catch (error) {
+        logger.warn('catalog.load.builtin_failed', { file, error: String(error) });
+      }
+    }
+  } catch (error) {
+    logger.warn('catalog.load.read_dir_failed', { dir: catalogDir, error: String(error) });
   }
 
   return catalogs;
