@@ -54,6 +54,28 @@ async function startLaceServer() {
 
   console.log(`🚀 Starting Lace server (production) on ${url}...`);
 
+  // Show embedded files at startup for debugging
+  if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
+    console.log(`\n📦 Embedded files: ${Bun.embeddedFiles.length} total`);
+    
+    const catalogs = Array.from(Bun.embeddedFiles).filter(f => 
+      f.name.includes('providers/catalog/data') && f.name.endsWith('.json')
+    );
+    console.log(`📋 Provider catalogs: ${catalogs.length}`);
+    
+    const prompts = Array.from(Bun.embeddedFiles).filter(f => 
+      f.name.includes('config/prompts') && f.name.endsWith('.md')
+    );
+    console.log(`📄 Prompt templates: ${prompts.length}`);
+    
+    const assets = Array.from(Bun.embeddedFiles).filter(f => 
+      f.name.includes('/build/client/')
+    );
+    console.log(`🎨 Client assets: ${assets.length}`);
+    console.log('');
+  } else {
+    console.log('\n❌ No Bun.embeddedFiles available\n');
+  }
 
   const app = express();
   app.use(compression());
