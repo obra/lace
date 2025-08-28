@@ -7,7 +7,7 @@ import type { SessionInfo, ThreadId } from '@/types/core';
 import { useSessionManagement } from './useSessionManagement';
 
 // Mock fetch globally
-const mockFetch = vi.fn();
+const mockFetch = vi.fn() as unknown as typeof fetch;
 global.fetch = mockFetch;
 
 // Mock parseResponse

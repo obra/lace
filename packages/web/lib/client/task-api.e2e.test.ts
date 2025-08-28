@@ -191,7 +191,7 @@ describe('TaskAPIClient E2E Tests', () => {
           // API route error - rethrow for test handling
           throw error;
         }
-      });
+      }) as unknown as typeof fetch;
 
     client = new TaskAPIClient();
   });

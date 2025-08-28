@@ -26,7 +26,7 @@ Object.defineProperty(window, 'localStorage', {
 
 // Mock fetch API to prevent actual network calls
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+global.fetch = mockFetch as unknown as typeof fetch;
 
 describe('SettingsContainer', () => {
   // Helper function to render with proper async handling

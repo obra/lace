@@ -45,7 +45,7 @@ const mockUseAgentManagement = vi.mocked(useAgentManagement);
 
 describe('EventStreamProvider', () => {
   // Mock fetch globally
-  const mockFetch = vi.fn();
+  const mockFetch = vi.fn() as unknown as typeof fetch;
   global.fetch = mockFetch;
 
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -90,7 +90,7 @@ describe('EventStreamProvider', () => {
         clone: function () {
           return this;
         },
-      } as Response);
+      } as Response) 
     });
 
     // Set up default mock return values

@@ -5,7 +5,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import mustache from 'mustache';
 import { logger } from '~/utils/logger';
-import '../types/bun-augmentation';
 
 export interface TemplateContext {
   [key: string]: unknown;
@@ -47,10 +46,10 @@ export class TemplateEngine {
         const targetPath = `packages/core/src/config/prompts/${templatePath}`;
 
         for (const file of Bun.embeddedFiles) {
-          if (file.name.endsWith(targetPath)) {
+          if ((file as File).name.endsWith(targetPath)) {
             logger.debug('Loading template from embedded files', {
               templatePath,
-              embeddedName: file.name,
+              embeddedName: (file as File).name,
             });
             try {
               // For embedded files, use a sync approach by blocking on the Promise
@@ -81,7 +80,7 @@ export class TemplateEngine {
               return content;
             } catch (fileError) {
               logger.debug('Failed to read embedded file', {
-                fileName: file.name,
+                fileName: (file as File).name,
                 error: String(fileError),
               });
               // Continue to try other files
@@ -128,7 +127,7 @@ export class TemplateEngine {
         const targetPath = `packages/core/src/config/prompts/${includePath}`;
 
         for (const file of Bun.embeddedFiles) {
-          if (file.name.endsWith(targetPath)) {
+          if ((file as File).name.endsWith(targetPath)) {
             try {
               // Use the same sync-over-async approach for consistency
               let content = '';

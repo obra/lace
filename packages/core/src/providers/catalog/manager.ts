@@ -7,7 +7,7 @@ import { getLaceDir } from '~/config/lace-dir';
 import { CatalogProvider, CatalogProviderSchema, CatalogModel } from '~/providers/catalog/types';
 import { resolveDataDirectory } from '~/utils/resource-resolver';
 import { logger } from '~/utils/logger';
-import '../types/bun-augmentation';
+
 // Helper function to read and validate provider catalog JSON
 async function readProviderCatalog(filePath: string): Promise<CatalogProvider> {
   const content = await fs.promises.readFile(filePath, 'utf-8');
@@ -19,18 +19,19 @@ async function loadBuiltinProviderCatalogs(): Promise<CatalogProvider[]> {
   const catalogs: CatalogProvider[] = [];
 
   // Try Bun embedded files first (only if available)
-  // @ts-ignore - Bun global only exists in Bun runtime, not Node.js
   if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
-    // @ts-ignore - Bun.embeddedFiles is typed in Bun runtime
     for (const file of Bun.embeddedFiles) {
-      if (file.name.includes('providers/catalog/data') && file.name.endsWith('.json')) {
+      if (
+        (file as File).name.includes('providers/catalog/data') &&
+        (file as File).name.endsWith('.json')
+      ) {
         try {
           const content = await file.text();
           const provider = CatalogProviderSchema.parse(JSON.parse(content));
           catalogs.push(provider);
         } catch (error) {
           logger.warn('catalog.load.embedded_failed', {
-            fileName: file.name,
+            fileName: (file as File).name,
             error: String(error),
           });
         }

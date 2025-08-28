@@ -5,7 +5,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { TemplateEngine } from '~/config/template-engine';
 import { resolveResourcePath } from '~/utils/resource-resolver';
-import '../types/bun-augmentation';
 import {
   VariableProviderManager,
   SystemVariableProvider,
@@ -116,7 +115,7 @@ export class PromptManager {
       // Check embedded first (Bun executable)
       if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
         for (const f of Bun.embeddedFiles) {
-          if (f.name.endsWith('/prompts/system.md')) return true;
+          if ((f as File).name.endsWith('/prompts/system.md')) return true;
         }
       }
       // Fallback: check file system (dev)

@@ -59,17 +59,17 @@ async function startLaceServer() {
     console.log(`\n📦 Embedded files: ${Bun.embeddedFiles.length} total`);
     
     const catalogs = Array.from(Bun.embeddedFiles).filter(f => 
-      f.name.includes('providers/catalog/data') && f.name.endsWith('.json')
+      (f as File).name.includes('providers/catalog/data') && (f as File).name.endsWith('.json')
     );
     console.log(`📋 Provider catalogs: ${catalogs.length}`);
     
     const prompts = Array.from(Bun.embeddedFiles).filter(f => 
-      f.name.includes('config/prompts') && f.name.endsWith('.md')
+      (f as File).name.includes('config/prompts') && (f as File).name.endsWith('.md')
     );
     console.log(`📄 Prompt templates: ${prompts.length}`);
     
     const assets = Array.from(Bun.embeddedFiles).filter(f => 
-      f.name.includes('/build/client/')
+      (f as File).name.includes('/build/client/')
     );
     console.log(`🎨 Client assets: ${assets.length}`);
     console.log('');
@@ -88,10 +88,10 @@ async function startLaceServer() {
     if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
       // Look for client assets by matching the request path to embedded file paths
       const assetFile = Array.from(Bun.embeddedFiles).find(f => {
-        if (!f.name.includes('/build/client')) return false;
+        if (!(f as File).name.includes('/build/client')) return false;
         
-        // Extract the path after /build/client from the embedded file name
-        const clientPath = f.name.split('/build/client')[1];
+        // Extract the path after /build/client from the embedded (file as File).name
+        const clientPath = (f as File).name.split('/build/client')[1];
         return clientPath === req.path;
       });
       
@@ -132,7 +132,7 @@ async function startLaceServer() {
 
   // React Router request handler
   const requestHandler = createRequestHandler({
-    build: () => serverBuild,
+    build: async () => serverBuild,
     getLoadContext() {
       return {};
     },

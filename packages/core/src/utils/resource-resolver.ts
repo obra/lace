@@ -3,7 +3,6 @@
 
 import path from 'path';
 import { fileURLToPath } from 'url';
-import '../types/bun-augmentation';
 
 /**
  * Resolves paths to bundled resources (data files, templates, etc.) that work in both
@@ -121,7 +120,7 @@ export async function tryReadEmbeddedFile(
   try {
     if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
       for (const file of Bun.embeddedFiles) {
-        if (file.name === filename) {
+        if ((file as File).name === filename) {
           return await file.text();
         }
       }
@@ -158,7 +157,7 @@ export function getEmbeddedFiles(pattern: string): string[] {
           '$'
       );
       return Array.from(Bun.embeddedFiles)
-        .map((file) => file.name)
+        .map((file) => (file as File).name)
         .filter((name) => regex.test(name));
     }
   } catch {
@@ -189,11 +188,13 @@ export async function loadFilesFromDirectory(
 
       // Log all embedded files for debugging
       Array.from(Bun.embeddedFiles).forEach((file, i) => {
-        logger.debug('resource.load.embedded_file', { index: i, name: file.name });
+        logger.debug('resource.load.embedded_file', { index: i, name: (file as File).name });
       });
 
       const embeddedFiles = Array.from(Bun.embeddedFiles).filter(
-        (file) => file.name.includes(`../${dirPath}`) && file.name.endsWith(fileExtension)
+        (file) =>
+          (file as File).name.includes(`../${dirPath}`) &&
+          (file as File).name.endsWith(fileExtension)
       );
 
       logger.debug('resource.load.filtered_embedded', {
@@ -202,15 +203,15 @@ export async function loadFilesFromDirectory(
         matchingCount: embeddedFiles.length,
       });
       embeddedFiles.forEach((file) =>
-        logger.debug('resource.load.embedded_match', { name: file.name })
+        logger.debug('resource.load.embedded_match', { name: (file as File).name })
       );
 
       if (embeddedFiles.length > 0) {
         for (const file of embeddedFiles) {
           const content = await file.text();
-          const name = path.basename(file.name, fileExtension);
+          const name = path.basename((file as File).name, fileExtension);
           files.push({ name, content });
-          logger.debug('resource.load.embedded_loaded', { filePath: file.name, name });
+          logger.debug('resource.load.embedded_loaded', { filePath: (file as File).name, name });
         }
         return files;
       }
@@ -254,8 +255,11 @@ export async function loadFileFromEmbeddedOrFilesystem(filePath: string): Promis
       const normalizedPath = filePath.replace(/^\.\.?\//, '');
 
       for (const file of Bun.embeddedFiles) {
-        if (file.name.endsWith(normalizedPath)) {
-          logger.debug('resource.load.embedded_file_found', { filePath, embeddedName: file.name });
+        if ((file as File).name.endsWith(normalizedPath)) {
+          logger.debug('resource.load.embedded_file_found', {
+            filePath,
+            embeddedName: (file as File).name,
+          });
           return await file.text();
         }
       }

@@ -8,7 +8,7 @@ import { useProjectManagement } from './useProjectManagement';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+global.fetch = mockFetch as unknown as typeof fetch;
 
 // Mock parseResponse to return parsed data directly
 vi.mock('@/lib/serialization', () => ({
