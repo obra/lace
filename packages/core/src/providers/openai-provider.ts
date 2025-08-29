@@ -38,6 +38,7 @@ export class OpenAIProvider extends AIProvider {
   private _openai: OpenAI | null = null;
   private _encoderCache = new Map<string, Tiktoken>();
   private _tiktokenModule: typeof import('tiktoken') | null = null;
+  private _tiktokenAvailable: boolean | undefined = undefined;
 
   constructor(config: OpenAIProviderConfig) {
     super(config);
@@ -99,17 +100,22 @@ export class OpenAIProvider extends AIProvider {
 
     // Check if we have embedded WASM available
     let wasmBuffer: Buffer | null = null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access -- Bun.embeddedFiles not in types
-    if (typeof Bun !== 'undefined' && (Bun as any).embeddedFiles) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access -- Bun.embeddedFiles not in types
-      const embeddedFiles = (Bun as any).embeddedFiles as Array<{
-        name: string;
-        arrayBuffer(): ArrayBuffer;
-      }>;
-      const wasmFile = embeddedFiles.find((file) => file.name === 'tiktoken_bg.wasm');
-      if (wasmFile) {
-        // This is sync in the compiled context since embeddedFiles are pre-extracted
-        wasmBuffer = Buffer.from(wasmFile.arrayBuffer());
+    if (typeof globalThis.Bun !== 'undefined') {
+      const bunGlobal = globalThis.Bun as unknown;
+      if (
+        bunGlobal &&
+        typeof bunGlobal === 'object' &&
+        'embeddedFiles' in bunGlobal &&
+        Array.isArray((bunGlobal as { embeddedFiles: unknown }).embeddedFiles)
+      ) {
+        const embeddedFiles = (
+          bunGlobal as { embeddedFiles: Array<{ name: string; arrayBuffer(): ArrayBuffer }> }
+        ).embeddedFiles;
+        const wasmFile = embeddedFiles.find((file) => file.name === 'tiktoken_bg.wasm');
+        if (wasmFile) {
+          // This is sync in the compiled context since embeddedFiles are pre-extracted
+          wasmBuffer = Buffer.from(wasmFile.arrayBuffer());
+        }
       }
     }
 
@@ -159,12 +165,21 @@ export class OpenAIProvider extends AIProvider {
       if (this._encoderCache.has(model)) {
         encoding = this._encoderCache.get(model)!;
       } else {
+        // Check if tiktoken is available (cached result)
+        if (this._tiktokenAvailable === false) {
+          // Previously failed to load, don't retry
+          return 0;
+        }
+
         // Load tiktoken with embedded WASM support for bun compile
         let tiktoken: typeof import('tiktoken');
         try {
           tiktoken = this._loadTiktokenWithEmbeddedWasm();
+          // Mark as available on successful load
+          this._tiktokenAvailable = true;
         } catch (importError) {
           // WASM loading failed - tiktoken unavailable
+          this._tiktokenAvailable = false;
           logger.debug('Tiktoken WASM failed to load, token counting disabled', {
             error: importError,
           });
