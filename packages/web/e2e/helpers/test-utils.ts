@@ -1,5 +1,5 @@
 // ABOUTME: Reusable E2E test utilities for common operations
-// ABOUTME: Centralizes UI interactions and per-test server management
+// ABOUTME: Centralizes UI interactions, per-test server management, and timeout constants
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -215,6 +215,34 @@ export async function cleanupTestEnvironment(env: TestEnvironment) {
   ) {
     await fs.promises.rm(env.tempDir, { recursive: true, force: true });
   }
+}
+
+/**
+ * Standard timeout constants for E2E tests
+ * Use these instead of hardcoded values for consistency
+ */
+export const TIMEOUTS = {
+  QUICK: 5000, // Element visibility, form interactions
+  STANDARD: 10000, // AI responses, navigation
+  EXTENDED: 15000, // Complex operations, streaming
+} as const;
+
+/**
+ * Simple wrapper that eliminates boilerplate setup/teardown
+ * Use this instead of manual beforeEach/afterEach in every test file
+ */
+export function withTestEnvironment(
+  testFn: (testEnv: TestEnvironment, page: any) => Promise<void>
+) {
+  return async ({ page }: { page: any }) => {
+    const testEnv = await setupTestEnvironment();
+    try {
+      await page.goto(testEnv.serverUrl);
+      await testFn(testEnv, page);
+    } finally {
+      await cleanupTestEnvironment(testEnv);
+    }
+  };
 }
 
 // Project management utilities are now in ui-interactions.ts
