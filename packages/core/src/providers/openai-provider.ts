@@ -3,6 +3,18 @@
 
 import OpenAI, { ClientOptions } from 'openai';
 
+// Import tiktoken WASM for embedding in bun compile (skip in test environment)
+if (process.env.NODE_ENV !== 'test') {
+  // Use require with try-catch to avoid breaking test environments that don't support import attributes
+  try {
+    // This will only work in bun compile, but that's fine
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Required for WASM embedding in bun compile
+    require('tiktoken/tiktoken_bg.wasm');
+  } catch {
+    // Ignore - this is expected in non-bun environments
+  }
+}
+
 // Dynamic tiktoken import to handle WASM loading failures gracefully
 type Tiktoken = import('tiktoken').Tiktoken;
 import { AIProvider } from '~/providers/base-provider';
@@ -25,6 +37,7 @@ interface OpenAIProviderConfig extends ProviderConfig {
 export class OpenAIProvider extends AIProvider {
   private _openai: OpenAI | null = null;
   private _encoderCache = new Map<string, Tiktoken>();
+  private _tiktokenModule: typeof import('tiktoken') | null = null;
 
   constructor(config: OpenAIProviderConfig) {
     super(config);
@@ -74,6 +87,65 @@ export class OpenAIProvider extends AIProvider {
     return true;
   }
 
+  /**
+   * Loads tiktoken with embedded WASM support for bun compile
+   * Uses scoped fs patching - only active during import, then fully restored
+   */
+  private _loadTiktokenWithEmbeddedWasm(): typeof import('tiktoken') {
+    // Return cached module if already loaded
+    if (this._tiktokenModule) {
+      return this._tiktokenModule;
+    }
+
+    // Check if we have embedded WASM available
+    let wasmBuffer: Buffer | null = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access -- Bun.embeddedFiles not in types
+    if (typeof Bun !== 'undefined' && (Bun as any).embeddedFiles) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access -- Bun.embeddedFiles not in types
+      const embeddedFiles = (Bun as any).embeddedFiles as Array<{
+        name: string;
+        arrayBuffer(): ArrayBuffer;
+      }>;
+      const wasmFile = embeddedFiles.find((file) => file.name === 'tiktoken_bg.wasm');
+      if (wasmFile) {
+        // This is sync in the compiled context since embeddedFiles are pre-extracted
+        wasmBuffer = Buffer.from(wasmFile.arrayBuffer());
+      }
+    }
+
+    // If no embedded WASM, fall back to regular import
+    if (!wasmBuffer) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- Fallback for non-embedded environments
+      this._tiktokenModule = require('tiktoken') as typeof import('tiktoken');
+      return this._tiktokenModule;
+    }
+
+    // Use scoped fs patching for embedded WASM
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Required for fs patching
+    const fs = require('fs') as typeof import('fs');
+    const originalReadFileSync = fs.readFileSync;
+
+    // Patch fs only during tiktoken import
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Required for fs patching with dynamic types
+    const patchedReadFileSync = function (this: any, path: any, options?: any) {
+      if (typeof path === 'string' && path.includes('tiktoken_bg.wasm')) {
+        return wasmBuffer;
+      }
+      return originalReadFileSync.call(this, path, options);
+    };
+    fs.readFileSync = patchedReadFileSync as typeof fs.readFileSync;
+
+    try {
+      // Import tiktoken while patch is active
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- Required for scoped patching
+      this._tiktokenModule = require('tiktoken') as typeof import('tiktoken');
+      return this._tiktokenModule;
+    } finally {
+      // Always restore original fs.readFileSync
+      fs.readFileSync = originalReadFileSync;
+    }
+  }
+
   // Provider-specific token counting using tiktoken for OpenAI-compatible models
   // Returns 0 when tiktoken WASM fails to load, allowing graceful degradation
   countTokens(messages: ProviderMessage[], tools: Tool[] = [], model?: string): number | null {
@@ -87,11 +159,10 @@ export class OpenAIProvider extends AIProvider {
       if (this._encoderCache.has(model)) {
         encoding = this._encoderCache.get(model)!;
       } else {
-        // Synchronous require() in try-catch to handle WASM loading gracefully
+        // Load tiktoken with embedded WASM support for bun compile
         let tiktoken: typeof import('tiktoken');
         try {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports -- Dynamic loading for WASM graceful degradation
-          tiktoken = require('tiktoken') as typeof import('tiktoken');
+          tiktoken = this._loadTiktokenWithEmbeddedWasm();
         } catch (importError) {
           // WASM loading failed - tiktoken unavailable
           logger.debug('Tiktoken WASM failed to load, token counting disabled', {
