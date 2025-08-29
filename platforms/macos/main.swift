@@ -11,6 +11,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var serverPort: Int?
     private var menu: NSMenu!
     private var shouldAutoOpen = true
+    private let legacyLoginItemHelperBundleID: String? = nil // No helper bundle shipped
     
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         setupMenuBar()
@@ -65,9 +66,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        // Launch at startup item
-        let launchAtStartupItem = NSMenuItem(title: "Launch at Startup", action: #selector(toggleLaunchAtStartup), keyEquivalent: "")
+        // Open at login item
+        let launchAtStartupItem = NSMenuItem(title: "Open at Login", action: #selector(toggleLaunchAtStartup), keyEquivalent: "")
         launchAtStartupItem.state = isLaunchAtStartupEnabled() ? .on : .off
+        if #unavailable(macOS 13.0) && legacyLoginItemHelperBundleID == nil {
+            launchAtStartupItem.isEnabled = false
+            launchAtStartupItem.toolTip = "Requires macOS 13+ or an embedded login item helper"
+        }
         menu.addItem(launchAtStartupItem)
         
         menu.addItem(NSMenuItem.separator())
@@ -151,11 +156,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                             DispatchQueue.main.async { [weak self] in
                                 self?.serverPort = port
                                 self?.updateMenu()
-                                // Auto-open browser when port is detected for the first time
-                                if self?.shouldAutoOpen == true {
-                                    self?.shouldAutoOpen = false
-                                    self?.openBrowser()
-                                }
+                                self?.maybeAutoOpenOnce()
                             }
                             return
                         }
@@ -176,11 +177,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                             DispatchQueue.main.async { [weak self] in
                                 self?.serverPort = port
                                 self?.updateMenu()
-                                // Auto-open browser when port is detected for the first time
-                                if self?.shouldAutoOpen == true {
-                                    self?.shouldAutoOpen = false
-                                    self?.openBrowser()
-                                }
+                                self?.maybeAutoOpenOnce()
                             }
                             return
                         }
@@ -237,6 +234,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    private func maybeAutoOpenOnce() {
+        guard shouldAutoOpen, serverPort != nil else { return }
+        shouldAutoOpen = false
+        openBrowser()
+    }
+    
     @objc private func toggleLaunchAtStartup() {
         if isLaunchAtStartupEnabled() {
             disableLaunchAtStartup()
@@ -247,18 +250,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func isLaunchAtStartupEnabled() -> Bool {
-        let bundleIdentifier = Bundle.main.bundleIdentifier!
         if #available(macOS 13.0, *) {
-            do {
-                let service = SMAppService.mainApp
-                return service.status == .enabled
-            } catch {
-                print("Error checking launch at startup status: \(error)")
-                return false
-            }
+            let service = SMAppService.mainApp
+            return service.status == .enabled
         } else {
-            // Fallback for older macOS versions using deprecated API
-            return SMLoginItemSetEnabled(bundleIdentifier as CFString, false)
+            // No legacy support without helper bundle
+            return false
         }
     }
     
@@ -267,17 +264,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 let service = SMAppService.mainApp
                 try service.register()
-                print("Successfully enabled launch at startup")
+                print("Successfully enabled open at login")
             } catch {
-                showError("Failed to enable launch at startup: \(error.localizedDescription)")
+                showError("Failed to enable open at login: \(error.localizedDescription)")
             }
         } else {
-            // Fallback for older macOS versions using deprecated API
-            let bundleIdentifier = Bundle.main.bundleIdentifier!
-            let success = SMLoginItemSetEnabled(bundleIdentifier as CFString, true)
-            if !success {
-                showError("Failed to enable launch at startup")
-            }
+            // No legacy support without helper bundle
+            showError("Open at login requires macOS 13.0 or later")
         }
     }
     
@@ -286,17 +279,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 let service = SMAppService.mainApp
                 try service.unregister()
-                print("Successfully disabled launch at startup")
+                print("Successfully disabled open at login")
             } catch {
-                showError("Failed to disable launch at startup: \(error.localizedDescription)")
+                showError("Failed to disable open at login: \(error.localizedDescription)")
             }
         } else {
-            // Fallback for older macOS versions using deprecated API
-            let bundleIdentifier = Bundle.main.bundleIdentifier!
-            let success = SMLoginItemSetEnabled(bundleIdentifier as CFString, false)
-            if !success {
-                showError("Failed to disable launch at startup")
-            }
+            // No legacy support without helper bundle
+            showError("Open at login requires macOS 13.0 or later")
         }
     }
 }
