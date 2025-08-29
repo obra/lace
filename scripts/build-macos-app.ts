@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { createDMG, getVersionInfo, updateAppVersion } from './create-dmg.js';
 import { writeFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 
 function runPackageTarget(workspace: string, target: string, description: string) {
   console.log(`🔨 ${description}...`);
@@ -85,13 +86,12 @@ async function generateAppcast(options: {
   execSync(`cp "${dmgPath}" "${appcastDmgPath}"`);
 
   // Run generate_appcast from Sparkle tools
-  const sparkleToolsPath = 'platforms/macos/bin/generate_appcast';
+  const sparkleToolsPath = resolve('platforms/macos/bin/generate_appcast');
   if (existsSync(sparkleToolsPath)) {
     console.log('🔧 Using Sparkle generate_appcast tool...');
     try {
-      execSync(`"${sparkleToolsPath}" "${appcastDir}"`, {
+      execFileSync(sparkleToolsPath, [resolve(appcastDir)], {
         stdio: 'inherit',
-        cwd: 'platforms/macos',
       });
       console.log(`✅ Appcast generated at ${appcastDir}/appcast.xml`);
     } catch (error) {

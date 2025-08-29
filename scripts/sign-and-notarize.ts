@@ -205,12 +205,22 @@ async function signAndNotarize(options: SigningOptions) {
       if (existsSync(sparkleFrameworkPath)) {
         console.log('   ⚡ Signing Sparkle framework components...');
 
-        // Sign XPC Services
-        const xpcServicesPath = `${sparkleFrameworkPath}/XPCServices`;
+        // Sign XPC Services (correct path: Versions/Current/XPCServices)
+        const xpcServicesPath = `${sparkleFrameworkPath}/Versions/Current/XPCServices`;
         if (existsSync(xpcServicesPath)) {
           console.log('   🔧 Signing Sparkle XPC services...');
           execSync(
             `find "${xpcServicesPath}" -name "*.xpc" -exec codesign --force --options runtime --sign "${signingIdentity}" {} \;`,
+            { stdio: 'inherit' }
+          );
+        }
+
+        // Sign Updater.app (critical for updates)
+        const updaterAppPath = `${sparkleFrameworkPath}/Versions/Current/Updater.app`;
+        if (existsSync(updaterAppPath)) {
+          console.log('   🔄 Signing Sparkle Updater.app...');
+          execSync(
+            `codesign --force --options runtime --sign "${signingIdentity}" "${updaterAppPath}" --verbose`,
             { stdio: 'inherit' }
           );
         }

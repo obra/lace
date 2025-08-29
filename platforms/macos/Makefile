@@ -45,9 +45,9 @@ $(APP_BUNDLE): main.swift Info.plist AppIcon.icns setup-sparkle
 	@mkdir -p $(RESOURCES_DIR)
 	@mkdir -p $(FRAMEWORKS_DIR)
 	
-	# Copy Sparkle framework
+	# Copy Sparkle framework (preserving symlinks and xattrs)
 	@echo "Embedding Sparkle framework..."
-	cp -R $(SPARKLE_FRAMEWORK) $(FRAMEWORKS_DIR)/
+	ditto "$(SPARKLE_FRAMEWORK)" "$(FRAMEWORKS_DIR)/Sparkle.framework"
 	
 	# Compile Swift app with Sparkle
 	@echo "Compiling Swift app with Sparkle support..."
