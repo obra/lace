@@ -1,7 +1,7 @@
 // ABOUTME: Generate imports for all JSON and MD files that need embedding
 // ABOUTME: Creates explicit imports that Bun needs for file embedding
 
-import { readdirSync, statSync, writeFileSync, mkdirSync } from 'fs';
+import { readdirSync, statSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join, relative, resolve } from 'path';
 import { pathToFileURL } from 'url';
 
@@ -19,7 +19,19 @@ function scanForFiles(dirPath: string, extension: string, prefix: string): Embed
   let counter = 0;
 
   function scanDirectory(dir: string) {
-    const entries = readdirSync(dir);
+    if (!existsSync(dir)) {
+      return;
+    }
+
+    let entries: string[];
+    try {
+      entries = readdirSync(dir);
+    } catch (err: unknown) {
+      if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
+        return;
+      }
+      throw err;
+    }
 
     for (const entry of entries) {
       const fullPath = join(dir, entry);
@@ -56,8 +68,12 @@ function generateAllImports() {
   console.log(`📄 Found ${mdFiles.length} prompt files`);
 
   // Scan for client assets
-  const clientAssets = scanForFiles('packages/web/build/client', '', 'asset');
-  console.log(`🎨 Found ${clientAssets.length} client asset files`);
+  const clientAssetsRaw = scanForFiles('packages/web/build/client', '', 'asset');
+  // Exclude .map files to reduce binary size
+  const clientAssets = clientAssetsRaw.filter((file) => !file.originalPath.endsWith('.map'));
+  console.log(
+    `🎨 Found ${clientAssets.length} client asset files (${clientAssetsRaw.length - clientAssets.length} .map files excluded)`
+  );
 
   const allFiles = [...jsonFiles, ...mdFiles, ...clientAssets];
 
