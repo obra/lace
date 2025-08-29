@@ -151,7 +151,7 @@ export function useSessionEditModal({
   );
 
   const updateProviderInstanceId = useCallback((instanceId: string) => {
-    setSessionConfig((prev) => ({ ...prev, providerInstanceId: instanceId }));
+    setSessionConfig((prev) => ({ ...prev, providerInstanceId: instanceId, modelId: '' }));
   }, []);
 
   const updateModelId = useCallback((modelId: string) => {
