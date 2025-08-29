@@ -20,12 +20,9 @@ import { useUIContext } from '@/components/providers/UIProvider';
 import { asThreadId } from '@/types/core';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
-import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useToolApprovalContext } from '@/components/providers/ToolApprovalProvider';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import { useURLState } from '@/hooks/useURLState';
-
-import type { SessionConfiguration } from '@/types/api';
 
 interface AgentPageContentProps {
   projectId: string;
@@ -47,8 +44,6 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
     updateAgent,
     reloadSessionDetails,
   } = useAgentContext();
-  const { loadSessionConfiguration, updateSessionConfiguration, updateSession } =
-    useSessionContext();
   const { pendingApprovals, handleApprovalDecision } = useToolApprovalContext();
   const { availableProviders: providers } = useProviderInstances();
 
@@ -62,17 +57,6 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   } | null>(null);
 
   const [showSessionEditModal, setShowSessionEditModal] = useState(false);
-  const [sessionConfig, setSessionConfig] = useState<SessionConfiguration>({
-    providerInstanceId: undefined,
-    modelId: undefined,
-    maxTokens: 4096,
-    tools: [],
-    toolPolicies: {},
-    workingDirectory: undefined,
-    environmentVariables: {},
-  });
-  const [sessionName, setSessionName] = useState('');
-  const [sessionDescription, setSessionDescription] = useState('');
 
   // Event handlers
   const handleAgentSelect = useCallback(
@@ -125,56 +109,9 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
     [editingAgent, updateAgent]
   );
 
-  const handleConfigureSession = useCallback(async () => {
-    if (selectedSessionDetails) {
-      setSessionName(selectedSessionDetails.name);
-      setSessionDescription(selectedSessionDetails.description || '');
-
-      try {
-        const config = await loadSessionConfiguration(selectedSessionDetails.id);
-        setSessionConfig(config as SessionConfiguration);
-        setShowSessionEditModal(true);
-      } catch (error) {
-        console.error('Failed to load session configuration:', error);
-      }
-    }
-  }, [selectedSessionDetails, loadSessionConfiguration]);
-
-  const handleSessionEditSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!selectedSessionDetails || !sessionName.trim()) return;
-
-      try {
-        await updateSessionConfiguration(selectedSessionDetails.id, sessionConfig);
-
-        const nameChanged = sessionName.trim() !== selectedSessionDetails.name;
-        const descChanged =
-          (sessionDescription.trim() || undefined) !== selectedSessionDetails.description;
-
-        if (nameChanged || descChanged) {
-          await updateSession(selectedSessionDetails.id, {
-            name: sessionName.trim(),
-            description: sessionDescription.trim() || undefined,
-          });
-        }
-
-        setShowSessionEditModal(false);
-        await reloadSessionDetails();
-      } catch (error) {
-        console.error('Failed to update session:', error);
-      }
-    },
-    [
-      selectedSessionDetails,
-      sessionName,
-      sessionDescription,
-      sessionConfig,
-      updateSessionConfiguration,
-      updateSession,
-      reloadSessionDetails,
-    ]
-  );
+  const handleConfigureSession = useCallback(() => {
+    setShowSessionEditModal(true);
+  }, []);
 
   // Get current agent info for display
   const currentAgent = selectedSessionDetails?.agents?.find((a) => a.threadId === agentId);
@@ -263,16 +200,8 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
           isOpen={showSessionEditModal}
           currentProject={currentProject}
           selectedSession={selectedSessionDetails}
-          providers={providers}
-          sessionConfig={sessionConfig}
-          sessionName={sessionName}
-          sessionDescription={sessionDescription}
-          loading={false}
           onClose={() => setShowSessionEditModal(false)}
-          onSubmit={handleSessionEditSubmit}
-          onSessionNameChange={setSessionName}
-          onSessionDescriptionChange={setSessionDescription}
-          onSessionConfigChange={setSessionConfig}
+          onSuccess={reloadSessionDetails}
         />
       )}
     </motion.div>

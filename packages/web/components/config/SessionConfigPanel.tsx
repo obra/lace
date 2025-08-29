@@ -86,11 +86,6 @@ export function SessionConfigPanel(): React.JSX.Element {
   const [selectedInstanceId, setSelectedInstanceId] = useState('');
   const [selectedModelId, setSelectedModelId] = useState('');
 
-  // Session edit state
-  const [editSessionName, setEditSessionName] = useState('');
-  const [editSessionDescription, setEditSessionDescription] = useState('');
-  const [editSessionConfig, setEditSessionConfig] = useState<SessionConfiguration>(DEFAULT_CONFIG);
-
   // Reset form when project or project configuration changes
   const projectId = currentProject.id;
   useEffect(() => {
@@ -101,8 +96,7 @@ export function SessionConfigPanel(): React.JSX.Element {
     setEditingAgent(null);
     resetSessionForm();
     resetAgentForm();
-    resetEditSessionForm();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Reason: only reset when projectId/projectConfig change to avoid unwanted resets on handler identity changes
   }, [projectId, projectConfig]);
 
   const resetSessionForm = useCallback(() => {
@@ -140,12 +134,6 @@ export function SessionConfigPanel(): React.JSX.Element {
     setNewAgentName('');
     setSelectedInstanceId('');
     setSelectedModelId('');
-  };
-
-  const resetEditSessionForm = () => {
-    setEditSessionName('');
-    setEditSessionDescription('');
-    setEditSessionConfig(DEFAULT_CONFIG);
   };
 
   const handleProviderInstanceSelection = (instanceId: string, modelId: string) => {
@@ -201,77 +189,7 @@ export function SessionConfigPanel(): React.JSX.Element {
 
   // Handle session edit
   const handleEditSessionClick = async (sessionId?: string) => {
-    // Use provided sessionId or fall back to selectedSession
-    const targetSessionId = sessionId || selectedSession?.id;
-    if (!targetSessionId) return;
-
-    // Find the session to edit
-    const sessionToEdit = sessions.find((s) => s.id === targetSessionId) || selectedSession;
-    if (!sessionToEdit) return;
-
-    try {
-      // Load session configuration from provider
-      const configuration = await loadSessionConfiguration(targetSessionId);
-
-      setEditSessionName(sessionToEdit.name);
-      setEditSessionDescription(''); // Session descriptions not currently stored
-
-      // Merge with defaults and ensure provider instance is set
-      const config = {
-        ...DEFAULT_CONFIG,
-        ...configuration,
-      };
-
-      // If no provider instance configured, use first available
-      if (!config.providerInstanceId && availableProviders.length > 0) {
-        config.providerInstanceId = availableProviders[0].instanceId;
-        config.modelId = availableProviders[0].models[0]?.id || '';
-      }
-
-      setEditSessionConfig(config);
-      setShowEditConfig(true);
-    } catch (error) {
-      console.error('Error loading session configuration:', error);
-      // Fallback to default configuration with first available provider
-      const config = { ...DEFAULT_CONFIG };
-      if (availableProviders.length > 0) {
-        config.providerInstanceId = availableProviders[0].instanceId;
-        config.modelId = availableProviders[0].models[0]?.id || '';
-      }
-      setEditSessionName(sessionToEdit.name);
-      setEditSessionDescription('');
-      setEditSessionConfig(config);
-      setShowEditConfig(true);
-    }
-  };
-
-  const handleEditSessionSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedSession || !editSessionName.trim()) return;
-
-    try {
-      // Update session configuration via provider
-      await updateSessionConfiguration(selectedSession.id, editSessionConfig);
-
-      // Update session name/description if changed via provider
-      const nameChanged = editSessionName.trim() !== selectedSession.name;
-      const descChanged = (editSessionDescription.trim() || undefined) !== undefined;
-
-      if (nameChanged || descChanged) {
-        await updateSession(selectedSession.id, {
-          name: editSessionName.trim(),
-          description: editSessionDescription.trim() || undefined,
-        });
-      }
-
-      // Trigger local state update by reloading session details
-      await reloadSessionDetails();
-
-      setShowEditConfig(false);
-      resetEditSessionForm();
-    } catch (error) {
-      console.error('Error updating session:', error);
-    }
+    setShowEditConfig(true);
   };
 
   const handleEditAgentSubmit = async (e: React.FormEvent) => {
@@ -406,19 +324,6 @@ export function SessionConfigPanel(): React.JSX.Element {
     setShowCreateSession(false);
   }, []);
 
-  // Session edit modal handlers
-  const handleEditSessionNameChange = useCallback((name: string) => {
-    setEditSessionName(name);
-  }, []);
-
-  const handleEditSessionDescriptionChange = useCallback((description: string) => {
-    setEditSessionDescription(description);
-  }, []);
-
-  const handleEditSessionConfigChange = useCallback((config: SessionConfiguration) => {
-    setEditSessionConfig(config);
-  }, []);
-
   const handleCloseEditSession = useCallback(() => {
     setShowEditConfig(false);
   }, []);
@@ -489,16 +394,8 @@ export function SessionConfigPanel(): React.JSX.Element {
         isOpen={showEditConfig}
         currentProject={currentProject}
         selectedSession={selectedSession}
-        providers={availableProviders}
-        sessionConfig={editSessionConfig}
-        sessionName={editSessionName}
-        sessionDescription={editSessionDescription}
-        loading={loading}
         onClose={handleCloseEditSession}
-        onSubmit={handleEditSessionSubmit}
-        onSessionNameChange={handleEditSessionNameChange}
-        onSessionDescriptionChange={handleEditSessionDescriptionChange}
-        onSessionConfigChange={handleEditSessionConfigChange}
+        onSuccess={reloadSessionDetails}
       />
 
       <AgentEditModal
