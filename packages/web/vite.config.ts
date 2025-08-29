@@ -8,16 +8,9 @@ import { dirname, resolve } from 'node:path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const isDev = process.env.NODE_ENV !== 'production';
-
 export default defineConfig({
-  plugins: [
-    reactRouter(),
-    // Only use tsconfigPaths in dev to avoid sourcemap issues in build
-    ...(isDev ? [tsconfigPaths()] : []),
-  ],
+  plugins: [reactRouter(), tsconfigPaths()],
   build: {
-    // Turn OFF sourcemaps so Rollup reports the raw, underlying error
     sourcemap: false,
     rollupOptions: {
       onwarn(warning, warn) {
