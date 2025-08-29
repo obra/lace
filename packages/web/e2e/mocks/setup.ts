@@ -1,7 +1,8 @@
 // ABOUTME: MSW setup for Playwright tests with isolated test environments
 // ABOUTME: Initializes mock service worker and provides LACE_DIR isolation per worker
 
-import { createWorkerFixture, MockServiceWorker } from 'playwright-msw';
+// TODO: Temporary fix for circular dependency issue with playwright-msw
+// import { createWorkerFixture, MockServiceWorker } from 'playwright-msw';
 import { test as baseTest } from '@playwright/test';
 import { http } from 'msw';
 import { handlers } from './handlers';
@@ -15,10 +16,10 @@ interface TestEnvironmentContext {
   projectName: string;
 }
 
-// Create test fixture with MSW worker AND environment isolation
+// Create test fixture with environment isolation (MSW temporarily disabled)
 export const test = baseTest.extend<
   {
-    worker: MockServiceWorker;
+    // worker: MockServiceWorker; // Temporarily disabled due to circular dependency
     http: typeof http;
   },
   { testEnv: TestEnvironmentContext }
@@ -71,8 +72,8 @@ export const test = baseTest.extend<
     { scope: 'worker' },
   ],
 
-  // Test-scoped MSW worker
-  worker: createWorkerFixture(handlers),
+  // Test-scoped MSW worker (temporarily disabled)
+  // worker: createWorkerFixture(handlers),
   http,
 });
 
