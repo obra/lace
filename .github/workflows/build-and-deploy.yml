@@ -1,0 +1,82 @@
+name: Build and Deploy macOS App
+
+on:
+  push:
+    branches: [ main ]     # Deploy to nightly channel
+  release:
+    types: [ published ]   # Deploy to release channel
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      
+      - name: Install dependencies
+        run: bun install
+      
+      - name: Determine deployment channel
+        id: channel
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "channel=release" >> $GITHUB_OUTPUT
+            echo "🚢 Deploying to RELEASE channel"
+          else
+            echo "channel=nightly" >> $GITHUB_OUTPUT
+            echo "🌙 Deploying to NIGHTLY channel"
+          fi
+      
+      - name: Build macOS app with DMG and appcast
+        run: |
+          bun scripts/build-macos-app.ts \
+            --dmg \
+            --sign \
+            --channel ${{ steps.channel.outputs.channel }} \
+            --generate-appcast
+        env:
+          # Add your signing certificates as secrets
+          APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      
+      - name: Upload to Dropbox - DMG
+        uses: Lewuathe/dropbox-github-action@v1.0.0
+        with:
+          args: upload build/Lace-*.dmg /lace-updates/${{ steps.channel.outputs.channel }}/
+        env:
+          DROPBOX_REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
+          DROPBOX_APP_SECRET: ${{ secrets.DROPBOX_APP_SECRET }}
+      
+      - name: Upload to Dropbox - Appcast
+        uses: Lewuathe/dropbox-github-action@v1.0.0
+        with:
+          args: upload build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml /lace-updates/${{ steps.channel.outputs.channel }}/
+        env:
+          DROPBOX_REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
+          DROPBOX_APP_SECRET: ${{ secrets.DROPBOX_APP_SECRET }}
+      
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lace-macos-${{ steps.channel.outputs.channel }}-${{ github.sha }}
+          path: |
+            build/Lace-*.dmg
+            build/appcast/
+            build/Lace.app
+          retention-days: 30
+      
+      - name: Notify build completion
+        run: |
+          echo "🎉 Build complete!"
+          echo "📦 Channel: ${{ steps.channel.outputs.channel }}"
+          echo "📱 DMG: $(ls build/Lace-*.dmg)"
+          echo "📡 Appcast: build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml"
+          echo "🚀 Deployed to Dropbox!"

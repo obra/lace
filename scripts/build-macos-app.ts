@@ -5,6 +5,8 @@ import { execSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createDMG, getVersionInfo, updateAppVersion } from './create-dmg.js';
+import { writeFileSync } from 'node:fs';
+import { stat } from 'node:fs/promises';
 
 function runPackageTarget(workspace: string, target: string, description: string) {
   console.log(`🔨 ${description}...`);
@@ -60,6 +62,90 @@ async function createAppBundle(executablePath: string, outdir: string): Promise<
   return resolve(appBundlePath);
 }
 
+async function generateAppcast(options: {
+  dmgPath: string;
+  channel: string;
+  outdir: string;
+  versionInfo: ReturnType<typeof getVersionInfo>;
+}) {
+  const { dmgPath, channel, outdir, versionInfo } = options;
+
+  console.log(`📝 Generating appcast for ${channel} channel...`);
+
+  // Get file size
+  const stats = await stat(dmgPath);
+  const fileSize = stats.size;
+
+  // Generate appcast using Sparkle's generate_appcast tool
+  const appcastDir = join(outdir, 'appcast', channel);
+  mkdirSync(appcastDir, { recursive: true });
+
+  // Copy DMG to appcast directory
+  const appcastDmgPath = join(appcastDir, `Lace-${versionInfo.fullVersion}.dmg`);
+  execSync(`cp "${dmgPath}" "${appcastDmgPath}"`);
+
+  // Run generate_appcast from Sparkle tools
+  const sparkleToolsPath = 'platforms/macos/bin/generate_appcast';
+  if (existsSync(sparkleToolsPath)) {
+    console.log('🔧 Using Sparkle generate_appcast tool...');
+    try {
+      execSync(`"${sparkleToolsPath}" "${appcastDir}"`, {
+        stdio: 'inherit',
+        cwd: 'platforms/macos',
+      });
+      console.log(`✅ Appcast generated at ${appcastDir}/appcast.xml`);
+    } catch (error) {
+      console.warn('⚠️  Sparkle generate_appcast failed, creating basic appcast...');
+      await createBasicAppcast({ dmgPath: appcastDmgPath, channel, outdir, versionInfo, fileSize });
+    }
+  } else {
+    console.log('📝 Creating basic appcast (Sparkle tools not found)...');
+    await createBasicAppcast({ dmgPath: appcastDmgPath, channel, outdir, versionInfo, fileSize });
+  }
+}
+
+async function createBasicAppcast(options: {
+  dmgPath: string;
+  channel: string;
+  outdir: string;
+  versionInfo: ReturnType<typeof getVersionInfo>;
+  fileSize: number;
+}) {
+  const { dmgPath, channel, outdir, versionInfo, fileSize } = options;
+  const appcastPath = join(outdir, 'appcast', channel, 'appcast.xml');
+
+  const appcastContent = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Lace ${channel === 'nightly' ? 'Nightly' : 'Release'} Updates</title>
+    <description>Updates for Lace AI Coding Assistant</description>
+    <language>en</language>
+    <item>
+      <title>Lace ${versionInfo.fullVersion}</title>
+      <description><![CDATA[
+        <h3>Lace ${versionInfo.fullVersion}</h3>
+        <p>Latest ${channel} build of Lace AI Coding Assistant.</p>
+        <p><strong>Version:</strong> ${versionInfo.npmVersion}</p>
+        <p><strong>Build:</strong> ${versionInfo.gitShortSha}</p>
+      ]]></description>
+      <pubDate>${new Date().toUTCString()}</pubDate>
+      <sparkle:version>${versionInfo.fullVersion}</sparkle:version>
+      <sparkle:shortVersionString>${versionInfo.npmVersion}</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
+      <enclosure
+        url="PLACEHOLDER_URL_TO_BE_REPLACED"
+        length="${fileSize}"
+        type="application/octet-stream"
+        sparkle:edSignature="PLACEHOLDER_SIGNATURE"/>
+    </item>
+  </channel>
+</rss>`;
+
+  writeFileSync(appcastPath, appcastContent);
+  console.log(`📝 Basic appcast created at ${appcastPath}`);
+  console.log(`⚠️  Remember to replace PLACEHOLDER_URL and PLACEHOLDER_SIGNATURE!`);
+}
+
 interface BuildOptions {
   target?: string;
   name?: string;
@@ -67,6 +153,8 @@ interface BuildOptions {
   sign?: boolean;
   bundle?: boolean;
   dmg?: boolean;
+  channel?: string;
+  generateAppcast?: boolean;
 }
 
 function parseArgs(): BuildOptions {
@@ -94,6 +182,12 @@ function parseArgs(): BuildOptions {
         options.dmg = true;
         options.bundle = true; // DMG requires bundle
         break;
+      case '--channel':
+        options.channel = args[++i];
+        break;
+      case '--generate-appcast':
+        options.generateAppcast = true;
+        break;
       case '--help':
         console.log(`
 Usage:
@@ -107,6 +201,8 @@ Options:
   --sign               Sign and notarize the binary (macOS only)
   --bundle             Create macOS .app bundle (macOS only)
   --dmg                Create DMG distribution (implies --bundle)
+  --channel <channel>  Update channel: release or nightly (default: release)
+  --generate-appcast   Generate appcast.xml for Sparkle updates
   --help               Show this help
 
 Examples:
@@ -137,6 +233,8 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   const sign = options.sign || false;
   const bundle = options.bundle || false;
   const dmg = options.dmg || false;
+  const channel = options.channel || 'release';
+  const shouldGenerateAppcast = options.generateAppcast || false;
 
   // Get version info for consistent naming
   const versionInfo = getVersionInfo();
@@ -145,7 +243,10 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   console.log(`   🎯 Target: ${target}`);
   console.log(`   📝 Name: ${name}`);
   console.log(`   📁 Output: ${outdir}`);
-  console.log(`   📄 Version: ${versionInfo.fullVersion}\n`);
+  console.log(`   📄 Version: ${versionInfo.fullVersion}`);
+  console.log(`   🎯 Channel: ${channel}`);
+  if (shouldGenerateAppcast) console.log(`   📡 Appcast: Will generate`);
+  console.log();
 
   // Install dependencies
   console.log('🔨 Installing dependencies...');
@@ -264,11 +365,22 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
         outputDir: outdir,
       });
       console.log(`✅ DMG created: ${dmgPath}`);
+
+      // Generate appcast if requested
+      if (shouldGenerateAppcast) {
+        await generateAppcast({
+          dmgPath,
+          channel,
+          outdir,
+          versionInfo,
+        });
+      }
     }
   }
 
   console.log('\n📊 Build Summary:');
   console.log(`   📄 Version: ${versionInfo.fullVersion}`);
+  console.log(`   🎯 Channel: ${channel}`);
   console.log(`   💾 Executable: ${(execSize / 1024 / 1024).toFixed(1)}MB`);
   console.log(`   📁 Location: ${resolve(outputPath)}`);
   if (appBundlePath) {
@@ -276,6 +388,9 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   }
   if (dmgPath) {
     console.log(`   📦 DMG: ${resolve(dmgPath)}`);
+  }
+  if (shouldGenerateAppcast && dmgPath) {
+    console.log(`   📡 Appcast: ${resolve(outdir)}/appcast/${channel}/appcast.xml`);
   }
   console.log(`   🗂️  Assets: Embedded (client files + JSON catalogs + MD prompts)`);
   console.log(`   🚀 Mode: Fully standalone - no file extraction, no temp dirs!`);

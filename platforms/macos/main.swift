@@ -7,7 +7,7 @@ import ServiceManagement
 import OSLog
 import Sparkle
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private var statusBarItem: NSStatusItem!
     private var serverProcess: Process?
     private var serverPort: Int?
@@ -15,7 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var shouldAutoOpen = true
     private let legacyLoginItemHelperBundleID: String? = nil // No helper bundle shipped
     private var settingsWindow: SettingsWindow?
-    private var updater: SPUStandardUpdaterController!
+    internal var updater: SPUStandardUpdaterController!
     
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         setupMenuBar()
@@ -250,21 +250,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func setupUpdater() {
-        updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+        updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: nil)
         
         // Configure based on user preferences
         let defaults = UserDefaults.standard
         let currentChannel = defaults.updateChannel
-        updateFeedURL(for: currentChannel)
-        
         print("Sparkle updater initialized for channel: \(currentChannel.displayName)")
     }
     
     func updateFeedURL(for channel: UpdateChannel) {
-        // Update the feed URL in the updater
-        let feedURL = URL(string: channel.feedURL)!
-        updater.updater.feedURL = feedURL
-        print("Updated feed URL to: \(channel.feedURL)")
+        // Channel switching will require app restart for full effect
+        // For now, just store the preference - it will take effect on next launch
+        print("Updated channel to: \(channel.displayName) - will take effect on next app launch")
+    }
+    
+    // SPUUpdaterDelegate method to provide dynamic feed URL
+    func feedURLString(for updater: SPUUpdater) -> String? {
+        let defaults = UserDefaults.standard
+        let currentChannel = defaults.updateChannel
+        return currentChannel.feedURL
     }
     
     private func showError(_ message: String) {
