@@ -43,15 +43,6 @@ jobs:
         cd packages/web && npm run build
     
     - name: Build executable
-      run: |
-        if [[ "${{ matrix.target }}" == *"darwin"* ]]; then
-          npx tsx scripts/build-simple.ts --target ${{ matrix.target }} --name ${{ matrix.name }} --bundle
-        else
-          npx tsx scripts/build-simple.ts --target ${{ matrix.target }} --name ${{ matrix.name }}
-        fi
-    
-    - name: Sign and notarize macOS executable
-      if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/')
       env:
         APPLE_DEVELOPER_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
         APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
@@ -61,17 +52,38 @@ jobs:
         KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
       run: |
         if [[ "${{ matrix.target }}" == *"darwin"* ]]; then
-          npx tsx scripts/sign-and-notarize.ts --binary "build/Lace.app"
+          # For releases (tags), build signed DMG; for PRs, build app bundle only
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
+            bun scripts/build-macos-app.ts --target ${{ matrix.target }} --name Lace --dmg --sign
+          else
+            bun scripts/build-macos-app.ts --target ${{ matrix.target }} --name Lace --bundle
+          fi
         else
-          npx tsx scripts/sign-and-notarize.ts --binary "build/${{ matrix.name }}"
+          bun scripts/build-macos-app.ts --target ${{ matrix.target }} --name ${{ matrix.name }}
         fi
+    
+    - name: Sign and notarize macOS executable (PR builds only)
+      if: runner.os == 'macOS' && github.event_name == 'pull_request'
+      env:
+        APPLE_DEVELOPER_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
+        APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+        APPLE_ID_EMAIL: ${{ secrets.APPLE_ID_EMAIL }}
+        APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      run: |
+        # For PR builds, sign the app bundle (release builds include signing in build step)
+        npx tsx scripts/sign-and-notarize.ts --binary "build/Lace.app"
     
     - name: Test executable
       run: |
         if [[ "${{ matrix.target }}" == *"darwin"* ]]; then
-          # Test the app bundle
+          # Test the app bundle and check for DMG if it's a release
           ls -la build/Lace.app/Contents/MacOS/
           echo "✅ App bundle structure verified"
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
+            ls -la build/*.dmg && echo "✅ DMG created successfully"
+          fi
         else
           chmod +x build/${{ matrix.name }}
           ./build/${{ matrix.name }} --help
@@ -85,18 +97,27 @@ jobs:
           ${{ matrix.target == 'bun-darwin-arm64' && 'build/Lace.app' || format('build/{0}', matrix.name) }}
         retention-days: 7
     
+    - name: Upload DMG (releases only)
+      if: startsWith(github.ref, 'refs/tags/') && matrix.target == 'bun-darwin-arm64'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.name }}-dmg
+        path: build/*.dmg
+        retention-days: 90
+    
     - name: Create archive
       if: startsWith(github.ref, 'refs/tags/')
       run: |
         cd build
         if [[ "${{ matrix.target }}" == *"darwin"* ]]; then
-          tar -czf ${{ matrix.name }}.tar.gz Lace.app
+          # For macOS releases, we now have DMG files - no need to create tar.gz
+          echo "DMG files created - skipping tar.gz creation for macOS"
         else
           tar -czf ${{ matrix.name }}.tar.gz ${{ matrix.name }}
         fi
     
     - name: Upload release asset
-      if: startsWith(github.ref, 'refs/tags/')
+      if: startsWith(github.ref, 'refs/tags/') && matrix.target != 'bun-darwin-arm64'
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.name }}.tar.gz
@@ -135,29 +156,33 @@ jobs:
           
           ### Downloads
           
-          - **lace-macos-arm64.tar.gz** - macOS App Bundle for Apple Silicon (M1/M2/M3/M4)
+          - **Lace-\<version\>-\<sha\>.dmg** - macOS Disk Image for Apple Silicon (M1/M2/M3/M4)
+            - Signed and notarized for macOS Gatekeeper
+            - Professional installer experience
+            - Drag-and-drop to Applications folder
           
-          ### Usage
+          ### Installation
           
-          **macOS (App Bundle):**
-          ```bash
-          # Extract archive
-          tar -xzf lace-macos-arm64.tar.gz
-          
-          # Run Lace (opens menu bar app)
-          open Lace.app
-          ```
+          **macOS (DMG):**
+          1. Download the `.dmg` file
+          2. Double-click to mount the disk image
+          3. Drag `Lace.app` to the `Applications` folder
+          4. Launch Lace from Applications or Launchpad
           
           ### Features
           
           - Complete Lace environment in a single executable
           - Embedded Next.js web interface with React components
-          - ZIP-based asset bundling with all dependencies
-          - No installation required - just download and run
+          - Asset bundling with all dependencies embedded
+          - No installation required beyond drag-and-drop
           - Self-contained with no external dependencies
+          - Code signed and notarized for macOS security
+          - Professional DMG installer with version info
           
           Built from commit ${{ github.sha }}
-        files: release-assets/**/*.tar.gz
+        files: |
+          release-assets/**/*.tar.gz
+          release-assets/**/*.dmg
         draft: false
         prerelease: false
         generate_release_notes: true

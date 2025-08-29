@@ -4,6 +4,7 @@
 import { execSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { createDMG, getVersionInfo } from './create-dmg.js';
 
 function runPackageTarget(workspace: string, target: string, description: string) {
   console.log(`🔨 ${description}...`);
@@ -69,6 +70,7 @@ interface BuildOptions {
   outdir?: string;
   sign?: boolean;
   bundle?: boolean;
+  dmg?: boolean;
 }
 
 function parseArgs(): BuildOptions {
@@ -92,6 +94,10 @@ function parseArgs(): BuildOptions {
       case '--bundle':
         options.bundle = true;
         break;
+      case '--dmg':
+        options.dmg = true;
+        options.bundle = true; // DMG requires bundle
+        break;
       case '--help':
         console.log(`
 Usage:
@@ -104,12 +110,14 @@ Options:
   --outdir <outdir>    Output directory (default: build)
   --sign               Sign and notarize the binary (macOS only)
   --bundle             Create macOS .app bundle (macOS only)
+  --dmg                Create DMG distribution (implies --bundle)
   --help               Show this help
 
 Examples:
   npm run build:macos
   npm run build:macos:signed
   npm run build:macos:app
+  npm run build:macos:dmg
   bun scripts/build-macos-app.ts --target bun-linux-x64 --name lace-linux
 
 This creates a fully standalone executable with:
@@ -132,11 +140,16 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   const outdir = options.outdir || 'build';
   const sign = options.sign || false;
   const bundle = options.bundle || false;
+  const dmg = options.dmg || false;
+
+  // Get version info for consistent naming
+  const versionInfo = getVersionInfo();
 
   console.log('🔨 Building clean standalone Lace executable...');
   console.log(`   🎯 Target: ${target}`);
   console.log(`   📝 Name: ${name}`);
-  console.log(`   📁 Output: ${outdir}\n`);
+  console.log(`   📁 Output: ${outdir}`);
+  console.log(`   📄 Version: ${versionInfo.fullVersion}\n`);
 
   // Install dependencies
   console.log('🔨 Installing dependencies...');
@@ -212,17 +225,32 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
 
   // Create app bundle if requested
   let appBundlePath = '';
+  let dmgPath = '';
   if (bundle && process.platform === 'darwin') {
     console.log('🔨 Creating macOS app bundle...');
     appBundlePath = await createAppBundle(outputPath, name, outdir);
     console.log(`✅ App bundle created: ${appBundlePath}`);
+
+    // Create DMG if requested
+    if (dmg) {
+      console.log('\n🔨 Creating DMG distribution...');
+      dmgPath = await createDMG({
+        appBundlePath,
+        outputDir: outdir,
+      });
+      console.log(`✅ DMG created: ${dmgPath}`);
+    }
   }
 
   console.log('\n📊 Build Summary:');
+  console.log(`   📄 Version: ${versionInfo.fullVersion}`);
   console.log(`   💾 Executable: ${(execSize / 1024 / 1024).toFixed(1)}MB`);
   console.log(`   📁 Location: ${resolve(outputPath)}`);
   if (appBundlePath) {
     console.log(`   📱 App Bundle: ${resolve(appBundlePath)}`);
+  }
+  if (dmgPath) {
+    console.log(`   📦 DMG: ${resolve(dmgPath)}`);
   }
   console.log(`   🗂️  Assets: Embedded (client files + JSON catalogs + MD prompts)`);
   console.log(`   🚀 Mode: Fully standalone - no file extraction, no temp dirs!`);
@@ -230,6 +258,9 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   console.log(`\nTo run: ./${outputPath}`);
   if (appBundlePath) {
     console.log(`App bundle: open ${appBundlePath}`);
+  }
+  if (dmgPath) {
+    console.log(`DMG ready for distribution: ${dmgPath}`);
   }
   console.log(`\n✨ This executable can be copied to any compatible system and run`);
   console.log(`   without any dependencies or file extraction.`);
