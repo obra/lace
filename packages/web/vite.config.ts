@@ -19,6 +19,16 @@ export default defineConfig({
   build: {
     // Turn OFF sourcemaps so Rollup reports the raw, underlying error
     sourcemap: false,
+    rollupOptions: {
+      onwarn(warning, warn) {
+        // Skip sourcemap-related warnings - known Vite issue
+        // See: https://github.com/vitejs/vite/issues/15012
+        if (warning.code === 'SOURCEMAP_ERROR') {
+          return;
+        }
+        warn(warning);
+      },
+    },
   },
   resolve: {
     alias: {
