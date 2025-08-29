@@ -1,15 +1,36 @@
 // ABOUTME: Type definitions for the task management system
 // ABOUTME: Used by both agent tools and human-facing web APIs
 
-// Re-export the existing types for compatibility
-export type {
-  Task,
-  TaskNote,
-  TaskStatus,
-  TaskPriority,
-} from '~/tools/implementations/task-manager/types';
+import type { ThreadId, AssigneeId } from '~/threads/types';
+import type { TaskStatus } from '~/tasks/task-status';
 
-import type { TaskActor, TaskStatus } from '~/tools/implementations/task-manager/types';
+export type { TaskStatus };
+export type TaskPriority = 'high' | 'medium' | 'low';
+
+// Task actors can be either a ThreadId or 'human' (or any string that represents a valid thread ID)
+export type TaskActor = string;
+
+export interface Task {
+  id: string;
+  title: string; // Brief summary
+  description: string; // Human-readable details
+  prompt: string; // Detailed instructions for assigned agent
+  status: TaskStatus;
+  priority: TaskPriority;
+  assignedTo?: AssigneeId; // ThreadId or NewAgentSpec
+  createdBy: TaskActor; // ThreadId of creating agent or 'human'
+  threadId: ThreadId; // Parent thread ID only (e.g., "lace_20250703_abc123")
+  createdAt: Date;
+  updatedAt: Date;
+  notes: TaskNote[];
+}
+
+export interface TaskNote {
+  id: string;
+  author: TaskActor; // ThreadId of note author or 'human'
+  content: string;
+  timestamp: Date;
+}
 
 export interface TaskContext {
   actor: TaskActor; // Who is performing the action (ThreadId or 'human')

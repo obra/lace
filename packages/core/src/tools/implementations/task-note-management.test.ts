@@ -2,7 +2,7 @@
 // ABOUTME: Validates note addition, ordering, and multi-agent communication
 
 import { describe, it, expect } from 'vitest';
-import { Task, TaskNote } from '~/tools/implementations/task-manager/types';
+import { Task, TaskNote } from '~/tasks/types';
 import { asThreadId } from '~/threads/types';
 
 describe('Task Note Management', () => {

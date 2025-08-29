@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Tool } from '~/tools/tool';
 import { NonEmptyString } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext } from '~/tools/types';
-import { Task } from '~/tools/implementations/task-manager/types';
+import { Task } from '~/tasks/types';
 import { isAssigneeId, AssigneeId } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { TaskStatusSchema } from '~/tasks/task-status';

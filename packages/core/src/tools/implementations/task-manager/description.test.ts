@@ -11,7 +11,7 @@ import {
   TaskViewTool,
 } from '~/tools/implementations/task-manager/tools';
 import { DelegateTool } from '~/tools/implementations/delegate';
-import type { TaskStatus } from '~/tools/implementations/task-manager/types';
+import type { TaskStatus } from '~/tasks/types';
 
 describe('Tool Descriptions', () => {
   it('should include usage examples in descriptions', () => {
