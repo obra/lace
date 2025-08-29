@@ -68,15 +68,21 @@ $(APP_BUNDLE): main.swift Info.plist AppIcon.icns setup-sparkle
 	@echo "App bundle created at $(APP_BUNDLE)"
 	@echo "Don't forget to code sign the Sparkle framework for distribution!"
 
-test-swift: SwiftValidationTests.swift main.swift
+test-swift: SwiftValidationTests.swift main.swift setup-sparkle
 	@echo "Running Swift validation tests..."
 	@mkdir -p $(TEST_DIR)
+	@mkdir -p $(TEST_DIR)/Frameworks
 	
-	# Compile and run Swift validation tests (no XCTest dependency)
+	# Copy Sparkle framework for testing
+	cp -R $(SPARKLE_FRAMEWORK) $(TEST_DIR)/Frameworks/
+	
+	# Compile and run Swift validation tests (with Sparkle support)
 	swiftc -o $(TEST_DIR)/SwiftValidationTests \
 		SwiftValidationTests.swift \
 		-framework Cocoa \
 		-framework ServiceManagement \
+		-F $(TEST_DIR)/Frameworks \
+		-framework Sparkle \
 		-target arm64-apple-macos10.15
 	
 	# Run the validation tests

@@ -200,7 +200,30 @@ async function signAndNotarize(options: SigningOptions) {
       console.log('✍️  Signing app bundle with hardened runtime and entitlements...');
       const entitlementsPath = `${process.cwd()}/scripts/entitlements.plist`;
 
-      // Sign the inner lace-server binary first
+      // Sign Sparkle framework components first (if present)
+      const sparkleFrameworkPath = `${resolvedBinaryPath}/Contents/Frameworks/Sparkle.framework`;
+      if (existsSync(sparkleFrameworkPath)) {
+        console.log('   ⚡ Signing Sparkle framework components...');
+
+        // Sign XPC Services
+        const xpcServicesPath = `${sparkleFrameworkPath}/XPCServices`;
+        if (existsSync(xpcServicesPath)) {
+          console.log('   🔧 Signing Sparkle XPC services...');
+          execSync(
+            `find "${xpcServicesPath}" -name "*.xpc" -exec codesign --force --options runtime --sign "${signingIdentity}" {} \;`,
+            { stdio: 'inherit' }
+          );
+        }
+
+        // Sign the main Sparkle framework
+        console.log('   ⚡ Signing Sparkle framework...');
+        execSync(
+          `codesign --force --options runtime --sign "${signingIdentity}" "${sparkleFrameworkPath}" --verbose`,
+          { stdio: 'inherit' }
+        );
+      }
+
+      // Sign the inner lace-server binary
       const laceServerPath = `${resolvedBinaryPath}/Contents/MacOS/lace-server`;
       if (existsSync(laceServerPath)) {
         console.log('   🔧 Signing lace-server binary...');
@@ -210,7 +233,7 @@ async function signAndNotarize(options: SigningOptions) {
         );
       }
 
-      // Then sign the outer app bundle
+      // Finally sign the outer app bundle
       console.log('   📦 Signing app bundle...');
       execSync(
         `codesign --force --options runtime --sign "${signingIdentity}" "${resolvedBinaryPath}" --verbose`,
