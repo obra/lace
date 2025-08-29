@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-macos:
-    runs-on: macos-latest
+    runs-on: self-hosted
     
     steps:
       - name: Checkout code
@@ -21,6 +21,34 @@ jobs:
       
       - name: Install dependencies
         run: bun install
+      
+      - name: Setup Apple Code Signing
+        run: |
+          # Create temporary keychain for signing
+          KEYCHAIN_NAME="github-actions-$(date +%s).keychain"
+          KEYCHAIN_PASSWORD="temp-keychain-pass-$(date +%s)"
+          
+          # Create and unlock keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          security default-keychain -s "$KEYCHAIN_NAME"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          
+          # Decode and import P12 certificate
+          echo "$APPLE_DEVELOPER_CERTIFICATE_P12" | base64 --decode > temp-cert.p12
+          security import temp-cert.p12 -k "$KEYCHAIN_NAME" -P "$APPLE_DEVELOPER_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          
+          # Set partition list for codesign access
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          
+          # Clean up certificate file
+          rm temp-cert.p12
+          
+          # Export for use in build step
+          echo "KEYCHAIN_NAME=$KEYCHAIN_NAME" >> $GITHUB_ENV
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> $GITHUB_ENV
+        env:
+          APPLE_DEVELOPER_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
+          APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
       
       - name: Determine deployment channel
         id: channel
@@ -83,3 +111,11 @@ jobs:
           echo "📱 DMG: $(ls build/Lace-*.dmg)"
           echo "📡 Appcast: build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml"
           echo "🚀 Deployed to Dropbox!"
+      
+      - name: Cleanup Keychain
+        if: always()
+        run: |
+          if [ -n "$KEYCHAIN_NAME" ]; then
+            security delete-keychain "$KEYCHAIN_NAME" || true
+            echo "🧹 Cleaned up temporary keychain"
+          fi
