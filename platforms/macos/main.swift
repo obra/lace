@@ -3,12 +3,16 @@
 
 import Cocoa
 import Foundation
+import ServiceManagement
+import OSLog
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBarItem: NSStatusItem!
     private var serverProcess: Process?
     private var serverPort: Int?
     private var menu: NSMenu!
+    private var shouldAutoOpen = true
+    private let legacyLoginItemHelperBundleID: String? = nil // No helper bundle shipped
     
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         setupMenuBar()
@@ -60,6 +64,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Restart server item
         let restartItem = NSMenuItem(title: "Restart Server", action: #selector(restartServer), keyEquivalent: "r")
         menu.addItem(restartItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        // Open at login item
+        let launchAtStartupItem = NSMenuItem(title: "Launch at Startup", action: #selector(toggleLaunchAtStartup), keyEquivalent: "")
+        launchAtStartupItem.state = isLaunchAtStartupEnabled() ? .on : .off
+        if #unavailable(macOS 13.0), legacyLoginItemHelperBundleID == nil {
+            launchAtStartupItem.isEnabled = false
+            launchAtStartupItem.toolTip = "Requires macOS 13+ or an embedded login item helper"
+        }
+        menu.addItem(launchAtStartupItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -128,7 +143,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func parseServerOutput(_ output: String) {
         // Debug: Log all server output to help with port detection
-        print("Server output: \(output)")
+        os_log("Server output: %{public}@", log: .default, type: .debug, output)
         
         // Look for the specific port signal from the server
         if output.contains("LACE_SERVER_PORT:") {
@@ -138,10 +153,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     let portRange = match.range(at: 1)
                     if let portSubstring = Range(portRange, in: output) {
                         if let port = Int(output[portSubstring]) {
-                            print("Found server port signal: \(port)")
+                            os_log("Found server port signal: %d", log: .default, type: .info, port)
                             DispatchQueue.main.async { [weak self] in
                                 self?.serverPort = port
                                 self?.updateMenu()
+                                self?.maybeAutoOpenOnce()
                             }
                             return
                         }
@@ -158,10 +174,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     let portRange = match.range(at: 1)
                     if let portSubstring = Range(portRange, in: output) {
                         if let port = Int(output[portSubstring]) {
-                            print("Found server URL signal: \(port)")
+                            os_log("Found server URL signal: %d", log: .default, type: .info, port)
                             DispatchQueue.main.async { [weak self] in
                                 self?.serverPort = port
                                 self?.updateMenu()
+                                self?.maybeAutoOpenOnce()
                             }
                             return
                         }
@@ -189,6 +206,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc private func restartServer() {
         serverPort = nil
+        shouldAutoOpen = false // Don't auto-open on restart
         updateMenu()
         startServer()
     }
@@ -214,6 +232,115 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             alert.alertStyle = .warning
             alert.addButton(withTitle: "OK")
             alert.runModal()
+        }
+    }
+    
+    private func showApprovalRequiredAlert() {
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "User Approval Required"
+            alert.informativeText = "Lace needs your permission to open at login. Please approve this request in System Settings."
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "Open System Settings")
+            alert.addButton(withTitle: "Cancel")
+            
+            // Use sheet presentation if we have a window, otherwise fall back to modal
+            if let window = NSApp.mainWindow {
+                alert.beginSheetModal(for: window) { response in
+                    if response == .alertFirstButtonReturn {
+                        self.openSystemSettings()
+                    }
+                }
+            } else {
+                // Fallback to modal if no main window
+                let response = alert.runModal()
+                if response == .alertFirstButtonReturn {
+                    self.openSystemSettings()
+                }
+            }
+        }
+    }
+    
+    private func openSystemSettings() {
+        // Open System Settings - use generic URL that works across macOS versions
+        let settingsURL: URL
+        if #available(macOS 13.0, *) {
+            // Use modern System Settings URL
+            settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?General")!
+        } else {
+            // Fallback to System Preferences
+            settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?General")!
+        }
+        
+        NSWorkspace.shared.open(settingsURL)
+    }
+    
+    private func maybeAutoOpenOnce() {
+        guard shouldAutoOpen, serverPort != nil else { return }
+        shouldAutoOpen = false
+        openBrowser()
+    }
+    
+    @objc private func toggleLaunchAtStartup() {
+        if isLaunchAtStartupEnabled() {
+            disableLaunchAtStartup()
+        } else {
+            enableLaunchAtStartup()
+        }
+        updateMenu()
+    }
+    
+    private func isLaunchAtStartupEnabled() -> Bool {
+        if #available(macOS 13.0, *) {
+            let service = SMAppService.mainApp
+            return service.status == .enabled
+        } else {
+            // No legacy support without helper bundle
+            return false
+        }
+    }
+    
+    private func enableLaunchAtStartup() {
+        if #available(macOS 13.0, *) {
+            do {
+                let service = SMAppService.mainApp
+                try service.register()
+                
+                // Check the status after registration
+                let status = SMAppService.mainApp.status
+                switch status {
+                case .requiresApproval:
+                    showApprovalRequiredAlert()
+                case .enabled:
+                    os_log("Successfully enabled open at login", log: .default, type: .info)
+                case .notRegistered:
+                    showError("Failed to register for open at login")
+                case .notFound:
+                    showError("Login item service not found")
+                @unknown default:
+                    os_log("Open at login registration completed with status: %{public}@", log: .default, type: .info, String(describing: status))
+                }
+            } catch {
+                showError("Failed to enable open at login: \(error.localizedDescription)")
+            }
+        } else {
+            // No legacy support without helper bundle
+            showError("Open at login requires macOS 13+ or an embedded login item helper")
+        }
+    }
+    
+    private func disableLaunchAtStartup() {
+        if #available(macOS 13.0, *) {
+            do {
+                let service = SMAppService.mainApp
+                try service.unregister()
+                os_log("Successfully disabled open at login", log: .default, type: .info)
+            } catch {
+                showError("Failed to disable open at login: \(error.localizedDescription)")
+            }
+        } else {
+            // No legacy support without helper bundle
+            showError("Open at login requires macOS 13+ or an embedded login item helper")
         }
     }
 }
