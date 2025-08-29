@@ -18,26 +18,32 @@ This guide walks through setting up the complete Sparkle auto-update system with
 ### 2. Dropbox Setup
 Create a Dropbox app at https://www.dropbox.com/developers/apps:
 1. Choose "Scoped access"
-2. Choose "Full Dropbox" 
+2. Choose "App folder" (more secure than Full Dropbox)
 3. Name your app (e.g., "Lace Updates")
 4. Generate App Key, App Secret, and Refresh Token
 
 ### 3. GitHub Repository Secrets
-Add these secrets to your GitHub repository:
+Add these **new** Dropbox secrets (Apple secrets already exist):
 
 ```
-APPLE_DEVELOPER_ID=Your Developer ID
-APPLE_CERTIFICATE_PASSWORD=Certificate password
+# New Dropbox secrets
 DROPBOX_REFRESH_TOKEN=Your Dropbox refresh token
 DROPBOX_APP_KEY=Your Dropbox app key
 DROPBOX_APP_SECRET=Your Dropbox app secret
+
+# Existing Apple secrets (already configured)
+APPLE_DEVELOPER_CERTIFICATE_P12=✅ Already set
+APPLE_DEVELOPER_CERTIFICATE_PASSWORD=✅ Already set  
+APPLE_ID_EMAIL=✅ Already set
+APPLE_ID_PASSWORD=✅ Already set
+APPLE_TEAM_ID=✅ Already set
 ```
 
 ## 🚀 Deployment Structure
 
-### Dropbox Folder Structure
+### Dropbox App Folder Structure
 ```
-/lace-updates/
+/Apps/Lace Updates/          (Auto-created by Dropbox)
   ├── release/
   │   ├── appcast.xml
   │   └── Lace-1.0.0-abc1234.dmg
@@ -46,10 +52,18 @@ DROPBOX_APP_SECRET=Your Dropbox app secret
       └── Lace-0.0.1-def5678.dmg
 ```
 
+**Benefits of App Folder Access:**
+- ✅ More secure (scoped access only)
+- ✅ Users more comfortable authorizing
+- ✅ Isolated from personal files
+- ✅ Same functionality as full access
+
 ### Update Feed URLs
-Once set up, your Dropbox URLs will be:
-- **Release**: `https://dl.dropboxusercontent.com/s/[TOKEN]/lace-updates/release/appcast.xml`
-- **Nightly**: `https://dl.dropboxusercontent.com/s/[TOKEN]/lace-updates/nightly/appcast.xml`
+Once set up, your Dropbox app folder URLs will be:
+- **Release**: `https://dl.dropboxusercontent.com/s/[TOKEN]/release/appcast.xml`
+- **Nightly**: `https://dl.dropboxusercontent.com/s/[TOKEN]/nightly/appcast.xml`
+
+**Note:** App folder access automatically scopes paths to `/Apps/Lace Updates/` - no need for full paths!
 
 ## ⚙️ Configuration Steps
 
@@ -60,9 +74,9 @@ Replace placeholder URLs in `platforms/macos/main.swift`:
 var feedURL: String {
     switch self {
     case .release:
-        return "https://dl.dropboxusercontent.com/s/YOUR_TOKEN_HERE/lace-updates/release/appcast.xml"
+        return "https://dl.dropboxusercontent.com/s/YOUR_TOKEN_HERE/release/appcast.xml"
     case .nightly:
-        return "https://dl.dropboxusercontent.com/s/YOUR_TOKEN_HERE/lace-updates/nightly/appcast.xml"
+        return "https://dl.dropboxusercontent.com/s/YOUR_TOKEN_HERE/nightly/appcast.xml"
     }
 }
 ```

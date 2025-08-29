@@ -449,12 +449,12 @@ enum UpdateChannel: String, CaseIterable {
     }
     
     var feedURL: String {
-        // TODO: Replace with actual Dropbox URLs once set up
+        // App folder URLs (scoped access) - cleaner paths
         switch self {
         case .release:
-            return "https://dl.dropboxusercontent.com/s/[TOKEN]/lace-updates/release/appcast.xml"
+            return "https://dl.dropboxusercontent.com/s/[TOKEN]/release/appcast.xml"
         case .nightly:
-            return "https://dl.dropboxusercontent.com/s/[TOKEN]/lace-updates/nightly/appcast.xml"
+            return "https://dl.dropboxusercontent.com/s/[TOKEN]/nightly/appcast.xml"
         }
     }
 }

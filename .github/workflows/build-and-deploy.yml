@@ -41,14 +41,17 @@ jobs:
             --channel ${{ steps.channel.outputs.channel }} \
             --generate-appcast
         env:
-          # Add your signing certificates as secrets
-          APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # Use existing Apple signing secrets
+          APPLE_DEVELOPER_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
+          APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+          APPLE_ID_EMAIL: ${{ secrets.APPLE_ID_EMAIL }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       
       - name: Upload to Dropbox - DMG
         uses: Lewuathe/dropbox-github-action@v1.0.0
         with:
-          args: upload build/Lace-*.dmg /lace-updates/${{ steps.channel.outputs.channel }}/
+          args: upload build/Lace-*.dmg /${{ steps.channel.outputs.channel }}/
         env:
           DROPBOX_REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
           DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
@@ -57,7 +60,7 @@ jobs:
       - name: Upload to Dropbox - Appcast
         uses: Lewuathe/dropbox-github-action@v1.0.0
         with:
-          args: upload build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml /lace-updates/${{ steps.channel.outputs.channel }}/
+          args: upload build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml /${{ steps.channel.outputs.channel }}/
         env:
           DROPBOX_REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
           DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}

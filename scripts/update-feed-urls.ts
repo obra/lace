@@ -17,12 +17,12 @@ function updateFeedUrls(config: FeedConfig) {
 
     // Replace placeholder URLs
     content = content.replace(
-      /https:\/\/dl\.dropboxusercontent\.com\/s\/\[TOKEN\]\/lace-updates\/release\/appcast\.xml/g,
+      /https:\/\/dl\.dropboxusercontent\.com\/s\/\[TOKEN\]\/release\/appcast\.xml/g,
       config.releaseUrl
     );
 
     content = content.replace(
-      /https:\/\/dl\.dropboxusercontent\.com\/s\/\[TOKEN\]\/lace-updates\/nightly\/appcast\.xml/g,
+      /https:\/\/dl\.dropboxusercontent\.com\/s\/\[TOKEN\]\/nightly\/appcast\.xml/g,
       config.nightlyUrl
     );
 
@@ -44,8 +44,8 @@ Usage: bun scripts/update-feed-urls.ts <release-url> <nightly-url>
 
 Example:
 bun scripts/update-feed-urls.ts \\
-  "https://dl.dropboxusercontent.com/s/abc123/lace-updates/release/appcast.xml" \\
-  "https://dl.dropboxusercontent.com/s/def456/lace-updates/nightly/appcast.xml"
+  "https://dl.dropboxusercontent.com/s/abc123/release/appcast.xml" \\
+  "https://dl.dropboxusercontent.com/s/def456/nightly/appcast.xml"
 `);
   process.exit(1);
 }
