@@ -1,7 +1,7 @@
 // ABOUTME: Task formatter utility for displaying tasks in CLI-friendly format
 // ABOUTME: Provides formatting for task lists and individual tasks with various display options
 
-import { Task } from '~/tools/implementations/task-manager/types';
+import { Task } from '~/tasks/types';
 import { ThreadId, AssigneeId } from '~/threads/types';
 import { getStatusIcon, getStatusOrder } from '~/tasks/task-status';
 

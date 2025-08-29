@@ -2,7 +2,7 @@
 // ABOUTME: Validates extended data model, thread scoping, and note management
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Task, TaskNote } from '~/tools/implementations/task-manager/types';
+import { Task, TaskNote } from '~/tasks/types';
 import { asThreadId, createNewAgentSpec, isAssigneeId } from '~/threads/types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 

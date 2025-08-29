@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach as _beforeEach, afterEach as _afterEach } from 'vitest';
 import { TaskFormatter } from '~/tools/implementations/task-manager/formatter';
-import { Task } from '~/tools/implementations/task-manager/types';
+import { Task } from '~/tasks/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 
