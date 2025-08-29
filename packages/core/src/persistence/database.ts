@@ -100,7 +100,7 @@ import {
   isTransientEventType,
 } from '~/threads/types';
 import type { ToolCall, ToolResult } from '~/tools/types';
-import { Task, TaskNote, TaskStatus, TaskPriority } from '~/tasks/types';
+import type { Task, TaskNote, TaskStatus, TaskPriority } from '~/tasks/types';
 import { logger } from '~/utils/logger';
 import type { CompactionData } from '~/threads/compaction/types';
 import type { ToolApprovalRequestData, ToolApprovalResponseData } from '~/threads/types';
