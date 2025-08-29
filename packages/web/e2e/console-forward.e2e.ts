@@ -1,7 +1,12 @@
 // ABOUTME: End-to-end test for console forwarding system
 // ABOUTME: Tests browser console messages forwarding to server logs
 
-import { test, expect } from './mocks/setup';
+import { test, expect } from '@playwright/test';
+import {
+  setupTestEnvironment,
+  cleanupTestEnvironment,
+  type TestEnvironment,
+} from './helpers/test-utils';
 
 interface ApiRequest {
   status: number;
@@ -13,10 +18,22 @@ interface ApiRequestWithTimestamp extends ApiRequest {
 }
 
 test.describe('Console Forwarding E2E', () => {
-  test('should forward simple console messages', async ({ page }) => {
-    // Navigate to the app
-    await page.goto('/');
+  let testEnv: TestEnvironment;
 
+  test.beforeEach(async ({ page }) => {
+    // Setup isolated test environment for each test
+    testEnv = await setupTestEnvironment();
+    await page.goto(testEnv.serverUrl);
+  });
+
+  test.afterEach(async () => {
+    // Always cleanup test environment
+    if (testEnv) {
+      await cleanupTestEnvironment(testEnv);
+    }
+  });
+
+  test('should forward simple console messages', async ({ page }) => {
     // Wait for console forwarding to initialize
     await page.waitForTimeout(1000);
 

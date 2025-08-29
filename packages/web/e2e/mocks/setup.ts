@@ -1,81 +1,14 @@
-// ABOUTME: MSW setup for Playwright tests with isolated test environments
-// ABOUTME: Initializes mock service worker and provides LACE_DIR isolation per worker
+// ABOUTME: Legacy MSW setup file - no longer needed
+// ABOUTME: Playwright-MSW has been removed due to circular dependency issues
 
-// TODO: Temporary fix for circular dependency issue with playwright-msw
-// import { createWorkerFixture, MockServiceWorker } from 'playwright-msw';
+// This file is kept temporarily for reference but should not be used.
+// Use the standard test pattern from docs/web-testing.md instead:
+//
+// import { test, expect } from '@playwright/test';
+// import { setupTestEnvironment, cleanupTestEnvironment } from './helpers/test-utils';
+
 import { test as baseTest } from '@playwright/test';
-import { http } from 'msw';
-import { handlers } from './handlers';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 
-interface TestEnvironmentContext {
-  tempDir: string;
-  originalLaceDir: string | undefined;
-  projectName: string;
-}
-
-// Create test fixture with environment isolation (MSW temporarily disabled)
-export const test = baseTest.extend<
-  {
-    // worker: MockServiceWorker; // Temporarily disabled due to circular dependency
-    http: typeof http;
-  },
-  { testEnv: TestEnvironmentContext }
->({
-  // Worker-scoped environment isolation
-  testEnv: [
-    async ({}, use, testInfo) => {
-      // Create worker-specific temp directory
-      const workerIndex = testInfo.workerIndex;
-      const tempDir = await fs.promises.mkdtemp(
-        path.join(os.tmpdir(), `lace-e2e-worker-${workerIndex}-`)
-      );
-
-      // Save original LACE_DIR and set to our temp directory
-      const originalLaceDir = process.env.LACE_DIR;
-      process.env.LACE_DIR = tempDir;
-
-      // Create unique project name for this worker
-      const projectName = `E2E Test Project Worker ${workerIndex}`;
-
-      // Worker using LACE_DIR
-
-      const context: TestEnvironmentContext = {
-        tempDir,
-        originalLaceDir,
-        projectName,
-      };
-
-      await use(context);
-
-      // Cleanup: restore original LACE_DIR
-      if (originalLaceDir !== undefined) {
-        process.env.LACE_DIR = originalLaceDir;
-      } else {
-        delete process.env.LACE_DIR;
-      }
-
-      // Cleanup: remove temp directory
-      if (
-        await fs.promises
-          .stat(tempDir)
-          .then(() => true)
-          .catch(() => false)
-      ) {
-        await fs.promises.rm(tempDir, { recursive: true, force: true });
-      }
-
-      // Worker cleaned up LACE_DIR
-    },
-    { scope: 'worker' },
-  ],
-
-  // Test-scoped MSW worker (temporarily disabled)
-  // worker: createWorkerFixture(handlers),
-  http,
-});
-
-// Re-export expect for convenience
+// Deprecated: Use standard setupTestEnvironment() pattern instead
+export const test = baseTest;
 export { expect } from '@playwright/test';
