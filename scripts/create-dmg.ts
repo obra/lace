@@ -409,4 +409,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 }
 
-export { createDMG, getVersionInfo, updateAppVersion };
+export { createDMG, getVersionInfo };
