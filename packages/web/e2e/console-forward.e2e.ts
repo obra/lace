@@ -81,7 +81,7 @@ test.describe('Console Forwarding E2E', () => {
       }
     });
 
-    await page.goto('/');
+    // Page is already at correct URL from beforeEach setup
     await page.waitForTimeout(1000);
 
     // Create complex object with circular reference
@@ -116,7 +116,7 @@ test.describe('Console Forwarding E2E', () => {
       }
     });
 
-    await page.goto('/');
+    // Page is already at correct URL from beforeEach setup
     await page.waitForTimeout(1000);
 
     // Test all log levels
@@ -161,7 +161,7 @@ test.describe('Console Forwarding E2E', () => {
       }
     });
 
-    await page.goto('/');
+    // Page is already at correct URL from beforeEach setup
     await page.waitForTimeout(1000);
 
     // Rapid console calls to test batching
@@ -193,7 +193,7 @@ test.describe('Console Forwarding E2E', () => {
       }
     });
 
-    await page.goto('/');
+    // Page is already at correct URL from beforeEach setup
     await page.waitForTimeout(1000);
 
     // Execute console.log - should only work in dev mode
