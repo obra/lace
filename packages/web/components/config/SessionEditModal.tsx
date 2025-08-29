@@ -13,45 +13,63 @@ import type { ProviderInfo, SessionConfiguration } from '@/types/api';
 import type { ProjectInfo, SessionInfo } from '@/types/core';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 import { AVAILABLE_TOOLS } from '@/lib/available-tools';
+import { useSessionEditModal } from '@/hooks/useSessionEditModal';
+import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
 interface SessionEditModalProps {
   isOpen: boolean;
   currentProject: ProjectInfo;
   selectedSession: SessionInfo | null;
-  providers: ProviderInfo[];
-  sessionConfig: SessionConfiguration;
-  sessionName: string;
-  sessionDescription: string;
-  loading: boolean;
   onClose: () => void;
-  onSubmit: (e: React.FormEvent) => void;
-  onSessionNameChange: (name: string) => void;
-  onSessionDescriptionChange: (description: string) => void;
-  onSessionConfigChange: (config: SessionConfiguration) => void;
+  onSuccess?: () => Promise<void>;
 }
 
 export const SessionEditModal = memo(function SessionEditModal({
   isOpen,
   currentProject,
   selectedSession,
-  providers,
-  sessionConfig,
-  sessionName,
-  sessionDescription,
-  loading,
   onClose,
-  onSubmit,
-  onSessionNameChange,
-  onSessionDescriptionChange,
-  onSessionConfigChange,
+  onSuccess,
 }: SessionEditModalProps) {
+  const { availableProviders } = useProviderInstances();
+
+  const {
+    loading,
+    sessionName,
+    sessionDescription,
+    sessionConfig,
+    openModal,
+    closeModal,
+    handleSubmit,
+    handleSessionNameChange,
+    handleSessionDescriptionChange,
+    handleSessionConfigChange,
+    updateProviderInstanceId,
+    updateModelId,
+  } = useSessionEditModal({ onSuccess });
+
   const [newEnvKey, setNewEnvKey] = useState('');
   const [newEnvValue, setNewEnvValue] = useState('');
+
+  // Sync external open state with internal modal state
+  React.useEffect(() => {
+    if (isOpen && selectedSession) {
+      void openModal(selectedSession);
+    } else if (!isOpen) {
+      closeModal();
+    }
+  }, [isOpen, selectedSession, openModal, closeModal]);
+
+  // Handle close - notify external component
+  const handleClose = () => {
+    onClose();
+    closeModal();
+  };
 
   const handleAddEnvironmentVariable = () => {
     if (!newEnvKey.trim() || !newEnvValue.trim()) return;
 
-    onSessionConfigChange({
+    handleSessionConfigChange({
       ...sessionConfig,
       environmentVariables: {
         ...(sessionConfig.environmentVariables ?? {}),
@@ -64,7 +82,7 @@ export const SessionEditModal = memo(function SessionEditModal({
   };
 
   const handleRemoveEnvironmentVariable = (key: string) => {
-    onSessionConfigChange({
+    handleSessionConfigChange({
       ...sessionConfig,
       environmentVariables: Object.fromEntries(
         Object.entries(sessionConfig.environmentVariables || {}).filter(([k]) => k !== key)
@@ -73,7 +91,7 @@ export const SessionEditModal = memo(function SessionEditModal({
   };
 
   const handleToolPolicyChange = (tool: string, policy: ToolPolicy) => {
-    onSessionConfigChange({
+    handleSessionConfigChange({
       ...sessionConfig,
       toolPolicies: {
         ...(sessionConfig.toolPolicies ?? {}),
@@ -87,12 +105,12 @@ export const SessionEditModal = memo(function SessionEditModal({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
-      title={`Edit Session: ${selectedSession.name}`}
+      onClose={handleClose}
+      title={selectedSession ? `Edit Session: ${selectedSession.name}` : 'Edit Session'}
       size="xl"
       className="max-h-[90vh] flex flex-col"
     >
-      <form onSubmit={onSubmit} className="flex flex-col max-h-[80vh]">
+      <form onSubmit={handleSubmit} className="flex flex-col max-h-[80vh]">
         <div className="flex-1 overflow-y-auto px-1 space-y-6">
           {/* Basic Information */}
           <div className="grid md:grid-cols-2 gap-4">
@@ -103,7 +121,7 @@ export const SessionEditModal = memo(function SessionEditModal({
               <input
                 type="text"
                 value={sessionName}
-                onChange={(e) => onSessionNameChange(e.target.value)}
+                onChange={(e) => handleSessionNameChange(e.target.value)}
                 className="input input-bordered w-full"
                 placeholder="e.g., Backend API Development"
                 required
@@ -118,7 +136,7 @@ export const SessionEditModal = memo(function SessionEditModal({
               <input
                 type="text"
                 value={sessionDescription}
-                onChange={(e) => onSessionDescriptionChange(e.target.value)}
+                onChange={(e) => handleSessionDescriptionChange(e.target.value)}
                 className="input input-bordered w-full"
                 placeholder="Optional description"
               />
@@ -127,13 +145,13 @@ export const SessionEditModal = memo(function SessionEditModal({
 
           {/* Provider and Model Selection */}
           <ModelSelectionForm
-            providers={providers}
+            providers={availableProviders}
             providerInstanceId={sessionConfig.providerInstanceId}
             modelId={sessionConfig.modelId}
-            onProviderChange={(instanceId) =>
-              onSessionConfigChange({ ...sessionConfig, providerInstanceId: instanceId })
-            }
-            onModelChange={(modelId) => onSessionConfigChange({ ...sessionConfig, modelId })}
+            onProviderChange={(instanceId) => {
+              updateProviderInstanceId(instanceId);
+            }}
+            onModelChange={(modelId) => updateModelId(modelId)}
           />
 
           {/* Working Directory */}
@@ -145,7 +163,7 @@ export const SessionEditModal = memo(function SessionEditModal({
               type="text"
               value={sessionConfig.workingDirectory || currentProject.workingDirectory}
               onChange={(e) =>
-                onSessionConfigChange({ ...sessionConfig, workingDirectory: e.target.value })
+                handleSessionConfigChange({ ...sessionConfig, workingDirectory: e.target.value })
               }
               className="input input-bordered w-full"
               placeholder={currentProject.workingDirectory}

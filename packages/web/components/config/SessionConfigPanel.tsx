@@ -86,11 +86,6 @@ export function SessionConfigPanel(): React.JSX.Element {
   const [selectedInstanceId, setSelectedInstanceId] = useState('');
   const [selectedModelId, setSelectedModelId] = useState('');
 
-  // Session edit state
-  const [editSessionName, setEditSessionName] = useState('');
-  const [editSessionDescription, setEditSessionDescription] = useState('');
-  const [editSessionConfig, setEditSessionConfig] = useState<SessionConfiguration>(DEFAULT_CONFIG);
-
   // Reset form when project or project configuration changes
   const projectId = currentProject.id;
   useEffect(() => {
@@ -140,12 +135,6 @@ export function SessionConfigPanel(): React.JSX.Element {
     setNewAgentName('');
     setSelectedInstanceId('');
     setSelectedModelId('');
-  };
-
-  const resetEditSessionForm = () => {
-    setEditSessionName('');
-    setEditSessionDescription('');
-    setEditSessionConfig(DEFAULT_CONFIG);
   };
 
   const handleProviderInstanceSelection = (instanceId: string, modelId: string) => {
@@ -489,16 +478,8 @@ export function SessionConfigPanel(): React.JSX.Element {
         isOpen={showEditConfig}
         currentProject={currentProject}
         selectedSession={selectedSession}
-        providers={availableProviders}
-        sessionConfig={editSessionConfig}
-        sessionName={editSessionName}
-        sessionDescription={editSessionDescription}
-        loading={loading}
         onClose={handleCloseEditSession}
-        onSubmit={handleEditSessionSubmit}
-        onSessionNameChange={handleEditSessionNameChange}
-        onSessionDescriptionChange={handleEditSessionDescriptionChange}
-        onSessionConfigChange={handleEditSessionConfigChange}
+        onSuccess={reloadSessionDetails}
       />
 
       <AgentEditModal
