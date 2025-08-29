@@ -31,5 +31,13 @@ export default defineConfig({
         setupFiles: ['./src/test-setup.ts'],
       },
     },
+    {
+      // macOS platform tests (Node environment for file system operations)
+      test: {
+        include: ['src/platforms/macos-app.test.ts'],
+        environment: 'node',
+        timeout: 30000, // Longer timeout for build operations
+      },
+    },
   ],
 });

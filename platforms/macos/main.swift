@@ -69,7 +69,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Open at login item
         let launchAtStartupItem = NSMenuItem(title: "Open at Login", action: #selector(toggleLaunchAtStartup), keyEquivalent: "")
         launchAtStartupItem.state = isLaunchAtStartupEnabled() ? .on : .off
-        if #unavailable(macOS 13.0) && legacyLoginItemHelperBundleID == nil {
+        if #unavailable(macOS 13.0), legacyLoginItemHelperBundleID == nil {
             launchAtStartupItem.isEnabled = false
             launchAtStartupItem.toolTip = "Requires macOS 13+ or an embedded login item helper"
         }
@@ -234,6 +234,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    private func showApprovalRequiredAlert() {
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "User Approval Required"
+            alert.informativeText = "Lace needs your permission to open at login. Please approve this request in System Settings."
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "Open System Settings")
+            alert.addButton(withTitle: "Cancel")
+            
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                // Open System Settings - use generic URL that works across macOS versions
+                let settingsURL: URL
+                if #available(macOS 13.0, *) {
+                    // Use modern System Settings URL
+                    settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?General")!
+                } else {
+                    // Fallback to System Preferences
+                    settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?General")!
+                }
+                
+                NSWorkspace.shared.open(settingsURL)
+            }
+        }
+    }
+    
     private func maybeAutoOpenOnce() {
         guard shouldAutoOpen, serverPort != nil else { return }
         shouldAutoOpen = false
@@ -264,7 +290,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 let service = SMAppService.mainApp
                 try service.register()
-                print("Successfully enabled open at login")
+                
+                // Check the status after registration
+                let status = SMAppService.mainApp.status
+                switch status {
+                case .requiresApproval:
+                    showApprovalRequiredAlert()
+                case .enabled:
+                    print("Successfully enabled open at login")
+                case .notRegistered:
+                    showError("Failed to register for open at login")
+                case .notFound:
+                    showError("Login item service not found")
+                @unknown default:
+                    print("Open at login registration completed with status: \(status)")
+                }
             } catch {
                 showError("Failed to enable open at login: \(error.localizedDescription)")
             }

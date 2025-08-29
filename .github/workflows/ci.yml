@@ -221,11 +221,59 @@ jobs:
             packages/web/playwright-report/
           retention-days: 7
 
+  test-macos-app:
+    name: Test macOS App
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
+    runs-on: [self-hosted, macOS]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run macOS app Swift tests
+        run: |
+          cd platforms/macos
+          make test-swift
+        continue-on-error: false
+
+      - name: Run macOS app integration tests
+        run: |
+          # Run the TypeScript integration tests
+          npx vitest run src/platforms/macos-app.test.ts
+        continue-on-error: false
+
+      - name: Test app build via Makefile
+        run: |
+          cd platforms/macos
+          make clean
+          make build
+          ls -la build/Lace.app/Contents/MacOS/
+          echo "✅ macOS app builds successfully"
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app-test-results
+          path: |
+            platforms/macos/build/
+          retention-days: 3
+
   build-and-package:
     name: Build and Package
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
     runs-on: [self-hosted, macOS]
-    needs: [lint-and-format, build, test, playwright-tests]
+    needs: [lint-and-format, build, test, test-macos-app, playwright-tests]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
