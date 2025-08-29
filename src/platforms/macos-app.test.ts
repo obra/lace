@@ -224,7 +224,7 @@ describe('macOS App Integration Tests', () => {
       expect(swiftCode).toContain('showError');
       expect(swiftCode).toContain('Failed to enable open at login');
       expect(swiftCode).toContain('Failed to disable open at login');
-      expect(swiftCode).toContain('requires macOS 13.0 or later');
+      expect(swiftCode).toContain('requires macOS 13+ or an embedded login item helper');
     });
   });
 

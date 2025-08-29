@@ -12,5 +12,19 @@
     <true/>
     <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
+    
+    <!-- ServiceManagement entitlements for login item management -->
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>group.com.jesseVincent.lace</string>
+    </array>
+    <key>com.apple.application-identifier</key>
+    <string>$(TeamIdentifierPrefix)com.jesseVincent.lace</string>
+    <key>com.apple.developer.team-identifier</key>
+    <string>$(TeamIdentifierPrefix)</string>
+    
+    <!-- Allow ServiceManagement framework usage -->
+    <key>com.apple.security.temporary-exception.sbpl</key>
+    <string>(allow process-exec (literal "/usr/libexec/lsd") (with no-sandbox))</string>
 </dict>
 </plist>

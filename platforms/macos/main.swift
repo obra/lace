@@ -4,6 +4,7 @@
 import Cocoa
 import Foundation
 import ServiceManagement
+import OSLog
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBarItem: NSStatusItem!
@@ -142,7 +143,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func parseServerOutput(_ output: String) {
         // Debug: Log all server output to help with port detection
-        print("Server output: \(output)")
+        os_log("Server output: %{public}@", log: .default, type: .debug, output)
         
         // Look for the specific port signal from the server
         if output.contains("LACE_SERVER_PORT:") {
@@ -152,7 +153,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     let portRange = match.range(at: 1)
                     if let portSubstring = Range(portRange, in: output) {
                         if let port = Int(output[portSubstring]) {
-                            print("Found server port signal: \(port)")
+                            os_log("Found server port signal: %d", log: .default, type: .info, port)
                             DispatchQueue.main.async { [weak self] in
                                 self?.serverPort = port
                                 self?.updateMenu()
@@ -173,7 +174,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     let portRange = match.range(at: 1)
                     if let portSubstring = Range(portRange, in: output) {
                         if let port = Int(output[portSubstring]) {
-                            print("Found server URL signal: \(port)")
+                            os_log("Found server URL signal: %d", log: .default, type: .info, port)
                             DispatchQueue.main.async { [weak self] in
                                 self?.serverPort = port
                                 self?.updateMenu()
@@ -243,21 +244,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             alert.addButton(withTitle: "Open System Settings")
             alert.addButton(withTitle: "Cancel")
             
-            let response = alert.runModal()
-            if response == .alertFirstButtonReturn {
-                // Open System Settings - use generic URL that works across macOS versions
-                let settingsURL: URL
-                if #available(macOS 13.0, *) {
-                    // Use modern System Settings URL
-                    settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?General")!
-                } else {
-                    // Fallback to System Preferences
-                    settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?General")!
+            // Use sheet presentation if we have a window, otherwise fall back to modal
+            if let window = NSApp.mainWindow {
+                alert.beginSheetModal(for: window) { response in
+                    if response == .alertFirstButtonReturn {
+                        self.openSystemSettings()
+                    }
                 }
-                
-                NSWorkspace.shared.open(settingsURL)
+            } else {
+                // Fallback to modal if no main window
+                let response = alert.runModal()
+                if response == .alertFirstButtonReturn {
+                    self.openSystemSettings()
+                }
             }
         }
+    }
+    
+    private func openSystemSettings() {
+        // Open System Settings - use generic URL that works across macOS versions
+        let settingsURL: URL
+        if #available(macOS 13.0, *) {
+            // Use modern System Settings URL
+            settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?General")!
+        } else {
+            // Fallback to System Preferences
+            settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?General")!
+        }
+        
+        NSWorkspace.shared.open(settingsURL)
     }
     
     private func maybeAutoOpenOnce() {
@@ -297,20 +312,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 case .requiresApproval:
                     showApprovalRequiredAlert()
                 case .enabled:
-                    print("Successfully enabled open at login")
+                    os_log("Successfully enabled open at login", log: .default, type: .info)
                 case .notRegistered:
                     showError("Failed to register for open at login")
                 case .notFound:
                     showError("Login item service not found")
                 @unknown default:
-                    print("Open at login registration completed with status: \(status)")
+                    os_log("Open at login registration completed with status: %{public}@", log: .default, type: .info, String(describing: status))
                 }
             } catch {
                 showError("Failed to enable open at login: \(error.localizedDescription)")
             }
         } else {
             // No legacy support without helper bundle
-            showError("Open at login requires macOS 13.0 or later")
+            showError("Open at login requires macOS 13+ or an embedded login item helper")
         }
     }
     
@@ -319,13 +334,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 let service = SMAppService.mainApp
                 try service.unregister()
-                print("Successfully disabled open at login")
+                os_log("Successfully disabled open at login", log: .default, type: .info)
             } catch {
                 showError("Failed to disable open at login: \(error.localizedDescription)")
             }
         } else {
             // No legacy support without helper bundle
-            showError("Open at login requires macOS 13.0 or later")
+            showError("Open at login requires macOS 13+ or an embedded login item helper")
         }
     }
 }
