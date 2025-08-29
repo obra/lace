@@ -67,7 +67,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
         
         // Open at login item
-        let launchAtStartupItem = NSMenuItem(title: "Open at Login", action: #selector(toggleLaunchAtStartup), keyEquivalent: "")
+        let launchAtStartupItem = NSMenuItem(title: "Launch at Startup", action: #selector(toggleLaunchAtStartup), keyEquivalent: "")
         launchAtStartupItem.state = isLaunchAtStartupEnabled() ? .on : .off
         if #unavailable(macOS 13.0), legacyLoginItemHelperBundleID == nil {
             launchAtStartupItem.isEnabled = false

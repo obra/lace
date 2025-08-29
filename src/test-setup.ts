@@ -5,9 +5,12 @@ import { beforeEach } from 'vitest';
 
 // Reset environment before each test
 beforeEach(() => {
-  // Clear any environment variables that might affect tests
-  delete process.env.NODE_ENV;
-  delete process.env.CI;
+  // Clear only LACE-specific environment variables that might affect tests
+  for (const key in process.env) {
+    if (key.startsWith('LACE_')) {
+      delete process.env[key];
+    }
+  }
 });
 
 // Global test utilities can be added here

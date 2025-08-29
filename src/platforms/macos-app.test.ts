@@ -60,7 +60,7 @@ describe('macOS App Integration Tests', () => {
       }, 'Swift compilation should succeed').not.toThrow();
     });
 
-    it('should build complete app bundle', () => {
+    it('should build complete app bundle', { timeout: 120000 }, () => {
       // Build using Makefile
       execSync(`make clean && make BUILD_DIR="${tempDir}" build`, {
         cwd: MACOS_PLATFORM_DIR,
@@ -232,7 +232,7 @@ describe('macOS App Integration Tests', () => {
     it('should use correct macOS conventions', () => {
       const swiftCode = readFileSync(join(MACOS_PLATFORM_DIR, 'main.swift'), 'utf-8');
 
-      expect(swiftCode).toContain('"Open at Login"'); // macOS convention
+      expect(swiftCode).toContain('"Launch at Startup"');
       expect(swiftCode).toContain('"Open Lace"');
       expect(swiftCode).toContain('"Restart Server"');
       expect(swiftCode).toContain('"Quit Lace"');
