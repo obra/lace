@@ -3,12 +3,14 @@
 
 import Cocoa
 import Foundation
+import ServiceManagement
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBarItem: NSStatusItem!
     private var serverProcess: Process?
     private var serverPort: Int?
     private var menu: NSMenu!
+    private var shouldAutoOpen = true
     
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         setupMenuBar()
@@ -60,6 +62,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Restart server item
         let restartItem = NSMenuItem(title: "Restart Server", action: #selector(restartServer), keyEquivalent: "r")
         menu.addItem(restartItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        // Launch at startup item
+        let launchAtStartupItem = NSMenuItem(title: "Launch at Startup", action: #selector(toggleLaunchAtStartup), keyEquivalent: "")
+        launchAtStartupItem.state = isLaunchAtStartupEnabled() ? .on : .off
+        menu.addItem(launchAtStartupItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -142,6 +151,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                             DispatchQueue.main.async { [weak self] in
                                 self?.serverPort = port
                                 self?.updateMenu()
+                                // Auto-open browser when port is detected for the first time
+                                if self?.shouldAutoOpen == true {
+                                    self?.shouldAutoOpen = false
+                                    self?.openBrowser()
+                                }
                             }
                             return
                         }
@@ -162,6 +176,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                             DispatchQueue.main.async { [weak self] in
                                 self?.serverPort = port
                                 self?.updateMenu()
+                                // Auto-open browser when port is detected for the first time
+                                if self?.shouldAutoOpen == true {
+                                    self?.shouldAutoOpen = false
+                                    self?.openBrowser()
+                                }
                             }
                             return
                         }
@@ -189,6 +208,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc private func restartServer() {
         serverPort = nil
+        shouldAutoOpen = false // Don't auto-open on restart
         updateMenu()
         startServer()
     }
@@ -214,6 +234,69 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             alert.alertStyle = .warning
             alert.addButton(withTitle: "OK")
             alert.runModal()
+        }
+    }
+    
+    @objc private func toggleLaunchAtStartup() {
+        if isLaunchAtStartupEnabled() {
+            disableLaunchAtStartup()
+        } else {
+            enableLaunchAtStartup()
+        }
+        updateMenu()
+    }
+    
+    private func isLaunchAtStartupEnabled() -> Bool {
+        let bundleIdentifier = Bundle.main.bundleIdentifier!
+        if #available(macOS 13.0, *) {
+            do {
+                let service = SMAppService.mainApp
+                return service.status == .enabled
+            } catch {
+                print("Error checking launch at startup status: \(error)")
+                return false
+            }
+        } else {
+            // Fallback for older macOS versions using deprecated API
+            return SMLoginItemSetEnabled(bundleIdentifier as CFString, false)
+        }
+    }
+    
+    private func enableLaunchAtStartup() {
+        if #available(macOS 13.0, *) {
+            do {
+                let service = SMAppService.mainApp
+                try service.register()
+                print("Successfully enabled launch at startup")
+            } catch {
+                showError("Failed to enable launch at startup: \(error.localizedDescription)")
+            }
+        } else {
+            // Fallback for older macOS versions using deprecated API
+            let bundleIdentifier = Bundle.main.bundleIdentifier!
+            let success = SMLoginItemSetEnabled(bundleIdentifier as CFString, true)
+            if !success {
+                showError("Failed to enable launch at startup")
+            }
+        }
+    }
+    
+    private func disableLaunchAtStartup() {
+        if #available(macOS 13.0, *) {
+            do {
+                let service = SMAppService.mainApp
+                try service.unregister()
+                print("Successfully disabled launch at startup")
+            } catch {
+                showError("Failed to disable launch at startup: \(error.localizedDescription)")
+            }
+        } else {
+            // Fallback for older macOS versions using deprecated API
+            let bundleIdentifier = Bundle.main.bundleIdentifier!
+            let success = SMLoginItemSetEnabled(bundleIdentifier as CFString, false)
+            if !success {
+                showError("Failed to disable launch at startup")
+            }
         }
     }
 }
