@@ -4,7 +4,7 @@
 import { execSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { createDMG, getVersionInfo } from './create-dmg.js';
+import { createDMG, getVersionInfo, updateAppVersion } from './create-dmg.js';
 
 function runPackageTarget(workspace: string, target: string, description: string) {
   console.log(`🔨 ${description}...`);
@@ -12,11 +12,7 @@ function runPackageTarget(workspace: string, target: string, description: string
   console.log(`✅ ${description} completed\n`);
 }
 
-async function createAppBundle(
-  executablePath: string,
-  baseName: string,
-  outdir: string
-): Promise<string> {
+async function createAppBundle(executablePath: string, outdir: string): Promise<string> {
   const appName = 'Lace';
   const appBundlePath = join(outdir, `${appName}.app`);
   const contentsPath = join(appBundlePath, 'Contents');
@@ -190,25 +186,24 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   const env = { ...process.env, NODE_ENV: 'production' };
   execSync(compileCmd, { stdio: 'inherit', env });
 
-  // Handle code signing
-  if (sign && process.platform === 'darwin') {
-    console.log('🔏 Starting signing and notarization...');
-    try {
+  // Handle code signing for standalone binaries (not app bundles)
+  if (process.platform === 'darwin') {
+    if (bundle) {
+      console.log('🔏 Deferring signing to app bundle stage...');
+    } else if (sign) {
+      console.log('🔏 Signing and notarizing standalone binary...');
       execFileSync('bunx', ['tsx', 'scripts/sign-and-notarize.ts', '--binary', outputPath], {
         stdio: 'inherit',
       });
-    } catch (error) {
-      console.error('❌ Signing failed:', error);
-      throw error;
-    }
-  } else if (process.platform === 'darwin') {
-    console.log('🔏 Applying basic ad-hoc signing (macOS)...');
-    try {
-      execFileSync('codesign', ['--remove-signature', outputPath], { stdio: 'pipe' });
-      execFileSync('codesign', ['-s', '-', '--deep', '--force', outputPath], { stdio: 'pipe' });
-      console.log('✅ Ad-hoc signing completed');
-    } catch (error) {
-      console.warn('⚠️  Warning: Ad-hoc signing failed, but executable may still work');
+    } else {
+      console.log('🔏 Applying ad-hoc signing (macOS)...');
+      try {
+        execFileSync('codesign', ['--remove-signature', outputPath], { stdio: 'pipe' });
+        execFileSync('codesign', ['-s', '-', '--deep', '--force', outputPath], { stdio: 'pipe' });
+        console.log('✅ Ad-hoc signing completed');
+      } catch {
+        console.warn('⚠️  Ad-hoc signing failed; continuing');
+      }
     }
   } else {
     console.log('ℹ️  Skipping code signing (non-macOS platform)');
@@ -228,10 +223,40 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
   let dmgPath = '';
   if (bundle && process.platform === 'darwin') {
     console.log('🔨 Creating macOS app bundle...');
-    appBundlePath = await createAppBundle(outputPath, name, outdir);
+    appBundlePath = await createAppBundle(outputPath, outdir);
     console.log(`✅ App bundle created: ${appBundlePath}`);
 
-    // Create DMG if requested
+    // Update app version in Info.plist BEFORE signing
+    console.log('📝 Updating app bundle version...');
+    updateAppVersion(appBundlePath, versionInfo.fullVersion);
+    console.log(`✅ App version updated to ${versionInfo.fullVersion}`);
+
+    // Sign the app bundle if requested
+    if (sign) {
+      console.log('🔏 Signing and notarizing app bundle...');
+      try {
+        execFileSync('bunx', ['tsx', 'scripts/sign-and-notarize.ts', '--binary', appBundlePath], {
+          stdio: 'inherit',
+        });
+        console.log('✅ App bundle signed and notarized');
+      } catch (error) {
+        console.error('❌ App bundle signing failed:', error);
+        throw error;
+      }
+    } else {
+      console.log('🔏 Applying ad-hoc signing to app bundle...');
+      try {
+        execFileSync('codesign', ['--remove-signature', appBundlePath], { stdio: 'pipe' });
+        execFileSync('codesign', ['-s', '-', '--deep', '--force', appBundlePath], {
+          stdio: 'pipe',
+        });
+        console.log('✅ App bundle ad-hoc signing completed');
+      } catch {
+        console.warn('⚠️  App bundle ad-hoc signing failed; continuing');
+      }
+    }
+
+    // Create DMG if requested (AFTER signing)
     if (dmg) {
       console.log('\n🔨 Creating DMG distribution...');
       dmgPath = await createDMG({

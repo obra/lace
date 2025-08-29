@@ -1,9 +1,10 @@
 // ABOUTME: Script to create a properly formatted DMG for macOS distribution
 // ABOUTME: Handles DMG creation with version naming and proper setup
 
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, resolve, basename } from 'path';
+import { z } from 'zod';
 
 interface DMGOptions {
   appBundlePath: string;
@@ -20,6 +21,20 @@ interface VersionInfo {
   fullVersion: string;
 }
 
+// Schema for package.json validation
+const PackageJsonSchema = z.object({
+  version: z.string().min(1, 'Version must not be empty'),
+});
+
+// Schema for hdiutil attach -plist output validation
+const HdiutilAttachSchema = z.object({
+  'system-entities': z.array(
+    z.object({
+      'mount-point': z.string().optional(),
+    })
+  ),
+});
+
 function getVersionInfo(): VersionInfo {
   // Get npm version from package.json
   const packageJsonPath = resolve('package.json');
@@ -27,28 +42,39 @@ function getVersionInfo(): VersionInfo {
     throw new Error('package.json not found');
   }
 
-  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
-  const npmVersion = packageJson.version;
-
-  // Get git short SHA
-  let gitShortSha: string;
   try {
-    gitShortSha = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
+    const packageJsonRaw = readFileSync(packageJsonPath, 'utf8');
+    const packageJsonParsed = JSON.parse(packageJsonRaw);
+    const packageJson = PackageJsonSchema.parse(packageJsonParsed);
+    const npmVersion = packageJson.version;
+
+    // Get git short SHA
+    let gitShortSha: string;
+    try {
+      gitShortSha = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
+    } catch (error) {
+      console.warn('Warning: Could not get git SHA, using fallback');
+      gitShortSha = 'dev';
+    }
+
+    const fullVersion = `${npmVersion}-${gitShortSha}`;
+
+    return {
+      npmVersion,
+      gitShortSha,
+      fullVersion,
+    };
   } catch (error) {
-    console.warn('Warning: Could not get git SHA, using fallback');
-    gitShortSha = 'dev';
+    if (error instanceof z.ZodError) {
+      throw new Error(`Invalid package.json format: ${error.message}`);
+    }
+    throw new Error(
+      `Failed to parse package.json: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
-
-  const fullVersion = `${npmVersion}-${gitShortSha}`;
-
-  return {
-    npmVersion,
-    gitShortSha,
-    fullVersion,
-  };
 }
 
-function updateAppVersion(appBundlePath: string, version: string) {
+export function updateAppVersion(appBundlePath: string, version: string) {
   const infoPlistPath = join(appBundlePath, 'Contents', 'Info.plist');
 
   if (!existsSync(infoPlistPath)) {
@@ -113,8 +139,7 @@ async function createDMG(options: DMGOptions): Promise<string> {
   console.log(`   📱 App Bundle: ${basename(appBundlePath)}`);
   console.log(`   📄 Version: ${versionInfo.fullVersion}`);
 
-  // Update app version before packaging
-  updateAppVersion(appBundlePath, versionInfo.fullVersion);
+  // Note: App version should be updated during build, before signing
 
   // Ensure output directory exists
   mkdirSync(outputDir, { recursive: true });
@@ -149,7 +174,7 @@ Installation:
 2. Open Lace from Applications or Launchpad
 3. Enjoy your AI coding assistant!
 
-For more information, visit: https://github.com/laceai/lace
+For more information, visit: https://github.com/obra/lace
 `
     );
 
@@ -173,18 +198,38 @@ For more information, visit: https://github.com/laceai/lace
     console.log('🎨 Customizing DMG appearance...');
 
     try {
-      // Mount the temporary DMG for customization
+      // Mount the temporary DMG for customization using -plist for safe parsing
       console.log('   📱 Mounting DMG for customization...');
-      const mountOutput = execSync(
-        `hdiutil attach "${tempDmgPath}" -readwrite -noverify -noautoopen`,
+      const mountOutput = execFileSync(
+        'hdiutil',
+        ['attach', tempDmgPath, '-readwrite', '-noverify', '-noautoopen', '-plist'],
         {
           encoding: 'utf8',
         }
       );
 
-      const volumePath = `/Volumes/${volumeName}`;
+      // Parse the plist output to get the actual mount point
+      let volumePath: string;
+      try {
+        const mountData = HdiutilAttachSchema.parse(JSON.parse(mountOutput));
+        const mountPoint = mountData['system-entities'].find((entity) => entity['mount-point'])?.[
+          'mount-point'
+        ];
+
+        if (!mountPoint) {
+          throw new Error('No mount point found in hdiutil output');
+        }
+
+        volumePath = mountPoint;
+        console.log(`   📁 DMG mounted at: ${volumePath}`);
+      } catch (error) {
+        throw new Error(
+          `Failed to parse hdiutil mount output: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+
       if (!existsSync(volumePath)) {
-        throw new Error(`Failed to mount DMG at ${volumePath}`);
+        throw new Error(`Mount point does not exist: ${volumePath}`);
       }
 
       try {
@@ -194,8 +239,7 @@ For more information, visit: https://github.com/laceai/lace
         console.log('   🎨 Applying custom layout...');
 
         // Set up the DMG appearance using AppleScript
-        const appleScript = `
-tell application "Finder"
+        const appleScript = `tell application "Finder"
   tell disk "${volumeName}"
     open
     set current view of container window to icon view
@@ -219,12 +263,14 @@ tell application "Finder"
     delay 2
     close
   end tell
-end tell
-`;
+end tell`;
 
-        // Apply the AppleScript (with error handling)
+        // Apply the AppleScript using execFileSync to avoid shell injection
         try {
-          execSync(`osascript -e '${appleScript}'`, { stdio: 'pipe', timeout: 30000 });
+          execFileSync('osascript', ['-e', appleScript], {
+            stdio: 'pipe',
+            timeout: 30000,
+          });
           console.log('   ✅ Layout applied successfully');
         } catch (error) {
           console.log('   ⚠️  Layout customization failed, but continuing with basic DMG');
@@ -233,10 +279,13 @@ end tell
         // Unmount the DMG
         console.log('   📤 Unmounting DMG...');
         try {
-          execSync(`hdiutil detach "${volumePath}"`, { stdio: 'pipe', timeout: 10000 });
+          execFileSync('hdiutil', ['detach', volumePath], {
+            stdio: 'pipe',
+            timeout: 10000,
+          });
         } catch (error) {
           console.log('   ⚠️  Force unmounting...');
-          execSync(`hdiutil detach "${volumePath}" -force`, { stdio: 'pipe' });
+          execFileSync('hdiutil', ['detach', volumePath, '-force'], { stdio: 'pipe' });
         }
       }
 
@@ -257,7 +306,11 @@ end tell
       // Clean up any partial files
       if (existsSync(tempDmgPath)) {
         try {
-          execSync(`hdiutil detach "/Volumes/${volumeName}" -force`, { stdio: 'pipe' });
+          // Try to unmount any volumes that may have been mounted
+          const detachResult = execFileSync('hdiutil', ['info'], { encoding: 'utf8' });
+          if (detachResult.includes(tempDmgPath)) {
+            execFileSync('hdiutil', ['detach', tempDmgPath, '-force'], { stdio: 'pipe' });
+          }
         } catch {}
         execSync(`rm -f "${tempDmgPath}"`);
       }
@@ -356,4 +409,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 }
 
-export { createDMG, getVersionInfo };
+export { createDMG, getVersionInfo, updateAppVersion };

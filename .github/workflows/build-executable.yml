@@ -38,9 +38,7 @@ jobs:
         npm install
         cd packages/web && npm install
     
-    - name: Build Next.js app
-      run: |
-        cd packages/web && npm run build
+    # Web build is invoked by scripts/build-macos-app.ts
     
     - name: Build executable
       env:
