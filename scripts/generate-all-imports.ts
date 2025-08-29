@@ -1,7 +1,7 @@
-// ABOUTME: Generate imports for all JSON and MD files that need embedding  
+// ABOUTME: Generate imports for all JSON and MD files that need embedding
 // ABOUTME: Creates explicit imports that Bun needs for file embedding
 
-import { readdirSync, statSync, writeFileSync, mkdirSync } from 'fs';
+import { readdirSync, statSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join, relative, resolve } from 'path';
 import { pathToFileURL } from 'url';
 
@@ -19,57 +19,94 @@ function scanForFiles(dirPath: string, extension: string, prefix: string): Embed
   let counter = 0;
 
   function scanDirectory(dir: string) {
-    const entries = readdirSync(dir);
-    
+    if (!existsSync(dir)) {
+      return;
+    }
+
+    let entries: string[];
+    try {
+      entries = readdirSync(dir);
+    } catch (err: unknown) {
+      if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
+        return;
+      }
+      throw err;
+    }
+
     for (const entry of entries) {
       const fullPath = join(dir, entry);
       const stat = statSync(fullPath);
-      
+
       if (stat.isDirectory()) {
         scanDirectory(fullPath);
       } else if (entry.endsWith(extension)) {
         // Generate relative path from build/temp/ to the file
         const relativePath = relative('build/temp', fullPath).replace(/\\/g, '/');
-        
+
         files.push({
           importName: `${prefix}${counter++}`,
           filePath: relativePath,
-          originalPath: fullPath
+          originalPath: fullPath,
         });
       }
     }
   }
-  
+
   scanDirectory(dirPath);
   return files;
 }
 
 function generateAllImports() {
   console.log('📁 Scanning for files to embed...');
-  
+
   // Scan for JSON catalogs
   const jsonFiles = scanForFiles('packages/core/src/providers/catalog/data', '.json', 'catalog');
   console.log(`📋 Found ${jsonFiles.length} catalog files`);
-  
-  // Scan for MD prompts  
+
+  // Scan for MD prompts
   const mdFiles = scanForFiles('packages/core/src/config/prompts', '.md', 'prompt');
   console.log(`📄 Found ${mdFiles.length} prompt files`);
-  
+
   // Scan for client assets
-  const clientAssets = scanForFiles('packages/web/build/client', '', 'asset');
-  console.log(`🎨 Found ${clientAssets.length} client asset files`);
-  
+  const clientAssetsRaw = scanForFiles('packages/web/build/client', '', 'asset');
+  // Exclude .map files to reduce binary size
+  const clientAssets = clientAssetsRaw.filter((file) => !file.originalPath.endsWith('.map'));
+  console.log(
+    `🎨 Found ${clientAssets.length} client asset files (${clientAssetsRaw.length - clientAssets.length} .map files excluded)`
+  );
+
   const allFiles = [...jsonFiles, ...mdFiles, ...clientAssets];
-  
-  // Generate imports
+
+  // Generate imports with appropriate types
   const imports = allFiles
-    .map(file => `import ${file.importName} from './${file.filePath}' with { type: 'file' };`)
+    .map((file) => {
+      const ext = file.filePath.split('.').pop()?.toLowerCase();
+      let importType = 'file'; // default
+
+      // Use appropriate import types based on file extension
+      switch (ext) {
+        case 'json':
+          importType = 'json';
+          break;
+        case 'css':
+          importType = 'file';
+          break;
+        case 'md':
+        case 'txt':
+          importType = 'text';
+          break;
+        default:
+          importType = 'file'; // fonts, js, images, etc.
+      }
+
+      return `import ${file.importName} from './${file.filePath}' with { type: '${importType}' };`;
+    })
     .join('\n');
-  
+
   const exportMap = allFiles
-    .map(file => `  '${file.originalPath}': ${file.importName},`)
+    .map((file) => `  '${file.originalPath}': ${file.importName},`)
     .join('\n');
-  
+
   const generatedCode = `// ABOUTME: Auto-generated file imports for Bun embedding
 // ABOUTME: Do not edit manually - regenerated on each build
 
@@ -86,10 +123,10 @@ import '../../packages/web/server-production';
 
   // Ensure output directory exists
   mkdirSync(OUTPUT_DIR, { recursive: true });
-  
+
   const outputFile = join(OUTPUT_DIR, 'embed-all-files.ts');
   writeFileSync(outputFile, generatedCode);
-  
+
   console.log(`✅ Generated ${outputFile} with ${allFiles.length} imports`);
   console.log(`   📋 ${jsonFiles.length} JSON catalogs`);
   console.log(`   📄 ${mdFiles.length} MD prompts`);

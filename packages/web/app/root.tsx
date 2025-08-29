@@ -3,6 +3,7 @@
 
 import { Outlet, Scripts, Links, Meta } from 'react-router';
 import '@/app/globals.css';
+import '@/app/fonts';
 import { ErrorBoundary } from '@/components/old/ErrorBoundary';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
