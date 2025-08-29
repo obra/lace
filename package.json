@@ -27,7 +27,7 @@
     "typecheck": "npm run typecheck --workspace=packages/core && npm run typecheck --workspace=packages/web",
     "lint": "npm run lint --workspace=packages/core && npm run lint --workspace=packages/web",
     "lint:fix": "npm run lint:fix --workspace=packages/core && npm run lint:fix --workspace=packages/web",
-    "format": "npm run format --workspace=packages/core && npm run format --workspace=packages/web",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css,scss,html,yml,yaml}\" && npm run format --workspace=packages/core && npm run format --workspace=packages/web",
     "knip": "npx knip --isolate-workspaces",
     "knip:ci": "npx knip --isolate-workspaces --reporter json > knip-report.json || true",
     "prepare": "husky",
