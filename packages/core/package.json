@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-    "format": "prettier --write \"src/**/*.{ts,js,json}\" \"*.{json,md,yml,yaml}\"",
+    "format": "prettier --ignore-path ../../.prettierignore --write \"src/**/*.{ts,js,json}\" \"**/*.{json,md,yml,yaml}\"",
     "test": "vitest run",
     "test:run": "npm run test",
     "test:watch": "vitest",
