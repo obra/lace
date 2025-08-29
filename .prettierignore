@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+dist/
+build/
+
+# Generated files
+.next/
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+.private-journal/
+
+# Data files
+*.sqlite
+*.db
+
+# Binary files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.svg
+*.woff
+*.woff2
+*.ttf
+*.eot
+
+# Generated config files
+packages/web/.react-router/
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
+# Documentation that shouldn't be auto-formatted
+CHANGELOG.md
