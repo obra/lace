@@ -30,7 +30,10 @@ jobs:
         run: npm run lint
 
       - name: Check Prettier formatting
-        run: npx prettier --check "src/**/*.ts"
+        run: npx prettier --check "packages/core/src/*.ts"
+      
+      - name: Check Prettier formatting
+        run: npx prettier --check "packages/web/**/*.ts" "packages/web/**/*.tsx"
 
   build:
     name: Build Project
