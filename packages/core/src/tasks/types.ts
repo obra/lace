@@ -2,7 +2,9 @@
 // ABOUTME: Used by both agent tools and human-facing web APIs
 
 import type { ThreadId, AssigneeId } from '~/threads/types';
-export type { TaskStatus } from '~/tasks/task-status';
+import type { TaskStatus } from '~/tasks/task-status';
+
+export type { TaskStatus };
 export type TaskPriority = 'high' | 'medium' | 'low';
 
 // Task actors can be either a ThreadId or 'human' (or any string that represents a valid thread ID)
