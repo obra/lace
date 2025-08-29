@@ -27,21 +27,19 @@ $(APP_BUNDLE): main.swift Info.plist AppIcon.icns
 	
 	@echo "App bundle created at $(APP_BUNDLE)"
 
-test-swift: MacosAppTests.swift
-	@echo "Building and running Swift unit tests..."
+test-swift: SwiftValidationTests.swift main.swift
+	@echo "Running Swift validation tests..."
 	@mkdir -p $(TEST_DIR)
 	
-	# Compile test bundle with XCTest framework
-	swiftc -o $(TEST_DIR)/MacosAppTests \
-		MacosAppTests.swift \
-		-framework XCTest \
+	# Compile and run Swift validation tests (no XCTest dependency)
+	swiftc -o $(TEST_DIR)/SwiftValidationTests \
+		SwiftValidationTests.swift \
 		-framework Cocoa \
 		-framework ServiceManagement \
-		-target arm64-apple-macos10.15 \
-		-I /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks
+		-target arm64-apple-macos10.15
 	
-	# Run the tests
-	$(TEST_DIR)/MacosAppTests
+	# Run the validation tests
+	$(TEST_DIR)/SwiftValidationTests
 
 test: test-swift
 	@echo "Running all macOS app tests..."
