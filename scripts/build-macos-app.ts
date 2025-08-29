@@ -5,9 +5,12 @@ import { execSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createDMG, getVersionInfo, updateAppVersion } from './create-dmg.js';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, unlinkSync, readFileSync, chmodSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+
+const ALLOWED_CHANNELS = ['release', 'nightly'] as const;
+type Channel = (typeof ALLOWED_CHANNELS)[number];
 
 function runPackageTarget(workspace: string, target: string, description: string) {
   console.log(`🔨 ${description}...`);
@@ -89,14 +92,36 @@ async function generateAppcast(options: {
   const sparkleToolsPath = resolve('platforms/macos/bin/generate_appcast');
   if (existsSync(sparkleToolsPath)) {
     console.log('🔧 Using Sparkle generate_appcast tool...');
+
+    // Check for EdDSA private key for signing
+    const privateKeyPath = 'platforms/macos/sparkle_private_key';
+    let tempKeyPath: string | null = null;
+
     try {
-      execFileSync(sparkleToolsPath, [resolve(appcastDir)], {
+      const args = [resolve(appcastDir)];
+
+      // Add private key if available
+      if (existsSync(privateKeyPath)) {
+        console.log('   🔑 Using EdDSA private key for signing...');
+        // Create temporary key file with secure permissions
+        tempKeyPath = join(tmpdir(), `sparkle-key-${Date.now()}.pem`);
+        const keyContent = readFileSync(privateKeyPath, 'utf8');
+        writeFileSync(tempKeyPath, keyContent, { mode: 0o600 });
+        args.push('--ed-key-file', tempKeyPath);
+      }
+
+      execFileSync(sparkleToolsPath, args, {
         stdio: 'inherit',
       });
       console.log(`✅ Appcast generated at ${appcastDir}/appcast.xml`);
     } catch (error) {
       console.warn('⚠️  Sparkle generate_appcast failed, creating basic appcast...');
       await createBasicAppcast({ dmgPath: appcastDmgPath, channel, outdir, versionInfo, fileSize });
+    } finally {
+      // Clean up temporary key file
+      if (tempKeyPath && existsSync(tempKeyPath)) {
+        unlinkSync(tempKeyPath);
+      }
     }
   } else {
     console.log('📝 Creating basic appcast (Sparkle tools not found)...');
@@ -135,7 +160,7 @@ async function createBasicAppcast(options: {
       <enclosure
         url="PLACEHOLDER_URL_TO_BE_REPLACED"
         length="${fileSize}"
-        type="application/octet-stream"
+        type="application/x-apple-diskimage"
         sparkle:edSignature="PLACEHOLDER_SIGNATURE"/>
     </item>
   </channel>
@@ -144,6 +169,17 @@ async function createBasicAppcast(options: {
   writeFileSync(appcastPath, appcastContent);
   console.log(`📝 Basic appcast created at ${appcastPath}`);
   console.log(`⚠️  Remember to replace PLACEHOLDER_URL and PLACEHOLDER_SIGNATURE!`);
+
+  // Fail CI if placeholders remain
+  if (
+    process.env.CI &&
+    (appcastContent.includes('PLACEHOLDER_URL_TO_BE_REPLACED') ||
+      appcastContent.includes('PLACEHOLDER_SIGNATURE'))
+  ) {
+    throw new Error(
+      'Appcast contains placeholders in CI environment. PLACEHOLDER_URL_TO_BE_REPLACED and/or PLACEHOLDER_SIGNATURE must be replaced with actual values.'
+    );
+  }
 }
 
 interface BuildOptions {
@@ -183,7 +219,13 @@ function parseArgs(): BuildOptions {
         options.bundle = true; // DMG requires bundle
         break;
       case '--channel':
-        options.channel = args[++i];
+        const channelValue = args[++i];
+        if (!ALLOWED_CHANNELS.includes(channelValue as Channel)) {
+          console.error(`❌ Invalid channel: ${channelValue}`);
+          console.error(`   Valid channels: ${ALLOWED_CHANNELS.join(', ')}`);
+          process.exit(1);
+        }
+        options.channel = channelValue;
         break;
       case '--generate-appcast':
         options.generateAppcast = true;
