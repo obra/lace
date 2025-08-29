@@ -69,35 +69,35 @@ export const SessionEditModal = memo(function SessionEditModal({
   const handleAddEnvironmentVariable = () => {
     if (!newEnvKey.trim() || !newEnvValue.trim()) return;
 
-    handleSessionConfigChange({
-      ...sessionConfig,
+    handleSessionConfigChange((prev) => ({
+      ...prev,
       environmentVariables: {
-        ...(sessionConfig.environmentVariables ?? {}),
+        ...(prev.environmentVariables ?? {}),
         [newEnvKey.trim()]: newEnvValue.trim(),
       },
-    });
+    }));
 
     setNewEnvKey('');
     setNewEnvValue('');
   };
 
   const handleRemoveEnvironmentVariable = (key: string) => {
-    handleSessionConfigChange({
-      ...sessionConfig,
+    handleSessionConfigChange((prev) => ({
+      ...prev,
       environmentVariables: Object.fromEntries(
-        Object.entries(sessionConfig.environmentVariables || {}).filter(([k]) => k !== key)
+        Object.entries(prev.environmentVariables || {}).filter(([k]) => k !== key)
       ),
-    });
+    }));
   };
 
   const handleToolPolicyChange = (tool: string, policy: ToolPolicy) => {
-    handleSessionConfigChange({
-      ...sessionConfig,
+    handleSessionConfigChange((prev) => ({
+      ...prev,
       toolPolicies: {
-        ...(sessionConfig.toolPolicies ?? {}),
+        ...(prev.toolPolicies ?? {}),
         [tool]: policy,
       },
-    });
+    }));
   };
 
   if (!selectedSession) return null;
@@ -163,7 +163,10 @@ export const SessionEditModal = memo(function SessionEditModal({
               type="text"
               value={sessionConfig.workingDirectory || currentProject.workingDirectory}
               onChange={(e) =>
-                handleSessionConfigChange({ ...sessionConfig, workingDirectory: e.target.value })
+                handleSessionConfigChange((prev) => ({
+                  ...prev,
+                  workingDirectory: e.target.value,
+                }))
               }
               className="input input-bordered w-full"
               placeholder={currentProject.workingDirectory}
@@ -253,7 +256,7 @@ export const SessionEditModal = memo(function SessionEditModal({
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-4 border-t border-base-300">
-          <button type="button" onClick={onClose} className="btn btn-ghost">
+          <button type="button" onClick={handleClose} className="btn btn-ghost">
             Cancel
           </button>
           <button

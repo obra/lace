@@ -22,7 +22,9 @@ export interface UseSessionEditModalReturn {
   handleSubmit: (e: React.FormEvent) => Promise<void>;
   handleSessionNameChange: (name: string) => void;
   handleSessionDescriptionChange: (description: string) => void;
-  handleSessionConfigChange: (config: SessionConfiguration) => void;
+  handleSessionConfigChange: (
+    config: SessionConfiguration | ((prev: SessionConfiguration) => SessionConfiguration)
+  ) => void;
   updateProviderInstanceId: (instanceId: string) => void;
   updateModelId: (modelId: string) => void;
 }
@@ -137,9 +139,16 @@ export function useSessionEditModal({
     setSessionDescription(description);
   }, []);
 
-  const handleSessionConfigChange = useCallback((config: SessionConfiguration) => {
-    setSessionConfig(config);
-  }, []);
+  const handleSessionConfigChange = useCallback(
+    (config: SessionConfiguration | ((prev: SessionConfiguration) => SessionConfiguration)) => {
+      if (typeof config === 'function') {
+        setSessionConfig(config);
+      } else {
+        setSessionConfig(config);
+      }
+    },
+    []
+  );
 
   const updateProviderInstanceId = useCallback((instanceId: string) => {
     setSessionConfig((prev) => ({ ...prev, providerInstanceId: instanceId }));
