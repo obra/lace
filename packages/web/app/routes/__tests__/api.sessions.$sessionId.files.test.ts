@@ -93,9 +93,7 @@ describe('/api/sessions/[sessionId]/files', () => {
   });
 
   it('should list files in subdirectory when path is specified', async () => {
-    const request = new Request(
-      `http://localhost/api/sessions/${testSessionId}/files?path=src`
-    );
+    const request = new Request(`http://localhost/api/sessions/${testSessionId}/files?path=src`);
 
     const response = await loader(createLoaderArgs(request, { sessionId: testSessionId }));
 
@@ -194,21 +192,21 @@ describe('/api/sessions/[sessionId]/files', () => {
 
   it('should not follow symlinks that resolve outside working directory', async () => {
     const outsideDir = await fs.mkdtemp(join(tmpdir(), 'outside-test-'));
-    
+
     try {
       await fs.writeFile(join(outsideDir, 'secret.txt'), 'secret content');
-      
+
       const symlinkPath = join(testDir, 'malicious-link');
       try {
         await fs.symlink(join(outsideDir, 'secret.txt'), symlinkPath);
-        
+
         const request = new Request(`http://localhost/api/sessions/${testSessionId}/files`);
         const response = await loader(createLoaderArgs(request, { sessionId: testSessionId }));
-        
+
         expect(response.status).toBe(200);
         const data = await parseResponse<SessionDirectoryResponse>(response);
-        
-        const entryNames = data.entries.map(e => e.name);
+
+        const entryNames = data.entries.map((e) => e.name);
         expect(entryNames).not.toContain('malicious-link');
       } catch (_symlinkError) {
         console.warn('Skipping symlink test - symlinks not supported');

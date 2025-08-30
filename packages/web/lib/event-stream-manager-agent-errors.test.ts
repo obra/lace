@@ -1,4 +1,4 @@
-// ABOUTME: Test agent error event forwarding through EventStreamManager to SSE streams  
+// ABOUTME: Test agent error event forwarding through EventStreamManager to SSE streams
 // ABOUTME: Verifies error events reach frontend with correct data structure and broadcasting
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -95,10 +95,10 @@ describe('EventStreamManager Agent Error Handling', () => {
       });
 
       // Wait for async event processing
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Should have captured AGENT_ERROR event
-      const agentErrorEvents = capturedEvents.filter(event => event.type === 'AGENT_ERROR');
+      const agentErrorEvents = capturedEvents.filter((event) => event.type === 'AGENT_ERROR');
       expect(agentErrorEvents).toHaveLength(1);
 
       const errorEvent = agentErrorEvents[0];
@@ -139,9 +139,9 @@ describe('EventStreamManager Agent Error Handling', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const agentErrorEvents = capturedEvents.filter(event => event.type === 'AGENT_ERROR');
+      const agentErrorEvents = capturedEvents.filter((event) => event.type === 'AGENT_ERROR');
       expect(agentErrorEvents).toHaveLength(1);
 
       const errorEvent = agentErrorEvents[0];
@@ -177,9 +177,9 @@ describe('EventStreamManager Agent Error Handling', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const agentErrorEvents = capturedEvents.filter(event => event.type === 'AGENT_ERROR');
+      const agentErrorEvents = capturedEvents.filter((event) => event.type === 'AGENT_ERROR');
       expect(agentErrorEvents).toHaveLength(1);
 
       const errorEvent = agentErrorEvents[0];
@@ -215,9 +215,9 @@ describe('EventStreamManager Agent Error Handling', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const errorEvent = capturedEvents.find(event => event.type === 'AGENT_ERROR');
+      const errorEvent = capturedEvents.find((event) => event.type === 'AGENT_ERROR');
       expect(errorEvent).toBeDefined();
       expect(errorEvent!.data).toMatchObject({
         errorType: 'provider_failure',
@@ -250,9 +250,9 @@ describe('EventStreamManager Agent Error Handling', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const errorEvent = capturedEvents.find(event => event.type === 'AGENT_ERROR');
+      const errorEvent = capturedEvents.find((event) => event.type === 'AGENT_ERROR');
       expect(errorEvent).toBeDefined();
       expect(errorEvent!.data).toMatchObject({
         errorType: 'provider_failure',
@@ -287,9 +287,9 @@ describe('EventStreamManager Agent Error Handling', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const errorEvent = capturedEvents.find(event => event.type === 'AGENT_ERROR');
+      const errorEvent = capturedEvents.find((event) => event.type === 'AGENT_ERROR');
       expect(errorEvent).toBeDefined();
       expect(errorEvent!.data).toHaveProperty('stack');
       expect((errorEvent!.data as AgentErrorData).stack).toContain('Error with stack');
@@ -312,9 +312,9 @@ describe('EventStreamManager Agent Error Handling', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const errorEvent = capturedEvents.find(event => event.type === 'AGENT_ERROR');
+      const errorEvent = capturedEvents.find((event) => event.type === 'AGENT_ERROR');
       expect(errorEvent).toBeDefined();
       expect(errorEvent!.transient).toBe(true);
     });
@@ -334,9 +334,9 @@ describe('EventStreamManager Agent Error Handling', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const errorEvent = capturedEvents.find(event => event.type === 'AGENT_ERROR');
+      const errorEvent = capturedEvents.find((event) => event.type === 'AGENT_ERROR');
       expect(errorEvent).toBeDefined();
       expect(errorEvent!.context).toMatchObject({
         projectId: project.getId(),
@@ -380,14 +380,14 @@ describe('EventStreamManager Agent Error Handling', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Should have captured both errors
-      const agentErrorEvents = capturedEvents.filter(event => event.type === 'AGENT_ERROR');
+      const agentErrorEvents = capturedEvents.filter((event) => event.type === 'AGENT_ERROR');
       expect(agentErrorEvents).toHaveLength(2);
 
-      const coordinatorError = agentErrorEvents.find(e => e.threadId === session.getId());
-      const delegateError = agentErrorEvents.find(e => e.threadId === delegateAgent.threadId);
+      const coordinatorError = agentErrorEvents.find((e) => e.threadId === session.getId());
+      const delegateError = agentErrorEvents.find((e) => e.threadId === delegateAgent.threadId);
 
       expect(coordinatorError).toBeDefined();
       expect(delegateError).toBeDefined();
@@ -419,9 +419,9 @@ describe('EventStreamManager Agent Error Handling', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const errorEvent = capturedEvents.find(event => event.type === 'AGENT_ERROR');
+      const errorEvent = capturedEvents.find((event) => event.type === 'AGENT_ERROR');
       expect(errorEvent).toBeDefined();
 
       // Validate complete event structure
@@ -464,7 +464,7 @@ describe('EventStreamManager Agent Error Handling', () => {
         'tool_execution',
         'processing_error',
         'timeout',
-        'streaming_error'
+        'streaming_error',
       ] as const;
 
       // Emit error for each type
@@ -481,16 +481,16 @@ describe('EventStreamManager Agent Error Handling', () => {
         });
       }
 
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Should have captured all error types
-      const agentErrorEvents = capturedEvents.filter(event => event.type === 'AGENT_ERROR');
+      const agentErrorEvents = capturedEvents.filter((event) => event.type === 'AGENT_ERROR');
       expect(agentErrorEvents).toHaveLength(errorTypes.length);
 
       // Verify each error type was captured correctly
       for (const errorType of errorTypes) {
         const errorEvent = agentErrorEvents.find(
-          event => (event.data as AgentErrorData).errorType === errorType
+          (event) => (event.data as AgentErrorData).errorType === errorType
         );
         expect(errorEvent).toBeDefined();
         expect((errorEvent!.data as AgentErrorData).message).toBe(`Test ${errorType} error`);
@@ -503,9 +503,9 @@ describe('EventStreamManager Agent Error Handling', () => {
 
       const phases = [
         'provider_response',
-        'tool_execution', 
+        'tool_execution',
         'conversation_processing',
-        'initialization'
+        'initialization',
       ] as const;
 
       // Emit error for each phase
@@ -522,15 +522,15 @@ describe('EventStreamManager Agent Error Handling', () => {
         });
       }
 
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const agentErrorEvents = capturedEvents.filter(event => event.type === 'AGENT_ERROR');
+      const agentErrorEvents = capturedEvents.filter((event) => event.type === 'AGENT_ERROR');
       expect(agentErrorEvents).toHaveLength(phases.length);
 
       // Verify each phase was captured correctly
       for (const phase of phases) {
         const errorEvent = agentErrorEvents.find(
-          event => (event.data as AgentErrorData).context.phase === phase
+          (event) => (event.data as AgentErrorData).context.phase === phase
         );
         expect(errorEvent).toBeDefined();
         expect((errorEvent!.data as AgentErrorData).message).toBe(`Test ${phase} error`);
@@ -559,11 +559,11 @@ describe('EventStreamManager Agent Error Handling', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Verify that the error handler was registered and event was captured
       expect(capturedEvents.length).toBeGreaterThan(0);
-      const errorEvent = capturedEvents.find(e => e.type === 'AGENT_ERROR');
+      const errorEvent = capturedEvents.find((e) => e.type === 'AGENT_ERROR');
       expect(errorEvent).toBeDefined();
       expect((errorEvent!.data as AgentErrorData).message).toBe('Handler registration test');
     });
@@ -604,11 +604,11 @@ describe('EventStreamManager Agent Error Handling', () => {
       });
 
       // Wait for event processing
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Verify error was captured (proves error handler was registered)
       const spawnedAgentErrors = capturedEvents.filter(
-        event => event.type === 'AGENT_ERROR' && event.threadId === newAgent.threadId
+        (event) => event.type === 'AGENT_ERROR' && event.threadId === newAgent.threadId
       );
       expect(spawnedAgentErrors).toHaveLength(1);
     });

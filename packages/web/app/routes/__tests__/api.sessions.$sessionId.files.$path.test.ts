@@ -41,7 +41,7 @@ describe('/api/sessions/:sessionId/files/:path', () => {
     await fs.writeFile(join(testDir, 'test.ts'), 'const message = "Hello TypeScript";');
     await fs.writeFile(join(testDir, 'package.json'), '{"name": "test", "version": "1.0.0"}');
     await fs.writeFile(join(testDir, 'README.md'), '# Test Project\nThis is a test project.');
-    
+
     // Create subdirectory with file
     await fs.mkdir(join(testDir, 'src'));
     await fs.writeFile(join(testDir, 'src', 'index.js'), 'console.log("Hello from subdirectory");');
@@ -70,7 +70,9 @@ describe('/api/sessions/:sessionId/files/:path', () => {
   it('should return file content for valid TypeScript file', async () => {
     const request = new Request(`http://localhost/api/sessions/${testSessionId}/files/test.ts`);
 
-    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId, '*': 'test.ts' }));
+    const response = await loader(
+      createLoaderArgs(request, { sessionId: testSessionId, '*': 'test.ts' })
+    );
 
     if (response.status !== 200) {
       const _errorData = await parseResponse(response);
@@ -85,9 +87,13 @@ describe('/api/sessions/:sessionId/files/:path', () => {
   });
 
   it('should return file content for valid JSON file', async () => {
-    const request = new Request(`http://localhost/api/sessions/${testSessionId}/files/package.json`);
+    const request = new Request(
+      `http://localhost/api/sessions/${testSessionId}/files/package.json`
+    );
 
-    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId, '*': 'package.json' }));
+    const response = await loader(
+      createLoaderArgs(request, { sessionId: testSessionId, '*': 'package.json' })
+    );
 
     expect(response.status).toBe(200);
     const data = await parseResponse<SessionFileContentResponse>(response);
@@ -101,7 +107,9 @@ describe('/api/sessions/:sessionId/files/:path', () => {
       `http://localhost/api/sessions/${testSessionId}/files/src/index.js`
     );
 
-    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId, '*': 'src/index.js' }));
+    const response = await loader(
+      createLoaderArgs(request, { sessionId: testSessionId, '*': 'src/index.js' })
+    );
 
     expect(response.status).toBe(200);
     const data = await parseResponse<SessionFileContentResponse>(response);
@@ -115,7 +123,9 @@ describe('/api/sessions/:sessionId/files/:path', () => {
       `http://localhost/api/sessions/${testSessionId}/files/large-file.txt`
     );
 
-    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId, '*': 'large-file.txt' }));
+    const response = await loader(
+      createLoaderArgs(request, { sessionId: testSessionId, '*': 'large-file.txt' })
+    );
 
     expect(response.status).toBe(413);
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -129,7 +139,9 @@ describe('/api/sessions/:sessionId/files/:path', () => {
       `http://localhost/api/sessions/${testSessionId}/files/../../../etc/passwd`
     );
 
-    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId, '*': '../../../etc/passwd' }));
+    const response = await loader(
+      createLoaderArgs(request, { sessionId: testSessionId, '*': '../../../etc/passwd' })
+    );
 
     expect(response.status).toBe(400); // Caught by schema validation first
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -141,7 +153,9 @@ describe('/api/sessions/:sessionId/files/:path', () => {
       `http://localhost/api/sessions/${testSessionId}/files/non-existent.txt`
     );
 
-    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId, '*': 'non-existent.txt' }));
+    const response = await loader(
+      createLoaderArgs(request, { sessionId: testSessionId, '*': 'non-existent.txt' })
+    );
 
     expect(response.status).toBe(403); // Blocked by realpath validation
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -151,7 +165,9 @@ describe('/api/sessions/:sessionId/files/:path', () => {
   it('should reject directories', async () => {
     const request = new Request(`http://localhost/api/sessions/${testSessionId}/files/src`);
 
-    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId, '*': 'src' }));
+    const response = await loader(
+      createLoaderArgs(request, { sessionId: testSessionId, '*': 'src' })
+    );
 
     expect(response.status).toBe(400);
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -163,7 +179,9 @@ describe('/api/sessions/:sessionId/files/:path', () => {
 
     const request = new Request('http://localhost/api/sessions/invalid-session/files/test.ts');
 
-    const response = await loader(createLoaderArgs(request, { sessionId: 'invalid-session', '*': 'test.ts' }));
+    const response = await loader(
+      createLoaderArgs(request, { sessionId: 'invalid-session', '*': 'test.ts' })
+    );
 
     expect(response.status).toBe(404);
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -177,7 +195,9 @@ describe('/api/sessions/:sessionId/files/:path', () => {
 
     const request = new Request(`http://localhost/api/sessions/${testSessionId}/files/test.ts`);
 
-    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId, '*': 'test.ts' }));
+    const response = await loader(
+      createLoaderArgs(request, { sessionId: testSessionId, '*': 'test.ts' })
+    );
 
     expect(response.status).toBe(400);
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -185,11 +205,11 @@ describe('/api/sessions/:sessionId/files/:path', () => {
   });
 
   it('should detect MIME types correctly for various file extensions', async () => {
-    const request = new Request(
-      `http://localhost/api/sessions/${testSessionId}/files/README.md`
-    );
+    const request = new Request(`http://localhost/api/sessions/${testSessionId}/files/README.md`);
 
-    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId, '*': 'README.md' }));
+    const response = await loader(
+      createLoaderArgs(request, { sessionId: testSessionId, '*': 'README.md' })
+    );
 
     expect(response.status).toBe(200);
     const data = await parseResponse<SessionFileContentResponse>(response);
@@ -200,7 +220,9 @@ describe('/api/sessions/:sessionId/files/:path', () => {
   it('should reject binary files with appropriate error', async () => {
     const request = new Request(`http://localhost/api/sessions/${testSessionId}/files/image.png`);
 
-    const response = await loader(createLoaderArgs(request, { sessionId: testSessionId, '*': 'image.png' }));
+    const response = await loader(
+      createLoaderArgs(request, { sessionId: testSessionId, '*': 'image.png' })
+    );
 
     expect(response.status).toBe(415);
     const data = await parseResponse<ApiErrorResponse>(response);
@@ -218,11 +240,15 @@ describe('/api/sessions/:sessionId/files/:path', () => {
       const symlinkPath = join(testDir, 'malicious-link');
       try {
         await fs.symlink(join(outsideDir, 'secret.txt'), symlinkPath);
-        
-        const request = new Request(`http://localhost/api/sessions/${testSessionId}/files/malicious-link`);
-        
-        const response = await loader(createLoaderArgs(request, { sessionId: testSessionId, '*': 'malicious-link' }));
-        
+
+        const request = new Request(
+          `http://localhost/api/sessions/${testSessionId}/files/malicious-link`
+        );
+
+        const response = await loader(
+          createLoaderArgs(request, { sessionId: testSessionId, '*': 'malicious-link' })
+        );
+
         expect(response.status).toBe(403);
         const data = await parseResponse<ApiErrorResponse>(response);
         expect(data.code).toBe('PATH_ACCESS_DENIED');

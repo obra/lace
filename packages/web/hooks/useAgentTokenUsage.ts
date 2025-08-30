@@ -97,7 +97,7 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
 
   // Use shared event stream context for real-time updates
   const { events } = useSessionEvents();
-  
+
   // Find latest agent message with O(1) reverse scan using useMemo
   const latestAgentMessage = useMemo(() => {
     // Reverse scan to find the latest AGENT_MESSAGE for this agent
@@ -109,7 +109,7 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
     }
     return null;
   }, [events, agentId]);
-  
+
   // Handle latest agent message for token updates
   useEffect(() => {
     if (latestAgentMessage) {

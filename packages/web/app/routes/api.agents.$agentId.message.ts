@@ -15,18 +15,21 @@ import type { ErrorType, ErrorPhase } from '@/types/core';
 // Helper to sanitize error text by redacting sensitive info and truncating
 function sanitizeErrorText(text?: string): string {
   if (!text) return '';
-  
+
   // Redact API keys and Bearer tokens
   let sanitized = text
     .replace(/sk-[a-zA-Z0-9-_]{20,}/g, 'sk-***REDACTED***')
     .replace(/Bearer\s+[a-zA-Z0-9-_+=\/]{20,}/g, 'Bearer ***REDACTED***')
-    .replace(/Authorization:\s*Bearer\s+[a-zA-Z0-9-_+=\/]{20,}/g, 'Authorization: Bearer ***REDACTED***');
-  
+    .replace(
+      /Authorization:\s*Bearer\s+[a-zA-Z0-9-_+=\/]{20,}/g,
+      'Authorization: Bearer ***REDACTED***'
+    );
+
   // Truncate very long text
   if (sanitized.length > 10000) {
     sanitized = sanitized.substring(0, 10000) + '... (truncated)';
   }
-  
+
   return sanitized;
 }
 
@@ -35,15 +38,15 @@ function getAgentProviderContext(agent: unknown) {
   try {
     // Type guard for agent with required methods
     if (
-      agent && 
-      typeof agent === 'object' && 
-      'getInfo' in agent && 
+      agent &&
+      typeof agent === 'object' &&
+      'getInfo' in agent &&
       typeof agent.getInfo === 'function'
     ) {
       const info = (agent.getInfo as () => { providerInstanceId?: string; modelId?: string })();
-      const providerName = 
-        agent && 
-        typeof agent === 'object' && 
+      const providerName =
+        agent &&
+        typeof agent === 'object' &&
         'providerInstance' in agent &&
         agent.providerInstance &&
         typeof agent.providerInstance === 'object' &&
@@ -60,7 +63,7 @@ function getAgentProviderContext(agent: unknown) {
   } catch {
     // Fall through to default
   }
-  
+
   return {
     providerInstanceId: 'unknown',
     modelId: 'unknown',
@@ -73,29 +76,48 @@ const messageSchema = z.object({
   message: z.string().min(1, 'Message cannot be empty'),
 });
 
-
 // Utility function to classify agent errors for better categorization
-function classifyAgentError(error: unknown): { errorType: ErrorType; phase: ErrorPhase; isRetryable: boolean } {
+function classifyAgentError(error: unknown): {
+  errorType: ErrorType;
+  phase: ErrorPhase;
+  isRetryable: boolean;
+} {
   const message = error instanceof Error ? error.message : String(error);
   const stack = error instanceof Error ? error.stack : undefined;
 
   // Network/connection errors (timeout, connection issues)
-  if (message.includes('ECONNREFUSED') || message.includes('ECONNRESET') || message.includes('ETIMEDOUT')) {
+  if (
+    message.includes('ECONNREFUSED') ||
+    message.includes('ECONNRESET') ||
+    message.includes('ETIMEDOUT')
+  ) {
     return { errorType: 'timeout', phase: 'provider_response', isRetryable: true };
   }
 
   // Authentication errors (provider issues)
-  if (message.includes('401') || message.includes('unauthorized') || message.includes('invalid_key')) {
+  if (
+    message.includes('401') ||
+    message.includes('unauthorized') ||
+    message.includes('invalid_key')
+  ) {
     return { errorType: 'provider_failure', phase: 'initialization', isRetryable: false };
   }
 
   // Rate limiting (provider issues)
-  if (message.includes('429') || message.includes('rate limit') || message.includes('too many requests')) {
+  if (
+    message.includes('429') ||
+    message.includes('rate limit') ||
+    message.includes('too many requests')
+  ) {
     return { errorType: 'provider_failure', phase: 'provider_response', isRetryable: true };
   }
 
   // Validation errors (processing issues)
-  if (message.includes('validation') || message.includes('invalid') || message.includes('malformed')) {
+  if (
+    message.includes('validation') ||
+    message.includes('invalid') ||
+    message.includes('malformed')
+  ) {
     return { errorType: 'processing_error', phase: 'conversation_processing', isRetryable: false };
   }
 
@@ -216,7 +238,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       const errorClassification = classifyAgentError(error);
 
       // Only broadcast for initialization/validation failures to avoid duplicate events
-      if (errorClassification.phase === 'initialization' || errorClassification.phase === 'conversation_processing') {
+      if (
+        errorClassification.phase === 'initialization' ||
+        errorClassification.phase === 'conversation_processing'
+      ) {
         const providerContext = getAgentProviderContext(agent);
         const eventStreamManager = EventStreamManager.getInstance();
         eventStreamManager.broadcast({

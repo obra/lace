@@ -36,15 +36,20 @@ export type SessionFileContentResponse = z.infer<typeof SessionFileContentRespon
 
 // Request schemas with path traversal protection
 export const ListSessionDirectoryRequestSchema = z.object({
-  path: z.string().optional().default('').refine(
-    (path) => !path.includes('..') && !path.includes('\\') && !path.startsWith('/'),
-    { message: 'Path contains invalid characters or traversal attempts' }
-  ), // Path relative to working directory
+  path: z
+    .string()
+    .optional()
+    .default('')
+    .refine((path) => !path.includes('..') && !path.includes('\\') && !path.startsWith('/'), {
+      message: 'Path contains invalid characters or traversal attempts',
+    }), // Path relative to working directory
 });
 
 export const GetSessionFileRequestSchema = z.object({
-  path: z.string().min(1, 'File path is required').refine(
-    (path) => !path.includes('..') && !path.includes('\\') && !path.startsWith('/'),
-    { message: 'Path contains invalid characters or traversal attempts' }
-  ),
+  path: z
+    .string()
+    .min(1, 'File path is required')
+    .refine((path) => !path.includes('..') && !path.includes('\\') && !path.startsWith('/'), {
+      message: 'Path contains invalid characters or traversal attempts',
+    }),
 });
