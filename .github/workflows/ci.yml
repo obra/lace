@@ -1,10 +1,33 @@
 name: CI
 
+# Minimal permissions for security
+permissions:
+  contents: read          # Read repository contents
+  actions: write          # Upload build artifacts
+  id-token: write         # For future OIDC if needed
+
+# Prevent overlapping deployments
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  release:
+    types: [ published ]   # Deploy to release channel
+  workflow_dispatch:       # Manual trigger
+    inputs:
+      channel:
+        description: 'Deployment channel'
+        required: true
+        default: 'nightly'
+        type: choice
+        options:
+          - nightly
+          - release
 
 env:
   NODE_VERSION: '20'
@@ -16,10 +39,10 @@ jobs:
     runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -41,10 +64,10 @@ jobs:
     runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -65,10 +88,10 @@ jobs:
             runner: [self-hosted, macOS]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -110,7 +133,7 @@ jobs:
 
       - name: Cache test artifacts
         if: runner.os == 'Linux'
-        uses: actions/cache@v4
+        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
         with:
           path: |
             coverage/
@@ -125,15 +148,15 @@ jobs:
     needs: test
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Restore test artifacts
-        uses: actions/cache@v4
+        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
         with:
           path: |
             coverage/
@@ -190,10 +213,10 @@ jobs:
     runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -212,7 +235,7 @@ jobs:
           CI: true
 
       - name: Upload Playwright test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         if: always()
         with:
           name: playwright-test-results
@@ -227,10 +250,10 @@ jobs:
     runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -262,7 +285,7 @@ jobs:
 
       - name: Upload test artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
           name: macos-app-test-results
           path: |
@@ -270,32 +293,148 @@ jobs:
           retention-days: 3
 
   build-and-package:
-    name: Build and Package
+    name: Build, Package, and Deploy
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
     runs-on: [self-hosted, macOS]
     needs: [lint-and-format, build, test, test-macos-app, playwright-tests]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v1.2.2
+        with:
+          bun-version: latest
+
       - name: Install dependencies
-        run: npm ci
+        run: bun install
 
-      - name: Build project
-        run: cd packages/web &&  npm run build
+      - name: Setup Apple Code Signing
+        run: |
+          # Save original default keychain
+          ORIGINAL_KEYCHAIN=$(security default-keychain | tr -d '"')
+          echo "ORIGINAL_KEYCHAIN=$ORIGINAL_KEYCHAIN" >> $GITHUB_ENV
+          
+          # Create temporary keychain for signing
+          KEYCHAIN_NAME="github-actions-$(date +%s).keychain"
+          KEYCHAIN_PASSWORD="temp-keychain-pass-$(date +%s)"
+          
+          # Create and unlock keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          security default-keychain -s "$KEYCHAIN_NAME"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          
+          # Decode and import P12 certificate
+          echo "$APPLE_DEVELOPER_CERTIFICATE_P12" | base64 --decode > temp-cert.p12
+          security import temp-cert.p12 -k "$KEYCHAIN_NAME" -P "$APPLE_DEVELOPER_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          
+          # Set partition list for codesign access
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          
+          # Clean up certificate file
+          rm temp-cert.p12
+          
+          # Export for use in build step
+          echo "KEYCHAIN_NAME=$KEYCHAIN_NAME" >> $GITHUB_ENV
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> $GITHUB_ENV
+        env:
+          APPLE_DEVELOPER_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
+          APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
 
+      - name: Determine deployment channel
+        id: channel
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "channel=release" >> $GITHUB_OUTPUT
+            echo "deploy=true" >> $GITHUB_OUTPUT
+            echo "🚢 Deploying to RELEASE channel"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "channel=${{ github.event.inputs.channel }}" >> $GITHUB_OUTPUT
+            echo "deploy=true" >> $GITHUB_OUTPUT
+            echo "🔧 Manual deploy to ${{ github.event.inputs.channel }} channel"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "channel=nightly" >> $GITHUB_OUTPUT
+            echo "deploy=false" >> $GITHUB_OUTPUT
+            echo "🧪 PR build (no deployment)"
+          else
+            echo "channel=nightly" >> $GITHUB_OUTPUT
+            echo "deploy=true" >> $GITHUB_OUTPUT
+            echo "🌙 Deploying to NIGHTLY channel"
+          fi
+
+      - name: Build macOS app with DMG and appcast
+        run: |
+          bun scripts/build-macos-app.ts \
+            --dmg \
+            --sign \
+            --channel ${{ steps.channel.outputs.channel }} \
+            --generate-appcast
+        env:
+          # Use existing Apple signing secrets
+          APPLE_DEVELOPER_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
+          APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+          APPLE_ID_EMAIL: ${{ secrets.APPLE_ID_EMAIL }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Upload to Dropbox - DMG
+        if: steps.channel.outputs.deploy == 'true'
+        uses: Lewuathe/dropbox-github-action@0cf2aca # v1.0.3
+        with:
+          dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
+          dropbox-app-secret: ${{ secrets.DROPBOX_APP_SECRET }}
+          dropbox-refresh-token: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+          source-path: build/Lace-*.dmg
+          target-path: /${{ steps.channel.outputs.channel }}/
+      
+      - name: Upload to Dropbox - Appcast
+        if: steps.channel.outputs.deploy == 'true'
+        uses: Lewuathe/dropbox-github-action@0cf2aca # v1.0.3
+        with:
+          dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
+          dropbox-app-secret: ${{ secrets.DROPBOX_APP_SECRET }}
+          dropbox-refresh-token: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+          source-path: build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml
+          target-path: /${{ steps.channel.outputs.channel }}/
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
-          name: build-artifacts
+          name: lace-macos-${{ steps.channel.outputs.channel }}-${{ github.sha }}
           path: |
+            build/Lace-*.dmg
+            build/appcast/
+            build/Lace.app
             dist/
             !dist/**/*.map
-          retention-days: 7
+          retention-days: 30
+
+      - name: Cleanup Keychain
+        if: always()
+        run: |
+          # Restore original default keychain if we saved one
+          if [ -n "$ORIGINAL_KEYCHAIN" ]; then
+            security default-keychain -s "$ORIGINAL_KEYCHAIN" || true
+            echo "✅ Restored original default keychain: $ORIGINAL_KEYCHAIN"
+          fi
+          
+          # Delete temporary keychain
+          if [ -n "$KEYCHAIN_NAME" ]; then
+            security delete-keychain "$KEYCHAIN_NAME" || true
+            echo "🧹 Cleaned up temporary keychain"
+          fi
+
+      - name: Notify build completion
+        if: steps.channel.outputs.deploy == 'true'
+        run: |
+          echo "🎉 Build and deployment complete!"
+          echo "📦 Channel: ${{ steps.channel.outputs.channel }}"
+          echo "📱 DMG: $(ls build/Lace-*.dmg)"
+          echo "📡 Appcast: build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml"
+          echo "🚀 Deployed to Dropbox!"
 
