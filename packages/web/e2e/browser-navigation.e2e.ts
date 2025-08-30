@@ -122,7 +122,7 @@ test.describe('Browser Navigation Support', () => {
     }
   });
 
-  test('preserves application state during URL hash changes', async ({ page }) => {
+  test('preserves application state during URL route changes', async ({ page }) => {
     // Setup provider first
     await setupAnthropicProvider(page);
 
@@ -136,10 +136,10 @@ test.describe('Browser Navigation Support', () => {
 
     const originalUrl = page.url();
     const urlMatch = originalUrl.match(/(\/project\/[^\/]+\/session\/[^\/]+\/agent\/[^\/]+)/);
-    expect(urlMatch).toBeTruthy(); // Verify we have the expected hash structure
+    expect(urlMatch).toBeTruthy(); // Verify we have the expected page route structure
 
     if (urlMatch) {
-      const hashPart = urlMatch[1];
+      const routePart = urlMatch[1];
 
       // Send a message to create state
       const stateMessage = 'Message to test state preservation during navigation';
@@ -151,40 +151,20 @@ test.describe('Browser Navigation Support', () => {
         page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
       ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
-      const hashNavigationTest = {
-        originalHash: hashPart,
+      const routeNavigationTest = {
+        originalRoute: routePart,
         navigationAttempts: [] as string[],
         stateTests: [] as { url: string; messageVisible: boolean }[],
       };
 
-      // Test various hash navigation scenarios
-      const navigationTests = [
-        {
-          name: 'Remove hash entirely',
-          url: originalUrl.replace(hashPart, ''),
-        },
-        {
-          name: 'Modify project ID in hash',
-          url: originalUrl.replace(/project\/[^\/]+/, 'project/modified-project-id'),
-        },
-        {
-          name: 'Modify session ID in hash',
-          url: originalUrl.replace(/session\/[^\/]+/, 'session/modified-session-id'),
-        },
-        {
-          name: 'Return to original hash',
-          url: originalUrl,
-        },
-      ];
-
-      // Test just 2 key scenarios instead of all 4 to reduce timing issues
+      // Test key page route manipulation scenarios
       const keyNavigationTests = [
         {
-          name: 'Modify project ID in hash',
+          name: 'Modify project ID in route',
           url: originalUrl.replace(/project\/[^\/]+/, 'project/modified-project-id'),
         },
         {
-          name: 'Return to original hash',
+          name: 'Return to original route',
           url: originalUrl,
         },
       ];
@@ -195,40 +175,40 @@ test.describe('Browser Navigation Support', () => {
           await page.waitForTimeout(2000); // Shorter wait
 
           const currentUrl = page.url();
-          hashNavigationTest.navigationAttempts.push(`${navTest.name}: ${currentUrl}`);
+          routeNavigationTest.navigationAttempts.push(`${navTest.name}: ${currentUrl}`);
 
           // Simplified state check - just verify URL handling
           const messageVisible = await page
             .getByText(stateMessage)
             .isVisible()
             .catch(() => false);
-          hashNavigationTest.stateTests.push({
+          routeNavigationTest.stateTests.push({
             url: currentUrl,
             messageVisible: messageVisible,
           });
         } catch (_error) {
-          hashNavigationTest.navigationAttempts.push(`${navTest.name}: ERROR`);
+          routeNavigationTest.navigationAttempts.push(`${navTest.name}: ERROR`);
         }
       }
 
-      const hashNavigationAnalysis = {
-        hashNavigationTest,
-        statePreservationCount: hashNavigationTest.stateTests.filter((test) => test.messageVisible)
+      const routeNavigationAnalysis = {
+        routeNavigationTest,
+        statePreservationCount: routeNavigationTest.stateTests.filter((test) => test.messageVisible)
           .length,
-        navigationSuccessCount: hashNavigationTest.stateTests.length,
+        navigationSuccessCount: routeNavigationTest.stateTests.length,
         statePreservationRatio:
-          hashNavigationTest.stateTests.length > 0
-            ? hashNavigationTest.stateTests.filter((test) => test.messageVisible).length /
-              hashNavigationTest.stateTests.length
+          routeNavigationTest.stateTests.length > 0
+            ? routeNavigationTest.stateTests.filter((test) => test.messageVisible).length /
+              routeNavigationTest.stateTests.length
             : 0,
-        robustHashHandling: hashNavigationTest.stateTests.some((test) => test.messageVisible),
+        robustRouteHandling: routeNavigationTest.stateTests.some((test) => test.messageVisible),
       };
 
-      // Test passes if we successfully tested hash navigation scenarios
-      expect(hashNavigationAnalysis.navigationSuccessCount).toBeGreaterThan(0);
+      // Test passes if we successfully tested page route scenarios
+      expect(routeNavigationAnalysis.navigationSuccessCount).toBeGreaterThan(0);
 
-      if (hashNavigationAnalysis.robustHashHandling) {
-        expect(hashNavigationAnalysis.robustHashHandling).toBeTruthy();
+      if (routeNavigationAnalysis.robustRouteHandling) {
+        expect(routeNavigationAnalysis.robustRouteHandling).toBeTruthy();
       } else {
         expect(true).toBeTruthy(); // Documents navigation behavior
       }
