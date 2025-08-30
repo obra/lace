@@ -53,7 +53,7 @@ jobs:
       - name: Check Prettier formatting
         run: npx prettier --check "packages/core/src/*.ts"
       
-      - name: Check Prettier formatting
+      - name: Check Prettier formatting (web)
         run: npx prettier --check "packages/web/**/*.ts" "packages/web/**/*.tsx"
 
   test:
@@ -105,11 +105,7 @@ jobs:
 
       - name: Run all tests
         run: |
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            script -q -c "npm test" /dev/null
-          else
-            script -q -k /dev/null npm test
-          fi
+          npm test
 
       - name: Cache test artifacts
         if: runner.os == 'Linux'
@@ -384,11 +380,11 @@ jobs:
             --channel ${{ steps.channel.outputs.channel }}
 
       - name: Resolve DMG path
-        if: steps.channel.outputs.deploy == 'true'
+        if: steps.channel.outputs.deploy == 'true' && steps.signing_check.outputs.available == 'true'
         run: echo "DMG_PATH=$(ls -1 build/Lace-*.dmg | head -n1)" >> $GITHUB_ENV
 
       - name: Upload to Dropbox - DMG
-        if: steps.channel.outputs.deploy == 'true'
+        if: steps.channel.outputs.deploy == 'true' && steps.signing_check.outputs.available == 'true'
         uses: Lewuathe/dropbox-github-action@0cf2acadb42e7fe8d14936b064313cca1db0dd68 # v1.0.3 (third-party)
         with:
           dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
@@ -398,7 +394,7 @@ jobs:
           target-path: /${{ steps.channel.outputs.channel }}/
       
       - name: Upload to Dropbox - Appcast
-        if: steps.channel.outputs.deploy == 'true'
+        if: steps.channel.outputs.deploy == 'true' && steps.signing_check.outputs.available == 'true'
         uses: Lewuathe/dropbox-github-action@0cf2acadb42e7fe8d14936b064313cca1db0dd68 # v1.0.3 (third-party)
         with:
           dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
@@ -428,8 +424,9 @@ jobs:
         run: |
           echo "🎉 Build complete!"
           echo "📦 Channel: ${{ steps.channel.outputs.channel }}"
-          if [ -f "build/Lace-*.dmg" ]; then
-            echo "📱 DMG: $(ls build/Lace-*.dmg)"
+          DMG=$(compgen -G "build/Lace-*.dmg" | head -n1 || true)
+          if [ -n "$DMG" ]; then
+            echo "📱 DMG: $DMG"
             echo "📡 Appcast: build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml"
           fi
           if [ "${{ steps.channel.outputs.deploy }}" = "true" ]; then
