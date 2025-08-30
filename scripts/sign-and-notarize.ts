@@ -259,9 +259,12 @@ async function signAndNotarize(options: SigningOptions) {
     }
   }
 
-  // Validate required credentials for proper signing
+  // Validate required credentials for proper signing (unless using GitHub Actions keychain)
   if (!certificateP12 || !certificatePassword) {
-    throw new Error('Certificate .p12 file and password are required for proper signing');
+    if (!process.env.GITHUB_ACTIONS_KEYCHAIN_READY) {
+      throw new Error('Certificate .p12 file and password are required for proper signing');
+    }
+    console.log('⚠️  No P12 credentials provided, but GitHub Actions keychain is available');
   }
 
   let tempCertPath = '';
