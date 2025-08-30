@@ -92,6 +92,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: Generate cache key
+        id: cache-key
+        run: |
+          CACHE_KEY="build-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/bun.lockb') }}-${{ github.sha }}"
+          echo "key=$CACHE_KEY" >> $GITHUB_OUTPUT
+          echo "Cache key: $CACHE_KEY"
+
       - name: Restore build cache
         uses: actions/cache@v4
         with:
@@ -100,7 +107,7 @@ jobs:
             packages/web/build/
             node_modules/
             packages/*/node_modules/
-          key: ${{ needs.build.outputs.build-cache-key }}
+          key: ${{ steps.cache-key.outputs.key }}
           fail-on-cache-miss: true
 
       - name: Install system dependencies
@@ -168,6 +175,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: Generate cache key
+        id: cache-key
+        run: |
+          CACHE_KEY="build-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/bun.lockb') }}-${{ github.sha }}"
+          echo "key=$CACHE_KEY" >> $GITHUB_OUTPUT
+          echo "Cache key: $CACHE_KEY"
+
       - name: Restore build cache
         uses: actions/cache@v4
         with:
@@ -176,7 +190,7 @@ jobs:
             packages/web/build/
             node_modules/
             packages/*/node_modules/
-          key: ${{ needs.build.outputs.build-cache-key }}
+          key: ${{ steps.cache-key.outputs.key }}
           fail-on-cache-miss: true
 
       - name: Run macOS app Swift tests
@@ -228,6 +242,13 @@ jobs:
         with:
           bun-version: 1.2.21
 
+      - name: Generate cache key
+        id: cache-key
+        run: |
+          CACHE_KEY="build-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/bun.lockb') }}-${{ github.sha }}"
+          echo "key=$CACHE_KEY" >> $GITHUB_OUTPUT
+          echo "Cache key: $CACHE_KEY"
+
       - name: Restore build cache
         uses: actions/cache@v4
         with:
@@ -236,7 +257,7 @@ jobs:
             packages/web/build/
             node_modules/
             packages/*/node_modules/
-          key: ${{ needs.build.outputs.build-cache-key }}
+          key: ${{ steps.cache-key.outputs.key }}
           fail-on-cache-miss: true
 
       - name: Install dependencies (if needed)
