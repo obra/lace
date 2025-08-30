@@ -371,10 +371,12 @@ jobs:
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Build macOS app with appcast (skip signing in CI for now)
+      - name: Build macOS app (signed) with DMG and appcast
+        if: steps.signing_check.outputs.available == 'true'
         run: |
           bun scripts/build-macos-app.ts \
-            --bundle \
+            --dmg \
+            --sign \
             --channel ${{ steps.channel.outputs.channel }} \
             --generate-appcast
         env:
