@@ -173,15 +173,13 @@ async function createBasicAppcast(options: {
   console.log(`📝 Basic appcast created at ${appcastPath}`);
   console.log(`⚠️  Remember to replace PLACEHOLDER_URL and PLACEHOLDER_SIGNATURE!`);
 
-  // Only fail CI if placeholders remain and we're trying to deploy
+  // Warn about placeholders but don't fail CI during development
   if (
-    process.env.CI &&
-    channel !== 'test' &&
-    (appcastContent.includes('PLACEHOLDER_URL_TO_BE_REPLACED') ||
-      appcastContent.includes('PLACEHOLDER_SIGNATURE'))
+    appcastContent.includes('PLACEHOLDER_URL_TO_BE_REPLACED') ||
+    appcastContent.includes('PLACEHOLDER_SIGNATURE')
   ) {
-    console.warn('⚠️  Appcast contains placeholders - OK for testing, but replace for production');
-    // Don't fail CI during development - just warn
+    console.warn('⚠️  Appcast contains placeholders - OK for development, replace for production');
+    console.warn('   Use proper EdDSA signing and real Dropbox URLs for production deployment');
   }
 }
 
