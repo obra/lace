@@ -309,8 +309,8 @@ jobs:
           # Set partition list for codesign access
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
           
-          # Allow all applications to use this keychain
-          security set-keychain-settings -l "$KEYCHAIN_NAME"
+          # Add to keychain search list so codesign can find it
+          security list-keychains -d user -s "$KEYCHAIN_NAME" login.keychain
           
           # Verify certificate was imported and accessible
           echo "🔍 Verifying certificate import..."
