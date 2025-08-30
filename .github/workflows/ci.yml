@@ -388,46 +388,25 @@ jobs:
           echo "DMG_PATH=$DMG_PATH" >> $GITHUB_ENV
           echo "📦 Will upload: $DMG_PATH"
           
-      - name: Upload to Dropbox using working access token
+      - name: Upload to Dropbox using third-party action
         if: steps.channel.outputs.deploy == 'true'
-        run: |
-          echo "📦 Uploading to Dropbox with direct token..."
-          
-          # We know the token works from earlier - use it directly with curl
-          ACCESS_TOKEN="${{ secrets.DROPBOX_REFRESH_TOKEN }}"
-          CHANNEL="${{ steps.channel.outputs.channel }}"
-          DMG_FILENAME=$(basename "$DMG_PATH")
-          
-          echo "📦 Uploading DMG: $DMG_FILENAME to $CHANNEL/"
-          
-          # Upload DMG with corrected JSON
-          curl -X POST https://content.dropboxapi.com/2/files/upload \
-            -H "Authorization: Bearer $ACCESS_TOKEN" \
-            -H "Content-Type: application/octet-stream" \
-            -H 'Dropbox-API-Arg: {"path": "'/$CHANNEL/$DMG_FILENAME'", "mode": "overwrite"}' \
-            --data-binary @"$DMG_PATH" \
-            --fail --show-error
-          
-          echo "✅ DMG uploaded successfully"
-          
-          # Upload Appcast
-          APPCAST_PATH="build/appcast/$CHANNEL/appcast.xml"
-          if [ -f "$APPCAST_PATH" ]; then
-            echo "📡 Uploading appcast..."
-            
-            curl -X POST https://content.dropboxapi.com/2/files/upload \
-              -H "Authorization: Bearer $ACCESS_TOKEN" \
-              -H "Content-Type: application/xml" \
-              -H 'Dropbox-API-Arg: {"path": "'/$CHANNEL/appcast.xml'", "mode": "overwrite"}' \
-              --data-binary @"$APPCAST_PATH" \
-              --fail --show-error
-            
-            echo "✅ Appcast uploaded successfully"
-          else
-            echo "⚠️  Appcast not found, skipping"
-          fi
-          
-          echo "🚀 Deployment complete!"
+        uses: Lewuathe/dropbox-github-action@0cf2acadb42e7fe8d14936b064313cca1db0dd68 # v1.0.3
+        with:
+          dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
+          dropbox-app-secret: ${{ secrets.DROPBOX_APP_SECRET }}
+          dropbox-refresh-token: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+          source-path: ${{ env.DMG_PATH }}
+          target-path: ${{ steps.channel.outputs.channel }}/
+      
+      - name: Upload appcast to Dropbox
+        if: steps.channel.outputs.deploy == 'true'
+        uses: Lewuathe/dropbox-github-action@0cf2acadb42e7fe8d14936b064313cca1db0dd68 # v1.0.3
+        with:
+          dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
+          dropbox-app-secret: ${{ secrets.DROPBOX_APP_SECRET }}
+          dropbox-refresh-token: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+          source-path: build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml
+          target-path: ${{ steps.channel.outputs.channel }}/appcast.xml
 
       # All artifacts go to Dropbox only - no GitHub storage needed
 
@@ -456,7 +435,6 @@ jobs:
           fi
           if [ "${{ steps.channel.outputs.deploy }}" = "true" ]; then
             echo "🚀 Deployed to Dropbox!"
-            echo "⚠️  Note: Unsigned builds - sign manually for production"
           else
             echo "🧪 PR build (no deployment)"
           fi
