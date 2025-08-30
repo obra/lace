@@ -83,7 +83,8 @@ test-swift: SwiftValidationTests.swift main.swift setup-sparkle
 		-framework ServiceManagement \
 		-F $(TEST_DIR)/Frameworks \
 		-framework Sparkle \
-		-target arm64-apple-macos10.15
+		-target arm64-apple-macos10.15 \
+		-Xlinker -rpath -Xlinker @executable_path/Frameworks
 	
 	# Run the validation tests
 	$(TEST_DIR)/SwiftValidationTests
