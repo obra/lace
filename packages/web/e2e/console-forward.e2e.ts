@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 
 interface ApiRequest {
@@ -21,13 +22,11 @@ test.describe('Console Forwarding E2E', () => {
   let testEnv: TestEnvironment;
 
   test.beforeEach(async ({ page }) => {
-    // Setup isolated test environment for each test
     testEnv = await setupTestEnvironment();
     await page.goto(testEnv.serverUrl);
   });
 
   test.afterEach(async () => {
-    // Always cleanup test environment
     if (testEnv) {
       await cleanupTestEnvironment(testEnv);
     }
@@ -61,7 +60,7 @@ test.describe('Console Forwarding E2E', () => {
     });
 
     // Wait for message to be forwarded
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(TIMEOUTS.STANDARD / 5);
 
     // Verify the console message was captured locally
     expect(logs).toEqual(expect.arrayContaining([expect.stringContaining('E2E test message')]));
@@ -96,7 +95,7 @@ test.describe('Console Forwarding E2E', () => {
       console.log('Complex object test:', complexObj);
     });
 
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(TIMEOUTS.STANDARD / 5);
 
     // Verify API call succeeded (didn't crash on circular reference)
     expect(apiRequests).toEqual(expect.arrayContaining([200]));
@@ -131,7 +130,7 @@ test.describe('Console Forwarding E2E', () => {
       console.debug('Test debug message');
     });
 
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(TIMEOUTS.STANDARD / 5);
 
     // Verify all console types were captured
     expect(logs).toEqual(
@@ -172,7 +171,7 @@ test.describe('Console Forwarding E2E', () => {
       }
     });
 
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(TIMEOUTS.STANDARD / 5);
 
     // Should be batched (fewer than 10 separate API calls)
     expect(apiRequests.length).toBeLessThan(10);
@@ -202,7 +201,7 @@ test.describe('Console Forwarding E2E', () => {
       console.log('Development mode test');
     });
 
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(TIMEOUTS.STANDARD / 5);
 
     // If console forwarding is working, we should get API calls
     expect(apiRequests.length).toBeGreaterThan(0);
