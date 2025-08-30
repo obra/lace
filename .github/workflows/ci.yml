@@ -413,7 +413,7 @@ jobs:
           dropbox-app-secret: ${{ secrets.DROPBOX_APP_SECRET }}
           dropbox-refresh-token: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
           source-path: ${{ env.DMG_PATH }}
-          target-path: /${{ steps.channel.outputs.channel }}/
+          target-path: ${{ steps.channel.outputs.channel }}/
       
       - name: Upload to Dropbox - Appcast
         if: steps.channel.outputs.deploy == 'true'
@@ -423,7 +423,7 @@ jobs:
           dropbox-app-secret: ${{ secrets.DROPBOX_APP_SECRET }}
           dropbox-refresh-token: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
           source-path: build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml
-          target-path: /${{ steps.channel.outputs.channel }}/
+          target-path: ${{ steps.channel.outputs.channel }}/
 
       # All artifacts go to Dropbox only - no GitHub storage needed
 
