@@ -11,7 +11,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 4 : 2, // Use multiple workers instead of 1
+  workers: process.env.CI ? 4 : 4, // Use multiple workers instead of 1
 
   // Enhanced reporting and debugging
   reporter: [
@@ -35,7 +35,7 @@ export default defineConfig({
     // WebKit disabled due to timing and compatibility issues
   ],
 
-  // Per-test servers are now managed by setupTestEnvironment/cleanupTestEnvironment
+  // Per-test servers are managed by setupTestEnvironment/cleanupTestEnvironment
   // No global webServer needed
 
   // Global setup for worker isolation
