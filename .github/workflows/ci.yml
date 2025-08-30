@@ -415,17 +415,27 @@ jobs:
           # For app folder access, try relative path first
           echo "📝 Attempting upload to relative path: ${{ steps.channel.outputs.channel }}/$DMG_FILENAME"
           
-          # Use simple curl with properly formatted header
+          # Use simple curl with file-based JSON to avoid escaping issues
           CHANNEL="${{ steps.channel.outputs.channel }}"
           echo "📝 Uploading to: $CHANNEL/$DMG_FILENAME"
+          
+          # Create JSON arg in temp file
+          cat > /tmp/dropbox_arg.json << EOF
+{"path": "$CHANNEL/$DMG_FILENAME", "mode": "overwrite"}
+EOF
+          
+          echo "📝 API arg content:"
+          cat /tmp/dropbox_arg.json
           
           UPLOAD_RESPONSE=$(curl -X POST https://content.dropboxapi.com/2/files/upload \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -H 'Content-Type: application/octet-stream' \
-            -H "Dropbox-API-Arg: {\"path\": \"$CHANNEL/$DMG_FILENAME\", \"mode\": \"overwrite\"}" \
+            -H "Dropbox-API-Arg: $(cat /tmp/dropbox_arg.json)" \
             --data-binary @"$DMG_PATH" \
             --write-out "HTTP_CODE:%{http_code}\n" \
             --silent --show-error)
+          
+          rm -f /tmp/dropbox_arg.json
           
           HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | grep "HTTP_CODE:" | cut -d: -f2)
           RESPONSE_BODY=$(echo "$UPLOAD_RESPONSE" | sed '/HTTP_CODE:/d')
@@ -442,16 +452,26 @@ jobs:
           echo "📡 Uploading appcast..."
           APPCAST_PATH="build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml"
           
-          # Upload appcast with simple curl
+          # Upload appcast using same file-based approach
           echo "📝 Uploading appcast to: $CHANNEL/appcast.xml"
+          
+          # Create JSON arg for appcast
+          cat > /tmp/appcast_arg.json << EOF
+{"path": "$CHANNEL/appcast.xml", "mode": "overwrite"}
+EOF
+          
+          echo "📝 Appcast API arg:"
+          cat /tmp/appcast_arg.json
           
           APPCAST_RESPONSE=$(curl -X POST https://content.dropboxapi.com/2/files/upload \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -H 'Content-Type: application/xml' \
-            -H "Dropbox-API-Arg: {\"path\": \"$CHANNEL/appcast.xml\", \"mode\": \"overwrite\"}" \
+            -H "Dropbox-API-Arg: $(cat /tmp/appcast_arg.json)" \
             --data-binary @"$APPCAST_PATH" \
             --write-out "HTTP_CODE:%{http_code}\n" \
             --silent --show-error)
+          
+          rm -f /tmp/appcast_arg.json
           
           APPCAST_HTTP_CODE=$(echo "$APPCAST_RESPONSE" | grep "HTTP_CODE:" | cut -d: -f2)
           APPCAST_BODY=$(echo "$APPCAST_RESPONSE" | sed '/HTTP_CODE:/d')
