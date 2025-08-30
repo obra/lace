@@ -2,9 +2,6 @@
 # Add one test file path per line
 # Lines starting with # are comments and will be ignored
 
-e2e/agent-management.e2e.ts
-e2e/basic-messaging.e2e.ts
-e2e/basic-user-journey.e2e.ts
 e2e/console-forward.e2e.ts
 e2e/data-testid-verification.test.e2e.ts
 e2e/directory-browser.e2e.ts
@@ -12,15 +9,15 @@ e2e/error-handling.e2e.ts
 e2e/example.test.e2e.ts
 e2e/file-browser.e2e.ts
 # e2e/msw-setup.test.e2e.ts # Removed - playwright-msw dependency removed
-e2e/multi-agent-workflows.e2e.ts
 e2e/page-objects.test.e2e.ts
 e2e/project-persistence.e2e.ts
 e2e/provider-dropdown-realtime.test.e2e.ts
-e2e/session-management.e2e.ts
+e2e/session-agent-management.e2e.ts
 e2e/streaming-advanced.e2e.ts
 e2e/streaming-core.e2e.ts
 e2e/task-management.e2e.ts
 e2e/tool-approval.e2e.ts
+e2e/user-messaging-flow.e2e.ts
 
 # Tests with known application bugs (not CI-ready yet)
 # e2e/agent-stop-functionality.e2e.ts  # Agent error recovery bug

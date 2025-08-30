@@ -1,5 +1,5 @@
-// ABOUTME: Tests basic messaging functionality using standardized E2E patterns
-// ABOUTME: Demonstrates proper isolated test setup and message interaction patterns
+// ABOUTME: Complete user journey and messaging behavior tests
+// ABOUTME: Consolidates basic-messaging and basic-user-journey with comprehensive coverage
 
 import { test, expect } from '@playwright/test';
 import {
@@ -18,11 +18,10 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 
-test.describe('Basic Messaging', () => {
+test.describe('Complete User Journey and Messaging Behavior', () => {
   let testEnv: TestEnvironment;
 
   test.beforeEach(async ({ page }) => {
-    // Setup isolated test environment with proper mocking
     testEnv = await setupTestEnvironment();
     await page.goto(testEnv.serverUrl);
   });
@@ -33,16 +32,48 @@ test.describe('Basic Messaging', () => {
     }
   });
 
-  test('can send and display user messages reliably', async ({ page }) => {
-    // Setup provider first
+  // From basic-user-journey: Complete end-to-end user onboarding flow
+  test('complete flow: onboarding → project creation → first message', async ({ page }) => {
+    // Step 1: User lands on the application (already done in beforeEach)
+
+    // Step 2: Setup provider first
     await setupAnthropicProvider(page);
 
-    // Create project in isolated environment
-    const projectPath = path.join(testEnv.tempDir, 'basic-messaging-project');
+    // Step 3: Create a new project in isolated environment
+    const projectPath = path.join(testEnv.tempDir, 'basic-journey-project');
     await fs.promises.mkdir(projectPath, { recursive: true });
-    await createProject(page, 'Basic Messaging Project', projectPath);
 
-    // Wait for project to be ready
+    await createProject(page, 'Basic Journey Project', projectPath);
+
+    // Step 4: Verify we're now in the chat interface
+    await getMessageInput(page);
+
+    // Step 5: Send a message to the AI
+    const testMessage = 'Hello, this is my first message!';
+    await sendMessage(page, testMessage);
+
+    // Step 6: Verify our message appears in the conversation
+    await verifyMessageVisible(page, testMessage);
+
+    // Step 7: Verify AI response appears (mocked by E2E test server)
+    await expect(
+      page.getByText("I'm a helpful AI assistant. How can I help you today?")
+    ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
+
+    // Step 8: Verify chat interface is ready for next message
+    const messageInput = await getMessageInput(page);
+    await expect(messageInput).toBeVisible();
+    await expect(messageInput).toBeEnabled();
+  });
+
+  // From basic-messaging: Single message reliability testing
+  test('can send and display user messages reliably', async ({ page }) => {
+    await setupAnthropicProvider(page);
+
+    const projectPath = path.join(testEnv.tempDir, 'reliable-messaging-project');
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'Reliable Messaging Test', projectPath);
+
     await getMessageInput(page);
 
     // Test single message sending and display
@@ -62,16 +93,14 @@ test.describe('Basic Messaging', () => {
     await expect(await getMessageInput(page)).toBeVisible();
   });
 
+  // From basic-messaging: Interface state monitoring during processing
   test('interface shows appropriate state during message processing', async ({ page }) => {
-    // Setup provider first
     await setupAnthropicProvider(page);
 
-    // Create project in isolated environment
     const projectPath = path.join(testEnv.tempDir, 'processing-state-project');
     await fs.promises.mkdir(projectPath, { recursive: true });
-    await createProject(page, 'Processing State Project', projectPath);
+    await createProject(page, 'Processing State Test', projectPath);
 
-    // Wait for project to be ready
     await getMessageInput(page);
 
     // Send a message
@@ -103,8 +132,6 @@ test.describe('Basic Messaging', () => {
       stopButtonVisible,
     };
 
-    // Interface state documented for debugging: interfaceState
-
     // Verify basic functionality is working
     expect(interfaceState.messageVisible).toBeTruthy();
     expect(interfaceState.inputVisible).toBeTruthy();
@@ -115,16 +142,14 @@ test.describe('Basic Messaging', () => {
     ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
   });
 
-  test('documents current streaming behavior without breaking', async ({ page }) => {
-    // Setup provider first
+  // From basic-messaging: Streaming behavior and network activity documentation
+  test('documents streaming behavior and network activity', async ({ page }) => {
     await setupAnthropicProvider(page);
 
-    // Create project in isolated environment
-    const projectPath = path.join(testEnv.tempDir, 'streaming-behavior-project');
+    const projectPath = path.join(testEnv.tempDir, 'network-behavior-project');
     await fs.promises.mkdir(projectPath, { recursive: true });
-    await createProject(page, 'Streaming Behavior Project', projectPath);
+    await createProject(page, 'Network Behavior Test', projectPath);
 
-    // Wait for project to be ready
     await getMessageInput(page);
 
     // Monitor network activity for streaming indicators
@@ -161,8 +186,6 @@ test.describe('Basic Messaging', () => {
       messageAccepted: testMessage.length > 0,
       timestamp: new Date().toISOString(),
     };
-
-    // Streaming behavior documented for analysis: streamingBehavior
 
     // Verify basic functionality is working
     expect(streamingBehavior.messageAccepted).toBeTruthy();
