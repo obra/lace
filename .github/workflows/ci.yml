@@ -398,14 +398,21 @@ jobs:
       # Signing temporarily disabled - build unsigned bundles for now
       # TODO: Set up proper Developer ID Application certificate for distribution
 
-      - name: Upload to Dropbox - App Bundle
+      - name: Create DMG for Dropbox upload
+        if: steps.channel.outputs.deploy == 'true'
+        run: |
+          DMG_PATH=$(ls -1 build/Lace-*.dmg | head -n1)
+          echo "DMG_PATH=$DMG_PATH" >> $GITHUB_ENV
+          echo "📦 Will upload: $DMG_PATH"
+          
+      - name: Upload to Dropbox - DMG
         if: steps.channel.outputs.deploy == 'true'
         uses: Lewuathe/dropbox-github-action@0cf2acadb42e7fe8d14936b064313cca1db0dd68 # v1.0.3 (third-party)
         with:
           dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
           dropbox-app-secret: ${{ secrets.DROPBOX_APP_SECRET }}
           dropbox-refresh-token: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
-          source-path: build/Lace.app
+          source-path: ${{ env.DMG_PATH }}
           target-path: /${{ steps.channel.outputs.channel }}/
       
       - name: Upload to Dropbox - Appcast
