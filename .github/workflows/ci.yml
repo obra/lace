@@ -404,6 +404,10 @@ jobs:
           echo "✅ Access token ready"
           echo "::add-mask::$ACCESS_TOKEN"
           
+          # Debug: Check token format
+          echo "🔍 Token length: ${#ACCESS_TOKEN}"
+          echo "🔍 Token starts with: ${ACCESS_TOKEN:0:10}..."
+          
           # Upload DMG
           echo "📦 Uploading DMG: $DMG_PATH to ${{ steps.channel.outputs.channel }}/"
           DMG_FILENAME=$(basename "$DMG_PATH")
