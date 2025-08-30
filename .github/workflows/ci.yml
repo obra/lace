@@ -31,10 +31,12 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-  lint-and-format:
-    name: Lint and Format
+  build:
+    name: Build Project
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
     runs-on: [self-hosted, macOS]
+    outputs:
+      build-cache-key: ${{ steps.cache-key.outputs.key }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -44,84 +46,43 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: Generate cache key
+        id: cache-key
+        run: |
+          CACHE_KEY="build-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/bun.lockb') }}-${{ github.sha }}"
+          echo "key=$CACHE_KEY" >> $GITHUB_OUTPUT
+          echo "Cache key: $CACHE_KEY"
+
+      - name: Cache build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            dist/
+            packages/web/build/
+            node_modules/
+            packages/*/node_modules/
+          key: ${{ steps.cache-key.outputs.key }}
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Run ESLint
+      - name: Build project
+        run: npm run build
+
+      - name: Run linting
         run: npm run lint
 
-      - name: Check Prettier formatting
+      - name: Check Prettier formatting (core)
         run: npx prettier --check "packages/core/src/*.ts"
       
       - name: Check Prettier formatting (web)
         run: npx prettier --check "packages/web/**/*.ts" "packages/web/**/*.tsx"
 
   test:
-    name: Test Suite
+    name: Test Suite with Coverage
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
-    needs: [lint-and-format]
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest
-            runner: [self-hosted, macOS]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install system dependencies
-        run: |
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            sudo apt-get update
-            sudo apt-get install -y \
-              python3 \
-              make \
-              g++ \
-              libtool \
-              pkg-config \
-              libncurses5-dev \
-              ripgrep
-          else
-            # Ensure Homebrew exists and avoid slow auto-update/cleanup
-            if ! command -v brew >/dev/null 2>&1; then
-              echo "Homebrew not found; please pre-provision brew on the runner." >&2
-              exit 1
-            fi
-            export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
-            brew install -q ripgrep
-          fi
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build project
-        run: npm run build
-
-      - name: Run all tests
-        run: |
-          npm test
-
-      - name: Cache test artifacts
-        if: runner.os == 'Linux'
-        uses: actions/cache@v4
-        with:
-          path: |
-            coverage/
-            packages/web/coverage/
-            .vitest-cache/
-          key: test-artifacts-${{ runner.os }}-${{ github.sha }}-${{ github.run_id }}
-
-  test-coverage:
-    name: Test Coverage
-    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
+    needs: [build]
     runs-on: [self-hosted, macOS]
-    needs: test
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -131,56 +92,37 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Restore test artifacts
+      - name: Restore build cache
         uses: actions/cache@v4
         with:
           path: |
-            coverage/
-            packages/web/coverage/
-            .vitest-cache/
-          key: test-artifacts-${{ runner.os }}-${{ github.sha }}-${{ github.run_id }}
+            dist/
+            packages/web/build/
+            node_modules/
+            packages/*/node_modules/
+          key: ${{ needs.build.outputs.build-cache-key }}
+          fail-on-cache-miss: true
 
       - name: Install system dependencies
         run: |
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            sudo apt-get update
-            sudo apt-get install -y \
-              python3 \
-              make \
-              g++ \
-              libtool \
-              pkg-config \
-              libncurses5-dev \
-              ripgrep
-          else
-            # Ensure Homebrew exists and avoid slow auto-update/cleanup
-            if ! command -v brew >/dev/null 2>&1; then
-              echo "Homebrew not found; please pre-provision brew on the runner." >&2
-              exit 1
-            fi
-            export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
-            brew install -q ripgrep
+          # Ensure Homebrew exists and avoid slow auto-update/cleanup
+          if ! command -v brew >/dev/null 2>&1; then
+            echo "Homebrew not found; please pre-provision brew on the runner." >&2
+            exit 1
           fi
+          export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
+          brew install -q ripgrep
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build project
-        run: npm run build
-
-      - name: Run coverage (incremental)
+      - name: Run tests with coverage
         run: |
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            script -q -c "npm run test:coverage" /dev/null
-          else
-            script -q -k /dev/null npm run test:coverage
-          fi
+          npm run test:coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage/lcov.info,./packages/web/coverage/lcov.info
           fail_ci_if_error: false
+
 
 
   # Temporarily disabled due to reliability issues
@@ -215,7 +157,7 @@ jobs:
   test-macos-app:
     name: Test macOS App
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
-    needs: [test]
+    needs: [build]
     runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout code
@@ -226,11 +168,16 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build project
-        run: npm run build
+      - name: Restore build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            dist/
+            packages/web/build/
+            node_modules/
+            packages/*/node_modules/
+          key: ${{ needs.build.outputs.build-cache-key }}
+          fail-on-cache-miss: true
 
       - name: Run macOS app Swift tests
         run: |
@@ -263,10 +210,10 @@ jobs:
       #     retention-days: 3
 
   build-and-package:
-    name: Build, Package, and Deploy
+    name: Package and Deploy
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
     runs-on: [self-hosted, macOS]
-    needs: [test-macos-app]
+    needs: [test, test-macos-app]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -281,8 +228,23 @@ jobs:
         with:
           bun-version: 1.2.21
 
-      - name: Install dependencies
-        run: bun install
+      - name: Restore build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            dist/
+            packages/web/build/
+            node_modules/
+            packages/*/node_modules/
+          key: ${{ needs.build.outputs.build-cache-key }}
+          fail-on-cache-miss: true
+
+      - name: Install dependencies (if needed)
+        run: |
+          # Dependencies should be cached, but install if missing
+          if [ ! -d "node_modules" ]; then
+            bun install
+          fi
       
       - name: Setup EdDSA key for Sparkle appcast signing
         run: |
