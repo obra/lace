@@ -69,7 +69,7 @@ test.describe('Browser Navigation Support', () => {
 
     // Test browser back button
     await page.goBack();
-    await page.waitForLoadState('networkidle', { timeout: TIMEOUTS.QUICK }).catch(() => {
+    await page.waitForLoadState('networkidle', { timeout: TIMEOUTS.EXTENDED }).catch(() => {
       // Navigation load state timeout - continuing
     });
 
@@ -181,7 +181,7 @@ test.describe('Browser Navigation Support', () => {
         try {
           // Testing hash navigation scenario
           await page.goto(navTest.url);
-          await page.waitForTimeout(3000);
+          await page.waitForTimeout(TIMEOUTS.QUICK);
 
           const currentUrl = page.url();
           hashNavigationTest.navigationAttempts.push(`${navTest.name}: ${currentUrl}`);
@@ -292,7 +292,7 @@ test.describe('Browser Navigation Support', () => {
 
             // Open URL in new context to simulate fresh browser session
             await page.goto(scenario.url);
-            await page.waitForTimeout(3000);
+            await page.waitForTimeout(TIMEOUTS.QUICK);
 
             const finalUrl = page.url();
             let result = 'unknown';
@@ -436,7 +436,7 @@ test.describe('Browser Navigation Support', () => {
         // Testing refresh scenario
 
         await scenario.action();
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(TIMEOUTS.QUICK);
 
         const currentUrl = page.url();
         let messagesVisible = 0;
