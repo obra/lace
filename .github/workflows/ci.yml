@@ -415,15 +415,14 @@ jobs:
           # For app folder access, try relative path first
           echo "📝 Attempting upload to relative path: ${{ steps.channel.outputs.channel }}/$DMG_FILENAME"
           
-          # Create properly escaped JSON for API arg
+          # Use simple curl with properly formatted header
           CHANNEL="${{ steps.channel.outputs.channel }}"
-          API_ARG=$(printf '{"path": "%s/%s", "mode": "overwrite"}' "$CHANNEL" "$DMG_FILENAME")
-          echo "📝 API arg: $API_ARG"
+          echo "📝 Uploading to: $CHANNEL/$DMG_FILENAME"
           
           UPLOAD_RESPONSE=$(curl -X POST https://content.dropboxapi.com/2/files/upload \
-            --header "Authorization: Bearer $ACCESS_TOKEN" \
-            --header "Dropbox-API-Arg: $API_ARG" \
-            --header "Content-Type: application/octet-stream" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H 'Content-Type: application/octet-stream' \
+            -H "Dropbox-API-Arg: {\"path\": \"$CHANNEL/$DMG_FILENAME\", \"mode\": \"overwrite\"}" \
             --data-binary @"$DMG_PATH" \
             --write-out "HTTP_CODE:%{http_code}\n" \
             --silent --show-error)
@@ -443,14 +442,13 @@ jobs:
           echo "📡 Uploading appcast..."
           APPCAST_PATH="build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml"
           
-          # Create properly escaped JSON for appcast API arg
-          APPCAST_API_ARG=$(printf '{"path": "%s/appcast.xml", "mode": "overwrite"}' "$CHANNEL")
-          echo "📝 Appcast API arg: $APPCAST_API_ARG"
+          # Upload appcast with simple curl
+          echo "📝 Uploading appcast to: $CHANNEL/appcast.xml"
           
           APPCAST_RESPONSE=$(curl -X POST https://content.dropboxapi.com/2/files/upload \
-            --header "Authorization: Bearer $ACCESS_TOKEN" \
-            --header "Dropbox-API-Arg: $APPCAST_API_ARG" \
-            --header "Content-Type: application/xml" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H 'Content-Type: application/xml' \
+            -H "Dropbox-API-Arg: {\"path\": \"$CHANNEL/appcast.xml\", \"mode\": \"overwrite\"}" \
             --data-binary @"$APPCAST_PATH" \
             --write-out "HTTP_CODE:%{http_code}\n" \
             --silent --show-error)
