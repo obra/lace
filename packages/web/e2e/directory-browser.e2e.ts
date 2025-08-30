@@ -7,6 +7,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 
 test.describe('Directory Browser E2E Tests', () => {
@@ -28,17 +29,17 @@ test.describe('Directory Browser E2E Tests', () => {
       .or(page.locator('[data-testid="create-first-project-button"]'))
       .first();
 
-    await newProjectButton.waitFor({ timeout: 10000 });
+    await newProjectButton.waitFor({ timeout: TIMEOUTS.STANDARD });
     await newProjectButton.click();
 
     // Should open create project modal
     await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible({
-      timeout: 10000,
+      timeout: TIMEOUTS.STANDARD,
     });
 
     // Should show directory field with DirectoryField component
     const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
-    await directoryInput.waitFor({ timeout: 5000 });
+    await directoryInput.waitFor({ timeout: TIMEOUTS.QUICK });
 
     // Check if directory field has folder icon (indicates DirectoryField is being used)
     const folderIcon = page.locator('.fa-folder').first();
@@ -63,23 +64,23 @@ test.describe('Directory Browser E2E Tests', () => {
       .or(page.locator('[data-testid="create-first-project-button"]'))
       .first();
 
-    await newProjectButton.waitFor({ timeout: 10000 });
+    await newProjectButton.waitFor({ timeout: TIMEOUTS.STANDARD });
     await newProjectButton.click();
 
     // Wait for modal to appear
     await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible({
-      timeout: 10000,
+      timeout: TIMEOUTS.STANDARD,
     });
 
     // Get the directory input field
     const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
-    await directoryInput.waitFor({ timeout: 5000 });
+    await directoryInput.waitFor({ timeout: TIMEOUTS.QUICK });
 
     // Test typing an invalid path
     await directoryInput.fill('/invalid/path/that/does/not/exist');
 
     // Try to proceed (button should be disabled or show error)
-    const createButton = page.locator('button:has-text("Create Project")');
+    const createButton = page.getByTestId('create-project-submit');
 
     // The button might be disabled for invalid paths
     // Or there might be validation errors displayed
@@ -102,17 +103,17 @@ test.describe('Directory Browser E2E Tests', () => {
       .or(page.locator('[data-testid="create-first-project-button"]'))
       .first();
 
-    await newProjectButton.waitFor({ timeout: 10000 });
+    await newProjectButton.waitFor({ timeout: TIMEOUTS.STANDARD });
     await newProjectButton.click();
 
     // Wait for modal
     await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible({
-      timeout: 10000,
+      timeout: TIMEOUTS.STANDARD,
     });
 
     // Get the directory input field
     const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
-    await directoryInput.waitFor({ timeout: 5000 });
+    await directoryInput.waitFor({ timeout: TIMEOUTS.QUICK });
 
     // Use home directory as a valid path
     const validPath = homedir();
@@ -123,11 +124,11 @@ test.describe('Directory Browser E2E Tests', () => {
     await page.waitForTimeout(1000);
 
     // Check if Create Project button becomes enabled
-    const createButton = page.locator('button:has-text("Create Project")');
+    const createButton = page.getByTestId('create-project-submit');
 
     // With a valid directory, the button should eventually become enabled
     // (may take some time for validation to run)
-    await expect(createButton).toBeEnabled({ timeout: 5000 });
+    await expect(createButton).toBeEnabled({ timeout: TIMEOUTS.QUICK });
   });
 
   test('should show directory browser dropdown when focused', async ({ page }) => {
@@ -137,17 +138,17 @@ test.describe('Directory Browser E2E Tests', () => {
       .or(page.locator('[data-testid="create-first-project-button"]'))
       .first();
 
-    await newProjectButton.waitFor({ timeout: 10000 });
+    await newProjectButton.waitFor({ timeout: TIMEOUTS.STANDARD });
     await newProjectButton.click();
 
     // Wait for modal
     await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible({
-      timeout: 10000,
+      timeout: TIMEOUTS.STANDARD,
     });
 
     // Get the directory input field
     const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
-    await directoryInput.waitFor({ timeout: 5000 });
+    await directoryInput.waitFor({ timeout: TIMEOUTS.QUICK });
 
     // Focus the input to potentially trigger dropdown
     await directoryInput.focus();
@@ -181,16 +182,16 @@ test.describe('Directory Browser E2E Tests', () => {
       .or(page.locator('[data-testid="create-first-project-button"]'))
       .first();
 
-    await newProjectButton.waitFor({ timeout: 10000 });
+    await newProjectButton.waitFor({ timeout: TIMEOUTS.STANDARD });
     await newProjectButton.click();
 
     // Wait for modal
     await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible({
-      timeout: 10000,
+      timeout: TIMEOUTS.STANDARD,
     });
 
     const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
-    await directoryInput.waitFor({ timeout: 5000 });
+    await directoryInput.waitFor({ timeout: TIMEOUTS.QUICK });
 
     // Test keyboard navigation by using Tab to navigate to the field
     // Start by focusing on the modal close button or first element
@@ -251,17 +252,17 @@ test.describe('Directory Browser E2E Tests', () => {
       .or(page.locator('[data-testid="create-first-project-button"]'))
       .first();
 
-    await newProjectButton.waitFor({ timeout: 10000 });
+    await newProjectButton.waitFor({ timeout: TIMEOUTS.STANDARD });
     await newProjectButton.click();
 
     // Wait for modal
     await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible({
-      timeout: 10000,
+      timeout: TIMEOUTS.STANDARD,
     });
 
     // Fill directory field using DirectoryField component
     const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
-    await directoryInput.waitFor({ timeout: 5000 });
+    await directoryInput.waitFor({ timeout: TIMEOUTS.QUICK });
 
     // Use testEnv temp directory for valid project creation
     const projectPath = `${testEnv.tempDir}/e2e-directory-test`;
@@ -272,8 +273,8 @@ test.describe('Directory Browser E2E Tests', () => {
     await page.waitForTimeout(1000);
 
     // Create Project button should become enabled
-    const createButton = page.locator('button:has-text("Create Project")');
-    await expect(createButton).toBeEnabled({ timeout: 5000 });
+    const createButton = page.getByTestId('create-project-submit');
+    await expect(createButton).toBeEnabled({ timeout: TIMEOUTS.QUICK });
 
     // Click create project
     await createButton.click();
@@ -286,11 +287,11 @@ test.describe('Directory Browser E2E Tests', () => {
           '[data-testid="current-project-name"], [data-testid="current-project-name-desktop"]'
         )
         .first()
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
     // Should reach the chat interface
     await page.waitForSelector('input[placeholder*="Message"], textarea[placeholder*="Message"]', {
-      timeout: 10000,
+      timeout: TIMEOUTS.STANDARD,
     });
 
     await test.step('Project creation with DirectoryField completed', async () => {

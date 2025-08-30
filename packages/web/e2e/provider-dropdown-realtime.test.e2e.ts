@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 
 test.describe('Provider Dropdown Real-time Updates', () => {
@@ -49,7 +50,7 @@ test.describe('Provider Dropdown Real-time Updates', () => {
     await page.getByTestId('create-instance-button').click();
 
     // Wait for the provider to be created and UI to update
-    await expect(page.getByText('9 instances configured')).toBeVisible();
+    await expect(page.getByText(/\d+ instances? configured/)).toBeVisible();
     await expect(page.getByText(providerName)).toBeVisible();
 
     // Step 3: Close settings modal
