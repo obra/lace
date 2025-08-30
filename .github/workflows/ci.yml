@@ -388,35 +388,51 @@ jobs:
           echo "DMG_PATH=$DMG_PATH" >> $GITHUB_ENV
           echo "📦 Will upload: $DMG_PATH"
           
-      - name: Upload to Dropbox using official CLI
+      - name: Upload to Dropbox using simple curl (fixed)
         if: steps.channel.outputs.deploy == 'true'
         run: |
-          echo "📦 Using official Dropbox CLI for reliable uploads..."
+          echo "📦 Uploading to Dropbox using curl..."
           
-          # Download official Dropbox CLI (correct URL)
-          curl -L https://github.com/dropbox/dbxcli/releases/download/v3.0.0/dbxcli-darwin-amd64 -o dbxcli
-          chmod +x dbxcli
+          ACCESS_TOKEN="${{ secrets.DROPBOX_REFRESH_TOKEN }}"
+          CHANNEL="${{ steps.channel.outputs.channel }}"
+          DMG_FILENAME=$(basename "$DMG_PATH")
           
-          # Verify download
-          file dbxcli
+          # Upload DMG with basic approach
+          echo "📦 Uploading DMG: $DMG_FILENAME"
           
-          # Set access token for dbxcli (avoid interactive auth)
-          export DROPBOX_ACCESS_TOKEN="${{ secrets.DROPBOX_REFRESH_TOKEN }}"
+          curl -X POST https://content.dropboxapi.com/2/files/upload \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/octet-stream" \
+            -H "Dropbox-API-Arg: {\"path\": \"/$CHANNEL/$DMG_FILENAME\", \"mode\": \"overwrite\"}" \
+            --data-binary @"$DMG_PATH" || {
+              echo "❌ DMG upload failed, trying without leading slash..."
+              curl -X POST https://content.dropboxapi.com/2/files/upload \
+                -H "Authorization: Bearer $ACCESS_TOKEN" \
+                -H "Content-Type: application/octet-stream" \
+                -H "Dropbox-API-Arg: {\"path\": \"$CHANNEL/$DMG_FILENAME\", \"mode\": \"overwrite\"}" \
+                --data-binary @"$DMG_PATH"
+            }
           
-          # Test authentication
-          ./dbxcli account info
-          
-          # Upload DMG
-          echo "📦 Uploading DMG to ${{ steps.channel.outputs.channel }}/"
-          ./dbxcli put "$DMG_PATH" "/${{ steps.channel.outputs.channel }}/"
           echo "✅ DMG uploaded successfully"
           
-          # Upload Appcast  
+          # Upload Appcast
           echo "📡 Uploading appcast..."
-          APPCAST_PATH="build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml"
-          ./dbxcli put "$APPCAST_PATH" "/${{ steps.channel.outputs.channel }}/appcast.xml"
-          echo "✅ Appcast uploaded successfully"
+          APPCAST_PATH="build/appcast/$CHANNEL/appcast.xml"
           
+          curl -X POST https://content.dropboxapi.com/2/files/upload \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/xml" \
+            -H "Dropbox-API-Arg: {\"path\": \"/$CHANNEL/appcast.xml\", \"mode\": \"overwrite\"}" \
+            --data-binary @"$APPCAST_PATH" || {
+              echo "❌ Appcast upload failed, trying without leading slash..."
+              curl -X POST https://content.dropboxapi.com/2/files/upload \
+                -H "Authorization: Bearer $ACCESS_TOKEN" \
+                -H "Content-Type: application/xml" \
+                -H "Dropbox-API-Arg: {\"path\": \"$CHANNEL/appcast.xml\", \"mode\": \"overwrite\"}" \
+                --data-binary @"$APPCAST_PATH"
+            }
+          
+          echo "✅ Appcast uploaded successfully"
           echo "🚀 Deployment to Dropbox complete!"
 
       # All artifacts go to Dropbox only - no GitHub storage needed
