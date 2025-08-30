@@ -88,7 +88,8 @@ async function startTestServer(
       LACE_DIR: tempDir,
       ANTHROPIC_API_KEY: 'test-anthropic-key-for-e2e',
       LACE_DB_PATH: path.join(tempDir, 'lace.db'),
-      NODE_ENV: 'development', // Use development mode for React Router v7 compatibility
+      NODE_ENV: 'development', // Use development mode but disable HMR for E2E tests
+      VITE_HMR_DISABLED: 'true', // Explicitly disable Vite HMR for E2E tests
       E2E_TOOL_APPROVAL_MOCK: 'true',
       LACE_LOG_LEVEL: 'debug',
       LACE_LOG_STDERR: 'true',
