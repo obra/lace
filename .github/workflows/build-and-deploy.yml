@@ -14,6 +14,8 @@ concurrency:
 on:
   push:
     branches: [ main ]     # Deploy to nightly channel
+  pull_request:
+    branches: [ main ]     # Test builds (no deployment)
   release:
     types: [ published ]   # Deploy to release channel
   workflow_dispatch:       # Manual trigger
@@ -80,12 +82,19 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "release" ]]; then
             echo "channel=release" >> $GITHUB_OUTPUT
+            echo "deploy=true" >> $GITHUB_OUTPUT
             echo "🚢 Deploying to RELEASE channel"
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "channel=${{ github.event.inputs.channel }}" >> $GITHUB_OUTPUT
+            echo "deploy=true" >> $GITHUB_OUTPUT
             echo "🔧 Manual deploy to ${{ github.event.inputs.channel }} channel"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "channel=nightly" >> $GITHUB_OUTPUT
+            echo "deploy=false" >> $GITHUB_OUTPUT
+            echo "🧪 PR build (no deployment)"
           else
             echo "channel=nightly" >> $GITHUB_OUTPUT
+            echo "deploy=true" >> $GITHUB_OUTPUT
             echo "🌙 Deploying to NIGHTLY channel"
           fi
       
@@ -105,6 +114,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       
       - name: Upload to Dropbox - DMG
+        if: steps.channel.outputs.deploy == 'true'
         uses: Lewuathe/dropbox-github-action@0cf2aca # v1.0.3
         with:
           dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
@@ -114,6 +124,7 @@ jobs:
           target-path: /${{ steps.channel.outputs.channel }}/
       
       - name: Upload to Dropbox - Appcast
+        if: steps.channel.outputs.deploy == 'true'
         uses: Lewuathe/dropbox-github-action@0cf2aca # v1.0.3
         with:
           dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
