@@ -366,8 +366,8 @@ jobs:
             --channel ${{ steps.channel.outputs.channel }} \
             --generate-appcast
         env:
-          APPLE_DEVELOPER_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
-          APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+          # Signal to sign-and-notarize.ts that keychain is already set up
+          GITHUB_ACTIONS_KEYCHAIN_READY: 'true'
           APPLE_ID_EMAIL: ${{ secrets.APPLE_ID_EMAIL }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
