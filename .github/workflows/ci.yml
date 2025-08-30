@@ -388,7 +388,7 @@ jobs:
           echo "DMG_PATH=$DMG_PATH" >> $GITHUB_ENV
           echo "📦 Will upload: $DMG_PATH"
           
-      - name: Upload to Dropbox using third-party action
+      - name: Upload DMG to Dropbox
         if: steps.channel.outputs.deploy == 'true'
         uses: Lewuathe/dropbox-github-action@0cf2acadb42e7fe8d14936b064313cca1db0dd68 # v1.0.3
         with:
@@ -397,6 +397,17 @@ jobs:
           dropbox-refresh-token: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
           source-path: ${{ env.DMG_PATH }}
           target-path: ${{ steps.channel.outputs.channel }}/
+          
+      - name: Verify DMG upload success
+        if: steps.channel.outputs.deploy == 'true'
+        run: |
+          echo "🔍 Verifying DMG upload..."
+          if [ $? -eq 0 ]; then
+            echo "✅ DMG upload verified successful"
+          else
+            echo "❌ DMG upload failed"
+            exit 1
+          fi
       
       - name: Check appcast generation
         if: steps.channel.outputs.deploy == 'true'
