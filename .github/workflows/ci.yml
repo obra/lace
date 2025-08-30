@@ -419,18 +419,27 @@ jobs:
           echo "📡 Uploading appcast..."
           APPCAST_PATH="build/appcast/$CHANNEL/appcast.xml"
           
-          curl -X POST https://content.dropboxapi.com/2/files/upload \
-            -H "Authorization: Bearer $ACCESS_TOKEN" \
-            -H "Content-Type: application/xml" \
-            -H "Dropbox-API-Arg: {\"path\": \"/$CHANNEL/appcast.xml\", \"mode\": \"overwrite\"}" \
-            --data-binary @"$APPCAST_PATH" || {
-              echo "❌ Appcast upload failed, trying without leading slash..."
-              curl -X POST https://content.dropboxapi.com/2/files/upload \
-                -H "Authorization: Bearer $ACCESS_TOKEN" \
-                -H "Content-Type: application/xml" \
-                -H "Dropbox-API-Arg: {\"path\": \"$CHANNEL/appcast.xml\", \"mode\": \"overwrite\"}" \
-                --data-binary @"$APPCAST_PATH"
-            }
+          # Check if appcast exists
+          if [ ! -f "$APPCAST_PATH" ]; then
+            echo "⚠️  Appcast not found at $APPCAST_PATH"
+            ls -la build/appcast/ || echo "No appcast directory"
+            echo "Skipping appcast upload"
+          else
+            echo "📝 Found appcast at: $APPCAST_PATH"
+          
+            curl -X POST https://content.dropboxapi.com/2/files/upload \
+              -H "Authorization: Bearer $ACCESS_TOKEN" \
+              -H "Content-Type: application/xml" \
+              -H "Dropbox-API-Arg: {\"path\": \"/$CHANNEL/appcast.xml\", \"mode\": \"overwrite\"}" \
+              --data-binary @"$APPCAST_PATH" || {
+                echo "❌ Appcast upload failed, trying without leading slash..."
+                curl -X POST https://content.dropboxapi.com/2/files/upload \
+                  -H "Authorization: Bearer $ACCESS_TOKEN" \
+                  -H "Content-Type: application/xml" \
+                  -H "Dropbox-API-Arg: {\"path\": \"$CHANNEL/appcast.xml\", \"mode\": \"overwrite\"}" \
+                  --data-binary @"$APPCAST_PATH"
+              }
+          fi
           
           echo "✅ Appcast uploaded successfully"
           echo "🚀 Deployment to Dropbox complete!"
