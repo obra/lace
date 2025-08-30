@@ -233,15 +233,16 @@ jobs:
         env:
           CI: true
 
-      - name: Upload Playwright test results
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
-        if: always()
-        with:
-          name: playwright-test-results
-          path: |
-            packages/web/test-results/
-            packages/web/playwright-report/
-          retention-days: 7
+      # Skip uploading test results to save storage quota
+      # - name: Upload Playwright test results
+      #   uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+      #   if: always()
+      #   with:
+      #     name: playwright-test-results
+      #     path: |
+      #       packages/web/test-results/
+      #       packages/web/playwright-report/
+      #     retention-days: 7
 
   test-macos-app:
     name: Test macOS App
@@ -282,14 +283,15 @@ jobs:
           ls -la build/Lace.app/Contents/MacOS/
           echo "✅ macOS app builds successfully"
 
-      - name: Upload test artifacts
-        if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
-        with:
-          name: macos-app-test-results
-          path: |
-            platforms/macos/build/
-          retention-days: 3
+      # Skip uploading test artifacts to save storage quota
+      # - name: Upload test artifacts
+      #   if: always()
+      #   uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+      #   with:
+      #     name: macos-app-test-results
+      #     path: |
+      #       platforms/macos/build/
+      #     retention-days: 3
 
   build-and-package:
     name: Build, Package, and Deploy
@@ -432,17 +434,15 @@ jobs:
           source-path: build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml
           target-path: /${{ steps.channel.outputs.channel }}/
 
-      - name: Upload build artifacts
+      - name: Upload essential build artifacts
+        if: steps.channel.outputs.deploy == 'true'
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
-          name: lace-macos-${{ steps.channel.outputs.channel }}-${{ github.sha }}
+          name: lace-macos-${{ steps.channel.outputs.channel }}
           path: |
             build/Lace-*.dmg
             build/appcast/
-            build/Lace.app
-            dist/
-            !dist/**/*.map
-          retention-days: 30
+          retention-days: 7
 
       - name: Cleanup Keychain
         if: always()
