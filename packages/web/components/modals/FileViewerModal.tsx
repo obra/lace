@@ -57,10 +57,10 @@ function FileViewerHeader({
             {fileContent.mimeType} • {formatFileSize(fileContent.size)}
           </div>
         )}
-        
-        <button 
-          onClick={onCopy} 
-          className="btn btn-ghost btn-sm" 
+
+        <button
+          onClick={onCopy}
+          className="btn btn-ghost btn-sm"
           title="Copy content"
           disabled={copyDisabled}
         >
@@ -96,7 +96,8 @@ function FileContent({ fileContent, isLoading, error }: FileContentProps) {
     }
 
     // Check if content is binary/non-text
-    const isBinary = !fileContent.mimeType.startsWith('text/') && fileContent.mimeType !== 'application/json';
+    const isBinary =
+      !fileContent.mimeType.startsWith('text/') && fileContent.mimeType !== 'application/json';
     if (isBinary) {
       setHighlightedContent(DOMPurify.sanitize('Cannot preview binary file'));
       return;
@@ -142,7 +143,6 @@ function FileContent({ fileContent, isLoading, error }: FileContentProps) {
 
   return (
     <div className="h-96 overflow-auto border border-base-300 rounded">
-
       {/* Code content with syntax highlighting */}
       <div className="p-4">
         <pre className="text-sm font-mono leading-relaxed">
@@ -152,7 +152,6 @@ function FileContent({ fileContent, isLoading, error }: FileContentProps) {
     </div>
   );
 }
-
 
 export function FileViewerModal({
   isOpen,
@@ -185,7 +184,7 @@ export function FileViewerModal({
           `/api/sessions/${sessionId}/files/${encodedPath}`,
           { signal: abortController.signal }
         );
-        
+
         if (!abortController.signal.aborted) {
           setFileContent(response);
         }
@@ -268,7 +267,11 @@ export function FileViewerModal({
           onDownload={handleDownload}
           onPopOut={handlePopOut}
           onCopy={handleCopy}
-          copyDisabled={!fileContent || (!fileContent.mimeType.startsWith('text/') && fileContent.mimeType !== 'application/json')}
+          copyDisabled={
+            !fileContent ||
+            (!fileContent.mimeType.startsWith('text/') &&
+              fileContent.mimeType !== 'application/json')
+          }
         />
       }
     >

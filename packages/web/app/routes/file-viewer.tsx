@@ -20,7 +20,6 @@ interface FileViewerContentProps {
   filePath: string;
 }
 
-
 function FileViewerContent({ sessionId, filePath }: FileViewerContentProps) {
   const [fileContent, setFileContent] = useState<SessionFileContentResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,7 +31,7 @@ function FileViewerContent({ sessionId, filePath }: FileViewerContentProps) {
   // Load file content
   useEffect(() => {
     const abortController = new AbortController();
-    
+
     const loadFileContent = async () => {
       setIsLoading(true);
       setError(null);
@@ -63,12 +62,12 @@ function FileViewerContent({ sessionId, filePath }: FileViewerContentProps) {
     };
 
     void loadFileContent();
-    
+
     return () => {
       abortController.abort();
     };
   }, [sessionId, filePath]);
-  
+
   // Cleanup copy timer on unmount
   useEffect(() => {
     return () => {

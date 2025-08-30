@@ -59,7 +59,7 @@ describe('FileBrowserSection', () => {
 
     // Verify the input value changed
     expect(searchInput).toHaveValue('test');
-    
+
     // Verify the search term was passed to SessionFileTree
     expect(screen.getByText('Search: test')).toBeInTheDocument();
   });

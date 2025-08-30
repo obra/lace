@@ -41,13 +41,12 @@ export function FileBrowserSection({
     setSearchTerm(event.target.value);
   }, []);
 
-
   return (
     <>
       <SidebarSection
         title="Files"
         isExpanded={isExpanded}
-        onToggle={() => setIsExpanded(prev => !prev)}
+        onToggle={() => setIsExpanded((prev) => !prev)}
         className={className}
       >
         {/* Search input */}

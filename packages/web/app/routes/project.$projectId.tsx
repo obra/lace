@@ -1,7 +1,6 @@
 // ABOUTME: Project page route for React Router v7
 // ABOUTME: Project dashboard page with all providers and context setup
 
-
 import { useParams } from 'react-router';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';

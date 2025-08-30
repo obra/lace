@@ -14,11 +14,11 @@ interface ErrorLogEntryProps {
   showContext?: boolean;
 }
 
-export function ErrorLogEntry({ 
-  error, 
-  onRetry, 
+export function ErrorLogEntry({
+  error,
+  onRetry,
   showTimestamp = true,
-  showContext = false
+  showContext = false,
 }: ErrorLogEntryProps): React.JSX.Element {
   const getErrorSeverityClass = () => {
     switch (error.errorType) {
@@ -36,32 +36,35 @@ export function ErrorLogEntry({
   };
 
   const formatErrorType = (errorType: string) => {
-    return errorType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return errorType.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
   const getPhaseDescription = (phase?: string) => {
     switch (phase) {
-      case 'provider_response': return 'during AI response';
-      case 'tool_execution': return 'during tool execution';
-      case 'conversation_processing': return 'during processing';
-      case 'initialization': return 'during initialization';
-      default: return 'in unknown phase';
+      case 'provider_response':
+        return 'during AI response';
+      case 'tool_execution':
+        return 'during tool execution';
+      case 'conversation_processing':
+        return 'during processing';
+      case 'initialization':
+        return 'during initialization';
+      default:
+        return 'in unknown phase';
     }
   };
 
   return (
     <div className="border-l-4 border-error bg-error/5 rounded-r p-3 my-2">
       <div className="flex items-start gap-3">
-        <FontAwesomeIcon 
-          icon={faExclamationTriangle} 
+        <FontAwesomeIcon
+          icon={faExclamationTriangle}
           className={`mt-1 ${getErrorSeverityClass()}`}
         />
-        
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="font-medium text-sm">
-              {formatErrorType(error.errorType)}
-            </span>
+            <span className="font-medium text-sm">{formatErrorType(error.errorType)}</span>
             {showTimestamp && (
               <>
                 <FontAwesomeIcon icon={faClock} className="text-xs opacity-50" />
@@ -70,27 +73,26 @@ export function ErrorLogEntry({
                 </span>
               </>
             )}
-            {error.isRetryable && (
-              <span className="badge badge-warning badge-xs">Retryable</span>
-            )}
+            {error.isRetryable && <span className="badge badge-warning badge-xs">Retryable</span>}
           </div>
-          
-          <div className="text-sm text-base-content/80 mb-2">
-            {error.message}
-          </div>
-          
+
+          <div className="text-sm text-base-content/80 mb-2">{error.message}</div>
+
           {error.context && Object.keys(error.context).length > 0 && (
             <div className="text-xs opacity-60 mb-2">
-              Failed {getPhaseDescription(typeof error.context.phase === 'string' ? error.context.phase : '')}
-              {error.context.toolName && typeof error.context.toolName === 'string' ? 
-                ` using ${error.context.toolName} tool` : ''
-              }
-              {error.context.providerName && typeof error.context.providerName === 'string' ? 
-                ` via ${error.context.providerName} provider` : ''
-              }
+              Failed{' '}
+              {getPhaseDescription(
+                typeof error.context.phase === 'string' ? error.context.phase : ''
+              )}
+              {error.context.toolName && typeof error.context.toolName === 'string'
+                ? ` using ${error.context.toolName} tool`
+                : ''}
+              {error.context.providerName && typeof error.context.providerName === 'string'
+                ? ` via ${error.context.providerName} provider`
+                : ''}
             </div>
           )}
-          
+
           {showContext && error.context && (
             <details className="collapse collapse-arrow mt-2">
               <summary className="collapse-title text-xs font-medium py-1">
@@ -108,16 +110,14 @@ export function ErrorLogEntry({
               </div>
             </details>
           )}
-          
+
           {error.retryCount && error.retryCount > 0 && (
-            <div className="text-xs opacity-50 mt-1">
-              Retry attempt: {error.retryCount}
-            </div>
+            <div className="text-xs opacity-50 mt-1">Retry attempt: {error.retryCount}</div>
           )}
         </div>
-        
+
         {error.isRetryable && error.canRetry && onRetry && (
-          <button 
+          <button
             className="btn btn-xs btn-warning"
             onClick={onRetry}
             title="Retry this operation"

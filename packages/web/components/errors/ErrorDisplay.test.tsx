@@ -28,7 +28,7 @@ describe('Error Display Components', () => {
 
     it('should render error information correctly', () => {
       render(<ErrorDisplay error={mockErrorLogEntry} />);
-      
+
       expect(screen.getByText('Provider Failure')).toBeInTheDocument();
       expect(screen.getByText('Provider API rate limit exceeded')).toBeInTheDocument();
       expect(screen.getByText('error')).toBeInTheDocument(); // severity badge
@@ -37,23 +37,23 @@ describe('Error Display Components', () => {
 
     it('should show context when enabled', () => {
       render(<ErrorDisplay error={mockErrorLogEntry} showContext={true} />);
-      
+
       expect(screen.getByText('Error Context')).toBeInTheDocument();
     });
 
     it('should hide context when disabled', () => {
       render(<ErrorDisplay error={mockErrorLogEntry} showContext={false} />);
-      
+
       expect(screen.queryByText('Error Context')).not.toBeInTheDocument();
     });
 
     it('should show retry button for retryable errors', () => {
       const onRetry = vi.fn();
       render(<ErrorDisplay error={mockErrorLogEntry} onRetry={onRetry} />);
-      
+
       const retryButton = screen.getByRole('button', { name: /retry/i });
       expect(retryButton).toBeInTheDocument();
-      
+
       fireEvent.click(retryButton);
       expect(onRetry).toHaveBeenCalledOnce();
     });
@@ -61,13 +61,13 @@ describe('Error Display Components', () => {
     it('should hide retry button for non-retryable errors', () => {
       const nonRetryableError = { ...mockErrorLogEntry, isRetryable: false };
       render(<ErrorDisplay error={nonRetryableError} />);
-      
+
       expect(screen.queryByRole('button', { name: /retry/i })).not.toBeInTheDocument();
     });
 
     it('should render compact mode correctly', () => {
       render(<ErrorDisplay error={mockErrorLogEntry} compact={true} />);
-      
+
       expect(screen.getByText('Provider Failure')).toBeInTheDocument();
       expect(screen.getByText('Provider API rate limit exceeded')).toBeInTheDocument();
     });
@@ -91,7 +91,7 @@ describe('Error Display Components', () => {
 
     it('should render timeline error entry correctly', () => {
       render(<ErrorLogEntry error={mockErrorEntry} />);
-      
+
       expect(screen.getByText('Tool Execution')).toBeInTheDocument();
       expect(screen.getByText('Tool execution failed: command not found')).toBeInTheDocument();
       expect(screen.getByText(/during tool execution/)).toBeInTheDocument();
@@ -100,31 +100,31 @@ describe('Error Display Components', () => {
 
     it('should show timestamp when enabled', () => {
       render(<ErrorLogEntry error={mockErrorEntry} showTimestamp={true} />);
-      
+
       // TimestampDisplay should be rendered
       expect(screen.getByTestId('timestamp')).toBeInTheDocument();
     });
 
     it('should hide timestamp when disabled', () => {
       render(<ErrorLogEntry error={mockErrorEntry} showTimestamp={false} />);
-      
+
       // TimestampDisplay should not be rendered when timestamp is hidden
       expect(screen.queryByTestId('timestamp')).not.toBeInTheDocument();
     });
 
     it('should show retry button for retryable errors with canRetry', () => {
-      const retryableError = { 
-        ...mockErrorEntry, 
-        isRetryable: true, 
-        canRetry: true 
+      const retryableError = {
+        ...mockErrorEntry,
+        isRetryable: true,
+        canRetry: true,
       };
       const onRetry = vi.fn();
-      
+
       render(<ErrorLogEntry error={retryableError} onRetry={onRetry} />);
-      
+
       const retryButton = screen.getByRole('button');
       expect(retryButton).toBeInTheDocument();
-      
+
       fireEvent.click(retryButton);
       expect(onRetry).toHaveBeenCalledOnce();
     });
@@ -132,13 +132,8 @@ describe('Error Display Components', () => {
 
   describe('ErrorToast', () => {
     it('should render error toast with message', () => {
-      render(
-        <ErrorToast 
-          errorType="provider_failure"
-          message="Network timeout occurred"
-        />
-      );
-      
+      render(<ErrorToast errorType="provider_failure" message="Network timeout occurred" />);
+
       expect(screen.getByText('Provider Failure')).toBeInTheDocument();
       expect(screen.getByText('Network timeout occurred')).toBeInTheDocument();
     });
@@ -146,17 +141,17 @@ describe('Error Display Components', () => {
     it('should show retry button for retryable errors', () => {
       const onRetry = vi.fn();
       render(
-        <ErrorToast 
+        <ErrorToast
           errorType="timeout"
           message="Request timed out"
           isRetryable={true}
           onRetry={onRetry}
         />
       );
-      
+
       const retryButton = screen.getByRole('button', { name: /retry/i });
       expect(retryButton).toBeInTheDocument();
-      
+
       fireEvent.click(retryButton);
       expect(onRetry).toHaveBeenCalledOnce();
     });
@@ -164,13 +159,13 @@ describe('Error Display Components', () => {
     it('should call onDismiss when dismiss button is clicked', () => {
       const onDismiss = vi.fn();
       render(
-        <ErrorToast 
+        <ErrorToast
           errorType="processing_error"
           message="Processing failed"
           onDismiss={onDismiss}
         />
       );
-      
+
       const dismissButton = screen.getByTitle('Dismiss');
       fireEvent.click(dismissButton);
       expect(onDismiss).toHaveBeenCalledOnce();
@@ -179,33 +174,27 @@ describe('Error Display Components', () => {
     it('should auto-dismiss after specified time', async () => {
       // Use fake timers for deterministic timing
       vi.useFakeTimers();
-      
+
       const onDismiss = vi.fn();
       render(
-        <ErrorToast 
+        <ErrorToast
           errorType="streaming_error"
           message="Stream interrupted"
           autoDismiss={100} // 100ms for fast test
           onDismiss={onDismiss}
         />
       );
-      
+
       // Fast-forward time to trigger auto-dismiss
       vi.advanceTimersByTime(150);
       expect(onDismiss).toHaveBeenCalledOnce();
-      
+
       vi.useRealTimers();
     });
 
     it('should render compact mode correctly', () => {
-      render(
-        <ErrorToast 
-          errorType="tool_execution"
-          message="Tool failed"
-          compact={true}
-        />
-      );
-      
+      render(<ErrorToast errorType="tool_execution" message="Tool failed" compact={true} />);
+
       expect(screen.getByText('Tool failed')).toBeInTheDocument();
     });
   });

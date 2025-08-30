@@ -84,7 +84,7 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
     sessionId = session.getId();
 
     // Mock fetch to route requests to real API handlers
-    global.fetch = (vi
+    global.fetch = vi
       .fn()
       .mockImplementation(async (url: RequestInfo | URL, init?: RequestInit) => {
         const urlString = typeof url === 'string' ? url : url.toString();
@@ -189,7 +189,7 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
           throw error;
         }
         return new Response('Not implemented', { status: 404 });
-      })) as unknown as typeof fetch;
+      }) as unknown as typeof fetch;
 
     client = new TaskAPIClient();
   });

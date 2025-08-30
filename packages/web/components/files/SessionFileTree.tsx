@@ -98,14 +98,14 @@ function FileTreeItem({
     // Check if this node or any loaded children match
     const nodeMatches = node.name.toLowerCase().includes(searchTerm.toLowerCase());
     if (nodeMatches) return true;
-    
+
     // For directories, check if any loaded children match
     if (node.type === 'directory' && node.children) {
-      return node.children.some(child => 
+      return node.children.some((child) =>
         child.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
+
     return false;
   }, [node.name, node.type, node.children, searchTerm]);
 
@@ -181,7 +181,6 @@ function FileTreeItem({
     </>
   );
 }
-
 
 export function SessionFileTree({
   sessionId,
