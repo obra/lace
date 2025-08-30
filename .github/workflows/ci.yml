@@ -56,28 +56,10 @@ jobs:
       - name: Check Prettier formatting
         run: npx prettier --check "packages/web/**/*.ts" "packages/web/**/*.tsx"
 
-  build:
-    name: Build Project
-    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
-    runs-on: [self-hosted, macOS]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build project
-        run: cd packages/web && npm run build
-
   test:
     name: Test Suite
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
+    needs: [lint-and-format]
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
@@ -208,6 +190,7 @@ jobs:
   playwright-tests:
     name: Playwright E2E Tests
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
+    needs: [test-macos-app]
     runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout code
@@ -246,6 +229,7 @@ jobs:
   test-macos-app:
     name: Test macOS App
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
+    needs: [test]
     runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout code
@@ -296,7 +280,7 @@ jobs:
     name: Build, Package, and Deploy
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
     runs-on: [self-hosted, macOS]
-    needs: [lint-and-format, build, test, test-macos-app, playwright-tests]
+    needs: [playwright-tests]
     steps:
       - name: Checkout code
         uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
