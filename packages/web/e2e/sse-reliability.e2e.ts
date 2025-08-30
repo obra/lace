@@ -110,8 +110,10 @@ test.describe('SSE Event System Reliability', () => {
         await interaction.action();
         await page.waitForTimeout(TIMEOUTS.QUICK / 5);
 
-        const stillFunctional = await getMessageInput(page)
-          .then(() => true)
+        // Check if message input is still accessible (may be hidden by modals)
+        const stillFunctional = await page
+          .getByTestId('message-input')
+          .isVisible()
           .catch(() => false);
         stabilityResults.push({
           interaction: interaction.name,

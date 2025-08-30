@@ -24,11 +24,9 @@ e2e/user-messaging-flow.e2e.ts
 # e2e/agent-stop-functionality.e2e.ts  # Agent error recovery bug
 # e2e/streaming-compaction.e2e.ts      # JavaScript errors in compaction
 # e2e/stop-functionality.e2e.ts       # Related to agent error recovery
+# e2e/sse-reliability.e2e.ts           # SSE connection hangs during page interactions
 
-# Tests needing UI fixes (test infrastructure issues)  
-# e2e/directory-browser.e2e.ts         # Wrong button selectors
-# e2e/provider-dropdown-realtime.test.e2e.ts  # Setup pattern needs updating
-# e2e/browser-navigation.e2e.ts        # Complex URL navigation timing
-
-# Tests for features that may not be implemented yet
-# e2e/sse-reliability.e2e.ts           # SSE connection stability issues
+# Tests that were fixed and can be removed from exclusion list:
+# e2e/directory-browser.e2e.ts         # ✅ FIXED - Now passes
+# e2e/provider-dropdown-realtime.test.e2e.ts  # ✅ FIXED - Now passes  
+# e2e/browser-navigation.e2e.ts        # ✅ FIXED - Now passes
