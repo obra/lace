@@ -14,6 +14,7 @@ e2e/page-objects.test.e2e.ts
 e2e/project-persistence.e2e.ts
 e2e/provider-dropdown-realtime.test.e2e.ts
 e2e/session-agent-management.e2e.ts
+e2e/sse-reliability.e2e.ts
 e2e/streaming-advanced.e2e.ts
 e2e/streaming-core.e2e.ts
 e2e/task-management.e2e.ts
@@ -24,7 +25,6 @@ e2e/user-messaging-flow.e2e.ts
 # e2e/agent-stop-functionality.e2e.ts  # Agent error recovery bug
 # e2e/streaming-compaction.e2e.ts      # JavaScript errors in compaction
 # e2e/stop-functionality.e2e.ts       # Related to agent error recovery
-# e2e/sse-reliability.e2e.ts           # SSE connection hangs during page interactions
 
 # Tests that were fixed and can be removed from exclusion list:
 # e2e/directory-browser.e2e.ts         # ✅ FIXED - Now passes
