@@ -393,9 +393,13 @@ jobs:
         run: |
           echo "📦 Using official Dropbox CLI for reliable uploads..."
           
-          # Download official Dropbox CLI
-          curl -L https://github.com/dropbox/dbxcli/releases/download/v2.1.1/dbxcli-darwin-arm64 -o dbxcli
+          # Download official Dropbox CLI (latest version)
+          curl -L https://github.com/dropbox/dbxcli/releases/latest/download/dbxcli-darwin-arm64 -o dbxcli
           chmod +x dbxcli
+          
+          # Verify download
+          file dbxcli
+          ./dbxcli version
           
           # Configure authentication with access token
           echo "${{ secrets.DROPBOX_REFRESH_TOKEN }}" | ./dbxcli account info
