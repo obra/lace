@@ -283,6 +283,15 @@ jobs:
 
       - name: Install dependencies
         run: bun install
+      
+      - name: Setup EdDSA key for Sparkle appcast signing
+        run: |
+          cd platforms/macos
+          echo "$SPARKLE_PRIVATE_KEY" > sparkle_private_key
+          chmod 600 sparkle_private_key
+          echo "✅ EdDSA private key configured for appcast signing"
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
 
       - name: Setup Apple Code Signing
         run: |

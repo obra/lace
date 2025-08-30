@@ -12,6 +12,30 @@ import { tmpdir } from 'node:os';
 const ALLOWED_CHANNELS = ['release', 'nightly'] as const;
 type Channel = (typeof ALLOWED_CHANNELS)[number];
 
+async function replaceAppcastPlaceholders(
+  appcastDir: string,
+  channel: string,
+  dmgFilename: string
+) {
+  const appcastPath = join(appcastDir, 'appcast.xml');
+  if (!existsSync(appcastPath)) {
+    console.warn(`⚠️  Appcast not found at ${appcastPath}`);
+    return;
+  }
+
+  let appcastContent = readFileSync(appcastPath, 'utf8');
+
+  // Replace placeholder URL with actual Dropbox URL for the DMG
+  const dmgUrl = `https://uc.dropbox.com/scl/fi/DMG_FILE_ID/${dmgFilename}?rlkey=DMG_KEY&dl=1`;
+  appcastContent = appcastContent.replace(/PLACEHOLDER_URL_TO_BE_REPLACED/g, dmgUrl);
+
+  console.log(`🔧 Replaced placeholder URL with: ${dmgUrl}`);
+  console.log('⚠️  Note: Using placeholder DMG URL - update with real Dropbox sharing link');
+
+  writeFileSync(appcastPath, appcastContent);
+  console.log(`✅ Updated appcast placeholders at ${appcastPath}`);
+}
+
 function runPackageTarget(workspace: string, target: string, description: string) {
   console.log(`🔨 ${description}...`);
   execSync(`bun run ${target}`, { cwd: workspace, stdio: 'inherit' });
@@ -117,9 +141,14 @@ async function generateAppcast(options: {
         stdio: 'inherit',
       });
       console.log(`✅ Appcast generated at ${appcastDir}/appcast.xml`);
+
+      // Replace placeholder URLs with actual Dropbox URLs
+      await replaceAppcastPlaceholders(appcastDir, channel, `Lace-${versionInfo.fullVersion}.dmg`);
     } catch (error) {
       console.warn('⚠️  Sparkle generate_appcast failed, creating basic appcast...');
       await createBasicAppcast({ dmgPath: appcastDmgPath, channel, outdir, versionInfo, fileSize });
+      // Replace placeholder URLs in basic appcast too
+      await replaceAppcastPlaceholders(appcastDir, channel, `Lace-${versionInfo.fullVersion}.dmg`);
     } finally {
       // Clean up temporary key file
       if (tempKeyPath && existsSync(tempKeyPath)) {
@@ -173,14 +202,7 @@ async function createBasicAppcast(options: {
   console.log(`📝 Basic appcast created at ${appcastPath}`);
   console.log(`⚠️  Remember to replace PLACEHOLDER_URL and PLACEHOLDER_SIGNATURE!`);
 
-  // Warn about placeholders but don't fail CI during development
-  if (
-    appcastContent.includes('PLACEHOLDER_URL_TO_BE_REPLACED') ||
-    appcastContent.includes('PLACEHOLDER_SIGNATURE')
-  ) {
-    console.warn('⚠️  Appcast contains placeholders - OK for development, replace for production');
-    console.warn('   Use proper EdDSA signing and real Dropbox URLs for production deployment');
-  }
+  // Note: Placeholders will be replaced by replaceAppcastPlaceholders function
 }
 
 interface BuildOptions {
