@@ -371,14 +371,21 @@ jobs:
         if: steps.channel.outputs.deploy == 'true'
         run: |
           echo "🔐 Getting Dropbox access token..."
-          ACCESS_TOKEN=$(curl -s https://api.dropbox.com/oauth2/token \
+          
+          # Debug: Test the OAuth endpoint
+          OAUTH_RESPONSE=$(curl -s https://api.dropbox.com/oauth2/token \
             -d refresh_token=${{ secrets.DROPBOX_REFRESH_TOKEN }} \
             -d grant_type=refresh_token \
             -d client_id=${{ secrets.DROPBOX_APP_KEY }} \
-            -d client_secret=${{ secrets.DROPBOX_APP_SECRET }} | jq -r '.access_token')
+            -d client_secret=${{ secrets.DROPBOX_APP_SECRET }})
+          
+          echo "🔍 OAuth response: $OAUTH_RESPONSE"
+          
+          ACCESS_TOKEN=$(echo "$OAUTH_RESPONSE" | jq -r '.access_token')
           
           if [ "$ACCESS_TOKEN" = "null" ] || [ -z "$ACCESS_TOKEN" ]; then
             echo "❌ Failed to get access token"
+            echo "OAuth response: $OAUTH_RESPONSE"
             exit 1
           fi
           
