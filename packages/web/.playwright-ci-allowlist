@@ -9,6 +9,7 @@ e2e/console-forward.e2e.ts
 e2e/data-testid-verification.test.e2e.ts
 e2e/error-handling.e2e.ts
 e2e/example.test.e2e.ts
+e2e/file-browser.e2e.ts
 e2e/message-streaming.e2e.ts
 # e2e/msw-setup.test.e2e.ts # Removed - playwright-msw dependency removed
 e2e/multi-agent-workflows.e2e.ts
@@ -16,8 +17,22 @@ e2e/page-objects.test.e2e.ts
 e2e/project-persistence.e2e.ts
 e2e/session-management.e2e.ts
 e2e/streaming-basic.e2e.ts
+e2e/streaming-error-recovery.e2e.ts
 e2e/streaming-minimal.e2e.ts
 e2e/streaming-reliability.e2e.ts
 e2e/streaming-sse-events.e2e.ts
 e2e/task-management.e2e.ts
 e2e/tool-approval.e2e.ts
+
+# Tests with known application bugs (not CI-ready yet)
+# e2e/agent-stop-functionality.e2e.ts  # Agent error recovery bug
+# e2e/streaming-compaction.e2e.ts      # JavaScript errors in compaction
+# e2e/stop-functionality.e2e.ts       # Related to agent error recovery
+
+# Tests needing UI fixes (test infrastructure issues)  
+# e2e/directory-browser.e2e.ts         # Wrong button selectors
+# e2e/provider-dropdown-realtime.test.e2e.ts  # Setup pattern needs updating
+# e2e/browser-navigation.e2e.ts        # Complex URL navigation timing
+
+# Tests for features that may not be implemented yet
+# e2e/sse-reliability.e2e.ts           # SSE connection stability issues
