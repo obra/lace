@@ -391,26 +391,17 @@ jobs:
       - name: Upload to Dropbox via direct API
         if: steps.channel.outputs.deploy == 'true'
         run: |
-          echo "🔐 Getting Dropbox access token..."
+          echo "🔐 Using Dropbox access token directly..."
           
-          # Debug: Test the OAuth endpoint
-          OAUTH_RESPONSE=$(curl -s https://api.dropbox.com/oauth2/token \
-            -d refresh_token=${{ secrets.DROPBOX_REFRESH_TOKEN }} \
-            -d grant_type=refresh_token \
-            -d client_id=${{ secrets.DROPBOX_APP_KEY }} \
-            -d client_secret=${{ secrets.DROPBOX_APP_SECRET }})
+          # Use the 'refresh token' as direct access token (from Dropbox console)
+          ACCESS_TOKEN="${{ secrets.DROPBOX_REFRESH_TOKEN }}"
           
-          echo "🔍 OAuth response: $OAUTH_RESPONSE"
-          
-          ACCESS_TOKEN=$(echo "$OAUTH_RESPONSE" | jq -r '.access_token')
-          
-          if [ "$ACCESS_TOKEN" = "null" ] || [ -z "$ACCESS_TOKEN" ]; then
-            echo "❌ Failed to get access token"
-            echo "OAuth response: $OAUTH_RESPONSE"
+          if [ -z "$ACCESS_TOKEN" ]; then
+            echo "❌ No access token available"
             exit 1
           fi
           
-          echo "✅ Access token obtained"
+          echo "✅ Access token ready"
           echo "::add-mask::$ACCESS_TOKEN"
           
           # Upload DMG
