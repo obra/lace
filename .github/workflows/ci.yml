@@ -309,9 +309,14 @@ jobs:
           # Set partition list for codesign access
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
           
-          # Verify certificate was imported
+          # Allow all applications to use this keychain
+          security set-keychain-settings -l "$KEYCHAIN_NAME"
+          
+          # Verify certificate was imported and accessible
           echo "🔍 Verifying certificate import..."
           security find-identity -v -p codesigning "$KEYCHAIN_NAME"
+          echo "🔍 Checking codesigning access..."
+          security find-identity -v -p codesigning
           
           # Debug: Check if secrets are available (without exposing values)
           echo "🔍 Checking secret availability..."
