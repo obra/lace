@@ -371,12 +371,10 @@ jobs:
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Build macOS app (signed) with DMG and appcast
-        if: steps.signing_check.outputs.available == 'true'
+      - name: Build macOS app with appcast (skip signing in CI for now)
         run: |
           bun scripts/build-macos-app.ts \
-            --dmg \
-            --sign \
+            --bundle \
             --channel ${{ steps.channel.outputs.channel }} \
             --generate-appcast
         env:
@@ -386,29 +384,21 @@ jobs:
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Build macOS app (unsigned) for testing
-        if: steps.signing_check.outputs.available == 'false'
-        run: |
-          bun scripts/build-macos-app.ts \
-            --bundle \
-            --channel ${{ steps.channel.outputs.channel }}
+      # Signing temporarily disabled - build unsigned bundles for now
+      # TODO: Set up proper Developer ID Application certificate for distribution
 
-      - name: Resolve DMG path
-        if: steps.channel.outputs.deploy == 'true' && steps.signing_check.outputs.available == 'true'
-        run: echo "DMG_PATH=$(ls -1 build/Lace-*.dmg | head -n1)" >> $GITHUB_ENV
-
-      - name: Upload to Dropbox - DMG
-        if: steps.channel.outputs.deploy == 'true' && steps.signing_check.outputs.available == 'true'
+      - name: Upload to Dropbox - App Bundle
+        if: steps.channel.outputs.deploy == 'true'
         uses: Lewuathe/dropbox-github-action@0cf2acadb42e7fe8d14936b064313cca1db0dd68 # v1.0.3 (third-party)
         with:
           dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
           dropbox-app-secret: ${{ secrets.DROPBOX_APP_SECRET }}
           dropbox-refresh-token: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
-          source-path: ${{ env.DMG_PATH }}
+          source-path: build/Lace.app
           target-path: /${{ steps.channel.outputs.channel }}/
       
       - name: Upload to Dropbox - Appcast
-        if: steps.channel.outputs.deploy == 'true' && steps.signing_check.outputs.available == 'true'
+        if: steps.channel.outputs.deploy == 'true'
         uses: Lewuathe/dropbox-github-action@0cf2acadb42e7fe8d14936b064313cca1db0dd68 # v1.0.3 (third-party)
         with:
           dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
@@ -438,13 +428,13 @@ jobs:
         run: |
           echo "🎉 Build complete!"
           echo "📦 Channel: ${{ steps.channel.outputs.channel }}"
-          DMG=$(compgen -G "build/Lace-*.dmg" | head -n1 || true)
-          if [ -n "$DMG" ]; then
-            echo "📱 DMG: $DMG"
+          if [ -d "build/Lace.app" ]; then
+            echo "📱 App Bundle: build/Lace.app"
             echo "📡 Appcast: build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml"
           fi
           if [ "${{ steps.channel.outputs.deploy }}" = "true" ]; then
             echo "🚀 Deployed to Dropbox!"
+            echo "⚠️  Note: Unsigned builds - sign manually for production"
           else
             echo "🧪 PR build (no deployment)"
           fi
