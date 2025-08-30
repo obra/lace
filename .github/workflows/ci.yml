@@ -388,61 +388,46 @@ jobs:
           echo "DMG_PATH=$DMG_PATH" >> $GITHUB_ENV
           echo "📦 Will upload: $DMG_PATH"
           
-      - name: Upload to Dropbox using simple curl (fixed)
+      - name: Setup Dropbox CLI for investor distribution
         if: steps.channel.outputs.deploy == 'true'
         run: |
-          echo "📦 Uploading to Dropbox using curl..."
+          echo "🏢 Setting up Dropbox CLI for investor distribution..."
           
-          ACCESS_TOKEN="${{ secrets.DROPBOX_REFRESH_TOKEN }}"
+          # Download and verify CLI
+          curl -L https://github.com/dropbox/dbxcli/releases/download/v3.0.0/dbxcli-darwin-amd64 -o dbxcli
+          chmod +x dbxcli
+          file dbxcli
+          
+          # Create config directory
+          mkdir -p ~/.config/dbxcli
+          
+          # Use OAuth code for proper authentication
+          echo "🔐 Configuring OAuth authentication..."
+          echo "${{ secrets.DROPBOX_OAUTH_CODE }}" | ./dbxcli auth -f
+          
+          # Test authentication
+          ./dbxcli account info
+          
           CHANNEL="${{ steps.channel.outputs.channel }}"
           DMG_FILENAME=$(basename "$DMG_PATH")
           
-          # Upload DMG with basic approach
-          echo "📦 Uploading DMG: $DMG_FILENAME"
-          
-          curl -X POST https://content.dropboxapi.com/2/files/upload \
-            -H "Authorization: Bearer $ACCESS_TOKEN" \
-            -H "Content-Type: application/octet-stream" \
-            -H "Dropbox-API-Arg: {\"path\": \"/$CHANNEL/$DMG_FILENAME\", \"mode\": \"overwrite\"}" \
-            --data-binary @"$DMG_PATH" || {
-              echo "❌ DMG upload failed, trying without leading slash..."
-              curl -X POST https://content.dropboxapi.com/2/files/upload \
-                -H "Authorization: Bearer $ACCESS_TOKEN" \
-                -H "Content-Type: application/octet-stream" \
-                -H "Dropbox-API-Arg: {\"path\": \"$CHANNEL/$DMG_FILENAME\", \"mode\": \"overwrite\"}" \
-                --data-binary @"$DMG_PATH"
-            }
-          
+          # Upload DMG
+          echo "📦 Uploading DMG for investor distribution: $DMG_FILENAME"
+          ./dbxcli put "$DMG_PATH" "/$CHANNEL/$DMG_FILENAME"
           echo "✅ DMG uploaded successfully"
           
           # Upload Appcast
-          echo "📡 Uploading appcast..."
           APPCAST_PATH="build/appcast/$CHANNEL/appcast.xml"
-          
-          # Check if appcast exists
-          if [ ! -f "$APPCAST_PATH" ]; then
-            echo "⚠️  Appcast not found at $APPCAST_PATH"
-            ls -la build/appcast/ || echo "No appcast directory"
-            echo "Skipping appcast upload"
+          if [ -f "$APPCAST_PATH" ]; then
+            echo "📡 Uploading appcast..."
+            ./dbxcli put "$APPCAST_PATH" "/$CHANNEL/appcast.xml"
+            echo "✅ Appcast uploaded successfully"
           else
-            echo "📝 Found appcast at: $APPCAST_PATH"
-          
-            curl -X POST https://content.dropboxapi.com/2/files/upload \
-              -H "Authorization: Bearer $ACCESS_TOKEN" \
-              -H "Content-Type: application/xml" \
-              -H "Dropbox-API-Arg: {\"path\": \"/$CHANNEL/appcast.xml\", \"mode\": \"overwrite\"}" \
-              --data-binary @"$APPCAST_PATH" || {
-                echo "❌ Appcast upload failed, trying without leading slash..."
-                curl -X POST https://content.dropboxapi.com/2/files/upload \
-                  -H "Authorization: Bearer $ACCESS_TOKEN" \
-                  -H "Content-Type: application/xml" \
-                  -H "Dropbox-API-Arg: {\"path\": \"$CHANNEL/appcast.xml\", \"mode\": \"overwrite\"}" \
-                  --data-binary @"$APPCAST_PATH"
-              }
+            echo "⚠️  Appcast not found at $APPCAST_PATH"
+            find build/ -name "*.xml" -type f
           fi
           
-          echo "✅ Appcast uploaded successfully"
-          echo "🚀 Deployment to Dropbox complete!"
+          echo "🏢 Investor distribution deployment complete!"
 
       # All artifacts go to Dropbox only - no GitHub storage needed
 
