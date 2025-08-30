@@ -398,15 +398,15 @@ jobs:
           chmod +x dbxcli
           file dbxcli
           
-          # Create config directory
-          mkdir -p ~/.config/dbxcli
+          # Configure authentication using environment variables
+          echo "🔐 Configuring authentication..."
+          export DROPBOX_PERSONAL_APP_KEY="${{ secrets.DROPBOX_APP_KEY }}"
+          export DROPBOX_PERSONAL_APP_SECRET="${{ secrets.DROPBOX_APP_SECRET }}"
           
-          # Use OAuth code for proper authentication
-          echo "🔐 Configuring OAuth authentication..."
-          echo "${{ secrets.DROPBOX_OAUTH_CODE }}" | ./dbxcli auth -f
+          # Feed OAuth code to dbxcli
+          echo "${{ secrets.DROPBOX_OAUTH_CODE }}" | ./dbxcli account info
           
-          # Test authentication
-          ./dbxcli account info
+          echo "✅ Authentication configured"
           
           CHANNEL="${{ steps.channel.outputs.channel }}"
           DMG_FILENAME=$(basename "$DMG_PATH")
