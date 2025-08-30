@@ -287,13 +287,20 @@ test.describe('Browser Navigation Support', () => {
               result = 'other-redirect';
             }
 
-            // Check if interface is functional
-            const messageInput = await getMessageInput(page).catch(() => null);
-            const interfaceFunctional = messageInput
-              ? await messageInput.isVisible().catch(() => false)
-              : false;
-            if (interfaceFunctional) {
+            // Check if interface is functional (don't wait for message input on error pages)
+            const messageInputExists = await page
+              .getByTestId('message-input')
+              .isVisible()
+              .catch(() => false);
+            const hasErrorPage = await page
+              .getByText(/error|not found|invalid/i)
+              .isVisible()
+              .catch(() => false);
+
+            if (messageInputExists) {
               result += '-functional';
+            } else if (hasErrorPage) {
+              result += '-error-page';
             } else {
               result += '-non-functional';
             }
