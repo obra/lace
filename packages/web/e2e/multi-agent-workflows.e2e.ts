@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import { createProject, setupAnthropicProvider, getMessageInput } from './helpers/ui-interactions';
 import * as fs from 'fs';
@@ -184,7 +185,7 @@ test.describe('Multi-Agent Workflows', () => {
     // Test agent persistence across page reload
     if (agentIsolationTest.canAccessUI) {
       await page.reload();
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(TIMEOUTS.QUICK);
 
       const reloadedUrl = page.url();
       agentIsolationTest.agentPersistence = !!agentId && reloadedUrl.includes(agentId);

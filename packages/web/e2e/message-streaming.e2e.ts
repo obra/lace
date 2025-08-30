@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import {
   createProject,
@@ -62,7 +63,7 @@ test.describe('Message Streaming', () => {
     // Verify AI response appears (mocked)
     await expect(
       page.getByText("I'm a helpful AI assistant. How can I help you today?")
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
     // Verify the chat interface is in a responsive state
     const messageInput = await getMessageInput(page);
@@ -132,7 +133,7 @@ test.describe('Message Streaming', () => {
     // Verify AI response appears (mocked)
     await expect(
       page.getByText("I'm a helpful AI assistant. How can I help you today?")
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
   });
 
   test('handles concurrent message sending appropriately', async ({ page }) => {
@@ -166,7 +167,7 @@ test.describe('Message Streaming', () => {
       // Both AI responses should appear (mocked)
       await expect(
         page.getByText("I'm a helpful AI assistant. How can I help you today?")
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
     } catch (_error) {
       // If second message fails, that's also valid behavior (input might be disabled)
       // Verify at least the first message is still visible
@@ -209,7 +210,7 @@ test.describe('Message Streaming', () => {
       // Wait for AI response (mocked) - use first match to avoid strict mode violations
       await expect(
         page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
       // Small delay between messages to ensure proper sequencing
       await page.waitForTimeout(1000);
@@ -228,6 +229,6 @@ test.describe('Message Streaming', () => {
     // Verify final AI response appears - use last match since this is the final response
     await expect(
       page.getByText("I'm a helpful AI assistant. How can I help you today?").last()
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
   });
 });

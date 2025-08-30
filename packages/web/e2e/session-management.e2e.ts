@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import {
   createProject,
@@ -83,7 +84,7 @@ test.describe('Session Management', () => {
 
       // Reload the page
       await page.reload();
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(TIMEOUTS.QUICK);
 
       // Verify we're still on the same session
       await expect(page).toHaveURL(sessionUrl);

@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import {
   createProject,
@@ -86,17 +87,17 @@ test.describe('Streaming Reliability', () => {
         let responseReceived = false;
         if (message.includes('First concurrent message')) {
           await expect(page.getByText('Processing first concurrent message').first()).toBeVisible({
-            timeout: 15000,
+            timeout: TIMEOUTS.EXTENDED,
           });
           responseReceived = true;
         } else if (message.includes('Second concurrent message')) {
           await expect(
             page.getByText('Second concurrent message response tests event stream').first()
-          ).toBeVisible({ timeout: 15000 });
+          ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
           responseReceived = true;
         } else if (message.includes('Third concurrent message')) {
           await expect(page.getByText('Third message in concurrent sequence').first()).toBeVisible({
-            timeout: 15000,
+            timeout: TIMEOUTS.EXTENDED,
           });
           responseReceived = true;
         }
@@ -194,12 +195,12 @@ test.describe('Streaming Reliability', () => {
         if (message.includes('Fourth stress test message')) {
           await expect(
             page.getByText('Fourth stress test response demonstrates robust streaming').first()
-          ).toBeVisible({ timeout: 12000 });
+          ).toBeVisible({ timeout: TIMEOUTS.STANDARD });
           responded = true;
         } else if (message.includes('Final reliability check message')) {
           await expect(
             page.getByText('Final reliability check confirms streaming event delivery').first()
-          ).toBeVisible({ timeout: 12000 });
+          ).toBeVisible({ timeout: TIMEOUTS.STANDARD });
           responded = true;
         }
 
@@ -296,19 +297,19 @@ test.describe('Streaming Reliability', () => {
                 'This is a streaming response that demonstrates real-time token generation'
               )
               .first()
-          ).toBeVisible({ timeout: 15000 });
+          ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
           responseReceived = true;
         } else if (message.includes('Can you read a file for me?')) {
           await expect(
             page
               .getByText('File reading request generates TOOL_CALL and TOOL_RESULT events')
               .first()
-          ).toBeVisible({ timeout: 15000 });
+          ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
           responseReceived = true;
         } else if (message.includes('Help me understand the project structure')) {
           await expect(
             page.getByText('Project structure analysis involves multiple SSE event types').first()
-          ).toBeVisible({ timeout: 15000 });
+          ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
           responseReceived = true;
         }
 

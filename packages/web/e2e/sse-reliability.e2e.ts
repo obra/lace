@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import { createProject, setupAnthropicProvider, getMessageInput } from './helpers/ui-interactions';
 import * as fs from 'fs';
@@ -107,7 +108,7 @@ test.describe('SSE Event System Reliability', () => {
     for (const interaction of interactions) {
       try {
         await interaction.action();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(TIMEOUTS.QUICK / 5);
 
         const stillFunctional = await getMessageInput(page)
           .then(() => true)

@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import {
   createProject,
@@ -64,7 +65,7 @@ test.describe('Streaming Error Handling & Recovery', () => {
       // Wait for AI response - should work with standard mocking
       await expect(
         page.getByText('Error handling test response with streaming events').first()
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
       recoveryAttempts.push({
         message: testMessage,
@@ -107,7 +108,7 @@ test.describe('Streaming Error Handling & Recovery', () => {
 
       await expect(
         page.getByText('Recovery test successful - streaming functionality restored').first()
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
       recoveryAttempts.push({
         message: recoveryMessage,
@@ -172,7 +173,7 @@ test.describe('Streaming Error Handling & Recovery', () => {
     try {
       await expect(
         page.getByText('Error handling test response with streaming events').first()
-      ).toBeVisible({ timeout: 10000 });
+      ).toBeVisible({ timeout: TIMEOUTS.STANDARD });
       responseSucceeded = true;
     } catch {
       // Response may have failed - that's part of what we're testing
@@ -282,7 +283,7 @@ test.describe('Streaming Error Handling & Recovery', () => {
 
         // Try to get response
         await expect(page.getByText("I'm a helpful AI assistant").first()).toBeVisible({
-          timeout: 12000,
+          timeout: TIMEOUTS.STANDARD,
         });
         responded = true;
       } catch {

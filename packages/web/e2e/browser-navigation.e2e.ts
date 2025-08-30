@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import {
   createProject,
@@ -55,7 +56,7 @@ test.describe('Browser Navigation Support', () => {
     // Wait for AI response (mocked)
     await expect(
       page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
     const navigationTest = {
       homeUrl,
@@ -68,7 +69,7 @@ test.describe('Browser Navigation Support', () => {
 
     // Test browser back button
     await page.goBack();
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
+    await page.waitForLoadState('networkidle', { timeout: TIMEOUTS.QUICK }).catch(() => {
       // Navigation load state timeout - continuing
     });
 
@@ -81,7 +82,7 @@ test.describe('Browser Navigation Support', () => {
 
     // Test browser forward button
     await page.goForward();
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
+    await page.waitForLoadState('networkidle', { timeout: TIMEOUTS.QUICK }).catch(() => {
       // Forward navigation load state timeout - continuing
     });
 
@@ -148,7 +149,7 @@ test.describe('Browser Navigation Support', () => {
       // Wait for AI response (mocked)
       await expect(
         page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
       const hashNavigationTest = {
         originalHash: hashPart,
@@ -394,7 +395,7 @@ test.describe('Browser Navigation Support', () => {
       // Wait for AI response (mocked)
       await expect(
         page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
-      ).toBeVisible({ timeout: 15000 });
+      ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
       await page.waitForTimeout(1000);
     }

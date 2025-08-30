@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import { createProject, setupAnthropicProvider, sendMessage } from './helpers/ui-interactions';
 import * as fs from 'fs';
@@ -44,7 +45,7 @@ test.describe('Error Propagation E2E', () => {
     await sendMessage(page, 'Test message for error propagation documentation');
 
     // Step 4: Wait for any async error propagation using deterministic waits
-    await page.waitForLoadState('networkidle', { timeout: 5000 });
+    await page.waitForLoadState('networkidle', { timeout: TIMEOUTS.QUICK });
 
     // Step 5: Document current error UI capabilities
     const errorElements = await page
@@ -104,8 +105,8 @@ test.describe('Error Propagation E2E', () => {
     await sendMessage(page, 'Please run a command that might fail: ls /nonexistent-directory');
 
     // Wait for tool execution response using deterministic wait
-    await page.waitForSelector('div', { timeout: 5000 }); // Wait for any content to render
-    await page.waitForLoadState('networkidle', { timeout: 5000 });
+    await page.waitForSelector('div', { timeout: TIMEOUTS.QUICK }); // Wait for any content to render
+    await page.waitForLoadState('networkidle', { timeout: TIMEOUTS.QUICK });
 
     // Document current behavior for tool execution errors
     const pageContent = await page.content();

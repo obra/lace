@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import {
   createProject,
@@ -86,7 +87,7 @@ test.describe('SSE Events Monitoring', () => {
     // Wait for expected AI response
     await expect(
       page.getByText('Response for SSE event testing with multiple event types').first()
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
     // Allow events to settle
     await page.waitForTimeout(2000);
@@ -143,11 +144,11 @@ test.describe('SSE Events Monitoring', () => {
       if (message.includes('Test message for SSE events')) {
         await expect(
           page.getByText('Response for SSE event testing with multiple event types').first()
-        ).toBeVisible({ timeout: 15000 });
+        ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
       } else if (message.includes('Can you read a file for me?')) {
         await expect(
           page.getByText('File reading request generates TOOL_CALL and TOOL_RESULT events').first()
-        ).toBeVisible({ timeout: 15000 });
+        ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
       }
 
       await page.waitForTimeout(1000);

@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import {
   createProject,
@@ -57,7 +58,7 @@ test.describe('Basic User Journey', () => {
     // Step 7: Verify AI response appears (mocked by E2E test server)
     await expect(
       page.getByText("I'm a helpful AI assistant. How can I help you today?")
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
     // Step 8: Verify chat interface is ready for next message
     const messageInput = await getMessageInput(page);

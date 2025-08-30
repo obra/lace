@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import {
   createProject,
@@ -55,7 +56,7 @@ test.describe('Basic Messaging', () => {
     // Verify AI response appears (mocked by E2E test server)
     await expect(
       page.getByText("I'm a helpful AI assistant. How can I help you today?")
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
     // Verify interface remains functional
     await expect(await getMessageInput(page)).toBeVisible();
@@ -111,7 +112,7 @@ test.describe('Basic Messaging', () => {
     // Wait for AI response (mocked)
     await expect(
       page.getByText("I'm a helpful AI assistant. How can I help you today?")
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
   });
 
   test('documents current streaming behavior without breaking', async ({ page }) => {
@@ -151,7 +152,7 @@ test.describe('Basic Messaging', () => {
     // Wait for streaming response (mocked)
     await expect(
       page.getByText("I'm a helpful AI assistant. How can I help you today?")
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
     // Document the network behavior we observe
     const streamingBehavior = {

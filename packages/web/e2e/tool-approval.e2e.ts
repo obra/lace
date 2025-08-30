@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import {
   createProject,
@@ -106,7 +107,7 @@ test.describe('Tool Approval Workflow', () => {
     await sendMessage(page, toolTriggerMessage);
 
     // Wait and check for tool approval UI
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(TIMEOUTS.QUICK);
 
     const toolWorkflowTest = {
       toolTriggerSent: await page

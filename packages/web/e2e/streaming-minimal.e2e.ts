@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import {
   createProject,
@@ -85,7 +86,7 @@ test.describe('Minimal Streaming Events', () => {
     // Wait for AI response (which should trigger streaming events)
     await expect(
       page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
     // Analyze captured streaming events
     const streamingAnalysis = {

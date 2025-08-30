@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import {
   createProject,
@@ -188,7 +189,7 @@ test.describe('Basic Streaming Functionality', () => {
     const messageStartTime = Date.now();
 
     // Wait for first streaming content to appear
-    const firstContentTimeout = 5000;
+    const firstContentTimeout = TIMEOUTS.QUICK;
     let firstContentTime: number | null = null;
 
     try {
@@ -222,7 +223,7 @@ test.describe('Basic Streaming Functionality', () => {
     };
 
     // Verify reasonable performance (should complete within 10 seconds)
-    expect(performanceAnalysis.totalDuration).toBeLessThan(10000);
+    expect(performanceAnalysis.totalDuration).toBeLessThan(TIMEOUTS.STANDARD);
 
     // Verify message processing is reasonably fast (under 2 seconds)
     expect(performanceAnalysis.messageProcessingTime).toBeLessThan(2000);

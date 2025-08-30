@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import { createProject, setupAnthropicProvider, getMessageInput } from './helpers/ui-interactions';
 import * as fs from 'fs';
@@ -73,7 +74,7 @@ test.describe('Project Persistence', () => {
     await page.goto(projectUrl);
 
     // Wait for the application to handle the deep URL
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(TIMEOUTS.QUICK * 0.6);
 
     // Check what actually happens - the app might redirect or show error
     const currentUrl = page.url();
@@ -109,7 +110,7 @@ test.describe('Project Persistence', () => {
 
     // The application may either show an error or redirect to project selection
     // Wait a reasonable time for the application to handle the invalid URL
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(TIMEOUTS.QUICK / 2.5);
 
     // Check if we get either project selector (redirect) or can at least load the page
     // The specific behavior may vary, so we test that the page is functional
