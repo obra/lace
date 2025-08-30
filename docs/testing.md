@@ -1075,33 +1075,30 @@ See `src/__tests__/e2e-pty-terminal.test.ts` for complete examples of the clean 
 
 ### Overview
 
-The Lace web interface uses a comprehensive Playwright testing infrastructure designed for reliability, maintainability, and parallel execution. This system provides robust testing of user workflows without the brittleness of CSS selectors or the complexity of mocking application logic.
+The Lace web interface uses a streamlined Playwright testing infrastructure focused on reliability and maintainability. This system provides robust testing of user workflows using a consistent manual setup pattern that ensures proper test lifecycle management.
 
 ### Key Features
 
-- **🚀 Parallel Execution**: Tests run in parallel with worker-scoped database isolation
+- **🚀 Parallel Execution**: Tests run in parallel with per-test server isolation
 - **🎯 Reliable Selectors**: Uses `data-testid` attributes instead of fragile CSS selectors  
-- **🔄 Real Functionality**: Tests actual application logic, mocks only external APIs
-- **🌐 Browser Support**: Chromium-only in CI, WebKit available for local development
-- **📊 Comprehensive Coverage**: 19+ test files covering all major application areas
-- **🔧 Page Object Model**: Maintainable test abstractions with clean APIs
+- **🔄 Real Functionality**: Tests actual application logic, mocks only external AI APIs
+- **🌐 Browser Support**: Chromium-only for CI reliability
+- **📊 Streamlined Coverage**: 15 consolidated test files covering all major application areas
+- **🔧 Consistent Patterns**: Manual beforeEach/afterEach setup ensures proper test lifecycle
 
 ### Quick Start
 
 #### Running Tests
 
 ```bash
-# Run all E2E tests (local: Chromium + WebKit, CI: Chromium only)
+# Run all E2E tests (Chromium only for reliability)
 npm run test:playwright
 
 # Run specific test file
-npm run test:playwright -- basic-user-journey.e2e.ts
+npm run test:playwright -- user-messaging-flow.e2e.ts
 
-# Run with specific browser
-npm run test:playwright -- --project=chromium
-
-# Run in CI mode (Chromium only)
-CI=true npm run test:playwright
+# Run allowlisted tests only (CI mode)
+npm run test:playwright:ci
 
 # Run with debugging (headed mode)
 npm run test:playwright -- --headed
@@ -1114,33 +1111,55 @@ npx playwright show-report
 #### Basic Test Structure
 
 ```typescript
-// ABOUTME: Tests user authentication flow
-// ABOUTME: Verifies login, session management, and logout functionality
+// ABOUTME: Tests user messaging flow functionality
+// ABOUTME: Verifies complete user journey from onboarding to messaging
 
-import { test, expect } from './mocks/setup';
-import { createPageObjects } from './page-objects';
-import { withTempLaceDir } from './utils/withTempLaceDir';
+import { test, expect } from '@playwright/test';
+import {
+  setupTestEnvironment,
+  cleanupTestEnvironment,
+  type TestEnvironment,
+  TIMEOUTS,
+} from './helpers/test-utils';
+import {
+  createProject,
+  setupAnthropicProvider,
+  getMessageInput,
+  sendMessage,
+  verifyMessageVisible,
+} from './helpers/ui-interactions';
+import * as fs from 'fs';
+import * as path from 'path';
 
-test.describe('Authentication Flow', () => {
-  test('user can log in and access dashboard', async ({ page }) => {
-    await withTempLaceDir(async (tempDir) => {
-      const { projectSelector, chatInterface } = createPageObjects(page);
-      
-      // Navigate to app
-      await page.goto('/');
-      
-      // Test user workflow
-      await expect(projectSelector.newProjectButton).toBeVisible();
-      
-      // Create project and verify success
-      const projectPath = path.join(tempDir, 'test-project');
-      await fs.promises.mkdir(projectPath, { recursive: true });
-      await projectSelector.createProject('Test Project', projectPath);
-      
-      // Verify we're in the chat interface
-      await chatInterface.waitForChatReady();
-      await expect(chatInterface.messageInput).toBeVisible();
-    });
+test.describe('User Messaging Flow', () => {
+  let testEnv: TestEnvironment;
+
+  test.beforeEach(async ({ page }) => {
+    testEnv = await setupTestEnvironment();
+    await page.goto(testEnv.serverUrl);
+  });
+
+  test.afterEach(async () => {
+    if (testEnv) {
+      await cleanupTestEnvironment(testEnv);
+    }
+  });
+
+  test('complete flow: onboarding → project creation → first message', async ({ page }) => {
+    await setupAnthropicProvider(page);
+
+    const projectPath = path.join(testEnv.tempDir, 'basic-journey-project');
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, 'Basic Journey Project', projectPath);
+    await getMessageInput(page);
+
+    const testMessage = 'Hello, this is my first message!';
+    await sendMessage(page, testMessage);
+    await verifyMessageVisible(page, testMessage);
+
+    await expect(
+      page.getByText("I'm a helpful AI assistant. How can I help you today?")
+    ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
   });
 });
 ```
