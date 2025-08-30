@@ -3,7 +3,6 @@ name: CI
 # Minimal permissions for security
 permissions:
   contents: read          # Read repository contents
-  actions: write          # Upload build artifacts
 
 # Prevent overlapping deployments
 concurrency:
@@ -434,15 +433,7 @@ jobs:
           source-path: build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml
           target-path: /${{ steps.channel.outputs.channel }}/
 
-      - name: Upload essential build artifacts
-        if: steps.channel.outputs.deploy == 'true'
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
-        with:
-          name: lace-macos-${{ steps.channel.outputs.channel }}
-          path: |
-            build/Lace-*.dmg
-            build/appcast/
-          retention-days: 7
+      # All artifacts go to Dropbox only - no GitHub storage needed
 
       - name: Cleanup Keychain
         if: always()
