@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import {
   createProject,
@@ -63,7 +64,7 @@ test.describe('Example E2E Test Patterns', () => {
     await expect(
       page.getByText('I see you sent a test message from Test 1. This is my response as Claude!')
     ).toBeVisible({
-      timeout: 15000,
+      timeout: TIMEOUTS.EXTENDED,
     });
 
     // Verify we're using our isolated server
@@ -101,7 +102,7 @@ test.describe('Example E2E Test Patterns', () => {
     await expect(
       page.getByText("Hello from Test 2! I'm responding to your different message.")
     ).toBeVisible({
-      timeout: 15000,
+      timeout: TIMEOUTS.EXTENDED,
     });
 
     // Verify we're using a completely different server than Test 1
@@ -178,7 +179,7 @@ test.describe('Example E2E Test Patterns', () => {
         "Hello! I'm Claude, streaming my response token by token. You can see each word appear as I generate it."
       )
     ).toBeVisible({
-      timeout: 15000,
+      timeout: TIMEOUTS.EXTENDED,
     });
 
     // Send a follow-up message to test continued conversation
@@ -189,7 +190,7 @@ test.describe('Example E2E Test Patterns', () => {
 
     // Wait for the follow-up AI response
     await expect(page.getByText('This is my follow-up response')).toBeVisible({
-      timeout: 15000,
+      timeout: TIMEOUTS.EXTENDED,
     });
 
     // Verify conversation history is preserved (both messages should be visible)
@@ -221,17 +222,19 @@ test.describe('Example E2E Test Patterns', () => {
     await sendMessage(page, 'Start a slow response that I can stop');
 
     // Wait for streaming to start (stop button should appear)
-    await waitForStopButton(page, 10000);
+    await waitForStopButton(page, TIMEOUTS.STANDARD);
 
     // Click stop to interrupt streaming
     await clickStopButton(page);
 
     // Wait for send button to return (streaming stopped)
-    await waitForSendButton(page, 5000);
+    await waitForSendButton(page, TIMEOUTS.QUICK);
 
     // The response should be partial (stopped before completion)
     // We should see at least the beginning of the response
-    await expect(page.getByText('This is a very long response')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('This is a very long response')).toBeVisible({
+      timeout: TIMEOUTS.QUICK,
+    });
 
     // But we should NOT see the full response since we stopped it
     const fullResponseVisible = await page
