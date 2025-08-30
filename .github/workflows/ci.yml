@@ -398,8 +398,28 @@ jobs:
           source-path: ${{ env.DMG_PATH }}
           target-path: ${{ steps.channel.outputs.channel }}/
       
-      - name: Upload appcast to Dropbox
+      - name: Check appcast generation
         if: steps.channel.outputs.deploy == 'true'
+        run: |
+          echo "🔍 Checking appcast generation..."
+          CHANNEL="${{ steps.channel.outputs.channel }}"
+          APPCAST_PATH="build/appcast/$CHANNEL/appcast.xml"
+          
+          echo "Looking for appcast at: $APPCAST_PATH"
+          if [ -f "$APPCAST_PATH" ]; then
+            echo "✅ Appcast found!"
+            ls -la "$APPCAST_PATH"
+            echo "First few lines:"
+            head -5 "$APPCAST_PATH"
+          else
+            echo "❌ Appcast not found!"
+            echo "Contents of build/:"
+            find build/ -type f -name "*.xml" || echo "No XML files found"
+            ls -la build/appcast/ 2>/dev/null || echo "No appcast directory"
+          fi
+      
+      - name: Upload appcast to Dropbox
+        if: steps.channel.outputs.deploy == 'true' && hashFiles('build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml') != ''
         uses: Lewuathe/dropbox-github-action@0cf2acadb42e7fe8d14936b064313cca1db0dd68 # v1.0.3
         with:
           dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
