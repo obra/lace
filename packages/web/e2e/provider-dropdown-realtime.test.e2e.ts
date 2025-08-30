@@ -54,7 +54,7 @@ test.describe('Provider Dropdown Real-time Updates', () => {
     await expect(page.getByText(providerName)).toBeVisible();
 
     // Step 3: Close settings modal
-    await page.getByRole('button', { name: 'Close modal' }).click();
+    await page.getByRole('button', { name: 'Close modal' }).first().click();
 
     // Step 4: IMMEDIATELY open project creation wizard (no page reload)
     const firstProjectButton = page.getByTestId('create-first-project-button');
@@ -105,7 +105,7 @@ test.describe('Provider Dropdown Real-time Updates', () => {
     await page.getByTestId('instance-name-input').fill('initial-provider');
     await page.getByTestId('api-key-input').fill('sk-initial-12345');
     await page.getByTestId('create-instance-button').click();
-    await page.getByRole('button', { name: 'Close modal' }).click();
+    await page.getByRole('button', { name: 'Close modal' }).first().click();
 
     // Create a test project
     await page.getByTestId('create-project-button').click();
@@ -124,7 +124,7 @@ test.describe('Provider Dropdown Real-time Updates', () => {
     await page.getByTestId('instance-name-input').fill(providerName);
     await page.getByTestId('api-key-input').fill('sk-test-67890');
     await page.getByTestId('create-instance-button').click();
-    await page.getByRole('button', { name: 'Close modal' }).click();
+    await page.getByRole('button', { name: 'Close modal' }).first().click();
 
     // Open project settings to edit the project
     await page.locator('[data-testid*="project-settings"]').first().click();
