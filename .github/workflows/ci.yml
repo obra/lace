@@ -388,10 +388,10 @@ jobs:
           echo "DMG_PATH=$DMG_PATH" >> $GITHUB_ENV
           echo "📦 Will upload: $DMG_PATH"
           
-      - name: Setup Dropbox CLI for investor distribution
+      - name: Setup Dropbox CLI for deployment
         if: steps.channel.outputs.deploy == 'true'
         run: |
-          echo "🏢 Setting up Dropbox CLI for investor distribution..."
+          echo "📦 Setting up Dropbox CLI for deployment..."
           
           # Download and verify CLI
           curl -L https://github.com/dropbox/dbxcli/releases/download/v3.0.0/dbxcli-darwin-amd64 -o dbxcli
@@ -412,7 +412,7 @@ jobs:
           DMG_FILENAME=$(basename "$DMG_PATH")
           
           # Upload DMG
-          echo "📦 Uploading DMG for investor distribution: $DMG_FILENAME"
+          echo "📦 Uploading DMG: $DMG_FILENAME"
           ./dbxcli put "$DMG_PATH" "/$CHANNEL/$DMG_FILENAME"
           echo "✅ DMG uploaded successfully"
           
@@ -427,7 +427,7 @@ jobs:
             find build/ -name "*.xml" -type f
           fi
           
-          echo "🏢 Investor distribution deployment complete!"
+          echo "🚀 Deployment to Dropbox complete!"
 
       # All artifacts go to Dropbox only - no GitHub storage needed
 
