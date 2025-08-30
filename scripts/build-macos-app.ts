@@ -384,6 +384,14 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
           {
             stdio: ['inherit', 'pipe', 'pipe'],
             encoding: 'utf8',
+            env: {
+              ...process.env,
+              // Ensure signing environment variables are passed through
+              GITHUB_ACTIONS_KEYCHAIN_READY: process.env.GITHUB_ACTIONS_KEYCHAIN_READY,
+              APPLE_ID_EMAIL: process.env.APPLE_ID_EMAIL,
+              APPLE_ID_PASSWORD: process.env.APPLE_ID_PASSWORD,
+              APPLE_TEAM_ID: process.env.APPLE_TEAM_ID,
+            },
           }
         );
         console.log('✅ App bundle signed and notarized');
