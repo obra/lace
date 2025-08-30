@@ -42,7 +42,7 @@ describe('FileViewerModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Ensure DOM is properly set up for tests that manipulate document.body
     if (typeof document !== 'undefined' && !document.body) {
       document.body = document.createElement('body');
@@ -124,7 +124,6 @@ describe('FileViewerModal', () => {
     expect(mockWriteText).toHaveBeenCalledWith('const hello = "world";');
   });
 
-
   it('should handle pop-out window functionality', async () => {
     const mockFileContent = {
       path: 'src/test.ts',
@@ -182,7 +181,7 @@ describe('FileViewerModal', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Cannot preview binary file')).toBeInTheDocument();
-      
+
       // Copy button should be disabled for binary files
       const copyButton = screen.getByTitle('Copy content');
       expect(copyButton).toBeDisabled();
@@ -205,7 +204,7 @@ describe('FileViewerModal', () => {
     const mockRevokeObjectURL = vi.fn();
     const originalCreateObjectURL = global.URL.createObjectURL;
     const originalRevokeObjectURL = global.URL.revokeObjectURL;
-    
+
     global.URL.createObjectURL = mockCreateObjectURL;
     global.URL.revokeObjectURL = mockRevokeObjectURL;
 
@@ -222,7 +221,7 @@ describe('FileViewerModal', () => {
     // Verify blob operations were called
     expect(mockCreateObjectURL).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: 'text/typescript'
+        type: 'text/typescript',
       })
     );
     expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:test-url');
@@ -244,10 +243,10 @@ describe('FileViewerModal', () => {
     mockApiGet.mockResolvedValueOnce(mockFileContent);
 
     render(
-      <FileViewerModal 
-        {...defaultProps} 
-        filePath="folder with spaces/file name.ts" 
-        fileName="file name.ts" 
+      <FileViewerModal
+        {...defaultProps}
+        filePath="folder with spaces/file name.ts"
+        fileName="file name.ts"
       />
     );
 

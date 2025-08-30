@@ -1,21 +1,25 @@
-// ABOUTME: Swift menu bar app that manages the Lace server process
-// ABOUTME: Provides native macOS interface with dynamic port detection
+// ABOUTME: Swift menu bar app that manages the Lace server process with Sparkle auto-updates
+// ABOUTME: Provides native macOS interface with dynamic port detection and settings window
 
 import Cocoa
 import Foundation
 import ServiceManagement
 import OSLog
+import Sparkle
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     private var statusBarItem: NSStatusItem!
     private var serverProcess: Process?
     private var serverPort: Int?
     private var menu: NSMenu!
     private var shouldAutoOpen = true
     private let legacyLoginItemHelperBundleID: String? = nil // No helper bundle shipped
+    private var settingsWindow: SettingsWindow?
+    internal var updater: SPUStandardUpdaterController!
     
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         setupMenuBar()
+        setupUpdater()
         startServer()
     }
     
@@ -75,6 +79,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             launchAtStartupItem.toolTip = "Requires macOS 13+ or an embedded login item helper"
         }
         menu.addItem(launchAtStartupItem)
+        
+        // Settings item
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showSettings), keyEquivalent: ",")
+        menu.addItem(settingsItem)
+        
+        // Check for updates item
+        let updateItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "")
+        menu.addItem(updateItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -211,6 +223,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         startServer()
     }
     
+    @objc private func showSettings() {
+        if settingsWindow == nil {
+            settingsWindow = SettingsWindow()
+        }
+        settingsWindow?.showWindow(nil)
+        settingsWindow?.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    @objc private func checkForUpdates() {
+        updater.checkForUpdates(nil)
+    }
+    
     @objc private func quit() {
         stopServer()
         NSApplication.shared.terminate(nil)
@@ -222,6 +247,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         serverProcess = nil
         serverPort = nil
         updateMenuOnMainThread()
+    }
+    
+    private func setupUpdater() {
+        updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: nil)
+        
+        // Configure based on user preferences
+        let defaults = UserDefaults.standard
+        let currentChannel = defaults.updateChannel
+        print("Sparkle updater initialized for channel: \(currentChannel.displayName)")
+    }
+    
+    func updateFeedURL(for channel: UpdateChannel) {
+        // Channel switching will require app restart for full effect
+        // For now, just store the preference - it will take effect on next launch
+        print("Updated channel to: \(channel.displayName) - will take effect on next app launch")
+    }
+    
+    // SPUUpdaterDelegate method to provide dynamic feed URL
+    func feedURLString(for updater: SPUUpdater) -> String? {
+        let defaults = UserDefaults.standard
+        let currentChannel = defaults.updateChannel
+        return currentChannel.feedURL
     }
     
     private func showError(_ message: String) {
@@ -342,6 +389,257 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // No legacy support without helper bundle
             showError("Open at login requires macOS 13+ or an embedded login item helper")
         }
+    }
+    
+    private func showInfo(_ message: String) {
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "Lace"
+            alert.informativeText = message
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
+    }
+}
+
+// MARK: - User Preferences
+extension UserDefaults {
+    private enum Keys {
+        static let updateChannel = "LaceUpdateChannel"
+        static let autoUpdate = "LaceAutoUpdate"
+        static let checkFrequency = "LaceUpdateCheckFrequency"
+    }
+    
+    var updateChannel: UpdateChannel {
+        get {
+            let rawValue = string(forKey: Keys.updateChannel) ?? UpdateChannel.release.rawValue
+            return UpdateChannel(rawValue: rawValue) ?? .release
+        }
+        set {
+            set(newValue.rawValue, forKey: Keys.updateChannel)
+        }
+    }
+    
+    var autoUpdate: Bool {
+        get { bool(forKey: Keys.autoUpdate) }
+        set { set(newValue, forKey: Keys.autoUpdate) }
+    }
+    
+    var updateCheckFrequency: UpdateFrequency {
+        get {
+            let rawValue = string(forKey: Keys.checkFrequency) ?? UpdateFrequency.daily.rawValue
+            return UpdateFrequency(rawValue: rawValue) ?? .daily
+        }
+        set {
+            set(newValue.rawValue, forKey: Keys.checkFrequency)
+        }
+    }
+}
+
+enum UpdateChannel: String, CaseIterable {
+    case release = "release"
+    case nightly = "nightly"
+    
+    var displayName: String {
+        switch self {
+        case .release: return "Release"
+        case .nightly: return "Nightly (Development)"
+        }
+    }
+    
+    var feedURL: String {
+        // App folder URLs (scoped access) - cleaner paths
+        switch self {
+        case .release:
+            return "https://dl.dropboxusercontent.com/s/[TOKEN]/release/appcast.xml"
+        case .nightly:
+            return "https://dl.dropboxusercontent.com/s/[TOKEN]/nightly/appcast.xml"
+        }
+    }
+}
+
+enum UpdateFrequency: String, CaseIterable {
+    case manual = "manual"
+    case daily = "daily"
+    case weekly = "weekly"
+    
+    var displayName: String {
+        switch self {
+        case .manual: return "Manual Only"
+        case .daily: return "Daily"
+        case .weekly: return "Weekly"
+        }
+    }
+}
+
+// MARK: - Settings Window
+class SettingsWindow: NSWindowController {
+    private var channelPopup: NSPopUpButton!
+    private var autoUpdateCheckbox: NSButton!
+    private var frequencyPopup: NSPopUpButton!
+    private var versionLabel: NSTextField!
+    private var checkNowButton: NSButton!
+    
+    init() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+                             styleMask: [.titled, .closable],
+                             backing: .buffered,
+                             defer: false)
+        window.title = "Lace Settings"
+        window.center()
+        
+        super.init(window: window)
+        setupUI()
+        loadSettings()
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    private func setupUI() {
+        guard let window = window else { return }
+        
+        let contentView = NSView(frame: window.contentView!.bounds)
+        window.contentView = contentView
+        
+        var yPos: CGFloat = 250
+        let margin: CGFloat = 20
+        let labelWidth: CGFloat = 120
+        let controlWidth: CGFloat = 200
+        
+        // Title
+        let titleLabel = NSTextField(labelWithString: "Update Settings")
+        titleLabel.font = NSFont.systemFont(ofSize: 16, weight: .bold)
+        titleLabel.frame = NSRect(x: margin, y: yPos, width: 360, height: 22)
+        contentView.addSubview(titleLabel)
+        yPos -= 40
+        
+        // Update Channel
+        let channelLabel = NSTextField(labelWithString: "Update Channel:")
+        channelLabel.frame = NSRect(x: margin, y: yPos, width: labelWidth, height: 22)
+        contentView.addSubview(channelLabel)
+        
+        channelPopup = NSPopUpButton(frame: NSRect(x: margin + labelWidth, y: yPos - 2, width: controlWidth, height: 26))
+        for channel in UpdateChannel.allCases {
+            channelPopup.addItem(withTitle: channel.displayName)
+            channelPopup.lastItem?.representedObject = channel
+        }
+        channelPopup.target = self
+        channelPopup.action = #selector(channelChanged)
+        contentView.addSubview(channelPopup)
+        yPos -= 35
+        
+        // Auto Update Checkbox
+        autoUpdateCheckbox = NSButton(checkboxWithTitle: "Automatically download and install updates", target: self, action: #selector(autoUpdateChanged))
+        autoUpdateCheckbox.frame = NSRect(x: margin, y: yPos, width: 360, height: 22)
+        contentView.addSubview(autoUpdateCheckbox)
+        yPos -= 35
+        
+        // Check Frequency
+        let frequencyLabel = NSTextField(labelWithString: "Check Frequency:")
+        frequencyLabel.frame = NSRect(x: margin, y: yPos, width: labelWidth, height: 22)
+        contentView.addSubview(frequencyLabel)
+        
+        frequencyPopup = NSPopUpButton(frame: NSRect(x: margin + labelWidth, y: yPos - 2, width: controlWidth, height: 26))
+        for frequency in UpdateFrequency.allCases {
+            frequencyPopup.addItem(withTitle: frequency.displayName)
+            frequencyPopup.lastItem?.representedObject = frequency
+        }
+        frequencyPopup.target = self
+        frequencyPopup.action = #selector(frequencyChanged)
+        contentView.addSubview(frequencyPopup)
+        yPos -= 50
+        
+        // Current Version
+        let versionTitleLabel = NSTextField(labelWithString: "Current Version:")
+        versionTitleLabel.frame = NSRect(x: margin, y: yPos, width: labelWidth, height: 22)
+        contentView.addSubview(versionTitleLabel)
+        
+        let currentVersion = getCurrentVersion()
+        versionLabel = NSTextField(labelWithString: currentVersion)
+        versionLabel.frame = NSRect(x: margin + labelWidth, y: yPos, width: controlWidth, height: 22)
+        contentView.addSubview(versionLabel)
+        yPos -= 35
+        
+        // Check Now Button
+        checkNowButton = NSButton(title: "Check for Updates Now", target: self, action: #selector(checkForUpdatesNow))
+        checkNowButton.frame = NSRect(x: margin, y: yPos, width: 180, height: 32)
+        checkNowButton.bezelStyle = .rounded
+        contentView.addSubview(checkNowButton)
+    }
+    
+    private func loadSettings() {
+        let defaults = UserDefaults.standard
+        
+        // Set channel popup
+        let currentChannel = defaults.updateChannel
+        for i in 0..<channelPopup.numberOfItems {
+            if let channel = channelPopup.item(at: i)?.representedObject as? UpdateChannel,
+               channel == currentChannel {
+                channelPopup.selectItem(at: i)
+                break
+            }
+        }
+        
+        // Set auto update checkbox
+        autoUpdateCheckbox.state = defaults.autoUpdate ? .on : .off
+        
+        // Set frequency popup
+        let currentFrequency = defaults.updateCheckFrequency
+        for i in 0..<frequencyPopup.numberOfItems {
+            if let frequency = frequencyPopup.item(at: i)?.representedObject as? UpdateFrequency,
+               frequency == currentFrequency {
+                frequencyPopup.selectItem(at: i)
+                break
+            }
+        }
+    }
+    
+    @objc private func channelChanged() {
+        if let channel = channelPopup.selectedItem?.representedObject as? UpdateChannel {
+            UserDefaults.standard.updateChannel = channel
+            print("Update channel changed to: \(channel.displayName)")
+            
+            // Update Sparkle feed URL
+            if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
+                appDelegate.updateFeedURL(for: channel)
+            }
+        }
+    }
+    
+    @objc private func autoUpdateChanged() {
+        let isEnabled = autoUpdateCheckbox.state == .on
+        UserDefaults.standard.autoUpdate = isEnabled
+        print("Auto update changed to: \(isEnabled)")
+        
+        // Update Sparkle auto-update setting
+        if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
+            appDelegate.updater.updater.automaticallyDownloadsUpdates = isEnabled
+        }
+    }
+    
+    @objc private func frequencyChanged() {
+        if let frequency = frequencyPopup.selectedItem?.representedObject as? UpdateFrequency {
+            UserDefaults.standard.updateCheckFrequency = frequency
+            print("Update frequency changed to: \(frequency.displayName)")
+            // TODO: Update Sparkle check frequency when integrated
+        }
+    }
+    
+    @objc private func checkForUpdatesNow() {
+        if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
+            appDelegate.updater.checkForUpdates(nil)
+        }
+    }
+    
+    private func getCurrentVersion() -> String {
+        if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+           let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
+            return "\(version) (\(build))"
+        }
+        return "Unknown"
     }
 }
 

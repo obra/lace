@@ -3,12 +3,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faExclamationTriangle, 
-  faRedo, 
-  faTimes,
-  faInfo
-} from '@/lib/fontawesome';
+import { faExclamationTriangle, faRedo, faTimes, faInfo } from '@/lib/fontawesome';
 import type { ErrorType } from '@/types/core';
 
 interface ErrorToastProps {
@@ -30,7 +25,7 @@ export function ErrorToast({
   onRetry,
   onDismiss,
   autoDismiss = 5000,
-  compact = false
+  compact = false,
 }: ErrorToastProps): React.JSX.Element {
   const [isVisible, setIsVisible] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -54,10 +49,14 @@ export function ErrorToast({
 
   const getToastIcon = () => {
     switch (severity) {
-      case 'critical': return faExclamationTriangle;
-      case 'error': return faExclamationTriangle;
-      case 'warning': return faExclamationTriangle;
-      default: return faInfo;
+      case 'critical':
+        return faExclamationTriangle;
+      case 'error':
+        return faExclamationTriangle;
+      case 'warning':
+        return faExclamationTriangle;
+      default:
+        return faInfo;
     }
   };
 
@@ -69,15 +68,19 @@ export function ErrorToast({
 
   const getAlertClass = () => {
     switch (severity) {
-      case 'critical': return 'alert-error';
-      case 'error': return 'alert-error';
-      case 'warning': return 'alert-warning';
-      default: return 'alert-info';
+      case 'critical':
+        return 'alert-error';
+      case 'error':
+        return 'alert-error';
+      case 'warning':
+        return 'alert-warning';
+      default:
+        return 'alert-info';
     }
   };
 
   const formatErrorType = (type: ErrorType) => {
-    return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return type.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
   const handleDismiss = () => {
@@ -96,23 +99,22 @@ export function ErrorToast({
 
   return (
     <div className={getToastClass()}>
-      <div className={`alert ${getAlertClass()} shadow-lg max-w-sm`} role="alert" aria-live="assertive" aria-atomic="true">
+      <div
+        className={`alert ${getAlertClass()} shadow-lg max-w-sm`}
+        role="alert"
+        aria-live="assertive"
+        aria-atomic="true"
+      >
         <FontAwesomeIcon icon={getToastIcon()} />
-        
+
         <div className="flex-1 min-w-0">
-          {!compact && (
-            <div className="font-medium text-sm mb-1">
-              {formatErrorType(errorType)}
-            </div>
-          )}
-          <div className={compact ? "text-sm" : "text-xs"}>
-            {message}
-          </div>
+          {!compact && <div className="font-medium text-sm mb-1">{formatErrorType(errorType)}</div>}
+          <div className={compact ? 'text-sm' : 'text-xs'}>{message}</div>
         </div>
-        
+
         <div className="flex gap-1">
           {isRetryable && onRetry && (
-            <button 
+            <button
               type="button"
               className="btn btn-xs btn-ghost"
               onClick={onRetry}
@@ -122,7 +124,7 @@ export function ErrorToast({
               <FontAwesomeIcon icon={faRedo} />
             </button>
           )}
-          <button 
+          <button
             type="button"
             className="btn btn-xs btn-ghost"
             onClick={handleDismiss}

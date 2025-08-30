@@ -127,7 +127,7 @@ export interface UseEventStreamOptions extends EventHandlers {
   sessionId?: string;
   threadIds?: string[];
   includeGlobal?: boolean;
-  
+
   // Prevents calling onError for AGENT_ERROR events to avoid duplicate handling
   treatAgentErrorAsGeneric?: boolean;
 

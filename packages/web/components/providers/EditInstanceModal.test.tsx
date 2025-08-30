@@ -141,7 +141,7 @@ describe('EditInstanceModal', () => {
           return this;
         },
       } as Response);
-    }) as unknown as typeof fetch;;
+    }) as unknown as typeof fetch;
     global.fetch = mockFetch;
 
     await renderWithProvider();
@@ -203,7 +203,7 @@ describe('EditInstanceModal', () => {
           return this;
         },
       } as Response);
-    }) as unknown as typeof fetch;;
+    }) as unknown as typeof fetch;
 
     await renderWithProvider();
 

@@ -35,10 +35,10 @@ describe('Error Web Event Types', () => {
         'tool_execution',
         'processing_error',
         'timeout',
-        'streaming_error'
+        'streaming_error',
       ] as const;
 
-      errorTypes.forEach(errorType => {
+      errorTypes.forEach((errorType) => {
         const errorEntry: ErrorEntry = {
           id: `error-${errorType}`,
           type: 'error',
@@ -72,7 +72,7 @@ describe('Error Web Event Types', () => {
 
     it('should support retry handler function', () => {
       const mockRetryHandler = vi.fn();
-      
+
       const errorEntry: ErrorEntry = {
         id: 'error-123',
         type: 'error',
@@ -123,7 +123,7 @@ describe('Error Web Event Types', () => {
     it('should accept all valid severity levels', () => {
       const severities = ['warning', 'error', 'critical'] as const;
 
-      severities.forEach(severity => {
+      severities.forEach((severity) => {
         const errorLogEntry: AgentErrorLogEntry = {
           id: `log-${severity}`,
           timestamp: new Date(),

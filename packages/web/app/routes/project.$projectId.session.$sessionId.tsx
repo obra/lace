@@ -1,7 +1,6 @@
 // ABOUTME: Project session page route for React Router v7
 // ABOUTME: Session page with auto-redirect logic and provider setup
 
-
 import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
@@ -24,7 +23,9 @@ function SessionRedirect({ projectId, sessionId }: { projectId: string; sessionI
 
       if (coordinatorAgent) {
         // Redirect to coordinator agent
-        navigate(`/project/${projectId}/session/${sessionId}/agent/${coordinatorAgent.threadId}`, { replace: true });
+        navigate(`/project/${projectId}/session/${sessionId}/agent/${coordinatorAgent.threadId}`, {
+          replace: true,
+        });
       } else if (sessionDetails.agents.length === 1) {
         // If only one agent, use it
         navigate(

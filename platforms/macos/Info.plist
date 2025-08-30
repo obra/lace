@@ -32,5 +32,19 @@
     <string>NSApplication</string>
     <key>NSSupportsAutomaticGraphicsSwitching</key>
     <true/>
+    
+    <!-- Sparkle Auto-Update Configuration -->
+    <key>SUFeedURL</key>
+    <string>SPARKLE_FEED_URL_PLACEHOLDER</string>
+    <key>SUPublicEDKey</key>
+    <string>ZY/ZPlRrnPohsWVic4GcjZ8tJg8qScm9MRHj3EWO4mg=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUCheckAtStartup</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
+    <key>SUAllowsAutomaticUpdates</key>
+    <true/>
 </dict>
 </plist>

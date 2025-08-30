@@ -20,7 +20,7 @@ vi.mock('@/lib/event-stream-firehose', () => {
     })),
     getInstance: vi.fn(() => mockFirehose),
   };
-  
+
   return {
     EventStreamFirehose: {
       getInstance: () => mockFirehose,
@@ -54,21 +54,24 @@ describe('useEventStream Error Handling', () => {
     unsubscribe: ReturnType<typeof vi.fn>;
     getStats: ReturnType<typeof vi.fn>;
   };
-  
+
   beforeEach(async () => {
     vi.clearAllMocks();
-    
+
     // Get the mocked EventStreamFirehose
     const eventStreamModule = await import('@/lib/event-stream-firehose');
-    mockFirehose = eventStreamModule.EventStreamFirehose.getInstance() as unknown as typeof mockFirehose;
-    
+    mockFirehose =
+      eventStreamModule.EventStreamFirehose.getInstance() as unknown as typeof mockFirehose;
+
     // Mock subscribe to capture the event handler
-    mockFirehose.subscribe.mockImplementation((filter: unknown, handler: (event: LaceEvent) => void) => {
-      mockSubscribeHandler = handler;
-      return 'mock-subscription-id';
-    });
+    mockFirehose.subscribe.mockImplementation(
+      (filter: unknown, handler: (event: LaceEvent) => void) => {
+        mockSubscribeHandler = handler;
+        return 'mock-subscription-id';
+      }
+    );
   });
-  
+
   // Helper function to simulate events
   const simulateEvent = (event: LaceEvent) => {
     if (mockSubscribeHandler) {
@@ -79,7 +82,7 @@ describe('useEventStream Error Handling', () => {
   describe('AGENT_ERROR Event Handler Registration', () => {
     it('should register onAgentError handler correctly and handle events', () => {
       const mockAgentErrorHandler = vi.fn();
-      
+
       const { result } = renderHook(() =>
         useEventStream({
           onAgentError: mockAgentErrorHandler,
@@ -105,7 +108,7 @@ describe('useEventStream Error Handling', () => {
 
       // Simulate the event being received
       simulateEvent(agentErrorEvent);
-      
+
       // Verify the handler was called with the entire event (not just data)
       expect(mockAgentErrorHandler).toHaveBeenCalledWith(agentErrorEvent);
       expect(result.current).toBeDefined();
@@ -113,7 +116,7 @@ describe('useEventStream Error Handling', () => {
 
     it('should register generic onError handler correctly and handle events', () => {
       const mockErrorHandler = vi.fn();
-      
+
       const { result } = renderHook(() =>
         useEventStream({
           onError: mockErrorHandler,
@@ -137,7 +140,7 @@ describe('useEventStream Error Handling', () => {
       };
 
       simulateEvent(agentErrorEvent);
-      
+
       // Verify generic error handler was called with Error object
       expect(mockErrorHandler).toHaveBeenCalledWith(expect.any(Error));
       expect(result.current).toBeDefined();
@@ -146,7 +149,7 @@ describe('useEventStream Error Handling', () => {
     it('should handle both onAgentError and onError handlers simultaneously', () => {
       const mockAgentErrorHandler = vi.fn();
       const mockGenericErrorHandler = vi.fn();
-      
+
       const { result } = renderHook(() =>
         useEventStream({
           onAgentError: mockAgentErrorHandler,
@@ -171,7 +174,7 @@ describe('useEventStream Error Handling', () => {
       };
 
       simulateEvent(agentErrorEvent);
-      
+
       // Both handlers should be called
       expect(mockAgentErrorHandler).toHaveBeenCalledWith(agentErrorEvent);
       expect(mockGenericErrorHandler).toHaveBeenCalledWith(expect.any(Error));
@@ -229,14 +232,20 @@ describe('useEventStream Error Handling', () => {
       };
 
       expect(toolErrorEvent.data).toHaveProperty('errorType', 'tool_execution');
-      expect((toolErrorEvent.data as TestErrorEventData).context).toHaveProperty('toolName', 'bash');
-      expect((toolErrorEvent.data as TestErrorEventData).context).toHaveProperty('toolCallId', 'tool-call-456');
+      expect((toolErrorEvent.data as TestErrorEventData).context).toHaveProperty(
+        'toolName',
+        'bash'
+      );
+      expect((toolErrorEvent.data as TestErrorEventData).context).toHaveProperty(
+        'toolCallId',
+        'tool-call-456'
+      );
     });
 
     it('should process conversation processing errors correctly', () => {
       const processingErrorEvent: LaceEvent = {
         type: 'AGENT_ERROR',
-        threadId: 'test-thread', 
+        threadId: 'test-thread',
         timestamp: new Date(),
         data: {
           errorType: 'processing_error',
@@ -253,7 +262,10 @@ describe('useEventStream Error Handling', () => {
       };
 
       expect(processingErrorEvent.data).toHaveProperty('errorType', 'processing_error');
-      expect((processingErrorEvent.data as TestErrorEventData).context).toHaveProperty('phase', 'conversation_processing');
+      expect((processingErrorEvent.data as TestErrorEventData).context).toHaveProperty(
+        'phase',
+        'conversation_processing'
+      );
     });
   });
 
@@ -261,13 +273,13 @@ describe('useEventStream Error Handling', () => {
     it('should convert AGENT_ERROR events to Error objects for generic handler', () => {
       const mockErrorHandler = vi.fn();
       const testMessage = 'Test agent error message';
-      
+
       renderHook(() =>
         useEventStream({
           onError: mockErrorHandler,
         })
       );
-      
+
       const agentErrorEvent: LaceEvent = {
         type: 'AGENT_ERROR',
         threadId: 'test-thread',
@@ -284,7 +296,7 @@ describe('useEventStream Error Handling', () => {
       };
 
       simulateEvent(agentErrorEvent);
-      
+
       // Verify generic handler receives Error object with correct message
       expect(mockErrorHandler).toHaveBeenCalledWith(expect.any(Error));
       const calledError = mockErrorHandler.mock.calls[0][0];
@@ -294,13 +306,13 @@ describe('useEventStream Error Handling', () => {
 
     it('should handle missing error message gracefully', () => {
       const mockErrorHandler = vi.fn();
-      
+
       renderHook(() =>
         useEventStream({
           onError: mockErrorHandler,
         })
       );
-      
+
       const agentErrorEventWithoutMessage: LaceEvent = {
         type: 'AGENT_ERROR',
         threadId: 'test-thread',
@@ -317,7 +329,7 @@ describe('useEventStream Error Handling', () => {
       };
 
       simulateEvent(agentErrorEventWithoutMessage);
-      
+
       // Should handle missing/empty message with fallback
       expect(mockErrorHandler).toHaveBeenCalledWith(expect.any(Error));
       const calledError = mockErrorHandler.mock.calls[0][0];
@@ -382,10 +394,10 @@ describe('useEventStream Error Handling', () => {
         'tool_execution',
         'processing_error',
         'timeout',
-        'streaming_error'
+        'streaming_error',
       ];
 
-      validErrorTypes.forEach(errorType => {
+      validErrorTypes.forEach((errorType) => {
         const errorEvent: LaceEvent = {
           type: 'AGENT_ERROR',
           threadId: 'test-thread',
@@ -410,10 +422,10 @@ describe('useEventStream Error Handling', () => {
         'provider_response',
         'tool_execution',
         'conversation_processing',
-        'initialization'
+        'initialization',
       ];
 
-      validPhases.forEach(phase => {
+      validPhases.forEach((phase) => {
         const errorEvent: LaceEvent = {
           type: 'AGENT_ERROR',
           threadId: 'test-thread',

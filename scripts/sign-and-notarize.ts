@@ -5,6 +5,92 @@ import { execSync } from 'child_process';
 import { existsSync, unlinkSync } from 'fs';
 import { resolve } from 'path';
 
+// Signing-only function for when keychain is already set up
+async function performSigningOnly(
+  resolvedBinaryPath: string,
+  signingIdentity: string,
+  appleId?: string,
+  applePassword?: string,
+  teamId?: string,
+  skipNotarization = false
+) {
+  const entitlementsPath = `${process.cwd()}/scripts/entitlements.plist`;
+
+  // Handle app bundle vs standalone binary signing
+  if (resolvedBinaryPath.endsWith('.app')) {
+    console.log('✍️  Signing app bundle with hardened runtime and entitlements...');
+
+    // Sign Sparkle framework components first (if present)
+    const sparkleFrameworkPath = `${resolvedBinaryPath}/Contents/Frameworks/Sparkle.framework`;
+    if (existsSync(sparkleFrameworkPath)) {
+      console.log('   ⚡ Signing Sparkle framework components...');
+
+      // Sign XPC Services (correct path: Versions/Current/XPCServices)
+      const xpcServicesPath = `${sparkleFrameworkPath}/Versions/Current/XPCServices`;
+      if (existsSync(xpcServicesPath)) {
+        console.log('   🔧 Signing Sparkle XPC services...');
+        execSync(
+          `find "${xpcServicesPath}" -name "*.xpc" -exec codesign --force --options runtime --sign "${signingIdentity}" {} \;`,
+          { stdio: 'inherit' }
+        );
+      }
+
+      // Sign Updater.app (critical for updates)
+      const updaterAppPath = `${sparkleFrameworkPath}/Versions/Current/Updater.app`;
+      if (existsSync(updaterAppPath)) {
+        console.log('   🔄 Signing Sparkle Updater.app...');
+        execSync(
+          `codesign --force --options runtime --sign "${signingIdentity}" "${updaterAppPath}" --verbose`,
+          { stdio: 'inherit' }
+        );
+      }
+
+      // Sign the main Sparkle framework
+      console.log('   ⚡ Signing Sparkle framework...');
+      execSync(
+        `codesign --force --options runtime --sign "${signingIdentity}" "${sparkleFrameworkPath}" --verbose`,
+        { stdio: 'inherit' }
+      );
+    }
+
+    // Sign the inner lace-server binary
+    const laceServerPath = `${resolvedBinaryPath}/Contents/MacOS/lace-server`;
+    if (existsSync(laceServerPath)) {
+      console.log('   🔧 Signing lace-server binary...');
+      execSync(
+        `codesign --force --options runtime --entitlements "${entitlementsPath}" --sign "${signingIdentity}" "${laceServerPath}" --verbose`,
+        { stdio: 'inherit' }
+      );
+    }
+
+    // Finally sign the outer app bundle
+    console.log('   📦 Signing app bundle...');
+    execSync(
+      `codesign --force --options runtime --sign "${signingIdentity}" "${resolvedBinaryPath}" --verbose`,
+      { stdio: 'inherit' }
+    );
+  } else {
+    console.log('✍️  Signing binary with hardened runtime and entitlements...');
+    execSync(
+      `codesign --force --options runtime --entitlements "${entitlementsPath}" --deep --sign "${signingIdentity}" "${resolvedBinaryPath}" --verbose`,
+      { stdio: 'inherit' }
+    );
+  }
+
+  // Verify signature
+  console.log('🔍 Verifying signature...');
+  execSync(`codesign --verify --deep --strict --verbose=2 "${resolvedBinaryPath}"`, {
+    stdio: 'inherit',
+  });
+
+  console.log('✅ Binary signed successfully!');
+
+  // Note: Skipping notarization in GitHub Actions for now as it's complex
+  if (!skipNotarization && appleId && applePassword && teamId) {
+    console.log('⚠️  Notarization available but skipping for now in GitHub Actions');
+  }
+}
+
 interface SigningOptions {
   binaryPath: string;
   appleId?: string;
@@ -116,6 +202,13 @@ async function signAndNotarize(options: SigningOptions) {
   const resolvedBinaryPath = resolve(binaryPath);
   console.log(`🔐 Signing binary: ${resolvedBinaryPath}`);
 
+  // Debug: Check environment
+  console.log('🔍 Environment check:');
+  console.log(`  GITHUB_ACTIONS_KEYCHAIN_READY: ${process.env.GITHUB_ACTIONS_KEYCHAIN_READY}`);
+  console.log(`  certificateP12 provided: ${!!certificateP12}`);
+  console.log(`  certificatePassword provided: ${!!certificatePassword}`);
+  console.log(`  appleId provided: ${!!appleId}`);
+
   // Check if we're on macOS
   if (process.platform !== 'darwin') {
     console.log('ℹ️  Not on macOS, skipping signing');
@@ -137,9 +230,55 @@ async function signAndNotarize(options: SigningOptions) {
     }
   }
 
-  // Validate required credentials for proper signing
+  // Check if GitHub Actions already set up keychain
+  if (process.env.GITHUB_ACTIONS_KEYCHAIN_READY === 'true') {
+    console.log('📝 Using GitHub Actions keychain setup...');
+
+    // Find signing identity from current default keychain
+    try {
+      const identityOutput = execSync(`security find-identity -v -p codesigning`, {
+        encoding: 'utf8',
+      });
+      console.log('🔍 Available identities:', identityOutput);
+
+      // Look for either Developer ID Application or Apple Development certificates
+      let identityMatch = identityOutput.match(/"([^"]*Developer ID Application[^"]*)"/);
+      if (!identityMatch) {
+        identityMatch = identityOutput.match(/"([^"]*Apple Development[^"]*)"/);
+        console.log('📝 Using Apple Development certificate for signing');
+      }
+
+      if (!identityMatch) {
+        throw new Error('No Developer ID Application certificate found in current keychain');
+      }
+
+      const signingIdentity = identityMatch[1];
+      console.log(`🔑 Using signing identity: ${signingIdentity}`);
+
+      // Proceed with signing using existing keychain
+      await performSigningOnly(
+        resolvedBinaryPath,
+        signingIdentity,
+        appleId,
+        applePassword,
+        teamId,
+        skipNotarization
+      );
+      return;
+    } catch (error) {
+      console.warn(
+        '⚠️  Failed to use GitHub Actions keychain, falling back to manual setup:',
+        error
+      );
+    }
+  }
+
+  // Validate required credentials for proper signing (unless using GitHub Actions keychain)
   if (!certificateP12 || !certificatePassword) {
-    throw new Error('Certificate .p12 file and password are required for proper signing');
+    if (!process.env.GITHUB_ACTIONS_KEYCHAIN_READY) {
+      throw new Error('Certificate .p12 file and password are required for proper signing');
+    }
+    console.log('⚠️  No P12 credentials provided, but GitHub Actions keychain is available');
   }
 
   let tempCertPath = '';
@@ -186,10 +325,19 @@ async function signAndNotarize(options: SigningOptions) {
       `security find-identity -v -p codesigning ${tempKeychainName}`,
       { encoding: 'utf8' }
     );
-    const identityMatch = identityOutput.match(/"([^"]*Developer ID Application[^"]*)"/);
+    console.log('🔍 Available identities in temp keychain:', identityOutput);
+
+    // Look for either Developer ID Application or Apple Development certificates
+    let identityMatch = identityOutput.match(/"([^"]*Developer ID Application[^"]*)"/);
+    if (!identityMatch) {
+      identityMatch = identityOutput.match(/"([^"]*Apple Development[^"]*)"/);
+      console.log('📝 Using Apple Development certificate for signing');
+    }
 
     if (!identityMatch) {
-      throw new Error('No Developer ID Application certificate found in keychain');
+      throw new Error(
+        'No Developer ID Application or Apple Development certificate found in keychain'
+      );
     }
 
     const signingIdentity = identityMatch[1];
@@ -200,7 +348,40 @@ async function signAndNotarize(options: SigningOptions) {
       console.log('✍️  Signing app bundle with hardened runtime and entitlements...');
       const entitlementsPath = `${process.cwd()}/scripts/entitlements.plist`;
 
-      // Sign the inner lace-server binary first
+      // Sign Sparkle framework components first (if present)
+      const sparkleFrameworkPath = `${resolvedBinaryPath}/Contents/Frameworks/Sparkle.framework`;
+      if (existsSync(sparkleFrameworkPath)) {
+        console.log('   ⚡ Signing Sparkle framework components...');
+
+        // Sign XPC Services (correct path: Versions/Current/XPCServices)
+        const xpcServicesPath = `${sparkleFrameworkPath}/Versions/Current/XPCServices`;
+        if (existsSync(xpcServicesPath)) {
+          console.log('   🔧 Signing Sparkle XPC services...');
+          execSync(
+            `find "${xpcServicesPath}" -name "*.xpc" -exec codesign --force --options runtime --sign "${signingIdentity}" {} \;`,
+            { stdio: 'inherit' }
+          );
+        }
+
+        // Sign Updater.app (critical for updates)
+        const updaterAppPath = `${sparkleFrameworkPath}/Versions/Current/Updater.app`;
+        if (existsSync(updaterAppPath)) {
+          console.log('   🔄 Signing Sparkle Updater.app...');
+          execSync(
+            `codesign --force --options runtime --sign "${signingIdentity}" "${updaterAppPath}" --verbose`,
+            { stdio: 'inherit' }
+          );
+        }
+
+        // Sign the main Sparkle framework
+        console.log('   ⚡ Signing Sparkle framework...');
+        execSync(
+          `codesign --force --options runtime --sign "${signingIdentity}" "${sparkleFrameworkPath}" --verbose`,
+          { stdio: 'inherit' }
+        );
+      }
+
+      // Sign the inner lace-server binary
       const laceServerPath = `${resolvedBinaryPath}/Contents/MacOS/lace-server`;
       if (existsSync(laceServerPath)) {
         console.log('   🔧 Signing lace-server binary...');
@@ -210,7 +391,7 @@ async function signAndNotarize(options: SigningOptions) {
         );
       }
 
-      // Then sign the outer app bundle
+      // Finally sign the outer app bundle
       console.log('   📦 Signing app bundle...');
       execSync(
         `codesign --force --options runtime --sign "${signingIdentity}" "${resolvedBinaryPath}" --verbose`,

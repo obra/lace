@@ -21,14 +21,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     // Validate request
     const parseResult = ListSessionDirectoryRequestSchema.safeParse({ path: rawPath });
     if (!parseResult.success) {
-      return createErrorResponse(
-        'Invalid request parameters',
-        400,
-        { 
-          code: 'INVALID_REQUEST',
-          details: parseResult.error.flatten()
-        }
-      );
+      return createErrorResponse('Invalid request parameters', 400, {
+        code: 'INVALID_REQUEST',
+        details: parseResult.error.flatten(),
+      });
     }
     const { path: requestedPath } = parseResult.data;
 
@@ -53,13 +49,17 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     // Security: Use realpath to resolve symlinks and prevent traversal outside working directory
     let realWorkingDir: string;
     let realRequestedPath: string;
-    
+
     try {
       realWorkingDir = await fs.realpath(workingDirectory);
       const tempPath = resolve(workingDirectory, requestedPath);
       realRequestedPath = await fs.realpath(tempPath);
     } catch (error) {
-      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'ENOENT'
+      ) {
         // Path doesn't exist, but we still need to check if it would be inside working dir
         realWorkingDir = await fs.realpath(workingDirectory);
         const tempPath = resolve(workingDirectory, requestedPath);
@@ -75,7 +75,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
     // Prevent path traversal attacks using real paths
     const relativePath = relative(realWorkingDir, realRequestedPath);
-    if (relativePath.startsWith('..') || !realRequestedPath.startsWith(realWorkingDir + '/') && realRequestedPath !== realWorkingDir) {
+    if (
+      relativePath.startsWith('..') ||
+      (!realRequestedPath.startsWith(realWorkingDir + '/') && realRequestedPath !== realWorkingDir)
+    ) {
       return createErrorResponse('Path access denied', 403, { code: 'PATH_ACCESS_DENIED' });
     }
 
@@ -104,10 +107,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     for (const dirent of dirents) {
       try {
         const entryPath = join(realRequestedPath, dirent.name);
-        
+
         // Use lstat to detect symlinks without following them
         const entryLstat = await fs.lstat(entryPath);
-        
+
         // Skip symlinks to prevent following them outside working directory
         if (entryLstat.isSymbolicLink()) {
           continue;
@@ -115,7 +118,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
         // Check if readable
         await fs.access(entryPath, fsConstants.R_OK);
-        
+
         // For directories, also check execute permission
         if (dirent.isDirectory()) {
           await fs.access(entryPath, fsConstants.X_OK);
@@ -155,10 +158,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     return createSuccessResponse(response);
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    return createErrorResponse(
-      'Failed to list directory',
-      500,
-      { code: 'INTERNAL_SERVER_ERROR', error: err }
-    );
+    return createErrorResponse('Failed to list directory', 500, {
+      code: 'INTERNAL_SERVER_ERROR',
+      error: err,
+    });
   }
 }

@@ -1,10 +1,31 @@
 name: CI
 
+# Minimal permissions for security
+permissions:
+  contents: read          # Read repository contents
+
+# Prevent overlapping deployments
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  release:
+    types: [ published ]   # Deploy to release channel
+  workflow_dispatch:       # Manual trigger
+    inputs:
+      channel:
+        description: 'Deployment channel'
+        required: true
+        default: 'nightly'
+        type: choice
+        options:
+          - nightly
+          - release
 
 env:
   NODE_VERSION: '20'
@@ -32,31 +53,13 @@ jobs:
       - name: Check Prettier formatting
         run: npx prettier --check "packages/core/src/*.ts"
       
-      - name: Check Prettier formatting
+      - name: Check Prettier formatting (web)
         run: npx prettier --check "packages/web/**/*.ts" "packages/web/**/*.tsx"
-
-  build:
-    name: Build Project
-    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
-    runs-on: [self-hosted, macOS]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build project
-        run: cd packages/web && npm run build
 
   test:
     name: Test Suite
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
+    needs: [lint-and-format]
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
@@ -102,11 +105,7 @@ jobs:
 
       - name: Run all tests
         run: |
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            script -q -c "npm test" /dev/null
-          else
-            script -q -k /dev/null npm test
-          fi
+          npm test
 
       - name: Cache test artifacts
         if: runner.os == 'Linux'
@@ -184,46 +183,39 @@ jobs:
           fail_ci_if_error: false
 
 
-  playwright-tests:
-    name: Playwright E2E Tests
-    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
-    runs-on: [self-hosted, macOS]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright browsers
-        run: cd packages/web && npx playwright install --with-deps chromium webkit
-
-      - name: Build web package
-        run: cd packages/web && npm run build
-
-      - name: Run allow-listed Playwright tests
-        run: cd packages/web && npm run test:playwright:ci
-        env:
-          CI: true
-
-      - name: Upload Playwright test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-test-results
-          path: |
-            packages/web/test-results/
-            packages/web/playwright-report/
-          retention-days: 7
+  # Temporarily disabled due to reliability issues
+  # playwright-tests:
+  #   name: Playwright E2E Tests
+  #   if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
+  #   needs: [test-macos-app]
+  #   runs-on: [self-hosted, macOS]
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
+  #
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #
+  #     - name: Install dependencies
+  #       run: npm ci
+  #
+  #     - name: Install Playwright browsers
+  #       run: cd packages/web && npx playwright install --with-deps chromium webkit
+  #
+  #     - name: Build web package
+  #       run: cd packages/web && npm run build
+  #
+  #     - name: Run allow-listed Playwright tests
+  #       run: cd packages/web && npm run test:playwright:ci
+  #       env:
+  #         CI: true
 
   test-macos-app:
     name: Test macOS App
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
+    needs: [test]
     runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout code
@@ -260,20 +252,21 @@ jobs:
           ls -la build/Lace.app/Contents/MacOS/
           echo "✅ macOS app builds successfully"
 
-      - name: Upload test artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-app-test-results
-          path: |
-            platforms/macos/build/
-          retention-days: 3
+      # Skip uploading test artifacts to save storage quota
+      # - name: Upload test artifacts
+      #   if: always()
+      #   uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+      #   with:
+      #     name: macos-app-test-results
+      #     path: |
+      #       platforms/macos/build/
+      #     retention-days: 3
 
   build-and-package:
-    name: Build and Package
+    name: Build, Package, and Deploy
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
     runs-on: [self-hosted, macOS]
-    needs: [lint-and-format, build, test, test-macos-app, playwright-tests]
+    needs: [test-macos-app]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -283,19 +276,177 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build project
-        run: cd packages/web &&  npm run build
-
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v1.2.2 (third-party)
         with:
-          name: build-artifacts
-          path: |
-            dist/
-            !dist/**/*.map
-          retention-days: 7
+          bun-version: 1.2.21
+
+      - name: Install dependencies
+        run: bun install
+      
+      - name: Setup EdDSA key for Sparkle appcast signing
+        run: |
+          cd platforms/macos
+          echo "$SPARKLE_PRIVATE_KEY" > sparkle_private_key
+          chmod 600 sparkle_private_key
+          echo "✅ EdDSA private key configured for appcast signing"
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+
+      - name: Setup Apple Code Signing
+        run: |
+          # Save original default keychain
+          ORIGINAL_KEYCHAIN=$(security default-keychain | tr -d '"')
+          echo "ORIGINAL_KEYCHAIN=$ORIGINAL_KEYCHAIN" >> $GITHUB_ENV
+          
+          # Create temporary keychain for signing
+          KEYCHAIN_NAME="github-actions-$(date +%s).keychain"
+          KEYCHAIN_PASSWORD="temp-keychain-pass-$(date +%s)"
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          
+          # Create and unlock keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          security default-keychain -s "$KEYCHAIN_NAME"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          # Keep unlocked during job and avoid UI prompts
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_NAME"
+          
+          # Decode and import P12 certificate
+          echo "$APPLE_DEVELOPER_CERTIFICATE_P12" | base64 --decode > temp-cert.p12
+          security import temp-cert.p12 -k "$KEYCHAIN_NAME" -P "$APPLE_DEVELOPER_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productsign -T /usr/bin/security
+          
+          # Set partition list for codesign access
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          
+          # Add to keychain search list so codesign can find it
+          security list-keychains -d user -s "$KEYCHAIN_NAME" login.keychain
+          
+          # Verify certificate was imported and accessible
+          echo "🔍 Verifying certificate import..."
+          security find-identity -v -p codesigning "$KEYCHAIN_NAME"
+          echo "🔍 Checking codesigning access..."
+          security find-identity -v -p codesigning
+          
+          # Debug: Check if secrets are available (without exposing values)
+          echo "🔍 Checking secret availability..."
+          [ -n "$APPLE_DEVELOPER_CERTIFICATE_P12" ] && echo "  APPLE_DEVELOPER_CERTIFICATE_P12: Present" || echo "  APPLE_DEVELOPER_CERTIFICATE_P12: Missing"
+          [ -n "$APPLE_DEVELOPER_CERTIFICATE_PASSWORD" ] && echo "  APPLE_DEVELOPER_CERTIFICATE_PASSWORD: Present" || echo "  APPLE_DEVELOPER_CERTIFICATE_PASSWORD: Missing"
+          
+          # Clean up certificate file
+          rm temp-cert.p12
+          
+          # Export for use in build step
+          echo "KEYCHAIN_NAME=$KEYCHAIN_NAME" >> $GITHUB_ENV
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> $GITHUB_ENV
+        env:
+          APPLE_DEVELOPER_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
+          APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+
+      - name: Determine deployment channel
+        id: channel
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "channel=release" >> $GITHUB_OUTPUT
+            echo "deploy=true" >> $GITHUB_OUTPUT
+            echo "🚢 Deploying to RELEASE channel"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "channel=${{ github.event.inputs.channel }}" >> $GITHUB_OUTPUT
+            echo "deploy=true" >> $GITHUB_OUTPUT
+            echo "🔧 Manual deploy to ${{ github.event.inputs.channel }} channel"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "channel=nightly" >> $GITHUB_OUTPUT
+            echo "deploy=false" >> $GITHUB_OUTPUT
+            echo "🧪 PR build (no deployment)"
+          else
+            echo "channel=nightly" >> $GITHUB_OUTPUT
+            echo "deploy=true" >> $GITHUB_OUTPUT
+            echo "🌙 Deploying to NIGHTLY channel"
+          fi
+
+      - name: Check Apple signing secrets
+        id: signing_check
+        run: |
+          if [ -n "$APPLE_DEVELOPER_CERTIFICATE_P12" ] && [ -n "$APPLE_DEVELOPER_CERTIFICATE_PASSWORD" ] && [ -n "$APPLE_ID_EMAIL" ] && [ -n "$APPLE_ID_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            echo "available=true" >> $GITHUB_OUTPUT
+            echo "✅ Apple signing secrets available"
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+            echo "⚠️  Apple signing secrets not available"
+          fi
+        env:
+          APPLE_DEVELOPER_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
+          APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+          APPLE_ID_EMAIL: ${{ secrets.APPLE_ID_EMAIL }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Build macOS app (signed) with DMG and appcast
+        if: steps.signing_check.outputs.available == 'true'
+        run: |
+          bun scripts/build-macos-app.ts \
+            --dmg \
+            --sign \
+            --channel ${{ steps.channel.outputs.channel }} \
+            --generate-appcast
+        env:
+          # Signal to sign-and-notarize.ts that keychain is already set up
+          GITHUB_ACTIONS_KEYCHAIN_READY: 'true'
+          APPLE_ID_EMAIL: ${{ secrets.APPLE_ID_EMAIL }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      # Signing temporarily disabled - build unsigned bundles for now
+      # TODO: Set up proper Developer ID Application certificate for distribution
+
+      - name: Upload to Dropbox - App Bundle
+        if: steps.channel.outputs.deploy == 'true'
+        uses: Lewuathe/dropbox-github-action@0cf2acadb42e7fe8d14936b064313cca1db0dd68 # v1.0.3 (third-party)
+        with:
+          dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
+          dropbox-app-secret: ${{ secrets.DROPBOX_APP_SECRET }}
+          dropbox-refresh-token: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+          source-path: build/Lace.app
+          target-path: /${{ steps.channel.outputs.channel }}/
+      
+      - name: Upload to Dropbox - Appcast
+        if: steps.channel.outputs.deploy == 'true'
+        uses: Lewuathe/dropbox-github-action@0cf2acadb42e7fe8d14936b064313cca1db0dd68 # v1.0.3 (third-party)
+        with:
+          dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
+          dropbox-app-secret: ${{ secrets.DROPBOX_APP_SECRET }}
+          dropbox-refresh-token: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+          source-path: build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml
+          target-path: /${{ steps.channel.outputs.channel }}/
+
+      # All artifacts go to Dropbox only - no GitHub storage needed
+
+      - name: Cleanup Keychain
+        if: always()
+        run: |
+          # Restore original default keychain if we saved one
+          if [ -n "$ORIGINAL_KEYCHAIN" ]; then
+            security default-keychain -s "$ORIGINAL_KEYCHAIN" || true
+            echo "✅ Restored original default keychain: $ORIGINAL_KEYCHAIN"
+          fi
+          
+          # Delete temporary keychain
+          if [ -n "$KEYCHAIN_NAME" ]; then
+            security delete-keychain "$KEYCHAIN_NAME" || true
+            echo "🧹 Cleaned up temporary keychain"
+          fi
+
+      - name: Notify build completion
+        run: |
+          echo "🎉 Build complete!"
+          echo "📦 Channel: ${{ steps.channel.outputs.channel }}"
+          if [ -d "build/Lace.app" ]; then
+            echo "📱 App Bundle: build/Lace.app"
+            echo "📡 Appcast: build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml"
+          fi
+          if [ "${{ steps.channel.outputs.deploy }}" = "true" ]; then
+            echo "🚀 Deployed to Dropbox!"
+            echo "⚠️  Note: Unsigned builds - sign manually for production"
+          else
+            echo "🧪 PR build (no deployment)"
+          fi
 

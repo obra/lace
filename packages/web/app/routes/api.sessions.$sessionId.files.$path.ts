@@ -34,29 +34,28 @@ function getMimeType(filePath: string): string {
 
 // Check if file is likely text-based
 function isTextFile(mimeType: string): boolean {
-  return mimeType.startsWith('text/') || 
-         mimeType === 'application/json' ||
-         mimeType === 'application/javascript' ||
-         mimeType === 'video/mp2t'; // .ts files incorrectly detected as MPEG transport stream
+  return (
+    mimeType.startsWith('text/') ||
+    mimeType === 'application/json' ||
+    mimeType === 'application/javascript' ||
+    mimeType === 'video/mp2t'
+  ); // .ts files incorrectly detected as MPEG transport stream
 }
 
 export async function loader({ request: _request, params }: LoaderArgs) {
   try {
     const { sessionId } = params;
-    const splatPath = (params as Record<string, string>)['*'] || (params as Record<string, string>)['path'] || '';
+    const splatPath =
+      (params as Record<string, string>)['*'] || (params as Record<string, string>)['path'] || '';
     const filePath = splatPath;
 
     // Validate request
     const parseResult = GetSessionFileRequestSchema.safeParse({ path: filePath });
     if (!parseResult.success) {
-      return createErrorResponse(
-        'Invalid request parameters',
-        400,
-        { 
-          code: 'INVALID_REQUEST',
-          details: parseResult.error.flatten()
-        }
-      );
+      return createErrorResponse('Invalid request parameters', 400, {
+        code: 'INVALID_REQUEST',
+        details: parseResult.error.flatten(),
+      });
     }
     const { path: requestedPath } = parseResult.data;
 
@@ -79,13 +78,17 @@ export async function loader({ request: _request, params }: LoaderArgs) {
     // Security: Use realpath to resolve symlinks and prevent traversal outside working directory
     let realWorkingDir: string;
     let realFilePath: string;
-    
+
     try {
       realWorkingDir = await fs.realpath(workingDirectory);
       const tempFilePath = resolve(workingDirectory, requestedPath);
       realFilePath = await fs.realpath(tempFilePath);
     } catch (error) {
-      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'ENOENT'
+      ) {
         // File doesn't exist, but we still need to check if it would be inside working dir
         realWorkingDir = await fs.realpath(workingDirectory);
         const tempFilePath = resolve(workingDirectory, requestedPath);
@@ -101,7 +104,10 @@ export async function loader({ request: _request, params }: LoaderArgs) {
 
     // Prevent path traversal attacks using real paths
     const relativePath = relative(realWorkingDir, realFilePath);
-    if (relativePath.startsWith('..') || !realFilePath.startsWith(realWorkingDir + '/') && realFilePath !== realWorkingDir) {
+    if (
+      relativePath.startsWith('..') ||
+      (!realFilePath.startsWith(realWorkingDir + '/') && realFilePath !== realWorkingDir)
+    ) {
       return createErrorResponse('Path access denied', 403, { code: 'PATH_ACCESS_DENIED' });
     }
 
@@ -178,10 +184,9 @@ export async function loader({ request: _request, params }: LoaderArgs) {
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     logger.error('File content route error:', { message: err.message, stack: err.stack });
-    return createErrorResponse(
-      'Failed to read file',
-      500,
-      { code: 'INTERNAL_SERVER_ERROR', error: { message: err.message, stack: err.stack } }
-    );
+    return createErrorResponse('Failed to read file', 500, {
+      code: 'INTERNAL_SERVER_ERROR',
+      error: { message: err.message, stack: err.stack },
+    });
   }
 }

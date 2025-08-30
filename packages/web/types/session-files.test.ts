@@ -109,7 +109,6 @@ describe('Session File Types', () => {
       expect(result.success).toBe(true);
     });
 
-
     it('should reject invalid encoding', () => {
       const invalidResponse = {
         path: 'src/test.ts',

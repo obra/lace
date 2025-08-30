@@ -62,7 +62,6 @@ vi.mock('@/components/providers/ToolApprovalProvider', () => ({
   }),
 }));
 
-
 // Mock useURLState to provide navigation
 const mockNavigateToAgent = vi.fn();
 vi.mock('@/hooks/useURLState', () => ({

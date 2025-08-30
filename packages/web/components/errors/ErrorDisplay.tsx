@@ -14,33 +14,41 @@ interface ErrorDisplayProps {
   compact?: boolean;
 }
 
-export function ErrorDisplay({ 
-  error, 
-  showContext = true, 
-  onRetry, 
-  onDismiss, 
-  compact = false 
+export function ErrorDisplay({
+  error,
+  showContext = true,
+  onRetry,
+  onDismiss,
+  compact = false,
 }: ErrorDisplayProps): React.JSX.Element {
   const getErrorIcon = () => {
     switch (error.severity) {
-      case 'critical': return faExclamationTriangle;
-      case 'error': return faExclamationTriangle;
-      case 'warning': return faInfo;
-      default: return faInfo;
+      case 'critical':
+        return faExclamationTriangle;
+      case 'error':
+        return faExclamationTriangle;
+      case 'warning':
+        return faInfo;
+      default:
+        return faInfo;
     }
   };
 
   const getAlertClass = () => {
     switch (error.severity) {
-      case 'critical': return 'alert-error';
-      case 'error': return 'alert-error';
-      case 'warning': return 'alert-warning';
-      default: return 'alert-info';
+      case 'critical':
+        return 'alert-error';
+      case 'error':
+        return 'alert-error';
+      case 'warning':
+        return 'alert-warning';
+      default:
+        return 'alert-info';
     }
   };
 
   const formatErrorType = (errorType: string) => {
-    return errorType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return errorType.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
   // Safe formatter for context values that handles objects/arrays properly
@@ -49,7 +57,7 @@ export function ErrorDisplay({
       // Truncate very long strings
       return value.length > 300 ? value.substring(0, 300) + '…' : value;
     }
-    
+
     if (value === null || value === undefined) {
       return String(value);
     }
@@ -58,16 +66,20 @@ export function ErrorDisplay({
       try {
         // Handle objects/arrays with circular reference protection
         const seen = new Set();
-        const result = JSON.stringify(value, (key, val: unknown) => {
-          if (typeof val === 'object' && val !== null) {
-            if (seen.has(val)) {
-              return '[Circular Reference]';
+        const result = JSON.stringify(
+          value,
+          (key, val: unknown) => {
+            if (typeof val === 'object' && val !== null) {
+              if (seen.has(val)) {
+                return '[Circular Reference]';
+              }
+              seen.add(val);
             }
-            seen.add(val);
-          }
-          return val as string | number | boolean | null;
-        }, 2);
-        
+            return val as string | number | boolean | null;
+          },
+          2
+        );
+
         // Truncate very long JSON
         return result.length > 300 ? result.substring(0, 300) + '…' : result;
       } catch {
@@ -87,7 +99,12 @@ export function ErrorDisplay({
           <div className="text-sm opacity-80">{error.message}</div>
         </div>
         {error.isRetryable && onRetry && (
-          <button type="button" data-testid="retry-button" className="btn btn-sm btn-ghost" onClick={onRetry}>
+          <button
+            type="button"
+            data-testid="retry-button"
+            className="btn btn-sm btn-ghost"
+            onClick={onRetry}
+          >
             <FontAwesomeIcon icon={faRedo} />
           </button>
         )}
@@ -102,19 +119,15 @@ export function ErrorDisplay({
         <div className="flex items-center gap-2 mb-1">
           <span className="font-medium">{formatErrorType(error.errorType)}</span>
           <span className="badge badge-outline text-xs">{error.severity}</span>
-          {error.isRetryable && (
-            <span className="badge badge-success badge-sm">Retryable</span>
-          )}
+          {error.isRetryable && <span className="badge badge-success badge-sm">Retryable</span>}
         </div>
-        
+
         <div className="text-sm">{error.message}</div>
-        
+
         {showContext && Object.keys(error.context).length > 0 && (
           <div className="mt-2">
             <details className="collapse collapse-arrow">
-              <summary className="collapse-title text-xs font-medium">
-                Error Context
-              </summary>
+              <summary className="collapse-title text-xs font-medium">Error Context</summary>
               <div className="collapse-content">
                 <div className="bg-base-200 rounded p-2 text-xs font-mono">
                   {Object.entries(error.context).map(([key, value]) => (
@@ -128,17 +141,20 @@ export function ErrorDisplay({
             </details>
           </div>
         )}
-        
+
         {error.retryCount && error.retryCount > 0 && (
-          <div className="mt-1 text-xs opacity-60">
-            Retry attempt: {error.retryCount}
-          </div>
+          <div className="mt-1 text-xs opacity-60">Retry attempt: {error.retryCount}</div>
         )}
       </div>
-      
+
       <div className="flex gap-2">
         {error.isRetryable && onRetry && (
-          <button type="button" data-testid="retry-button" className="btn btn-sm btn-primary" onClick={onRetry}>
+          <button
+            type="button"
+            data-testid="retry-button"
+            className="btn btn-sm btn-primary"
+            onClick={onRetry}
+          >
             <FontAwesomeIcon icon={faRedo} className="mr-1" />
             Retry
           </button>

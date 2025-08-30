@@ -186,7 +186,7 @@ export function Button({ children, onClick }: ButtonProps) {
 
     // Verify popup content
     await popupPage.waitForLoadState();
-    
+
     // Verify the popup navigated to the file viewer route
     expect(popupPage.url()).toContain('/file-viewer');
     await expect(popupPage.getByText('README.md')).toBeVisible();

@@ -26,7 +26,7 @@ vi.mock('@/hooks/useAgentManagement');
 
 // Mock global fetch for ToolApprovalProvider
 beforeEach(() => {
-  global.fetch = vi.fn().mockResolvedValue(createMockResponse([])) as unknown as typeof fetch;;
+  global.fetch = vi.fn().mockResolvedValue(createMockResponse([])) as unknown as typeof fetch;
 });
 
 import { useAgentEvents as useAgentEventsHook } from '@/hooks/useAgentEvents';

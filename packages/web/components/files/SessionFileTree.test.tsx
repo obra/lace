@@ -192,13 +192,11 @@ describe('SessionFileTree', () => {
   });
 
   it('should handle API errors gracefully', async () => {
-    mockApiGet
-      .mockRejectedValueOnce(new Error('Network error'))
-      .mockResolvedValueOnce({
-        workingDirectory: '/test/dir',
-        currentPath: '',
-        entries: [],
-      });
+    mockApiGet.mockRejectedValueOnce(new Error('Network error')).mockResolvedValueOnce({
+      workingDirectory: '/test/dir',
+      currentPath: '',
+      entries: [],
+    });
 
     render(<SessionFileTree {...defaultProps} />);
 
