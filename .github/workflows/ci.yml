@@ -369,8 +369,25 @@ jobs:
             echo "🌙 Deploying to NIGHTLY channel"
           fi
 
+      - name: Check Apple signing secrets
+        id: signing_check
+        run: |
+          if [ -n "$APPLE_DEVELOPER_CERTIFICATE_P12" ] && [ -n "$APPLE_DEVELOPER_CERTIFICATE_PASSWORD" ] && [ -n "$APPLE_ID_EMAIL" ] && [ -n "$APPLE_ID_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            echo "available=true" >> $GITHUB_OUTPUT
+            echo "✅ Apple signing secrets available"
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+            echo "⚠️  Apple signing secrets not available"
+          fi
+        env:
+          APPLE_DEVELOPER_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
+          APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+          APPLE_ID_EMAIL: ${{ secrets.APPLE_ID_EMAIL }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
       - name: Build macOS app (signed) with DMG and appcast
-        if: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 != '' && secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD != '' && secrets.APPLE_ID_EMAIL != '' && secrets.APPLE_ID_PASSWORD != '' && secrets.APPLE_TEAM_ID != '' }}
+        if: steps.signing_check.outputs.available == 'true'
         run: |
           bun scripts/build-macos-app.ts \
             --dmg \
@@ -385,7 +402,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Build macOS app (unsigned) for testing
-        if: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 == '' || secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD == '' || secrets.APPLE_ID_EMAIL == '' || secrets.APPLE_ID_PASSWORD == '' || secrets.APPLE_TEAM_ID == '' }}
+        if: steps.signing_check.outputs.available == 'false'
         run: |
           bun scripts/build-macos-app.ts \
             --bundle \
