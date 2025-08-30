@@ -239,7 +239,14 @@ async function signAndNotarize(options: SigningOptions) {
       const identityOutput = execSync(`security find-identity -v -p codesigning`, {
         encoding: 'utf8',
       });
-      const identityMatch = identityOutput.match(/"([^"]*Developer ID Application[^"]*)"/);
+      console.log('🔍 Available identities:', identityOutput);
+
+      // Look for either Developer ID Application or Apple Development certificates
+      let identityMatch = identityOutput.match(/"([^"]*Developer ID Application[^"]*)"/);
+      if (!identityMatch) {
+        identityMatch = identityOutput.match(/"([^"]*Apple Development[^"]*)"/);
+        console.log('📝 Using Apple Development certificate for signing');
+      }
 
       if (!identityMatch) {
         throw new Error('No Developer ID Application certificate found in current keychain');
@@ -318,10 +325,19 @@ async function signAndNotarize(options: SigningOptions) {
       `security find-identity -v -p codesigning ${tempKeychainName}`,
       { encoding: 'utf8' }
     );
-    const identityMatch = identityOutput.match(/"([^"]*Developer ID Application[^"]*)"/);
+    console.log('🔍 Available identities in temp keychain:', identityOutput);
+
+    // Look for either Developer ID Application or Apple Development certificates
+    let identityMatch = identityOutput.match(/"([^"]*Developer ID Application[^"]*)"/);
+    if (!identityMatch) {
+      identityMatch = identityOutput.match(/"([^"]*Apple Development[^"]*)"/);
+      console.log('📝 Using Apple Development certificate for signing');
+    }
 
     if (!identityMatch) {
-      throw new Error('No Developer ID Application certificate found in keychain');
+      throw new Error(
+        'No Developer ID Application or Apple Development certificate found in keychain'
+      );
     }
 
     const signingIdentity = identityMatch[1];
