@@ -313,6 +313,11 @@ jobs:
           echo "🔍 Verifying certificate import..."
           security find-identity -v -p codesigning "$KEYCHAIN_NAME"
           
+          # Debug: Check if secrets are available (without exposing values)
+          echo "🔍 Checking secret availability..."
+          [ -n "$APPLE_DEVELOPER_CERTIFICATE_P12" ] && echo "  APPLE_DEVELOPER_CERTIFICATE_P12: Present" || echo "  APPLE_DEVELOPER_CERTIFICATE_P12: Missing"
+          [ -n "$APPLE_DEVELOPER_CERTIFICATE_PASSWORD" ] && echo "  APPLE_DEVELOPER_CERTIFICATE_PASSWORD: Present" || echo "  APPLE_DEVELOPER_CERTIFICATE_PASSWORD: Missing"
+          
           # Clean up certificate file
           rm temp-cert.p12
           

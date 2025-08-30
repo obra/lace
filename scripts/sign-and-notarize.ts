@@ -202,6 +202,13 @@ async function signAndNotarize(options: SigningOptions) {
   const resolvedBinaryPath = resolve(binaryPath);
   console.log(`🔐 Signing binary: ${resolvedBinaryPath}`);
 
+  // Debug: Check environment
+  console.log('🔍 Environment check:');
+  console.log(`  GITHUB_ACTIONS_KEYCHAIN_READY: ${process.env.GITHUB_ACTIONS_KEYCHAIN_READY}`);
+  console.log(`  certificateP12 provided: ${!!certificateP12}`);
+  console.log(`  certificatePassword provided: ${!!certificatePassword}`);
+  console.log(`  appleId provided: ${!!appleId}`);
+
   // Check if we're on macOS
   if (process.platform !== 'darwin') {
     console.log('ℹ️  Not on macOS, skipping signing');
