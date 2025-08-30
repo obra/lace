@@ -378,12 +378,21 @@ async function buildCleanExecutable(options: BuildOptions = {}) {
     if (sign) {
       console.log('🔏 Signing and notarizing app bundle...');
       try {
-        execFileSync('bunx', ['tsx', 'scripts/sign-and-notarize.ts', '--binary', appBundlePath], {
-          stdio: 'inherit',
-        });
+        const result = execFileSync(
+          'bunx',
+          ['tsx', 'scripts/sign-and-notarize.ts', '--binary', appBundlePath],
+          {
+            stdio: ['inherit', 'pipe', 'pipe'],
+            encoding: 'utf8',
+          }
+        );
         console.log('✅ App bundle signed and notarized');
-      } catch (error) {
-        console.error('❌ App bundle signing failed:', error);
+        if (result) console.log('Signing output:', result);
+      } catch (error: any) {
+        console.error('❌ App bundle signing failed:');
+        if (error.stdout) console.error('STDOUT:', error.stdout);
+        if (error.stderr) console.error('STDERR:', error.stderr);
+        console.error('Error details:', error.message || error);
         throw error;
       }
     } else {
