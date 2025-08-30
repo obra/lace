@@ -389,7 +389,7 @@ jobs:
 
       - name: Upload to Dropbox - DMG
         if: steps.channel.outputs.deploy == 'true'
-        uses: Lewuathe/dropbox-github-action@0cf2aca # v1.0.3
+        uses: Lewuathe/dropbox-github-action@0cf2acadb42e7fe8d14936b064313cca1db0dd68 # v1.0.3
         with:
           dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
           dropbox-app-secret: ${{ secrets.DROPBOX_APP_SECRET }}
@@ -399,7 +399,7 @@ jobs:
       
       - name: Upload to Dropbox - Appcast
         if: steps.channel.outputs.deploy == 'true'
-        uses: Lewuathe/dropbox-github-action@0cf2aca # v1.0.3
+        uses: Lewuathe/dropbox-github-action@0cf2acadb42e7fe8d14936b064313cca1db0dd68 # v1.0.3
         with:
           dropbox-app-key: ${{ secrets.DROPBOX_APP_KEY }}
           dropbox-app-secret: ${{ secrets.DROPBOX_APP_SECRET }}
