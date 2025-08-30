@@ -408,12 +408,25 @@ jobs:
           echo "📦 Uploading DMG: $DMG_PATH to ${{ steps.channel.outputs.channel }}/"
           DMG_FILENAME=$(basename "$DMG_PATH")
           
-          curl -X POST https://content.dropboxapi.com/2/files/upload \
+          # For app folder access, try relative path first
+          echo "📝 Attempting upload to relative path: ${{ steps.channel.outputs.channel }}/$DMG_FILENAME"
+          
+          UPLOAD_RESPONSE=$(curl -X POST https://content.dropboxapi.com/2/files/upload \
             --header "Authorization: Bearer $ACCESS_TOKEN" \
-            --header "Dropbox-API-Arg: {\"path\": \"/${{ steps.channel.outputs.channel }}/$DMG_FILENAME\", \"mode\": \"overwrite\"}" \
+            --header "Dropbox-API-Arg: {\"path\": \"${{ steps.channel.outputs.channel }}/$DMG_FILENAME\", \"mode\": \"overwrite\"}" \
             --header "Content-Type: application/octet-stream" \
             --data-binary @"$DMG_PATH" \
-            --fail --show-error --verbose
+            --write-out "HTTP_CODE:%{http_code}\n" \
+            --silent --show-error)
+          
+          HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | grep "HTTP_CODE:" | cut -d: -f2)
+          RESPONSE_BODY=$(echo "$UPLOAD_RESPONSE" | sed '/HTTP_CODE:/d')
+          
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Upload failed with HTTP $HTTP_CODE"
+            echo "Response: $RESPONSE_BODY"
+            exit 1
+          fi
           
           echo "✅ DMG uploaded successfully"
           
@@ -421,12 +434,22 @@ jobs:
           echo "📡 Uploading appcast..."
           APPCAST_PATH="build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml"
           
-          curl -X POST https://content.dropboxapi.com/2/files/upload \
+          APPCAST_RESPONSE=$(curl -X POST https://content.dropboxapi.com/2/files/upload \
             --header "Authorization: Bearer $ACCESS_TOKEN" \
-            --header "Dropbox-API-Arg: {\"path\": \"/${{ steps.channel.outputs.channel }}/appcast.xml\", \"mode\": \"overwrite\"}" \
+            --header "Dropbox-API-Arg: {\"path\": \"${{ steps.channel.outputs.channel }}/appcast.xml\", \"mode\": \"overwrite\"}" \
             --header "Content-Type: application/xml" \
             --data-binary @"$APPCAST_PATH" \
-            --fail --show-error --verbose
+            --write-out "HTTP_CODE:%{http_code}\n" \
+            --silent --show-error)
+          
+          APPCAST_HTTP_CODE=$(echo "$APPCAST_RESPONSE" | grep "HTTP_CODE:" | cut -d: -f2)
+          APPCAST_BODY=$(echo "$APPCAST_RESPONSE" | sed '/HTTP_CODE:/d')
+          
+          if [ "$APPCAST_HTTP_CODE" != "200" ]; then
+            echo "❌ Appcast upload failed with HTTP $APPCAST_HTTP_CODE"
+            echo "Response: $APPCAST_BODY"
+            exit 1
+          fi
           
           echo "✅ Appcast uploaded successfully"
           echo "🚀 Deployment to Dropbox complete!"
