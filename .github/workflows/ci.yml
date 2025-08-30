@@ -309,6 +309,10 @@ jobs:
           # Set partition list for codesign access
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
           
+          # Verify certificate was imported
+          echo "🔍 Verifying certificate import..."
+          security find-identity -v -p codesigning "$KEYCHAIN_NAME"
+          
           # Clean up certificate file
           rm temp-cert.p12
           
