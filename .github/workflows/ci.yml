@@ -398,16 +398,7 @@ jobs:
           source-path: ${{ env.DMG_PATH }}
           target-path: ${{ steps.channel.outputs.channel }}/
           
-      - name: Verify DMG upload success
-        if: steps.channel.outputs.deploy == 'true'
-        run: |
-          echo "🔍 Verifying DMG upload..."
-          if [ $? -eq 0 ]; then
-            echo "✅ DMG upload verified successful"
-          else
-            echo "❌ DMG upload failed"
-            exit 1
-          fi
+      # DMG upload failed with 'OAuth 2 access token is malformed' - need fresh token
       
       - name: Check appcast generation
         if: steps.channel.outputs.deploy == 'true'
@@ -423,10 +414,13 @@ jobs:
             echo "First few lines:"
             head -5 "$APPCAST_PATH"
           else
-            echo "❌ Appcast not found!"
-            echo "Contents of build/:"
-            find build/ -type f -name "*.xml" || echo "No XML files found"
-            ls -la build/appcast/ 2>/dev/null || echo "No appcast directory"
+            echo "❌ Appcast not found at expected path!"
+            echo "Searching for XML files in build/:"
+            find build/ -name "*.xml" -type f
+            echo "Directory structure:"
+            ls -la build/appcast/
+            echo "Checking if appcast is in nightly dir:"
+            ls -la build/appcast/nightly/ 2>/dev/null || echo "Nightly dir doesn't exist"
           fi
       
       - name: Upload appcast to Dropbox
