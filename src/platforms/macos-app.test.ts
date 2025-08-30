@@ -53,10 +53,20 @@ describe('macOS App Integration Tests', () => {
 
     it('should compile Swift source without syntax errors', () => {
       expect(() => {
-        execSync(`swiftc -typecheck main.swift -target arm64-apple-macos10.15`, {
+        // Ensure Sparkle framework is available for typecheck
+        execSync('make setup-sparkle', {
           cwd: MACOS_PLATFORM_DIR,
           stdio: 'pipe',
         });
+
+        // Typecheck with Sparkle framework paths
+        execSync(
+          `swiftc -typecheck main.swift -target arm64-apple-macos10.15 -F Sparkle.xcframework/macos-arm64_x86_64 -framework Sparkle`,
+          {
+            cwd: MACOS_PLATFORM_DIR,
+            stdio: 'pipe',
+          }
+        );
       }, 'Swift compilation should succeed').not.toThrow();
     });
 
