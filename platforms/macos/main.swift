@@ -449,12 +449,12 @@ enum UpdateChannel: String, CaseIterable {
     }
     
     var feedURL: String {
-        // App folder URLs (scoped access) - cleaner paths
+        // fsck.com hosting - reliable and controlled
         switch self {
         case .release:
-            return "https://dl.dropboxusercontent.com/s/[TOKEN]/release/appcast.xml"
+            return "https://fsck.com/lace/dist/release/appcast.xml"
         case .nightly:
-            return "https://dl.dropboxusercontent.com/s/[TOKEN]/nightly/appcast.xml"
+            return "https://fsck.com/lace/dist/nightly/appcast.xml"
         }
     }
 }
