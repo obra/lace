@@ -439,34 +439,28 @@ jobs:
           CHANNEL="${{ steps.channel.outputs.channel }}"
           DMG_FILENAME=$(basename "$DMG_PATH")
           
-          # Upload DMG with verbose scp debugging
-          echo "📦 Uploading DMG: $DMG_FILENAME"
-          echo "📝 Target: jesse@fsck.com:/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/$DMG_FILENAME"
+          # Create staging directory
+          mkdir -p staging/$CHANNEL
           
-          scp -v -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
-            "$DMG_PATH" jesse@fsck.com:"/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/$DMG_FILENAME" || {
-            echo "❌ SCP upload failed, debugging..."
-            echo "Trying to create directory first:"
-            ssh -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no \
-              jesse@fsck.com "mkdir -p /opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL" || echo "Directory creation failed"
-            echo "Retrying upload:"
-            scp -vvv -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no \
-              "$DMG_PATH" jesse@fsck.com:"/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/$DMG_FILENAME"
-          }
+          # Copy DMG to staging
+          cp "$DMG_PATH" "staging/$CHANNEL/$DMG_FILENAME"
+          echo "✅ DMG staged: $DMG_FILENAME"
+          
+          # Upload with minimal rsync
+          echo "📦 Uploading with rsync -t..."
+          rsync -t -e "ssh -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no" \
+            staging/$CHANNEL/* jesse@fsck.com:/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/
           
           echo "✅ DMG uploaded to https://fsck.com/lace/dist/$CHANNEL/$DMG_FILENAME"
           
           # Upload appcast if it exists
-          # Find and upload appcast (handle wrong filename)
+          # Find and stage appcast
           APPCAST_DIR="build/appcast/$CHANNEL"
           APPCAST_FILE=$(find "$APPCAST_DIR" -name "*.xml" -o -name "*PLACEHOLDER*" | head -n1)
           
           if [ -n "$APPCAST_FILE" ] && [ -f "$APPCAST_FILE" ]; then
-            echo "📡 Found appcast: $(basename "$APPCAST_FILE")"
-            echo "Uploading as appcast.xml..."
-            scp -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no \
-              "$APPCAST_FILE" jesse@fsck.com:"/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/appcast.xml"
-            echo "✅ Appcast uploaded to https://fsck.com/lace/dist/$CHANNEL/appcast.xml"
+            cp "$APPCAST_FILE" "staging/$CHANNEL/appcast.xml"
+            echo "✅ Appcast staged: $(basename "$APPCAST_FILE") -> appcast.xml"
           else
             echo "⚠️  No appcast file found in $APPCAST_DIR"
           fi
