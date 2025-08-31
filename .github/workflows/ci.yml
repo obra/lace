@@ -430,10 +430,20 @@ jobs:
           cp "$DMG_PATH" "staging/$CHANNEL/$DMG_FILENAME"
           echo "✅ DMG staged: $DMG_FILENAME"
           
-          # Upload with rsync (works with wrapper script)
+          # Debug what's actually in staging
+          echo "🔍 Staging directory contents:"
+          ls -la staging/$CHANNEL/
+          
+          # Upload with verbose rsync to see what's happening
           echo "📦 Uploading to fsck.com via restricted rsync..."
-          rsync -av -e "ssh -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no" \
-            staging/$CHANNEL/ jesse@fsck.com:/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/
+          echo "📝 Command: rsync -av staging/$CHANNEL/ -> jesse@fsck.com:/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/"
+          
+          rsync -av --progress -e "ssh -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no" \
+            staging/$CHANNEL/ jesse@fsck.com:/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/ || {
+            echo "❌ rsync failed!"
+            echo "Exit code: $?"
+            exit 1
+          }
           
           echo "✅ Files uploaded successfully"
           
