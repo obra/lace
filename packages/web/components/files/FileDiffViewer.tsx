@@ -245,14 +245,14 @@ export default function FileDiffViewer({
               <div key={index} className={`${bgClass} hover:bg-base-200`}>
                 {renderLineNumbers(line)}
                 {renderDiffIndicator(line)}
-                <div className="flex-1 px-2 py-1 min-w-0">
+                <div className="flex-1 px-2 py-1">
                   {hasHighlighting ? (
                     <code
-                      className="whitespace-pre hljs"
+                      className="whitespace-nowrap hljs block"
                       dangerouslySetInnerHTML={{ __html: highlightedContent }}
                     />
                   ) : (
-                    <code className={`whitespace-pre ${getLanguageClass(diff.language)}`}>
+                    <code className={`whitespace-nowrap block ${getLanguageClass(diff.language)}`}>
                       {line.content}
                     </code>
                   )}
@@ -329,14 +329,16 @@ export default function FileDiffViewer({
                       {line.oldLineNumber || ''}
                     </span>
                   )}
-                  <div className="flex-1 px-2 py-1 min-w-0">
+                  <div className="flex-1 px-2 py-1">
                     {hasHighlighting ? (
                       <code
-                        className="whitespace-pre hljs"
+                        className="whitespace-nowrap hljs block"
                         dangerouslySetInnerHTML={{ __html: highlightedContent }}
                       />
                     ) : (
-                      <code className={`whitespace-pre ${getLanguageClass(diff.language)}`}>
+                      <code
+                        className={`whitespace-nowrap block ${getLanguageClass(diff.language)}`}
+                      >
                         {line.content}
                       </code>
                     )}
@@ -383,14 +385,16 @@ export default function FileDiffViewer({
                       {line.newLineNumber || ''}
                     </span>
                   )}
-                  <div className="flex-1 px-2 py-1 min-w-0">
+                  <div className="flex-1 px-2 py-1">
                     {hasHighlighting ? (
                       <code
-                        className="whitespace-pre hljs"
+                        className="whitespace-nowrap hljs block"
                         dangerouslySetInnerHTML={{ __html: highlightedContent }}
                       />
                     ) : (
-                      <code className={`whitespace-pre ${getLanguageClass(diff.language)}`}>
+                      <code
+                        className={`whitespace-nowrap block ${getLanguageClass(diff.language)}`}
+                      >
                         {line.content}
                       </code>
                     )}
