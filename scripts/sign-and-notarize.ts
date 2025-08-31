@@ -85,9 +85,36 @@ async function performSigningOnly(
 
   console.log('✅ Binary signed successfully!');
 
-  // Note: Skipping notarization in GitHub Actions for now as it's complex
+  // Notarization for distribution
   if (!skipNotarization && appleId && applePassword && teamId) {
-    console.log('⚠️  Notarization available but skipping for now in GitHub Actions');
+    console.log('📤 Starting notarization for distribution...');
+
+    // Create ZIP for notarization
+    const zipName = `${resolvedBinaryPath.split('/').pop()}-signed.zip`;
+    execSync(`zip -r "${zipName}" "${resolvedBinaryPath}"`);
+
+    try {
+      // Submit for notarization
+      console.log('📤 Submitting for notarization (may take several minutes)...');
+      execSync(
+        `xcrun notarytool submit "${zipName}" --apple-id "${appleId}" --password "${applePassword}" --team-id "${teamId}" --wait --timeout 10m`,
+        { stdio: 'inherit' }
+      );
+
+      // Staple the ticket
+      console.log('📎 Stapling notarization ticket...');
+      execSync(`xcrun stapler staple "${resolvedBinaryPath}"`, { stdio: 'inherit' });
+
+      console.log('✅ Binary successfully signed and notarized!');
+    } catch (error) {
+      console.error('❌ Notarization failed:', error);
+      console.log('⚠️  Continuing with signed-only binary');
+    } finally {
+      // Clean up
+      if (existsSync(zipName)) {
+        unlinkSync(zipName);
+      }
+    }
   }
 }
 
