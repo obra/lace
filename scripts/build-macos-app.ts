@@ -77,34 +77,7 @@ async function createAppBundle(executablePath: string, outdir: string): Promise<
   const macosPath = join(finalAppBundlePath, 'Contents/MacOS');
   execSync(`cp "${executablePath}" "${join(macosPath, 'lace-server')}"`);
 
-  // Copy Frameworks directory from the Swift build (critical for Sparkle)
-  const frameworksSourcePath = 'platforms/macos/build/Lace.app/Contents/Frameworks';
-  const frameworksDestPath = join(contentsPath, 'Frameworks');
-
-  if (existsSync(frameworksSourcePath)) {
-    console.log(`   ⚡ Copying Sparkle framework from ${frameworksSourcePath}...`);
-    mkdirSync(frameworksDestPath, { recursive: true });
-    execSync(`ditto "${frameworksSourcePath}" "${frameworksDestPath}"`);
-
-    // Verify the framework was copied
-    const sparkleFramework = join(frameworksDestPath, 'Sparkle.framework');
-    if (existsSync(sparkleFramework)) {
-      console.log(`   ✅ Sparkle framework copied successfully`);
-    } else {
-      console.error(`   ❌ Sparkle framework copy failed!`);
-    }
-  } else {
-    console.error(
-      `   ❌ No Frameworks directory at ${frameworksSourcePath} - Sparkle not embedded!`
-    );
-    console.log(`   🔍 Swift build contents:`);
-    execSync(
-      `find platforms/macos/build/Lace.app -type d -name "*ramework*" || echo "No framework directories found"`
-    );
-  }
-
-  // Copy the lace server as 'lace-server'
-  execSync(`cp "${executablePath}" "${join(macosPath, 'lace-server')}"`);
+  // Frameworks already copied via complete bundle copy above
 
   // Update Info.plist with real feed URL
   const channel = process.env.BUILD_CHANNEL || 'nightly';
