@@ -385,6 +385,7 @@ jobs:
         env:
           # Signal to sign-and-notarize.ts that keychain is already set up
           GITHUB_ACTIONS_KEYCHAIN_READY: 'true'
+          BUILD_CHANNEL: ${{ steps.channel.outputs.channel }}
           APPLE_ID_EMAIL: ${{ secrets.APPLE_ID_EMAIL }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

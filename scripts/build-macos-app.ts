@@ -2,7 +2,7 @@
 // ABOUTME: Uses --loader flags to embed JSON/MD files as assets with no temp extraction
 
 import { execSync, execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createDMG, getVersionInfo, updateAppVersion } from './create-dmg.js';
 import { writeFileSync, unlinkSync, readFileSync, chmodSync } from 'node:fs';
@@ -74,8 +74,15 @@ async function createAppBundle(executablePath: string, outdir: string): Promise<
   // Copy the lace server as 'lace-server'
   execSync(`cp "${executablePath}" "${join(macosPath, 'lace-server')}"`);
 
-  // Copy Info.plist
-  execSync(`cp platforms/macos/Info.plist "${contentsPath}/"`);
+  // Copy and update Info.plist with actual feed URL
+  const channel = process.env.BUILD_CHANNEL || 'nightly';
+  const feedUrl = `https://fsck.com/lace/dist/${channel}/appcast.xml`;
+
+  let infoPlistContent = readFileSync('platforms/macos/Info.plist', 'utf8');
+  infoPlistContent = infoPlistContent.replace('SPARKLE_FEED_URL_PLACEHOLDER', feedUrl);
+  writeFileSync(`${contentsPath}/Info.plist`, infoPlistContent);
+
+  console.log(`   📡 Feed URL set to: ${feedUrl}`);
 
   // Copy app icon
   if (existsSync('platforms/macos/AppIcon.icns')) {
