@@ -218,15 +218,36 @@ jobs:
           # Sign app bundle (inside-out approach)
           echo "✍️  Signing app bundle with: $SIGNING_IDENTITY"
           
-          # Sign Sparkle framework components
+          # Sign Sparkle framework components thoroughly
           if [ -d "build/Lace.app/Contents/Frameworks/Sparkle.framework" ]; then
+            echo "   ⚡ Signing Sparkle framework components..."
+            
+            # Sign XPC Services first
+            if [ -d "build/Lace.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices" ]; then
+              echo "   🔧 Signing Sparkle XPC services..."
+              find "build/Lace.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices" -name "*.xpc" -exec codesign --force --options runtime --sign "$SIGNING_IDENTITY" {} \;
+            fi
+            
+            # Sign Updater.app
+            if [ -d "build/Lace.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Updater.app" ]; then
+              echo "   🔄 Signing Sparkle Updater.app..."
+              codesign --force --options runtime --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Updater.app"
+            fi
+            
+            # Sign main framework
             echo "   ⚡ Signing Sparkle framework..."
             codesign --force --options runtime --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/Frameworks/Sparkle.framework"
           fi
           
-          # Sign inner binaries
-          codesign --force --options runtime --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/MacOS/lace-server"
-          codesign --force --options runtime --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/MacOS/Lace"
+          # Sign inner binaries with entitlements
+          echo "   🔧 Signing inner binaries..."
+          if [ -f "scripts/entitlements.plist" ]; then
+            codesign --force --options runtime --entitlements scripts/entitlements.plist --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/MacOS/lace-server"
+            codesign --force --options runtime --entitlements scripts/entitlements.plist --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/MacOS/Lace"
+          else
+            codesign --force --options runtime --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/MacOS/lace-server"
+            codesign --force --options runtime --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/MacOS/Lace"
+          fi
           
           # Sign main app bundle
           codesign --force --options runtime --sign "$SIGNING_IDENTITY" "build/Lace.app"
@@ -257,13 +278,31 @@ jobs:
           
           # Submit directly without storing credentials (avoids keychain UI prompts)
           echo "📤 Submitting for notarization (this will be VERY verbose)..."
-          xcrun notarytool submit "$DMG_FILE" \
+          SUBMISSION_OUTPUT=$(xcrun notarytool submit "$DMG_FILE" \
             --apple-id "$APPLE_ID_EMAIL" \
             --password "$APPLE_ID_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait --timeout 30m \
             --verbose \
-            --progress
+            --progress 2>&1)
+          
+          SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep "id:" | head -1 | awk '{print $2}')
+          echo "📝 Submission ID: $SUBMISSION_ID"
+          
+          # If notarization failed, get detailed logs from Apple
+          if echo "$SUBMISSION_OUTPUT" | grep -q "status: Invalid"; then
+            echo "❌ Notarization failed - getting detailed logs from Apple..."
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --apple-id "$APPLE_ID_EMAIL" \
+              --password "$APPLE_ID_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID"
+            exit 1
+          elif echo "$SUBMISSION_OUTPUT" | grep -q "status: Accepted"; then
+            echo "✅ Notarization succeeded!"
+          else
+            echo "⚠️  Unknown notarization status"
+            echo "$SUBMISSION_OUTPUT"
+          fi
           
           # Staple notarization
           echo "📎 Stapling notarization..."
