@@ -194,9 +194,9 @@ export default function FileDiffViewer({
     const indicator = line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' ';
     const colorClass =
       line.type === 'added'
-        ? 'text-green-600'
+        ? 'text-success'
         : line.type === 'removed'
-          ? 'text-red-600'
+          ? 'text-error'
           : 'text-base-content/40';
 
     return <span className={`w-4 text-center select-none ${colorClass}`}>{indicator}</span>;
@@ -317,7 +317,7 @@ export default function FileDiffViewer({
               }
 
               const bgClass =
-                line.type === 'removed' ? 'bg-red-50' : line.isHighlighted ? 'bg-yellow-50' : '';
+                line.type === 'removed' ? 'bg-error/10' : line.isHighlighted ? 'bg-warning/10' : '';
 
               const highlightedContent = getHighlightedContent(line);
               const hasHighlighting = highlightedContent !== line.content;
@@ -371,7 +371,7 @@ export default function FileDiffViewer({
               }
 
               const bgClass =
-                line.type === 'added' ? 'bg-green-50' : line.isHighlighted ? 'bg-yellow-50' : '';
+                line.type === 'added' ? 'bg-success/10' : line.isHighlighted ? 'bg-warning/10' : '';
 
               const highlightedContent = getHighlightedContent(line);
               const hasHighlighting = highlightedContent !== line.content;
@@ -505,11 +505,11 @@ export default function FileDiffViewer({
         {/* Stats */}
         <div className="flex items-center gap-4 mt-2 text-xs text-base-content/60">
           <span className="flex items-center gap-1">
-            <span className="text-green-600">+{stats.added}</span>
+            <span className="text-success">+{stats.added}</span>
             <span>additions</span>
           </span>
           <span className="flex items-center gap-1">
-            <span className="text-red-600">-{stats.removed}</span>
+            <span className="text-error">-{stats.removed}</span>
             <span>deletions</span>
           </span>
           {stats.unchanged > 0 && <span>{stats.unchanged} unchanged</span>}

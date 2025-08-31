@@ -215,28 +215,15 @@ select {
 }
 
 .diff-line.added {
-  @apply bg-green-50 border-l-2 border-green-500;
+  @apply bg-success/10 border-l-2 border-success;
 }
 
 .diff-line.removed {
-  @apply bg-red-50 border-l-2 border-red-500;
+  @apply bg-error/10 border-l-2 border-error;
 }
 
 .diff-line.highlighted {
-  @apply bg-yellow-50;
-}
-
-/* Dark mode adjustments */
-[data-theme='dark'] .diff-line.added {
-  @apply bg-green-100 border-green-400;
-}
-
-[data-theme='dark'] .diff-line.removed {
-  @apply bg-red-100 border-red-400;
-}
-
-[data-theme='dark'] .diff-line.highlighted {
-  @apply bg-yellow-100;
+  @apply bg-warning/10;
 }
 
 /* Syntax highlighting using DaisyUI theme colors */
