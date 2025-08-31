@@ -255,17 +255,12 @@ jobs:
           [ -z "$APPLE_TEAM_ID" ] && echo "❌ Team ID is empty!" || echo "✅ Team ID present"  
           [ -z "$APPLE_ID_PASSWORD" ] && echo "❌ Password is empty!" || echo "✅ Password present"
           
-          # Store credentials to avoid repeated auth
-          echo "🔐 Setting up notarytool credentials..."
-          xcrun notarytool store-credentials "lace-profile" \
+          # Submit directly without storing credentials (avoids keychain UI prompts)
+          echo "📤 Submitting for notarization (this will be VERY verbose)..."
+          xcrun notarytool submit "$DMG_FILE" \
             --apple-id "$APPLE_ID_EMAIL" \
             --password "$APPLE_ID_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --validate
-          
-          echo "📤 Submitting for notarization (this will be VERY verbose)..."
-          xcrun notarytool submit "$DMG_FILE" \
-            --keychain-profile "lace-profile" \
             --wait --timeout 30m \
             --verbose \
             --progress
