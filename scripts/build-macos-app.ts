@@ -99,11 +99,11 @@ async function createAppBundle(executablePath: string, outdir: string): Promise<
   console.log('🔍 Final verification before shipping...');
 
   // 1. Verify Sparkle framework exists and is signed
-  const sparkleFramework = join(
+  const sparkleFrameworkBinary = join(
     finalAppBundlePath,
     'Contents/Frameworks/Sparkle.framework/Sparkle'
   );
-  if (!existsSync(sparkleFramework)) {
+  if (!existsSync(sparkleFrameworkBinary)) {
     throw new Error('CRITICAL: Sparkle framework missing from final bundle - cannot ship!');
   }
 

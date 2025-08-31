@@ -31,203 +31,10 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-  build:
-    name: Build Project
+  ci-and-deploy:
+    name: CI and Deploy
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
     runs-on: [self-hosted, macOS]
-    outputs:
-      build-cache-key: ${{ steps.cache-key.outputs.key }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Generate cache key
-        id: cache-key
-        run: |
-          CACHE_KEY="build-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/bun.lockb') }}-${{ github.sha }}"
-          echo "key=$CACHE_KEY" >> $GITHUB_OUTPUT
-          echo "Cache key: $CACHE_KEY"
-
-      - name: Cache build artifacts
-        uses: actions/cache@v4
-        with:
-          path: |
-            dist/
-            packages/web/build/
-            node_modules/
-            packages/*/node_modules/
-          key: ${{ steps.cache-key.outputs.key }}
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build project
-        run: npm run build
-
-      - name: Run linting
-        run: npm run lint
-
-      - name: Check Prettier formatting (core)
-        run: npx prettier --check "packages/core/src/*.ts"
-      
-      - name: Check Prettier formatting (web)
-        run: npx prettier --check "packages/web/**/*.ts" "packages/web/**/*.tsx"
-
-  test:
-    name: Test Suite with Coverage
-    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
-    needs: [build]
-    runs-on: [self-hosted, macOS]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Generate cache key
-        id: cache-key
-        run: |
-          CACHE_KEY="build-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/bun.lockb') }}-${{ github.sha }}"
-          echo "key=$CACHE_KEY" >> $GITHUB_OUTPUT
-          echo "Cache key: $CACHE_KEY"
-
-      - name: Restore build cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            dist/
-            packages/web/build/
-            node_modules/
-            packages/*/node_modules/
-          key: ${{ steps.cache-key.outputs.key }}
-          fail-on-cache-miss: true
-
-      - name: Install system dependencies
-        run: |
-          # Ensure Homebrew exists and avoid slow auto-update/cleanup
-          if ! command -v brew >/dev/null 2>&1; then
-            echo "Homebrew not found; please pre-provision brew on the runner." >&2
-            exit 1
-          fi
-          export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
-          brew install -q ripgrep
-
-      - name: Run tests with coverage
-        run: |
-          npm run test:coverage
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage/lcov.info,./packages/web/coverage/lcov.info
-          fail_ci_if_error: false
-
-
-
-  # Temporarily disabled due to reliability issues
-  # playwright-tests:
-  #   name: Playwright E2E Tests
-  #   if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
-  #   needs: [test-macos-app]
-  #   runs-on: [self-hosted, macOS]
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
-  #
-  #     - name: Setup Node.js
-  #       uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
-  #       with:
-  #         node-version: ${{ env.NODE_VERSION }}
-  #
-  #     - name: Install dependencies
-  #       run: npm ci
-  #
-  #     - name: Install Playwright browsers
-  #       run: cd packages/web && npx playwright install --with-deps chromium webkit
-  #
-  #     - name: Build web package
-  #       run: cd packages/web && npm run build
-  #
-  #     - name: Run allow-listed Playwright tests
-  #       run: cd packages/web && npm run test:playwright:ci
-  #       env:
-  #         CI: true
-
-  test-macos-app:
-    name: Test macOS App
-    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
-    needs: [build]
-    runs-on: [self-hosted, macOS]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Generate cache key
-        id: cache-key
-        run: |
-          CACHE_KEY="build-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/bun.lockb') }}-${{ github.sha }}"
-          echo "key=$CACHE_KEY" >> $GITHUB_OUTPUT
-          echo "Cache key: $CACHE_KEY"
-
-      - name: Restore build cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            dist/
-            packages/web/build/
-            node_modules/
-            packages/*/node_modules/
-          key: ${{ steps.cache-key.outputs.key }}
-          fail-on-cache-miss: true
-
-      - name: Run macOS app Swift tests
-        run: |
-          cd platforms/macos
-          make test-swift
-        continue-on-error: false
-
-      - name: Run macOS app integration tests
-        run: |
-          # Run the TypeScript integration tests
-          npx vitest run src/platforms/macos-app.test.ts
-        continue-on-error: false
-
-      - name: Test app build via Makefile
-        run: |
-          cd platforms/macos
-          make clean
-          make build
-          ls -la build/Lace.app/Contents/MacOS/
-          echo "✅ macOS app builds successfully"
-
-      # Skip uploading test artifacts to save storage quota
-      # - name: Upload test artifacts
-      #   if: always()
-      #   uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
-      #   with:
-      #     name: macos-app-test-results
-      #     path: |
-      #       platforms/macos/build/
-      #     retention-days: 3
-
-  build-and-package:
-    name: Package and Deploy
-    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor == 'obra' }}
-    runs-on: [self-hosted, macOS]
-    needs: [test, test-macos-app]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -242,31 +49,59 @@ jobs:
         with:
           bun-version: 1.2.21
 
-      - name: Generate cache key
-        id: cache-key
-        run: |
-          CACHE_KEY="build-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/bun.lockb') }}-${{ github.sha }}"
-          echo "key=$CACHE_KEY" >> $GITHUB_OUTPUT
-          echo "Cache key: $CACHE_KEY"
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Restore build cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            dist/
-            packages/web/build/
-            node_modules/
-            packages/*/node_modules/
-          key: ${{ steps.cache-key.outputs.key }}
-          fail-on-cache-miss: true
-
-      - name: Install dependencies (if needed)
+      - name: Install system dependencies
         run: |
-          # Dependencies should be cached, but install if missing
-          if [ ! -d "node_modules" ]; then
-            bun install
+          # Ensure Homebrew exists and avoid slow auto-update/cleanup
+          if ! command -v brew >/dev/null 2>&1; then
+            echo "Homebrew not found; please pre-provision brew on the runner." >&2
+            exit 1
           fi
+          export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
+          brew install -q ripgrep
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Check Prettier formatting (core)
+        run: npx prettier --check "packages/core/src/*.ts"
       
+      - name: Check Prettier formatting (web)
+        run: npx prettier --check "packages/web/**/*.ts" "packages/web/**/*.tsx"
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info,./packages/web/coverage/lcov.info
+          fail_ci_if_error: false
+
+      - name: Run macOS app Swift tests
+        run: |
+          cd platforms/macos
+          make test-swift
+        continue-on-error: false
+
+      - name: Run macOS app integration tests
+        run: |
+          npx vitest run src/platforms/macos-app.test.ts
+        continue-on-error: false
+
+      - name: Test app build via Makefile
+        run: |
+          cd platforms/macos
+          make clean
+          make build
+          ls -la build/Lace.app/Contents/MacOS/
+          echo "✅ macOS app builds successfully"
+
       - name: Setup EdDSA key for Sparkle appcast signing
         run: |
           cd platforms/macos
@@ -290,7 +125,7 @@ jobs:
       - name: Setup Apple Code Signing
         run: |
           # Save original default keychain
-          ORIGINAL_KEYCHAIN=$(security default-keychain | tr -d '"')
+          ORIGINAL_KEYCHAIN=$(security default-keychain 2>/dev/null | tr -d '"' || echo "no-default")
           echo "ORIGINAL_KEYCHAIN=$ORIGINAL_KEYCHAIN" >> $GITHUB_ENV
           
           # Create temporary keychain for signing
@@ -321,17 +156,17 @@ jobs:
           echo "🔍 Checking codesigning access..."
           security find-identity -v -p codesigning
           
-          # Debug: Check if secrets are available (without exposing values)
-          echo "🔍 Checking secret availability..."
-          [ -n "$APPLE_DEVELOPER_CERTIFICATE_P12" ] && echo "  APPLE_DEVELOPER_CERTIFICATE_P12: Present" || echo "  APPLE_DEVELOPER_CERTIFICATE_P12: Missing"
-          [ -n "$APPLE_DEVELOPER_CERTIFICATE_PASSWORD" ] && echo "  APPLE_DEVELOPER_CERTIFICATE_PASSWORD: Present" || echo "  APPLE_DEVELOPER_CERTIFICATE_PASSWORD: Missing"
-          
           # Clean up certificate file
           rm temp-cert.p12
           
           # Export for use in build step
           echo "KEYCHAIN_NAME=$KEYCHAIN_NAME" >> $GITHUB_ENV
           echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> $GITHUB_ENV
+          
+          # Debug: Check if secrets are available (without exposing values)
+          echo "🔍 Checking secret availability..."
+          [ -n "$APPLE_DEVELOPER_CERTIFICATE_P12" ] && echo "  APPLE_DEVELOPER_CERTIFICATE_P12: Present" || echo "  APPLE_DEVELOPER_CERTIFICATE_P12: Missing"
+          [ -n "$APPLE_DEVELOPER_CERTIFICATE_PASSWORD" ] && echo "  APPLE_DEVELOPER_CERTIFICATE_PASSWORD: Present" || echo "  APPLE_DEVELOPER_CERTIFICATE_PASSWORD: Missing"
         env:
           APPLE_DEVELOPER_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
           APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
@@ -390,47 +225,36 @@ jobs:
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      # Signing temporarily disabled - build unsigned bundles for now
-      # TODO: Set up proper Developer ID Application certificate for distribution
+      - name: Build macOS app (unsigned) for testing
+        if: steps.signing_check.outputs.available == 'false'
+        run: |
+          bun scripts/build-macos-app.ts \
+            --bundle \
+            --channel ${{ steps.channel.outputs.channel }}
 
-      - name: Create DMG for Dropbox upload
+      - name: Deploy to fsck.com
         if: steps.channel.outputs.deploy == 'true'
         run: |
-          DMG_PATH=$(ls -1 build/Lace-*.dmg | head -n1)
-          echo "DMG_PATH=$DMG_PATH" >> $GITHUB_ENV
-          echo "📦 Will upload: $DMG_PATH"
-          
-      - name: Setup SSH for fsck.com deployment
-        if: steps.channel.outputs.deploy == 'true'
-        run: |
-          echo "🔐 Setting up SSH key for fsck.com deployment..."
+          echo "🚀 Deploying to fsck.com..."
           
           # Setup SSH key
           mkdir -p ~/.ssh
           echo "${{ secrets.FSCK_SSH_PRIVATE_KEY }}" > ~/.ssh/fsck_deploy_key
           chmod 600 ~/.ssh/fsck_deploy_key
-          
-          # Add fsck.com to known hosts
           ssh-keyscan fsck.com >> ~/.ssh/known_hosts
           
-          echo "✅ SSH key configured for fsck.com"
-      
-      - name: Upload to fsck.com via minimal rsync
-        if: steps.channel.outputs.deploy == 'true'
-        run: |
-          echo "🚀 Deploying to fsck.com with minimal rsync..."
-          
           CHANNEL="${{ steps.channel.outputs.channel }}"
+          DMG_PATH=$(ls -1 build/Lace-*.dmg | head -n1)
           DMG_FILENAME=$(basename "$DMG_PATH")
           
           # Create staging directory
           mkdir -p staging/$CHANNEL
           
-          # Copy DMG to staging
+          # Stage DMG
           cp "$DMG_PATH" "staging/$CHANNEL/$DMG_FILENAME"
           echo "✅ DMG staged: $DMG_FILENAME"
           
-          # Stage appcast BEFORE upload
+          # Stage appcast
           APPCAST_FILE=$(find "build/appcast/$CHANNEL" -name "*.xml" | head -n1)
           if [ -n "$APPCAST_FILE" ] && [ -f "$APPCAST_FILE" ]; then
             cp "$APPCAST_FILE" "staging/$CHANNEL/appcast.xml"
@@ -440,37 +264,23 @@ jobs:
           fi
           
           # Final staging verification
-          echo "🔍 Staging contents before upload:"
+          echo "📁 Staging contents:"
           ls -la staging/$CHANNEL/
           
-          # Upload with verbose rsync to see what's happening
-          echo "📦 Uploading to fsck.com via restricted rsync..."
-          echo "📝 Command: rsync -av staging/$CHANNEL/ -> jesse@fsck.com:/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/"
+          # Upload everything
+          echo "📦 Uploading to fsck.com..."
+          rsync -av -e "ssh -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no" \
+            staging/$CHANNEL/ jesse@fsck.com:/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/
           
-          rsync -av --progress -e "ssh -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no" \
-            staging/$CHANNEL/ jesse@fsck.com:/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/ || {
-            echo "❌ rsync failed!"
-            echo "Exit code: $?"
-            exit 1
-          }
-          
-          echo "✅ Files uploaded successfully"
-          
-          echo "✅ All files uploaded to fsck.com"
-          
-          echo "🚀 Deployment to fsck.com complete!"
+          echo "🚀 Deployment complete!"
           echo "🔗 DMG: https://fsck.com/lace/dist/$CHANNEL/$DMG_FILENAME"
           echo "📡 Appcast: https://fsck.com/lace/dist/$CHANNEL/appcast.xml"
-      
-      # Appcast verification and upload handled in deployment step
-
-      # All artifacts go to Dropbox only - no GitHub storage needed
 
       - name: Cleanup Keychain
         if: always()
         run: |
           # Restore original default keychain if we saved one
-          if [ -n "$ORIGINAL_KEYCHAIN" ]; then
+          if [ -n "$ORIGINAL_KEYCHAIN" ] && [ "$ORIGINAL_KEYCHAIN" != "no-default" ]; then
             security default-keychain -s "$ORIGINAL_KEYCHAIN" || true
             echo "✅ Restored original default keychain: $ORIGINAL_KEYCHAIN"
           fi
@@ -481,17 +291,12 @@ jobs:
             echo "🧹 Cleaned up temporary keychain"
           fi
 
-      - name: Notify build completion
+      - name: Notify completion
         run: |
-          echo "🎉 Build complete!"
+          echo "🎉 CI complete!"
           echo "📦 Channel: ${{ steps.channel.outputs.channel }}"
-          if [ -d "build/Lace.app" ]; then
-            echo "📱 App Bundle: build/Lace.app"
-            echo "📡 Appcast: build/appcast/${{ steps.channel.outputs.channel }}/appcast.xml"
-          fi
           if [ "${{ steps.channel.outputs.deploy }}" = "true" ]; then
-            echo "🚀 Deployed to Dropbox!"
+            echo "🚀 Deployed to fsck.com!"
           else
             echo "🧪 PR build (no deployment)"
           fi
-
