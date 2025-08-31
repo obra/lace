@@ -3,10 +3,22 @@
 
 import React, { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faEye, faCode } from '@/lib/fontawesome';
 import type { PendingApproval } from '@/types/api';
 import { ApprovalDecision } from '@/types/core';
 import { getToolRenderer } from '@/components/timeline/tool';
-import { getToolIcon, createDefaultToolSummary } from '@/components/ui/ToolCallDisplay';
+import {
+  getToolIcon,
+  createDefaultToolSummary,
+  ToolCallDisplay,
+} from '@/components/ui/ToolCallDisplay';
+import FileDiffViewer from '@/components/files/FileDiffViewer';
+import FileRenderer from '@/components/ui/FileRenderer';
+import {
+  createPartialDiff,
+  createPreviewResult,
+  shouldShowPartialDiff,
+} from './tool-approval-preview';
 
 interface ToolApprovalModalProps {
   approvals: PendingApproval[];
@@ -74,14 +86,21 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
     args && typeof args === 'object' && args !== null && Object.keys(args).length > 0
   );
 
+  const operationName = renderer.getSummary?.(args) ?? createDefaultToolSummary(toolName, args);
+
   const modalTitle = (
     <div className="flex justify-between items-start w-full">
-      <div>
-        <h2 className="text-xl font-bold text-base-content">Approve: {toolName}</h2>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-sm text-base-content/60">
-            {isReadOnly ? 'Read-only' : 'May modify data'}
-          </span>
+      <div className="flex items-center gap-2">
+        <FontAwesomeIcon icon={toolIcon} className="w-5 h-5 text-warning" />
+        <div>
+          <h2 className="text-xl font-bold text-base-content">
+            Approval required: {operationName}
+          </h2>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-sm text-base-content/60">
+              {isReadOnly ? 'Read-only' : 'May modify data'}
+            </span>
+          </div>
         </div>
       </div>
       {/* Approval Counter with Navigation */}
@@ -131,62 +150,57 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
             {/* Content */}
             <div className="p-4">
               <div className="flex flex-col max-h-[75vh]">
-                {/* Tool display styled like timeline */}
-                <div className="flex gap-3 mb-4">
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-md flex items-center justify-center text-sm bg-warning/10 text-warning">
-                      <FontAwesomeIcon icon={toolIcon} className="text-xs" />
+                {/* Tool Preview (always shown, no toggle) */}
+                {hasArgs && (
+                  <div className="mb-4">
+                    {/* File Edit: Show partial diff */}
+                    {shouldShowPartialDiff(toolName) &&
+                      (() => {
+                        const partialDiff = createPartialDiff(toolName, args);
+                        return partialDiff ? (
+                          <div className="mb-3">
+                            <FileDiffViewer
+                              diff={partialDiff}
+                              viewMode="unified"
+                              showLineNumbers={false}
+                              maxLines={20}
+                              className="border border-info/20 rounded-lg"
+                            />
+                            <div className="text-xs text-base-content/60 mt-2 italic">
+                              Showing edit operations (without full file context)
+                            </div>
+                          </div>
+                        ) : null;
+                      })()}
+
+                    {/* All Tools: Use existing renderer directly */}
+                    <div>
+                      {(() => {
+                        const renderer = getToolRenderer(toolName);
+                        const mockResult = createPreviewResult(toolName, args);
+                        const aggregatedData = {
+                          call: {
+                            id: 'preview',
+                            name: toolName,
+                            arguments: args,
+                          },
+                          result: mockResult,
+                          toolName: toolName,
+                          toolId: 'preview',
+                          arguments: args,
+                        };
+
+                        return (
+                          renderer.renderResult?.(mockResult, aggregatedData) || (
+                            <div className="p-3 text-sm text-base-content/60">
+                              Preview not available for this tool type
+                            </div>
+                          )
+                        );
+                      })()}
                     </div>
                   </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
-                      {/* Tool header */}
-                      <div className="p-3 bg-base-50 border-b border-base-200">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            {toolName.toLowerCase() === 'bash' &&
-                            args &&
-                            typeof args === 'object' &&
-                            'command' in args ? (
-                              <code className="text-sm font-mono bg-base-300 px-2 py-1 rounded text-base-content break-all">
-                                $ {String((args as { command: unknown }).command)}
-                              </code>
-                            ) : (
-                              <span className="text-sm text-base-content/80">
-                                {String(toolSummary)}
-                              </span>
-                            )}
-                          </div>
-
-                          {hasArgs && (
-                            <button
-                              onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-                              className="text-xs text-base-content/50 hover:text-base-content px-2 py-1 rounded hover:bg-base-200 flex-shrink-0"
-                              data-testid="tool-approval-toggle-details-button"
-                            >
-                              {showTechnicalDetails ? 'Hide' : 'Show'} Details
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Technical Details (when expanded) */}
-                      {showTechnicalDetails && hasArgs && (
-                        <div className="px-3 py-2 bg-base-50 border-b border-base-200">
-                          <div className="text-xs text-base-content/70 mb-1 font-medium">
-                            Technical Details:
-                          </div>
-                          <div className="text-xs font-mono text-base-content/80 whitespace-pre-wrap bg-base-100 p-2 rounded border">
-                            <strong>Tool:</strong> {toolName}
-                            {'\n'}
-                            <strong>Arguments:</strong> {JSON.stringify(args, null, 2)}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-2">

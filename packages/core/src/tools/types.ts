@@ -60,7 +60,7 @@ export interface ContentBlock {
   uri?: string;
 }
 
-export type ToolResultStatus = 'completed' | 'failed' | 'aborted' | 'denied';
+export type ToolResultStatus = 'completed' | 'failed' | 'aborted' | 'denied' | 'pending';
 
 export interface ToolResult {
   id?: string; // Optional - set by tools if they have it
