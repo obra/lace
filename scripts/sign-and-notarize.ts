@@ -5,6 +5,117 @@ import { execSync } from 'child_process';
 import { existsSync, unlinkSync } from 'fs';
 import { resolve } from 'path';
 
+// Full signing with existing keychain (includes notarization)
+async function signWithExistingKeychain(
+  resolvedBinaryPath: string,
+  signingIdentity: string,
+  appleId?: string,
+  applePassword?: string,
+  teamId?: string,
+  skipNotarization = false
+) {
+  const entitlementsPath = `${process.cwd()}/scripts/entitlements.plist`;
+
+  // Handle app bundle vs standalone binary signing
+  if (resolvedBinaryPath.endsWith('.app')) {
+    console.log('✍️  Signing app bundle with hardened runtime and entitlements...');
+
+    // Sign Sparkle framework components first (if present)
+    const sparkleFrameworkPath = `${resolvedBinaryPath}/Contents/Frameworks/Sparkle.framework`;
+    if (existsSync(sparkleFrameworkPath)) {
+      console.log('   ⚡ Signing Sparkle framework components...');
+
+      // Sign XPC Services (correct path: Versions/Current/XPCServices)
+      const xpcServicesPath = `${sparkleFrameworkPath}/Versions/Current/XPCServices`;
+      if (existsSync(xpcServicesPath)) {
+        console.log('   🔧 Signing Sparkle XPC services...');
+        execSync(
+          `find "${xpcServicesPath}" -name "*.xpc" -exec codesign --force --options runtime --sign "${signingIdentity}" {} \\;`,
+          { stdio: 'inherit' }
+        );
+      }
+
+      // Sign Updater.app (critical for updates)
+      const updaterAppPath = `${sparkleFrameworkPath}/Versions/Current/Updater.app`;
+      if (existsSync(updaterAppPath)) {
+        console.log('   🔄 Signing Sparkle Updater.app...');
+        execSync(
+          `codesign --force --options runtime --sign "${signingIdentity}" "${updaterAppPath}" --verbose`,
+          { stdio: 'inherit' }
+        );
+      }
+
+      // Sign the main Sparkle framework
+      console.log('   ⚡ Signing Sparkle framework...');
+      execSync(
+        `codesign --force --options runtime --sign "${signingIdentity}" "${sparkleFrameworkPath}" --verbose`,
+        { stdio: 'inherit' }
+      );
+    }
+
+    // Sign the inner lace-server binary
+    const laceServerPath = `${resolvedBinaryPath}/Contents/MacOS/lace-server`;
+    if (existsSync(laceServerPath)) {
+      console.log('   🔧 Signing lace-server binary...');
+      execSync(
+        `codesign --force --options runtime --entitlements "${entitlementsPath}" --sign "${signingIdentity}" "${laceServerPath}" --verbose`,
+        { stdio: 'inherit' }
+      );
+    }
+
+    // Finally sign the outer app bundle
+    console.log('   📦 Signing app bundle...');
+    execSync(
+      `codesign --force --options runtime --sign "${signingIdentity}" "${resolvedBinaryPath}" --verbose`,
+      { stdio: 'inherit' }
+    );
+  } else {
+    console.log('✍️  Signing binary with hardened runtime and entitlements...');
+    execSync(
+      `codesign --force --options runtime --entitlements "${entitlementsPath}" --deep --sign "${signingIdentity}" "${resolvedBinaryPath}" --verbose`,
+      { stdio: 'inherit' }
+    );
+  }
+
+  // Verify signature
+  console.log('🔍 Verifying signature...');
+  execSync(`codesign --verify --deep --strict --verbose=2 "${resolvedBinaryPath}"`, {
+    stdio: 'inherit',
+  });
+
+  console.log('✅ Binary signed successfully!');
+
+  // CRITICAL: Always notarize for distribution
+  if (!skipNotarization && appleId && applePassword && teamId) {
+    console.log('📤 Starting notarization for distribution...');
+
+    const zipName = `${resolvedBinaryPath.split('/').pop()}-signed.zip`;
+    execSync(`zip -r "${zipName}" "${resolvedBinaryPath}"`);
+
+    try {
+      console.log('📤 Submitting for notarization (this will take several minutes)...');
+      execSync(
+        `xcrun notarytool submit "${zipName}" --apple-id "${appleId}" --password "${applePassword}" --team-id "${teamId}" --wait --timeout 20m`,
+        { stdio: 'inherit' }
+      );
+
+      console.log('📎 Stapling notarization ticket...');
+      execSync(`xcrun stapler staple "${resolvedBinaryPath}"`, { stdio: 'inherit' });
+
+      console.log('✅ Binary successfully signed and notarized for distribution!');
+    } catch (error) {
+      console.error('❌ Notarization failed:', error);
+      console.log('⚠️  App is signed but not notarized - users will see Gatekeeper warnings');
+    } finally {
+      if (existsSync(zipName)) {
+        unlinkSync(zipName);
+      }
+    }
+  } else {
+    console.log('⚠️  Notarization skipped - need Apple ID credentials for distribution');
+  }
+}
+
 // Signing-only function for when keychain is already set up
 async function performSigningOnly(
   resolvedBinaryPath: string,
@@ -282,8 +393,12 @@ async function signAndNotarize(options: SigningOptions) {
       const signingIdentity = identityMatch[1];
       console.log(`🔑 Using signing identity: ${signingIdentity}`);
 
-      // Proceed with signing using existing keychain
-      await performSigningOnly(
+      // Proceed with full signing including notarization
+      console.log(`🔑 Using signing identity: ${signingIdentity}`);
+
+      // Skip keychain setup since GitHub Actions already did it
+      // Go straight to signing the app bundle
+      await signWithExistingKeychain(
         resolvedBinaryPath,
         signingIdentity,
         appleId,
