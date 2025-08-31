@@ -115,21 +115,21 @@ test.describe('SSE Event System Reliability', () => {
 
     for (const interaction of interactions) {
       try {
-        console.log(`Starting SSE stability test interaction: ${interaction.name}`);
+        console.warn(`Starting SSE stability test interaction: ${interaction.name}`);
 
         await interaction.action();
 
-        console.log(`Completed interaction: ${interaction.name}, waiting for stabilization`);
+        console.warn(`Completed interaction: ${interaction.name}, waiting for stabilization`);
         await page.waitForTimeout(TIMEOUTS.QUICK / 5);
 
         // Check if message input is still accessible (may be hidden by modals)
-        console.log(`Checking if message input accessible after: ${interaction.name}`);
+        console.warn(`Checking if message input accessible after: ${interaction.name}`);
         const stillFunctional = await page
           .getByTestId('message-input')
           .isVisible()
           .catch(() => false);
 
-        console.log(`Interaction ${interaction.name} result: stillFunctional=${stillFunctional}`);
+        console.warn(`Interaction ${interaction.name} result: stillFunctional=${stillFunctional}`);
 
         stabilityResults.push({
           interaction: interaction.name,
@@ -137,7 +137,7 @@ test.describe('SSE Event System Reliability', () => {
           connectionEventsAfter: connectionEvents.length,
         });
       } catch (error) {
-        console.log(`Interaction ${interaction.name} failed with error:`, error);
+        console.warn(`Interaction ${interaction.name} failed with error:`, error);
         stabilityResults.push({
           interaction: interaction.name,
           stillFunctional: false,

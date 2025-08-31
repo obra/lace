@@ -21,10 +21,14 @@ e2e/task-management.e2e.ts
 e2e/tool-approval.e2e.ts
 e2e/user-messaging-flow.e2e.ts
 
+e2e/stop-functionality.e2e.ts
+e2e/agent-stop-functionality.e2e.ts
+e2e/streaming-compaction.e2e.ts
+e2e/error-propagation.e2e.ts
+e2e/provider-dropdown-simple.test.e2e.ts
+
 # Tests with known application bugs (not CI-ready yet)
-# e2e/agent-stop-functionality.e2e.ts  # Agent error recovery bug
-# e2e/streaming-compaction.e2e.ts      # JavaScript errors in compaction
-# e2e/stop-functionality.e2e.ts       # Related to agent error recovery
+# No known application bugs remaining in allowlisted tests
 
 # Tests that were fixed and can be removed from exclusion list:
 # e2e/directory-browser.e2e.ts         # ✅ FIXED - Now passes

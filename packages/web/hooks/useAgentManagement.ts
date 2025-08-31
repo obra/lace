@@ -60,16 +60,49 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
   );
 
   const updateAgentState = useCallback((agentId: string, to: string) => {
-    setSessionDetails((prevSession) => {
-      if (!prevSession?.agents) return prevSession;
+    // Validate inputs to prevent crashes during rapid state changes
+    if (!agentId || typeof agentId !== 'string') {
+      console.warn('updateAgentState: Invalid agentId:', agentId);
+      return;
+    }
 
-      return {
-        ...prevSession,
-        agents: prevSession.agents.map((agent) =>
-          agent.threadId === agentId ? { ...agent, status: to as AgentState } : agent
-        ),
-      };
-    });
+    if (!to || typeof to !== 'string') {
+      console.warn('updateAgentState: Invalid state:', to);
+      return;
+    }
+
+    // Validate that the state is a valid AgentState
+    const validStates: AgentState[] = ['idle', 'thinking', 'streaming', 'tool_execution'];
+    if (!validStates.includes(to as AgentState)) {
+      console.warn('updateAgentState: Invalid AgentState:', to);
+      return;
+    }
+
+    try {
+      setSessionDetails((prevSession) => {
+        // Extra safety checks inside the state updater
+        if (!prevSession?.agents) {
+          return prevSession;
+        }
+
+        // Find the agent to make sure it exists before updating
+        const agentExists = prevSession.agents.some((agent) => agent.threadId === agentId);
+        if (!agentExists) {
+          console.warn('updateAgentState: Agent not found:', agentId);
+          return prevSession;
+        }
+
+        return {
+          ...prevSession,
+          agents: prevSession.agents.map((agent) =>
+            agent.threadId === agentId ? { ...agent, status: to as AgentState } : agent
+          ),
+        };
+      });
+    } catch (error) {
+      console.error('updateAgentState: Error updating state:', error);
+      // Don't rethrow - let the UI continue working
+    }
   }, []);
 
   const loadAgentConfiguration = useCallback(

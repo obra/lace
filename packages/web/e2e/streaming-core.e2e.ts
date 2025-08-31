@@ -14,7 +14,6 @@ import {
   getMessageInput,
   sendMessage,
   verifyMessageVisible,
-  isStreamingActive,
   waitForStreamingStart,
   waitForStreamingStop,
   getChatInterfaceState,
@@ -432,7 +431,7 @@ test.describe('Core Streaming Functionality', () => {
     const placeholderChanged = await messageInput.getAttribute('placeholder');
 
     // Document what thinking/processing state looks like (for debugging)
-    const processingState = {
+    const _processingState = {
       inputDisabled,
       hasThinkingIndicator,
       hasLoadingSpinner,

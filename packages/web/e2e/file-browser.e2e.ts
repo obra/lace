@@ -1,7 +1,7 @@
 // ABOUTME: End-to-end tests for complete file browser functionality
 // ABOUTME: Tests file browsing, search, viewing, and pop-out functionality with real filesystem
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import {

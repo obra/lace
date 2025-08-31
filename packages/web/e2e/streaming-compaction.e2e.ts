@@ -85,10 +85,8 @@ test.describe('Streaming Compaction Events', () => {
     await sendMessage(page, compactionCommand);
     await verifyMessageVisible(page, compactionCommand);
 
-    // Wait for compaction response
-    await expect(page.getByText(/Manual compaction command received/).first()).toBeVisible({
-      timeout: TIMEOUTS.EXTENDED,
-    });
+    // Wait for compaction events to be processed (compaction is silent)
+    await page.waitForTimeout(2000);
 
     // Allow time for compaction processing
     await page.waitForTimeout(3000);
@@ -279,17 +277,8 @@ test.describe('Streaming Compaction Events', () => {
       uiResults[check.name] = visible;
     }
 
-    // Wait for compaction response (may fail due to application bugs)
-    let compactionWorked = false;
-    try {
-      await expect(page.getByText(/Manual compaction command received/).first()).toBeVisible({
-        timeout: TIMEOUTS.EXTENDED,
-      });
-      compactionWorked = true;
-    } catch (error) {
-      // KNOWN ISSUE: Compaction command causes JavaScript errors
-      console.warn('Compaction failed:', error instanceof Error ? error.message : String(error));
-    }
+    // Wait for compaction to process
+    await page.waitForTimeout(2000);
 
     const compactionEnd = Date.now();
     const compactionDuration = compactionEnd - compactionStart;

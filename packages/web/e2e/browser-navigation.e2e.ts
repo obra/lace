@@ -244,7 +244,7 @@ test.describe('Browser Navigation Support', () => {
       };
 
       if (projectIdMatch && sessionIdMatch && agentIdMatch) {
-        const [_projectId, sessionId, agentId] = [
+        const [_projectId, sessionId, _agentId] = [
           projectIdMatch[1],
           sessionIdMatch[1],
           agentIdMatch[1],

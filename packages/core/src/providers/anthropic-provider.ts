@@ -177,14 +177,14 @@ export class AnthropicProvider extends AIProvider {
           response: JSON.stringify(response, null, 2),
         });
 
-        const textContent = response.content
+        const textContent = (response.content || [])
           .filter(
             (contentBlock): contentBlock is Anthropic.TextBlock => contentBlock.type === 'text'
           )
           .map((contentBlock) => contentBlock.text)
           .join('');
 
-        const toolCalls: ToolCall[] = response.content
+        const toolCalls: ToolCall[] = (response.content || [])
           .filter(
             (contentBlock): contentBlock is Anthropic.ToolUseBlock =>
               contentBlock.type === 'tool_use'
@@ -320,13 +320,13 @@ export class AnthropicProvider extends AIProvider {
           const finalMessage = await stream.finalMessage();
 
           // Extract text content from the final message
-          const textContent = finalMessage.content
+          const textContent = (finalMessage.content || [])
             .filter((content): content is Anthropic.TextBlock => content.type === 'text')
             .map((content) => content.text)
             .join('');
 
           // Extract tool calls from the final message
-          toolCalls = finalMessage.content
+          toolCalls = (finalMessage.content || [])
             .filter((content): content is Anthropic.ToolUseBlock => content.type === 'tool_use')
             .map((content) => ({
               id: content.id,

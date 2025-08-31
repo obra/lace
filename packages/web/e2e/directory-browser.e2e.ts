@@ -254,7 +254,7 @@ test.describe('Directory Browser E2E Tests', () => {
       await expect(directoryInput).toHaveValue(`${homedir()}/test`);
     } else {
       // Modal closed on Escape - this is expected UX behavior
-      console.log('Modal closed on Escape - good UX behavior');
+      console.warn('Modal closed on Escape - good UX behavior');
       expect(true).toBeTruthy(); // Documents expected behavior
       return;
     }
@@ -330,7 +330,7 @@ test.describe('Directory Browser E2E Tests', () => {
 
       if (hasMessageInput) {
         // Project loaded successfully, just name element is hidden
-        console.log('Project loaded successfully - name element hidden but interface functional');
+        console.warn('Project loaded successfully - name element hidden but interface functional');
       } else {
         // Project creation may have failed
         throw new Error('Project creation appears to have failed - no interface elements found');

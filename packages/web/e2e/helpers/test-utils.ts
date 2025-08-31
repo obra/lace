@@ -8,6 +8,7 @@ import * as http from 'http';
 import { spawn, ChildProcess } from 'child_process';
 import { createServer } from 'net';
 import { fileURLToPath } from 'url';
+import type { Page } from '@playwright/test';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -88,10 +89,10 @@ async function startTestServer(
       LACE_DIR: tempDir,
       ANTHROPIC_API_KEY: 'test-anthropic-key-for-e2e',
       LACE_DB_PATH: path.join(tempDir, 'lace.db'),
-      NODE_ENV: 'development', // Use development mode but disable HMR for E2E tests
-      VITE_HMR_DISABLED: 'true', // Explicitly disable Vite HMR for E2E tests
+      NODE_ENV: 'development',
+      VITE_CACHE_DIR: path.join(tempDir, '.vite'), // Isolated Vite cache per test
       E2E_TOOL_APPROVAL_MOCK: 'true',
-      LACE_LOG_LEVEL: 'debug',
+      LACE_LOG_LEVEL: 'error',
       LACE_LOG_STDERR: 'true',
     },
   });
@@ -233,9 +234,9 @@ export const TIMEOUTS = {
  * Use this instead of manual beforeEach/afterEach in every test file
  */
 export function withTestEnvironment(
-  testFn: (testEnv: TestEnvironment, page: any) => Promise<void>
+  testFn: (testEnv: TestEnvironment, page: Page) => Promise<void>
 ) {
-  return async ({ page }: { page: any }) => {
+  return async ({ page }: { page: Page }) => {
     const testEnv = await setupTestEnvironment();
     try {
       await page.goto(testEnv.serverUrl);

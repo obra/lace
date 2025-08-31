@@ -6,7 +6,6 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
-  TIMEOUTS,
 } from './helpers/test-utils';
 import {
   createProject,

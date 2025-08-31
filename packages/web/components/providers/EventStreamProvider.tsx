@@ -152,7 +152,6 @@ export function EventStreamProvider({
       // Add AGENT_ERROR event directly to timeline - don't convert to AGENT_MESSAGE
       // The UI should handle AGENT_ERROR events natively
       addAgentEvent(event);
-    },
     [addAgentEvent]
   );
 

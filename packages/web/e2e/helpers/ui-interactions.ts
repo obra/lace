@@ -2,7 +2,7 @@
 // ABOUTME: Component-aware functions using proper testids for reliable testing
 
 import { Page, expect } from '@playwright/test';
-import { withTestEnvironment, type TestEnvironment, TIMEOUTS } from './test-utils';
+import { withTestEnvironment } from './test-utils';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -141,11 +141,13 @@ export async function setupProvider(
   }
 ): Promise<void> {
   // Check if provider is already configured - try multiple indicators
-  const existingProviders = await Promise.race([
+  const providerCounts = await Promise.all([
     page.locator('text="1 instance configured"').count(),
     page.locator('text="instance configured"').count(),
     page.locator('text="instances configured"').count(),
   ]);
+
+  const existingProviders = providerCounts.reduce((sum, count) => sum + count, 0);
 
   if (existingProviders > 0) {
     return;

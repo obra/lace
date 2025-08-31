@@ -6,7 +6,6 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
-  TIMEOUTS,
 } from './helpers/test-utils';
 
 test.describe('Provider Dropdown Real-time Updates', () => {
