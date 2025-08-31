@@ -237,15 +237,25 @@ jobs:
           echo "📦 Creating signed DMG..."
           bun scripts/create-dmg.ts --app build/Lace.app --output build
           
-          # Notarize DMG
+          # Notarize DMG with maximum verbosity
           DMG_FILE=$(ls build/Lace-*.dmg | head -n1)
-          echo "📤 Notarizing $DMG_FILE..."
+          echo "📤 Notarizing $DMG_FILE with verbose output..."
+          echo "📝 File info: $(ls -lh "$DMG_FILE")"
           
-          xcrun notarytool submit "$DMG_FILE" \
+          # Store credentials to avoid repeated auth
+          echo "🔐 Setting up notarytool credentials..."
+          xcrun notarytool store-credentials "lace-profile" \
             --apple-id "$APPLE_ID_EMAIL" \
             --password "$APPLE_ID_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --wait --timeout 30m
+            --validate
+          
+          echo "📤 Submitting for notarization (this will be VERY verbose)..."
+          xcrun notarytool submit "$DMG_FILE" \
+            --keychain-profile "lace-profile" \
+            --wait --timeout 30m \
+            --verbose \
+            --progress
           
           # Staple notarization
           echo "📎 Stapling notarization..."
