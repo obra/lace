@@ -162,7 +162,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
                             <FileDiffViewer
                               diff={partialDiff}
                               viewMode="unified"
-                              showLineNumbers={false}
+                              showLineNumbers={true}
                               maxLines={20}
                               className="border border-info/20 rounded-lg"
                             />
