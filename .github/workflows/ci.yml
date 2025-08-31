@@ -190,7 +190,8 @@ jobs:
         run: |
           echo "🔐 Setting up signing keychain..."
           
-          # Create temporary keychain
+          # Create temporary keychain (delete if exists)
+          security delete-keychain signing.keychain 2>/dev/null || true
           security create-keychain -p actions signing.keychain
           security default-keychain -s signing.keychain
           security unlock-keychain -p actions signing.keychain
@@ -261,15 +262,23 @@ jobs:
       
       # DMG creation and notarization handled in signing step above
 
-      - name: Build macOS app (unsigned) for testing
-        if: steps.signing_check.outputs.available == 'false'
+      - name: Fail if signing not available (never deploy unsigned)
+        if: steps.signing_check.outputs.available == 'false' && steps.channel.outputs.deploy == 'true'
         run: |
+          echo "❌ Cannot deploy without proper signing certificates"
+          echo "All deployments must be signed and notarized"
+          exit 1
+      
+      - name: Build macOS app (unsigned) for testing only
+        if: steps.signing_check.outputs.available == 'false' && steps.channel.outputs.deploy == 'false'
+        run: |
+          echo "🧪 Building unsigned app for PR testing only (no deployment)"
           bun scripts/build-macos-app.ts \
             --bundle \
             --channel ${{ steps.channel.outputs.channel }}
 
       - name: Deploy to fsck.com
-        if: steps.channel.outputs.deploy == 'true'
+        if: steps.channel.outputs.deploy == 'true' && steps.signing_check.outputs.available == 'true'
         run: |
           echo "🚀 Deploying to fsck.com..."
           
