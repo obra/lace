@@ -417,31 +417,27 @@ jobs:
       - name: Upload to fsck.com via restricted rsync
         if: steps.channel.outputs.deploy == 'true'
         run: |
-          echo "🚀 Deploying to fsck.com with restricted rsync..."
+          echo "🚀 Deploying to fsck.com with restricted scp..."
           
           CHANNEL="${{ steps.channel.outputs.channel }}"
           DMG_FILENAME=$(basename "$DMG_PATH")
           
-          # Create local staging directory matching remote structure
-          mkdir -p "staging/$CHANNEL"
+          # Upload DMG with scp
+          echo "📦 Uploading DMG: $DMG_FILENAME"
+          scp -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no \
+            "$DMG_PATH" jesse@fsck.com:"/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/$DMG_FILENAME"
+          echo "✅ DMG uploaded to https://fsck.com/lace/dist/$CHANNEL/$DMG_FILENAME"
           
-          # Copy files to staging
-          cp "$DMG_PATH" "staging/$CHANNEL/$DMG_FILENAME"
-          echo "✅ DMG staged: $DMG_FILENAME"
-          
-          # Copy appcast if it exists
+          # Upload appcast if it exists
           APPCAST_PATH="build/appcast/$CHANNEL/appcast.xml"
           if [ -f "$APPCAST_PATH" ]; then
-            cp "$APPCAST_PATH" "staging/$CHANNEL/appcast.xml"
-            echo "✅ Appcast staged"
+            echo "📡 Uploading appcast..."
+            scp -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no \
+              "$APPCAST_PATH" jesse@fsck.com:"/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/appcast.xml"
+            echo "✅ Appcast uploaded to https://fsck.com/lace/dist/$CHANNEL/appcast.xml"
           else
             echo "⚠️  Appcast not found, skipping"
           fi
-          
-          # Upload everything with rsync (matches restricted key)
-          echo "📦 Uploading to fsck.com..."
-          rsync -av -e "ssh -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no" \
-            staging/ jesse@fsck.com:/opt/web/hosted/www.fsck.com/html/lace/dist/
           
           echo "🚀 Deployment to fsck.com complete!"
           echo "🔗 DMG: https://fsck.com/lace/dist/$CHANNEL/$DMG_FILENAME"
