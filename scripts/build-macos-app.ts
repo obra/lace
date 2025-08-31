@@ -122,7 +122,7 @@ async function createAppBundle(executablePath: string, outdir: string): Promise<
   console.log(`   🖥️  Server binary: lace-server`);
   console.log(`   📄 Info.plist copied`);
 
-  return resolve(appBundlePath);
+  return resolve(finalAppBundlePath);
 }
 
 async function generateAppcast(options: {
