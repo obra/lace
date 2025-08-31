@@ -329,15 +329,15 @@ export default function FileDiffViewer({
                       {line.oldLineNumber || ''}
                     </span>
                   )}
-                  <div className="flex-1 px-2 py-1">
+                  <div className="flex-1 px-2 py-1 min-w-0">
                     {hasHighlighting ? (
                       <code
-                        className="whitespace-nowrap hljs block"
+                        className="whitespace-pre-wrap hljs break-words"
                         dangerouslySetInnerHTML={{ __html: highlightedContent }}
                       />
                     ) : (
                       <code
-                        className={`whitespace-nowrap block ${getLanguageClass(diff.language)}`}
+                        className={`whitespace-pre-wrap break-words ${getLanguageClass(diff.language)}`}
                       >
                         {line.content}
                       </code>
@@ -385,15 +385,15 @@ export default function FileDiffViewer({
                       {line.newLineNumber || ''}
                     </span>
                   )}
-                  <div className="flex-1 px-2 py-1">
+                  <div className="flex-1 px-2 py-1 min-w-0">
                     {hasHighlighting ? (
                       <code
-                        className="whitespace-nowrap hljs block"
+                        className="whitespace-pre-wrap hljs break-words"
                         dangerouslySetInnerHTML={{ __html: highlightedContent }}
                       />
                     ) : (
                       <code
-                        className={`whitespace-nowrap block ${getLanguageClass(diff.language)}`}
+                        className={`whitespace-pre-wrap break-words ${getLanguageClass(diff.language)}`}
                       >
                         {line.content}
                       </code>
