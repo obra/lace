@@ -222,21 +222,27 @@ jobs:
           if [ -d "build/Lace.app/Contents/Frameworks/Sparkle.framework" ]; then
             echo "   ⚡ Signing Sparkle framework components..."
             
-            # Sign XPC Services first
+            # Sign XPC Services first with timestamp
             if [ -d "build/Lace.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices" ]; then
               echo "   🔧 Signing Sparkle XPC services..."
-              find "build/Lace.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices" -name "*.xpc" -exec codesign --force --options runtime --sign "$SIGNING_IDENTITY" {} \;
+              find "build/Lace.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices" -name "*.xpc" -exec codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" {} \;
             fi
             
             # Sign Updater.app
             if [ -d "build/Lace.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Updater.app" ]; then
               echo "   🔄 Signing Sparkle Updater.app..."
-              codesign --force --options runtime --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Updater.app"
+              codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Updater.app"
+            fi
+            
+            # Sign Autoupdate binary (CRITICAL - this was missing!)
+            if [ -f "build/Lace.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Autoupdate" ]; then
+              echo "   🔄 Signing Sparkle Autoupdate binary..."
+              codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Autoupdate"
             fi
             
             # Sign main framework
             echo "   ⚡ Signing Sparkle framework..."
-            codesign --force --options runtime --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/Frameworks/Sparkle.framework"
+            codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/Frameworks/Sparkle.framework"
           fi
           
           # Sign inner binaries with entitlements
