@@ -212,7 +212,7 @@ export default function FileDiffViewer({
   // Render unified diff view
   const renderUnifiedView = () => {
     return (
-      <div className="overflow-x-auto">
+      <div>
         <div className="font-mono text-sm">
           {processedLines.map((line, index) => {
             // Special rendering for folded sections
@@ -248,11 +248,13 @@ export default function FileDiffViewer({
                 <div className="flex-1 px-2 py-1">
                   {hasHighlighting ? (
                     <code
-                      className="whitespace-nowrap hljs block"
+                      className="whitespace-pre-wrap hljs break-words"
                       dangerouslySetInnerHTML={{ __html: highlightedContent }}
                     />
                   ) : (
-                    <code className={`whitespace-nowrap block ${getLanguageClass(diff.language)}`}>
+                    <code
+                      className={`whitespace-pre-wrap break-words ${getLanguageClass(diff.language)}`}
+                    >
                       {line.content}
                     </code>
                   )}
@@ -292,7 +294,7 @@ export default function FileDiffViewer({
     });
 
     return (
-      <div className="grid grid-cols-2 gap-2 overflow-x-auto">
+      <div className="grid grid-cols-2 gap-2">
         {/* Old file column */}
         <div className="border-r border-base-300">
           <div className="bg-base-200 px-2 py-1 text-xs font-medium text-base-content/70 border-b border-base-300">
