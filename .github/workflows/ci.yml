@@ -185,32 +185,71 @@ jobs:
             exit 1
           fi
       
-      - name: Sign macOS app with reusable action
-        if: steps.signing_check.outputs.available == 'true'
-        uses: lando/code-sign-action@v2
-        with:
-          file: build/Lace.app
-          certificate-data: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
-          certificate-password: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
-          apple-team-id: ${{ secrets.APPLE_TEAM_ID }}
-      
-      - name: Notarize macOS app with reusable action
-        if: steps.signing_check.outputs.available == 'true'
-        uses: lando/notarize-action@v2
-        with:
-          product-path: build/Lace.app
-          appstore-connect-username: ${{ secrets.APPLE_ID_EMAIL }}
-          appstore-connect-password: ${{ secrets.APPLE_ID_PASSWORD }}
-          appstore-connect-team-id: ${{ secrets.APPLE_TEAM_ID }}
-      
-      - name: Recreate DMG with signed app
+      - name: Sign and notarize macOS app (proven approach)
         if: steps.signing_check.outputs.available == 'true'
         run: |
-          # Remove old unsigned DMG
-          rm -f build/Lace-*.dmg
+          echo "🔐 Setting up signing keychain..."
           
-          # Create new DMG with signed app
+          # Create temporary keychain
+          security create-keychain -p actions signing.keychain
+          security default-keychain -s signing.keychain
+          security unlock-keychain -p actions signing.keychain
+          security set-keychain-settings -t 3600 -u signing.keychain
+          
+          # Import certificate
+          echo "$APPLE_DEVELOPER_CERTIFICATE_P12" | base64 --decode > /tmp/cert.p12
+          security import /tmp/cert.p12 -k signing.keychain -P "$APPLE_DEVELOPER_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k actions signing.keychain
+          
+          # Sign app bundle (inside-out approach)
+          echo "✍️  Signing app bundle..."
+          
+          # Sign Sparkle framework components
+          if [ -d "build/Lace.app/Contents/Frameworks/Sparkle.framework" ]; then
+            echo "   ⚡ Signing Sparkle framework..."
+            codesign --force --options runtime --sign "$APPLE_TEAM_ID" "build/Lace.app/Contents/Frameworks/Sparkle.framework"
+          fi
+          
+          # Sign inner binaries
+          codesign --force --options runtime --sign "$APPLE_TEAM_ID" "build/Lace.app/Contents/MacOS/lace-server"
+          codesign --force --options runtime --sign "$APPLE_TEAM_ID" "build/Lace.app/Contents/MacOS/Lace"
+          
+          # Sign main app bundle
+          codesign --force --options runtime --sign "$APPLE_TEAM_ID" "build/Lace.app"
+          
+          echo "✅ App bundle signed"
+          
+          # Create DMG
+          echo "📦 Creating signed DMG..."
           bun scripts/create-dmg.ts --app build/Lace.app --output build
+          
+          # Notarize DMG
+          DMG_FILE=$(ls build/Lace-*.dmg | head -n1)
+          echo "📤 Notarizing $DMG_FILE..."
+          
+          xcrun notarytool submit "$DMG_FILE" \
+            --apple-id "$APPLE_ID_EMAIL" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait --timeout 30m
+          
+          # Staple notarization
+          echo "📎 Stapling notarization..."
+          xcrun stapler staple "$DMG_FILE"
+          
+          echo "✅ App bundle signed and notarized!"
+          
+          # Cleanup
+          security delete-keychain signing.keychain
+          rm /tmp/cert.p12
+        env:
+          APPLE_DEVELOPER_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
+          APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+          APPLE_ID_EMAIL: ${{ secrets.APPLE_ID_EMAIL }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      
+      # DMG creation and notarization handled in signing step above
 
       - name: Build macOS app (unsigned) for testing
         if: steps.signing_check.outputs.available == 'false'
