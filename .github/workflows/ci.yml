@@ -430,8 +430,17 @@ jobs:
           cp "$DMG_PATH" "staging/$CHANNEL/$DMG_FILENAME"
           echo "✅ DMG staged: $DMG_FILENAME"
           
-          # Debug what's actually in staging
-          echo "🔍 Staging directory contents:"
+          # Stage appcast BEFORE upload
+          APPCAST_FILE=$(find "build/appcast/$CHANNEL" -name "*.xml" | head -n1)
+          if [ -n "$APPCAST_FILE" ] && [ -f "$APPCAST_FILE" ]; then
+            cp "$APPCAST_FILE" "staging/$CHANNEL/appcast.xml"
+            echo "✅ Appcast staged: $(basename "$APPCAST_FILE")"
+          else
+            echo "⚠️  No appcast found"
+          fi
+          
+          # Final staging verification
+          echo "🔍 Staging contents before upload:"
           ls -la staging/$CHANNEL/
           
           # Upload with verbose rsync to see what's happening
@@ -447,31 +456,7 @@ jobs:
           
           echo "✅ Files uploaded successfully"
           
-          echo "✅ DMG uploaded to https://fsck.com/lace/dist/$CHANNEL/$DMG_FILENAME"
-          
-          # Upload appcast if it exists
-          # Find and stage appcast with debugging
-          APPCAST_DIR="build/appcast/$CHANNEL"
-          echo "🔍 Looking for appcast in: $APPCAST_DIR"
-          ls -la "$APPCAST_DIR" || echo "Appcast directory doesn't exist"
-          
-          APPCAST_FILE=$(find "$APPCAST_DIR" -name "*.xml" -o -name "*PLACEHOLDER*" | head -n1)
-          echo "🔍 Found appcast file: $APPCAST_FILE"
-          
-          if [ -n "$APPCAST_FILE" ] && [ -f "$APPCAST_FILE" ]; then
-            echo "📝 Copying $APPCAST_FILE to staging/$CHANNEL/appcast.xml"
-            cp "$APPCAST_FILE" "staging/$CHANNEL/appcast.xml"
-            echo "✅ Appcast staged: $(basename "$APPCAST_FILE") -> appcast.xml"
-            
-            # Verify it's actually in staging
-            if [ -f "staging/$CHANNEL/appcast.xml" ]; then
-              echo "🔍 Verified appcast in staging: $(ls -la staging/$CHANNEL/appcast.xml)"
-            else
-              echo "❌ Appcast copy failed!"
-            fi
-          else
-            echo "⚠️  No appcast file found in $APPCAST_DIR"
-          fi
+          echo "✅ All files uploaded to fsck.com"
           
           echo "🚀 Deployment to fsck.com complete!"
           echo "🔗 DMG: https://fsck.com/lace/dist/$CHANNEL/$DMG_FILENAME"
