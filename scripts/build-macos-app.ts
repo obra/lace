@@ -44,25 +44,16 @@ function runPackageTarget(workspace: string, target: string, description: string
 
 async function createAppBundle(executablePath: string, outdir: string): Promise<string> {
   const appName = 'Lace';
-  const appBundlePath = join(outdir, `${appName}.app`);
-  const contentsPath = join(appBundlePath, 'Contents');
-  const macosPath = join(contentsPath, 'MacOS');
-  const resourcesPath = join(contentsPath, 'Resources');
+  const finalAppBundlePath = join(outdir, `${appName}.app`);
 
-  // Create app bundle structure
-  mkdirSync(appBundlePath, { recursive: true });
-  mkdirSync(contentsPath, { recursive: true });
-  mkdirSync(macosPath, { recursive: true });
-  mkdirSync(resourcesPath, { recursive: true });
-
-  // Build the Swift menu bar app
-  console.log('📱 Building Swift menu bar app...');
+  // Build the complete Swift menu bar app with Sparkle first
+  console.log('📱 Building complete Swift app with Sparkle...');
   execSync('make clean && make build', {
     cwd: 'platforms/macos',
     stdio: 'inherit',
   });
 
-  // Copy the entire Swift app bundle (including Frameworks)
+  // Simply copy the ENTIRE working Swift app bundle
   const swiftAppBundlePath = 'platforms/macos/build/Lace.app';
   if (!existsSync(swiftAppBundlePath)) {
     throw new Error(
