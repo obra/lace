@@ -446,10 +446,10 @@ jobs:
           cp "$DMG_PATH" "staging/$CHANNEL/$DMG_FILENAME"
           echo "✅ DMG staged: $DMG_FILENAME"
           
-          # Upload with minimal rsync
-          echo "📦 Uploading with rsync -t..."
+          # Upload with minimal rsync to correct directory
+          echo "📦 Uploading with rsync -t to $CHANNEL/ directory..."
           rsync -t -e "ssh -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no" \
-            staging/$CHANNEL/* jesse@fsck.com:/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/
+            staging/$CHANNEL/ jesse@fsck.com:/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/
           
           echo "✅ DMG uploaded to https://fsck.com/lace/dist/$CHANNEL/$DMG_FILENAME"
           
