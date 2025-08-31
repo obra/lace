@@ -77,30 +77,9 @@ function generateAllImports() {
 
   const allFiles = [...jsonFiles, ...mdFiles, ...clientAssets];
 
-  // Generate imports with appropriate types
+  // Generate imports with file type for JSON and MD to ensure File objects in Bun.embeddedFiles
   const imports = allFiles
-    .map((file) => {
-      const ext = file.filePath.split('.').pop()?.toLowerCase();
-      let importType = 'file'; // default
-
-      // Use appropriate import types based on file extension
-      switch (ext) {
-        case 'json':
-          importType = 'json';
-          break;
-        case 'css':
-          importType = 'file';
-          break;
-        case 'md':
-        case 'txt':
-          importType = 'text';
-          break;
-        default:
-          importType = 'file'; // fonts, js, images, etc.
-      }
-
-      return `import ${file.importName} from './${file.filePath}' with { type: '${importType}' };`;
-    })
+    .map((file) => `import ${file.importName} from './${file.filePath}' with { type: 'file' };`)
     .join('\n');
 
   const exportMap = allFiles
