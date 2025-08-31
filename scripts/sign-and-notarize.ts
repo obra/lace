@@ -93,11 +93,13 @@ async function signWithExistingKeychain(
     execSync(`zip -r "${zipName}" "${resolvedBinaryPath}"`);
 
     try {
-      console.log('📤 Submitting for notarization (this will take several minutes)...');
-      execSync(
-        `xcrun notarytool submit "${zipName}" --apple-id "${appleId}" --password "${applePassword}" --team-id "${teamId}" --wait --timeout 20m`,
-        { stdio: 'inherit' }
+      console.log('📤 Submitting for notarization (this will take 5-15 minutes)...');
+      const notarizeResult = execSync(
+        `xcrun notarytool submit "${zipName}" --apple-id "${appleId}" --password "${applePassword}" --team-id "${teamId}" --wait --timeout 30m --verbose`,
+        { encoding: 'utf8', stdio: 'inherit' }
       );
+
+      console.log('✅ Notarization completed successfully!');
 
       console.log('📎 Stapling notarization ticket...');
       execSync(`xcrun stapler staple "${resolvedBinaryPath}"`, { stdio: 'inherit' });

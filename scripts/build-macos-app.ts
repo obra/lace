@@ -95,6 +95,36 @@ async function createAppBundle(executablePath: string, outdir: string): Promise<
   console.log(`   🖥️  Server binary: lace-server`);
   console.log(`   📄 Info.plist copied`);
 
+  // CRITICAL: Verify app bundle is complete and signed before shipping
+  console.log('🔍 Final verification before shipping...');
+
+  // 1. Verify Sparkle framework exists and is signed
+  const sparkleFramework = join(
+    finalAppBundlePath,
+    'Contents/Frameworks/Sparkle.framework/Sparkle'
+  );
+  if (!existsSync(sparkleFramework)) {
+    throw new Error('CRITICAL: Sparkle framework missing from final bundle - cannot ship!');
+  }
+
+  // 2. Verify code signature
+  try {
+    execSync(`codesign --verify --deep --strict "${finalAppBundlePath}"`, { stdio: 'pipe' });
+    console.log('   ✅ App bundle signature verified');
+  } catch {
+    throw new Error('CRITICAL: App bundle signature verification failed - cannot ship!');
+  }
+
+  // 3. Check notarization status
+  try {
+    execSync(`spctl --assess --type execute "${finalAppBundlePath}"`, { stdio: 'pipe' });
+    console.log('   ✅ App bundle notarization verified');
+  } catch {
+    console.warn('   ⚠️  App bundle not properly notarized - users will see Gatekeeper warnings');
+  }
+
+  console.log('✅ Final verification complete - app bundle ready for shipping');
+
   return resolve(finalAppBundlePath);
 }
 
