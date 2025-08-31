@@ -245,8 +245,15 @@ jobs:
           # Debug credentials (without exposing values)
           echo "🔍 Checking notarization credentials..."
           echo "Apple ID: ${APPLE_ID_EMAIL:0:10}..."
-          echo "Team ID: $APPLE_TEAM_ID"
+          echo "Team ID length: ${#APPLE_TEAM_ID} chars"
+          echo "Team ID starts with: ${APPLE_TEAM_ID:0:3}..."
           echo "Password length: ${#APPLE_ID_PASSWORD} chars"
+          echo "Password starts with: ${APPLE_ID_PASSWORD:0:4}..."
+          
+          # Check if any are empty
+          [ -z "$APPLE_ID_EMAIL" ] && echo "❌ Apple ID is empty!" || echo "✅ Apple ID present"
+          [ -z "$APPLE_TEAM_ID" ] && echo "❌ Team ID is empty!" || echo "✅ Team ID present"  
+          [ -z "$APPLE_ID_PASSWORD" ] && echo "❌ Password is empty!" || echo "✅ Password present"
           
           # Store credentials to avoid repeated auth
           echo "🔐 Setting up notarytool credentials..."
