@@ -431,10 +431,10 @@ jobs:
           
           echo "✅ SSH key configured for fsck.com"
       
-      - name: Upload to fsck.com via restricted rsync
+      - name: Upload to fsck.com via minimal rsync
         if: steps.channel.outputs.deploy == 'true'
         run: |
-          echo "🚀 Deploying to fsck.com with restricted scp..."
+          echo "🚀 Deploying to fsck.com with minimal rsync..."
           
           CHANNEL="${{ steps.channel.outputs.channel }}"
           DMG_FILENAME=$(basename "$DMG_PATH")
