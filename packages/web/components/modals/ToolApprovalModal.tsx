@@ -182,7 +182,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
                           call: {
                             id: 'preview',
                             name: toolName,
-                            arguments: args,
+                            arguments: (args as Record<string, unknown>) || {},
                           },
                           result: mockResult,
                           toolName: toolName,

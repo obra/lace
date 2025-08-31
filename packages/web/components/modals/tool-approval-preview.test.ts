@@ -85,7 +85,7 @@ describe('tool-approval-preview', () => {
       const args = { path: '/src/new-file.ts', content: 'console.log("hello");' };
       const result = createPreviewResult('file_write', args);
 
-      expect(result.status).toBe('completed');
+      expect(result.status).toBe('pending');
       expect(result.content[0].text).toBe('Would write to /src/new-file.ts');
       expect(result.metadata?.isPreview).toBe(true);
       expect(result.metadata?.arguments).toBe(args);
@@ -98,7 +98,7 @@ describe('tool-approval-preview', () => {
       };
       const result = createPreviewResult('file_edit', args);
 
-      expect(result.status).toBe('completed');
+      expect(result.status).toBe('pending');
       expect(result.content[0].text).toBe('Would apply 1 edit to /src/app.ts');
       expect(result.metadata?.isPreview).toBe(true);
     });
@@ -107,7 +107,7 @@ describe('tool-approval-preview', () => {
       const args = { command: 'npm test', description: 'Run tests' };
       const result = createPreviewResult('bash', args);
 
-      expect(result.status).toBe('completed');
+      expect(result.status).toBe('pending');
       expect(result.content[0].text).toBe('Would execute command: npm test');
       expect(result.metadata?.isPreview).toBe(true);
     });
@@ -115,7 +115,7 @@ describe('tool-approval-preview', () => {
     it('should create default preview result for unknown tools', () => {
       const result = createPreviewResult('unknown_tool', {});
 
-      expect(result.status).toBe('completed');
+      expect(result.status).toBe('pending');
       expect(result.content[0].text).toBe('Would execute unknown_tool');
       expect(result.metadata?.isPreview).toBe(true);
     });
