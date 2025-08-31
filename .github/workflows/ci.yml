@@ -242,6 +242,12 @@ jobs:
           echo "📤 Notarizing $DMG_FILE with verbose output..."
           echo "📝 File info: $(ls -lh "$DMG_FILE")"
           
+          # Debug credentials (without exposing values)
+          echo "🔍 Checking notarization credentials..."
+          echo "Apple ID: ${APPLE_ID_EMAIL:0:10}..."
+          echo "Team ID: $APPLE_TEAM_ID"
+          echo "Password length: ${#APPLE_ID_PASSWORD} chars"
+          
           # Store credentials to avoid repeated auth
           echo "🔐 Setting up notarytool credentials..."
           xcrun notarytool store-credentials "lace-profile" \
