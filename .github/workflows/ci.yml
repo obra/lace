@@ -457,14 +457,18 @@ jobs:
           echo "✅ DMG uploaded to https://fsck.com/lace/dist/$CHANNEL/$DMG_FILENAME"
           
           # Upload appcast if it exists
-          APPCAST_PATH="build/appcast/$CHANNEL/appcast.xml"
-          if [ -f "$APPCAST_PATH" ]; then
-            echo "📡 Uploading appcast..."
+          # Find and upload appcast (handle wrong filename)
+          APPCAST_DIR="build/appcast/$CHANNEL"
+          APPCAST_FILE=$(find "$APPCAST_DIR" -name "*.xml" -o -name "*PLACEHOLDER*" | head -n1)
+          
+          if [ -n "$APPCAST_FILE" ] && [ -f "$APPCAST_FILE" ]; then
+            echo "📡 Found appcast: $(basename "$APPCAST_FILE")"
+            echo "Uploading as appcast.xml..."
             scp -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no \
-              "$APPCAST_PATH" jesse@fsck.com:"/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/appcast.xml"
+              "$APPCAST_FILE" jesse@fsck.com:"/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/appcast.xml"
             echo "✅ Appcast uploaded to https://fsck.com/lace/dist/$CHANNEL/appcast.xml"
           else
-            echo "⚠️  Appcast not found, skipping"
+            echo "⚠️  No appcast file found in $APPCAST_DIR"
           fi
           
           echo "🚀 Deployment to fsck.com complete!"
