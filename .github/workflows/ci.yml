@@ -201,21 +201,31 @@ jobs:
           security import /tmp/cert.p12 -k signing.keychain -P "$APPLE_DEVELOPER_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k actions signing.keychain
           
+          # Find the correct signing identity
+          SIGNING_IDENTITY=$(security find-identity -v signing.keychain | grep "Developer ID Application" | head -1 | grep -o '"[^"]*"' | tr -d '"')
+          echo "🔑 Using signing identity: $SIGNING_IDENTITY"
+          
+          if [ -z "$SIGNING_IDENTITY" ]; then
+            echo "❌ No Developer ID Application certificate found in keychain"
+            security find-identity -v signing.keychain
+            exit 1
+          fi
+          
           # Sign app bundle (inside-out approach)
-          echo "✍️  Signing app bundle..."
+          echo "✍️  Signing app bundle with: $SIGNING_IDENTITY"
           
           # Sign Sparkle framework components
           if [ -d "build/Lace.app/Contents/Frameworks/Sparkle.framework" ]; then
             echo "   ⚡ Signing Sparkle framework..."
-            codesign --force --options runtime --sign "$APPLE_TEAM_ID" "build/Lace.app/Contents/Frameworks/Sparkle.framework"
+            codesign --force --options runtime --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/Frameworks/Sparkle.framework"
           fi
           
           # Sign inner binaries
-          codesign --force --options runtime --sign "$APPLE_TEAM_ID" "build/Lace.app/Contents/MacOS/lace-server"
-          codesign --force --options runtime --sign "$APPLE_TEAM_ID" "build/Lace.app/Contents/MacOS/Lace"
+          codesign --force --options runtime --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/MacOS/lace-server"
+          codesign --force --options runtime --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/MacOS/Lace"
           
           # Sign main app bundle
-          codesign --force --options runtime --sign "$APPLE_TEAM_ID" "build/Lace.app"
+          codesign --force --options runtime --sign "$SIGNING_IDENTITY" "build/Lace.app"
           
           echo "✅ App bundle signed"
           
