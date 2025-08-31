@@ -404,13 +404,30 @@ jobs:
         run: |
           echo "🔐 Setting up SSH key for fsck.com deployment..."
           
-          # Setup SSH key
+          # Setup SSH key with verbose debugging
           mkdir -p ~/.ssh
           echo "${{ secrets.FSCK_SSH_PRIVATE_KEY }}" > ~/.ssh/fsck_deploy_key
           chmod 600 ~/.ssh/fsck_deploy_key
           
+          # Debug key setup
+          echo "🔍 SSH key debugging:"
+          ls -la ~/.ssh/fsck_deploy_key
+          echo "Key length: $(wc -c < ~/.ssh/fsck_deploy_key) bytes"
+          echo "Key type: $(ssh-keygen -l -f ~/.ssh/fsck_deploy_key)"
+          
           # Add fsck.com to known hosts
           ssh-keyscan fsck.com >> ~/.ssh/known_hosts
+          echo "🔍 Known hosts added"
+          
+          # Test basic SSH connectivity
+          echo "🧪 Testing SSH connection..."
+          ssh -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            jesse@fsck.com 'echo "SSH connection successful"' || {
+            echo "❌ SSH connection failed"
+            echo "Debug: SSH verbose connection test:"
+            ssh -vvv -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+              jesse@fsck.com 'echo test' 2>&1 | head -20
+          }
           
           echo "✅ SSH key configured for fsck.com"
       
@@ -422,10 +439,21 @@ jobs:
           CHANNEL="${{ steps.channel.outputs.channel }}"
           DMG_FILENAME=$(basename "$DMG_PATH")
           
-          # Upload DMG with scp
+          # Upload DMG with verbose scp debugging
           echo "📦 Uploading DMG: $DMG_FILENAME"
-          scp -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no \
-            "$DMG_PATH" jesse@fsck.com:"/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/$DMG_FILENAME"
+          echo "📝 Target: jesse@fsck.com:/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/$DMG_FILENAME"
+          
+          scp -v -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
+            "$DMG_PATH" jesse@fsck.com:"/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/$DMG_FILENAME" || {
+            echo "❌ SCP upload failed, debugging..."
+            echo "Trying to create directory first:"
+            ssh -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no \
+              jesse@fsck.com "mkdir -p /opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL" || echo "Directory creation failed"
+            echo "Retrying upload:"
+            scp -vvv -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no \
+              "$DMG_PATH" jesse@fsck.com:"/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/$DMG_FILENAME"
+          }
+          
           echo "✅ DMG uploaded to https://fsck.com/lace/dist/$CHANNEL/$DMG_FILENAME"
           
           # Upload appcast if it exists
