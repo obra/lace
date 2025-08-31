@@ -272,6 +272,17 @@ jobs:
           cd platforms/macos
           echo "$SPARKLE_PRIVATE_KEY" > sparkle_private_key
           chmod 600 sparkle_private_key
+          
+          # Verify key was created
+          echo "🔍 Verifying EdDSA key setup..."
+          ls -la sparkle_private_key
+          echo "Key length: $(wc -c < sparkle_private_key) bytes"
+          echo "Key starts with: $(head -c 10 sparkle_private_key)..."
+          
+          # Also verify from build script perspective
+          cd ../..
+          ls -la platforms/macos/sparkle_private_key
+          
           echo "✅ EdDSA private key configured for appcast signing"
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}

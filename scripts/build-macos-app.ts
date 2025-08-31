@@ -25,12 +25,12 @@ async function replaceAppcastPlaceholders(
 
   let appcastContent = readFileSync(appcastPath, 'utf8');
 
-  // Replace placeholder URL with actual Dropbox URL for the DMG
-  const dmgUrl = `https://uc.dropbox.com/scl/fi/DMG_FILE_ID/${dmgFilename}?rlkey=DMG_KEY&dl=1`;
+  // Replace placeholder URL with actual fsck.com URL for the DMG
+  const dmgUrl = `https://fsck.com/lace/dist/${channel}/${dmgFilename}`;
   appcastContent = appcastContent.replace(/PLACEHOLDER_URL_TO_BE_REPLACED/g, dmgUrl);
 
   console.log(`🔧 Replaced placeholder URL with: ${dmgUrl}`);
-  console.log('⚠️  Note: Using placeholder DMG URL - update with real Dropbox sharing link');
+  console.log('✅ Using fsck.com hosting for reliable distribution');
 
   writeFileSync(appcastPath, appcastContent);
   console.log(`✅ Updated appcast placeholders at ${appcastPath}`);
