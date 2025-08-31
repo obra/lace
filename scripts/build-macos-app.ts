@@ -62,14 +62,28 @@ async function createAppBundle(executablePath: string, outdir: string): Promise<
     stdio: 'inherit',
   });
 
-  // Copy the Swift app executable
-  const swiftAppPath = 'platforms/macos/build/Lace.app/Contents/MacOS/Lace';
-  if (!existsSync(swiftAppPath)) {
+  // Copy the entire Swift app bundle (including Frameworks)
+  const swiftAppBundlePath = 'platforms/macos/build/Lace.app';
+  if (!existsSync(swiftAppBundlePath)) {
     throw new Error(
-      `Swift app not found at ${swiftAppPath}. Make sure Swift compilation succeeded.`
+      `Swift app bundle not found at ${swiftAppBundlePath}. Make sure Swift compilation succeeded.`
     );
   }
+
+  // Copy the Swift app executable
+  const swiftAppPath = 'platforms/macos/build/Lace.app/Contents/MacOS/Lace';
   execSync(`cp "${swiftAppPath}" "${join(macosPath, appName)}"`);
+
+  // Copy Frameworks directory (critical for Sparkle)
+  const frameworksSourcePath = 'platforms/macos/build/Lace.app/Contents/Frameworks';
+  if (existsSync(frameworksSourcePath)) {
+    const frameworksDestPath = join(contentsPath, 'Frameworks');
+    mkdirSync(frameworksDestPath, { recursive: true });
+    execSync(`cp -R "${frameworksSourcePath}/" "${frameworksDestPath}/"`);
+    console.log(`   ⚡ Sparkle framework copied to app bundle`);
+  } else {
+    console.warn(`   ⚠️  No Frameworks directory found at ${frameworksSourcePath}`);
+  }
 
   // Copy the lace server as 'lace-server'
   execSync(`cp "${executablePath}" "${join(macosPath, 'lace-server')}"`);
