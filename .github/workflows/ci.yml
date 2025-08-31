@@ -162,15 +162,28 @@ jobs:
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Build macOS app bundle and DMG (unsigned)
+      - name: Build macOS app bundle (unsigned)
         if: steps.signing_check.outputs.available == 'true'
         run: |
           bun scripts/build-macos-app.ts \
-            --dmg \
+            --bundle \
             --channel ${{ steps.channel.outputs.channel }} \
             --generate-appcast
         env:
           BUILD_CHANNEL: ${{ steps.channel.outputs.channel }}
+      
+      - name: Verify app bundle exists before signing
+        if: steps.signing_check.outputs.available == 'true'
+        run: |
+          echo "🔍 Checking for app bundle..."
+          ls -la build/
+          if [ -d "build/Lace.app" ]; then
+            echo "✅ App bundle found"
+            ls -la build/Lace.app/Contents/
+          else
+            echo "❌ App bundle missing!"
+            exit 1
+          fi
       
       - name: Sign macOS app with reusable action
         if: steps.signing_check.outputs.available == 'true'
