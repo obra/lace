@@ -30,7 +30,7 @@ async function performSigningOnly(
       if (existsSync(xpcServicesPath)) {
         console.log('   🔧 Signing Sparkle XPC services...');
         execSync(
-          `find "${xpcServicesPath}" -name "*.xpc" -exec codesign --force --options runtime --sign "${signingIdentity}" {} \;`,
+          `find "${xpcServicesPath}" -name "*.xpc" -exec codesign --force --options runtime --sign "${signingIdentity}" {} \\;`,
           { stdio: 'inherit' }
         );
       }
