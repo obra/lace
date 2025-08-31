@@ -61,9 +61,21 @@ async function createAppBundle(executablePath: string, outdir: string): Promise<
     );
   }
 
-  // Copy the Swift app executable
-  const swiftAppPath = 'platforms/macos/build/Lace.app/Contents/MacOS/Lace';
-  execSync(`cp "${swiftAppPath}" "${join(macosPath, appName)}"`);
+  // Copy the ENTIRE working Swift app bundle (includes all frameworks)
+  console.log('📝 Copying complete Swift app bundle...');
+  execSync(`ditto "${swiftAppBundlePath}" "${finalAppBundlePath}"`);
+
+  // Verify Sparkle framework is included
+  const sparkleFramework = join(finalAppBundlePath, 'Contents/Frameworks/Sparkle.framework');
+  if (existsSync(sparkleFramework)) {
+    console.log('   ✅ Sparkle framework verified in final bundle');
+  } else {
+    console.error('   ❌ Sparkle framework missing!');
+  }
+
+  // Add lace-server to the complete bundle
+  const macosPath = join(finalAppBundlePath, 'Contents/MacOS');
+  execSync(`cp "${executablePath}" "${join(macosPath, 'lace-server')}"`);
 
   // Copy Frameworks directory from the Swift build (critical for Sparkle)
   const frameworksSourcePath = 'platforms/macos/build/Lace.app/Contents/Frameworks';
@@ -94,21 +106,17 @@ async function createAppBundle(executablePath: string, outdir: string): Promise<
   // Copy the lace server as 'lace-server'
   execSync(`cp "${executablePath}" "${join(macosPath, 'lace-server')}"`);
 
-  // Copy and update Info.plist with actual feed URL
+  // Update Info.plist with real feed URL
   const channel = process.env.BUILD_CHANNEL || 'nightly';
   const feedUrl = `https://fsck.com/lace/dist/${channel}/appcast.xml`;
 
-  let infoPlistContent = readFileSync('platforms/macos/Info.plist', 'utf8');
+  const infoPlistPath = join(finalAppBundlePath, 'Contents/Info.plist');
+  let infoPlistContent = readFileSync(infoPlistPath, 'utf8');
   infoPlistContent = infoPlistContent.replace('SPARKLE_FEED_URL_PLACEHOLDER', feedUrl);
-  writeFileSync(`${contentsPath}/Info.plist`, infoPlistContent);
+  writeFileSync(infoPlistPath, infoPlistContent);
 
   console.log(`   📡 Feed URL set to: ${feedUrl}`);
-
-  // Copy app icon
-  if (existsSync('platforms/macos/AppIcon.icns')) {
-    execSync(`cp platforms/macos/AppIcon.icns "${resourcesPath}/"`);
-    console.log(`   🎨 App icon copied`);
-  }
+  console.log(`   📱 Complete app bundle ready with Sparkle framework`);
 
   console.log(`   📱 Swift menu bar app: ${appName}`);
   console.log(`   🖥️  Server binary: lace-server`);
