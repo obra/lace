@@ -122,54 +122,7 @@ jobs:
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
 
-      - name: Setup Apple Code Signing
-        run: |
-          # Save original default keychain
-          ORIGINAL_KEYCHAIN=$(security default-keychain 2>/dev/null | tr -d '"' || echo "no-default")
-          echo "ORIGINAL_KEYCHAIN=$ORIGINAL_KEYCHAIN" >> $GITHUB_ENV
-          
-          # Create temporary keychain for signing
-          KEYCHAIN_NAME="github-actions-$(date +%s).keychain"
-          KEYCHAIN_PASSWORD="temp-keychain-pass-$(date +%s)"
-          echo "::add-mask::$KEYCHAIN_PASSWORD"
-          
-          # Create and unlock keychain
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
-          security default-keychain -s "$KEYCHAIN_NAME"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
-          # Keep unlocked during job and avoid UI prompts
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_NAME"
-          
-          # Decode and import P12 certificate
-          echo "$APPLE_DEVELOPER_CERTIFICATE_P12" | base64 --decode > temp-cert.p12
-          security import temp-cert.p12 -k "$KEYCHAIN_NAME" -P "$APPLE_DEVELOPER_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productsign -T /usr/bin/security
-          
-          # Set partition list for codesign access
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
-          
-          # Add to keychain search list so codesign can find it
-          security list-keychains -d user -s "$KEYCHAIN_NAME" login.keychain
-          
-          # Verify certificate was imported and accessible
-          echo "🔍 Verifying certificate import..."
-          security find-identity -v -p codesigning "$KEYCHAIN_NAME"
-          echo "🔍 Checking codesigning access..."
-          security find-identity -v -p codesigning
-          
-          # Clean up certificate file
-          rm temp-cert.p12
-          
-          # Export for use in build step
-          echo "KEYCHAIN_NAME=$KEYCHAIN_NAME" >> $GITHUB_ENV
-          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> $GITHUB_ENV
-          
-          # Debug: Check if secrets are available (without exposing values)
-          echo "🔍 Checking secret availability..."
-          [ -n "$APPLE_DEVELOPER_CERTIFICATE_P12" ] && echo "  APPLE_DEVELOPER_CERTIFICATE_P12: Present" || echo "  APPLE_DEVELOPER_CERTIFICATE_P12: Missing"
-          [ -n "$APPLE_DEVELOPER_CERTIFICATE_PASSWORD" ] && echo "  APPLE_DEVELOPER_CERTIFICATE_PASSWORD: Present" || echo "  APPLE_DEVELOPER_CERTIFICATE_PASSWORD: Missing"
-        env:
-          APPLE_DEVELOPER_CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
-          APPLE_DEVELOPER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+      # Keychain setup handled by reusable actions
 
       - name: Determine deployment channel
         id: channel
@@ -209,21 +162,42 @@ jobs:
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Build macOS app (signed) with DMG and appcast
+      - name: Build macOS app bundle and DMG (unsigned)
         if: steps.signing_check.outputs.available == 'true'
         run: |
           bun scripts/build-macos-app.ts \
             --dmg \
-            --sign \
             --channel ${{ steps.channel.outputs.channel }} \
             --generate-appcast
         env:
-          # Signal to sign-and-notarize.ts that keychain is already set up
-          GITHUB_ACTIONS_KEYCHAIN_READY: 'true'
           BUILD_CHANNEL: ${{ steps.channel.outputs.channel }}
-          APPLE_ID_EMAIL: ${{ secrets.APPLE_ID_EMAIL }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      
+      - name: Sign macOS app with reusable action
+        if: steps.signing_check.outputs.available == 'true'
+        uses: lando/code-sign-action@v2
+        with:
+          file: build/Lace.app
+          certificate-data: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12 }}
+          certificate-password: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+          apple-team-id: ${{ secrets.APPLE_TEAM_ID }}
+      
+      - name: Notarize macOS app with reusable action
+        if: steps.signing_check.outputs.available == 'true'
+        uses: lando/notarize-action@v2
+        with:
+          product-path: build/Lace.app
+          appstore-connect-username: ${{ secrets.APPLE_ID_EMAIL }}
+          appstore-connect-password: ${{ secrets.APPLE_ID_PASSWORD }}
+          appstore-connect-team-id: ${{ secrets.APPLE_TEAM_ID }}
+      
+      - name: Recreate DMG with signed app
+        if: steps.signing_check.outputs.available == 'true'
+        run: |
+          # Remove old unsigned DMG
+          rm -f build/Lace-*.dmg
+          
+          # Create new DMG with signed app
+          bun scripts/create-dmg.ts --app build/Lace.app --output build
 
       - name: Build macOS app (unsigned) for testing
         if: steps.signing_check.outputs.available == 'false'
@@ -276,20 +250,7 @@ jobs:
           echo "🔗 DMG: https://fsck.com/lace/dist/$CHANNEL/$DMG_FILENAME"
           echo "📡 Appcast: https://fsck.com/lace/dist/$CHANNEL/appcast.xml"
 
-      - name: Cleanup Keychain
-        if: always()
-        run: |
-          # Restore original default keychain if we saved one
-          if [ -n "$ORIGINAL_KEYCHAIN" ] && [ "$ORIGINAL_KEYCHAIN" != "no-default" ]; then
-            security default-keychain -s "$ORIGINAL_KEYCHAIN" || true
-            echo "✅ Restored original default keychain: $ORIGINAL_KEYCHAIN"
-          fi
-          
-          # Delete temporary keychain
-          if [ -n "$KEYCHAIN_NAME" ]; then
-            security delete-keychain "$KEYCHAIN_NAME" || true
-            echo "🧹 Cleaned up temporary keychain"
-          fi
+      # Keychain cleanup handled by reusable actions
 
       - name: Notify completion
         run: |
