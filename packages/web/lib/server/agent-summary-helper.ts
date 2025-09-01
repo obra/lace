@@ -19,21 +19,9 @@ export async function generateAgentSummary(
   lastAgentResponse?: string
 ): Promise<string> {
   try {
-    logger.debug('Creating SessionHelper for agent summary', {
-      agentId: getAgentId(agent),
-      hasAgent: !!agent,
-      userMessage,
-      hasLastResponse: !!lastAgentResponse,
-    });
-
-    // SessionHelper will try 'fast' model from global config, fall back to agent's provider
     const helper = new SessionHelper({
       model: 'fast',
       parentAgent: agent,
-    });
-
-    logger.debug('SessionHelper created successfully', {
-      agentId: getAgentId(agent),
     });
 
     // Build context for the summary
@@ -48,31 +36,13 @@ ${context}
 
 Respond with just the summary sentence, nothing else. Keep it concise and focused on the current task or activity.`;
 
-    logger.debug('Executing SessionHelper with prompt', {
-      agentId: getAgentId(agent),
-      promptLength: prompt.length,
-    });
-
     const result = await helper.execute(prompt);
 
-    logger.debug('SessionHelper execution result', {
-      agentId: getAgentId(agent),
-      hasContent: !!result.content,
-      contentLength: result.content?.length || 0,
-      toolCallsCount: result.toolCalls?.length || 0,
-    });
-
     if (result.content && result.content.trim()) {
-      const summary = result.content.trim();
-      logger.debug('Agent summary generated successfully', {
-        agentId: getAgentId(agent),
-        summary,
-      });
-      return summary;
+      return result.content.trim();
     } else {
       logger.warn('Agent summary generation failed - no content returned', {
         agentId: getAgentId(agent),
-        result: result,
       });
       return 'Processing your request';
     }
