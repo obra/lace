@@ -124,9 +124,6 @@ export async function createProviderInstance(page: Page): Promise<void> {
         return page.waitForTimeout(2000);
       });
     });
-
-  // Dismiss the settings modal after provider creation
-  await closeSettingsModal(page);
 }
 
 /**
