@@ -10,7 +10,8 @@ import { randomUUID } from 'crypto';
 import { logger } from '~/utils/logger';
 import type { Route } from './+types/api.agents.$agentId.message';
 import { EventStreamManager } from '@/lib/event-stream-manager';
-import type { ErrorType, ErrorPhase } from '@/types/core';
+import { generateAgentSummary, getLastAgentResponse } from '@/lib/server/agent-summary-helper';
+import type { ErrorType, ErrorPhase, AgentSummaryUpdatedData } from '@/types/core';
 
 // Helper to sanitize error text by redacting sensitive info and truncating
 function sanitizeErrorText(text?: string): string {
@@ -213,7 +214,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    const agent = session.getAgent(agentId);
+    const agent = session.getAgent(asThreadId(agentId));
     if (!agent) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
@@ -223,6 +224,68 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     // Generate message ID
     const messageId = randomUUID();
+
+    // Generate agent summary before processing the message
+    const summaryPromise = (async () => {
+      try {
+        logger.debug('Starting agent summary generation', {
+          agentId,
+          userMessage: validation.data.message,
+        });
+
+        // Get thread events to find the last agent response
+        const threadManager = agent.threadManager;
+        const events = threadManager.getEvents(asThreadId(agentId));
+        const lastAgentResponse = getLastAgentResponse(events);
+
+        logger.debug('Retrieved conversation context', {
+          agentId,
+          eventCount: events.length,
+          hasLastResponse: !!lastAgentResponse,
+        });
+
+        // Generate summary
+        const summary = await generateAgentSummary(
+          agent,
+          validation.data.message,
+          lastAgentResponse
+        );
+
+        logger.debug('Generated summary', { agentId, summary });
+
+        // Broadcast summary update event
+        const eventStreamManager = EventStreamManager.getInstance();
+        eventStreamManager.broadcast({
+          type: 'AGENT_SUMMARY_UPDATED',
+          threadId: agentId,
+          timestamp: new Date(),
+          data: {
+            summary,
+            agentThreadId: asThreadId(agentId),
+            timestamp: new Date(),
+          } as AgentSummaryUpdatedData,
+          transient: true,
+          context: {
+            projectId: session.getProjectId(),
+            sessionId: sessionId,
+            agentId: agentId,
+          },
+        });
+
+        logger.debug('Broadcast summary event', { agentId, summary });
+      } catch (error) {
+        logger.error('Agent summary generation failed', {
+          agentId,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+      }
+    })();
+
+    // Handle promise rejection to prevent unhandled rejection warnings
+    summaryPromise.catch(() => {
+      // Error already logged above, just prevent unhandled rejection
+    });
 
     // Process message asynchronously
     void agent.sendMessage(validation.data.message).catch((error: unknown) => {

@@ -11,6 +11,7 @@ export { EventApprovalCallback } from '~/tools/event-approval-callback';
 export { Session } from '~/sessions/session';
 export { Project } from '~/projects/project';
 export { ThreadManager } from '~/threads/thread-manager';
+export { SessionHelper } from '~/helpers/session-helper';
 
 // Tool types
 

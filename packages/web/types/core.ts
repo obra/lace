@@ -9,10 +9,13 @@ export type {
   LaceEvent,
   AgentMessageData,
   AgentStateChangeData,
+  AgentSummaryUpdatedData,
   ErrorType,
   ErrorPhase,
   AgentErrorData,
 } from '~/threads/types';
+
+export { isAgentSummaryUpdatedData } from '~/threads/types';
 
 export type { CombinedTokenUsage, ThreadTokenUsage } from '~/token-management/types';
 

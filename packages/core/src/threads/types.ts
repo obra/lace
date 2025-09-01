@@ -33,6 +33,7 @@ export const EVENT_TYPES = [
   'TASK_NOTE_ADDED',
   // Agent lifecycle events (transient)
   'AGENT_SPAWNED',
+  'AGENT_SUMMARY_UPDATED',
   // Project events (transient)
   'PROJECT_CREATED',
   'PROJECT_UPDATED',
@@ -62,6 +63,7 @@ export function isTransientEventType(type: LaceEventType): boolean {
     'TASK_NOTE_ADDED',
     // Agent lifecycle events
     'AGENT_SPAWNED',
+    'AGENT_SUMMARY_UPDATED',
     // Project events
     'PROJECT_CREATED',
     'PROJECT_UPDATED',
@@ -213,6 +215,22 @@ interface AgentSpawnedData {
     isHuman: boolean;
   };
   timestamp: Date;
+}
+
+export interface AgentSummaryUpdatedData {
+  summary: string;
+  agentThreadId: ThreadId;
+  timestamp: Date;
+}
+
+export function isAgentSummaryUpdatedData(value: unknown): value is AgentSummaryUpdatedData {
+  if (!value || typeof value !== 'object') return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.summary === 'string' &&
+    typeof obj.agentThreadId === 'string' &&
+    (obj.timestamp instanceof Date || typeof obj.timestamp === 'string')
+  );
 }
 
 // Project event data types
@@ -415,6 +433,10 @@ export type LaceEvent =
   | (BaseLaceEvent & {
       type: 'AGENT_SPAWNED';
       data: AgentSpawnedData;
+    })
+  | (BaseLaceEvent & {
+      type: 'AGENT_SUMMARY_UPDATED';
+      data: AgentSummaryUpdatedData;
     })
   | (BaseLaceEvent & {
       type: 'PROJECT_CREATED';

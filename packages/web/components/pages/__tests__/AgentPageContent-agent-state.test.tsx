@@ -44,6 +44,23 @@ vi.mock('@/components/providers/SessionProvider', () => ({
   }),
 }));
 
+vi.mock('@/components/providers/EventStreamProvider', () => ({
+  useEventStreamContext: () => ({
+    agentEvents: {
+      events: [],
+      loadingHistory: false,
+      addAgentEvent: vi.fn(),
+    },
+    eventStream: {
+      connection: { connected: false },
+      lastEvent: undefined,
+      sendCount: 0,
+      close: vi.fn(),
+      reconnect: vi.fn(),
+    },
+  }),
+}));
+
 vi.mock('@/components/providers/AgentProvider', () => ({
   useAgentContext: () => ({
     currentAgent: {

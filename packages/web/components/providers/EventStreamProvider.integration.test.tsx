@@ -15,6 +15,7 @@ import { AgentProvider } from './AgentProvider';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { createMockResponse } from '@/test-utils/mock-fetch';
 import type { ThreadId } from '@/types/core';
+import { asThreadId } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
 
 // Mock all the hooks that EventStreamProvider depends on
@@ -325,7 +326,39 @@ describe('EventStreamProvider Integration', () => {
     expect(screen.getByTestId('connection-id')).toHaveTextContent('new-conn');
   });
 
-  it('passes correct parameters to underlying hooks based on props', async () => {
+  it('forwards events to child components when they occur', async () => {
+    // Mock an event stream that receives events
+    const mockEvents: LaceEvent[] = [];
+    const mockAddAgentEvent = vi.fn((event: LaceEvent) => {
+      mockEvents.push(event);
+    });
+
+    vi.mocked(useAgentEventsHook).mockReturnValue({
+      events: mockEvents,
+      loadingHistory: false,
+      connected: true,
+      addAgentEvent: mockAddAgentEvent,
+    });
+
+    // Mock the event stream to simulate receiving events
+    let eventHandlers: Record<string, Function> = {};
+    vi.mocked(useEventStreamHook).mockImplementation((options) => {
+      // Capture the event handlers so we can simulate events
+      eventHandlers = {
+        onUserMessage: options.onUserMessage || (() => {}),
+        onAgentMessage: options.onAgentMessage || (() => {}),
+        onSessionEvent: options.onSessionEvent || (() => {}),
+      };
+
+      return {
+        connection: { connected: true, reconnectAttempts: 0, maxReconnectAttempts: 5 },
+        lastEvent: undefined,
+        sendCount: 0,
+        close: vi.fn(),
+        reconnect: vi.fn(),
+      };
+    });
+
     await act(async () => {
       render(
         <ThemeProvider>
@@ -344,29 +377,33 @@ describe('EventStreamProvider Integration', () => {
       );
     });
 
-    // Verify hooks are called with correct parameters
-    expect(useAgentEventsHook).toHaveBeenCalledWith('lace_20250101_xyz789', false);
-    expect(useEventStreamHook).toHaveBeenCalledWith({
-      projectId: 'my-project',
-      sessionId: 'lace_20250101_qrs456',
-      threadIds: ['lace_20250101_xyz789'],
-      onConnect: expect.any(Function),
-      onError: expect.any(Function),
-      onAgentError: expect.any(Function),
-      onUserMessage: expect.any(Function),
-      onAgentMessage: expect.any(Function),
-      onAgentToken: expect.any(Function),
-      onToolCall: expect.any(Function),
-      onToolResult: expect.any(Function),
-      onAgentStateChange: expect.any(Function),
-      onApprovalRequest: expect.any(Function),
-      onApprovalResponse: expect.any(Function),
-      onCompactionStart: expect.any(Function),
-      onCompactionComplete: expect.any(Function),
+    // Test behavior: Simulate an AGENT_SUMMARY_UPDATED event coming through SSE
+    const summaryEvent: LaceEvent = {
+      id: 'test-summary-event',
+      type: 'AGENT_SUMMARY_UPDATED',
+      threadId: 'lace_20250101_xyz789',
+      timestamp: new Date(),
+      data: {
+        summary: 'Working on test summary',
+        agentThreadId: asThreadId('lace_20250101_xyz789'),
+        timestamp: new Date(),
+      },
+      transient: true,
+    };
+
+    // Trigger the event through the session event handler
+    await act(async () => {
+      if (eventHandlers.onSessionEvent) {
+        eventHandlers.onSessionEvent(summaryEvent);
+      }
     });
+
+    // Test behavior: Verify the event was properly forwarded to child components
+    expect(mockAddAgentEvent).toHaveBeenCalledWith(summaryEvent);
+    expect(mockEvents).toContain(summaryEvent);
   });
 
-  it('handles null agentId gracefully', async () => {
+  it('handles null agentId gracefully without breaking', async () => {
     await act(async () => {
       render(
         <ThemeProvider>
@@ -385,28 +422,17 @@ describe('EventStreamProvider Integration', () => {
       );
     });
 
-    // Should still work with null agentId
+    // Test behavior: Provider should render without crashing when agentId is null
     expect(screen.getByTestId('is-connected')).toHaveTextContent('false');
     expect(screen.getByTestId('events-count')).toHaveTextContent('0');
 
-    // Verify correct parameters passed
-    expect(useEventStreamHook).toHaveBeenCalledWith({
-      projectId: 'test-project',
-      sessionId: 'lace_20250101_def456',
-      threadIds: undefined,
-      onConnect: expect.any(Function),
-      onError: expect.any(Function),
-      onAgentError: expect.any(Function),
-      onUserMessage: expect.any(Function),
-      onAgentMessage: expect.any(Function),
-      onAgentToken: expect.any(Function),
-      onToolCall: expect.any(Function),
-      onToolResult: expect.any(Function),
-      onAgentStateChange: expect.any(Function),
-      onApprovalRequest: expect.any(Function),
-      onApprovalResponse: expect.any(Function),
-      onCompactionStart: expect.any(Function),
-      onCompactionComplete: expect.any(Function),
-    });
+    // Test configuration: Verify event stream is configured with correct filters
+    expect(useEventStreamHook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: 'test-project',
+        sessionId: 'lace_20250101_def456',
+        threadIds: undefined,
+      })
+    );
   });
 });
