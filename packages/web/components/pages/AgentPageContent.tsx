@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars } from '@/lib/fontawesome';
@@ -23,6 +23,7 @@ import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useToolApprovalContext } from '@/components/providers/ToolApprovalProvider';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import { useURLState } from '@/hooks/useURLState';
+import { useEventStream } from '@/hooks/useEventStream';
 
 interface AgentPageContentProps {
   projectId: string;
@@ -46,6 +47,9 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   } = useAgentContext();
   const { pendingApprovals, handleApprovalDecision } = useToolApprovalContext();
   const { availableProviders: providers } = useProviderInstances();
+
+  // Agent summary state
+  const [agentSummary, setAgentSummary] = useState<string | null>(null);
 
   // Modal states
   const [showEditAgent, setShowEditAgent] = useState(false);
@@ -113,6 +117,26 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
     setShowSessionEditModal(true);
   }, []);
 
+  // Listen for agent summary updates
+  const { events } = useEventStream();
+
+  useEffect(() => {
+    if (!events) return;
+
+    for (const event of events) {
+      if (
+        event.type === 'AGENT_SUMMARY_UPDATED' &&
+        event.data &&
+        typeof event.data === 'object' &&
+        'agentThreadId' in event.data &&
+        event.data.agentThreadId === agentId
+      ) {
+        const summaryData = event.data as { summary: string };
+        setAgentSummary(summaryData.summary);
+      }
+    }
+  }, [events, agentId]);
+
   // Get current agent info for display
   const currentAgent = selectedSessionDetails?.agents?.find((a) => a.threadId === agentId);
 
@@ -160,10 +184,13 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
               >
                 <FontAwesomeIcon icon={faBars} className="w-6 h-6" />
               </motion.button>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-1">
                 <h1 className="font-semibold text-base-content truncate">
                   {currentAgent ? `${currentAgent.name} - ${currentAgent.modelId}` : 'Agent'}
                 </h1>
+                {agentSummary && (
+                  <p className="text-sm text-base-content/70 truncate">{agentSummary}</p>
+                )}
               </div>
             </motion.div>
           </motion.div>

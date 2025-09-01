@@ -1,12 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { HelperFactory } from './helper-factory';
 import { HelperRegistry } from './helper-registry';
 import { InfrastructureHelper } from './infrastructure-helper';
 import { SessionHelper } from './session-helper';
 import { Agent } from '~/agents/agent';
 
-// Test integration between factory and registry
-describe('HelperFactory and HelperRegistry Integration', () => {
+// Test integration between helper constructors and registry
+describe('Helper and HelperRegistry Integration', () => {
   let registry: HelperRegistry;
   let mockAgent: Agent;
 
@@ -16,36 +15,33 @@ describe('HelperFactory and HelperRegistry Integration', () => {
     vi.clearAllMocks();
   });
 
-  describe('factory with registry workflow', () => {
-    it('should create helpers via factory and track in registry', () => {
-      // Create infrastructure helper via factory
-      const infraHelper = HelperFactory.createInfrastructureHelper({
+  describe('direct constructor with registry workflow', () => {
+    it('should create helpers via constructors and track in registry', () => {
+      // Create infrastructure helper directly
+      const infraHelper = new InfrastructureHelper({
         model: 'fast',
-        tools: ['test_tool']
+        tools: ['test_tool'],
       });
 
-      // Create session helper via factory
-      const sessionHelper = HelperFactory.createSessionHelper({
+      // Create session helper directly
+      const sessionHelper = new SessionHelper({
         model: 'smart',
-        parentAgent: mockAgent
+        parentAgent: mockAgent,
       });
 
-      // Register them manually (in real usage, registry would create them)
-      expect(() => {
-        // This demonstrates the factory creates valid instances
-        expect(infraHelper).toBeInstanceOf(InfrastructureHelper);
-        expect(sessionHelper).toBeInstanceOf(SessionHelper);
-      }).not.toThrow();
+      // This demonstrates the constructors create valid instances
+      expect(infraHelper).toBeInstanceOf(InfrastructureHelper);
+      expect(sessionHelper).toBeInstanceOf(SessionHelper);
     });
 
     it('should demonstrate complete workflow pattern', () => {
       // Pattern: Create helper via registry, use it, then clean up
       const helperId = 'workflow-test';
-      
+
       // Step 1: Create helper
       const helper = registry.createInfrastructureHelper(helperId, {
         model: 'fast',
-        tools: ['file-read', 'ripgrep-search']
+        tools: ['file-read', 'ripgrep-search'],
       });
 
       expect(helper).toBeDefined();
@@ -65,37 +61,36 @@ describe('HelperFactory and HelperRegistry Integration', () => {
       // Create multiple helpers of different types
       const infraHelper1 = registry.createInfrastructureHelper('infra-1', {
         model: 'fast',
-        tools: ['tool1']
+        tools: ['tool1'],
       });
 
       const _infraHelper2 = registry.createInfrastructureHelper('infra-2', {
-        model: 'smart', 
-        tools: ['tool2']
+        model: 'smart',
+        tools: ['tool2'],
       });
 
       const _sessionHelper1 = registry.createSessionHelper('session-1', {
         model: 'fast',
-        parentAgent: mockAgent
+        parentAgent: mockAgent,
       });
 
       const sessionHelper2 = registry.createSessionHelper('session-2', {
         model: 'smart',
-        parentAgent: mockAgent
+        parentAgent: mockAgent,
       });
 
       // Verify all are tracked
       expect(registry.getActiveHelperCount()).toBe(4);
       expect(registry.getActiveHelperIds()).toEqual([
-        'infra-1', 'infra-2', 'session-1', 'session-2'
+        'infra-1',
+        'infra-2',
+        'session-1',
+        'session-2',
       ]);
 
       // Verify type filtering works
-      expect(registry.getHelperIdsByType('infrastructure')).toEqual([
-        'infra-1', 'infra-2'
-      ]);
-      expect(registry.getHelperIdsByType('session')).toEqual([
-        'session-1', 'session-2'
-      ]);
+      expect(registry.getHelperIdsByType('infrastructure')).toEqual(['infra-1', 'infra-2']);
+      expect(registry.getHelperIdsByType('session')).toEqual(['session-1', 'session-2']);
 
       // Verify individual access
       expect(registry.getHelper('infra-1')).toBe(infraHelper1);
@@ -116,14 +111,14 @@ describe('HelperFactory and HelperRegistry Integration', () => {
     it('should prevent id collisions', () => {
       registry.createInfrastructureHelper('helper-1', {
         model: 'fast',
-        tools: []
+        tools: [],
       });
 
       // Try to create session helper with same ID
       expect(() => {
         registry.createSessionHelper('helper-1', {
           model: 'smart',
-          parentAgent: mockAgent
+          parentAgent: mockAgent,
         });
       }).toThrow('Helper with id "helper-1" already exists');
 
@@ -131,7 +126,7 @@ describe('HelperFactory and HelperRegistry Integration', () => {
       expect(() => {
         registry.createInfrastructureHelper('helper-1', {
           model: 'smart',
-          tools: ['different-tool']
+          tools: ['different-tool'],
         });
       }).toThrow('Helper with id "helper-1" already exists');
     });
@@ -141,16 +136,16 @@ describe('HelperFactory and HelperRegistry Integration', () => {
     it('should support memory management helper pattern', () => {
       // Scenario: Memory system creates helper for conversation analysis
       const memoryHelperId = 'memory-analyzer';
-      
+
       const helper = registry.createInfrastructureHelper(memoryHelperId, {
         model: 'smart', // Use smart model for analysis
         tools: ['ripgrep-search', 'file-read', 'url-fetch'],
-        workingDirectory: '/path/to/logs'
+        workingDirectory: '/path/to/logs',
       });
 
       expect(helper).toBeDefined();
       expect(registry.getHelperType(memoryHelperId)).toBe('infrastructure');
-      
+
       // After analysis is complete
       registry.removeHelper(memoryHelperId);
       expect(registry.getHelper(memoryHelperId)).toBeUndefined();
@@ -160,15 +155,15 @@ describe('HelperFactory and HelperRegistry Integration', () => {
       // Scenario: Agent spawns helper for URL summarization during conversation
       const agent = mockAgent; // Would be real agent in practice
       const subTaskId = 'url-summarizer';
-      
+
       const helper = registry.createSessionHelper(subTaskId, {
         model: 'fast', // Use fast model for simple summarization
-        parentAgent: agent
+        parentAgent: agent,
       });
 
       expect(helper).toBeDefined();
       expect(registry.getHelperType(subTaskId)).toBe('session');
-      
+
       // Helper inherits agent context and approval workflow
       // After summarization is complete
       registry.removeHelper(subTaskId);
@@ -178,11 +173,11 @@ describe('HelperFactory and HelperRegistry Integration', () => {
     it('should support bulk operations', () => {
       // Create multiple helpers for batch processing
       const helperIds = ['batch-1', 'batch-2', 'batch-3'];
-      
-      helperIds.forEach(id => {
+
+      helperIds.forEach((id) => {
         registry.createInfrastructureHelper(id, {
           model: 'fast',
-          tools: ['file-read']
+          tools: ['file-read'],
         });
       });
 

@@ -9,6 +9,7 @@ export type {
   LaceEvent,
   AgentMessageData,
   AgentStateChangeData,
+  AgentSummaryUpdatedData,
   ErrorType,
   ErrorPhase,
   AgentErrorData,

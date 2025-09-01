@@ -169,7 +169,8 @@ function createLaceEventFromDb(
 
     // Agent lifecycle events are transient
     case 'AGENT_SPAWNED':
-      throw new Error('AGENT_SPAWNED events are transient and should not be persisted');
+    case 'AGENT_SUMMARY_UPDATED':
+      throw new Error(`${type} events are transient and should not be persisted`);
 
     // Project events are transient
     case 'PROJECT_CREATED':
