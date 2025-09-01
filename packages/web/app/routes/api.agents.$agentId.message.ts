@@ -226,7 +226,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const messageId = randomUUID();
 
     // Generate agent summary before processing the message
-    void (async () => {
+    const summaryPromise = (async () => {
       try {
         logger.debug('Starting agent summary generation', {
           agentId,
@@ -281,6 +281,11 @@ export async function action({ request, params }: Route.ActionArgs) {
         });
       }
     })();
+
+    // Handle promise rejection to prevent unhandled rejection warnings
+    summaryPromise.catch(() => {
+      // Error already logged above, just prevent unhandled rejection
+    });
 
     // Process message asynchronously
     void agent.sendMessage(validation.data.message).catch((error: unknown) => {
