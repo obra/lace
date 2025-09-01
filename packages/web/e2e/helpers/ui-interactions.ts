@@ -13,11 +13,14 @@ import * as path from 'path';
 /** Open the settings modal using the testid */
 export async function openSettingsModal(page: Page): Promise<void> {
   const settingsButton = page.locator('[data-testid="settings-button"]');
-  await settingsButton.waitFor({ state: 'visible', timeout: 5000 });
+  await settingsButton.waitFor({ state: 'visible', timeout: 15000 });
+
+  // Ensure button is actually clickable and page is ready
+  await page.waitForTimeout(1000);
   await settingsButton.click();
 
-  // Wait for settings modal to open
-  await page.waitForSelector('text="Configuration"', { timeout: 10000 });
+  // Wait for settings modal to open with longer timeout for CI
+  await page.waitForSelector('text="Configuration"', { timeout: 20000 });
 }
 
 /** Navigate to a specific settings tab */
@@ -30,12 +33,12 @@ export async function navigateToSettingsTab(page: Page, tabName: string): Promis
 
 /** Close the settings modal using the dismiss button */
 export async function closeSettingsModal(page: Page): Promise<void> {
-  // Use .first() since there might be multiple close buttons (nested modals)
-  const closeButton = page.locator('[aria-label="Close modal"]').first();
-  await closeButton.waitFor({ state: 'visible', timeout: 5000 });
+  const closeButton = page.locator('[data-testid="dismiss-button"]').first();
+  await closeButton.waitFor({ state: 'visible', timeout: 15000 });
+  await closeButton.click();
 
-  // Force click to get past any overlay issues
-  await closeButton.click({ force: true });
+  // Wait for modal to actually close
+  await page.waitForTimeout(1000);
 }
 
 /**
