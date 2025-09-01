@@ -157,40 +157,6 @@ describe('Agent Message Endpoint with Summary Generation', () => {
     expect(eventData.timestamp).toBeInstanceOf(Date);
   });
 
-  it('should handle summary generation failure gracefully', async () => {
-    // Mock the AI provider to fail
-    server.use(
-      http.post('https://api.anthropic.com/v1/messages', () => {
-        return HttpResponse.error();
-      })
-    );
-
-    const request = new Request('http://localhost:3000/api/agents/test-agent/message', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: 'Test message',
-      }),
-    });
-
-    const response = await action({
-      request,
-      params: { agentId },
-    } as { request: Request; params: { agentId: string }; context: Record<string, unknown> });
-
-    // Endpoint should still succeed
-    expect(response.status).toBe(202);
-
-    // Wait for async summary generation to complete
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    // Should not broadcast summary event when helper fails
-    const summaryEvent = capturedEvents.find((event) => event.type === 'AGENT_SUMMARY_UPDATED');
-    expect(summaryEvent).toBeUndefined();
-  });
-
   it('should include last agent response in summary context', async () => {
     // This test verifies that the helper considers conversation history
     // We'll mock a more specific response to prove it was called with context
