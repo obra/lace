@@ -1,10 +1,24 @@
 // ABOUTME: Helper for generating agent summaries using SessionHelper
 // ABOUTME: Called after user messages to create real-time activity summaries
 
-import { SessionHelper } from '~/helpers/session-helper';
+import { SessionHelper } from '@/lib/server/lace-imports';
 import { logger } from '~/utils/logger';
 import type { Agent } from '@/lib/server/lace-imports';
 import type { LaceEvent } from '@/types/core';
+
+class AgentSummaryError extends Error {
+  public readonly code: string;
+  public readonly agentId: string;
+  public readonly cause?: Error;
+
+  constructor(message: string, context: { agentId: string; code: string; cause?: unknown }) {
+    super(message);
+    this.name = 'AgentSummaryError';
+    this.code = context.code;
+    this.agentId = context.agentId;
+    this.cause = context.cause instanceof Error ? context.cause : undefined;
+  }
+}
 
 /**
  * Generate a one-sentence summary of what the agent is currently working on
@@ -41,17 +55,43 @@ Respond with just the summary sentence, nothing else. Keep it concise and focuse
     if (result.content && result.content.trim()) {
       return result.content.trim();
     } else {
-      logger.warn('Agent summary generation failed - no content returned', {
-        agentId: getAgentId(agent),
+      const agentId = getAgentId(agent);
+      throw new AgentSummaryError('No summary content returned from helper', {
+        agentId,
+        code: 'NO_CONTENT',
       });
-      throw new Error('No summary content returned from helper');
     }
   } catch (error) {
-    logger.error('Agent summary helper error', {
-      agentId: getAgentId(agent),
-      error: error instanceof Error ? error.message : String(error),
+    const agentId = getAgentId(agent);
+
+    if (error instanceof AgentSummaryError) {
+      // Already structured, just log and re-throw
+      logger.error('Agent summary helper error', {
+        agentId: error.agentId,
+        code: error.code,
+        message: error.message,
+        stack: error.stack,
+        cause: error.cause?.message,
+      });
+      throw error;
+    }
+
+    // Wrap other errors in structured format
+    const wrappedError = new AgentSummaryError('Agent summary helper execution failed', {
+      agentId,
+      code: 'EXECUTION_FAILED',
+      cause: error,
     });
-    throw error; // Re-throw to prevent event broadcasting
+
+    logger.error('Agent summary helper error', {
+      agentId: wrappedError.agentId,
+      code: wrappedError.code,
+      message: wrappedError.message,
+      stack: wrappedError.stack,
+      cause: wrappedError.cause?.message,
+    });
+
+    throw wrappedError;
   }
 }
 
@@ -64,12 +104,11 @@ export function getLastAgentResponse(events: LaceEvent[]): string | undefined {
   // Find the last AGENT_MESSAGE event
   for (let i = events.length - 1; i >= 0; i--) {
     const event = events[i];
-    if (event.type === 'AGENT_MESSAGE') {
-      // Handle both string data (legacy) and AgentMessageData format
-      if (typeof event.data === 'string') {
-        return event.data;
-      } else if (event.data && typeof event.data === 'object' && 'content' in event.data) {
-        return (event.data as { content: string }).content;
+    if (event.type === 'AGENT_MESSAGE' && event.data && typeof event.data === 'object') {
+      // AGENT_MESSAGE.data is AgentMessageData { content: string }
+      if ('content' in event.data) {
+        const content = (event.data as { content: string }).content;
+        return typeof content === 'string' ? content : undefined;
       }
     }
   }

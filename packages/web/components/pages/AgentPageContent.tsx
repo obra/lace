@@ -17,7 +17,7 @@ import { AgentEditModal } from '@/components/config/AgentEditModal';
 import { SessionEditModal } from '@/components/config/SessionEditModal';
 
 import { useUIContext } from '@/components/providers/UIProvider';
-import { asThreadId } from '@/types/core';
+import { asThreadId, isAgentSummaryUpdatedData } from '@/types/core';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useToolApprovalContext } from '@/components/providers/ToolApprovalProvider';
@@ -121,22 +121,29 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   const { agentEvents } = useEventStreamContext();
 
   useEffect(() => {
-    if (!agentEvents.events) return;
+    if (!agentEvents.events) {
+      setAgentSummary(null); // Clear summary when no events
+      return;
+    }
 
     // Look for the most recent AGENT_SUMMARY_UPDATED event for this agent
+    let foundSummary = false;
     for (let i = agentEvents.events.length - 1; i >= 0; i--) {
       const event = agentEvents.events[i];
       if (
         event.type === 'AGENT_SUMMARY_UPDATED' &&
-        event.data &&
-        typeof event.data === 'object' &&
-        'agentThreadId' in event.data &&
+        isAgentSummaryUpdatedData(event.data) &&
         event.data.agentThreadId === agentId
       ) {
-        const summaryData = event.data as { summary: string };
-        setAgentSummary(summaryData.summary);
+        setAgentSummary(event.data.summary);
+        foundSummary = true;
         break; // Only use the most recent summary
       }
+    }
+
+    // Clear stale summary when switching agents
+    if (!foundSummary) {
+      setAgentSummary(null);
     }
   }, [agentEvents.events, agentId]);
 
