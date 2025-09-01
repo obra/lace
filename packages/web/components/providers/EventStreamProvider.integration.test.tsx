@@ -425,7 +425,13 @@ describe('EventStreamProvider Integration', () => {
     expect(screen.getByTestId('is-connected')).toHaveTextContent('false');
     expect(screen.getByTestId('events-count')).toHaveTextContent('0');
 
-    // Test behavior: useAgentEvents should be called with null (not crash)
-    expect(useAgentEventsHook).toHaveBeenCalledWith(null, false);
+    // Test configuration: Verify event stream is configured with correct filters
+    expect(useEventStreamHook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: 'test-project',
+        sessionId: 'lace_20250101_def456',
+        threadIds: undefined,
+      })
+    );
   });
 });
