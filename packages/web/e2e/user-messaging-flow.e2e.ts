@@ -57,7 +57,7 @@ test.describe('Complete User Journey and Messaging Behavior', () => {
 
     // Step 7: Verify AI response appears (mocked by E2E test server)
     await expect(
-      page.getByText("I'm a helpful AI assistant. How can I help you today?")
+      page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
     ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
     // Step 8: Verify chat interface is ready for next message
@@ -86,7 +86,7 @@ test.describe('Complete User Journey and Messaging Behavior', () => {
 
     // Verify AI response appears (mocked by E2E test server)
     await expect(
-      page.getByText("I'm a helpful AI assistant. How can I help you today?")
+      page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
     ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
     // Verify interface remains functional
@@ -138,7 +138,7 @@ test.describe('Complete User Journey and Messaging Behavior', () => {
 
     // Wait for AI response (mocked)
     await expect(
-      page.getByText("I'm a helpful AI assistant. How can I help you today?")
+      page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
     ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
   });
 
@@ -176,7 +176,7 @@ test.describe('Complete User Journey and Messaging Behavior', () => {
 
     // Wait for streaming response (mocked)
     await expect(
-      page.getByText("I'm a helpful AI assistant. How can I help you today?")
+      page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
     ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
     // Document the network behavior we observe
