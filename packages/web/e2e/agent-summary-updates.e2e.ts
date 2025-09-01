@@ -14,8 +14,9 @@ import * as path from 'path';
 test.describe('Agent Summary Updates', () => {
   let testEnv: TestEnvironment;
 
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ page }) => {
     testEnv = await setupTestEnvironment();
+    await page.goto(testEnv.serverUrl);
   });
 
   test.afterEach(async () => {
@@ -23,14 +24,12 @@ test.describe('Agent Summary Updates', () => {
   });
 
   test('should display agent summary below agent name after user message', async ({ page }) => {
-    // Set up project
-    await page.goto('/');
+    await setupAnthropicProvider(page);
 
     const projectPath = path.join(testEnv.tempDir, 'test-project');
     await fs.promises.mkdir(projectPath, { recursive: true });
 
     await createProject(page, 'Summary Test Project', projectPath);
-    await setupAnthropicProvider(page);
 
     // Verify initial state - agent header should be visible
     const agentHeader = page.locator('h1').filter({ hasText: /Claude.*haiku/ });
@@ -57,14 +56,12 @@ test.describe('Agent Summary Updates', () => {
   });
 
   test('documents current state when summary updates occur', async ({ page }) => {
-    // Set up project and send initial message
-    await page.goto('/');
+    await setupAnthropicProvider(page);
 
     const projectPath = path.join(testEnv.tempDir, 'summary-update-test');
     await fs.promises.mkdir(projectPath, { recursive: true });
 
     await createProject(page, 'Summary Update Test', projectPath);
-    await setupAnthropicProvider(page);
 
     // Send first message
     await sendMessage(page, 'Create login endpoint');
