@@ -79,24 +79,24 @@ describe('agent-summary-helper', () => {
       );
     });
 
-    it('should return fallback message when helper fails', async () => {
+    it('should throw when helper returns no content', async () => {
       mockExecute.mockResolvedValue({
         content: '',
         toolCalls: [],
         toolResults: [],
       });
 
-      const result = await generateAgentSummary(mockAgent, 'Test message');
-
-      expect(result).toBe('Processing your request');
+      await expect(generateAgentSummary(mockAgent, 'Test message')).rejects.toThrow(
+        'No summary content returned from helper'
+      );
     });
 
-    it('should return fallback message when helper throws', async () => {
+    it('should re-throw when helper throws', async () => {
       mockExecute.mockRejectedValue(new Error('Network error'));
 
-      const result = await generateAgentSummary(mockAgent, 'Test message');
-
-      expect(result).toBe('Processing your request');
+      await expect(generateAgentSummary(mockAgent, 'Test message')).rejects.toThrow(
+        'Network error'
+      );
     });
 
     it('should trim whitespace from successful response', async () => {
