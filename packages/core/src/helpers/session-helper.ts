@@ -19,6 +19,9 @@ export interface SessionHelperOptions {
   /** Parent agent to inherit context and policies from */
   parentAgent: Agent;
 
+  /** Use parent agent's provider instead of resolving from global config */
+  useParentProvider?: boolean;
+
   /** Optional abort signal for cancellation */
   abortSignal?: AbortSignal;
 }
@@ -42,11 +45,27 @@ export class SessionHelper extends BaseHelper {
       return this.provider;
     }
 
-    // Get the model we want to use
+    // Use parent agent's provider if requested (avoids global config dependency)
+    if (this.options.useParentProvider) {
+      const parentProvider = await this.options.parentAgent.getProvider();
+      if (!parentProvider) {
+        throw new Error('Parent agent has no provider available');
+      }
+
+      logger.debug('SessionHelper using parent agent provider', {
+        agentId: this.options.parentAgent.threadId,
+        providerName: parentProvider.providerName,
+      });
+
+      this.provider = parentProvider;
+      return parentProvider;
+    }
+
+    // Get the model we want to use from global config
     const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
     const { instanceId, modelId } = parseProviderModel(providerModel);
 
-    logger.debug('SessionHelper creating provider', {
+    logger.debug('SessionHelper creating provider from global config', {
       tier: this.options.model,
       instanceId,
       modelId,
