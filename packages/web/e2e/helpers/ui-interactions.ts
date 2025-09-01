@@ -19,8 +19,8 @@ export async function openSettingsModal(page: Page): Promise<void> {
   await page.waitForTimeout(1000);
   await settingsButton.click();
 
-  // Wait for settings modal to open with longer timeout for CI
-  await page.waitForSelector('text="Configuration"', { timeout: 20000 });
+  // Wait for settings modal to open - check for the actual content that appears
+  await page.waitForSelector('text="AI Provider Configuration"', { timeout: 20000 });
 }
 
 /** Navigate to a specific settings tab */
@@ -33,7 +33,7 @@ export async function navigateToSettingsTab(page: Page, tabName: string): Promis
 
 /** Close the settings modal using the dismiss button */
 export async function closeSettingsModal(page: Page): Promise<void> {
-  const closeButton = page.locator('[data-testid="dismiss-button"]').first();
+  const closeButton = page.locator('[aria-label="Close modal"]').first();
   await closeButton.waitFor({ state: 'visible', timeout: 15000 });
   await closeButton.click();
 
