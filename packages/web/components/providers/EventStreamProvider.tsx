@@ -239,6 +239,8 @@ export function EventStreamProvider({
       onAgentToken: handleAgentToken,
       onToolCall: stableAddAgentEvent,
       onToolResult: stableAddAgentEvent,
+      // Agent lifecycle events
+      onAgentEvent: stableAddAgentEvent, // Handles AGENT_SUMMARY_UPDATED and other agent events
       // Agent state changes
       onAgentStateChange: handleAgentStateChangeCallback,
       // Tool approval requests
