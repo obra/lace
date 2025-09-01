@@ -130,6 +130,7 @@ export function ToolCallDisplay({
   const hasResult = result?.content?.some((block) => block.text?.trim()) || !!result?.metadata;
   const isError = hasResult && (renderer.isError?.(result!) ?? isDefaultError(result!));
   const isAborted = hasResult && result?.status === 'aborted';
+  const isPending = hasResult && result?.status === 'pending';
   const args = metadata?.arguments;
   const hasArgs: boolean = Boolean(
     args && typeof args === 'object' && args !== null && Object.keys(args).length > 0
@@ -173,11 +174,13 @@ export function ToolCallDisplay({
           className={`w-8 h-8 rounded-md flex items-center justify-center text-sm ${
             isError
               ? 'bg-error/10 text-error'
-              : isAborted
-                ? 'bg-warning/10 text-warning'
-                : hasResult
-                  ? 'bg-success/10 text-success'
-                  : 'bg-warning/10 text-warning'
+              : isPending
+                ? 'bg-info/10 text-info'
+                : isAborted
+                  ? 'bg-warning/10 text-warning'
+                  : hasResult
+                    ? 'bg-success/10 text-success'
+                    : 'bg-warning/10 text-warning'
           }`}
         >
           <FontAwesomeIcon icon={toolIcon} className="text-xs" />

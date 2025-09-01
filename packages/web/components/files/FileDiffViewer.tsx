@@ -194,9 +194,9 @@ export default function FileDiffViewer({
     const indicator = line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' ';
     const colorClass =
       line.type === 'added'
-        ? 'text-green-600'
+        ? 'text-success'
         : line.type === 'removed'
-          ? 'text-red-600'
+          ? 'text-error'
           : 'text-base-content/40';
 
     return <span className={`w-4 text-center select-none ${colorClass}`}>{indicator}</span>;
@@ -212,7 +212,7 @@ export default function FileDiffViewer({
   // Render unified diff view
   const renderUnifiedView = () => {
     return (
-      <div className="overflow-x-auto">
+      <div>
         <div className="font-mono text-sm">
           {processedLines.map((line, index) => {
             // Special rendering for folded sections
@@ -245,14 +245,16 @@ export default function FileDiffViewer({
               <div key={index} className={`${bgClass} hover:bg-base-200`}>
                 {renderLineNumbers(line)}
                 {renderDiffIndicator(line)}
-                <div className="flex-1 px-2 py-1 min-w-0">
+                <div className="flex-1 px-2 py-1">
                   {hasHighlighting ? (
                     <code
-                      className="whitespace-pre hljs"
+                      className="whitespace-pre-wrap hljs break-words"
                       dangerouslySetInnerHTML={{ __html: highlightedContent }}
                     />
                   ) : (
-                    <code className={`whitespace-pre ${getLanguageClass(diff.language)}`}>
+                    <code
+                      className={`whitespace-pre-wrap break-words ${getLanguageClass(diff.language)}`}
+                    >
                       {line.content}
                     </code>
                   )}
@@ -292,7 +294,7 @@ export default function FileDiffViewer({
     });
 
     return (
-      <div className="grid grid-cols-2 gap-2 overflow-x-auto">
+      <div className="grid grid-cols-2 gap-2">
         {/* Old file column */}
         <div className="border-r border-base-300">
           <div className="bg-base-200 px-2 py-1 text-xs font-medium text-base-content/70 border-b border-base-300">
@@ -317,7 +319,7 @@ export default function FileDiffViewer({
               }
 
               const bgClass =
-                line.type === 'removed' ? 'bg-red-50' : line.isHighlighted ? 'bg-yellow-50' : '';
+                line.type === 'removed' ? 'bg-error/10' : line.isHighlighted ? 'bg-warning/10' : '';
 
               const highlightedContent = getHighlightedContent(line);
               const hasHighlighting = highlightedContent !== line.content;
@@ -332,11 +334,13 @@ export default function FileDiffViewer({
                   <div className="flex-1 px-2 py-1 min-w-0">
                     {hasHighlighting ? (
                       <code
-                        className="whitespace-pre hljs"
+                        className="whitespace-pre-wrap hljs break-words"
                         dangerouslySetInnerHTML={{ __html: highlightedContent }}
                       />
                     ) : (
-                      <code className={`whitespace-pre ${getLanguageClass(diff.language)}`}>
+                      <code
+                        className={`whitespace-pre-wrap break-words ${getLanguageClass(diff.language)}`}
+                      >
                         {line.content}
                       </code>
                     )}
@@ -371,7 +375,7 @@ export default function FileDiffViewer({
               }
 
               const bgClass =
-                line.type === 'added' ? 'bg-green-50' : line.isHighlighted ? 'bg-yellow-50' : '';
+                line.type === 'added' ? 'bg-success/10' : line.isHighlighted ? 'bg-warning/10' : '';
 
               const highlightedContent = getHighlightedContent(line);
               const hasHighlighting = highlightedContent !== line.content;
@@ -386,11 +390,13 @@ export default function FileDiffViewer({
                   <div className="flex-1 px-2 py-1 min-w-0">
                     {hasHighlighting ? (
                       <code
-                        className="whitespace-pre hljs"
+                        className="whitespace-pre-wrap hljs break-words"
                         dangerouslySetInnerHTML={{ __html: highlightedContent }}
                       />
                     ) : (
-                      <code className={`whitespace-pre ${getLanguageClass(diff.language)}`}>
+                      <code
+                        className={`whitespace-pre-wrap break-words ${getLanguageClass(diff.language)}`}
+                      >
                         {line.content}
                       </code>
                     )}
@@ -505,11 +511,11 @@ export default function FileDiffViewer({
         {/* Stats */}
         <div className="flex items-center gap-4 mt-2 text-xs text-base-content/60">
           <span className="flex items-center gap-1">
-            <span className="text-green-600">+{stats.added}</span>
+            <span className="text-success">+{stats.added}</span>
             <span>additions</span>
           </span>
           <span className="flex items-center gap-1">
-            <span className="text-red-600">-{stats.removed}</span>
+            <span className="text-error">-{stats.removed}</span>
             <span>deletions</span>
           </span>
           {stats.unchanged > 0 && <span>{stats.unchanged} unchanged</span>}

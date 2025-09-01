@@ -57,6 +57,7 @@ export const fileEditRenderer: ToolRenderer = {
     const content = result.content.map((block) => block.text || '').join('');
 
     const isError = fileEditRenderer.isError!(result);
+    const isPending = result.status === 'pending';
 
     if (isError) {
       // Check for enhanced validation error metadata
@@ -210,35 +211,40 @@ export const fileEditRenderer: ToolRenderer = {
       );
     }
 
-    // Success message with edit details
-    const editCount = resultMetadata?.edits_applied?.length || 0;
-    const totalReplacements = resultMetadata?.total_replacements || 0;
+    // Success message with edit details (skip for pending status)
+    if (!isPending) {
+      const editCount = resultMetadata?.edits_applied?.length || 0;
+      const totalReplacements = resultMetadata?.total_replacements || 0;
 
-    const successDescription =
-      editCount > 0
-        ? `Applied ${editCount} edit${editCount === 1 ? '' : 's'}${totalReplacements > 0 ? ` with ${totalReplacements} total replacement${totalReplacements === 1 ? '' : 's'}` : ''}`
-        : content;
+      const successDescription =
+        editCount > 0
+          ? `Applied ${editCount} edit${editCount === 1 ? '' : 's'}${totalReplacements > 0 ? ` with ${totalReplacements} total replacement${totalReplacements === 1 ? '' : 's'}` : ''}`
+          : content;
 
-    return (
-      <Alert variant="success" title="Edit Successful" description={successDescription}>
-        {resultMetadata?.edits_applied && resultMetadata.edits_applied.length <= 3 && (
-          <div className="space-y-1">
-            {resultMetadata.edits_applied.map((edit, i) => (
-              <div key={i} className="text-xs font-mono opacity-60 bg-success/5 rounded p-2">
-                <span className="opacity-50">Replace:</span> {edit.old_text.substring(0, 50)}
-                {edit.old_text.length > 50 ? '...' : ''}
-                <br />
-                <span className="opacity-50">With:</span> {edit.new_text.substring(0, 50)}
-                {edit.new_text.length > 50 ? '...' : ''}
-                {edit.occurrences_replaced > 1 && (
-                  <span className="opacity-40"> ({edit.occurrences_replaced} occurrences)</span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </Alert>
-    );
+      return (
+        <Alert variant="success" title="Edit Successful" description={successDescription}>
+          {resultMetadata?.edits_applied && resultMetadata.edits_applied.length <= 3 && (
+            <div className="space-y-1">
+              {resultMetadata.edits_applied.map((edit, i) => (
+                <div key={i} className="text-xs font-mono opacity-60 bg-success/5 rounded p-2">
+                  <span className="opacity-50">Replace:</span> {edit.old_text.substring(0, 50)}
+                  {edit.old_text.length > 50 ? '...' : ''}
+                  <br />
+                  <span className="opacity-50">With:</span> {edit.new_text.substring(0, 50)}
+                  {edit.new_text.length > 50 ? '...' : ''}
+                  {edit.occurrences_replaced > 1 && (
+                    <span className="opacity-40"> ({edit.occurrences_replaced} occurrences)</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Alert>
+      );
+    }
+
+    // For pending status, return empty div (diff already shown above)
+    return <div />;
   },
 
   getIcon: () => {
