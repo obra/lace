@@ -137,9 +137,32 @@ export async function setupTestEnvironment(): Promise<TestEnvironment> {
   const anthropicCredentials = {
     apiKey: 'test-anthropic-key-for-e2e',
   };
+
+  // Create anthropic-helper credentials file for helper agents
+  const anthropicHelperCredentials = {
+    apiKey: 'test-anthropic-helper-key-for-e2e',
+  };
   await fs.promises.writeFile(
     path.join(credentialsDir, 'anthropic-default.json'),
     JSON.stringify(anthropicCredentials, null, 2)
+  );
+
+  await fs.promises.writeFile(
+    path.join(credentialsDir, 'anthropic-helper.json'),
+    JSON.stringify(anthropicHelperCredentials, null, 2)
+  );
+
+  // Create global config with separate models for helpers vs main tests
+  const globalConfig = {
+    defaultModels: {
+      fast: 'anthropic-helper:claude-3-haiku-20240307', // Helper agents use different model
+      smart: 'anthropic-default:claude-opus-4-1-20250805', // Main tests use this model
+    },
+  };
+
+  await fs.promises.writeFile(
+    path.join(tempDir, 'config.json'),
+    JSON.stringify(globalConfig, null, 2)
   );
 
   // Create provider-instances.json configuration
@@ -151,6 +174,12 @@ export async function setupTestEnvironment(): Promise<TestEnvironment> {
         displayName: 'Test Anthropic Provider',
         catalogProviderId: 'anthropic',
         isDefault: true,
+      },
+      'anthropic-helper': {
+        id: 'anthropic-helper',
+        displayName: 'Helper Anthropic Provider',
+        catalogProviderId: 'anthropic',
+        isDefault: false,
       },
     },
   };

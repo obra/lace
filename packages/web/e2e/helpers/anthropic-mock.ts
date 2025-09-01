@@ -32,6 +32,24 @@ export function mockAnthropicForE2E(): void {
       const body = await request.text();
       const requestData = JSON.parse(body) as AnthropicRequest;
 
+      // Route helper agents to different responses based on model
+      if (requestData.model === 'claude-3-haiku-20240307') {
+        // Helper agent requests - return simple, non-interfering responses
+        return new Response(
+          JSON.stringify({
+            id: 'msg_helper_response',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Helper: Brief summary completed.' }],
+            model: 'claude-3-haiku-20240307',
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 5, output_tokens: 5 },
+          }),
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Main test agent requests - use detailed test responses
       // Get the LAST user message from conversation history (not the first)
       const userMessages = requestData.messages?.filter((m) => m.role === 'user') || [];
       const userMessage = userMessages[userMessages.length - 1]?.content || '';
