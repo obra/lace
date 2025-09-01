@@ -60,13 +60,9 @@ export class SessionHelper extends BaseHelper {
         this.provider = instance;
         return instance;
       }
-    } catch (globalConfigError) {
+    } catch (_globalConfigError) {
       logger.debug('SessionHelper global config failed, falling back to parent provider', {
         tier: this.options.model,
-        error:
-          globalConfigError instanceof Error
-            ? globalConfigError.message
-            : String(globalConfigError),
       });
     }
 
@@ -119,7 +115,7 @@ export class SessionHelper extends BaseHelper {
       const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
       const { modelId } = parseProviderModel(providerModel);
       return modelId;
-    } catch (globalConfigError) {
+    } catch (_globalConfigError) {
       // Fallback: Get model from parent agent
       const agentInfo = this.options.parentAgent.getInfo();
       if (agentInfo?.modelId) {
