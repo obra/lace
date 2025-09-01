@@ -118,24 +118,24 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   }, []);
 
   // Listen for agent summary updates
-  const { events } = useEventStream();
-
-  useEffect(() => {
-    if (!events) return;
-
-    for (const event of events) {
-      if (
-        event.type === 'AGENT_SUMMARY_UPDATED' &&
-        event.data &&
-        typeof event.data === 'object' &&
-        'agentThreadId' in event.data &&
-        event.data.agentThreadId === agentId
-      ) {
-        const summaryData = event.data as { summary: string };
-        setAgentSummary(summaryData.summary);
-      }
-    }
-  }, [events, agentId]);
+  useEventStream({
+    threadIds: [agentId],
+    onAgentEvent: useCallback(
+      (event) => {
+        if (
+          event.type === 'AGENT_SUMMARY_UPDATED' &&
+          event.data &&
+          typeof event.data === 'object' &&
+          'agentThreadId' in event.data &&
+          event.data.agentThreadId === agentId
+        ) {
+          const summaryData = event.data as { summary: string };
+          setAgentSummary(summaryData.summary);
+        }
+      },
+      [agentId]
+    ),
+  });
 
   // Get current agent info for display
   const currentAgent = selectedSessionDetails?.agents?.find((a) => a.threadId === agentId);
