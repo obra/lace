@@ -122,7 +122,7 @@ describe('Agent Message Endpoint with Summary Generation', () => {
     const response = await action({
       request,
       params: { agentId },
-    } as { request: Request; params: { agentId: string }; context: object });
+    } as { request: Request; params: { agentId: string }; context: Record<string, unknown> });
 
     // Verify successful response
     expect(response.status).toBe(202);
@@ -176,7 +176,7 @@ describe('Agent Message Endpoint with Summary Generation', () => {
     const response = await action({
       request,
       params: { agentId },
-    } as { request: Request; params: { agentId: string }; context: object });
+    } as { request: Request; params: { agentId: string }; context: Record<string, unknown> });
 
     // Endpoint should still succeed
     expect(response.status).toBe(202);
@@ -222,7 +222,7 @@ describe('Agent Message Endpoint with Summary Generation', () => {
     await action({
       request,
       params: { agentId },
-    } as { request: Request; params: { agentId: string }; context: object });
+    } as { request: Request; params: { agentId: string }; context: Record<string, unknown> });
 
     // Wait for summary generation
     await new Promise((resolve) => setTimeout(resolve, 100));

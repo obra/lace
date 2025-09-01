@@ -3,9 +3,6 @@
 
 import './lib/server/data-dir-init';
 import { parseArgs } from 'util';
-import path from 'node:path';
-import { createRequestHandler } from '@react-router/express';
-import type { ServerBuild } from 'react-router';
 
 // Parse command line arguments
 const { values } = parseArgs({
