@@ -12,9 +12,10 @@ import type { Agent } from '@/lib/server/lace-imports';
 import type { LaceEvent } from '@/types/core';
 
 // Mock SessionHelper
+const mockExecute = vi.fn();
 vi.mock('~/helpers/session-helper', () => ({
   SessionHelper: vi.fn().mockImplementation(() => ({
-    execute: vi.fn(),
+    execute: mockExecute,
   })),
 }));
 
@@ -27,10 +28,8 @@ describe('agent-summary-helper', () => {
       threadId: 'test-agent-123',
     } as Agent;
 
-    // Get the mocked SessionHelper constructor
-    const { SessionHelper } = vi.mocked(await import('~/helpers/session-helper'));
-    mockSessionHelper = { execute: vi.fn() };
-    SessionHelper.mockReturnValue(mockSessionHelper);
+    mockSessionHelper = { execute: mockExecute };
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -39,26 +38,28 @@ describe('agent-summary-helper', () => {
 
   describe('generateAgentSummary', () => {
     it('should generate summary with user message only', async () => {
-      mockSessionHelper.execute.mockResolvedValue({
-        success: true,
-        response: 'Working on user authentication setup',
+      mockExecute.mockResolvedValue({
+        content: 'Working on user authentication setup',
+        toolCalls: [],
+        toolResults: [],
       });
 
       const result = await generateAgentSummary(mockAgent, 'Help me set up user authentication');
 
       expect(result).toBe('Working on user authentication setup');
-      expect(mockSessionHelper.execute).toHaveBeenCalledWith(
+      expect(mockExecute).toHaveBeenCalledWith(
         expect.stringContaining('User message: "Help me set up user authentication"')
       );
-      expect(mockSessionHelper.execute).toHaveBeenCalledWith(
+      expect(mockExecute).toHaveBeenCalledWith(
         expect.stringContaining('put together a clear one-sentence summary')
       );
     });
 
     it('should generate summary with user message and last agent response', async () => {
-      mockSessionHelper.execute.mockResolvedValue({
-        success: true,
-        response: 'Implementing database schema for user accounts',
+      mockExecute.mockResolvedValue({
+        content: 'Implementing database schema for user accounts',
+        toolCalls: [],
+        toolResults: [],
       });
 
       const result = await generateAgentSummary(
@@ -68,10 +69,10 @@ describe('agent-summary-helper', () => {
       );
 
       expect(result).toBe('Implementing database schema for user accounts');
-      expect(mockSessionHelper.execute).toHaveBeenCalledWith(
+      expect(mockExecute).toHaveBeenCalledWith(
         expect.stringContaining('User message: "Add password reset functionality"')
       );
-      expect(mockSessionHelper.execute).toHaveBeenCalledWith(
+      expect(mockExecute).toHaveBeenCalledWith(
         expect.stringContaining(
           'Agent\'s last response: "I\'ve set up the basic user model and authentication endpoints"'
         )
@@ -79,9 +80,10 @@ describe('agent-summary-helper', () => {
     });
 
     it('should return fallback message when helper fails', async () => {
-      mockSessionHelper.execute.mockResolvedValue({
-        success: false,
-        error: 'Provider connection failed',
+      mockExecute.mockResolvedValue({
+        content: '',
+        toolCalls: [],
+        toolResults: [],
       });
 
       const result = await generateAgentSummary(mockAgent, 'Test message');
@@ -90,7 +92,7 @@ describe('agent-summary-helper', () => {
     });
 
     it('should return fallback message when helper throws', async () => {
-      mockSessionHelper.execute.mockRejectedValue(new Error('Network error'));
+      mockExecute.mockRejectedValue(new Error('Network error'));
 
       const result = await generateAgentSummary(mockAgent, 'Test message');
 
@@ -98,9 +100,10 @@ describe('agent-summary-helper', () => {
     });
 
     it('should trim whitespace from successful response', async () => {
-      mockSessionHelper.execute.mockResolvedValue({
-        success: true,
-        response: '   Working on file processing   \n',
+      mockExecute.mockResolvedValue({
+        content: '   Working on file processing   \n',
+        toolCalls: [],
+        toolResults: [],
       });
 
       const result = await generateAgentSummary(mockAgent, 'Process these files');
@@ -124,7 +127,7 @@ describe('agent-summary-helper', () => {
           type: 'AGENT_MESSAGE',
           threadId: 'test',
           timestamp: new Date(),
-          data: 'First agent response',
+          data: { content: 'First agent response' },
         },
         {
           id: '3',
@@ -138,7 +141,7 @@ describe('agent-summary-helper', () => {
           type: 'AGENT_MESSAGE',
           threadId: 'test',
           timestamp: new Date(),
-          data: 'Latest agent response',
+          data: { content: 'Latest agent response' },
         },
       ];
 
@@ -160,7 +163,7 @@ describe('agent-summary-helper', () => {
           type: 'TOOL_CALL',
           threadId: 'test',
           timestamp: new Date(),
-          data: { name: 'test', args: {} },
+          data: { id: 'test-call', name: 'test', arguments: {} },
         },
       ];
 
@@ -173,19 +176,19 @@ describe('agent-summary-helper', () => {
       expect(result).toBeUndefined();
     });
 
-    it('should handle non-string agent message data', () => {
+    it('should handle AgentMessageData object format', () => {
       const events: LaceEvent[] = [
         {
           id: '1',
           type: 'AGENT_MESSAGE',
           threadId: 'test',
           timestamp: new Date(),
-          data: { content: 'This is not a string' }, // Non-string data
+          data: { content: 'Message from object format' },
         },
       ];
 
       const result = getLastAgentResponse(events);
-      expect(result).toBeUndefined();
+      expect(result).toBe('Message from object format');
     });
   });
 });

@@ -12,12 +12,10 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
-import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '~/projects/project';
 import { Session } from '@/lib/server/lace-imports';
-import { action } from '../api.agents.$agentId.message';
+import { action } from '@/app/routes/api.agents.$agentId.message';
 import { EventStreamManager } from '@/lib/event-stream-manager';
-import { generateAgentSummary, getLastAgentResponse } from '@/lib/server/agent-summary-helper';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import type { LaceEvent, AgentSummaryUpdatedData } from '@/types/core';
@@ -125,7 +123,7 @@ describe('Agent Message Endpoint with Summary Generation', () => {
     const response = await action({
       request,
       params: { agentId },
-    } as any);
+    } as { request: Request; params: { agentId: string } });
 
     // Verify successful response
     expect(response.status).toBe(202);
@@ -140,21 +138,8 @@ describe('Agent Message Endpoint with Summary Generation', () => {
     // Wait a bit for async summary generation
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    // Debug: Log all captured events
-    console.log(`📊 Captured ${capturedEvents.length} events:`);
-    capturedEvents.forEach((event, i) => {
-      console.log(`  ${i}: ${event.type} (${event.threadId})`);
-    });
-
     // Verify AGENT_SUMMARY_UPDATED event was broadcast
     const summaryEvent = capturedEvents.find((event) => event.type === 'AGENT_SUMMARY_UPDATED');
-
-    if (!summaryEvent) {
-      // Debug why the event wasn't found
-      const allEventTypes = capturedEvents.map((e) => e.type);
-      expect(allEventTypes).toContain('AGENT_SUMMARY_UPDATED'); // This will show what types we actually got
-    }
-
     expect(summaryEvent).toBeDefined();
     expect(summaryEvent!.threadId).toBe(agentId);
     expect(summaryEvent!.transient).toBe(true);
@@ -192,7 +177,7 @@ describe('Agent Message Endpoint with Summary Generation', () => {
     const response = await action({
       request,
       params: { agentId },
-    } as any);
+    } as { request: Request; params: { agentId: string } });
 
     // Endpoint should still succeed
     expect(response.status).toBe(202);
@@ -238,7 +223,7 @@ describe('Agent Message Endpoint with Summary Generation', () => {
     await action({
       request,
       params: { agentId },
-    } as any);
+    } as { request: Request; params: { agentId: string } });
 
     // Wait for summary generation
     await new Promise((resolve) => setTimeout(resolve, 100));

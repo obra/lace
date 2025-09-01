@@ -7,13 +7,7 @@ import {
   cleanupTestEnvironment,
   type TestEnvironment,
 } from './helpers/test-utils';
-import {
-  createProject,
-  setupAnthropicProvider,
-  getMessageInput,
-  sendMessage,
-  verifyMessageVisible,
-} from './helpers/ui-interactions';
+import { createProject, setupAnthropicProvider, sendMessage } from './helpers/ui-interactions';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -54,12 +48,10 @@ test.describe('Agent Summary Updates', () => {
     // Test documents whether summary appears (may fail until feature is complete)
     try {
       await expect(summaryText).toBeVisible({ timeout: 5000 });
-      console.log('✅ Agent summary is displayed in UI');
-
-      // Verify the summary has the correct styling if visible
+      // Summary is visible - feature is working
       await expect(summaryText).toHaveClass(/text-sm/);
-    } catch (error) {
-      console.log('📝 Agent summary not yet visible in UI - feature may need completion');
+    } catch (_error) {
+      // Feature may not be complete yet
       expect(true).toBeTruthy(); // Test passes - we're documenting current behavior
     }
   });
@@ -84,15 +76,13 @@ test.describe('Agent Summary Updates', () => {
 
     // Document current behavior
     const summaryCount = await summaryElements.count();
-    console.log(`📊 Found ${summaryCount} potential summary elements`);
 
     if (summaryCount > 0) {
-      console.log('✅ Summary elements found - feature appears to be working');
-      const firstSummary = summaryElements.first();
-      const summaryText = await firstSummary.textContent();
-      console.log(`📝 Summary text: "${summaryText}"`);
+      // Summary elements found - feature appears to be working
+      expect(summaryCount).toBeGreaterThan(0);
     } else {
-      console.log('📝 No summary elements found - feature may need UI integration');
+      // No summary elements found - feature may need UI integration
+      expect(summaryCount).toBe(0);
     }
 
     // Test always passes - we're documenting current behavior

@@ -64,8 +64,13 @@ export function getLastAgentResponse(events: LaceEvent[]): string | undefined {
   // Find the last AGENT_MESSAGE event
   for (let i = events.length - 1; i >= 0; i--) {
     const event = events[i];
-    if (event.type === 'AGENT_MESSAGE' && typeof event.data === 'string') {
-      return event.data;
+    if (event.type === 'AGENT_MESSAGE') {
+      // Handle both string data (legacy) and AgentMessageData format
+      if (typeof event.data === 'string') {
+        return event.data;
+      } else if (event.data && typeof event.data === 'object' && 'content' in event.data) {
+        return (event.data as { content: string }).content;
+      }
     }
   }
   return undefined;
