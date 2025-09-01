@@ -99,6 +99,15 @@ async function startLaceServer() {
 
   app.use(viteDevServer.middlewares);
 
+  // Preload routes to prevent 404s on first requests
+  try {
+    console.log('🔄 Preloading API routes...');
+    await viteDevServer.ssrLoadModule('./server/app.ts');
+    console.log('✅ API routes preloaded');
+  } catch (error) {
+    console.warn('⚠️  Route preloading failed, routes will load on first request:', error);
+  }
+
   // Handle all routes using React Router template pattern
   app.use(async (req, res, next) => {
     try {
