@@ -114,10 +114,27 @@ export class SessionHelper extends BaseHelper {
   }
 
   protected getModel(): string {
-    // Extract model ID from provider model string
-    const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
-    const { modelId } = parseProviderModel(providerModel);
-    return modelId;
+    try {
+      // Try to get model from global config first
+      const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
+      const { modelId } = parseProviderModel(providerModel);
+      return modelId;
+    } catch (globalConfigError) {
+      // Fallback: Get model from parent agent
+      const agentInfo = this.options.parentAgent.getInfo();
+      if (agentInfo?.modelId) {
+        logger.debug('SessionHelper using parent agent model as fallback', {
+          agentId: this.options.parentAgent.threadId,
+          modelId: agentInfo.modelId,
+        });
+        return agentInfo.modelId;
+      }
+
+      // Last resort
+      throw new Error(
+        'No model available: global config failed and parent agent has no model info'
+      );
+    }
   }
 
   protected async executeToolCalls(
