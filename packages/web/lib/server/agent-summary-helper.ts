@@ -42,7 +42,7 @@ export async function generateAgentSummary(
       context += `\n\nAgent's last response: "${lastAgentResponse}"`;
     }
 
-    const prompt = `Based on this conversation context, put together a clear one-sentence summary of what the agent is currently working on. It should be casual and sometimes a little playful, like you're talking to someone you trust.
+    const prompt = `Based on this conversation context, put together a clear one-sentence summary of what the agent is currently working on. It should be casual and sometimes a little playful, like you're talking to someone you trust. This will be shown at the top of the chat window.
 
 ${context}
 
