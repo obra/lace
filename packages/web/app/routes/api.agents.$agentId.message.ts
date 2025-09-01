@@ -234,7 +234,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         });
 
         // Get thread events to find the last agent response
-        const threadManager = session.getThreadManager();
+        const threadManager = agent.threadManager;
         const events = threadManager.getEvents(asThreadId(agentId));
         const lastAgentResponse = getLastAgentResponse(events);
 
