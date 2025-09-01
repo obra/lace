@@ -13,10 +13,11 @@ import type { LaceEvent } from '@/types/core';
 
 // Mock SessionHelper
 const mockExecute = vi.fn();
-vi.mock('~/helpers/session-helper', () => ({
+vi.mock('@/lib/server/lace-imports', () => ({
   SessionHelper: vi.fn().mockImplementation(() => ({
     execute: mockExecute,
   })),
+  Agent: vi.fn(),
 }));
 
 describe('agent-summary-helper', () => {
@@ -95,7 +96,7 @@ describe('agent-summary-helper', () => {
       mockExecute.mockRejectedValue(new Error('Network error'));
 
       await expect(generateAgentSummary(mockAgent, 'Test message')).rejects.toThrow(
-        'Network error'
+        'Agent summary helper execution failed'
       );
     });
 
