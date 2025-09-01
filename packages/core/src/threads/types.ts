@@ -223,6 +223,16 @@ export interface AgentSummaryUpdatedData {
   timestamp: Date;
 }
 
+export function isAgentSummaryUpdatedData(value: unknown): value is AgentSummaryUpdatedData {
+  if (!value || typeof value !== 'object') return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.summary === 'string' &&
+    typeof obj.agentThreadId === 'string' &&
+    (obj.timestamp instanceof Date || typeof obj.timestamp === 'string')
+  );
+}
+
 // Project event data types
 interface ProjectCreatedData {
   projectId: string;
