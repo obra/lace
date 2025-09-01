@@ -26,11 +26,10 @@ export async function generateAgentSummary(
       hasLastResponse: !!lastAgentResponse,
     });
 
-    // Use the agent's existing provider to avoid global config dependency
+    // SessionHelper will try 'fast' model from global config, fall back to agent's provider
     const helper = new SessionHelper({
-      model: 'fast', // This will be ignored since we're using agent's provider
+      model: 'fast',
       parentAgent: agent,
-      useParentProvider: true, // Use agent's existing provider instead of global config
     });
 
     logger.debug('SessionHelper created successfully', {

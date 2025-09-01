@@ -19,9 +19,6 @@ export interface SessionHelperOptions {
   /** Parent agent to inherit context and policies from */
   parentAgent: Agent;
 
-  /** Use parent agent's provider instead of resolving from global config */
-  useParentProvider?: boolean;
-
   /** Optional abort signal for cancellation */
   abortSignal?: AbortSignal;
 }
@@ -45,43 +42,49 @@ export class SessionHelper extends BaseHelper {
       return this.provider;
     }
 
-    // Use parent agent's provider if requested (avoids global config dependency)
-    if (this.options.useParentProvider) {
-      const parentProvider = await this.options.parentAgent.getProvider();
-      if (!parentProvider) {
-        throw new Error('Parent agent has no provider available');
-      }
+    try {
+      // Try global config first
+      const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
+      const { instanceId, modelId } = parseProviderModel(providerModel);
 
-      logger.debug('SessionHelper using parent agent provider', {
-        agentId: this.options.parentAgent.threadId,
-        providerName: parentProvider.providerName,
+      logger.debug('SessionHelper creating provider from global config', {
+        tier: this.options.model,
+        instanceId,
+        modelId,
       });
 
-      this.provider = parentProvider;
-      return parentProvider;
+      const registry = ProviderRegistry.getInstance();
+      const instance = await registry.createProviderFromInstanceAndModel(instanceId, modelId);
+
+      if (instance) {
+        this.provider = instance;
+        return instance;
+      }
+    } catch (globalConfigError) {
+      logger.debug('SessionHelper global config failed, falling back to parent provider', {
+        tier: this.options.model,
+        error:
+          globalConfigError instanceof Error
+            ? globalConfigError.message
+            : String(globalConfigError),
+      });
     }
 
-    // Get the model we want to use from global config
-    const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
-    const { instanceId, modelId } = parseProviderModel(providerModel);
+    // Fallback: Use parent agent's provider when global config unavailable
+    const parentProvider = await this.options.parentAgent.getProvider();
+    if (!parentProvider) {
+      throw new Error(
+        'No provider available: global config failed and parent agent has no provider'
+      );
+    }
 
-    logger.debug('SessionHelper creating provider from global config', {
-      tier: this.options.model,
-      instanceId,
-      modelId,
+    logger.debug('SessionHelper using parent agent provider as fallback', {
+      agentId: this.options.parentAgent.threadId,
+      providerName: parentProvider.providerName,
     });
 
-    // Create provider instance with the correct model using registry
-    // This ensures we get a provider configured for the right model
-    const registry = ProviderRegistry.getInstance();
-    const instance = await registry.createProviderFromInstanceAndModel(instanceId, modelId);
-
-    if (!instance) {
-      throw new Error(`Failed to create provider instance: ${instanceId}:${modelId}`);
-    }
-
-    this.provider = instance;
-    return instance;
+    this.provider = parentProvider;
+    return parentProvider;
   }
 
   protected getTools(): Tool[] {
