@@ -169,6 +169,265 @@ Agent processes → Emits events → SSE stream
 Browser receives events → Updates UI in real-time
 ```
 
+## Server-Sent Events (SSE) Architecture
+
+### Overview
+
+Lace uses a sophisticated SSE system for real-time communication between the backend and web UI. The architecture follows a **firehose pattern** with client-side filtering, providing scalable real-time updates while maintaining clean separation of concerns.
+
+### SSE Event Flow
+
+```
+Backend Event Source → EventStreamManager → SSE Stream → EventStreamProvider → React Components
+```
+
+### Core Components
+
+#### 1. EventStreamManager (Backend)
+**Location**: `packages/web/lib/event-stream-manager.ts`
+
+- **Global singleton** managing all SSE connections
+- **Firehose approach**: Broadcasts all events, client-side filtering handles specificity  
+- **Connection management**: Tracks client connections with subscription filters
+- **Event broadcasting**: Converts internal events to LaceEvent format
+
+```typescript
+class EventStreamManager {
+  // Global event broadcasting
+  broadcast(event: LaceEvent): void;
+  
+  // Connection lifecycle
+  addConnection(controller: ReadableStreamDefaultController, subscription): string;
+  removeConnection(connectionId: string): void;
+  
+  // Session registration for auto-forwarding events
+  registerSession(session: Session): void;
+}
+```
+
+**Key Features**:
+- **Automatic session registration**: Called by SessionService to forward TaskManager events
+- **Agent error handling**: Registers error listeners for all agents in registered sessions
+- **Connection limits**: 100 connections globally, automatic cleanup in development
+- **Keepalive**: 30-second heartbeat to maintain connections
+
+#### 2. SSE HTTP Endpoint
+**Location**: `packages/web/app/routes/api.events.stream.ts`
+
+- **Single global endpoint**: `/api/events/stream` 
+- **No filtering**: Sends ALL events, client-side filtering provides specificity
+- **Persistent connection**: Uses ReadableStream for long-lived connections
+- **Proper headers**: SSE-compliant headers with CORS support
+
+```typescript
+export async function loader({ request }: Route.LoaderArgs) {
+  const manager = EventStreamManager.getInstance();
+  
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const connectionId = manager.addConnection(controller, {});
+      request.signal?.addEventListener('abort', () => {
+        manager.removeConnection(connectionId);
+      });
+    }
+  });
+  
+  return new Response(stream, { /* SSE headers */ });
+}
+```
+
+#### 3. EventStreamProvider (Frontend)
+**Location**: `packages/web/components/providers/EventStreamProvider.tsx`
+
+- **React context provider** wrapping UI components
+- **Manages event stream connection** using `useEventStream` hook
+- **Provides local event management** via `useAgentEvents` hook  
+- **Combines multiple event sources** into unified interface
+
+```typescript
+interface EventStreamContextType {
+  eventStream: EventStreamConnection;    // SSE connection status
+  agentEvents: AgentEventsState;        // Local event array
+  streamingContent: string;             // Real-time content
+  compactionState: CompactionState;     // UI state
+  agentAPI: AgentAPIActions;           // Agent management
+}
+
+export function useEventStreamContext(): EventStreamContextType;
+```
+
+**Provider Architecture**:
+```tsx
+<EventStreamProvider projectId={projectId} sessionId={sessionId} agentId={agentId}>
+  <AgentPageContent /> {/* Can access events via useEventStreamContext() */}
+</EventStreamProvider>
+```
+
+#### 4. Component Integration Pattern
+
+**❌ WRONG: Creating New Subscriptions**
+```typescript
+// Don't do this - creates duplicate SSE connections
+const { events } = useEventStream({ threadIds: [agentId] });
+```
+
+**✅ CORRECT: Using Existing Context**
+```typescript
+// Use existing EventStreamProvider context
+const { agentEvents } = useEventStreamContext();
+
+useEffect(() => {
+  agentEvents.events.forEach(event => {
+    if (event.type === 'AGENT_SUMMARY_UPDATED') {
+      // Handle event
+    }
+  });
+}, [agentEvents.events]);
+```
+
+### Event Broadcasting Integration
+
+#### Message Endpoint Integration
+**Location**: `packages/web/app/routes/api.agents.$agentId.message.ts`
+
+```typescript
+// After user message received, before agent.sendMessage()
+void (async () => {
+  try {
+    const summary = await generateAgentSummary(agent, userMessage, lastResponse);
+    
+    // Broadcast via EventStreamManager
+    const eventStreamManager = EventStreamManager.getInstance();
+    eventStreamManager.broadcast({
+      type: 'AGENT_SUMMARY_UPDATED',
+      threadId: agentId,
+      data: { summary, agentThreadId: agentId, timestamp: new Date() },
+      transient: true,
+      context: { projectId, sessionId, agentId },
+    });
+  } catch (error) {
+    logger.error('Agent summary failed', { error });
+  }
+})();
+```
+
+#### Session Helper Integration
+**Location**: `packages/web/lib/server/agent-summary-helper.ts`
+
+```typescript
+export async function generateAgentSummary(
+  agent: Agent,
+  userMessage: string,
+  lastAgentResponse?: string
+): Promise<string> {
+  // Uses SessionHelper with 'fast' model tier
+  const helper = new SessionHelper({
+    model: 'fast',
+    parentAgent: agent,
+  });
+  
+  const result = await helper.execute(summaryPrompt);
+  return result.success ? result.response.trim() : 'Processing your request';
+}
+```
+
+### Event Types and Data Structures
+
+#### Agent Summary Events
+```typescript
+export interface AgentSummaryUpdatedData {
+  summary: string;
+  agentThreadId: ThreadId;
+  timestamp: Date;
+}
+
+// Event structure
+{
+  type: 'AGENT_SUMMARY_UPDATED',
+  threadId: string,
+  data: AgentSummaryUpdatedData,
+  transient: true,  // Not persisted to database
+  context: { projectId, sessionId, agentId }
+}
+```
+
+#### Event Registration
+- **Transient events**: Added to `isTransientEventType()` - not persisted to database
+- **Type safety**: Added to LaceEvent union type with discriminated unions
+- **Database handling**: Explicit rejection in database serialization with helpful error messages
+
+### Connection Management
+
+#### Connection Lifecycle
+1. **EventStreamProvider mounts** → Creates SSE connection to `/api/events/stream`
+2. **Backend registers session** → EventStreamManager.registerSession() sets up auto-forwarding
+3. **Events occur** → Broadcast via EventStreamManager.broadcast()
+4. **Frontend receives events** → EventStreamProvider updates local state
+5. **Components consume events** → Via useEventStreamContext() hook
+
+#### Error Handling
+- **Connection failures**: Automatic reconnection with exponential backoff
+- **Event parsing errors**: Graceful handling with logging
+- **Component errors**: Error boundaries prevent SSE connection loss
+- **Memory management**: Automatic cleanup on unmount
+
+#### Performance Considerations
+- **Single connection per session**: No duplicate connections
+- **Client-side filtering**: Server sends all events, client filters by relevance
+- **Event batching**: Natural SSE batching for high-frequency events
+- **Memory management**: Event arrays managed by providers, automatic cleanup
+
+### Best Practices
+
+#### For Component Authors
+1. **Use existing context**: Always use `useEventStreamContext()` instead of `useEventStream()`
+2. **Filter in components**: Handle event filtering in useEffect, not at connection level
+3. **Handle missing data**: Events may have different data structures depending on type
+4. **Performance**: Use dependency arrays properly in useEffect for event handling
+
+#### For Backend Integration
+1. **Use EventStreamManager.broadcast()**: Don't create custom SSE endpoints
+2. **Register sessions**: Call `eventStreamManager.registerSession(session)` for auto-forwarding
+3. **Proper event structure**: Follow LaceEvent interface with required fields
+4. **Transient vs persisted**: Mark UI-only events as `transient: true`
+
+#### Common Pitfalls
+- **Multiple subscriptions**: Components should NOT call useEventStream() if wrapped in EventStreamProvider
+- **Event data assumptions**: Always check event.data structure - different event types have different shapes
+- **Memory leaks**: EventStreamProvider handles cleanup automatically, don't manage connections manually
+- **Error handling**: Handle both connection errors and event processing errors separately
+
+### Integration Examples
+
+#### Real-Time Agent Summaries
+```typescript
+// In AgentPageContent component
+const { agentEvents } = useEventStreamContext();
+
+useEffect(() => {
+  agentEvents.events.forEach(event => {
+    if (
+      event.type === 'AGENT_SUMMARY_UPDATED' && 
+      event.data?.agentThreadId === agentId
+    ) {
+      setAgentSummary(event.data.summary);
+    }
+  });
+}, [agentEvents.events, agentId]);
+```
+
+#### Tool Approval Notifications  
+```typescript
+// ToolApprovalProvider handles TOOL_APPROVAL_REQUEST events automatically
+// Components get pendingApprovals via useToolApprovalContext()
+```
+
+#### Agent State Updates
+```typescript
+// EventStreamProvider forwards AGENT_STATE_CHANGE events
+// Components can listen via onAgentStateChange prop or context
+```
+
 ### Event Type Management
 
 Event types are centrally managed through:
