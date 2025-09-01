@@ -3,6 +3,7 @@
 
 import './lib/server/data-dir-init';
 import { parseArgs } from 'util';
+import type express from 'express';
 
 // Parse command line arguments
 const { values } = parseArgs({
@@ -98,22 +99,11 @@ async function startLaceServer() {
   );
 
   app.use(viteDevServer.middlewares);
-
-  // Preload routes to prevent 404s on first requests
-  try {
-    console.log('🔄 Preloading API routes...');
-    await viteDevServer.ssrLoadModule('./server/app.ts');
-    console.log('✅ API routes preloaded');
-  } catch (error) {
-    console.warn('⚠️  Route preloading failed, routes will load on first request:', error);
-  }
-
-  // Handle all routes using React Router template pattern
   app.use(async (req, res, next) => {
     try {
       const source = await viteDevServer.ssrLoadModule('./server/app.ts');
       return await (
-        source as { app: (req: unknown, res: unknown, next: unknown) => Promise<unknown> }
+        source as { app: (req: unknown, res: unknown, next: unknown) => Promise<void> }
       ).app(req, res, next);
     } catch (error) {
       if (typeof error === 'object' && error instanceof Error) {
@@ -122,6 +112,27 @@ async function startLaceServer() {
       next(error);
     }
   });
+
+  // Clean error handler for 404s and other errors
+  app.use(
+    (err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+      if (res.headersSent) {
+        return next(err);
+      }
+
+      const error = err as { status?: number; message?: string };
+      const status = error.status || 500;
+
+      if (status === 404) {
+        // eslint-disable-next-line no-console -- 404 logging is appropriate for development server
+        console.log(`404: ${req.method} ${req.url}`);
+        res.status(404).send('Not Found');
+      } else {
+        console.error(`${status}: ${req.method} ${req.url} - ${error.message || 'Unknown error'}`);
+        res.status(status).send(error.message || 'Internal Server Error');
+      }
+    }
+  );
   app.listen(port, hostname, () => {
     // eslint-disable-next-line no-console -- Server ready message with URL/PID is appropriate for server process
     console.log(`
