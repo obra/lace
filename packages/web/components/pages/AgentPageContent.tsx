@@ -23,7 +23,7 @@ import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useToolApprovalContext } from '@/components/providers/ToolApprovalProvider';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import { useURLState } from '@/hooks/useURLState';
-import { useEventStream } from '@/hooks/useEventStream';
+import { useEventStreamContext } from '@/components/providers/EventStreamProvider';
 
 interface AgentPageContentProps {
   projectId: string;
@@ -117,25 +117,28 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
     setShowSessionEditModal(true);
   }, []);
 
-  // Listen for agent summary updates
-  useEventStream({
-    threadIds: [agentId],
-    onAgentEvent: useCallback(
-      (event) => {
-        if (
-          event.type === 'AGENT_SUMMARY_UPDATED' &&
-          event.data &&
-          typeof event.data === 'object' &&
-          'agentThreadId' in event.data &&
-          event.data.agentThreadId === agentId
-        ) {
-          const summaryData = event.data as { summary: string };
-          setAgentSummary(summaryData.summary);
-        }
-      },
-      [agentId]
-    ),
-  });
+  // Listen for agent summary updates from existing event stream
+  const { agentEvents } = useEventStreamContext();
+
+  useEffect(() => {
+    if (!agentEvents.events) return;
+
+    // Look for the most recent AGENT_SUMMARY_UPDATED event for this agent
+    for (let i = agentEvents.events.length - 1; i >= 0; i--) {
+      const event = agentEvents.events[i];
+      if (
+        event.type === 'AGENT_SUMMARY_UPDATED' &&
+        event.data &&
+        typeof event.data === 'object' &&
+        'agentThreadId' in event.data &&
+        event.data.agentThreadId === agentId
+      ) {
+        const summaryData = event.data as { summary: string };
+        setAgentSummary(summaryData.summary);
+        break; // Only use the most recent summary
+      }
+    }
+  }, [agentEvents.events, agentId]);
 
   // Get current agent info for display
   const currentAgent = selectedSessionDetails?.agents?.find((a) => a.threadId === agentId);
