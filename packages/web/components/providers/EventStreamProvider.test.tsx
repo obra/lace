@@ -289,6 +289,7 @@ describe('EventStreamProvider', () => {
       onApprovalRequest: expect.any(Function),
       onApprovalResponse: expect.any(Function),
       onCompactionStart: expect.any(Function),
+      onSessionEvent: expect.any(Function),
       onCompactionComplete: expect.any(Function),
     });
   });
@@ -342,6 +343,7 @@ describe('EventStreamProvider', () => {
       onApprovalRequest: expect.any(Function),
       onApprovalResponse: expect.any(Function),
       onCompactionStart: expect.any(Function),
+      onSessionEvent: expect.any(Function),
       onCompactionComplete: expect.any(Function),
     });
   });
@@ -383,6 +385,7 @@ describe('EventStreamProvider', () => {
       onApprovalRequest: expect.any(Function),
       onApprovalResponse: expect.any(Function),
       onCompactionStart: expect.any(Function),
+      onSessionEvent: expect.any(Function),
       onCompactionComplete: expect.any(Function),
     });
   });
