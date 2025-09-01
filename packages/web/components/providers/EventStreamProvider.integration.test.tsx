@@ -15,6 +15,7 @@ import { AgentProvider } from './AgentProvider';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { createMockResponse } from '@/test-utils/mock-fetch';
 import type { ThreadId } from '@/types/core';
+import { asThreadId } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
 
 // Mock all the hooks that EventStreamProvider depends on
@@ -384,7 +385,7 @@ describe('EventStreamProvider Integration', () => {
       timestamp: new Date(),
       data: {
         summary: 'Working on test summary',
-        agentThreadId: 'lace_20250101_xyz789',
+        agentThreadId: asThreadId('lace_20250101_xyz789'),
         timestamp: new Date(),
       },
       transient: true,
