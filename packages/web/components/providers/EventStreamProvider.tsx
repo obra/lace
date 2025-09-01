@@ -239,8 +239,8 @@ export function EventStreamProvider({
       onAgentToken: handleAgentToken,
       onToolCall: stableAddAgentEvent,
       onToolResult: stableAddAgentEvent,
-      // Agent lifecycle events
-      onAgentEvent: stableAddAgentEvent, // Handles AGENT_SUMMARY_UPDATED and other agent events
+      // Session events (includes all LaceEvent types like AGENT_SUMMARY_UPDATED)
+      onSessionEvent: stableAddAgentEvent, // Handles all session-level events including agent summaries
       // Agent state changes
       onAgentStateChange: handleAgentStateChangeCallback,
       // Tool approval requests
