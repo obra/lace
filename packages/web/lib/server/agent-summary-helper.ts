@@ -44,14 +44,14 @@ Respond with just the summary sentence, nothing else. Keep it concise and focuse
       logger.warn('Agent summary generation failed - no content returned', {
         agentId: getAgentId(agent),
       });
-      return 'Processing your request';
+      throw new Error('No summary content returned from helper');
     }
   } catch (error) {
     logger.error('Agent summary helper error', {
       agentId: getAgentId(agent),
       error: error instanceof Error ? error.message : String(error),
     });
-    return 'Processing your request';
+    throw error; // Re-throw to prevent event broadcasting
   }
 }
 

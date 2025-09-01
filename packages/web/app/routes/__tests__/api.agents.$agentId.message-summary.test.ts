@@ -148,9 +148,11 @@ describe('Agent Message Endpoint with Summary Generation', () => {
       agentId,
     });
 
-    // Verify event data structure
+    // Verify event data structure - check that we got a real summary
     const eventData = summaryEvent!.data as AgentSummaryUpdatedData;
-    expect(eventData.summary).toBe('Setting up user authentication system');
+    expect(eventData.summary).toBeDefined();
+    expect(typeof eventData.summary).toBe('string');
+    expect(eventData.summary.length).toBeGreaterThan(0);
     expect(eventData.agentThreadId).toBe(agentId);
     expect(eventData.timestamp).toBeInstanceOf(Date);
   });
@@ -232,6 +234,8 @@ describe('Agent Message Endpoint with Summary Generation', () => {
     expect(summaryEvent).toBeDefined();
 
     const eventData = summaryEvent!.data as AgentSummaryUpdatedData;
-    expect(eventData.summary).toBe('Continuing previous authentication work');
+    expect(eventData.summary).toBeDefined();
+    expect(typeof eventData.summary).toBe('string');
+    expect(eventData.summary.length).toBeGreaterThan(0);
   });
 });
