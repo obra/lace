@@ -21,14 +21,11 @@ e2e/task-management.e2e.ts
 e2e/tool-approval.e2e.ts
 e2e/user-messaging-flow.e2e.ts
 
-# Tests that need proper fixes before CI enablement
-# e2e/stop-functionality.e2e.ts                 # My responsibility - agent error recovery
-# e2e/agent-stop-functionality.e2e.ts          # My responsibility - agent error recovery  
-# e2e/streaming-compaction.e2e.ts              # My responsibility - compaction issues
-# e2e/error-propagation.e2e.ts                 # My responsibility - setup timeouts
-# e2e/provider-dropdown-simple.test.e2e.ts     # My responsibility - setup timeouts
-# e2e/browser-navigation.e2e.ts                # My responsibility - enabled without verification
-# e2e/streaming-core.e2e.ts                    # My responsibility - enabled without verification
+e2e/agent-stop-functionality.e2e.ts
+e2e/stop-functionality.e2e.ts
+e2e/streaming-compaction.e2e.ts
+e2e/error-propagation.e2e.ts
+e2e/provider-dropdown-simple.test.e2e.ts
 
 # Tests with known application bugs (not CI-ready yet)
 

@@ -40,6 +40,7 @@ export function DismissButton({
         ${className}
       `}
       aria-label={ariaLabel}
+      data-testid="dismiss-button"
       type="button"
     >
       <FontAwesomeIcon icon={faTimes} className={`${sizeClass.icon} text-base-content/60`} />
