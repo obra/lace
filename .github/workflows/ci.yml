@@ -248,8 +248,8 @@ jobs:
           # Sign inner binaries with proper entitlements
           echo "   🔧 Signing inner binaries..."
           
-          # lace-server: Use Bun-specific entitlements, NO hardened runtime
-          codesign --force --timestamp --entitlements scripts/bun-entitlements.plist --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/MacOS/lace-server"
+          # lace-server: Use Bun-specific entitlements WITH hardened runtime (required for notarization)
+          codesign --force --options runtime --timestamp --entitlements scripts/bun-entitlements.plist --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/MacOS/lace-server"
           
           # Main Lace app: Standard app entitlements WITH hardened runtime
           if [ -f "scripts/entitlements.plist" ]; then
