@@ -42,20 +42,37 @@ export async function generateAgentSummary(
       context += `\n\nAgent's last response: "${lastAgentResponse}"`;
     }
 
-    const prompt = `Based on this conversation context, put together a clear one-sentence summary of what the agent is currently working on.
+    const prompt = `Based on this conversation context, put together a clear one-sentence summary of what the agent is currently working on. It should be casual and sometimes a little playful, like you're talking to someone you trust.
 
 ${context}
 
 Respond with just the summary sentence, nothing else. Keep it concise and focused on the current task or activity.`;
 
+    logger.debug('Executing SessionHelper with prompt', {
+      agentId: getAgentId(agent),
+      promptLength: prompt.length,
+    });
+
     const result = await helper.execute(prompt);
 
-    if (result.success) {
-      return result.response.trim();
-    } else {
-      logger.warn('Agent summary generation failed', {
+    logger.debug('SessionHelper execution result', {
+      agentId: getAgentId(agent),
+      hasContent: !!result.content,
+      contentLength: result.content?.length || 0,
+      toolCallsCount: result.toolCalls?.length || 0,
+    });
+
+    if (result.content && result.content.trim()) {
+      const summary = result.content.trim();
+      logger.debug('Agent summary generated successfully', {
         agentId: getAgentId(agent),
-        error: result.error,
+        summary,
+      });
+      return summary;
+    } else {
+      logger.warn('Agent summary generation failed - no content returned', {
+        agentId: getAgentId(agent),
+        result: result,
       });
       return 'Processing your request';
     }
