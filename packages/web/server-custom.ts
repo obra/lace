@@ -91,57 +91,31 @@ async function startLaceServer() {
   app.use(compression.default());
   app.disable('x-powered-by');
 
-  if (DEVELOPMENT) {
-    console.error('Starting development server with Vite middleware');
+  console.error('Starting development server with Vite middleware');
 
-    // Development mode - use Vite middleware
-    const viteDevServer = await import('vite').then((vite) =>
-      vite.createServer({
-        server: { middlewareMode: true },
-      })
-    );
+  // Development mode - use Vite middleware
+  const viteDevServer = await import('vite').then((vite) =>
+    vite.createServer({
+      server: { middlewareMode: true },
+    })
+  );
 
-    app.use(viteDevServer.middlewares);
+  app.use(viteDevServer.middlewares);
 
-    // Handle all routes using React Router template pattern
-    app.use(async (req, res, next) => {
-      try {
-        const source = await viteDevServer.ssrLoadModule('./server/app.ts');
-        return await (
-          source as { app: (req: unknown, res: unknown, next: unknown) => Promise<unknown> }
-        ).app(req, res, next);
-      } catch (error) {
-        if (typeof error === 'object' && error instanceof Error) {
-          viteDevServer.ssrFixStacktrace(error);
-        }
-        next(error);
+  // Handle all routes using React Router template pattern
+  app.use(async (req, res, next) => {
+    try {
+      const source = await viteDevServer.ssrLoadModule('./server/app.ts');
+      return await (
+        source as { app: (req: unknown, res: unknown, next: unknown) => Promise<unknown> }
+      ).app(req, res, next);
+    } catch (error) {
+      if (typeof error === 'object' && error instanceof Error) {
+        viteDevServer.ssrFixStacktrace(error);
       }
-    });
-  } else {
-    console.error('Starting production server with static file serving');
-    const morgan = await import('morgan');
-
-    // Production mode - static assets FIRST, exactly like React Router template
-    const clientRoot = path.resolve(process.cwd(), 'build', 'client');
-    const assetsRoot = path.join(clientRoot, 'assets');
-    app.use('/assets', express.static(assetsRoot, { immutable: true, maxAge: '1y' }));
-    app.use(morgan.default('tiny'));
-    app.use(express.static(clientRoot, { maxAge: '1h' }));
-
-    // Import and mount React Router app last
-    const requestHandler = createRequestHandler({
-      build: () =>
-        // @ts-expect-error - Build file will exist in production
-        import('./build/server/index.js') as Promise<ServerBuild>,
-      getLoadContext() {
-        return {
-          // Add any context needed by your routes here
-        };
-      },
-    });
-    app.use(requestHandler);
-  }
-
+      next(error);
+    }
+  });
   app.listen(port, hostname, () => {
     // eslint-disable-next-line no-console -- Server ready message with URL/PID is appropriate for server process
     console.log(`

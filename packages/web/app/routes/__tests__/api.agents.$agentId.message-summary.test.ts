@@ -19,7 +19,6 @@ import { EventStreamManager } from '@/lib/event-stream-manager';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import type { LaceEvent, AgentSummaryUpdatedData } from '@/types/core';
-import { asThreadId } from '@/types/core';
 
 // Mock the AI provider HTTP responses
 const server = setupServer(
@@ -123,7 +122,7 @@ describe('Agent Message Endpoint with Summary Generation', () => {
     const response = await action({
       request,
       params: { agentId },
-    } as { request: Request; params: { agentId: string } });
+    } as { request: Request; params: { agentId: string }; context: object });
 
     // Verify successful response
     expect(response.status).toBe(202);
@@ -177,7 +176,7 @@ describe('Agent Message Endpoint with Summary Generation', () => {
     const response = await action({
       request,
       params: { agentId },
-    } as { request: Request; params: { agentId: string } });
+    } as { request: Request; params: { agentId: string }; context: object });
 
     // Endpoint should still succeed
     expect(response.status).toBe(202);
@@ -223,7 +222,7 @@ describe('Agent Message Endpoint with Summary Generation', () => {
     await action({
       request,
       params: { agentId },
-    } as { request: Request; params: { agentId: string } });
+    } as { request: Request; params: { agentId: string }; context: object });
 
     // Wait for summary generation
     await new Promise((resolve) => setTimeout(resolve, 100));

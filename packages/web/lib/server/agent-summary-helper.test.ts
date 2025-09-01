@@ -21,14 +21,14 @@ vi.mock('~/helpers/session-helper', () => ({
 
 describe('agent-summary-helper', () => {
   let mockAgent: Agent;
-  let mockSessionHelper: { execute: ReturnType<typeof vi.fn> };
+  let _mockSessionHelper: { execute: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     mockAgent = {
       threadId: 'test-agent-123',
     } as Agent;
 
-    mockSessionHelper = { execute: mockExecute };
+    _mockSessionHelper = { execute: mockExecute };
     vi.clearAllMocks();
   });
 
