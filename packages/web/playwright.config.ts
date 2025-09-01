@@ -13,6 +13,9 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 4 : 4, // Use multiple workers instead of 1
 
+  // Increase timeout for CI where server startup is slower
+  timeout: process.env.CI ? 120000 : 60000,
+
   // Enhanced reporting and debugging
   reporter: [
     ['html', { outputFolder: 'temp/playwright-report' }],
