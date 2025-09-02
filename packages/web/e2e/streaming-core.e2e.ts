@@ -390,7 +390,7 @@ test.describe('Core Streaming Functionality', () => {
 
     // Verify AI response appears (mocked)
     await expect(
-      page.getByText("I'm a helpful AI assistant. How can I help you today?")
+      page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
     ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
     // Verify the chat interface is in a responsive state
@@ -459,7 +459,7 @@ test.describe('Core Streaming Functionality', () => {
 
     // Verify AI response appears (mocked)
     await expect(
-      page.getByText("I'm a helpful AI assistant. How can I help you today?")
+      page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
     ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
   });
 
@@ -583,7 +583,7 @@ test.describe('Core Streaming Functionality', () => {
 
     // Wait for streaming response (mocked)
     await expect(
-      page.getByText("I'm a helpful AI assistant. How can I help you today?")
+      page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
     ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
     // Document the network behavior we observe
