@@ -100,7 +100,7 @@ test.describe('Example E2E Test Patterns', () => {
 
     // Wait for AI response (mocked by E2E test server)
     await expect(
-      page.getByText("Hello from Test 2! I'm responding to your different message.").first()
+      page.getByText("Hello from Test 2! I'm responding to your different message.")
     ).toBeVisible({
       timeout: TIMEOUTS.EXTENDED,
     });
@@ -189,7 +189,7 @@ test.describe('Example E2E Test Patterns', () => {
     await verifyMessageVisible(page, 'This is a follow-up message to test conversation flow');
 
     // Wait for the follow-up AI response
-    await expect(page.getByText('This is my follow-up response').first()).toBeVisible({
+    await expect(page.getByText('This is my follow-up response')).toBeVisible({
       timeout: TIMEOUTS.EXTENDED,
     });
 
@@ -205,7 +205,7 @@ test.describe('Example E2E Test Patterns', () => {
         )
         .isVisible()
     ).toBeTruthy();
-    expect(await page.getByText('This is my follow-up response').first().isVisible()).toBeTruthy();
+    expect(await page.getByText('This is my follow-up response').isVisible()).toBeTruthy();
   });
 
   test('Test 5: Message streaming with stop functionality', async ({ page }) => {
@@ -232,7 +232,7 @@ test.describe('Example E2E Test Patterns', () => {
 
     // The response should be partial (stopped before completion)
     // We should see at least the beginning of the response
-    await expect(page.getByText('This is a very long response').first()).toBeVisible({
+    await expect(page.getByText('This is a very long response')).toBeVisible({
       timeout: TIMEOUTS.QUICK,
     });
 
