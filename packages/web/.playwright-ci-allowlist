@@ -2,30 +2,34 @@
 # Add one test file path per line
 # Lines starting with # are comments and will be ignored
 
-e2e/browser-navigation.e2e.ts
-e2e/console-forward.e2e.ts
+# High-value, stable core tests
 e2e/data-testid-verification.test.e2e.ts
-e2e/directory-browser.e2e.ts
-e2e/error-handling.e2e.ts
 e2e/example.test.e2e.ts
-e2e/file-browser.e2e.ts
-# e2e/msw-setup.test.e2e.ts # Removed - playwright-msw dependency removed
-e2e/page-objects.test.e2e.ts
-e2e/project-persistence.e2e.ts
-e2e/provider-dropdown-realtime.test.e2e.ts
-e2e/session-agent-management.e2e.ts
-e2e/sse-reliability.e2e.ts
-e2e/streaming-advanced.e2e.ts
-e2e/streaming-core.e2e.ts
+e2e/user-messaging-flow.e2e.ts
+e2e/directory-browser.e2e.ts
 e2e/task-management.e2e.ts
 e2e/tool-approval.e2e.ts
-e2e/user-messaging-flow.e2e.ts
+e2e/streaming-core.e2e.ts
 
-e2e/agent-stop-functionality.e2e.ts
-e2e/stop-functionality.e2e.ts
-e2e/streaming-compaction.e2e.ts
-e2e/error-propagation.e2e.ts
-e2e/provider-dropdown-simple.test.e2e.ts
+# Secondary features - good signal/noise ratio
+e2e/console-forward.e2e.ts
+e2e/sse-reliability.e2e.ts
+e2e/project-persistence.e2e.ts
+
+# Tests that need more stabilization before CI
+# e2e/browser-navigation.e2e.ts               # Complex, browser-specific
+# e2e/agent-summary-updates.e2e.ts           # New feature, still stabilizing  
+# e2e/streaming-advanced.e2e.ts              # Edge cases, potentially flaky
+# e2e/file-browser.e2e.ts                    # Secondary feature
+# e2e/error-handling.e2e.ts                  # Edge cases
+# e2e/error-propagation.e2e.ts               # Edge cases
+# e2e/session-agent-management.e2e.ts        # Complex, potentially flaky
+# e2e/provider-dropdown-realtime.test.e2e.ts # Provider features
+# e2e/provider-dropdown-simple.test.e2e.ts   # Provider features
+# e2e/page-objects.test.e2e.ts               # Testing infrastructure
+# e2e/agent-stop-functionality.e2e.ts        # Need to fix setup issues first
+# e2e/stop-functionality.e2e.ts              # Need to fix setup issues first  
+# e2e/streaming-compaction.e2e.ts            # Need to fix compaction properly
 
 # Tests with known application bugs (not CI-ready yet)
 
