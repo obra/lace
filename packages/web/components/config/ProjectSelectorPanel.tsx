@@ -352,6 +352,33 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
       className="bg-base-100 rounded-lg border border-base-300 p-6 flex flex-col h-full"
       onClick={handleBackdropClick}
     >
+      {/* Create New Project Button - Always show when projects exist */}
+      {projects.length > 0 && (
+        <div className="flex-shrink-0 mb-6">
+          <div
+            onClick={() => setShowCreateProject(true)}
+            className="border-2 border-dashed border-primary/50 rounded-lg p-4 cursor-pointer transition-all hover:border-primary hover:bg-primary/5 flex items-center gap-4"
+            data-testid="create-project-button"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setShowCreateProject(true);
+              }
+            }}
+          >
+            <FontAwesomeIcon icon={faPlus} className="w-6 h-6 text-primary" />
+            <div className="text-left">
+              <h3 className="font-semibold text-base-content">Create New Project</h3>
+              <p className="text-sm text-base-content/60">
+                Tell Lace about another project or codebase you want a hand with.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header (hidden until at least one project exists) */}
       {projects.length > 0 && (
         <div className="flex items-start justify-between mb-6 flex-shrink-0">
@@ -438,29 +465,6 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
           </div>
         ) : (
           <div className="space-y-3 pb-4">
-            {/* New Project Button */}
-            <div
-              onClick={() => setShowCreateProject(true)}
-              className="border-2 border-dashed border-primary/50 rounded-lg p-4 cursor-pointer transition-all hover:border-primary hover:bg-primary/5 flex items-center gap-4"
-              data-testid="create-project-button"
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  setShowCreateProject(true);
-                }
-              }}
-            >
-              <FontAwesomeIcon icon={faPlus} className="w-6 h-6 text-primary" />
-              <div className="text-left">
-                <h3 className="font-semibold text-base-content">Create New Project</h3>
-                <p className="text-sm text-base-content/60">
-                  Start a new project to organize your AI conversations
-                </p>
-              </div>
-            </div>
-
             {filteredProjects.map((project) => (
               <div
                 key={project.id}
