@@ -169,7 +169,6 @@ describe('Chat', () => {
         loadingHistory: false,
         addAgentEvent: vi.fn(),
       },
-      streamingContent: undefined,
       compactionState: {
         isCompacting: false,
         isAuto: false,

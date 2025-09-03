@@ -116,11 +116,11 @@ describe('useTimelineAutoscroll', () => {
     const mockEvents = [{ type: 'USER_MESSAGE', content: 'Hello' }];
 
     const { result, rerender } = renderHook(
-      ({ streamingContent }: { streamingContent?: string }) =>
-        useTimelineAutoscroll(mockEvents, false, streamingContent, { scrollDelay: 0 }),
+      ({ events }: { events: unknown[] }) =>
+        useTimelineAutoscroll(events, false, undefined, { scrollDelay: 0 }),
       {
         wrapper,
-        initialProps: { streamingContent: undefined as string | undefined },
+        initialProps: { events: mockEvents },
       }
     );
 
@@ -130,9 +130,13 @@ describe('useTimelineAutoscroll', () => {
       writable: true,
     });
 
-    // Start streaming
+    // Start streaming by adding AGENT_STREAMING event
+    const eventsWithStreaming = [
+      ...mockEvents,
+      { type: 'AGENT_STREAMING', content: 'Streaming...' },
+    ];
     act(() => {
-      rerender({ streamingContent: 'Streaming response...' });
+      rerender({ events: eventsWithStreaming });
     });
 
     await waitFor(() => expect(mockContainer.scrollTo).toHaveBeenCalled());
