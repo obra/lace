@@ -24,8 +24,8 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
     // Running from Bun executable - return special markers for embedded file loading
     if (relativePath === 'data') {
       return '__BUN_EMBEDDED_DATA__';
-    } else if (relativePath === 'prompts') {
-      return '__BUN_EMBEDDED_PROMPTS__';
+    } else if (relativePath === 'agent-personas') {
+      return '__BUN_EMBEDDED_AGENT_PERSONAS__';
     } else if (relativePath === 'templates') {
       return '__BUN_EMBEDDED_TEMPLATES__';
     } else {
@@ -51,8 +51,8 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
         projectRoot.replace('file://', ''),
         'packages/core/src/providers/catalog/data'
       );
-    } else if (relativePath === 'prompts') {
-      return path.resolve(projectRoot.replace('file://', ''), 'packages/core/src/config/prompts');
+    } else if (relativePath === 'agent-personas') {
+      return path.resolve(projectRoot.replace('file://', ''), 'packages/core/config/agent-personas');
     } else {
       throw new Error(
         `Unknown resource path '${relativePath}' in bundled mode. Add explicit mapping.`

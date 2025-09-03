@@ -44,7 +44,7 @@ export class TemplateEngine {
     // First try embedded files - check for the template path directly
     try {
       if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
-        const targetPath = `packages/core/src/config/prompts/${templatePath}`;
+        const targetPath = `packages/core/config/agent-personas/${templatePath}`;
 
         for (const file of Bun.embeddedFiles) {
           if ((file as File).name.endsWith(targetPath)) {
@@ -124,7 +124,7 @@ export class TemplateEngine {
       // Try embedded files first (Bun executable)
       let foundContent: string | null = null;
       if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
-        const targetPath = `packages/core/src/config/prompts/${includePath}`;
+        const targetPath = `packages/core/config/agent-personas/${includePath}`;
 
         for (const file of Bun.embeddedFiles) {
           if ((file as File).name.endsWith(targetPath)) {
