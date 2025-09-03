@@ -3,10 +3,11 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlug, faUser, faCog } from '@/lib/fontawesome';
+import { useTheme } from '@/components/providers/ThemeProvider';
 import { SettingsTabs } from './SettingsTabs';
 import { UISettingsPanel } from './panels/UISettingsPanel';
 import { UserSettingsPanel } from './panels/UserSettingsPanel';
@@ -18,24 +19,14 @@ interface SettingsContainerProps {
 
 export function SettingsContainer({ children }: SettingsContainerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [currentTheme, setCurrentTheme] = useState('dark');
+  const { theme, setTheme } = useTheme();
 
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    setCurrentTheme(savedTheme);
-    document.documentElement.setAttribute('data-theme', savedTheme);
-  }, []);
-
-  const handleThemeChange = useCallback((theme: string) => {
-    // Update state and localStorage immediately for consistency
-    setCurrentTheme(theme);
-    localStorage.setItem('theme', theme);
-
-    // Batch DOM operation to avoid unnecessary reflows
-    requestAnimationFrame(() => {
-      document.documentElement.setAttribute('data-theme', theme);
-    });
-  }, []);
+  const handleThemeChange = useCallback(
+    (newTheme: string) => {
+      setTheme(newTheme as 'light' | 'dark');
+    },
+    [setTheme]
+  );
 
   const handleOpenSettings = useCallback(() => setIsOpen(true), []);
   const handleCloseSettings = useCallback(() => setIsOpen(false), []);
@@ -50,8 +41,8 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
 
   // Memoize the settings panels to avoid recreating on every render
   const uiSettingsPanel = useMemo(
-    () => <UISettingsPanel currentTheme={currentTheme} onThemeChange={handleThemeChange} />,
-    [currentTheme, handleThemeChange]
+    () => <UISettingsPanel currentTheme={theme} onThemeChange={handleThemeChange} />,
+    [theme, handleThemeChange]
   );
 
   const userSettingsPanel = useMemo(() => <UserSettingsPanel />, []);

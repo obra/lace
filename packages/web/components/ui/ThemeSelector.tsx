@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-// Using FontAwesome instead of Heroicons
+import React from 'react';
+import { useTheme } from '@/components/providers/ThemeProvider';
 
 // Limit app-visible themes to core options for now. Others retained for quick restore.
 const availableThemes = [
@@ -22,26 +22,16 @@ interface ThemeSelectorProps {
 }
 
 export function ThemeSelector({ currentTheme: propTheme, onThemeChange }: ThemeSelectorProps) {
-  const [currentTheme, setCurrentTheme] = useState(propTheme || 'dark');
+  const { theme: contextTheme, setTheme: setContextTheme } = useTheme();
 
-  useEffect(() => {
-    if (propTheme) {
-      setCurrentTheme(propTheme);
-    } else {
-      // Get theme from localStorage or default
-      const savedTheme = localStorage.getItem('theme') || 'dark';
-      setCurrentTheme(savedTheme);
-      document.documentElement.setAttribute('data-theme', savedTheme);
-    }
-  }, [propTheme]);
+  // Use prop theme if provided, otherwise use context theme
+  const currentTheme = propTheme ?? contextTheme;
 
-  const setTheme = (themeName: string) => {
-    setCurrentTheme(themeName);
+  const handleThemeChange = (themeName: string) => {
     if (onThemeChange) {
       onThemeChange(themeName);
     } else {
-      localStorage.setItem('theme', themeName);
-      document.documentElement.setAttribute('data-theme', themeName);
+      setContextTheme(themeName as 'light' | 'dark');
     }
   };
 
@@ -56,7 +46,7 @@ export function ThemeSelector({ currentTheme: propTheme, onThemeChange }: ThemeS
         {availableThemes.map((theme) => (
           <button
             key={theme.name}
-            onClick={() => setTheme(theme.name)}
+            onClick={() => handleThemeChange(theme.name)}
             className={`relative p-2 rounded-lg border-2 transition-all hover:scale-105 ${
               currentTheme === theme.name
                 ? 'border-primary'

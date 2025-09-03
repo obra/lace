@@ -11,6 +11,7 @@ import { vi, beforeEach, afterEach, expect, describe, it } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { SettingsContainer } from './SettingsContainer';
 import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { stringify } from '@/lib/serialization';
 
 // Mock localStorage
@@ -37,9 +38,11 @@ describe('SettingsContainer', () => {
 
     await act(async () => {
       component = render(
-        <ProviderInstanceProvider>
-          <SettingsContainer>{children}</SettingsContainer>
-        </ProviderInstanceProvider>
+        <ThemeProvider>
+          <ProviderInstanceProvider>
+            <SettingsContainer>{children}</SettingsContainer>
+          </ProviderInstanceProvider>
+        </ThemeProvider>
       );
     });
 
@@ -156,16 +159,18 @@ describe('SettingsContainer', () => {
     localStorageMock.getItem.mockReturnValue('light');
 
     render(
-      <SettingsContainer>
-        {({ onOpenSettings }) => (
-          <button onClick={onOpenSettings} data-testid="settings-trigger">
-            Open Settings
-          </button>
-        )}
-      </SettingsContainer>
+      <ThemeProvider>
+        <SettingsContainer>
+          {({ onOpenSettings }) => (
+            <button onClick={onOpenSettings} data-testid="settings-trigger">
+              Open Settings
+            </button>
+          )}
+        </SettingsContainer>
+      </ThemeProvider>
     );
 
-    expect(localStorageMock.getItem).toHaveBeenCalledWith('theme');
+    expect(localStorageMock.getItem).toHaveBeenCalledWith('lace-theme');
     expect(document.documentElement.setAttribute).toHaveBeenCalledWith('data-theme', 'light');
   });
 
@@ -173,13 +178,15 @@ describe('SettingsContainer', () => {
     localStorageMock.getItem.mockReturnValue(null);
 
     render(
-      <SettingsContainer>
-        {({ onOpenSettings }) => (
-          <button onClick={onOpenSettings} data-testid="settings-trigger">
-            Open Settings
-          </button>
-        )}
-      </SettingsContainer>
+      <ThemeProvider>
+        <SettingsContainer>
+          {({ onOpenSettings }) => (
+            <button onClick={onOpenSettings} data-testid="settings-trigger">
+              Open Settings
+            </button>
+          )}
+        </SettingsContainer>
+      </ThemeProvider>
     );
 
     expect(document.documentElement.setAttribute).toHaveBeenCalledWith('data-theme', 'dark');
@@ -215,7 +222,7 @@ describe('SettingsContainer', () => {
     });
 
     // Verify theme was saved to localStorage
-    expect(localStorageMock.setItem).toHaveBeenCalledWith('theme', 'light');
+    expect(localStorageMock.setItem).toHaveBeenCalledWith('lace-theme', 'light');
   });
 
   it('displays UI settings panel in modal', async () => {
@@ -317,14 +324,16 @@ describe('SettingsContainer', () => {
 
   it('provides render prop pattern for flexible integration', () => {
     const TestComponent = () => (
-      <SettingsContainer>
-        {({ onOpenSettings }) => (
-          <div>
-            <span>Test Content</span>
-            <button onClick={onOpenSettings}>Settings</button>
-          </div>
-        )}
-      </SettingsContainer>
+      <ThemeProvider>
+        <SettingsContainer>
+          {({ onOpenSettings }) => (
+            <div>
+              <span>Test Content</span>
+              <button onClick={onOpenSettings}>Settings</button>
+            </div>
+          )}
+        </SettingsContainer>
+      </ThemeProvider>
     );
 
     render(<TestComponent />);
