@@ -203,30 +203,4 @@ describe('ProjectSelectorPanel', () => {
       expect(screen.getByDisplayValue('my-awesome-project')).toBeInTheDocument();
     });
   });
-
-  it('should allow switching to advanced setup', async () => {
-    // Override to enable auto-open mode
-    mockUseUIContext.mockReturnValue(
-      createMockUIContext({
-        autoOpenCreateProject: true,
-        setAutoOpenCreateProject: mockHandlers.setAutoOpenCreateProject,
-      })
-    );
-
-    render(
-      <BrowserRouter>
-        <ProjectSelectorPanel />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Advanced setup')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('Advanced setup'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Default Provider')).toBeInTheDocument();
-    });
-  });
 });

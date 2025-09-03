@@ -9,6 +9,36 @@ import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types'
 import type { ToolAggregatedEventData } from '@/types/web-events';
 import { Alert } from '@/components/ui/Alert';
 
+// Type for structured bash output
+interface BashOutput {
+  stdoutPreview?: string;
+  stderrPreview?: string;
+  exitCode?: number;
+}
+
+// Type guard to validate bash output structure
+function isBashOutput(obj: unknown): obj is BashOutput {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    (typeof (obj as BashOutput).stdoutPreview === 'string' ||
+      (obj as BashOutput).stdoutPreview === undefined) &&
+    (typeof (obj as BashOutput).stderrPreview === 'string' ||
+      (obj as BashOutput).stderrPreview === undefined) &&
+    (typeof (obj as BashOutput).exitCode === 'number' || (obj as BashOutput).exitCode === undefined)
+  );
+}
+
+// Safe bash output parser
+function parseBashOutput(rawOutput: string): BashOutput | null {
+  try {
+    const parsed: unknown = JSON.parse(rawOutput);
+    return isBashOutput(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 // Expandable result component for bash output with 15-line folding threshold
 function BashExpandableResult({ content, isError }: { content: string; isError: boolean }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -65,11 +95,10 @@ export const bashRenderer: ToolRenderer = {
         if (result?.content) {
           try {
             const rawOutput = result.content.map((block) => block.text || '').join('');
-            const bashOutput = JSON.parse(rawOutput) as { exitCode?: number };
-            const exitCode = bashOutput.exitCode;
+            const bashOutput = parseBashOutput(rawOutput);
 
-            if (exitCode != null && exitCode !== 0) {
-              summary += ` (exit ${exitCode})`;
+            if (bashOutput?.exitCode != null && bashOutput.exitCode !== 0) {
+              summary += ` (exit ${bashOutput.exitCode})`;
             }
           } catch {
             // Ignore parsing errors
@@ -86,13 +115,14 @@ export const bashRenderer: ToolRenderer = {
     if (result.status === 'failed' || result.status === 'denied') return true;
 
     // Check for non-zero exit code in structured output
-    try {
-      const rawOutput = result.content?.map((block) => block.text || '').join('') || '';
-      const bashOutput = JSON.parse(rawOutput) as { exitCode?: number };
-      return bashOutput.exitCode != null && bashOutput.exitCode !== 0;
-    } catch {
-      return false;
+    const rawOutput = result.content?.map((block) => block.text || '').join('') || '';
+    const bashOutput = parseBashOutput(rawOutput);
+
+    if (bashOutput?.exitCode != null && bashOutput.exitCode !== 0) {
+      return true;
     }
+
+    return false;
   },
 
   renderResult: (result: ToolResult): React.ReactNode => {
@@ -107,14 +137,9 @@ export const bashRenderer: ToolRenderer = {
     const rawOutput = result.content.map((block) => block.text || '').join('');
 
     // Try to parse structured bash output
-    let bashOutput: { stdoutPreview?: string; stderrPreview?: string; exitCode?: number };
-    try {
-      bashOutput = JSON.parse(rawOutput) as {
-        stdoutPreview?: string;
-        stderrPreview?: string;
-        exitCode?: number;
-      };
-    } catch {
+    const bashOutput = parseBashOutput(rawOutput);
+
+    if (!bashOutput) {
       // Fallback to raw output if not structured - use ExpandableResult for consistency
       const isError = result.status !== 'completed';
       return <BashExpandableResult content={rawOutput} isError={isError} />;

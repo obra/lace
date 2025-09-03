@@ -49,6 +49,9 @@ function CompactEditError({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // Generate a stable id for the collapsible content
+  const contentId = `edit-error-details-${filename ? filename.replace(/[^a-zA-Z0-9]/g, '-') : 'unknown'}`;
+
   const errorTitle =
     error.type === 'WRONG_COUNT'
       ? 'Occurrence Count Mismatch'
@@ -59,21 +62,25 @@ function CompactEditError({
   return (
     <div className="space-y-2">
       {/* Compact header */}
-      <div
-        className="flex items-center gap-2 cursor-pointer hover:bg-error/5 p-2 rounded border border-error/20"
+      <button
+        type="button"
+        className="flex items-center gap-2 cursor-pointer hover:bg-error/5 p-2 rounded border border-error/20 w-full text-left"
         onClick={() => setIsExpanded(!isExpanded)}
+        aria-expanded={isExpanded}
+        aria-controls={contentId}
       >
         <FontAwesomeIcon
           icon={isExpanded ? faChevronDown : faChevronRight}
           className="text-xs text-error"
+          aria-hidden="true"
         />
         <span className="text-sm text-error font-medium">{errorTitle}</span>
         {filename && <span className="text-xs text-base-content/60 font-mono">{filename}</span>}
-      </div>
+      </button>
 
       {/* Expanded details */}
       {isExpanded && (
-        <div className="bg-error/5 border border-error/10 rounded-lg p-3 space-y-3">
+        <div id={contentId} className="bg-error/5 border border-error/10 rounded-lg p-3 space-y-3">
           {error.edit_index !== undefined && (
             <div className="text-sm">
               Edit {error.edit_index + 1} of {error.total_edits} failed

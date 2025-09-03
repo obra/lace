@@ -4,24 +4,62 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useAvailableTools } from './useAvailableTools';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
+import type { ProjectContextType } from '@/components/providers/ProjectProvider';
+import type { ProjectInfo } from '@/types/core';
 
 // Mock the ProjectProvider
 const mockLoadProjectConfiguration = vi.fn();
-const mockProjects = [
-  { id: 'project-1', name: 'Test Project' },
-  { id: 'project-2', name: 'Another Project' },
+const mockProjects: ProjectInfo[] = [
+  {
+    id: 'project-1',
+    name: 'Test Project',
+    description: 'A test project',
+    workingDirectory: '/test/path',
+    isArchived: false,
+    createdAt: new Date(),
+    lastUsedAt: new Date(),
+  },
+  {
+    id: 'project-2',
+    name: 'Another Project',
+    description: 'Another test project',
+    workingDirectory: '/test/path2',
+    isArchived: false,
+    createdAt: new Date(),
+    lastUsedAt: new Date(),
+  },
 ];
 
+const createMockProjectContext = (
+  overrides: Partial<ProjectContextType> = {}
+): ProjectContextType => ({
+  projects: mockProjects,
+  loading: false,
+  error: null,
+  selectedProject: null,
+  foundProject: null,
+  currentProject: mockProjects[0]!,
+  projectsForSidebar: mockProjects,
+  selectProject: vi.fn(),
+  onProjectSelect: vi.fn(),
+  updateProject: vi.fn(),
+  createProject: vi.fn(),
+  deleteProject: vi.fn(),
+  loadProjectConfiguration: mockLoadProjectConfiguration,
+  reloadProjects: vi.fn(),
+  ...overrides,
+});
+
 vi.mock('@/components/providers/ProjectProvider', () => ({
-  useProjectContext: () => ({
-    projects: mockProjects,
-    loadProjectConfiguration: mockLoadProjectConfiguration,
-  }),
+  useProjectContext: vi.fn(() => createMockProjectContext()),
 }));
 
 describe('useAvailableTools', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset the mock to return default values
+    vi.mocked(useProjectContext).mockReturnValue(createMockProjectContext());
   });
 
   it('should start with loading state', () => {
@@ -52,10 +90,11 @@ describe('useAvailableTools', () => {
   });
 
   it('should handle empty projects array', async () => {
-    vi.mocked(require('@/components/providers/ProjectProvider').useProjectContext).mockReturnValue({
-      projects: [],
-      loadProjectConfiguration: mockLoadProjectConfiguration,
-    });
+    vi.mocked(useProjectContext).mockReturnValue(
+      createMockProjectContext({
+        projects: [],
+      })
+    );
 
     const { result } = renderHook(() => useAvailableTools());
 
@@ -78,6 +117,8 @@ describe('useAvailableTools', () => {
       expect(result.current.loading).toBe(false);
     });
 
+    // Verify the function was actually called
+    expect(mockLoadProjectConfiguration).toHaveBeenCalledWith('project-1');
     expect(result.current.availableTools).toEqual([]);
     expect(result.current.error).toBe(errorMessage);
   });
@@ -143,15 +184,14 @@ describe('useAvailableTools', () => {
 
     const { result, rerender } = renderHook(
       ({ projects }) => {
-        vi.mocked(
-          require('@/components/providers/ProjectProvider').useProjectContext
-        ).mockReturnValue({
-          projects,
-          loadProjectConfiguration: mockLoadProjectConfiguration,
-        });
+        vi.mocked(useProjectContext).mockReturnValue(
+          createMockProjectContext({
+            projects,
+          })
+        );
         return useAvailableTools();
       },
-      { initialProps: { projects: [{ id: 'project-1' }] } }
+      { initialProps: { projects: [mockProjects[0]] } }
     );
 
     await waitFor(() => {
@@ -160,7 +200,7 @@ describe('useAvailableTools', () => {
     expect(result.current.availableTools).toEqual(['bash']);
 
     // Change projects
-    rerender({ projects: [{ id: 'project-2' }] });
+    rerender({ projects: [mockProjects[1]] });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);

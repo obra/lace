@@ -42,9 +42,25 @@ const mockProject = {
   updateConfiguration: vi.fn(),
 };
 
+const mockToolExecutor = {
+  registerAllAvailableTools: vi.fn(),
+  getAllTools: vi.fn(() => [
+    { name: 'file-read', annotations: {} },
+    { name: 'file-write', annotations: {} },
+    { name: 'bash', annotations: {} },
+    { name: 'internal-tool', annotations: { safeInternal: true } },
+  ]),
+};
+
 vi.mock('@/lib/server/lace-imports', () => ({
   Project: {
     getById: vi.fn(),
+  },
+  ToolExecutor: vi.fn(() => mockToolExecutor),
+  ProviderRegistry: {
+    getInstance: vi.fn(() => ({
+      getConfiguredInstances: vi.fn(() => []),
+    })),
   },
 }));
 
@@ -74,6 +90,7 @@ describe('Project Configuration API', () => {
         },
         workingDirectory: '/test/path',
         environmentVariables: { NODE_ENV: 'test' },
+        availableTools: ['file-read', 'file-write', 'bash'], // Added by API route
       });
     });
 
