@@ -7,14 +7,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrash } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
-import { GlassCard } from '@/components/ui/GlassCard';
 import { AccentButton } from '@/components/ui/AccentButton';
 import { DirectoryField } from '@/components/ui';
-import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
+import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import type { ProviderInfo } from '@/types/api';
-import { AVAILABLE_TOOLS } from '@/lib/available-tools';
+import { useAvailableTools } from '@/hooks/useAvailableTools';
+import { DIRECTORY_BROWSER, WIZARD_PROGRESS } from '@/lib/constants/ui';
 
 interface ProjectConfiguration {
   providerInstanceId?: string;
@@ -42,7 +42,7 @@ interface ProjectCreateModalProps {
 
 const DEFAULT_PROJECT_CONFIG: ProjectConfiguration = {
   maxTokens: 4096,
-  tools: [...AVAILABLE_TOOLS],
+  tools: undefined, // Use all available user-configurable tools
   toolPolicies: {},
   environmentVariables: {},
 };
@@ -56,11 +56,13 @@ export function ProjectCreateModal({
 }: ProjectCreateModalProps) {
   // Get providers from ProviderInstanceProvider context
   const { availableProviders: providers, instancesLoading } = useProviderInstances();
+  const { availableTools, loading: toolsLoading, error: toolsError } = useAvailableTools();
   const [createStep, setCreateStep] = useState<number>(2);
   const [createName, setCreateName] = useState('');
   const [createDescription, setCreateDescription] = useState('');
   const [createWorkingDirectory, setCreateWorkingDirectory] = useState('');
   const [createConfig, setCreateConfig] = useState<ProjectConfiguration>(DEFAULT_PROJECT_CONFIG);
+  const [userEditedName, setUserEditedName] = useState(false);
   const [createNewEnvKey, setCreateNewEnvKey] = useState('');
   const [createNewEnvValue, setCreateNewEnvValue] = useState('');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
@@ -105,6 +107,7 @@ export function ProjectCreateModal({
     setCreateDescription('');
     setCreateWorkingDirectory('');
     setCreateConfig(DEFAULT_PROJECT_CONFIG);
+    setUserEditedName(false);
     setCreateNewEnvKey('');
     setCreateNewEnvValue('');
     setShowAdvancedOptions(false);
@@ -118,7 +121,7 @@ export function ProjectCreateModal({
   const handleCreateDirectoryChange = (directory: string) => {
     setCreateWorkingDirectory(directory);
 
-    if (isSimplifiedMode) {
+    if (isSimplifiedMode && !userEditedName) {
       const baseName =
         directory
           .replace(/[/\\]+$/, '')
@@ -186,16 +189,16 @@ export function ProjectCreateModal({
       isOpen={isOpen}
       onClose={handleClose}
       title="Create New Project"
-      size="xl"
-      className="max-h-[90vh] flex flex-col"
+      size="full"
+      className="flex flex-col"
     >
-      <form onSubmit={handleCreateProject} className="flex flex-col max-h-[80vh]">
+      <form onSubmit={handleCreateProject} className="flex flex-col max-h-[85vh]">
         <div className="flex-1 overflow-y-auto px-1 space-y-6">
           {isSimplifiedMode ? (
             // Simplified Mode Wizard
             <>
               {createStep === 2 && (
-                <GlassCard className="p-6">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-lg font-semibold">Set project directory</h4>
                     <button
@@ -216,6 +219,8 @@ export function ProjectCreateModal({
                     placeholder="/path/to/your/project"
                     required
                     className="input-lg focus:outline-none focus:ring-2 focus:ring-accent/60"
+                    inline
+                    minRows={DIRECTORY_BROWSER.DEFAULT_ROWS}
                   />
                   {createWorkingDirectory.trim() &&
                     !createWorkingDirectory.trim().startsWith('/') && (
@@ -258,18 +263,23 @@ export function ProjectCreateModal({
                         <input
                           type="text"
                           value={createName}
+                          onChange={(e) => {
+                            setCreateName(e.target.value);
+                            setUserEditedName(true);
+                          }}
                           data-testid="create-project-wizard-project-name"
                           className="input input-bordered w-full focus:outline-none focus:ring-2 focus:ring-accent/60"
-                          readOnly
+                          placeholder="Enter project name"
+                          required
                         />
                       </div>
                     </div>
                   )}
-                </GlassCard>
+                </div>
               )}
 
               {createStep === 3 && (
-                <GlassCard className="p-6">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-lg font-semibold">Set default AI provider</h4>
                     <button
@@ -399,11 +409,11 @@ export function ProjectCreateModal({
                       )}
                     </div>
                   )}
-                </GlassCard>
+                </div>
               )}
 
               {createStep === 4 && (
-                <GlassCard className="p-6">
+                <div className="space-y-4">
                   <h4 className="text-lg font-semibold mb-2">Review</h4>
                   <p className="text-sm text-base-content/70 mb-3">
                     Review your project settings. Go back to make changes.
@@ -425,11 +435,11 @@ export function ProjectCreateModal({
                       <span className="font-medium">Model:</span> {createConfig.modelId || '—'}
                     </div>
                   </div>
-                </GlassCard>
+                </div>
               )}
 
               {/* Bottom footer: back, step indicators, primary action */}
-              <div className="mt-auto flex justify-between items-center pt-4">
+              <div className="mt-auto flex justify-between items-center pt-4 pb-6 pr-4">
                 <div>
                   {createStep > 2 && (
                     <button
@@ -447,21 +457,13 @@ export function ProjectCreateModal({
                     <div className="w-40 h-1.5 rounded-full bg-base-content/20 overflow-hidden">
                       <div
                         className="h-full bg-accent/80 transition-all"
-                        style={{ width: `${createStep === 3 ? 66 : 100}%` }}
+                        style={{
+                          width: `${createStep === 3 ? WIZARD_PROGRESS.STEP_3_PERCENTAGE : WIZARD_PROGRESS.COMPLETE_PERCENTAGE}%`,
+                        }}
                       />
                     </div>
                   )}
                   <div className="flex items-center gap-2">
-                    {createStep === 2 && (
-                      <button
-                        type="button"
-                        className="btn btn-link text-base-content/70 no-underline"
-                        onClick={() => setShowAdvancedOptions(true)}
-                        data-testid="project-advanced-setup-button"
-                      >
-                        Advanced setup
-                      </button>
-                    )}
                     {createStep > 1 && createStep < 4 && (
                       <AccentButton
                         type="button"
@@ -668,23 +670,13 @@ export function ProjectCreateModal({
                 <label className="label">
                   <span className="label-text font-medium">Tool Access Policies</span>
                 </label>
-                <div className="grid md:grid-cols-2 gap-3">
-                  {AVAILABLE_TOOLS.map((tool) => (
-                    <div
-                      key={tool}
-                      className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
-                    >
-                      <span className="font-medium text-sm">{tool}</span>
-                      <ToolPolicyToggle
-                        value={
-                          (createConfig.toolPolicies?.[tool] || 'require-approval') as ToolPolicy
-                        }
-                        onChange={(policy) => handleCreateToolPolicyChange(tool, policy)}
-                        size="sm"
-                      />
-                    </div>
-                  ))}
-                </div>
+                <ToolPolicyList
+                  tools={availableTools}
+                  policies={createConfig.toolPolicies || {}}
+                  onChange={handleCreateToolPolicyChange}
+                  loading={toolsLoading}
+                  error={toolsError}
+                />
               </div>
             </>
           )}

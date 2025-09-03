@@ -143,7 +143,9 @@ export function TimelineMessage({
               <div className="text-base-content/60 text-xs whitespace-pre-wrap font-mono">
                 {typeof event.data === 'string'
                   ? event.data
-                  : event.data.content?.map((block) => block.text).join('') || 'No result'}
+                  : Array.isArray(event.data?.content)
+                    ? event.data.content.map((block) => block?.text ?? '').join('')
+                    : 'No result'}
               </div>
             </div>
           </div>
@@ -252,6 +254,7 @@ export function TimelineMessage({
     case 'TOOL_APPROVAL_REQUEST':
     case 'TOOL_APPROVAL_RESPONSE':
     case 'AGENT_SPAWNED':
+    case 'AGENT_SUMMARY_UPDATED':
     case 'PROJECT_CREATED':
     case 'PROJECT_UPDATED':
     case 'PROJECT_DELETED':

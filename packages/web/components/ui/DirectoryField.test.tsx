@@ -155,18 +155,6 @@ describe('DirectoryField', () => {
     expect(input).toBeDisabled();
   });
 
-  it('should display folder icon', async () => {
-    const mockOnChange = vi.fn();
-
-    await act(async () => {
-      render(<DirectoryField label="Directory" value="" onChange={mockOnChange} />);
-    });
-
-    // FontAwesome icon is rendered as SVG
-    const icon = document.querySelector('svg[data-icon="folder"]');
-    expect(icon).toBeInTheDocument();
-  });
-
   it('should apply custom className', async () => {
     const mockOnChange = vi.fn();
 

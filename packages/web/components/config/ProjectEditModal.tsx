@@ -8,12 +8,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrash } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { DirectoryField } from '@/components/ui';
-import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
+import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import type { ProjectInfo } from '@/types/core';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
-import type { ProviderInfo } from '@/types/api';
-import { AVAILABLE_TOOLS } from '@/lib/available-tools';
+import type { ProviderInfo, SessionConfiguration } from '@/types/api';
 
 interface ProjectConfiguration {
   providerInstanceId?: string;
@@ -137,10 +136,10 @@ export function ProjectEditModal({
       isOpen={isOpen}
       onClose={onClose}
       title={`Edit Project: ${project.name}`}
-      size="xl"
-      className="max-h-[90vh] flex flex-col"
+      size="full"
+      className="flex flex-col"
     >
-      <form onSubmit={handleSubmit} className="flex flex-col max-h-[80vh]">
+      <form onSubmit={handleSubmit} className="flex flex-col max-h-[85vh]">
         <div className="flex-1 overflow-y-auto px-1 space-y-6">
           {/* Basic Information */}
           <div className="grid md:grid-cols-2 gap-4">
@@ -305,21 +304,11 @@ export function ProjectEditModal({
             <label className="label">
               <span className="label-text font-medium">Tool Access Policies</span>
             </label>
-            <div className="grid md:grid-cols-2 gap-3">
-              {AVAILABLE_TOOLS.map((tool) => (
-                <div
-                  key={tool}
-                  className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
-                >
-                  <span className="font-medium text-sm">{tool}</span>
-                  <ToolPolicyToggle
-                    value={(editConfig.toolPolicies?.[tool] || 'require-approval') as ToolPolicy}
-                    onChange={(policy) => handleToolPolicyChange(tool, policy)}
-                    size="sm"
-                  />
-                </div>
-              ))}
-            </div>
+            <ToolPolicyList
+              tools={(initialConfig as SessionConfiguration).availableTools || []}
+              policies={editConfig.toolPolicies || {}}
+              onChange={handleToolPolicyChange}
+            />
           </div>
         </div>
 

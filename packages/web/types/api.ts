@@ -21,7 +21,13 @@ export interface SessionConfiguration {
   toolPolicies?: Record<string, 'allow' | 'require-approval' | 'deny'>;
   workingDirectory?: string;
   environmentVariables?: Record<string, string>;
+  availableTools?: string[];
   [key: string]: unknown;
+}
+
+// Configuration response from API endpoints
+export interface ConfigurationResponse {
+  configuration: SessionConfiguration;
 }
 
 // Tool approval types

@@ -1,7 +1,7 @@
 // ABOUTME: REST API endpoints for project configuration - GET, PUT for configuration management
 // ABOUTME: Handles project configuration retrieval and updates with validation and error handling
 
-import { Project, ProviderRegistry } from '@/lib/server/lace-imports';
+import { Project, ProviderRegistry, ToolExecutor } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
@@ -27,7 +27,20 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     const configuration = project.getConfiguration();
 
-    return createSuperjsonResponse({ configuration });
+    // Get user-configurable tools from tool registry
+    const toolExecutor = new ToolExecutor();
+    toolExecutor.registerAllAvailableTools();
+    const userConfigurableTools = toolExecutor
+      .getAllTools()
+      .filter((tool) => !tool.annotations?.safeInternal)
+      .map((tool) => tool.name);
+
+    return createSuperjsonResponse({
+      configuration: {
+        ...configuration,
+        availableTools: userConfigurableTools,
+      },
+    });
   } catch (error: unknown) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to fetch configuration',
@@ -78,7 +91,20 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const configuration = project.getConfiguration();
 
-    return createSuperjsonResponse({ configuration });
+    // Get user-configurable tools from tool registry (same as GET)
+    const toolExecutor = new ToolExecutor();
+    toolExecutor.registerAllAvailableTools();
+    const userConfigurableTools = toolExecutor
+      .getAllTools()
+      .filter((tool) => !tool.annotations?.safeInternal)
+      .map((tool) => tool.name);
+
+    return createSuperjsonResponse({
+      configuration: {
+        ...configuration,
+        availableTools: userConfigurableTools,
+      },
+    });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       // Provide detailed field-level validation errors

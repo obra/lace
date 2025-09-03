@@ -109,12 +109,12 @@ describe('OpenAIProvider', () => {
 
       const callArgs = mockCreate.mock.calls[0][0] as {
         model: string;
-        max_tokens: number;
+        max_completion_tokens: number;
         messages: Array<{ role: string; content: string }>;
         tools?: Array<{ type: string; function: { name: string } }>;
       };
       expect(callArgs.model).toBe('gpt-4o');
-      expect(callArgs.max_tokens).toBe(4000);
+      expect(callArgs.max_completion_tokens).toBe(4000);
       expect(callArgs.messages[0]).toEqual({ role: 'system', content: 'Test system prompt' });
       expect(callArgs.messages[1]).toEqual({ role: 'user', content: 'Hello' });
       expect(callArgs.tools).toEqual([
@@ -175,7 +175,7 @@ describe('OpenAIProvider', () => {
 
       const callArgs = mockCreate.mock.calls[0][0] as {
         model: string;
-        max_tokens: number;
+        max_completion_tokens: number;
         messages: Array<{ role: string; content: string }>;
         tools?: Array<{ type: string; function: { name: string } }>;
       };
@@ -474,7 +474,7 @@ describe('OpenAIProvider', () => {
 
       const callArgs = mockCreate.mock.calls[0][0] as {
         model: string;
-        max_tokens: number;
+        max_completion_tokens: number;
         messages: Array<{ role: string; content: string }>;
         tools?: Array<{ type: string; function: { name: string } }>;
       };
@@ -501,11 +501,11 @@ describe('OpenAIProvider', () => {
 
       const callArgs = mockCreate.mock.calls[0][0] as {
         model: string;
-        max_tokens: number;
+        max_completion_tokens: number;
         messages: Array<{ role: string; content: string }>;
         tools?: Array<{ type: string; function: { name: string } }>;
       };
-      expect(callArgs.max_tokens).toBe(2000);
+      expect(callArgs.max_completion_tokens).toBe(2000);
     });
 
     it('should use fallback system prompt when none provided', async () => {
@@ -527,7 +527,7 @@ describe('OpenAIProvider', () => {
 
       const callArgs = mockCreate.mock.calls[0][0] as {
         model: string;
-        max_tokens: number;
+        max_completion_tokens: number;
         messages: Array<{ role: string; content: string }>;
         tools?: Array<{ type: string; function: { name: string } }>;
       };

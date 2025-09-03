@@ -270,7 +270,7 @@ export class OpenAIProvider extends AIProvider {
     const requestPayload: OpenAI.Chat.ChatCompletionCreateParams = {
       model,
       messages: messagesWithSystem,
-      max_tokens: this._config.maxTokens || 4000,
+      max_completion_tokens: this._config.maxTokens || 4000,
       stream,
       ...(tools.length > 0 && { tools: openaiTools }),
     };

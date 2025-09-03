@@ -1,0 +1,57 @@
+// ABOUTME: Hook for fetching user-configurable tools from the backend
+// ABOUTME: Replaces hardcoded AVAILABLE_TOOLS with API-driven tool discovery
+
+import { useState, useEffect } from 'react';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
+import type { ConfigurationResponse } from '@/types/api';
+
+export function useAvailableTools() {
+  const [availableTools, setAvailableTools] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { projects, loadProjectConfiguration } = useProjectContext();
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const loadTools = async () => {
+      try {
+        setError(null);
+        // Get available tools from any existing project's configuration
+        if (projects.length > 0) {
+          const config = await loadProjectConfiguration(projects[0].id);
+
+          if (!isCancelled) {
+            const configResponse = config as ConfigurationResponse['configuration'];
+            setAvailableTools(configResponse.availableTools ?? []);
+          }
+        } else {
+          if (!isCancelled) {
+            // Fallback: empty array for new installations (will be populated when first project is created)
+            setAvailableTools([]);
+          }
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          const errorMessage =
+            err instanceof Error ? err.message : 'Failed to load available tools';
+          console.error('Failed to load available tools:', err);
+          setError(errorMessage);
+          setAvailableTools([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadTools();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [projects, loadProjectConfiguration]);
+
+  return { availableTools, loading, error };
+}
