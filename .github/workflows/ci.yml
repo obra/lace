@@ -346,7 +346,15 @@ jobs:
           cd ../..
           
           # Replace placeholder URLs in appcast
-          sed -i '' "s|PLACEHOLDER_URL_TO_BE_REPLACED|https://fsck.com/lace/dist/$CHANNEL/Lace-$VERSION_INFO.dmg|g" "build/appcast/$CHANNEL/appcast.xml"
+          echo "🔧 Replacing placeholder URL with: https://fsck.com/lace/dist/$CHANNEL/Lace-$VERSION_INFO.dmg"
+          node -e "
+const fs = require('fs');
+const filePath = 'build/appcast/$CHANNEL/appcast.xml';
+let content = fs.readFileSync(filePath, 'utf8');
+content = content.replace(/PLACEHOLDER_URL_TO_BE_REPLACED/g, 'https://fsck.com/lace/dist/$CHANNEL/Lace-$VERSION_INFO.dmg');
+fs.writeFileSync(filePath, content);
+console.log('✅ URL replacement completed');
+"
           
           echo "✅ Appcast generated with correct signature for signed DMG"
           
