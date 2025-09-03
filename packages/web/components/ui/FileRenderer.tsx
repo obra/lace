@@ -77,6 +77,7 @@ export default function FileRenderer({
           showLanguageLabel={false}
           showHeader={false}
           maxHeight="400px"
+          wrapText={true}
           className="border-0 bg-transparent"
         />
 
@@ -148,9 +149,10 @@ export default function FileRenderer({
               showLineNumbers={true}
               startLineNumber={startLineNumber}
               showCopyButton={false}
-              showLanguageLabel={true}
+              showLanguageLabel={false}
               showHeader={false}
               maxHeight="none"
+              wrapText={true}
               className="border border-base-300 rounded-lg"
             />
           </div>

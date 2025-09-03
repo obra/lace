@@ -23,6 +23,7 @@ interface CodeBlockProps {
   onCopy?: (code: string) => void;
   collapsed?: boolean;
   collapsible?: boolean;
+  wrapText?: boolean;
 }
 
 export default function CodeBlock({
@@ -39,6 +40,7 @@ export default function CodeBlock({
   onCopy,
   collapsed = false,
   collapsible = false,
+  wrapText = false,
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!collapsed);
@@ -203,12 +205,21 @@ export default function CodeBlock({
           <div className="font-mono text-sm">
             <div className="code-line">
               {showLineNumbers && renderLineNumbers(lines)}
-              <div className="code-line-content">
+              <div className={`code-line-content ${wrapText ? 'min-w-0 break-words' : ''}`}>
                 {detectedLanguage === 'plaintext' ? (
                   <pre className="whitespace-pre-wrap p-4">{code}</pre>
                 ) : (
                   <code
-                    className="hljs"
+                    className={`hljs ${wrapText ? 'whitespace-pre-wrap break-words overflow-hidden' : ''}`}
+                    style={
+                      wrapText
+                        ? {
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            overflowWrap: 'break-word',
+                          }
+                        : {}
+                    }
                     dangerouslySetInnerHTML={{ __html: safeSanitize(highlightResult.value) }}
                   />
                 )}

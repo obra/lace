@@ -26,7 +26,7 @@ function BashExpandableResult({ content, isError }: { content: string; isError: 
             : 'bg-base-100/80 border-base-300/50 text-base-content/80'
         }`}
       >
-        <pre className="p-3 font-mono text-xs whitespace-pre-wrap break-words leading-relaxed">
+        <pre className="p-3 font-mono text-sm whitespace-pre-wrap break-words leading-relaxed">
           {displayContent}
           {shouldShowExpand && !isExpanded && (
             <button
