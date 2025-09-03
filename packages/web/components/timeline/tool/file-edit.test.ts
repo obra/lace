@@ -85,11 +85,10 @@ describe('fileEditRenderer', () => {
       const rendered = fileEditRenderer.renderResult!(result);
       const { container } = render(React.createElement('div', null, rendered));
 
+      // Should show compact error header
       expect(container.textContent).toContain('Occurrence Count Mismatch');
-      expect(container.textContent).toContain('Edit 1 of 2');
-      expect(container.textContent).toContain('Line 5');
-      expect(container.textContent).toContain('Line 10');
-      expect(container.textContent).toContain('Line 15');
+      // Details are collapsed by default, not visible until expanded
+      expect(container.textContent).not.toContain('Edit 1 of 2');
     });
 
     it('should render NO_MATCH error with similar content', () => {
@@ -112,10 +111,10 @@ describe('fileEditRenderer', () => {
       const rendered = fileEditRenderer.renderResult!(result);
       const { container } = render(React.createElement('div', null, rendered));
 
+      // Should show compact error header
       expect(container.textContent).toContain('Text Not Found');
-      expect(container.textContent).toContain('Similar content found');
-      expect(container.textContent).toContain('85% similar');
-      expect(container.textContent).toContain('75% similar');
+      // Details are collapsed by default, not visible until expanded
+      expect(container.textContent).not.toContain('Similar content found');
     });
 
     it('should render diff when enhanced metadata is available', () => {

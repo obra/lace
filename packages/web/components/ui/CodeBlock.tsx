@@ -32,7 +32,7 @@ export default function CodeBlock({
   showLineNumbers = false,
   startLineNumber = 1,
   showCopyButton = true,
-  showLanguageLabel = true,
+  showLanguageLabel = false,
   showHeader = true,
   maxHeight = '400px',
   className = '',

@@ -161,7 +161,7 @@ describe('Task Tool Renderers', () => {
 
     test('should create formatted summary for task completion', () => {
       const summary = taskRenderers.task_complete.getSummary?.(mockTaskCompleteArgs);
-      expect(summary).toBe('Mark task task_20250731_n9q0qi as completed');
+      expect(summary).toBe('Task task_20250731_n9q0qi completed');
     });
 
     test('should return check icon', () => {
