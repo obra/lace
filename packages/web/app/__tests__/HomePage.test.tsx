@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { HomePage } from '@/app/HomePage';
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
 
 // Mock the providers
 vi.mock('@/components/providers/ProjectProvider', () => ({
@@ -95,7 +96,11 @@ describe('HomePage', () => {
       reloadProjects: vi.fn(),
     });
 
-    render(<HomePage />);
+    render(
+      <ThemeProvider>
+        <HomePage />
+      </ThemeProvider>
+    );
 
     expect(screen.getByTestId('loading-view')).toBeInTheDocument();
   });
@@ -127,7 +132,11 @@ describe('HomePage', () => {
       reloadProjects: vi.fn(),
     });
 
-    render(<HomePage />);
+    render(
+      <ThemeProvider>
+        <HomePage />
+      </ThemeProvider>
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId('first-project-hero')).toBeInTheDocument();
@@ -163,7 +172,11 @@ describe('HomePage', () => {
       reloadProjects: vi.fn(),
     });
 
-    render(<HomePage />);
+    render(
+      <ThemeProvider>
+        <HomePage />
+      </ThemeProvider>
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId('project-selector-panel')).toBeInTheDocument();
@@ -212,7 +225,11 @@ describe('HomePage', () => {
       reloadProjects: vi.fn(),
     });
 
-    render(<HomePageWithMock />);
+    render(
+      <ThemeProvider>
+        <HomePageWithMock />
+      </ThemeProvider>
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId('project-selector-panel')).toBeInTheDocument();
