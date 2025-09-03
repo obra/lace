@@ -55,42 +55,25 @@ test.describe('Streaming Content Duplication Bug', () => {
     // Wait a bit more for potential duplication to manifest
     await page.waitForTimeout(2000);
 
-    // Check for duplicate content by counting occurrences of streaming text
-    // The key insight: streaming content should only appear in ONE place at a time
-    const streamingContentLocators = [
-      // Real-time streaming content (from streamingContent state)
-      page.locator('[data-testid="streaming-content"]'),
-      // Processed streaming events (from useProcessedEvents)
-      page.locator('.timeline-message').filter({ hasText: 'This is a streaming' }),
-      // Any message containing the streaming text
-      page.getByText('This is a streaming', { exact: false }),
-    ];
-
-    // Count streaming elements for debugging (not used in assertions)
-    for (const locator of streamingContentLocators) {
-      await locator.count(); // Just check they exist
-    }
+    // Assert only one streaming snippet is visible at a time
+    await expect(page.locator('.timeline-message:has-text("streaming")')).toHaveCount(1);
 
     // Wait for streaming to complete
-    await page.waitForTimeout(3000);
+    await expect(
+      page.getByText('This is a streaming response that demonstrates real-time token generation', {
+        exact: false,
+      })
+    ).toBeVisible({ timeout: 10000 });
 
     // Final check after streaming completes
     const completeResponseText =
       'This is a streaming response that demonstrates real-time token generation';
 
-    // Count how many times the complete response appears
-    const completeResponseCount = await page
-      .getByText(completeResponseText, { exact: false })
-      .count();
+    // Assert the complete response appears exactly once
+    await expect(page.getByText(completeResponseText, { exact: false })).toHaveCount(1);
 
-    // The complete response should appear exactly once
-    expect(completeResponseCount).toBeLessThanOrEqual(1);
-
-    // Check for specific duplication patterns
-    const potentialDuplicates = await page.locator('text=This is a streaming').count();
-
-    // Should not have multiple copies of the same streaming content
-    expect(potentialDuplicates).toBeLessThanOrEqual(1);
+    // Assert no duplicate streaming content
+    await expect(page.locator('text=This is a streaming')).toHaveCount(1);
 
     // Additional check: look for duplicate message blocks
     const messageBlocks = await page.locator('.timeline-message, [data-testid="message"]').count();
@@ -131,15 +114,15 @@ test.describe('Streaming Content Duplication Bug', () => {
     // Wait for streaming to begin
     await page.waitForTimeout(500);
 
-    // Check initial state during streaming
-    await page
-      .getByText('This')
-      .first()
-      .isVisible()
-      .catch(() => false);
+    // Assert initial streaming content is visible
+    await expect(page.getByText('This').first()).toBeVisible();
 
-    // Wait for streaming to complete
-    await page.waitForTimeout(4000);
+    // Wait for streaming to complete by waiting for final response
+    await expect(
+      page.getByText('This is a streaming response that demonstrates real-time token generation', {
+        exact: false,
+      })
+    ).toBeVisible({ timeout: 10000 });
 
     // After streaming completes, verify clean state
     const finalResponseText =

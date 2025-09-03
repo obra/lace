@@ -100,17 +100,21 @@ export function TimelineView({
           </AnimatePresence>
 
           <AnimatePresence>
-            {isTyping && currentAgent && (
-              <motion.div
-                key="typing"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -2 }}
-                transition={{ duration: 0.1, ease: 'easeOut' }}
-              >
-                <TypingIndicator agent={currentAgent} />
-              </motion.div>
-            )}
+            {isTyping &&
+              currentAgent &&
+              !processedEvents.some(
+                (e) => e.type === 'AGENT_STREAMING' && e.threadId === asThreadId(currentAgent)
+              ) && (
+                <motion.div
+                  key="typing"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -2 }}
+                  transition={{ duration: 0.1, ease: 'easeOut' }}
+                >
+                  <TypingIndicator agent={currentAgent} />
+                </motion.div>
+              )}
 
             {compactionState?.isCompacting && (
               <motion.div

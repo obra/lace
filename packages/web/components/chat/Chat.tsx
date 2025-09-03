@@ -10,7 +10,6 @@ import { useTimelineAutoscroll } from '@/hooks/useSmartAutoscroll';
 import {
   useSessionEvents,
   useAgentAPI,
-  useEventStreamContext,
   useCompactionState,
 } from '@/components/providers/EventStreamProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';

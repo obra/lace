@@ -130,9 +130,13 @@ export function useTimelineAutoscroll(
 
   // Detect streaming content from events
   const hasStreamingContent = useMemo(() => {
-    return events.some((event) => {
-      const e = event as { type: string };
-      return e?.type === 'AGENT_STREAMING';
+    return events.some((e) => {
+      return (
+        typeof e === 'object' &&
+        e !== null &&
+        'type' in e &&
+        (e as { type: unknown }).type === 'AGENT_STREAMING'
+      );
     });
   }, [events]);
 

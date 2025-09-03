@@ -118,10 +118,14 @@ export function EventStreamProvider({
     [updateAgentState, onAgentStateChange]
   );
 
-  // Agent token handler - tokens now processed by useProcessedEvents
-  const handleAgentToken = useCallback((_event: LaceEvent) => {
-    // No-op: useProcessedEvents handles token aggregation for streaming display
-  }, []);
+  // Agent token handler - forward events to useProcessedEvents for token aggregation
+  const handleAgentToken = useCallback(
+    (event: LaceEvent) => {
+      // Forward AGENT_TOKEN events so useProcessedEvents can aggregate them
+      addAgentEvent(event);
+    },
+    [addAgentEvent]
+  );
 
   // Compaction event handlers
   const handleCompactionStart = useCallback((event: LaceEvent) => {
@@ -183,10 +187,9 @@ export function EventStreamProvider({
     [agentId, addAgentEvent]
   );
 
-  // Agent message handler - no streaming content state to manage
-  const stableAddAgentEventWithStreaming = useCallback(
+  // Agent message handler
+  const stableAddAgentEventMessage = useCallback(
     (event: LaceEvent) => {
-      // useProcessedEvents handles streaming state transitions automatically
       addAgentEvent(event);
     },
     [addAgentEvent]
@@ -219,8 +222,8 @@ export function EventStreamProvider({
       },
       onAgentError: handleAgentError,
       // Agent event handlers - use single stable handler to prevent stale closures
-      onUserMessage: stableAddAgentEventWithStreaming,
-      onAgentMessage: stableAddAgentEventWithStreaming,
+      onUserMessage: stableAddAgentEventMessage,
+      onAgentMessage: stableAddAgentEventMessage,
       onAgentToken: handleAgentToken,
       onToolCall: stableAddAgentEvent,
       onToolResult: stableAddAgentEvent,
@@ -243,7 +246,7 @@ export function EventStreamProvider({
     sessionId,
     threadIds,
     stableAddAgentEvent,
-    stableAddAgentEventWithStreaming,
+    stableAddAgentEventMessage,
     handleAgentToken,
     handleAgentStateChangeCallback,
     handleApprovalRequest,
