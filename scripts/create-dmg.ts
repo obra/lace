@@ -58,8 +58,15 @@ function getVersionInfo(): VersionInfo {
     }
 
     // Create timestamp-based version: major.minor.YYYYMMDDHHMM
-    const now = new Date();
-    const timestamp = now.toISOString().replace(/[-:]/g, '').replace(/T/, '').substring(0, 12); // YYYYMMDDHHMM
+    // Use BUILD_TIMESTAMP env var if available (for CI stability), otherwise generate new timestamp
+    let timestamp: string;
+    if (process.env.BUILD_TIMESTAMP) {
+      timestamp = process.env.BUILD_TIMESTAMP;
+      console.log(`Using stable CI timestamp: ${timestamp}`);
+    } else {
+      const now = new Date();
+      timestamp = now.toISOString().replace(/[-:]/g, '').replace(/T/, '').substring(0, 12); // YYYYMMDDHHMM
+    }
 
     const fullVersion = `${npmVersion}.${timestamp}`;
 

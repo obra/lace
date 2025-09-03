@@ -163,8 +163,13 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Build macOS app with DMG (unsigned - appcast will be generated after signing)
-        if: steps.signing_check.outputs.available == 'true'
+        if: steps.signing_check.outputs.available == 'true' && steps.channel.outputs.deploy == 'true'
         run: |
+          # Generate stable timestamp for this entire build
+          BUILD_TIMESTAMP=$(date -u '+%Y%m%d%H%M')
+          echo "BUILD_TIMESTAMP=$BUILD_TIMESTAMP" >> $GITHUB_ENV
+          echo "🕒 Using stable timestamp: $BUILD_TIMESTAMP"
+          
           bun scripts/build-macos-app.ts \
             --dmg \
             --channel ${{ steps.channel.outputs.channel }}
@@ -172,7 +177,7 @@ jobs:
           BUILD_CHANNEL: ${{ steps.channel.outputs.channel }}
       
       - name: Verify app bundle exists before signing
-        if: steps.signing_check.outputs.available == 'true'
+        if: steps.signing_check.outputs.available == 'true' && steps.channel.outputs.deploy == 'true'
         run: |
           echo "🔍 Checking for app bundle..."
           ls -la build/
@@ -185,7 +190,7 @@ jobs:
           fi
       
       - name: Sign and notarize macOS app (proven approach)
-        if: steps.signing_check.outputs.available == 'true'
+        if: steps.signing_check.outputs.available == 'true' && steps.channel.outputs.deploy == 'true'
         run: |
           echo "🔐 Setting up signing keychain..."
           
@@ -330,7 +335,8 @@ jobs:
           # Create appcast directory
           mkdir -p "build/appcast/$CHANNEL"
           
-          # Copy final signed DMG to appcast directory with correct name
+          # Copy final signed DMG to appcast directory with correct name (using same timestamp)
+          export BUILD_TIMESTAMP=$BUILD_TIMESTAMP
           VERSION_INFO=$(bun -e "import('./scripts/create-dmg.ts').then(m => console.log(m.getVersionInfo().fullVersion))")
           cp "$DMG_FILE" "build/appcast/$CHANNEL/Lace-$VERSION_INFO.dmg"
           
