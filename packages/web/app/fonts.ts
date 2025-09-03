@@ -6,6 +6,7 @@ import '@fontsource/lato/400.css';
 import '@fontsource/lato/700.css';
 import '@fontsource-variable/dm-sans/index.css';
 import '@fontsource/google-sans-code/latin.css';
+import '@fontsource/noto-emoji/400.css';
 
 // Explicit font file imports ensure Vite processes them as build assets
 import '@fontsource/lato/files/lato-latin-400-normal.woff2';
@@ -30,3 +31,5 @@ import '@fontsource/google-sans-code/files/google-sans-code-latin-700-normal.wof
 import '@fontsource/google-sans-code/files/google-sans-code-latin-700-normal.woff';
 import '@fontsource/google-sans-code/files/google-sans-code-latin-800-normal.woff2';
 import '@fontsource/google-sans-code/files/google-sans-code-latin-800-normal.woff';
+import '@fontsource/noto-emoji/files/noto-emoji-0-400-normal.woff2';
+import '@fontsource/noto-emoji/files/noto-emoji-0-400-normal.woff';
