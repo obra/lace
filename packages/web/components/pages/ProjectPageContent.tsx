@@ -48,7 +48,6 @@ export function ProjectPageContent({ projectId }: ProjectPageContentProps) {
                 onCloseMobileNav={() => toggleSidebar()}
                 onSwitchProject={handleSwitchProject}
                 onAgentSelect={() => {}} // No agent navigation on project page
-                onClearAgent={() => {}} // No agent clearing on project page
                 onConfigureAgent={() => {}} // No agent configuration on project page
                 onConfigureSession={() => {}} // No session configuration on project page
               />

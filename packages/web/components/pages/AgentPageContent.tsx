@@ -171,9 +171,6 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
                 onCloseMobileNav={toggleSidebar as () => void}
                 onSwitchProject={handleSwitchProject}
                 onAgentSelect={handleAgentSelect}
-                onClearAgent={() =>
-                  (window.location.href = `/project/${projectId}/session/${sessionId}`)
-                }
                 onConfigureAgent={handleConfigureAgent}
                 onConfigureSession={handleConfigureSession}
               />

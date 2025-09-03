@@ -300,12 +300,12 @@ export function SidebarItem({
   className = '',
 }: SidebarItemProps) {
   const baseClasses =
-    'w-full text-left py-2 px-3 rounded-lg text-sm transition-all duration-200 font-ui';
+    'w-full text-left py-2 px-3 rounded-lg text-sm transition-all duration-200 font-ui focus:outline-none';
   const stateClasses = disabled
     ? 'text-base-content/40 cursor-not-allowed'
     : active
-      ? 'bg-base-200/60 text-base-content shadow-sm border border-base-300/30 font-medium'
-      : 'text-base-content/70 hover:bg-base-200/40 hover:text-base-content';
+      ? 'bg-base-200/60 text-base-content shadow-sm border border-base-300/30 font-medium focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
+      : 'text-base-content/70 hover:bg-base-200/40 hover:text-base-content focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2';
 
   return (
     <button

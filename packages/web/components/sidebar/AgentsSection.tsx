@@ -38,18 +38,15 @@ export const AgentsSection = memo(function AgentsSection({
     }
   };
 
-  const getAgentStatusBadgeClass = (status: AgentInfo['status']) => {
-    switch (status) {
-      case 'idle':
-        return 'badge-success';
-      case 'thinking':
-      case 'tool_execution':
-      case 'streaming':
-        return 'badge-warning';
-      default:
-        return 'badge-neutral';
-    }
-  };
+  const STATUS_BADGE: Record<AgentInfo['status'], string> = {
+    idle: 'badge-success',
+    thinking: 'badge-warning',
+    tool_execution: 'badge-warning',
+    streaming: 'badge-warning',
+  } as const;
+
+  const getAgentStatusBadgeClass = (status: AgentInfo['status']) =>
+    STATUS_BADGE[status] ?? 'badge-neutral';
 
   return (
     <div className="ml-4 mt-2">

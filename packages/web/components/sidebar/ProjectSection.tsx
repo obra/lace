@@ -9,7 +9,6 @@ import { faFolder, faCog } from '@/lib/fontawesome';
 import { ProjectEditModal } from '@/components/config/ProjectEditModal';
 import { SwitchIcon } from '@/components/ui/SwitchIcon';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
 interface ProjectSectionProps {
   isMobile?: boolean;
@@ -24,15 +23,12 @@ export const ProjectSection = memo(function ProjectSection({
 }: ProjectSectionProps) {
   // Modal state
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editConfig, setEditConfig] = useState({});
+  const [editConfig, setEditConfig] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
 
   // Get project data from ProjectProvider
   const { selectedProject, foundProject, updateProject, loadProjectConfiguration } =
     useProjectContext();
-
-  // Get providers data
-  const { availableProviders: providers } = useProviderInstances();
 
   // Load project configuration when modal opens
   useEffect(() => {
@@ -105,8 +101,9 @@ export const ProjectSection = memo(function ProjectSection({
   const headerActions = (
     <div className="flex items-center gap-1">
       <button
+        type="button"
         onClick={handleOpenSettings}
-        className="p-1 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 border border-transparent hover:border-base-300/30"
+        className="p-1 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 border border-transparent hover:border-base-300/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         title="Workspace settings"
         data-testid="workspace-settings-button"
       >

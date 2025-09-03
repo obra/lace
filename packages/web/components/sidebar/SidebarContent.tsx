@@ -22,7 +22,6 @@ interface SidebarContentProps {
   // Event handlers (still needed for parent coordination)
   onSwitchProject: () => void;
   onAgentSelect: (threadId: ThreadId) => void;
-  onClearAgent: () => void;
   onConfigureAgent?: (threadId: ThreadId) => void;
   onConfigureSession?: () => void;
 }
@@ -32,7 +31,6 @@ export const SidebarContent = memo(function SidebarContent({
   onCloseMobileNav,
   onSwitchProject,
   onAgentSelect,
-  onClearAgent,
   onConfigureAgent,
   onConfigureSession,
 }: SidebarContentProps) {
