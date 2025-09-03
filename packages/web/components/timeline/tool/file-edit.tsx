@@ -3,8 +3,13 @@
 // ABOUTME: File edit tool renderer with diff visualization
 // ABOUTME: Displays file modifications using the FileDiffViewer component for clear before/after comparison
 
-import React from 'react';
-import { faFileEdit, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import React, { useState } from 'react';
+import {
+  faFileEdit,
+  faExclamationTriangle,
+  faChevronRight,
+  faChevronDown,
+} from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import FileDiffViewer from '@/components/files/FileDiffViewer';
 import {
@@ -17,11 +22,113 @@ import type { FileEditDiffContext } from '@/types/core';
 import { Alert } from '@/components/ui/Alert';
 
 /**
+ * Compact error display that expands to show full details
+ */
+function CompactEditError({
+  error,
+  filename,
+}: {
+  error: {
+    type?: string;
+    edit_index?: number;
+    total_edits?: number;
+    expected_occurrences?: number;
+    actual_occurrences?: number;
+    match_locations?: Array<{
+      line_number: number;
+      column_start: number;
+      line_content: string;
+    }>;
+    similar_content?: Array<{
+      line_number: number;
+      content: string;
+      similarity_score: number;
+    }>;
+  };
+  filename?: string;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Generate a stable id for the collapsible content
+  const contentId = `edit-error-details-${filename ? filename.replace(/[^a-zA-Z0-9]/g, '-') : 'unknown'}`;
+
+  const errorTitle =
+    error.type === 'WRONG_COUNT'
+      ? 'Occurrence Count Mismatch'
+      : error.type === 'NO_MATCH'
+        ? 'Text Not Found'
+        : 'Edit Failed';
+
+  return (
+    <div className="space-y-2">
+      {/* Compact header */}
+      <button
+        type="button"
+        className="flex items-center gap-2 cursor-pointer hover:bg-error/5 p-2 rounded border border-error/20 w-full text-left"
+        onClick={() => setIsExpanded(!isExpanded)}
+        aria-expanded={isExpanded}
+        aria-controls={contentId}
+      >
+        <FontAwesomeIcon
+          icon={isExpanded ? faChevronDown : faChevronRight}
+          className="text-xs text-error"
+          aria-hidden="true"
+        />
+        <span className="text-sm text-error font-medium">{errorTitle}</span>
+        {filename && <span className="text-xs text-base-content/60 font-mono">{filename}</span>}
+      </button>
+
+      {/* Expanded details */}
+      {isExpanded && (
+        <div id={contentId} className="bg-error/5 border border-error/10 rounded-lg p-3 space-y-3">
+          {error.edit_index !== undefined && (
+            <div className="text-sm">
+              Edit {error.edit_index + 1} of {error.total_edits} failed
+            </div>
+          )}
+
+          {/* Show match locations for WRONG_COUNT errors */}
+          {error.match_locations && error.match_locations.length > 0 && (
+            <div>
+              <h4 className="text-xs font-medium opacity-70 mb-2">Found at:</h4>
+              <div className="space-y-1 text-xs font-mono">
+                {error.match_locations.map((loc, i) => (
+                  <div key={i} className="opacity-80">
+                    <span className="opacity-60">Line {loc.line_number}:</span> {loc.line_content}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Show similar content for NO_MATCH errors */}
+          {error.similar_content && error.similar_content.length > 0 && (
+            <div>
+              <h4 className="text-xs font-medium text-warning/70 mb-2">Similar content found:</h4>
+              <div className="space-y-1 text-xs font-mono">
+                {error.similar_content.map((sim, i) => (
+                  <div key={i} className="text-warning/80">
+                    <span className="text-warning/60">
+                      Line {sim.line_number} ({Math.round(sim.similarity_score * 100)}% similar):
+                    </span>{' '}
+                    {sim.content}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * File edit-specific tool renderer providing diff visualization
  * for file modification operations
  */
 export const fileEditRenderer: ToolRenderer = {
-  getSummary: (args: unknown): string => {
+  getSummary: (args: unknown, result?: ToolResult): string => {
     if (typeof args === 'object' && args !== null) {
       const argsObj = args as { path?: unknown; edits?: unknown[] };
 
@@ -30,6 +137,12 @@ export const fileEditRenderer: ToolRenderer = {
 
       // Count the number of edits
       const editCount = Array.isArray(argsObj.edits) ? argsObj.edits.length : 1;
+
+      // Add failure indicator if edit failed
+      if (result?.status === 'failed') {
+        const filename = path ? path.split('/').pop() : 'file';
+        return `⚠ Edit ${filename} failed`;
+      }
 
       if (path && editCount > 1) {
         return `Apply ${editCount} edits to ${path}`;
@@ -81,52 +194,16 @@ export const fileEditRenderer: ToolRenderer = {
           }
         | undefined;
 
-      const errorTitle =
-        validationError?.type === 'WRONG_COUNT'
-          ? 'Occurrence Count Mismatch'
-          : validationError?.type === 'NO_MATCH'
-            ? 'Text Not Found'
-            : 'Edit Failed';
+      // Get filename for compact display
+      const resultMetadata = result.metadata as { path?: string } | undefined;
+      const filename = resultMetadata?.path?.split('/').pop();
 
-      const errorDescription =
-        validationError?.edit_index !== undefined
-          ? `Edit ${validationError.edit_index + 1} of ${validationError.total_edits}: ${content}`
-          : content;
+      if (validationError) {
+        return <CompactEditError error={validationError} filename={filename} />;
+      }
 
-      return (
-        <Alert variant="error" title={errorTitle} description={errorDescription}>
-          {/* Show match locations for WRONG_COUNT errors */}
-          {validationError?.match_locations && validationError.match_locations.length > 0 && (
-            <div className="bg-error/5 rounded border border-error/10 p-3">
-              <h4 className="text-xs font-medium opacity-70 mb-2">Found at:</h4>
-              <div className="space-y-1 text-xs font-mono">
-                {validationError.match_locations.map((loc, i) => (
-                  <div key={i} className="opacity-80">
-                    <span className="opacity-60">Line {loc.line_number}:</span> {loc.line_content}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Show similar content for NO_MATCH errors */}
-          {validationError?.similar_content && validationError.similar_content.length > 0 && (
-            <div className="bg-warning/5 rounded border border-warning/10 p-3">
-              <h4 className="text-xs font-medium text-warning/70 mb-2">Similar content found:</h4>
-              <div className="space-y-1 text-xs font-mono">
-                {validationError.similar_content.map((sim, i) => (
-                  <div key={i} className="text-warning/80">
-                    <span className="text-warning/60">
-                      Line {sim.line_number} ({Math.round(sim.similarity_score * 100)}% similar):
-                    </span>{' '}
-                    {sim.content}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </Alert>
-      );
+      // Fallback for other errors
+      return <Alert variant="error" title="Edit Failed" description={content} />;
     }
 
     // Check if we have the enhanced metadata from the tool

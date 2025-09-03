@@ -113,7 +113,7 @@ export function DirectoryField({
 
   // Get filtered directories based on current input
   const getFilteredDirectories = useCallback((): DirectoryEntry[] => {
-    let filtered = directories;
+    let filtered = directories || [];
 
     // Extract the search term from the current input
     // This should be the part after the last slash

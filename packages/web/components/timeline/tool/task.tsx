@@ -24,6 +24,7 @@ import type { Task } from '@/types/core';
 import { Badge } from '@/components/ui';
 import { Alert } from '@/components/ui/Alert';
 import InlineCode from '@/components/ui/InlineCode';
+import MarkdownRenderer from '@/components/ui/MarkdownRenderer';
 
 /**
  * Priority badge component using design system Badge
@@ -334,16 +335,28 @@ const taskCompleteRenderer: ToolRenderer = {
     return 'Completed task';
   },
 
-  getSummary: (args: unknown): string => {
-    // We can't get the result here, so just use a generic summary
-    // The actual task title will be shown in the renderResult
+  getSummary: (args: unknown, result?: ToolResult): string => {
+    // Extract task title from result content
+    if (result?.content && result.content.length > 0) {
+      const textContent = result.content
+        .map((block) => block.text || '')
+        .join('')
+        .trim();
+      // Extract title after the colon: "Completed task task_20250731_n9q0qi: Remove unused build artifacts from _build directory"
+      const match = textContent.match(/Completed task [^:]+:\s*(.+)$/);
+      if (match) {
+        return `Task "${match[1]}" completed`;
+      }
+    }
+
+    // Fallback
     if (typeof args === 'object' && args !== null && 'id' in args) {
       const taskId = (args as { id?: unknown }).id;
       if (typeof taskId === 'string') {
-        return `Mark task ${taskId} as completed`;
+        return `Task ${taskId} completed`;
       }
     }
-    return 'Mark task as completed';
+    return 'Task completed';
   },
 
   isError: (result: ToolResult): boolean => {
@@ -363,37 +376,15 @@ const taskCompleteRenderer: ToolRenderer = {
     ) {
       const error = parsed as { error: string };
       return (
-        <div className="alert alert-error">
-          <FontAwesomeIcon icon={faExclamationTriangle} className="w-4 h-4" />
-          <div>
-            <div className="font-bold">Failed to complete task</div>
-            <div className="text-sm">{error?.error || 'Unknown error'}</div>
-          </div>
-        </div>
+        <Alert
+          variant="error"
+          title="Failed to complete task"
+          description={error?.error || 'Unknown error'}
+        />
       );
     }
 
-    // Get task data from metadata (structured data from task tools)
-    const resultMetadata = result.metadata as { task?: Task } | undefined;
-    const task = resultMetadata?.task;
-
-    // Extract task title from result content
-    // The result content contains: "Completed task task_20250731_n9q0qi: Remove unused build artifacts from _build directory"
-    let taskTitle: string | null = null;
-    if (result.content && result.content.length > 0) {
-      const textContent = result.content
-        .map((block) => block.text || '')
-        .join('')
-        .trim();
-      // Extract title after the colon
-      const match = textContent.match(/Completed task [^:]+:\s*(.+)$/);
-      if (match) {
-        taskTitle = match[1];
-      }
-    }
-
-    // Get completion message from tool arguments
-    // From Technical Details: Arguments: { "id": "...", "message": "Successfully cleaned up..." }
+    // Get completion message from tool arguments for rich display
     let completionMessage: string | null = null;
     if (
       metadata?.arguments &&
@@ -404,38 +395,20 @@ const taskCompleteRenderer: ToolRenderer = {
       completionMessage = (metadata.arguments as { message: string }).message;
     }
 
-    return (
-      <div className="card bg-base-100 border border-base-300">
-        <div className="card-body p-4">
-          {/* Show task title prominently */}
-          {taskTitle && (
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-base-content">{taskTitle}</h3>
-              {task?.id && (
-                <a href={`#/tasks/${task.id}`} className="btn btn-ghost btn-xs gap-1">
-                  <FontAwesomeIcon icon={faEye} className="w-3 h-3" />
-                  View
-                </a>
-              )}
-            </div>
-          )}
+    // Show expanded format only if there's a completion message
+    if (completionMessage) {
+      return (
+        <MarkdownRenderer
+          content={completionMessage}
+          maxLines={10}
+          isRecentMessage={true}
+          className="bg-success/5 border-success/20"
+        />
+      );
+    }
 
-          {/* Show completion message if available */}
-          {completionMessage && (
-            <div className="bg-base-200/50 rounded-lg p-3 text-sm text-base-content mb-3">
-              {completionMessage}
-            </div>
-          )}
-
-          {/* Show metadata */}
-          <div className="flex items-center gap-2 text-xs">
-            {task?.id && <span className="font-mono text-base-content/50">{task.id}</span>}
-            <StatusBadge status="completed" />
-            {task?.priority && <PriorityBadge priority={task.priority} />}
-          </div>
-        </div>
-      </div>
-    );
+    // Default compact format
+    return <div className="text-sm text-success p-2">✓ Task completed</div>;
   },
 
   getIcon: () => faCheck,
@@ -445,7 +418,15 @@ const taskCompleteRenderer: ToolRenderer = {
  * Task Update Tool Renderer - Update task properties with change tracking
  */
 const taskUpdateRenderer: ToolRenderer = {
-  getSummary: (args: unknown): string => {
+  getSummary: (args: unknown, result?: ToolResult): string => {
+    // Get task title from result metadata for better summary
+    const resultMetadata = result?.metadata as { task?: Task } | undefined;
+    const task = resultMetadata?.task;
+
+    if (task?.title) {
+      return `Updated task: ${task.title}`;
+    }
+
     if (typeof args === 'object' && args !== null && 'taskId' in args) {
       const taskId = (args as { taskId?: unknown }).taskId;
       if (typeof taskId === 'string') {
@@ -472,13 +453,11 @@ const taskUpdateRenderer: ToolRenderer = {
     ) {
       const error = parsed as { error: string };
       return (
-        <div className="alert alert-error">
-          <FontAwesomeIcon icon={faExclamationTriangle} className="w-4 h-4" />
-          <div>
-            <div className="font-bold">Failed to update task</div>
-            <div className="text-sm">{error?.error || 'Unknown error'}</div>
-          </div>
-        </div>
+        <Alert
+          variant="error"
+          title="Failed to update task"
+          description={error?.error || 'Unknown error'}
+        />
       );
     }
 
@@ -489,62 +468,66 @@ const taskUpdateRenderer: ToolRenderer = {
     const task = resultMetadata?.task;
     const changes = resultMetadata?.changes;
 
+    // For simple updates (no substantial changes), show compact format
+    const hasSubstantialChanges =
+      changes &&
+      Object.keys(changes).some(
+        (field) => field === 'title' || field === 'description' || field === 'assignedTo'
+      );
+
+    if (!hasSubstantialChanges) {
+      return <div className="text-sm text-success p-2">✓ Task updated</div>;
+    }
+
+    // Show full format for substantial changes
     return (
-      <div className="card bg-base-100 border border-base-300">
-        <div className="card-body p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <FontAwesomeIcon icon={faEdit} className="w-4 h-4 text-primary" />
-              <h3 className="font-semibold text-base-content">Task Updated</h3>
-            </div>
-            {task?.id && (
-              <a href={`#/tasks/${task.id}`} className="btn btn-ghost btn-xs gap-1">
-                <FontAwesomeIcon icon={faEye} className="w-3 h-3" />
-                View
-              </a>
-            )}
+      <div className="bg-base-100 border border-base-300 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <FontAwesomeIcon icon={faEdit} className="w-4 h-4 text-primary" />
+            <h3 className="font-semibold text-base-content">Task Updated</h3>
           </div>
+          {task?.id && (
+            <a href={`#/tasks/${task.id}`} className="btn btn-ghost btn-xs gap-1">
+              <FontAwesomeIcon icon={faEye} className="w-3 h-3" />
+              View
+            </a>
+          )}
+        </div>
 
-          {task?.title && <div className="font-medium text-base-content mb-3">{task.title}</div>}
+        {task?.title && <div className="font-medium text-base-content mb-3">{task.title}</div>}
 
-          {/* Show what changed */}
-          {changes && Object.keys(changes).length > 0 && (
-            <div className="bg-base-200/50 rounded-lg p-3 mb-3">
-              <div className="text-sm font-medium text-base-content/70 mb-2">Changes:</div>
-              <div className="space-y-2">
-                {Object.entries(changes).map(([field, change]) => (
-                  <div key={field} className="flex items-start gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-base-content/80 capitalize mb-1">
-                        {field.replace(/([A-Z])/g, ' $1').trim()}
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <InlineCode
-                          code={String(change.from) || '(empty)'}
-                          className="text-xs bg-base-300"
-                        />
-                        <FontAwesomeIcon
-                          icon={faArrowRight}
-                          className="w-3 h-3 text-base-content/40"
-                        />
-                        <InlineCode
-                          code={String(change.to) || '(empty)'}
-                          className="text-xs bg-primary/10 text-primary"
-                        />
-                      </div>
+        {/* Show what changed */}
+        {changes && Object.keys(changes).length > 0 && (
+          <div className="bg-base-200/50 rounded-lg p-3">
+            <div className="text-sm font-medium text-base-content/70 mb-2">Changes:</div>
+            <div className="space-y-2">
+              {Object.entries(changes).map(([field, change]) => (
+                <div key={field} className="flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-base-content/80 capitalize mb-1">
+                      {field.replace(/([A-Z])/g, ' $1').trim()}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <InlineCode
+                        code={String(change.from) || '(empty)'}
+                        className="text-xs bg-base-300"
+                      />
+                      <FontAwesomeIcon
+                        icon={faArrowRight}
+                        className="w-3 h-3 text-base-content/40"
+                      />
+                      <InlineCode
+                        code={String(change.to) || '(empty)'}
+                        className="text-xs bg-primary/10 text-primary"
+                      />
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          )}
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {task?.id && <div className="text-xs text-base-content/50 font-mono">{task.id}</div>}
-            {task?.status && <StatusBadge status={task.status} />}
-            {task?.priority && <PriorityBadge priority={task.priority} />}
           </div>
-        </div>
+        )}
       </div>
     );
   },

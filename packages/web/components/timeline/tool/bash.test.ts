@@ -2,6 +2,8 @@
 // ABOUTME: Comprehensive tests for bash-specific tool display customizations
 
 import { describe, test, expect } from 'vitest';
+import { render } from '@testing-library/react';
+import React from 'react';
 import { faTerminal } from '@fortawesome/free-solid-svg-icons';
 import type { ToolResult } from '@/types/core';
 import { bashRenderer } from './bash';

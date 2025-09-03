@@ -95,16 +95,18 @@ export function TimelineMessage({
     case 'TOOL_AGGREGATED':
       // Use enhanced display for aggregated tools
       return (
-        <ToolCallDisplay
-          tool={event.data.toolName}
-          content={`Tool: ${event.data.toolName}`}
-          result={event.data.result}
-          timestamp={timestamp}
-          metadata={{
-            toolId: event.data.toolId,
-            arguments: event.data.arguments,
-          }}
-        />
+        <div className="my-2">
+          <ToolCallDisplay
+            tool={event.data.toolName}
+            content={`Tool: ${event.data.toolName}`}
+            result={event.data.result}
+            timestamp={timestamp}
+            metadata={{
+              toolId: event.data.toolId,
+              arguments: event.data.arguments,
+            }}
+          />
+        </div>
       );
 
     case 'TOOL_CALL':
@@ -218,11 +220,10 @@ export function TimelineMessage({
 
     case 'TASK_UPDATED':
       return (
-        <div className="flex justify-center">
-          <Alert
-            variant="info"
-            title={`Task updated: ${event.data.task?.title || event.data.taskId}`}
-          />
+        <div className="flex justify-center my-1">
+          <div className="bg-info/10 border border-info/20 rounded-lg px-3 py-1 text-xs text-info">
+            ✓ Updated task: {event.data.task?.title || event.data.taskId}
+          </div>
         </div>
       );
 

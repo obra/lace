@@ -72,39 +72,39 @@ function createDefaultResultRenderer(result: ToolResult): React.ReactNode {
   return <ExpandableResult content={textContent} isError={isError} />;
 }
 
-// Expandable result component with 5-line preview
+// Expandable result component with 3-line preview for better density
 function ExpandableResult({ content, isError }: { content: string; isError: boolean }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const lines = content.split('\n');
-  const shouldShowExpand = lines.length > 5;
-  const displayContent = isExpanded ? content : lines.slice(0, 5).join('\n');
+  const shouldShowExpand = lines.length > 3;
+  const displayContent = isExpanded ? content : lines.slice(0, 3).join('\n');
 
   return (
-    <div className="p-3">
+    <div className="p-2">
       <div
         className={`text-sm rounded border ${
           isError
             ? 'bg-error/5 border-error/20 text-error'
-            : 'bg-base-200 border-base-300 text-base-content/80'
+            : 'bg-base-100/80 border-base-300/50 text-base-content/80'
         }`}
       >
-        <pre className="p-3 font-mono text-sm whitespace-pre-wrap break-words">
+        <pre className="p-3 font-mono text-sm whitespace-pre-wrap break-words leading-relaxed">
           {displayContent}
           {shouldShowExpand && !isExpanded && (
             <button
               onClick={() => setIsExpanded(true)}
-              className="text-base-content/40 hover:text-base-content/70 cursor-pointer mt-2 block"
+              className="text-base-content/40 hover:text-base-content/70 cursor-pointer mt-2 block text-xs"
             >
-              ... ({lines.length - 5} more lines)
+              + {lines.length - 3} more lines
             </button>
           )}
           {shouldShowExpand && isExpanded && (
             <button
               onClick={() => setIsExpanded(false)}
-              className="text-base-content/40 hover:text-base-content/70 cursor-pointer mt-2 block"
+              className="text-base-content/40 hover:text-base-content/70 cursor-pointer mt-2 block text-xs"
             >
-              Show less
+              − Show less
             </button>
           )}
         </pre>
@@ -188,14 +188,24 @@ export function ToolCallDisplay({
       </div>
 
       <div className="flex-1 min-w-0">
-        <MessageHeader
-          name={toolDisplayName}
-          timestamp={timestamp}
-          icon={statusIcon}
-          hideTimestamp={true}
-          action={
+        <div className="flex justify-between mb-1">
+          <div className={`flex gap-2 ${tool === 'bash' ? 'items-start' : 'items-center'}`}>
+            {statusIcon && (
+              <span className={`text-sm ${tool === 'bash' ? 'mt-0.5' : ''}`}>{statusIcon}</span>
+            )}
+            <span
+              className={`font-medium text-sm text-base-content ${
+                tool === 'bash' ? 'font-mono whitespace-pre-wrap break-words' : ''
+              }`}
+            >
+              {toolDisplayName}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">
               {renderer.getAction?.(result, aggregatedData)}
+
+              {/* Technical details toggle */}
               {hasArgs && (
                 <button
                   onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
@@ -208,8 +218,8 @@ export function ToolCallDisplay({
                 </button>
               )}
             </div>
-          }
-        />
+          </div>
+        </div>
 
         <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
           {/* Technical Details (when expanded) */}
