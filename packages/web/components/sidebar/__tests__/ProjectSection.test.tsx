@@ -99,10 +99,10 @@ describe('ProjectSection', () => {
   });
 
   describe('Basic Structure', () => {
-    it('renders with workspace title and folder icon', () => {
+    it('renders with project name as title and folder icon', () => {
       render(<ProjectSection {...defaultProps} />);
 
-      expect(screen.getByText('Workspace')).toBeInTheDocument();
+      expect(screen.getByText('Test Project')).toBeInTheDocument();
     });
 
     it('displays project name and description', () => {

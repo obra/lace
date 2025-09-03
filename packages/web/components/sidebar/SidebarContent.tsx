@@ -7,6 +7,7 @@ import React, { memo } from 'react';
 import { ThreadId } from '@/types/core';
 import { ProjectSection } from '@/components/sidebar/ProjectSection';
 import { SessionSection } from '@/components/sidebar/SessionSection';
+import { AgentsSection } from '@/components/sidebar/AgentsSection';
 import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
 import { FeedbackSection } from '@/components/sidebar/FeedbackSection';
 import { FileBrowserSection } from '@/components/sidebar/FileBrowserSection';
@@ -60,20 +61,27 @@ export const SidebarContent = memo(function SidebarContent({
           <SessionSection
             isMobile={isMobile}
             onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
-            onAgentSelect={onAgentSelect}
-            onClearAgent={onClearAgent}
-            onConfigureAgent={onConfigureAgent}
             onConfigureSession={onConfigureSession}
           />
         )}
 
-        {/* FILE BROWSER */}
-        {sessionDetails && sessionDetails.id && (
-          <FileBrowserSection sessionId={sessionDetails.id} />
+        {/* AGENTS */}
+        {sessionDetails && (
+          <AgentsSection
+            isMobile={isMobile}
+            onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
+            onAgentSelect={onAgentSelect}
+            onConfigureAgent={onConfigureAgent}
+          />
         )}
 
         {/* TASK MANAGEMENT */}
         <TaskSidebarSection onCloseMobileNav={isMobile ? onCloseMobileNav : undefined} />
+
+        {/* FILE BROWSER */}
+        {sessionDetails && sessionDetails.id && (
+          <FileBrowserSection sessionId={sessionDetails.id} defaultCollapsed={true} />
+        )}
       </div>
 
       {/* FEEDBACK - anchored to bottom on desktop only */}

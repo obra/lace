@@ -255,8 +255,8 @@ export function SidebarSection({
   }, [defaultCollapsed]);
 
   return (
-    <div className="px-6 py-4">
-      <div className="w-full flex items-center justify-between text-sm font-medium text-base-content/60 mb-3">
+    <div className="px-6 py-2">
+      <div className="w-full flex items-center justify-between text-sm font-medium text-base-content/60 mb-2">
         <button
           onClick={() => collapsible && setCollapsed(!collapsed)}
           className={`flex items-center gap-2 hover:text-base-content/80 transition-all duration-200 ${
@@ -300,12 +300,12 @@ export function SidebarItem({
   className = '',
 }: SidebarItemProps) {
   const baseClasses =
-    'w-full text-left py-3 px-4 rounded-xl text-sm transition-all duration-200 font-ui';
+    'w-full text-left py-2 px-3 rounded-lg text-sm transition-all duration-200 font-ui';
   const stateClasses = disabled
     ? 'text-base-content/40 cursor-not-allowed'
     : active
-      ? 'bg-primary/90 text-primary-content shadow-sm ring-1 ring-primary/20 font-medium'
-      : 'text-base-content/70 hover:bg-base-200/80 hover:text-base-content hover:scale-[1.02] hover:shadow-sm';
+      ? 'bg-base-200/60 text-base-content shadow-sm border border-base-300/30 font-medium'
+      : 'text-base-content/70 hover:bg-base-200/40 hover:text-base-content';
 
   return (
     <button

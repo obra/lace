@@ -56,13 +56,9 @@ const createMockSessionDetails = (agents: AgentInfo[]): SessionInfo => ({
 });
 
 describe('SessionSection', () => {
-  const mockOnAgentSelect = vi.fn();
-  const mockOnClearAgent = vi.fn();
   const mockOnCloseMobileNav = vi.fn();
 
   const defaultProps = {
-    onAgentSelect: mockOnAgentSelect,
-    onClearAgent: mockOnClearAgent,
     onCloseMobileNav: mockOnCloseMobileNav,
   };
 
@@ -113,7 +109,6 @@ describe('SessionSection', () => {
       render(<SessionSection {...defaultProps} />);
 
       expect(screen.getByText('Test Session')).toBeInTheDocument();
-      expect(screen.getByText('Session')).toBeInTheDocument();
     });
 
     it('does not render when no session details available', () => {
@@ -131,83 +126,7 @@ describe('SessionSection', () => {
     });
   });
 
-  describe('Agent Status Display', () => {
-    it('displays current agent name and status when selected', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
-          sessionDetails: createMockSessionDetails([
-            createMockAgent('agent-1', 'Alice', 'thinking'),
-          ]),
-          selectedAgent: 'agent-1' as ThreadId,
-          foundAgent: createMockAgent('agent-1', 'Alice', 'thinking'),
-        })
-      );
-
-      render(<SessionSection {...defaultProps} />);
-
-      expect(screen.getByText('Alice')).toBeInTheDocument();
-      expect(screen.getByText('thinking')).toBeInTheDocument();
-    });
-
-    it('shows correct status badges for different agent states', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
-          sessionDetails: createMockSessionDetails([
-            createMockAgent('agent-1', 'Alice', 'idle'),
-            createMockAgent('agent-2', 'Bob', 'thinking'),
-            createMockAgent('agent-3', 'Charlie', 'tool_execution'),
-          ]),
-          selectedAgent: null,
-          foundAgent: null,
-        })
-      );
-
-      render(<SessionSection {...defaultProps} />);
-
-      expect(screen.getByText('idle')).toBeInTheDocument();
-      expect(screen.getByText('thinking')).toBeInTheDocument();
-      expect(screen.getByText('tool_execution')).toBeInTheDocument();
-    });
-
-    it('handles missing selected agent gracefully', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
-          sessionDetails: createMockSessionDetails([createMockAgent('agent-1', 'Alice', 'idle')]),
-          selectedAgent: 'nonexistent-agent' as ThreadId,
-          foundAgent: null,
-        })
-      );
-
-      render(<SessionSection {...defaultProps} />);
-
-      // Should show agent selection UI since current agent is null
-      expect(screen.getByText('Alice')).toBeInTheDocument();
-    });
-  });
-
-  describe('Event Handling', () => {
-    it('calls onAgentSelect when agent is clicked', () => {
-      render(<SessionSection {...defaultProps} />);
-
-      const aliceButton = screen.getByText('Alice').closest('div')!;
-      fireEvent.click(aliceButton);
-
-      expect(mockOnAgentSelect).toHaveBeenCalledWith('agent-1');
-    });
-  });
-
   describe('Mobile Behavior', () => {
-    it('calls onCloseMobileNav in mobile mode after actions', () => {
-      const mobileProps = { ...defaultProps, isMobile: true };
-      render(<SessionSection {...mobileProps} />);
-
-      const aliceButton = screen.getByText('Alice').closest('div')!;
-      fireEvent.click(aliceButton);
-
-      expect(mockOnCloseMobileNav).toHaveBeenCalledTimes(1);
-      expect(mockOnAgentSelect).toHaveBeenCalledWith('agent-1');
-    });
-
     it('works without onCloseMobileNav callback', () => {
       const propsWithoutCallback = { ...defaultProps, onCloseMobileNav: undefined };
 
