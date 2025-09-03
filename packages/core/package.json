@@ -1,6 +1,6 @@
 {
   "name": "@lace/core",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
   "description": "Core backend logic for Lace AI coding assistant",
   "main": "dist/index.js",

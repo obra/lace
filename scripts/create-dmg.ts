@@ -48,7 +48,7 @@ function getVersionInfo(): VersionInfo {
     const packageJson = PackageJsonSchema.parse(packageJsonParsed);
     const npmVersion = packageJson.version;
 
-    // Get git short SHA
+    // Get git short SHA for build identification
     let gitShortSha: string;
     try {
       gitShortSha = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
@@ -57,7 +57,11 @@ function getVersionInfo(): VersionInfo {
       gitShortSha = 'dev';
     }
 
-    const fullVersion = `${npmVersion}-${gitShortSha}`;
+    // Create timestamp-based version: major.minor.YYYYMMDDHHMM
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[-:]/g, '').replace(/T/, '').substring(0, 12); // YYYYMMDDHHMM
+
+    const fullVersion = `${npmVersion}.${timestamp}`;
 
     return {
       npmVersion,
