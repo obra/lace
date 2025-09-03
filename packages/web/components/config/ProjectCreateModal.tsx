@@ -9,11 +9,11 @@ import { faPlus, faTrash } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { AccentButton } from '@/components/ui/AccentButton';
 import { DirectoryField } from '@/components/ui';
-import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
+import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import type { ProviderInfo } from '@/types/api';
-import { AVAILABLE_TOOLS } from '@/lib/available-tools';
+import { useAvailableTools } from '@/hooks/useAvailableTools';
 
 interface ProjectConfiguration {
   providerInstanceId?: string;
@@ -41,7 +41,7 @@ interface ProjectCreateModalProps {
 
 const DEFAULT_PROJECT_CONFIG: ProjectConfiguration = {
   maxTokens: 4096,
-  tools: [...AVAILABLE_TOOLS],
+  tools: undefined, // Use all available user-configurable tools
   toolPolicies: {},
   environmentVariables: {},
 };
@@ -55,6 +55,7 @@ export function ProjectCreateModal({
 }: ProjectCreateModalProps) {
   // Get providers from ProviderInstanceProvider context
   const { availableProviders: providers, instancesLoading } = useProviderInstances();
+  const { availableTools, loading: toolsLoading } = useAvailableTools();
   const [createStep, setCreateStep] = useState<number>(2);
   const [createName, setCreateName] = useState('');
   const [createDescription, setCreateDescription] = useState('');
@@ -666,23 +667,12 @@ export function ProjectCreateModal({
                 <label className="label">
                   <span className="label-text font-medium">Tool Access Policies</span>
                 </label>
-                <div className="grid md:grid-cols-2 gap-3">
-                  {AVAILABLE_TOOLS.map((tool) => (
-                    <div
-                      key={tool}
-                      className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
-                    >
-                      <span className="font-medium text-sm">{tool}</span>
-                      <ToolPolicyToggle
-                        value={
-                          (createConfig.toolPolicies?.[tool] || 'require-approval') as ToolPolicy
-                        }
-                        onChange={(policy) => handleCreateToolPolicyChange(tool, policy)}
-                        size="sm"
-                      />
-                    </div>
-                  ))}
-                </div>
+                <ToolPolicyList
+                  tools={availableTools}
+                  policies={createConfig.toolPolicies || {}}
+                  onChange={handleCreateToolPolicyChange}
+                  loading={toolsLoading}
+                />
               </div>
             </>
           )}

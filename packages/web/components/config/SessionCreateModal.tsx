@@ -7,13 +7,13 @@ import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrash, faExclamationTriangle } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
-import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
+import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import { ModelSelectionForm } from './ModelSelectionForm';
 import { Alert } from '@/components/ui/Alert';
 import type { ProviderInfo, SessionConfiguration } from '@/types/api';
 import type { ProjectInfo } from '@/types/core';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
-import { AVAILABLE_TOOLS } from '@/lib/available-tools';
+import { useAvailableTools } from '@/hooks/useAvailableTools';
 
 interface SessionCreateModalProps {
   isOpen: boolean;
@@ -44,6 +44,7 @@ export const SessionCreateModal = memo(function SessionCreateModal({
   onSessionDescriptionChange,
   onSessionConfigChange,
 }: SessionCreateModalProps) {
+  const { availableTools, loading: toolsLoading } = useAvailableTools();
   const [newEnvKey, setNewEnvKey] = useState('');
   const [newEnvValue, setNewEnvValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -259,21 +260,12 @@ export const SessionCreateModal = memo(function SessionCreateModal({
             <label className="label">
               <span className="label-text font-medium">Tool Access Policies</span>
             </label>
-            <div className="grid md:grid-cols-2 gap-3">
-              {AVAILABLE_TOOLS.map((tool) => (
-                <div
-                  key={tool}
-                  className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
-                >
-                  <span className="font-medium text-sm">{tool}</span>
-                  <ToolPolicyToggle
-                    value={(sessionConfig.toolPolicies?.[tool] || 'require-approval') as ToolPolicy}
-                    onChange={(policy) => handleToolPolicyChange(tool, policy)}
-                    size="sm"
-                  />
-                </div>
-              ))}
-            </div>
+            <ToolPolicyList
+              tools={availableTools}
+              policies={sessionConfig.toolPolicies || {}}
+              onChange={handleToolPolicyChange}
+              loading={toolsLoading}
+            />
           </div>
         </div>
 

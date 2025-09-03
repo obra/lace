@@ -7,12 +7,11 @@ import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrash } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
-import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
+import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import { ModelSelectionForm } from './ModelSelectionForm';
 import type { ProviderInfo, SessionConfiguration } from '@/types/api';
 import type { ProjectInfo, SessionInfo } from '@/types/core';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
-import { AVAILABLE_TOOLS } from '@/lib/available-tools';
 import { useSessionEditModal } from '@/hooks/useSessionEditModal';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
@@ -236,21 +235,11 @@ export const SessionEditModal = memo(function SessionEditModal({
             <label className="label">
               <span className="label-text font-medium">Tool Access Policies</span>
             </label>
-            <div className="grid md:grid-cols-2 gap-3">
-              {AVAILABLE_TOOLS.map((tool) => (
-                <div
-                  key={tool}
-                  className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
-                >
-                  <span className="font-medium text-sm">{tool}</span>
-                  <ToolPolicyToggle
-                    value={(sessionConfig.toolPolicies?.[tool] || 'require-approval') as ToolPolicy}
-                    onChange={(policy) => handleToolPolicyChange(tool, policy)}
-                    size="sm"
-                  />
-                </div>
-              ))}
-            </div>
+            <ToolPolicyList
+              tools={sessionConfig.availableTools || []}
+              policies={sessionConfig.toolPolicies || {}}
+              onChange={handleToolPolicyChange}
+            />
           </div>
         </div>
 

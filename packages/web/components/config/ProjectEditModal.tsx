@@ -8,12 +8,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrash } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { DirectoryField } from '@/components/ui';
-import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
+import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import type { ProjectInfo } from '@/types/core';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
-import type { ProviderInfo } from '@/types/api';
-import { AVAILABLE_TOOLS } from '@/lib/available-tools';
+import type { ProviderInfo, SessionConfiguration } from '@/types/api';
 
 interface ProjectConfiguration {
   providerInstanceId?: string;
@@ -305,21 +304,11 @@ export function ProjectEditModal({
             <label className="label">
               <span className="label-text font-medium">Tool Access Policies</span>
             </label>
-            <div className="grid md:grid-cols-2 gap-3">
-              {AVAILABLE_TOOLS.map((tool) => (
-                <div
-                  key={tool}
-                  className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
-                >
-                  <span className="font-medium text-sm">{tool}</span>
-                  <ToolPolicyToggle
-                    value={(editConfig.toolPolicies?.[tool] || 'require-approval') as ToolPolicy}
-                    onChange={(policy) => handleToolPolicyChange(tool, policy)}
-                    size="sm"
-                  />
-                </div>
-              ))}
-            </div>
+            <ToolPolicyList
+              tools={(initialConfig as SessionConfiguration).availableTools || []}
+              policies={editConfig.toolPolicies || {}}
+              onChange={handleToolPolicyChange}
+            />
           </div>
         </div>
 

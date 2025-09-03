@@ -25,13 +25,13 @@ import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useURLState } from '@/hooks/useURLState';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
+import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import { asThreadId } from '@/types/core';
-import { AVAILABLE_TOOLS } from '@/lib/available-tools';
 
 const DEFAULT_CONFIG: SessionConfiguration = {
   // Note: providerInstanceId and modelId should be set by user selection, not defaults
   maxTokens: 4096,
-  tools: [...AVAILABLE_TOOLS],
+  tools: undefined, // Use all available user-configurable tools
   toolPolicies: {},
   environmentVariables: {},
 };
