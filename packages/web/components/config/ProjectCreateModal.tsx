@@ -14,6 +14,7 @@ import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import type { ProviderInfo } from '@/types/api';
 import { useAvailableTools } from '@/hooks/useAvailableTools';
+import { DIRECTORY_BROWSER, WIZARD_PROGRESS } from '@/lib/constants/ui';
 
 interface ProjectConfiguration {
   providerInstanceId?: string;
@@ -55,7 +56,7 @@ export function ProjectCreateModal({
 }: ProjectCreateModalProps) {
   // Get providers from ProviderInstanceProvider context
   const { availableProviders: providers, instancesLoading } = useProviderInstances();
-  const { availableTools, loading: toolsLoading } = useAvailableTools();
+  const { availableTools, loading: toolsLoading, error: toolsError } = useAvailableTools();
   const [createStep, setCreateStep] = useState<number>(2);
   const [createName, setCreateName] = useState('');
   const [createDescription, setCreateDescription] = useState('');
@@ -219,7 +220,7 @@ export function ProjectCreateModal({
                     required
                     className="input-lg focus:outline-none focus:ring-2 focus:ring-accent/60"
                     inline
-                    minRows={6}
+                    minRows={DIRECTORY_BROWSER.DEFAULT_ROWS}
                   />
                   {createWorkingDirectory.trim() &&
                     !createWorkingDirectory.trim().startsWith('/') && (
@@ -456,7 +457,9 @@ export function ProjectCreateModal({
                     <div className="w-40 h-1.5 rounded-full bg-base-content/20 overflow-hidden">
                       <div
                         className="h-full bg-accent/80 transition-all"
-                        style={{ width: `${createStep === 3 ? 66 : 100}%` }}
+                        style={{
+                          width: `${createStep === 3 ? WIZARD_PROGRESS.STEP_3_PERCENTAGE : WIZARD_PROGRESS.COMPLETE_PERCENTAGE}%`,
+                        }}
                       />
                     </div>
                   )}
@@ -672,6 +675,7 @@ export function ProjectCreateModal({
                   policies={createConfig.toolPolicies || {}}
                   onChange={handleCreateToolPolicyChange}
                   loading={toolsLoading}
+                  error={toolsError}
                 />
               </div>
             </>

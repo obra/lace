@@ -12,6 +12,7 @@ interface ToolPolicyListProps {
   policies: Record<string, ToolPolicy>;
   onChange: (tool: string, policy: ToolPolicy) => void;
   loading?: boolean;
+  error?: string | null;
 }
 
 export function ToolPolicyList({
@@ -19,7 +20,17 @@ export function ToolPolicyList({
   policies,
   onChange,
   loading = false,
+  error = null,
 }: ToolPolicyListProps) {
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <div className="text-error font-medium mb-2">Failed to load tools</div>
+        <div className="text-sm text-base-content/60">{error}</div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">

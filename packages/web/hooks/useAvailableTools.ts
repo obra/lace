@@ -8,30 +8,50 @@ import type { ConfigurationResponse } from '@/types/api';
 export function useAvailableTools() {
   const [availableTools, setAvailableTools] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { projects, loadProjectConfiguration } = useProjectContext();
 
   useEffect(() => {
+    let isCancelled = false;
+
     const loadTools = async () => {
       try {
+        setError(null);
         // Get available tools from any existing project's configuration
         if (projects.length > 0) {
           const config = await loadProjectConfiguration(projects[0].id);
-          const configResponse = config as ConfigurationResponse['configuration'];
-          setAvailableTools(configResponse.availableTools ?? []);
+
+          if (!isCancelled) {
+            const configResponse = config as ConfigurationResponse['configuration'];
+            setAvailableTools(configResponse.availableTools ?? []);
+          }
         } else {
-          // Fallback: empty array for new installations (will be populated when first project is created)
+          if (!isCancelled) {
+            // Fallback: empty array for new installations (will be populated when first project is created)
+            setAvailableTools([]);
+          }
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          const errorMessage =
+            err instanceof Error ? err.message : 'Failed to load available tools';
+          console.error('Failed to load available tools:', err);
+          setError(errorMessage);
           setAvailableTools([]);
         }
-      } catch (error) {
-        console.error('Failed to load available tools:', error);
-        setAvailableTools([]);
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     };
 
     void loadTools();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [projects, loadProjectConfiguration]);
 
-  return { availableTools, loading };
+  return { availableTools, loading, error };
 }

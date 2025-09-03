@@ -96,7 +96,20 @@ export async function action({ request, params }: Route.ActionArgs) {
     session.updateConfiguration(validatedData);
     const configuration = session.getEffectiveConfiguration();
 
-    return createSuperjsonResponse({ configuration });
+    // Get user-configurable tools from tool registry (same as GET)
+    const toolExecutor = new ToolExecutor();
+    toolExecutor.registerAllAvailableTools();
+    const userConfigurableTools = toolExecutor
+      .getAllTools()
+      .filter((tool) => !tool.annotations?.safeInternal)
+      .map((tool) => tool.name);
+
+    return createSuperjsonResponse({
+      configuration: {
+        ...configuration,
+        availableTools: userConfigurableTools,
+      },
+    });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return createErrorResponse('Invalid request data', 400, {

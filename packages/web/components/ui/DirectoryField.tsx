@@ -8,6 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faSpinner, faChevronLeft, faHome } from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
 import type { ListDirectoryResponse, DirectoryEntry } from '@/types/filesystem';
+import { DIRECTORY_BROWSER } from '@/lib/constants/ui';
 
 interface DirectoryFieldProps {
   label?: string;
@@ -36,7 +37,7 @@ export function DirectoryField({
   className = '',
   prepopulatePath = true,
   inline = false,
-  minRows = 8,
+  minRows = DIRECTORY_BROWSER.DEFAULT_ROWS,
 }: DirectoryFieldProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -312,7 +313,11 @@ export function DirectoryField({
                   <>
                     <div
                       className="overflow-y-auto"
-                      style={inline ? { height: `${minRows * 2.5}rem` } : undefined}
+                      style={
+                        inline
+                          ? { height: `${minRows * DIRECTORY_BROWSER.ROW_HEIGHT_REM}rem` }
+                          : undefined
+                      }
                     >
                       {getVisibleDirectories().map((dir) => (
                         <button

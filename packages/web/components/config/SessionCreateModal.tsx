@@ -44,7 +44,7 @@ export const SessionCreateModal = memo(function SessionCreateModal({
   onSessionDescriptionChange,
   onSessionConfigChange,
 }: SessionCreateModalProps) {
-  const { availableTools, loading: toolsLoading } = useAvailableTools();
+  const { availableTools, loading: toolsLoading, error: toolsError } = useAvailableTools();
   const [newEnvKey, setNewEnvKey] = useState('');
   const [newEnvValue, setNewEnvValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -265,6 +265,7 @@ export const SessionCreateModal = memo(function SessionCreateModal({
               policies={sessionConfig.toolPolicies || {}}
               onChange={handleToolPolicyChange}
               loading={toolsLoading}
+              error={toolsError}
             />
           </div>
         </div>
