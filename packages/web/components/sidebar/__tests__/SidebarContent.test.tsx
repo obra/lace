@@ -28,6 +28,7 @@ vi.mock('@/components/providers/SessionProvider', () => ({
 
 vi.mock('@/components/providers/AgentProvider', () => ({
   useOptionalAgentContext: vi.fn(),
+  useAgentContext: vi.fn(),
 }));
 
 // Mock the child components to verify they receive correct props
@@ -58,25 +59,46 @@ vi.mock('@/components/sidebar/ProjectSection', () => ({
 vi.mock('@/components/sidebar/SessionSection', () => ({
   SessionSection: ({
     isMobile,
-    onAgentSelect,
-    onClearAgent,
     onCloseMobileNav,
   }: {
     isMobile: boolean;
-    onAgentSelect: (agentId: string) => void;
-    onClearAgent: () => void;
     onCloseMobileNav?: () => void;
   }) => (
     <div data-testid="session-section">
       <div data-testid="is-mobile">{isMobile.toString()}</div>
+      {onCloseMobileNav && (
+        <button onClick={onCloseMobileNav} data-testid="close-mobile-nav-session">
+          Close
+        </button>
+      )}
+    </div>
+  ),
+}));
+
+vi.mock('@/components/sidebar/AgentsSection', () => ({
+  AgentsSection: ({
+    isMobile,
+    onAgentSelect,
+    onConfigureAgent,
+    onCloseMobileNav,
+  }: {
+    isMobile: boolean;
+    onAgentSelect: (agentId: string) => void;
+    onConfigureAgent?: (agentId: string) => void;
+    onCloseMobileNav?: () => void;
+  }) => (
+    <div data-testid="agents-section">
+      <div data-testid="is-mobile">{isMobile.toString()}</div>
       <button onClick={() => onAgentSelect('test-agent')} data-testid="select-agent">
         Select Agent
       </button>
-      <button onClick={onClearAgent} data-testid="clear-agent">
-        Clear Agent
-      </button>
+      {onConfigureAgent && (
+        <button onClick={() => onConfigureAgent('test-agent')} data-testid="configure-agent">
+          Configure Agent
+        </button>
+      )}
       {onCloseMobileNav && (
-        <button onClick={onCloseMobileNav} data-testid="close-mobile-nav-session">
+        <button onClick={onCloseMobileNav} data-testid="close-mobile-nav-agents">
           Close
         </button>
       )}
@@ -99,11 +121,12 @@ vi.mock('@/components/sidebar/TaskSidebarSection', () => ({
 // Import mocked hooks
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
+import { useOptionalAgentContext, useAgentContext } from '@/components/providers/AgentProvider';
 
 const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseOptionalAgentContext = vi.mocked(useOptionalAgentContext);
+const mockUseAgentContext = vi.mocked(useAgentContext);
 
 // Test data factories
 const createMockProject = (): ProjectInfo => ({
@@ -137,6 +160,8 @@ describe('SidebarContent', () => {
     onSwitchProject: vi.fn(),
     onAgentSelect: vi.fn(),
     onClearAgent: vi.fn(),
+    onConfigureAgent: vi.fn(),
+    onConfigureSession: vi.fn(),
     onCloseMobileNav: vi.fn(),
   };
 
@@ -170,6 +195,7 @@ describe('SidebarContent', () => {
     });
 
     mockUseOptionalAgentContext.mockReturnValue(mockAgentContext);
+    mockUseAgentContext.mockReturnValue(mockAgentContext);
   });
 
   describe('Component Rendering', () => {
@@ -178,6 +204,7 @@ describe('SidebarContent', () => {
 
       expect(screen.getByTestId('project-section')).toBeInTheDocument();
       expect(screen.getByTestId('session-section')).toBeInTheDocument();
+      expect(screen.getByTestId('agents-section')).toBeInTheDocument();
       expect(screen.getByTestId('task-section')).toBeInTheDocument();
     });
 
@@ -197,6 +224,7 @@ describe('SidebarContent', () => {
 
       expect(screen.queryByTestId('project-section')).not.toBeInTheDocument();
       expect(screen.queryByTestId('session-section')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('agents-section')).not.toBeInTheDocument();
       expect(screen.getByTestId('task-section')).toBeInTheDocument();
     });
 
@@ -207,6 +235,7 @@ describe('SidebarContent', () => {
 
       expect(screen.getByTestId('project-section')).toBeInTheDocument();
       expect(screen.queryByTestId('session-section')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('agents-section')).not.toBeInTheDocument();
       expect(screen.getByTestId('task-section')).toBeInTheDocument();
     });
   });
@@ -235,6 +264,7 @@ describe('SidebarContent', () => {
 
       expect(screen.getByTestId('close-mobile-nav-project')).toBeInTheDocument();
       expect(screen.getByTestId('close-mobile-nav-session')).toBeInTheDocument();
+      expect(screen.getByTestId('close-mobile-nav-agents')).toBeInTheDocument();
       expect(screen.getByTestId('close-mobile-nav-task')).toBeInTheDocument();
     });
 
@@ -243,6 +273,7 @@ describe('SidebarContent', () => {
 
       expect(screen.queryByTestId('close-mobile-nav-project')).not.toBeInTheDocument();
       expect(screen.queryByTestId('close-mobile-nav-session')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('close-mobile-nav-agents')).not.toBeInTheDocument();
       expect(screen.queryByTestId('close-mobile-nav-task')).not.toBeInTheDocument();
     });
 
@@ -266,7 +297,7 @@ describe('SidebarContent', () => {
       expect(mockHandlers.onSwitchProject).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onAgentSelect when SessionSection triggers it', () => {
+    it('calls onAgentSelect when AgentsSection triggers it', () => {
       render(<SidebarContent {...defaultProps} />);
 
       screen.getByTestId('select-agent').click();
@@ -274,12 +305,12 @@ describe('SidebarContent', () => {
       expect(mockHandlers.onAgentSelect).toHaveBeenCalledWith('test-agent');
     });
 
-    it('calls onClearAgent when SessionSection triggers it', () => {
+    it('calls onConfigureAgent when AgentsSection triggers it', () => {
       render(<SidebarContent {...defaultProps} />);
 
-      screen.getByTestId('clear-agent').click();
+      screen.getByTestId('configure-agent').click();
 
-      expect(mockHandlers.onClearAgent).toHaveBeenCalledTimes(1);
+      expect(mockHandlers.onConfigureAgent).toHaveBeenCalledWith('test-agent');
     });
 
     it('calls onCloseMobileNav from all sections in mobile mode', () => {
@@ -287,9 +318,10 @@ describe('SidebarContent', () => {
 
       screen.getByTestId('close-mobile-nav-project').click();
       screen.getByTestId('close-mobile-nav-session').click();
+      screen.getByTestId('close-mobile-nav-agents').click();
       screen.getByTestId('close-mobile-nav-task').click();
 
-      expect(mockHandlers.onCloseMobileNav).toHaveBeenCalledTimes(3);
+      expect(mockHandlers.onCloseMobileNav).toHaveBeenCalledTimes(4);
     });
   });
 
