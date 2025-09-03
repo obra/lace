@@ -53,9 +53,9 @@ describe('CodeBlock', () => {
       expect(codeElement.textContent).toContain('plain');
       expect(codeElement.textContent).toContain('text');
       expect(codeElement.textContent).toContain('content');
-      // Language label could be anything due to auto-detection
+      // Language label should not be shown by default
       const languageLabel = document.querySelector('.code-block-language');
-      expect(languageLabel).toBeInTheDocument();
+      expect(languageLabel).not.toBeInTheDocument();
     });
 
     it('renders with filename when provided', () => {
@@ -82,7 +82,8 @@ describe('CodeBlock', () => {
       const codeElement = screen.getByRole('code');
       expect(codeElement.innerHTML).toContain('hljs');
       expect(codeElement.innerHTML).toContain('const');
-      expect(screen.getByText('typescript')).toBeInTheDocument();
+      // Language label should not be shown by default
+      expect(() => screen.getByText('typescript')).toThrow();
     });
 
     it('formats JSON code automatically', () => {
@@ -116,8 +117,14 @@ describe('CodeBlock', () => {
   });
 
   describe('UI Features', () => {
-    it('shows language label by default', () => {
+    it('hides language label by default', () => {
       render(<CodeBlock code="test code" language="javascript" />);
+
+      expect(() => screen.getByText('javascript')).toThrow();
+    });
+
+    it('shows language label when explicitly enabled', () => {
+      render(<CodeBlock code="test code" language="javascript" showLanguageLabel={true} />);
 
       expect(screen.getByText('javascript')).toBeInTheDocument();
     });

@@ -82,7 +82,7 @@ describe('Task Tool Renderer Integration', () => {
       expect(getToolRenderer('task_list').getSummary?.({ filter: 'mine' })).toBe('List my tasks');
 
       expect(getToolRenderer('task_complete').getSummary?.({ id: 'task-123' })).toBe(
-        'Mark task task-123 as completed'
+        'Task task-123 completed'
       );
 
       expect(getToolRenderer('task_update').getSummary?.({ taskId: 'task-456' })).toBe(
