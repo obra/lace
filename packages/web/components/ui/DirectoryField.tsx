@@ -20,6 +20,8 @@ interface DirectoryFieldProps {
   helpText?: string;
   className?: string;
   prepopulatePath?: boolean;
+  inline?: boolean;
+  minRows?: number;
 }
 
 export function DirectoryField({
@@ -33,6 +35,8 @@ export function DirectoryField({
   helpText,
   className = '',
   prepopulatePath = true,
+  inline = false,
+  minRows = 8,
 }: DirectoryFieldProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -51,11 +55,17 @@ export function DirectoryField({
   const requestAbortRef = useRef<AbortController | null>(null);
 
   // Add click outside handler
-  const handleClickOutside = useCallback((event: MouseEvent) => {
-    if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-      setIsDropdownOpen(false);
-    }
-  }, []);
+  const handleClickOutside = useCallback(
+    (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        // Don't close dropdown in inline mode
+        if (!inline) {
+          setIsDropdownOpen(false);
+        }
+      }
+    },
+    [inline]
+  );
 
   useEffect(() => {
     if (isDropdownOpen) {
@@ -132,8 +142,12 @@ export function DirectoryField({
     if (!hasInitializedRef.current) {
       void fetchDirectories('');
       hasInitializedRef.current = true;
+      // For inline mode, keep the directory browser open
+      if (inline) {
+        setIsDropdownOpen(true);
+      }
     }
-  }, [fetchDirectories]);
+  }, [fetchDirectories, inline]);
 
   // Separate effect for prepopulating path after initialization
   useEffect(() => {
@@ -208,6 +222,7 @@ export function DirectoryField({
 
   const handleFocus = () => {
     setIsFocused(true);
+    // Always show dropdown when focused (even in inline mode)
     setIsDropdownOpen(true);
   };
 
@@ -215,14 +230,7 @@ export function DirectoryField({
     setIsFocused(false);
   };
 
-  const inputClasses = [
-    'input',
-    'input-bordered',
-    'w-full',
-    'pr-10', // Space for folder icon
-    error ? 'input-error' : '',
-    className,
-  ]
+  const inputClasses = ['input', 'input-bordered', 'w-full', error ? 'input-error' : '', className]
     .filter(Boolean)
     .join(' ');
 
@@ -256,16 +264,15 @@ export function DirectoryField({
           data-testid="project-path-input"
         />
 
-        {/* Folder icon */}
-        <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-          <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-base-content/40" />
-        </div>
-
-        {/* Dropdown */}
-        {isDropdownOpen && (
+        {/* Directory Browser */}
+        {(isDropdownOpen || inline) && (
           <div
             ref={dropdownRef}
-            className="absolute z-50 left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg max-h-64 overflow-hidden"
+            className={
+              inline
+                ? 'mt-3 bg-base-200 border border-base-300 rounded-lg overflow-hidden'
+                : 'absolute z-50 left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg max-h-64 overflow-hidden'
+            }
           >
             {isLoading ? (
               <div className="flex items-center justify-center p-4">
@@ -278,7 +285,7 @@ export function DirectoryField({
               <>
                 {/* Navigation header - removed breadcrumbs and home line */}
                 {!isLoading && !apiError && (
-                  <div className="sticky top-0 bg-base-200 border-b border-base-300 p-2">
+                  <div className="sticky top-0 bg-base-300 border-b border-base-content/20 p-2">
                     <div className="flex items-center gap-2">
                       {parentPath && (
                         <button
@@ -303,13 +310,16 @@ export function DirectoryField({
                 {/* Show filtered directory contents */}
                 {getFilteredDirectories().length > 0 && (
                   <>
-                    <div className="overflow-y-auto">
+                    <div
+                      className="overflow-y-auto"
+                      style={inline ? { height: `${minRows * 2.5}rem` } : undefined}
+                    >
                       {getVisibleDirectories().map((dir) => (
                         <button
                           key={dir.path}
                           onClick={() => handleDirectorySelect(dir)}
                           onDoubleClick={() => handleDirectoryDoubleClick(dir)}
-                          className="w-full px-3 py-2 text-left hover:bg-base-200 flex items-center gap-2 group border-b border-base-200/50 last:border-b-0"
+                          className="w-full px-3 py-2 text-left hover:bg-base-100 flex items-center gap-2 border-b border-base-content/10 last:border-b-0 transition-none"
                         >
                           <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
                           <span className="truncate flex-1">{dir.name}</span>
@@ -318,27 +328,28 @@ export function DirectoryField({
                           </span>
                         </button>
                       ))}
+                      {getFilteredDirectories().length > 10 && !showMore && (
+                        <div className="border-t border-base-300 p-2">
+                          <button
+                            onClick={() => setShowMore(true)}
+                            className="w-full text-center text-sm text-primary hover:text-primary-focus py-1"
+                          >
+                            Show {Math.min(90, getFilteredDirectories().length - 10)} more
+                            directories
+                          </button>
+                        </div>
+                      )}
+                      {showMore && getFilteredDirectories().length > 10 && (
+                        <div className="border-t border-base-300 p-2">
+                          <button
+                            onClick={() => setShowMore(false)}
+                            className="w-full text-center text-sm text-base-content/60 hover:text-base-content py-1"
+                          >
+                            Show less
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    {getFilteredDirectories().length > 10 && !showMore && (
-                      <div className="border-t border-base-300 p-2">
-                        <button
-                          onClick={() => setShowMore(true)}
-                          className="w-full text-center text-sm text-primary hover:text-primary-focus py-1"
-                        >
-                          Show {Math.min(90, getFilteredDirectories().length - 10)} more directories
-                        </button>
-                      </div>
-                    )}
-                    {showMore && getFilteredDirectories().length > 10 && (
-                      <div className="border-t border-base-300 p-2">
-                        <button
-                          onClick={() => setShowMore(false)}
-                          className="w-full text-center text-sm text-base-content/60 hover:text-base-content py-1"
-                        >
-                          Show less
-                        </button>
-                      </div>
-                    )}
                   </>
                 )}
 

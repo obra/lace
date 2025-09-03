@@ -7,7 +7,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrash } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
-import { GlassCard } from '@/components/ui/GlassCard';
 import { AccentButton } from '@/components/ui/AccentButton';
 import { DirectoryField } from '@/components/ui';
 import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
@@ -61,6 +60,7 @@ export function ProjectCreateModal({
   const [createDescription, setCreateDescription] = useState('');
   const [createWorkingDirectory, setCreateWorkingDirectory] = useState('');
   const [createConfig, setCreateConfig] = useState<ProjectConfiguration>(DEFAULT_PROJECT_CONFIG);
+  const [userEditedName, setUserEditedName] = useState(false);
   const [createNewEnvKey, setCreateNewEnvKey] = useState('');
   const [createNewEnvValue, setCreateNewEnvValue] = useState('');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
@@ -105,6 +105,7 @@ export function ProjectCreateModal({
     setCreateDescription('');
     setCreateWorkingDirectory('');
     setCreateConfig(DEFAULT_PROJECT_CONFIG);
+    setUserEditedName(false);
     setCreateNewEnvKey('');
     setCreateNewEnvValue('');
     setShowAdvancedOptions(false);
@@ -118,7 +119,7 @@ export function ProjectCreateModal({
   const handleCreateDirectoryChange = (directory: string) => {
     setCreateWorkingDirectory(directory);
 
-    if (isSimplifiedMode) {
+    if (isSimplifiedMode && !userEditedName) {
       const baseName =
         directory
           .replace(/[/\\]+$/, '')
@@ -186,16 +187,16 @@ export function ProjectCreateModal({
       isOpen={isOpen}
       onClose={handleClose}
       title="Create New Project"
-      size="xl"
-      className="max-h-[90vh] flex flex-col"
+      size="full"
+      className="flex flex-col"
     >
-      <form onSubmit={handleCreateProject} className="flex flex-col max-h-[80vh]">
+      <form onSubmit={handleCreateProject} className="flex flex-col max-h-[85vh]">
         <div className="flex-1 overflow-y-auto px-1 space-y-6">
           {isSimplifiedMode ? (
             // Simplified Mode Wizard
             <>
               {createStep === 2 && (
-                <GlassCard className="p-6">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-lg font-semibold">Set project directory</h4>
                     <button
@@ -216,6 +217,8 @@ export function ProjectCreateModal({
                     placeholder="/path/to/your/project"
                     required
                     className="input-lg focus:outline-none focus:ring-2 focus:ring-accent/60"
+                    inline
+                    minRows={6}
                   />
                   {createWorkingDirectory.trim() &&
                     !createWorkingDirectory.trim().startsWith('/') && (
@@ -258,18 +261,23 @@ export function ProjectCreateModal({
                         <input
                           type="text"
                           value={createName}
+                          onChange={(e) => {
+                            setCreateName(e.target.value);
+                            setUserEditedName(true);
+                          }}
                           data-testid="create-project-wizard-project-name"
                           className="input input-bordered w-full focus:outline-none focus:ring-2 focus:ring-accent/60"
-                          readOnly
+                          placeholder="Enter project name"
+                          required
                         />
                       </div>
                     </div>
                   )}
-                </GlassCard>
+                </div>
               )}
 
               {createStep === 3 && (
-                <GlassCard className="p-6">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-lg font-semibold">Set default AI provider</h4>
                     <button
@@ -399,11 +407,11 @@ export function ProjectCreateModal({
                       )}
                     </div>
                   )}
-                </GlassCard>
+                </div>
               )}
 
               {createStep === 4 && (
-                <GlassCard className="p-6">
+                <div className="space-y-4">
                   <h4 className="text-lg font-semibold mb-2">Review</h4>
                   <p className="text-sm text-base-content/70 mb-3">
                     Review your project settings. Go back to make changes.
@@ -425,11 +433,11 @@ export function ProjectCreateModal({
                       <span className="font-medium">Model:</span> {createConfig.modelId || '—'}
                     </div>
                   </div>
-                </GlassCard>
+                </div>
               )}
 
               {/* Bottom footer: back, step indicators, primary action */}
-              <div className="mt-auto flex justify-between items-center pt-4">
+              <div className="mt-auto flex justify-between items-center pt-4 pb-6 pr-4">
                 <div>
                   {createStep > 2 && (
                     <button
@@ -452,16 +460,6 @@ export function ProjectCreateModal({
                     </div>
                   )}
                   <div className="flex items-center gap-2">
-                    {createStep === 2 && (
-                      <button
-                        type="button"
-                        className="btn btn-link text-base-content/70 no-underline"
-                        onClick={() => setShowAdvancedOptions(true)}
-                        data-testid="project-advanced-setup-button"
-                      >
-                        Advanced setup
-                      </button>
-                    )}
                     {createStep > 1 && createStep < 4 && (
                       <AccentButton
                         type="button"

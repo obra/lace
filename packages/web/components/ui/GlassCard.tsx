@@ -13,10 +13,10 @@ export function GlassCard({ as: Tag = 'div', className, children, ...rest }: Gla
   return (
     <Tag
       className={clsx(
-        'glass-card rounded-2xl',
-        // Fill + borders + blur
-        'bg-[rgba(12,16,14,.55)] border border-white/10 outline-1 outline-black/40',
-        'backdrop-blur-[14px] saturate-[1.4] shadow-[0_14px_44px_rgba(0,0,0,.35),inset_0_1px_0_rgba(255,255,255,.06)]',
+        'rounded-2xl',
+        'bg-base-100/80 border border-base-300/50',
+        'backdrop-blur-md saturate-150',
+        'shadow-lg',
         'p-4 md:p-6',
         className
       )}

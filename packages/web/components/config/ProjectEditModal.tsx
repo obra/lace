@@ -137,10 +137,10 @@ export function ProjectEditModal({
       isOpen={isOpen}
       onClose={onClose}
       title={`Edit Project: ${project.name}`}
-      size="xl"
-      className="max-h-[90vh] flex flex-col"
+      size="full"
+      className="flex flex-col"
     >
-      <form onSubmit={handleSubmit} className="flex flex-col max-h-[80vh]">
+      <form onSubmit={handleSubmit} className="flex flex-col max-h-[85vh]">
         <div className="flex-1 overflow-y-auto px-1 space-y-6">
           {/* Basic Information */}
           <div className="grid md:grid-cols-2 gap-4">
