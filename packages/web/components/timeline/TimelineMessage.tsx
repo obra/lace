@@ -252,6 +252,7 @@ export function TimelineMessage({
     case 'TOOL_APPROVAL_REQUEST':
     case 'TOOL_APPROVAL_RESPONSE':
     case 'AGENT_SPAWNED':
+    case 'AGENT_SUMMARY_UPDATED':
     case 'PROJECT_CREATED':
     case 'PROJECT_UPDATED':
     case 'PROJECT_DELETED':
