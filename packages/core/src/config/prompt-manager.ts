@@ -14,6 +14,7 @@ import {
   ContextDisclaimerProvider,
 } from '~/config/variable-providers';
 import { getLaceDir } from '~/config/lace-dir';
+import { personaRegistry } from '~/config/persona-registry';
 import { logger } from '~/utils/logger';
 
 interface PromptManagerOptions {
@@ -52,16 +53,26 @@ export class PromptManager {
   }
 
   /**
-   * Generate the system prompt using template system
+   * Generate the system prompt using template system for specified persona (defaults to 'lace')
    */
-  async generateSystemPrompt(): Promise<string> {
+  async generateSystemPrompt(persona: string = 'lace'): Promise<string> {
     try {
-      logger.debug('Generating system prompt using template system');
+      logger.debug('Generating system prompt using template system', { persona });
 
+      // Validate persona exists
+      personaRegistry.validatePersona(persona);
+      
+      // Get persona template path
+      const personaPath = personaRegistry.getPersonaPath(persona);
+      if (!personaPath) {
+        throw new Error(`Persona '${persona}' not found`);
+      }
+      
       const context = await this.variableManager.getTemplateContext();
-      const prompt = this.templateEngine.render('lace.md', context);
+      const prompt = this.templateEngine.render(`${persona}.md`, context);
 
       logger.debug('System prompt generated successfully', {
+        persona,
         contextKeys: Object.keys(context),
         promptLength: prompt.length,
       });
@@ -69,6 +80,7 @@ export class PromptManager {
       return prompt;
     } catch (error) {
       logger.error('Failed to generate system prompt', {
+        persona,
         error: error instanceof Error ? error.message : String(error),
       });
       return this.getFallbackPrompt();

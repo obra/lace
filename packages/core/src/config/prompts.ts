@@ -17,6 +17,7 @@ interface PromptOptions {
   tools?: Array<{ name: string; description: string }>;
   session?: { getWorkingDirectory(): string };
   project?: { getWorkingDirectory(): string };
+  persona?: string;
 }
 
 // Default user instructions - empty by default
@@ -55,17 +56,17 @@ function readPromptFile(
  * Load the system prompt using the template system
  */
 export async function loadPromptConfig(options: PromptOptions = {}): Promise<PromptConfig> {
-  logger.debug('Loading prompt config using template system');
+  logger.debug('Loading prompt config using template system', { persona: options.persona });
 
   const promptManager = new PromptManager({
     tools: options.tools,
     session: options.session,
     project: options.project,
   });
-  const systemPrompt = await promptManager.generateSystemPrompt();
+  const systemPrompt = await promptManager.generateSystemPrompt(options.persona);
   const userInstructions = loadUserInstructions();
 
-  logger.info('Loaded prompt config using template system');
+  logger.info('Loaded prompt config using template system', { persona: options.persona });
   return {
     systemPrompt,
     userInstructions: userInstructions.content.trim(),
