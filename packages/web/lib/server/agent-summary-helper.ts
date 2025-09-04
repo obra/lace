@@ -36,19 +36,19 @@ export async function generateAgentSummary(
     const helper = new SessionHelper({
       model: 'fast',
       parentAgent: agent,
+      persona: 'session-summary', // Use our minimal summary persona
     });
 
-    // Build context for the summary
+    // Build simplified context for the persona
     let context = `User message: "${userMessage}"`;
     if (lastAgentResponse) {
       context += `\n\nAgent's last response: "${lastAgentResponse}"`;
     }
 
-    const prompt = `Based on this conversation context, put together a clear one-sentence summary of what the agent is currently working on. It should be casual and sometimes a little playful, like you're talking to someone you trust. This will be shown at the top of the chat window.
+    // Simplified prompt - let the persona handle the behavior guidelines
+    const prompt = `Based on this conversation context, generate a one-sentence summary of what the agent is currently working on:
 
-${context}
-
-Respond with just the summary sentence, nothing else. Keep it concise and focused on the current task or activity.`;
+${context}`;
 
     const result = await helper.execute(prompt);
 

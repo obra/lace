@@ -11,12 +11,16 @@ import { generateAgentSummary, getLastAgentResponse } from './agent-summary-help
 import type { Agent } from '@/lib/server/lace-imports';
 import type { LaceEvent } from '@/types/core';
 
-// Mock SessionHelper
+// Mock SessionHelper and capture constructor options
 const mockExecute = vi.fn();
+let capturedSessionHelperOptions: any;
 vi.mock('@/lib/server/lace-imports', () => ({
-  SessionHelper: vi.fn().mockImplementation(() => ({
-    execute: mockExecute,
-  })),
+  SessionHelper: vi.fn().mockImplementation((options) => {
+    capturedSessionHelperOptions = options;
+    return {
+      execute: mockExecute,
+    };
+  }),
   Agent: vi.fn(),
 }));
 
@@ -38,6 +42,23 @@ describe('agent-summary-helper', () => {
   });
 
   describe('generateAgentSummary', () => {
+    it('should use session-summary persona when creating SessionHelper', async () => {
+      mockExecute.mockResolvedValue({
+        content: 'Working on user authentication setup',
+        toolCalls: [],
+        toolResults: [],
+      });
+
+      await generateAgentSummary(mockAgent, 'Help me set up user authentication');
+
+      // Verify SessionHelper was created with session-summary persona
+      expect(capturedSessionHelperOptions).toEqual({
+        model: 'fast',
+        parentAgent: mockAgent,
+        persona: 'session-summary',
+      });
+    });
+
     it('should generate summary with user message only', async () => {
       mockExecute.mockResolvedValue({
         content: 'Working on user authentication setup',
@@ -52,7 +73,9 @@ describe('agent-summary-helper', () => {
         expect.stringContaining('User message: "Help me set up user authentication"')
       );
       expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('put together a clear one-sentence summary')
+        expect.stringContaining(
+          'generate a one-sentence summary of what the agent is currently working on'
+        )
       );
     });
 

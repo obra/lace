@@ -335,6 +335,7 @@ describe('SessionHelper', () => {
       const helper = new SessionHelper({
         model: 'fast',
         parentAgent: mockAgent,
+        persona: 'session-summary', // Test with our new persona
       });
 
       // Spy on the provider's createResponse to see exactly what gets sent

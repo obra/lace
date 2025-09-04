@@ -112,6 +112,10 @@ export class SessionHelper extends BaseHelper {
     return this.toolExecutor;
   }
 
+  protected getPersona(): string | undefined {
+    return this.options.persona;
+  }
+
   protected getModel(): string {
     try {
       // Try to get model from global config first
