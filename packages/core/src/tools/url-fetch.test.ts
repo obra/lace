@@ -1,15 +1,23 @@
 // ABOUTME: Tests for schema-based URL fetch tool with structured output
 // ABOUTME: Validates URL fetching, content handling, and enhanced error reporting
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
 import { UrlFetchTool } from '~/tools/implementations/url-fetch';
-
-// Mock fetch to avoid external network dependencies in tests
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
 
 describe('UrlFetchTool with schema validation', () => {
   let tool: UrlFetchTool;
+  // Properly typed fetch mock
+  const mockFetch = vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>();
+
+  beforeAll(() => {
+    // Stub global fetch for this test suite only
+    vi.stubGlobal('fetch', mockFetch);
+  });
+
+  afterAll(() => {
+    // Clean up global stubbing
+    vi.unstubAllGlobals();
+  });
 
   beforeEach(() => {
     tool = new UrlFetchTool();
