@@ -56,14 +56,16 @@ describe('ThreadId types', () => {
 describe('NewAgentSpec types', () => {
   describe('isNewAgentSpec', () => {
     it('should validate correct new agent specs', () => {
-      expect(isNewAgentSpec('new:anthropic/claude-3-haiku')).toBe(true);
-      expect(isNewAgentSpec('new:openai/gpt-4')).toBe(true);
-      expect(isNewAgentSpec('new:local/llama-2')).toBe(true);
+      expect(isNewAgentSpec('new:lace:anthropic/claude-3-haiku')).toBe(true);
+      expect(isNewAgentSpec('new:coding-agent:openai/gpt-4')).toBe(true);
+      expect(isNewAgentSpec('new:helper:local/llama-2')).toBe(true);
     });
 
     it('should reject invalid new agent specs', () => {
       expect(isNewAgentSpec('new:anthropic')).toBe(false); // Missing model
       expect(isNewAgentSpec('anthropic/claude-3-haiku')).toBe(false); // Missing new: prefix
+      expect(isNewAgentSpec('new:anthropic/claude-3-haiku')).toBe(false); // Old format - now invalid
+      expect(isNewAgentSpec('new:openai/gpt-4')).toBe(false); // Old format - now invalid
       expect(isNewAgentSpec('new:')).toBe(false);
       expect(isNewAgentSpec('new:/')).toBe(false);
       expect(isNewAgentSpec('new:provider/')).toBe(false);
@@ -90,8 +92,8 @@ describe('AssigneeId types', () => {
     });
 
     it('should accept valid new agent specs', () => {
-      expect(isAssigneeId('new:anthropic/claude-3-haiku')).toBe(true);
-      expect(isAssigneeId('new:openai/gpt-4')).toBe(true);
+      expect(isAssigneeId('new:lace:anthropic/claude-3-haiku')).toBe(true);
+      expect(isAssigneeId('new:coding-agent:openai/gpt-4')).toBe(true);
     });
 
     it('should reject invalid formats', () => {

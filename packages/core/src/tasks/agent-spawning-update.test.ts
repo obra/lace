@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskManager } from '~/tasks/task-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { asThreadId, asNewAgentSpec } from '~/threads/types';
+import { asThreadId, asNewAgentSpec, createNewAgentSpec } from '~/threads/types';
 import { getPersistence, type DatabasePersistence } from '~/persistence/database';
 
 describe('Agent Spawning on Assignment', () => {
@@ -22,9 +22,11 @@ describe('Agent Spawning on Assignment', () => {
     delegateCounter = 1;
 
     // Mock agent creation callback
-    mockAgentCreator = vi.fn().mockImplementation((_provider: string, _model: string) => {
-      return Promise.resolve(asThreadId(`${sessionId}.${delegateCounter++}`));
-    });
+    mockAgentCreator = vi
+      .fn()
+      .mockImplementation((_persona: string, _provider: string, _model: string, _task: any) => {
+        return Promise.resolve(asThreadId(`${sessionId}.${delegateCounter++}`));
+      });
 
     taskManager = new TaskManager(asThreadId(sessionId), persistence, mockAgentCreator);
   });
@@ -34,24 +36,29 @@ describe('Agent Spawning on Assignment', () => {
     vi.restoreAllMocks();
   });
 
-  it('should spawn agent during task creation with new:provider/model assignment', async () => {
+  it('should spawn agent during task creation with new:persona:provider/model assignment', async () => {
     const taskContext = { actor: sessionId, isHuman: false };
 
     const task = await taskManager.createTask(
       {
         title: 'Test task creation',
         prompt: 'Test prompt',
-        assignedTo: asNewAgentSpec('new:anthropic/claude-3-5-haiku-20241022'),
+        assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-3-5-haiku-20241022'),
       },
       taskContext
     );
 
     // Should have called agent creator
-    expect(mockAgentCreator).toHaveBeenCalledWith('anthropic', 'claude-3-5-haiku-20241022', task);
+    expect(mockAgentCreator).toHaveBeenCalledWith(
+      'lace',
+      'anthropic',
+      'claude-3-5-haiku-20241022',
+      task
+    );
 
     // Task should have delegate thread ID, not original assignment
     expect(task.assignedTo).toBe(`${sessionId}.1`);
-    expect(task.assignedTo).not.toBe('new:anthropic/claude-3-5-haiku-20241022');
+    expect(task.assignedTo).not.toBe('new:lace:anthropic/claude-3-5-haiku-20241022');
 
     // Should be marked as in_progress due to agent spawning
     expect(task.status).toBe('in_progress');
@@ -77,7 +84,7 @@ describe('Agent Spawning on Assignment', () => {
     const updatedTask = await taskManager.updateTask(
       task.id,
       {
-        assignedTo: asNewAgentSpec('new:anthropic/claude-sonnet-4-20250514'),
+        assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-sonnet-4-20250514'),
         status: 'in_progress', // This will be overridden by agent spawning
       },
       taskContext
@@ -85,6 +92,7 @@ describe('Agent Spawning on Assignment', () => {
 
     // Should have called agent creator
     expect(mockAgentCreator).toHaveBeenCalledWith(
+      'lace',
       'anthropic',
       'claude-sonnet-4-20250514',
       updatedTask
@@ -92,7 +100,7 @@ describe('Agent Spawning on Assignment', () => {
 
     // Task should have delegate thread ID, not original assignment
     expect(updatedTask.assignedTo).toBe(`${sessionId}.1`);
-    expect(updatedTask.assignedTo).not.toBe('new:anthropic/claude-sonnet-4-20250514');
+    expect(updatedTask.assignedTo).not.toBe('new:lace:anthropic/claude-sonnet-4-20250514');
 
     // Should be marked as in_progress due to agent spawning
     expect(updatedTask.status).toBe('in_progress');
@@ -134,7 +142,7 @@ describe('Agent Spawning on Assignment', () => {
         {
           title: 'Test error handling',
           prompt: 'Test prompt',
-          assignedTo: asNewAgentSpec('new:anthropic/claude-3-5-haiku-20241022'),
+          assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-3-5-haiku-20241022'),
         },
         taskContext
       )
@@ -149,7 +157,7 @@ describe('Agent Spawning on Assignment', () => {
       {
         title: 'Task 1',
         prompt: 'Prompt 1',
-        assignedTo: asNewAgentSpec('new:anthropic/claude-3-5-haiku-20241022'),
+        assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-3-5-haiku-20241022'),
       },
       taskContext
     );
@@ -159,7 +167,7 @@ describe('Agent Spawning on Assignment', () => {
       {
         title: 'Task 2',
         prompt: 'Prompt 2',
-        assignedTo: asNewAgentSpec('new:anthropic/claude-sonnet-4-20250514'),
+        assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-sonnet-4-20250514'),
       },
       taskContext
     );
