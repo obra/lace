@@ -94,7 +94,12 @@ async function startLaceServer() {
   // Development mode - use Vite middleware
   const viteDevServer = await import('vite').then((vite) =>
     vite.createServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: {
+          port: 0, // Use dynamic port allocation for websocket
+        },
+      },
     })
   );
 
