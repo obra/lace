@@ -435,7 +435,12 @@ export function ProjectCreateModal({
                   {createStep === 4 && (
                     <AccentButton
                       type="submit"
-                      disabled={!createWorkingDirectory.trim()}
+                      disabled={
+                        !createName ||
+                        !createName.trim() ||
+                        !createWorkingDirectory ||
+                        !createWorkingDirectory.trim()
+                      }
                       data-testid="create-project-submit"
                     >
                       {loading ? (
