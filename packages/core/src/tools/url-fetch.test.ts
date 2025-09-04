@@ -280,8 +280,10 @@ Follows redirects by default. Returns detailed error context for failures.`
       );
 
       expect(result.status).toBe('failed');
-      // Should get either timeout or network error depending on environment
-      expect(result.content[0].text).toMatch(/(timeout|network|NETWORK ERROR|TIMEOUT ERROR)/i);
+      // Should get either timeout, network error, or service unavailable depending on environment
+      expect(result.content[0].text).toMatch(
+        /(timeout|network|NETWORK ERROR|TIMEOUT ERROR|503|service.*unavailable)/i
+      );
     }, 10000);
 
     it('should handle invalid domains', async () => {
