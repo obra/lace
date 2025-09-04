@@ -1,5 +1,5 @@
 // ABOUTME: Test suite for task-based agent spawning functionality
-// ABOUTME: Verifies that tasks assigned to "new:provider/model" trigger agent creation
+// ABOUTME: Verifies that tasks assigned to "new:persona:provider/model" trigger agent creation
 
 import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
 import { TaskManager, type AgentCreationCallback } from '~/tasks/task-manager';
@@ -35,11 +35,11 @@ describe('Agent Spawning', () => {
   });
 
   describe('Task Creation with Agent Spawning', () => {
-    it('should spawn agent when task assigned to "new:provider/model"', async () => {
+    it('should spawn agent when task assigned to "new:persona:provider/model"', async () => {
       const taskRequest: CreateTaskRequest = {
         title: 'Test Task',
         prompt: 'Please complete this test task',
-        assignedTo: asNewAgentSpec('new:anthropic/claude-3-sonnet'),
+        assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-3-sonnet'),
         priority: 'medium',
       };
 
@@ -56,7 +56,7 @@ describe('Agent Spawning', () => {
       );
 
       // Verify task assignment was updated to actual thread ID
-      expect(task.assignedTo).not.toBe('new:anthropic/claude-3-sonnet');
+      expect(task.assignedTo).not.toBe('new:lace:anthropic/claude-3-sonnet');
       expect(task.assignedTo).toMatch(/^lace_20250726_test01\.\d+$/);
 
       // Verify task status was updated to in_progress
