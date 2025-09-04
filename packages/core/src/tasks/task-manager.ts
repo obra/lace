@@ -9,6 +9,7 @@ import { logger } from '~/utils/logger';
 
 // Type for agent creation callback
 export type AgentCreationCallback = (
+  persona: string,
   provider: string,
   model: string,
   task: Task
@@ -303,11 +304,11 @@ export class TaskManager extends EventEmitter {
 
     // Parse "new:persona:provider/model" format using proper parser
     const parsed = parseNewAgentSpec(task.assignedTo);
-    const { provider, model } = parsed;
+    const { persona, provider, model } = parsed;
 
     try {
       // Create the agent and get its thread ID
-      const agentThreadId = await this.createAgent(provider, model, task);
+      const agentThreadId = await this.createAgent(persona, provider, model, task);
 
       // Update the task assignment to the actual thread ID
       task.assignedTo = agentThreadId;

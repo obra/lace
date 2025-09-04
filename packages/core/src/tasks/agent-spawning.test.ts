@@ -27,7 +27,7 @@ describe('Agent Spawning', () => {
     } as unknown as DatabasePersistence;
 
     // Mock agent creator
-    mockAgentCreator = vi.fn().mockImplementation((_provider, _model, _task) => {
+    mockAgentCreator = vi.fn().mockImplementation((_persona, _provider, _model, _task) => {
       return Promise.resolve(asThreadId(`${sessionId}.${Date.now()}`));
     });
 
@@ -47,6 +47,7 @@ describe('Agent Spawning', () => {
 
       // Verify agent creator was called with correct parameters
       expect(mockAgentCreator).toHaveBeenCalledWith(
+        'lace',
         'anthropic',
         'claude-3-sonnet',
         expect.objectContaining({
@@ -94,6 +95,7 @@ describe('Agent Spawning', () => {
         await taskManager.createTask(taskRequest, context);
 
         expect(mockAgentCreator).toHaveBeenCalledWith(
+          'lace',
           testCase.expectedProvider,
           testCase.expectedModel,
           expect.objectContaining({
