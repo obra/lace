@@ -282,10 +282,10 @@ describe('TaskSidebarSection', () => {
       const tasks = [
         createMockTask('1', 'completed'), // unassigned
         createMockTask('2', 'completed'), // unassigned
-        { ...createMockTask('3', 'in_progress'), assignedTo: 'agent-1' as any }, // assigned - should be filtered out
+        { ...createMockTask('3', 'in_progress'), assignedTo: 'agent-1' }, // assigned - should be filtered out
         createMockTask('4', 'pending'), // unassigned
         createMockTask('5', 'pending'), // unassigned
-        { ...createMockTask('6', 'pending'), assignedTo: 'agent-2' as any }, // assigned - should be filtered out
+        { ...createMockTask('6', 'pending'), assignedTo: 'agent-2' }, // assigned - should be filtered out
       ];
       mockTaskContext.taskManager = createMockTaskManager(tasks);
 
@@ -297,8 +297,8 @@ describe('TaskSidebarSection', () => {
 
     it('passes zero tasks when all tasks are assigned', () => {
       const tasks = [
-        { ...createMockTask('1', 'in_progress'), assignedTo: 'agent-1' as any }, // all assigned
-        { ...createMockTask('2', 'pending'), assignedTo: 'agent-2' as any },
+        { ...createMockTask('1', 'in_progress'), assignedTo: 'agent-1' }, // all assigned
+        { ...createMockTask('2', 'pending'), assignedTo: 'agent-2' },
       ];
       mockTaskContext.taskManager = createMockTaskManager(tasks);
 
@@ -348,10 +348,10 @@ describe('TaskSidebarSection', () => {
     it('passes only unassigned tasks to TaskListSidebar', () => {
       const tasks = [
         createMockTask('1', 'completed'), // unassigned
-        { ...createMockTask('2', 'in_progress'), assignedTo: 'agent-1' as any }, // assigned - filtered out
+        { ...createMockTask('2', 'in_progress'), assignedTo: 'agent-1' }, // assigned - filtered out
         createMockTask('3', 'pending'), // unassigned
         createMockTask('4', 'pending'), // unassigned
-        { ...createMockTask('5', 'pending'), assignedTo: 'agent-2' as any }, // assigned - filtered out
+        { ...createMockTask('5', 'pending'), assignedTo: 'agent-2' }, // assigned - filtered out
       ];
       mockTaskContext.taskManager = createMockTaskManager(tasks);
 
