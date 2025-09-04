@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskManager } from '~/tasks/task-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { asThreadId, asNewAgentSpec, createNewAgentSpec } from '~/threads/types';
+import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import { getPersistence, type DatabasePersistence } from '~/persistence/database';
 
 describe('Agent Spawning on Assignment', () => {

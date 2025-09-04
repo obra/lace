@@ -38,9 +38,9 @@ export class PersonaRegistry {
           this.bundledPersonasCache.add(file.name);
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Bundled personas should always exist, but handle gracefully
-      console.warn('Failed to load bundled personas:', error);
+      console.warn('Failed to load bundled personas:', _error);
     }
   }
 
@@ -68,7 +68,7 @@ export class PersonaRegistry {
       }
 
       this.userCacheExpiry = now + this.USER_CACHE_TTL;
-    } catch (error) {
+    } catch (_error) {
       // User directory may not exist, that's ok
       this.userCacheExpiry = now + this.USER_CACHE_TTL;
     }

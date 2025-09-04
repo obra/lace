@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import type { AgentInfo } from '@/types/core';
+import type { AgentInfo, ThreadId } from '@/types/core';
 
 // Mock AgentsSection component
 const AgentsSection = ({ agents }: { agents: AgentInfo[] }) => (
@@ -17,7 +17,7 @@ const AgentsSection = ({ agents }: { agents: AgentInfo[] }) => (
 
 describe('Web UI Persona Integration', () => {
   const mockAgent: AgentInfo = {
-    threadId: 'lace_20250904_test01' as any,
+    threadId: 'lace_20250904_test01' as ThreadId,
     name: 'Test Agent',
     modelId: 'claude-3-sonnet',
     providerInstanceId: 'anthropic',
@@ -29,14 +29,14 @@ describe('Web UI Persona Integration', () => {
     it('includes persona field in AgentInfo type', () => {
       // Type-level test - if this compiles, the persona field exists
       const agentWithPersona: AgentInfo = {
-        threadId: 'lace_20250904_test01' as any,
+        threadId: 'lace_20250904_test01' as ThreadId,
         name: 'Test Agent',
-        modelId: 'claude-3-sonnet', 
+        modelId: 'claude-3-sonnet',
         providerInstanceId: 'anthropic',
         status: 'idle',
         persona: 'helper-agent', // This field must exist for compilation
       };
-      
+
       expect(agentWithPersona.persona).toBe('helper-agent');
     });
 
@@ -51,7 +51,7 @@ describe('Web UI Persona Integration', () => {
   describe('Agent display components', () => {
     it('can display agent persona in components', () => {
       render(<AgentsSection agents={[mockAgent]} />);
-      
+
       expect(screen.getByTestId('agent-name')).toHaveTextContent('Test Agent');
       expect(screen.getByTestId('agent-persona')).toHaveTextContent('coding-agent');
       expect(screen.getByTestId('agent-status')).toHaveTextContent('idle');
@@ -60,12 +60,12 @@ describe('Web UI Persona Integration', () => {
     it('handles different persona types', () => {
       const agents: AgentInfo[] = [
         { ...mockAgent, persona: 'lace' },
-        { ...mockAgent, threadId: 'lace_20250904_test02' as any, persona: 'coding-agent' },
-        { ...mockAgent, threadId: 'lace_20250904_test03' as any, persona: 'helper-agent' },
+        { ...mockAgent, threadId: 'lace_20250904_test02' as ThreadId, persona: 'coding-agent' },
+        { ...mockAgent, threadId: 'lace_20250904_test03' as ThreadId, persona: 'helper-agent' },
       ];
-      
+
       render(<AgentsSection agents={agents} />);
-      
+
       const personaElements = screen.getAllByTestId('agent-persona');
       expect(personaElements).toHaveLength(3);
       expect(personaElements[0]).toHaveTextContent('lace');
@@ -77,19 +77,23 @@ describe('Web UI Persona Integration', () => {
   describe('NewAgentSpec format support', () => {
     it('NewAgentSpec imports are available for web components', async () => {
       // Test that the web UI can import the core types
-      const { isNewAgentSpec, parseNewAgentSpec, createNewAgentSpec } = await import('@/types/core');
-      
+      const { isNewAgentSpec, parseNewAgentSpec, createNewAgentSpec } = await import(
+        '@/types/core'
+      );
+
       expect(typeof isNewAgentSpec).toBe('function');
-      expect(typeof parseNewAgentSpec).toBe('function'); 
+      expect(typeof parseNewAgentSpec).toBe('function');
       expect(typeof createNewAgentSpec).toBe('function');
     });
 
     it('can create and parse NewAgentSpec in web context', async () => {
-      const { isNewAgentSpec, parseNewAgentSpec, createNewAgentSpec } = await import('@/types/core');
-      
+      const { isNewAgentSpec, parseNewAgentSpec, createNewAgentSpec } = await import(
+        '@/types/core'
+      );
+
       const spec = createNewAgentSpec('coding-agent', 'anthropic', 'claude-3-sonnet');
       expect(isNewAgentSpec(spec)).toBe(true);
-      
+
       const parsed = parseNewAgentSpec(spec);
       expect(parsed.persona).toBe('coding-agent');
       expect(parsed.provider).toBe('anthropic');

@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
 import { TaskManager, type AgentCreationCallback } from '~/tasks/task-manager';
 import { DatabasePersistence } from '~/persistence/database';
-import { asThreadId, asNewAgentSpec, asAssigneeId, createNewAgentSpec } from '~/threads/types';
+import { asThreadId, asAssigneeId, createNewAgentSpec } from '~/threads/types';
 import { TaskContext, CreateTaskRequest } from '~/tasks/types';
 
 describe('Agent Spawning', () => {

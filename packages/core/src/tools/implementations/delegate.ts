@@ -7,7 +7,7 @@ import { NonEmptyString } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 import type { TaskManager } from '~/tasks/task-manager';
 import type { Task, TaskContext } from '~/tasks/types';
-import { isNewAgentSpec, createNewAgentSpec } from '~/threads/types';
+import { createNewAgentSpec } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { parseProviderModel } from '~/providers/provider-utils';
 
@@ -108,9 +108,6 @@ Examples:
     try {
       // Create assignment spec using provider instance ID with default persona
       const assigneeSpec = createNewAgentSpec('lace', providerInstanceId, modelName);
-      if (!isNewAgentSpec(assigneeSpec)) {
-        throw new Error(`Invalid assignee spec format: ${assigneeSpec}`);
-      }
 
       logger.debug('DelegateTool: Creating task with agent spawning', {
         title,

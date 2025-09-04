@@ -85,7 +85,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
           name: agentDetails.name,
           providerInstanceId: agentDetails.providerInstanceId,
           modelId: agentDetails.modelId,
-          persona: agentDetails.persona || 'lace',
+          persona: (agentDetails as any).persona || 'lace',
         });
         setShowEditAgent(true);
       } catch (error) {

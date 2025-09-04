@@ -61,13 +61,13 @@ export class PromptManager {
 
       // Validate persona exists
       personaRegistry.validatePersona(persona);
-      
+
       // Get persona template path
       const personaPath = personaRegistry.getPersonaPath(persona);
       if (!personaPath) {
         throw new Error(`Persona '${persona}' not found`);
       }
-      
+
       const context = await this.variableManager.getTemplateContext();
       const prompt = this.templateEngine.render(`${persona}.md`, context);
 

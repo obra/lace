@@ -9,7 +9,7 @@ describe('PersonaRegistry', () => {
   let tempBundledDir: string;
   let tempUserDir: string;
   let registry: PersonaRegistry;
-  let originalGetLaceDir: () => string;
+  let _originalGetLaceDir: () => string;
 
   beforeEach(async () => {
     // Create temp directories for testing

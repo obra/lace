@@ -142,8 +142,8 @@ export function scanEmbeddedFiles(
           files.push({
             name: baseName,
             fullPath,
-            loadContent: async () => {
-              return fs.readFileSync(fullPath, 'utf8');
+            loadContent: () => {
+              return Promise.resolve(fs.readFileSync(fullPath, 'utf8'));
             },
           });
         }

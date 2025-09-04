@@ -512,12 +512,14 @@ export interface ParsedNewAgentSpec {
 export function parseNewAgentSpec(spec: NewAgentSpec): ParsedNewAgentSpec {
   const match = spec.match(/^new:([^:]+):([^/]+)\/(.+)$/);
   if (!match) {
-    throw new Error(`Invalid NewAgentSpec format: ${spec}. Expected format: new:persona:provider/model`);
+    throw new Error(
+      `Invalid NewAgentSpec format: ${spec}. Expected format: new:persona:provider/model`
+    );
   }
-  
+
   return {
     persona: match[1],
-    provider: match[2], 
+    provider: match[2],
     model: match[3],
   };
 }
