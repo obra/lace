@@ -37,7 +37,11 @@ export function TimelineView({
   compactionState,
 }: TimelineViewProps) {
   // Generate unique instance ID to prevent key conflicts across multiple TimelineView instances
-  const instanceId = useRef(`tl-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`);
+  const instanceId = useRef<string>(
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? `tl-${crypto.randomUUID()}`
+      : `tl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  );
 
   // Process events (filtering, aggregation, etc.)
   const processedEvents = useProcessedEvents(
@@ -81,7 +85,9 @@ export function TimelineView({
                 <motion.div
                   key={
                     event.id ||
-                    `${instanceId.current}-${event.threadId}-${event.timestamp}-${index}`
+                    `${instanceId.current}-${event.threadId}-${
+                      event.timestamp instanceof Date ? event.timestamp.getTime() : event.timestamp
+                    }-${index}`
                   }
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}

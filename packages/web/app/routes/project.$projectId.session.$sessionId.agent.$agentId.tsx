@@ -20,7 +20,7 @@ export default function ProjectSessionAgent() {
   const { projectId, sessionId, agentId } = useParams();
 
   return (
-    <UIProvider key={`${projectId}-${sessionId}-${agentId}`}>
+    <UIProvider>
       <ProjectProvider
         selectedProject={projectId!}
         onProjectSelect={noOpCallback}
@@ -39,11 +39,7 @@ export default function ProjectSessionAgent() {
                 sessionId={sessionId! as ThreadId}
                 agentId={agentId! as ThreadId}
               >
-                <TaskProvider
-                  projectId={projectId!}
-                  sessionId={sessionId! as ThreadId}
-                  agents={[]} // Will be populated by AgentProvider
-                >
+                <TaskProvider projectId={projectId!} sessionId={sessionId! as ThreadId}>
                   <ScrollProvider>
                     <AgentPageContent
                       key={agentId}

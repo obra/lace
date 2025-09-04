@@ -32,7 +32,7 @@ interface AgentPageContentProps {
 }
 
 export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageContentProps) {
-  const { navigateToAgent } = useURLState();
+  const { navigateToAgent, navigateToRoot } = useURLState();
 
   // UI State
   const { sidebarOpen, toggleSidebar } = useUIContext();
@@ -72,8 +72,8 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
 
   const handleSwitchProject = useCallback(() => {
     // Navigate to root to show project selection
-    window.location.href = '/';
-  }, []);
+    navigateToRoot();
+  }, [navigateToRoot]);
 
   const handleConfigureAgent = useCallback(
     async (agentIdToEdit: string) => {

@@ -24,11 +24,7 @@ export default function Project() {
       >
         <SessionProvider projectId={projectId!} selectedSessionId={null}>
           <AgentProvider sessionId={null} selectedAgentId={null} onAgentChange={noOpCallback}>
-            <TaskProvider
-              projectId={projectId!}
-              sessionId={null}
-              agents={[]} // No agents on project page
-            >
+            <TaskProvider projectId={projectId!} sessionId={null}>
               <ProjectPageContent projectId={projectId!} />
             </TaskProvider>
           </AgentProvider>
