@@ -35,6 +35,7 @@ export interface AgentConfig {
   threadManager: ThreadManager;
   threadId: string;
   tools: Tool[];
+  persona?: string;
   metadata?: {
     name: string;
     modelId: string;
@@ -65,6 +66,7 @@ export interface AgentInfo {
   providerInstanceId: string;
   modelId: string;
   status: AgentState;
+  persona: string;
 }
 
 export interface CurrentTurnMetrics {
@@ -130,6 +132,7 @@ export class Agent extends EventEmitter {
   private readonly _threadManager: ThreadManager;
   private readonly _threadId: string;
   private readonly _tools: Tool[];
+  private readonly _persona: string;
 
   // Public access to tool executor for interfaces
   get toolExecutor(): ToolExecutor {
@@ -187,6 +190,7 @@ export class Agent extends EventEmitter {
     this._threadManager = config.threadManager;
     this._threadId = config.threadId;
     this._tools = config.tools;
+    this._persona = config.persona || 'lace';
     this._stopReasonHandler = new StopReasonHandler();
 
     // Token budget management has been removed - using direct ThreadTokenUsage calculation
@@ -445,6 +449,7 @@ export class Agent extends EventEmitter {
       );
 
       const promptConfig = await loadPromptConfig({
+        persona: this._persona,
         tools: this._tools.map((tool) => ({ name: tool.name, description: tool.description })),
         session: session,
         project: project,
@@ -637,6 +642,7 @@ export class Agent extends EventEmitter {
       providerInstanceId: (metadata?.providerInstanceId as string) || 'unknown',
       modelId: (metadata?.modelId as string) || 'unknown',
       status: this.status,
+      persona: this._persona,
     };
   }
 
