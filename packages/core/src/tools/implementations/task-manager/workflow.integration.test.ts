@@ -26,6 +26,7 @@ import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ApprovalDecision } from '~/tools/approval-types';
+import { createNewAgentSpec } from '~/threads/types';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
@@ -333,7 +334,11 @@ describe('Task Management Workflow Integration', () => {
               title: 'Analyze security vulnerabilities',
               prompt: 'Review codebase for common security issues and provide recommendations',
               priority: 'high',
-              assignedTo: `new:${providerInstanceId}/claude-3-5-haiku-20241022`,
+              assignedTo: createNewAgentSpec(
+                'lace',
+                providerInstanceId,
+                'claude-3-5-haiku-20241022'
+              ),
             },
           ],
         },
@@ -358,7 +363,7 @@ describe('Task Management Workflow Integration', () => {
       const reassignResult = await taskUpdateTool.execute(
         {
           taskId: validDelegateTaskId,
-          assignTo: `new:${providerInstanceId}/claude-3-5-haiku-20241022`,
+          assignTo: createNewAgentSpec('lace', providerInstanceId, 'claude-3-5-haiku-20241022'),
           status: 'in_progress',
         },
         context
@@ -508,7 +513,11 @@ describe('Task Management Workflow Integration', () => {
               title: 'High priority task',
               prompt: 'This is high priority',
               priority: 'high',
-              assignedTo: `new:${providerInstanceId}/claude-3-5-haiku-20241022`,
+              assignedTo: createNewAgentSpec(
+                'lace',
+                providerInstanceId,
+                'claude-3-5-haiku-20241022'
+              ),
             },
           ],
         },
