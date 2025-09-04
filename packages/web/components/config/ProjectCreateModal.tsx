@@ -97,7 +97,7 @@ export function ProjectCreateModal({
     setCreateName('');
     setCreateDescription('');
     setCreateWorkingDirectory('');
-    setCreateConfig(DEFAULT_PROJECT_CONFIG);
+    setCreateConfig({ ...DEFAULT_PROJECT_CONFIG });
     setUserEditedName(false);
     setShowDirHelp(false);
     setShowProviderHelp(false);
@@ -393,7 +393,7 @@ export function ProjectCreateModal({
                   <button
                     type="button"
                     className="btn btn-link text-base-content/70 no-underline"
-                    onClick={() => setCreateStep(createStep - 1)}
+                    onClick={() => setCreateStep((s) => Math.max(1, s - 1))}
                     data-testid="project-wizard-back-button"
                   >
                     Back
@@ -415,7 +415,7 @@ export function ProjectCreateModal({
                   {createStep > 1 && createStep < 4 && (
                     <AccentButton
                       type="button"
-                      onClick={() => setCreateStep(createStep + 1)}
+                      onClick={() => setCreateStep((s) => s + 1)}
                       disabled={
                         (createStep === 2 &&
                           !(

@@ -19,6 +19,7 @@ export function useAvailableTools() {
     let isCancelled = false;
 
     const loadTools = async () => {
+      setLoading(true);
       try {
         setError(null);
         // Get available tools from any existing project's configuration
@@ -33,11 +34,16 @@ export function useAvailableTools() {
               if (isStringArray(toolsFromConfig)) {
                 setAvailableTools(toolsFromConfig);
               } else {
-                console.warn('Invalid availableTools format:', toolsFromConfig);
+                console.warn(
+                  'Invalid availableTools format - expected string array, got:',
+                  typeof toolsFromConfig,
+                  'length:',
+                  Array.isArray(toolsFromConfig) ? toolsFromConfig.length : 'N/A'
+                );
                 setAvailableTools([]);
               }
             } else {
-              console.warn('Configuration missing availableTools:', config);
+              console.warn('Configuration missing availableTools field');
               setAvailableTools([]);
             }
           }
