@@ -3,8 +3,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { getLaceDir } from '~/config/lace-dir';
-import { resolveResourcePath } from '~/utils/resource-resolver';
 
 export interface PersonaInfo {
   name: string;
@@ -132,7 +132,8 @@ export class PersonaRegistry {
   }
 }
 
-// Singleton instance
-export const personaRegistry = new PersonaRegistry(
-  resolveResourcePath(import.meta.url, 'agent-personas')
-);
+// Singleton instance - resolve to config/agent-personas relative to this file
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const bundledPersonasPath = path.resolve(currentDir, '../../config/agent-personas');
+
+export const personaRegistry = new PersonaRegistry(bundledPersonasPath);
