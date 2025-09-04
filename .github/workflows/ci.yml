@@ -337,7 +337,7 @@ jobs:
           
           # Copy final signed DMG to appcast directory with correct name (using same timestamp)
           export BUILD_TIMESTAMP=$BUILD_TIMESTAMP
-          VERSION_INFO=$(bun -e "import('./scripts/create-dmg.ts').then(m => console.log(m.getVersionInfo().fullVersion))")
+          VERSION_INFO=$(bun -e "import('./scripts/create-dmg.ts').then(m => { const info = m.getVersionInfo(); process.stdout.write(info.fullVersion); })")
           cp "$DMG_FILE" "build/appcast/$CHANNEL/Lace-$VERSION_INFO.dmg"
           
           # Generate appcast using Sparkle tools
