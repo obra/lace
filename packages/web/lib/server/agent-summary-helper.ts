@@ -2,23 +2,8 @@
 // ABOUTME: Called after user messages to create real-time activity summaries
 
 import { SessionHelper } from '@/lib/server/lace-imports';
-import { logger } from '~/utils/logger';
 import type { Agent } from '@/lib/server/lace-imports';
 import type { LaceEvent } from '@/types/core';
-
-class AgentSummaryError extends Error {
-  public readonly code: string;
-  public readonly agentId: string;
-  public readonly cause?: Error;
-
-  constructor(message: string, context: { agentId: string; code: string; cause?: unknown }) {
-    super(message);
-    this.name = 'AgentSummaryError';
-    this.code = context.code;
-    this.agentId = context.agentId;
-    this.cause = context.cause instanceof Error ? context.cause : undefined;
-  }
-}
 
 /**
  * Generate a one-sentence summary of what the agent is currently working on
@@ -52,46 +37,16 @@ ${context}`;
 
     const result = await helper.execute(prompt);
 
-    if (result.content && result.content.trim()) {
+    if (result?.content && typeof result.content === 'string' && result.content.trim()) {
       return result.content.trim();
     } else {
-      const agentId = getAgentId(agent);
-      throw new AgentSummaryError('No summary content returned from helper', {
-        agentId,
-        code: 'NO_CONTENT',
-      });
+      throw new Error('No summary content returned from helper');
     }
   } catch (error) {
-    const agentId = getAgentId(agent);
-
-    if (error instanceof AgentSummaryError) {
-      // Already structured, just log and re-throw
-      logger.error('Agent summary helper error', {
-        agentId: error.agentId,
-        code: error.code,
-        message: error.message,
-        stack: error.stack,
-        cause: error.cause?.message,
-      });
+    if (error instanceof Error && error.message.includes('No summary content')) {
       throw error;
     }
-
-    // Wrap other errors in structured format
-    const wrappedError = new AgentSummaryError('Agent summary helper execution failed', {
-      agentId,
-      code: 'EXECUTION_FAILED',
-      cause: error,
-    });
-
-    logger.error('Agent summary helper error', {
-      agentId: wrappedError.agentId,
-      code: wrappedError.code,
-      message: wrappedError.message,
-      stack: wrappedError.stack,
-      cause: wrappedError.cause?.message,
-    });
-
-    throw wrappedError;
+    throw new Error('Agent summary helper execution failed');
   }
 }
 
@@ -113,19 +68,4 @@ export function getLastAgentResponse(events: LaceEvent[]): string | undefined {
     }
   }
   return undefined;
-}
-
-/**
- * Helper to safely get agent ID
- */
-function getAgentId(agent: Agent): string {
-  try {
-    // Try to get the thread ID from agent
-    if (agent && typeof agent === 'object' && 'threadId' in agent) {
-      return String(agent.threadId);
-    }
-    return 'unknown';
-  } catch {
-    return 'unknown';
-  }
 }

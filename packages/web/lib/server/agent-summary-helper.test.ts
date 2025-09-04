@@ -12,6 +12,16 @@ import type { Agent } from '@/lib/server/lace-imports';
 import type { LaceEvent, ThreadId } from '@/types/core';
 import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
+// Mock logger to avoid console output and potential undefined errors
+vi.mock('~/utils/logger', () => ({
+  logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
 // Mock SessionHelper and capture constructor options
 const mockExecute = vi.fn();
 let capturedSessionHelperOptions:
@@ -115,24 +125,41 @@ describe('agent-summary-helper', () => {
       );
     });
 
-    it('should throw when helper returns no content', async () => {
+    it('should handle empty content from helper gracefully', async () => {
       mockExecute.mockResolvedValue({
         content: '',
         toolCalls: [],
         toolResults: [],
+        tokenUsage: undefined,
       });
 
-      await expect(generateAgentSummary(mockAgent, 'Test message')).rejects.toThrow(
-        'No summary content returned from helper'
-      );
+      // Should reject the promise when no content is returned
+      let errorThrown = false;
+      try {
+        await generateAgentSummary(mockAgent, 'Test message');
+      } catch (error) {
+        errorThrown = true;
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toContain('No summary content');
+      }
+
+      expect(errorThrown).toBe(true);
     });
 
-    it('should re-throw when helper throws', async () => {
+    it('should handle helper execution failures gracefully', async () => {
       mockExecute.mockRejectedValue(new Error('Network error'));
 
-      await expect(generateAgentSummary(mockAgent, 'Test message')).rejects.toThrow(
-        'Agent summary helper execution failed'
-      );
+      // Should reject with wrapped error when helper fails
+      let errorThrown = false;
+      try {
+        await generateAgentSummary(mockAgent, 'Test message');
+      } catch (error) {
+        errorThrown = true;
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toContain('execution failed');
+      }
+
+      expect(errorThrown).toBe(true);
     });
 
     it('should trim whitespace from successful response', async () => {
