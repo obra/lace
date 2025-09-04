@@ -3,7 +3,11 @@
 
 import { useState, useEffect } from 'react';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
-import type { ConfigurationResponse } from '@/types/api';
+
+// Type guard to check if value is a string array
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item): item is string => typeof item === 'string');
+}
 
 export function useAvailableTools() {
   const [availableTools, setAvailableTools] = useState<string[]>([]);
@@ -15,6 +19,7 @@ export function useAvailableTools() {
     let isCancelled = false;
 
     const loadTools = async () => {
+      setLoading(true);
       try {
         setError(null);
         // Get available tools from any existing project's configuration
@@ -22,8 +27,25 @@ export function useAvailableTools() {
           const config = await loadProjectConfiguration(projects[0].id);
 
           if (!isCancelled) {
-            const configResponse = config as ConfigurationResponse['configuration'];
-            setAvailableTools(configResponse.availableTools ?? []);
+            // Defensive type validation
+            if (config && typeof config === 'object' && 'availableTools' in config) {
+              const configObj = config as Record<string, unknown>;
+              const toolsFromConfig = configObj.availableTools;
+              if (isStringArray(toolsFromConfig)) {
+                setAvailableTools(toolsFromConfig);
+              } else {
+                console.warn(
+                  'Invalid availableTools format - expected string array, got:',
+                  typeof toolsFromConfig,
+                  'length:',
+                  Array.isArray(toolsFromConfig) ? toolsFromConfig.length : 'N/A'
+                );
+                setAvailableTools([]);
+              }
+            } else {
+              console.warn('Configuration missing availableTools field');
+              setAvailableTools([]);
+            }
           }
         } else {
           if (!isCancelled) {

@@ -24,7 +24,7 @@ interface SessionCreateModalProps {
   sessionDescription: string;
   loading: boolean;
   onClose: () => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: (e: React.FormEvent) => Promise<void>;
   onSessionNameChange: (name: string) => void;
   onSessionDescriptionChange: (description: string) => void;
   onSessionConfigChange: (config: SessionConfiguration) => void;
@@ -91,22 +91,27 @@ export const SessionCreateModal = memo(function SessionCreateModal({
 
     try {
       await onSubmit(e);
-    } catch (error) {
-      // Extract meaningful error message
+    } catch (err) {
       let errorMessage = 'Failed to create session';
-
-      if (error && typeof error === 'object') {
-        // Check for API error response structure
-        if ('json' in error && error.json && typeof error.json === 'object') {
-          const json = error.json as Record<string, unknown>;
-          if ('message' in json && typeof json.message === 'string') {
-            errorMessage = json.message;
+      if (err instanceof Response) {
+        try {
+          const data = (await err.json()) as unknown;
+          if (
+            data &&
+            typeof data === 'object' &&
+            'message' in data &&
+            typeof (data as Record<string, unknown>).message === 'string'
+          ) {
+            errorMessage = (data as { message: string }).message;
+          } else {
+            errorMessage = `${err.status} ${err.statusText}`;
           }
-        } else if ('message' in error && typeof error.message === 'string') {
-          errorMessage = error.message;
+        } catch {
+          errorMessage = `${err.status} ${err.statusText}`;
         }
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
       }
-
       setError(errorMessage);
     } finally {
       setIsSubmitting(false);
