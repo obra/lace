@@ -20,7 +20,7 @@ export default function ProjectSessionAgent() {
   const { projectId, sessionId, agentId } = useParams();
 
   return (
-    <UIProvider>
+    <UIProvider key={`${projectId}-${sessionId}-${agentId}`}>
       <ProjectProvider
         selectedProject={projectId!}
         onProjectSelect={noOpCallback}
@@ -34,6 +34,7 @@ export default function ProjectSessionAgent() {
           >
             <ToolApprovalProvider agentId={agentId! as ThreadId}>
               <EventStreamProvider
+                key={agentId}
                 projectId={projectId!}
                 sessionId={sessionId! as ThreadId}
                 agentId={agentId! as ThreadId}
@@ -45,6 +46,7 @@ export default function ProjectSessionAgent() {
                 >
                   <ScrollProvider>
                     <AgentPageContent
+                      key={agentId}
                       projectId={projectId!}
                       sessionId={sessionId!}
                       agentId={agentId!}

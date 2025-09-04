@@ -205,7 +205,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
 
         {/* Chat Interface */}
         <div className="flex-1 flex flex-col min-h-0 text-base-content bg-base-100/30 backdrop-blur-sm">
-          <Chat />
+          <Chat key={agentId} />
         </div>
       </motion.div>
 
