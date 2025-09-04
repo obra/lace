@@ -1,6 +1,7 @@
 # 🎯 Lace Features Demo Guide
 
-This guide shows you how to explore all the implemented features in the Lace web interface.
+This guide shows you how to explore all the implemented features in the Lace web
+interface.
 
 ## 🚀 Getting Started
 
@@ -27,7 +28,8 @@ This guide shows you how to explore all the implemented features in the Lace web
 - **Access**: Click on **"Tennis Commentary Demo"** in the sidebar
 - **What You'll See**:
   - Engaging sports-style commentary on development activities
-  - Sample messages like _"And here we see the agent entering deep thought mode!"_
+  - Sample messages like _"And here we see the agent entering deep thought
+    mode!"_
   - Performance insights and tool execution commentary
   - Turn-based commentary for conversation flow
 
@@ -71,23 +73,32 @@ This guide shows you how to explore all the implemented features in the Lace web
 
 When you visit the **"Tennis Commentary Demo"** timeline, you'll see:
 
-- **Tool Execution**: _"A powerful file-read execution is underway - precision is key here!"_
-- **Success Messages**: _"Excellent execution! The bash tool delivered exactly what was needed."_
-- **Turn Commentary**: _"What a magnificent turn! The agent has delivered exceptional results."_
-- **Performance Insights**: _"Beautiful work! The FileDiffViewer operation was executed with precision."_
+- **Tool Execution**: _"A powerful file-read execution is underway - precision
+  is key here!"_
+- **Success Messages**: _"Excellent execution! The bash tool delivered exactly
+  what was needed."_
+- **Turn Commentary**: _"What a magnificent turn! The agent has delivered
+  exceptional results."_
+- **Performance Insights**: _"Beautiful work! The FileDiffViewer operation was
+  executed with precision."_
 
 ## 🔧 Technical Features
 
 ### Syntax Highlighting
 
-- **30+ Languages**: JavaScript, TypeScript, Python, Java, C++, Rust, Go, PHP, Ruby, Swift, Kotlin, HTML, CSS, SCSS, JSON, YAML, XML, Bash, PowerShell, SQL, Dockerfile, Markdown, and more
-- **Automatic Detection**: Language detection based on file extensions and content patterns
+- **30+ Languages**: JavaScript, TypeScript, Python, Java, C++, Rust, Go, PHP,
+  Ruby, Swift, Kotlin, HTML, CSS, SCSS, JSON, YAML, XML, Bash, PowerShell, SQL,
+  Dockerfile, Markdown, and more
+- **Automatic Detection**: Language detection based on file extensions and
+  content patterns
 - **Theme Support**: GitHub Light/Dark, Visual Studio, Monokai themes
-- **Performance Optimized**: Caching, lazy loading, and chunked processing for large files
+- **Performance Optimized**: Caching, lazy loading, and chunked processing for
+  large files
 
 ### Monospace Typography
 
-- **Font Stack**: ui-monospace, Google Code Sans, JetBrains Mono, Fira Code, SF Mono, SFMono-Regular, Monaco, Consolas, Liberation Mono, Menlo, Courier New
+- **Font Stack**: ui-monospace, Google Code Sans, JetBrains Mono, Fira Code, SF
+  Mono, SFMono-Regular, Monaco, Consolas, Liberation Mono, Menlo, Courier New
 - **Ligature Support**: Enhanced readability with programming ligatures
 - **Contexts**: Code blocks, inline code, terminal interfaces, file paths
 
@@ -99,19 +110,23 @@ When you visit the **"Tennis Commentary Demo"** timeline, you'll see:
 
 ## 📱 Navigation Tips
 
-1. **Sidebar Navigation**: Use the left sidebar to switch between different timelines
+1. **Sidebar Navigation**: Use the left sidebar to switch between different
+   timelines
 2. **Mobile Support**: Fully responsive interface works on mobile devices
-3. **Theme Support**: Multiple DaisyUI themes available (dark, light, cupcake, synthwave, etc.)
+3. **Theme Support**: Multiple DaisyUI themes available (dark, light, cupcake,
+   synthwave, etc.)
 4. **Component Testing**: Visit `/admin/design` to explore all built components
 
 ## 🎯 What to Look For
 
-1. **Code Blocks**: Look for syntax-highlighted TypeScript, JavaScript, and other code
+1. **Code Blocks**: Look for syntax-highlighted TypeScript, JavaScript, and
+   other code
 2. **Inline Code**: Notice syntax highlighting in inline code snippets
 3. **Monospace Fonts**: Consistent monospace typography in code contexts
 4. **Tennis Commentary**: Engaging, sports-style development feedback
 5. **Responsive Design**: Try resizing your browser window
-6. **Interactive Elements**: Click through different timelines to see varied content
+6. **Interactive Elements**: Click through different timelines to see varied
+   content
 
 ## 🛠️ Behind the Scenes
 
@@ -142,4 +157,6 @@ If you encounter any issues:
 
 ## 🎉 Enjoy Exploring!
 
-The Lace web interface showcases modern web development practices with a focus on developer experience, performance, and accessibility. Enjoy exploring all the features we've built!
+The Lace web interface showcases modern web development practices with a focus
+on developer experience, performance, and accessibility. Enjoy exploring all the
+features we've built!

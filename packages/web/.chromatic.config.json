@@ -6,12 +6,8 @@
   "exitOnceUploaded": true,
   "allowConsoleErrors": true,
   "ignoreLastBuildOnBranch": "main",
-  "skip": [
-    "dependabot/**"
-  ],
-  "externals": [
-    "public/**"
-  ],
+  "skip": ["dependabot/**"],
+  "externals": ["public/**"],
   "fileHashing": true,
   "zip": true,
   "diagnostics": true,

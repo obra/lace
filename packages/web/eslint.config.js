@@ -27,8 +27,14 @@ const config = [
   },
 
   {
-    ignores: ['.next/**/*', 'node_modules/**/*', 'stories_parked/**/*', 'temp/**/*',    '.react-router/**/*',  'build/**/*'
-],
+    ignores: [
+      '.next/**/*',
+      'node_modules/**/*',
+      'stories_parked/**/*',
+      'temp/**/*',
+      '.react-router/**/*',
+      'build/**/*',
+    ],
   },
   // Remove Next.js configuration - using React Router v7 now
   // Extend selected rules from root config
@@ -43,30 +49,45 @@ const config = [
     plugins: {
       'no-relative-import-paths': noRelativeImportPaths,
       '@typescript-eslint': tseslint,
-      'import': importPlugin,
+      import: importPlugin,
     },
     rules: {
       // Override Next.js defaults with project standards
       'no-console': ['error', { allow: ['warn', 'error'] }],
       'no-relative-import-paths/no-relative-import-paths': [
         'error',
-        { allowSameFolder: true, rootDir: '.', prefix: '@' }
+        { allowSameFolder: true, rootDir: '.', prefix: '@' },
       ],
-      'no-restricted-imports': ['error', {
-        patterns: [
-          {
-            group: ['../*'],
-            message: 'Use @ alias instead of relative parent imports'
-          }
-        ]
-      }],
-      'no-restricted-globals': ['error', {
-        name: 'fetch',
-        message: 'Use api.get/post/put/delete from @/lib/api-client instead of direct fetch() to ensure proper error handling'
-      }],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['../*'],
+              message: 'Use @ alias instead of relative parent imports',
+            },
+          ],
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'fetch',
+          message:
+            'Use api.get/post/put/delete from @/lib/api-client instead of direct fetch() to ensure proper error handling',
+        },
+      ],
       'no-var': 'error',
       // Add TypeScript ESLint rules from root config
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unsafe-assignment': 'error',

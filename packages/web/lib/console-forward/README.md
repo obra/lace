@@ -1,10 +1,15 @@
 # Browser Console Forwarding for Next.js Development
 
-This system forwards browser console messages (`console.log`, `console.error`, etc.) to your development server terminal for easier debugging during Next.js development.
+This system forwards browser console messages (`console.log`, `console.error`,
+etc.) to your development server terminal for easier debugging during Next.js
+development.
 
 ## Inspiration
 
-Inspired by [mitsuhiko/vite-console-forward-plugin](https://github.com/mitsuhiko/vite-console-forward-plugin) - a similar solution for Vite projects. We adapted the concept for Next.js using API routes and React components.
+Inspired by
+[mitsuhiko/vite-console-forward-plugin](https://github.com/mitsuhiko/vite-console-forward-plugin) -
+a similar solution for Vite projects. We adapted the concept for Next.js using
+API routes and React components.
 
 ## How It Works
 
@@ -12,8 +17,10 @@ The system consists of three main components:
 
 ### 1. Client-Side Console Patching (`client.ts`)
 
-- Patches browser console methods (`console.log`, `console.warn`, etc.) to capture all calls
-- Uses SuperJSON for robust serialization including circular references and complex objects
+- Patches browser console methods (`console.log`, `console.warn`, etc.) to
+  capture all calls
+- Uses SuperJSON for robust serialization including circular references and
+  complex objects
 - Buffers console messages and sends them in batches to reduce network overhead
 - Fails gracefully if the server is unavailable
 
@@ -32,7 +39,8 @@ The system consists of three main components:
 
 ## Usage
 
-The system is automatically active in development mode - no configuration needed!
+The system is automatically active in development mode - no configuration
+needed!
 
 ### Basic Usage
 

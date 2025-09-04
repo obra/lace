@@ -73,7 +73,7 @@ const config = {
         light: {
           ...require('daisyui')['light'],
           '--agent-claude': '251 146 60',
-          '--agent-gpt4': '34 197 94', 
+          '--agent-gpt4': '34 197 94',
           '--agent-gemini': '59 130 246',
           '--user-primary': '20 184 166',
         },
@@ -97,7 +97,7 @@ const config = {
           warning: '#f59e0b',
           error: '#ef4444',
           '--agent-claude': '251 146 60',
-          '--agent-gpt4': '34 197 94', 
+          '--agent-gpt4': '34 197 94',
           '--agent-gemini': '59 130 246',
           '--user-primary': '20 184 166',
         },
