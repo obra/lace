@@ -4,6 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { getLaceDir } from '~/config/lace-dir';
+import { resolveResourcePath } from '~/utils/resource-resolver';
 
 export interface PersonaInfo {
   name: string;
@@ -133,5 +134,5 @@ export class PersonaRegistry {
 
 // Singleton instance
 export const personaRegistry = new PersonaRegistry(
-  path.resolve(__dirname, '../../config/agent-personas')
+  resolveResourcePath(import.meta.url, 'agent-personas')
 );

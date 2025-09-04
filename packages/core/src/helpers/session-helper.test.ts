@@ -315,5 +315,92 @@ describe('SessionHelper', () => {
       await expect(helper.execute('Test abort', abortController.signal))
         .rejects.toThrow('Helper execution aborted');
     });
+
+    it('should reveal what SessionHelper actually sends to AI provider', async () => {
+      const helper = new SessionHelper({
+        model: 'fast',
+        parentAgent: mockAgent
+      });
+
+      // Spy on the provider's createResponse to see exactly what gets sent
+      const createResponseSpy = vi.spyOn(mockProvider, 'createResponse');
+      
+      mockProvider.addMockResponse({
+        content: 'Test response',
+        toolCalls: []
+      });
+
+      const testPrompt = 'Generate a summary of this conversation';
+      await helper.execute(testPrompt);
+
+      // Verify createResponse was called
+      expect(createResponseSpy).toHaveBeenCalledTimes(1);
+      
+      const [conversation, tools, model] = createResponseSpy.mock.calls[0];
+      
+      // DEBUG: Print what's actually being sent
+      console.log('DEBUG: Conversation sent to AI provider:');
+      console.log(JSON.stringify(conversation, null, 2));
+      console.log('DEBUG: Conversation length:', conversation.length);
+      
+      // Let's verify what we actually got instead of asserting what we expected
+      expect(conversation).toBeInstanceOf(Array);
+      expect(conversation.length).toBeGreaterThan(0);
+      
+      // Check if there's a system message
+      const systemMessage = conversation.find(msg => msg.role === 'system');
+      if (systemMessage) {
+        console.log('DEBUG: System message found:');
+        console.log(JSON.stringify(systemMessage, null, 2));
+      } else {
+        console.log('DEBUG: No system message found');
+      }
+      
+      // Verify tools and model are passed through correctly
+      expect(tools).toEqual([testTool]);
+      expect(model).toBe('test-model');
+    });
+
+    it('should handle multi-turn conversations correctly', async () => {
+      const helper = new SessionHelper({
+        model: 'smart',
+        parentAgent: mockAgent
+      });
+
+      const createResponseSpy = vi.spyOn(mockProvider, 'createResponse');
+      
+      // Add a tool call response first
+      mockProvider.addMockResponse({
+        content: 'Using tool',
+        toolCalls: [{
+          id: 'call_1',
+          name: 'test_tool',
+          arguments: { input: 'test' }
+        }]
+      });
+      
+      // Then a final response
+      mockProvider.addMockResponse({
+        content: 'Done with tool',
+        toolCalls: []
+      });
+
+      // Execute a prompt that would normally get a system prompt from Agent class
+      await helper.execute('You are a helpful assistant. Summarize this conversation.');
+
+      // Should have been called twice (once for initial, once after tool call)
+      expect(createResponseSpy).toHaveBeenCalledTimes(2);
+      
+      // Check the first call
+      const [firstConversation] = createResponseSpy.mock.calls[0];
+      console.log('DEBUG: First conversation call:', JSON.stringify(firstConversation, null, 2));
+      
+      // Check the second call (after tool execution)
+      const [secondConversation] = createResponseSpy.mock.calls[1];
+      console.log('DEBUG: Second conversation call:', JSON.stringify(secondConversation, null, 2));
+      
+      expect(firstConversation.length).toBeGreaterThan(0);
+      expect(secondConversation.length).toBeGreaterThan(firstConversation.length);
+    });
   });
 });

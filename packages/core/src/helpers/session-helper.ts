@@ -21,6 +21,9 @@ export interface SessionHelperOptions {
 
   /** Optional abort signal for cancellation */
   abortSignal?: AbortSignal;
+
+  /** Optional persona to use - defaults to 'lace' */
+  persona?: string;
 }
 
 /**
