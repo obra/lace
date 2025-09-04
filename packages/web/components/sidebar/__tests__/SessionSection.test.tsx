@@ -12,6 +12,7 @@ import '@testing-library/jest-dom/vitest';
 import { SessionSection } from '@/components/sidebar/SessionSection';
 import type { SessionInfo, ThreadId, AgentInfo } from '@/types/core';
 import { createMockAgentContext, createMockProjectContext } from '@/__tests__/utils/provider-mocks';
+import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
 // Mock the providers
 vi.mock('@/components/providers/AgentProvider', () => ({
@@ -40,13 +41,14 @@ const createMockAgent = (
   id: string,
   name: string,
   status: AgentInfo['status'] = 'idle'
-): AgentInfo => ({
-  threadId: id as ThreadId,
-  name,
-  providerInstanceId: 'test-provider',
-  modelId: 'test-model',
-  status,
-});
+): AgentInfo =>
+  createMockAgentInfo({
+    threadId: id as ThreadId,
+    name,
+    providerInstanceId: 'test-provider',
+    modelId: 'test-model',
+    status,
+  });
 
 const createMockSessionDetails = (agents: AgentInfo[]): SessionInfo => ({
   id: 'test-session' as ThreadId,

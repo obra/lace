@@ -5,6 +5,7 @@ import { renderHook, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SessionInfo, ThreadId } from '@/types/core';
 import { useSessionManagement } from './useSessionManagement';
+import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -24,13 +25,13 @@ const mockSessions: SessionInfo[] = [
     name: 'Test Session 1',
     createdAt: new Date('2024-01-01'),
     agents: [
-      {
+      createMockAgentInfo({
         threadId: 'agent-1' as ThreadId,
         name: 'Agent 1',
         modelId: 'claude-3-5-haiku',
         status: 'idle',
         providerInstanceId: 'provider-1',
-      },
+      }),
     ],
   },
   {

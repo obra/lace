@@ -13,6 +13,7 @@ import { Chat } from '@/components/chat/Chat';
 import { ScrollProvider } from '@/components/providers/ScrollProvider';
 import type { ThreadId, AgentInfo, LaceEvent } from '@/types/core';
 import { createMockAgentContext } from '@/__tests__/utils/provider-mocks';
+import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
 // Use vi.hoisted to ensure mock functions are available during hoisting
 const mockTimelineView = vi.hoisted(() => {
@@ -107,13 +108,14 @@ const mockUseCompactionState = vi.mocked(useCompactionState);
 const mockUseAgentContext = vi.mocked(useAgentContext);
 
 // Test data factories
-const createMockAgent = (id: string, name: string): AgentInfo => ({
-  threadId: id as ThreadId,
-  name,
-  providerInstanceId: 'test-provider',
-  modelId: 'test-model',
-  status: 'idle',
-});
+const createMockAgent = (id: string, name: string): AgentInfo =>
+  createMockAgentInfo({
+    threadId: id as ThreadId,
+    name,
+    providerInstanceId: 'test-provider',
+    modelId: 'test-model',
+    status: 'idle',
+  });
 
 const createMockEvent = (id: string): LaceEvent => ({
   id,

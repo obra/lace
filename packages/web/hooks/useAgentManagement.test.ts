@@ -13,6 +13,7 @@ import {
   type MockedFunction,
 } from 'vitest';
 import type { SessionInfo, ThreadId } from '@/types/core';
+import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 import { useAgentManagement } from './useAgentManagement';
 
 // Mock fetch globally using Vitest's stubbing API
@@ -39,20 +40,20 @@ const mockSessionWithAgents: SessionInfo = {
   name: 'Test Session',
   createdAt: new Date('2024-01-01'),
   agents: [
-    {
+    createMockAgentInfo({
       threadId: 'agent-1' as ThreadId,
       name: 'Agent 1',
       modelId: 'claude-3-5-haiku',
       status: 'idle',
       providerInstanceId: 'provider-1',
-    },
-    {
+    }),
+    createMockAgentInfo({
       threadId: 'agent-2' as ThreadId,
       name: 'Agent 2',
       modelId: 'claude-3-5-sonnet',
       status: 'thinking',
       providerInstanceId: 'provider-2',
-    },
+    }),
   ],
 };
 
@@ -126,7 +127,10 @@ describe('useAgentManagement', () => {
     } as Response;
     const updatedSession = {
       ...mockSessionWithAgents,
-      agents: [...mockSessionWithAgents.agents!, { threadId: 'new-agent', name: 'New Agent' }],
+      agents: [
+        ...mockSessionWithAgents.agents!,
+        createMockAgentInfo({ threadId: 'new-agent' as ThreadId, name: 'New Agent' }),
+      ],
     };
     const mockUpdatedResponse = {
       ok: true,

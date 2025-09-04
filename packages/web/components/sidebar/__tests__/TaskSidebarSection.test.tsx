@@ -12,6 +12,7 @@ import '@testing-library/jest-dom/vitest';
 import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
 import { TaskProvider } from '@/components/providers/TaskProvider';
 import type { SessionInfo, ThreadId, Task, AgentInfo } from '@/types/core';
+import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 import { asAssigneeId } from '@/types/core';
 import {
   createMockSessionContext,
@@ -132,13 +133,14 @@ const createMockTask = (id: string, status: Task['status'] = 'pending'): Task =>
   createdBy: 'user',
 });
 
-const createMockAgent = (id: string, name: string): AgentInfo => ({
-  threadId: id as ThreadId,
-  name,
-  providerInstanceId: 'test-provider',
-  modelId: 'test-model',
-  status: 'idle',
-});
+const createMockAgent = (id: string, name: string): AgentInfo =>
+  createMockAgentInfo({
+    threadId: id as ThreadId,
+    name,
+    providerInstanceId: 'test-provider',
+    modelId: 'test-model',
+    status: 'idle',
+  });
 
 const createMockSessionDetails = (): SessionInfo => ({
   id: 'test-session' as ThreadId,

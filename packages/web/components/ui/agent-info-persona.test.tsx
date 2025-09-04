@@ -1,6 +1,8 @@
+import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { AgentInfo, ThreadId } from '@/types/core';
+import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
 // Mock AgentsSection component
 const AgentsSection = ({ agents }: { agents: AgentInfo[] }) => (
@@ -16,14 +18,14 @@ const AgentsSection = ({ agents }: { agents: AgentInfo[] }) => (
 );
 
 describe('Web UI Persona Integration', () => {
-  const mockAgent: AgentInfo = {
+  const mockAgent = createMockAgentInfo({
     threadId: 'lace_20250904_test01' as ThreadId,
     name: 'Test Agent',
     modelId: 'claude-3-sonnet',
     providerInstanceId: 'anthropic',
     status: 'idle',
     persona: 'coding-agent',
-  };
+  });
 
   describe('AgentInfo interface with personas', () => {
     it('includes persona field in AgentInfo type', () => {
@@ -59,9 +61,15 @@ describe('Web UI Persona Integration', () => {
 
     it('handles different persona types', () => {
       const agents: AgentInfo[] = [
-        { ...mockAgent, persona: 'lace' },
-        { ...mockAgent, threadId: 'lace_20250904_test02' as ThreadId, persona: 'coding-agent' },
-        { ...mockAgent, threadId: 'lace_20250904_test03' as ThreadId, persona: 'helper-agent' },
+        createMockAgentInfo({ persona: 'lace' }),
+        createMockAgentInfo({
+          threadId: 'lace_20250904_test02' as ThreadId,
+          persona: 'coding-agent',
+        }),
+        createMockAgentInfo({
+          threadId: 'lace_20250904_test03' as ThreadId,
+          persona: 'helper-agent',
+        }),
       ];
 
       render(<AgentsSection agents={agents} />);

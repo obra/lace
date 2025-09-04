@@ -7,6 +7,7 @@ import type { AgentContextType } from '@/components/providers/AgentProvider';
 import type { ProjectContextType } from '@/components/providers/ProjectProvider';
 import type { UseUIStateResult } from '@/hooks/useUIState';
 import type { ThreadId } from '@/types/core';
+import { createMockAgentInfo } from './agent-mocks';
 
 /**
  * Creates a mock SessionContextType with all required methods
@@ -162,13 +163,13 @@ export function createTestScenarios() {
           name: 'Test Session',
           createdAt: new Date(),
           agents: [
-            {
+            createMockAgentInfo({
               threadId: 'lace_20250801_test01.1' as ThreadId,
               name: 'Test Agent',
               providerInstanceId: 'test-provider',
               modelId: 'test-model',
               status: 'idle',
-            },
+            }),
           ],
         },
       ],
@@ -178,13 +179,13 @@ export function createTestScenarios() {
         name: 'Test Session',
         createdAt: new Date(),
         agents: [
-          {
+          createMockAgentInfo({
             threadId: 'lace_20250801_test01.1' as ThreadId,
             name: 'Test Agent',
             providerInstanceId: 'test-provider',
             modelId: 'test-model',
             status: 'idle',
-          },
+          }),
         ],
       },
     }),
@@ -196,23 +197,23 @@ export function createTestScenarios() {
         name: 'Test Session',
         createdAt: new Date(),
         agents: [
-          {
+          createMockAgentInfo({
             threadId: 'lace_20250801_test01.1' as ThreadId,
             name: 'Test Agent',
             providerInstanceId: 'test-provider',
             modelId: 'test-model',
             status: 'idle',
-          },
+          }),
         ],
       },
       selectedAgent: 'lace_20250801_test01.1' as ThreadId,
-      currentAgent: {
+      currentAgent: createMockAgentInfo({
         threadId: 'lace_20250801_test01.1' as ThreadId,
         name: 'Test Agent',
         providerInstanceId: 'test-provider',
         modelId: 'test-model',
         status: 'idle',
-      },
+      }),
     }),
 
     // Project with configuration

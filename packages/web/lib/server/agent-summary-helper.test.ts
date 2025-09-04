@@ -9,11 +9,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { generateAgentSummary, getLastAgentResponse } from './agent-summary-helper';
 import type { Agent } from '@/lib/server/lace-imports';
-import type { LaceEvent } from '@/types/core';
+import type { LaceEvent, ThreadId } from '@/types/core';
+import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
 // Mock SessionHelper and capture constructor options
 const mockExecute = vi.fn();
-let capturedSessionHelperOptions: any;
+let capturedSessionHelperOptions:
+  | { model: string; parentAgent: Agent; persona?: string }
+  | undefined;
 vi.mock('@/lib/server/lace-imports', () => ({
   SessionHelper: vi.fn().mockImplementation((options) => {
     capturedSessionHelperOptions = options;
@@ -29,9 +32,18 @@ describe('agent-summary-helper', () => {
   let _mockSessionHelper: { execute: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
+    // Use the centralized mock factory for consistent agent structure
+    const agentInfo = createMockAgentInfo({
+      threadId: 'test-agent-123' as ThreadId,
+      name: 'Test Agent',
+      persona: 'lace',
+    });
+
     mockAgent = {
-      threadId: 'test-agent-123',
-    } as Agent;
+      threadId: agentInfo.threadId,
+      getInfo: vi.fn().mockReturnValue(agentInfo),
+      toString: vi.fn().mockReturnValue('test-agent-123'),
+    } as unknown as Agent;
 
     _mockSessionHelper = { execute: mockExecute };
     vi.clearAllMocks();

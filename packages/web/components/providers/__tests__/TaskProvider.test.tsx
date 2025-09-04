@@ -11,6 +11,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { TaskProvider, useTaskContext } from '@/components/providers/TaskProvider';
 import type { Task, AgentInfo, ThreadId } from '@/types/core';
+import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
 // Only mock external API calls - let everything else use real implementation
 vi.mock('@/hooks/useTaskManager', () => ({
@@ -82,13 +83,14 @@ vi.mock('@/components/modals/TaskDisplayModal', () => ({
 }));
 
 // Test data factories
-const createMockAgent = (id: string, name: string): AgentInfo => ({
-  threadId: id as ThreadId,
-  name,
-  providerInstanceId: 'test-provider',
-  modelId: 'test-model',
-  status: 'idle',
-});
+const createMockAgent = (id: string, name: string): AgentInfo =>
+  createMockAgentInfo({
+    threadId: id as ThreadId,
+    name,
+    providerInstanceId: 'test-provider',
+    modelId: 'test-model',
+    status: 'idle',
+  });
 
 const createMockTask = (): Task => ({
   id: 'task-1',

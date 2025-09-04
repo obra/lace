@@ -14,7 +14,7 @@ interface UseAgentManagementResult {
   reloadSessionDetails: () => Promise<void>;
   loadAgentConfiguration: (
     agentId: string
-  ) => Promise<{ name: string; providerInstanceId: string; modelId: string }>;
+  ) => Promise<{ name: string; providerInstanceId: string; modelId: string; persona: string }>;
   updateAgent: (
     agentId: string,
     config: { name: string; providerInstanceId: string; modelId: string }
@@ -75,12 +75,13 @@ export function useAgentManagement(sessionId: string | null): UseAgentManagement
   const loadAgentConfiguration = useCallback(
     async (
       agentId: string
-    ): Promise<{ name: string; providerInstanceId: string; modelId: string }> => {
+    ): Promise<{ name: string; providerInstanceId: string; modelId: string; persona: string }> => {
       try {
         return await api.get<{
           name: string;
           providerInstanceId: string;
           modelId: string;
+          persona: string;
         }>(`/api/agents/${agentId}`);
       } catch (error) {
         console.error('Error loading agent configuration:', error);

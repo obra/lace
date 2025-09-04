@@ -3,6 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { SessionInfo, AgentInfo } from '@/types/core';
+import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
 // Test that all key types can be imported from current paths
 describe('Type Integrity - Current State', () => {
@@ -96,13 +97,13 @@ describe('Type Integrity - Current State', () => {
 
       // Test AgentInfo creation with proper ThreadId
       const agentThreadId = asThreadId('lace_20250731_abc123.1');
-      const agent: AgentInfo = {
+      const agent: AgentInfo = createMockAgentInfo({
         threadId: agentThreadId,
         name: 'Test Agent',
         providerInstanceId: 'anthropic-instance-1',
         modelId: 'claude-3-sonnet',
         status: 'idle',
-      };
+      });
 
       expect(agent.threadId).toBe(agentThreadId);
       expect(agent.name).toBe('Test Agent');

@@ -74,6 +74,7 @@ export function SessionConfigPanel(): React.JSX.Element {
     name: string;
     providerInstanceId: string;
     modelId: string;
+    persona: string;
   } | null>(null);
 
   // Session creation state
@@ -249,6 +250,7 @@ export function SessionConfigPanel(): React.JSX.Element {
           name: agentDetails.name,
           providerInstanceId: agentDetails.providerInstanceId,
           modelId: agentDetails.modelId,
+          persona: agentDetails.persona,
         });
         setShowEditAgent(true);
       } catch (error) {
