@@ -128,6 +128,7 @@ describe('Agent System Prompt Refresh', () => {
     await agent.initialize();
     expect(mockLoadPromptConfig).toHaveBeenCalledTimes(1);
     expect(mockLoadPromptConfig).toHaveBeenCalledWith({
+      persona: 'lace', // Default persona
       tools: [],
       session: expect.anything() as unknown, // Should have session context
       project: expect.anything() as unknown, // Should have project context
