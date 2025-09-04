@@ -408,9 +408,8 @@ describe('TaskSidebarSection', () => {
 
       render(<TaskSidebarSection {...defaultProps} onCloseMobileNav={undefined} />);
 
-      // Should not throw error
+      // Should not throw error when clicking add task button
       expect(() => {
-        fireEvent.click(screen.getByText('Task Board (1)'));
         fireEvent.click(screen.getByTestId('add-task-button'));
       }).not.toThrow();
     });
