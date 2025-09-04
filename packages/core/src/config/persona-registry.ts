@@ -24,10 +24,28 @@ export class PersonaRegistry {
 
   private loadBundledPersonas(): void {
     try {
-      const files = fs.readdirSync(this.bundledPersonasPath);
-      for (const file of files) {
-        if (file.endsWith('.md')) {
-          this.bundledPersonasCache.add(file.slice(0, -3)); // Remove .md extension
+      // Check embedded files first (production/bundled mode)
+      if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
+        for (const f of Bun.embeddedFiles) {
+          const fileName = (f as File).name;
+          if (
+            fileName.includes('/agent-personas/') &&
+            fileName.endsWith('.md') &&
+            !fileName.includes('/sections/')
+          ) {
+            const personaName = fileName.split('/').pop()?.slice(0, -3); // Remove .md extension
+            if (personaName) {
+              this.bundledPersonasCache.add(personaName);
+            }
+          }
+        }
+      } else {
+        // Fallback to file system (development mode)
+        const files = fs.readdirSync(this.bundledPersonasPath);
+        for (const file of files) {
+          if (file.endsWith('.md')) {
+            this.bundledPersonasCache.add(file.slice(0, -3)); // Remove .md extension
+          }
         }
       }
     } catch (error) {
@@ -43,7 +61,7 @@ export class PersonaRegistry {
     }
 
     this.userPersonasCache.clear();
-    
+
     try {
       const userPersonasPath = path.join(getLaceDir(), 'agent-personas');
       if (!fs.existsSync(userPersonasPath)) {
@@ -58,7 +76,7 @@ export class PersonaRegistry {
           this.userPersonasCache.set(name, path.join(userPersonasPath, file));
         }
       }
-      
+
       this.userCacheExpiry = now + this.USER_CACHE_TTL;
     } catch (error) {
       // User directory may not exist, that's ok
@@ -71,7 +89,7 @@ export class PersonaRegistry {
    */
   listAvailablePersonas(): PersonaInfo[] {
     this.loadUserPersonas();
-    
+
     const personas: PersonaInfo[] = [];
     const seen = new Set<string>();
 
@@ -102,18 +120,19 @@ export class PersonaRegistry {
 
   /**
    * Get path to a persona file (user overrides built-in)
+   * Note: For built-in personas, returns logical path - actual loading handled by TemplateEngine
    */
   getPersonaPath(name: string): string | null {
     this.loadUserPersonas();
-    
+
     // Check user personas first
     if (this.userPersonasCache.has(name)) {
       return this.userPersonasCache.get(name)!;
     }
 
-    // Check built-in personas
+    // Check built-in personas - return logical path
     if (this.bundledPersonasCache.has(name)) {
-      return path.join(this.bundledPersonasPath, `${name}.md`);
+      return `${name}.md`; // TemplateEngine will resolve this in bundled or file mode
     }
 
     return null;
@@ -124,10 +143,8 @@ export class PersonaRegistry {
    */
   validatePersona(name: string): void {
     if (!this.hasPersona(name)) {
-      const available = this.listAvailablePersonas().map(p => p.name);
-      throw new Error(
-        `Persona '${name}' not found. Available personas: ${available.join(', ')}`
-      );
+      const available = this.listAvailablePersonas().map((p) => p.name);
+      throw new Error(`Persona '${name}' not found. Available personas: ${available.join(', ')}`);
     }
   }
 }
