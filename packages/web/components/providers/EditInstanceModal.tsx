@@ -29,7 +29,7 @@ export function EditInstanceModal({
   onSuccess,
 }: EditInstanceModalProps) {
   const { updateInstance } = useProviderInstances();
-  const isMountedRef = useRef(true);
+  const isMountedRef = useRef(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +41,9 @@ export function EditInstanceModal({
     apiKey: '',
   });
 
-  // Cleanup to prevent state updates after unmount
+  // Track mount status for React 18 Strict Mode compatibility
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };

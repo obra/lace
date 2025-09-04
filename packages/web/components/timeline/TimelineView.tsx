@@ -39,14 +39,19 @@ export function TimelineView({
   // Generate unique instance ID to prevent key conflicts across multiple TimelineView instances
   const instanceId = useRef<string>(
     (() => {
-      if (typeof crypto !== 'undefined') {
-        if (typeof crypto.randomUUID === 'function') {
-          return `tl-${crypto.randomUUID()}`;
+      try {
+        if (typeof crypto !== 'undefined') {
+          if (typeof crypto.randomUUID === 'function') {
+            return `tl-${crypto.randomUUID()}`;
+          }
+          // Fallback to crypto.getRandomValues if available
+          const array = new Uint32Array(2);
+          crypto.getRandomValues(array);
+          return `tl-${array[0]}-${array[1]}`;
         }
-        // Fallback to crypto.getRandomValues if available
-        const array = new Uint32Array(2);
-        crypto.getRandomValues(array);
-        return `tl-${array[0]}-${array[1]}`;
+      } catch (error) {
+        // Fallback for crypto failures
+        return `tl-fallback-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       }
       return `tl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     })()
