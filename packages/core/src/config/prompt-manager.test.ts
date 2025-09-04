@@ -76,7 +76,7 @@ describe('PromptManager', () => {
   describe('template system availability', () => {
     it('should detect when template system is available', () => {
       // Create required template files
-      fs.writeFileSync(path.join(tempDir, 'system.md'), 'Test template');
+      fs.writeFileSync(path.join(tempDir, 'lace.md'), 'Test template');
 
       const manager = new PromptManager({ templateDirs: [tempDir] });
       expect(manager.isTemplateSystemAvailable()).toBe(true);
@@ -119,7 +119,7 @@ describe('PromptManager', () => {
     it('should generate prompt with all includes and variables', async () => {
       // Create main system template
       fs.writeFileSync(
-        path.join(tempDir, 'system.md'),
+        path.join(tempDir, 'lace.md'),
         '{{include:sections/agent-personality.md}}\n\n{{include:sections/environment.md}}\n\n{{include:sections/tools.md}}\n\n{{include:sections/guidelines.md}}\n\n{{context.disclaimer}}'
       );
 
@@ -142,7 +142,7 @@ describe('PromptManager', () => {
 
     it('should generate prompt without tools when none provided', async () => {
       fs.writeFileSync(
-        path.join(tempDir, 'system.md'),
+        path.join(tempDir, 'lace.md'),
         '{{include:sections/agent-personality.md}}\n\n{{#tools}}Tools available{{/tools}}{{^tools}}No tools available{{/tools}}'
       );
 
@@ -155,7 +155,7 @@ describe('PromptManager', () => {
 
     it('should handle missing include files gracefully', async () => {
       fs.writeFileSync(
-        path.join(tempDir, 'system.md'),
+        path.join(tempDir, 'lace.md'),
         '{{include:sections/agent-personality.md}}\n\n{{include:sections/missing.md}}\n\nEnd of prompt'
       );
 
@@ -168,7 +168,7 @@ describe('PromptManager', () => {
     });
 
     it('should return fallback prompt when template system fails', async () => {
-      // Don't create system.md template
+      // Don't create lace.md template
       const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
 
@@ -179,7 +179,7 @@ describe('PromptManager', () => {
 
     it('should handle template syntax errors with fallback', async () => {
       fs.writeFileSync(
-        path.join(tempDir, 'system.md'),
+        path.join(tempDir, 'lace.md'),
         'Valid start {{#broken}} {{/different}} Invalid syntax'
       );
 
@@ -195,7 +195,7 @@ describe('PromptManager', () => {
   describe('error handling', () => {
     it('should handle template directory permission errors', async () => {
       // Create template file then make directory unreadable
-      fs.writeFileSync(path.join(tempDir, 'system.md'), 'Test template');
+      fs.writeFileSync(path.join(tempDir, 'lace.md'), 'Test template');
       fs.chmodSync(tempDir, 0o000);
 
       try {
@@ -212,7 +212,7 @@ describe('PromptManager', () => {
 
     it('should handle variable provider errors gracefully', async () => {
       fs.writeFileSync(
-        path.join(tempDir, 'system.md'),
+        path.join(tempDir, 'lace.md'),
         'System: {{system.os}}\nProject: {{project.cwd}}'
       );
 
@@ -231,7 +231,7 @@ describe('PromptManager', () => {
     });
 
     it('should handle empty template file', async () => {
-      fs.writeFileSync(path.join(tempDir, 'system.md'), '');
+      fs.writeFileSync(path.join(tempDir, 'lace.md'), '');
 
       const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
@@ -240,7 +240,7 @@ describe('PromptManager', () => {
     });
 
     it('should handle template with only whitespace', async () => {
-      fs.writeFileSync(path.join(tempDir, 'system.md'), '   \n\t\r\n   ');
+      fs.writeFileSync(path.join(tempDir, 'lace.md'), '   \n\t\r\n   ');
 
       const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
@@ -271,7 +271,7 @@ describe('PromptManager', () => {
       );
 
       fs.writeFileSync(
-        path.join(tempDir, 'system.md'),
+        path.join(tempDir, 'lace.md'),
         '{{include:sections/header.md}}\n\n{{include:sections/environment.md}}\n\n{{include:sections/tools.md}}\n\n{{context.disclaimer}}'
       );
 
@@ -298,7 +298,7 @@ describe('PromptManager', () => {
     });
 
     it('should work with minimal template', async () => {
-      fs.writeFileSync(path.join(tempDir, 'system.md'), 'Hello {{name}}!');
+      fs.writeFileSync(path.join(tempDir, 'lace.md'), 'Hello {{name}}!');
 
       const manager = new PromptManager({ templateDirs: [tempDir] });
       const prompt = await manager.generateSystemPrompt();
@@ -318,14 +318,11 @@ describe('PromptManager', () => {
 
       // Create different templates in each directory
       fs.writeFileSync(
-        path.join(userTemplateDir, 'system.md'),
+        path.join(userTemplateDir, 'lace.md'),
         'Custom user template: {{system.os}}'
       );
 
-      fs.writeFileSync(
-        path.join(defaultTemplateDir, 'system.md'),
-        'Default template: {{system.os}}'
-      );
+      fs.writeFileSync(path.join(defaultTemplateDir, 'lace.md'), 'Default template: {{system.os}}');
 
       // User template should take precedence
       const manager = new PromptManager({ templateDirs: [userTemplateDir, defaultTemplateDir] });
@@ -344,7 +341,7 @@ describe('PromptManager', () => {
 
       // Only create template in default directory
       fs.writeFileSync(
-        path.join(defaultTemplateDir, 'system.md'),
+        path.join(defaultTemplateDir, 'lace.md'),
         'Default fallback template: {{system.os}}'
       );
 
@@ -378,7 +375,7 @@ describe('PromptManager', () => {
 
       // System template uses both includes
       fs.writeFileSync(
-        path.join(userTemplateDir, 'system.md'),
+        path.join(userTemplateDir, 'lace.md'),
         '{{include:sections/agent-personality.md}}\n\n{{include:sections/environment.md}}'
       );
 
