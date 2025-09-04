@@ -5,7 +5,6 @@
 
 import React from 'react';
 import type { Task } from '@/types/core';
-import { getStatusBgColor } from '@/lib/task-status-ui';
 
 interface TaskSidebarItemProps {
   task: Task;
@@ -57,15 +56,6 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
               {getAssignmentText(task.assignedTo)}
             </div>
           )}
-        </div>
-
-        {/* Status Indicator */}
-        <div className="flex items-center justify-center">
-          <div
-            className={`w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-200 ${getStatusBgColor(task.status)}`}
-            role="presentation"
-            aria-label={`Status: ${task.status.replace('_', ' ')}`}
-          />
         </div>
       </div>
     </div>
