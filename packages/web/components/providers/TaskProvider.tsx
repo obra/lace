@@ -9,6 +9,7 @@ import { useTaskHandlers } from '@/hooks/useTaskHandlers';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import { TaskCreationModal } from '@/components/modals/TaskCreationModal';
 import { TaskDisplayModal } from '@/components/modals/TaskDisplayModal';
+import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
 import type { Task, AgentInfo } from '@/types/core';
 
 // Task context interface
@@ -53,10 +54,12 @@ interface TaskProviderProps {
   children: ReactNode;
   projectId: string | null;
   sessionId: string | null;
-  agents?: AgentInfo[];
 }
 
-export function TaskProvider({ children, projectId, sessionId, agents = [] }: TaskProviderProps) {
+export function TaskProvider({ children, projectId, sessionId }: TaskProviderProps) {
+  // Get agents from AgentProvider context instead of props
+  const agentContext = useOptionalAgentContext();
+  const agents: AgentInfo[] = agentContext?.sessionDetails?.agents ?? [];
   // Task modal states
   const [showTaskBoardModal, setShowTaskBoardModal] = useState(false);
   const [showTaskCreationModal, setShowTaskCreationModal] = useState(false);

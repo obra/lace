@@ -34,17 +34,15 @@ export default function ProjectSessionAgent() {
           >
             <ToolApprovalProvider agentId={agentId! as ThreadId}>
               <EventStreamProvider
+                key={agentId}
                 projectId={projectId!}
                 sessionId={sessionId! as ThreadId}
                 agentId={agentId! as ThreadId}
               >
-                <TaskProvider
-                  projectId={projectId!}
-                  sessionId={sessionId! as ThreadId}
-                  agents={[]} // Will be populated by AgentProvider
-                >
+                <TaskProvider projectId={projectId!} sessionId={sessionId! as ThreadId}>
                   <ScrollProvider>
                     <AgentPageContent
+                      key={agentId}
                       projectId={projectId!}
                       sessionId={sessionId!}
                       agentId={agentId!}

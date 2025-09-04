@@ -3,7 +3,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { LaceEvent, AgentInfo, ThreadId } from '@/types/core';
 import type { CompactionState } from '@/components/providers/EventStreamProvider';
@@ -34,6 +34,27 @@ export function TimelineView({
   selectedAgent,
   compactionState,
 }: TimelineViewProps) {
+  // Generate unique instance ID to prevent key conflicts across multiple TimelineView instances
+  const instanceId = useRef<string>(
+    (() => {
+      try {
+        if (typeof crypto !== 'undefined') {
+          if (typeof crypto.randomUUID === 'function') {
+            return `tl-${crypto.randomUUID()}`;
+          }
+          // Fallback to crypto.getRandomValues if available
+          const array = new Uint32Array(2);
+          crypto.getRandomValues(array);
+          return `tl-${array[0]}-${array[1]}`;
+        }
+      } catch (error) {
+        // Fallback for crypto failures
+        return `tl-fallback-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      }
+      return `tl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    })()
+  );
+
   // Process events (filtering, aggregation, etc.)
   const processedEvents = useProcessedEvents(
     events,
@@ -74,7 +95,12 @@ export function TimelineView({
 
               return (
                 <motion.div
-                  key={event.id || `${event.threadId}-${event.timestamp}-${index}`}
+                  key={
+                    event.id ||
+                    `${instanceId.current}-${event.threadId}-${
+                      event.timestamp instanceof Date ? event.timestamp.getTime() : event.timestamp
+                    }-${index}`
+                  }
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}

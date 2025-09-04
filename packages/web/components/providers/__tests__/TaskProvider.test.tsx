@@ -166,7 +166,7 @@ describe('TaskProvider', () => {
 
     it('handles null project and session IDs gracefully', () => {
       render(
-        <TaskProvider projectId={null} sessionId={null} agents={[]}>
+        <TaskProvider projectId={null} sessionId={null}>
           <ContextConsumer />
         </TaskProvider>
       );
@@ -248,7 +248,7 @@ describe('TaskProvider', () => {
   describe('Conditional Modal Rendering', () => {
     it('only renders TaskBoard modal when project and session exist', async () => {
       render(
-        <TaskProvider projectId={null} sessionId={null} agents={[]}>
+        <TaskProvider projectId={null} sessionId={null}>
           <ContextConsumer />
         </TaskProvider>
       );
@@ -263,7 +263,7 @@ describe('TaskProvider', () => {
 
     it('only renders TaskCreation modal when project and session exist', async () => {
       render(
-        <TaskProvider projectId={null} sessionId={null} agents={[]}>
+        <TaskProvider projectId={null} sessionId={null}>
           <ContextConsumer />
         </TaskProvider>
       );
@@ -277,7 +277,7 @@ describe('TaskProvider', () => {
 
     it('renders TaskDisplay modal regardless of project/session (uses selected task)', async () => {
       render(
-        <TaskProvider projectId={null} sessionId={null} agents={[]}>
+        <TaskProvider projectId={null} sessionId={null}>
           <ContextConsumer />
         </TaskProvider>
       );
