@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { getLaceDir } from '~/config/lace-dir';
+import { scanEmbeddedFiles } from '~/utils/resource-resolver';
 
 export interface PersonaInfo {
   name: string;
@@ -24,28 +25,17 @@ export class PersonaRegistry {
 
   private loadBundledPersonas(): void {
     try {
-      // Check embedded files first (production/bundled mode)
-      if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
-        for (const f of Bun.embeddedFiles) {
-          const fileName = (f as File).name;
-          if (
-            fileName.includes('/agent-personas/') &&
-            fileName.endsWith('.md') &&
-            !fileName.includes('/sections/')
-          ) {
-            const personaName = fileName.split('/').pop()?.slice(0, -3); // Remove .md extension
-            if (personaName) {
-              this.bundledPersonasCache.add(personaName);
-            }
-          }
-        }
-      } else {
-        // Fallback to file system (development mode)
-        const files = fs.readdirSync(this.bundledPersonasPath);
-        for (const file of files) {
-          if (file.endsWith('.md')) {
-            this.bundledPersonasCache.add(file.slice(0, -3)); // Remove .md extension
-          }
+      // Use shared utility to scan for persona files
+      const personaFiles = scanEmbeddedFiles(
+        'config/agent-personas',
+        '.md',
+        this.bundledPersonasPath
+      );
+
+      // Filter out section files and add to cache
+      for (const file of personaFiles) {
+        if (!file.fullPath.includes('/sections/')) {
+          this.bundledPersonasCache.add(file.name);
         }
       }
     } catch (error) {
