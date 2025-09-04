@@ -2,6 +2,7 @@
 // ABOUTME: Singleton service to avoid re-registering tools on every API call
 
 import { ToolExecutor } from '@/lib/server/lace-imports';
+import { logger } from '~/utils/logger';
 
 class ToolCacheService {
   private static instance: ToolCacheService | null = null;
@@ -24,7 +25,7 @@ class ToolCacheService {
       try {
         this.initializeTools();
       } catch (error) {
-        console.error('Failed to initialize tool registry:', error);
+        logger.error('Failed to initialize tool registry', { error });
         this.userConfigurableTools = [];
       }
     }
@@ -44,7 +45,7 @@ class ToolCacheService {
         .filter((tool) => !tool.annotations?.safeInternal)
         .map((tool) => tool.name);
     } catch (error) {
-      console.error('Failed to register tools:', error);
+      logger.error('Failed to register tools', { error });
       this.userConfigurableTools = [];
       throw error; // Re-throw for caller to handle
     }
