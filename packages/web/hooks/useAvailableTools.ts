@@ -3,7 +3,6 @@
 
 import { useState, useEffect } from 'react';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
-import type { ConfigurationResponse } from '@/types/api';
 
 export function useAvailableTools() {
   const [availableTools, setAvailableTools] = useState<string[]>([]);
@@ -24,10 +23,11 @@ export function useAvailableTools() {
           if (!isCancelled) {
             // Defensive type validation
             if (config && typeof config === 'object' && 'availableTools' in config) {
-              const availableTools = (config as any).availableTools;
+              const configObj = config as Record<string, unknown>;
+              const availableTools = configObj.availableTools;
               if (
                 Array.isArray(availableTools) &&
-                availableTools.every((tool) => typeof tool === 'string')
+                availableTools.every((tool): tool is string => typeof tool === 'string')
               ) {
                 setAvailableTools(availableTools);
               } else {

@@ -95,8 +95,13 @@ export const SessionCreateModal = memo(function SessionCreateModal({
       let errorMessage = 'Failed to create session';
       if (err instanceof Response) {
         try {
-          const data = await err.json();
-          if (data && typeof (data as { message?: unknown }).message === 'string') {
+          const data = (await err.json()) as unknown;
+          if (
+            data &&
+            typeof data === 'object' &&
+            'message' in data &&
+            typeof (data as Record<string, unknown>).message === 'string'
+          ) {
             errorMessage = (data as { message: string }).message;
           } else {
             errorMessage = `${err.status} ${err.statusText}`;
