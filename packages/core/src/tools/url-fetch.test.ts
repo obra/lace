@@ -1,14 +1,19 @@
 // ABOUTME: Tests for schema-based URL fetch tool with structured output
 // ABOUTME: Validates URL fetching, content handling, and enhanced error reporting
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UrlFetchTool } from '~/tools/implementations/url-fetch';
+
+// Mock fetch to avoid external network dependencies in tests
+const mockFetch = vi.fn();
+vi.stubGlobal('fetch', mockFetch);
 
 describe('UrlFetchTool with schema validation', () => {
   let tool: UrlFetchTool;
 
   beforeEach(() => {
     tool = new UrlFetchTool();
+    mockFetch.mockClear();
   });
 
   describe('Tool metadata', () => {
@@ -133,6 +138,15 @@ Follows redirects by default. Returns detailed error context for failures.`
     });
 
     it('should accept valid parameters', async () => {
+      // Mock successful response
+      mockFetch.mockResolvedValueOnce(
+        new Response('{"test": "success"}', {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
       const result = await tool.execute(
         {
           url: 'https://httpbin.org/get',
@@ -271,6 +285,14 @@ Follows redirects by default. Returns detailed error context for failures.`
 
   describe('Network error scenarios', () => {
     it('should handle timeout errors gracefully', async () => {
+      // Mock timeout by rejecting after delay
+      mockFetch.mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('The operation was aborted due to timeout')), 100);
+          })
+      );
+
       const result = await tool.execute(
         {
           url: 'https://httpbin.org/delay/5',
@@ -280,10 +302,8 @@ Follows redirects by default. Returns detailed error context for failures.`
       );
 
       expect(result.status).toBe('failed');
-      // Should get either timeout, network error, or service unavailable depending on environment
-      expect(result.content[0].text).toMatch(
-        /(timeout|network|NETWORK ERROR|TIMEOUT ERROR|503|service.*unavailable)/i
-      );
+      // Should get timeout error from mock
+      expect(result.content[0].text).toMatch(/(timeout|aborted|TIMEOUT ERROR)/i);
     }, 10000);
 
     it('should handle invalid domains', async () => {
