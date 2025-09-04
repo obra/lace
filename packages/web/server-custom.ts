@@ -89,7 +89,7 @@ async function startLaceServer() {
   app.use(compression.default());
   app.disable('x-powered-by');
 
-  console.info('Starting development server with Vite middleware');
+  console.error('Starting development server with Vite middleware');
 
   // Development mode - use Vite middleware
   const vite = await import('vite');
