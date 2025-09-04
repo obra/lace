@@ -278,7 +278,7 @@ describe('TaskSidebarSection', () => {
   });
 
   describe('Unassigned Task Filtering', () => {
-    it('shows statistics only for unassigned tasks', () => {
+    it('filters and passes only unassigned tasks to TaskListSidebar', () => {
       const tasks = [
         createMockTask('1', 'completed'), // unassigned
         createMockTask('2', 'completed'), // unassigned
@@ -291,13 +291,11 @@ describe('TaskSidebarSection', () => {
 
       render(<TaskSidebarSection {...defaultProps} />);
 
-      // Should only count unassigned tasks (2 completed, 0 in_progress, 2 pending)
-      expect(screen.getByText('2 done')).toBeInTheDocument();
-      expect(screen.getByText('0 active')).toBeInTheDocument();
-      expect(screen.getByText('2 pending')).toBeInTheDocument();
+      // Should only pass 4 unassigned tasks (2 completed, 2 pending) to TaskListSidebar
+      expect(screen.getByText('Task count: 4')).toBeInTheDocument();
     });
 
-    it('hides statistics when no unassigned tasks exist', () => {
+    it('passes zero tasks when all tasks are assigned', () => {
       const tasks = [
         { ...createMockTask('1', 'in_progress'), assignedTo: 'agent-1' as any }, // all assigned
         { ...createMockTask('2', 'pending'), assignedTo: 'agent-2' as any },
@@ -306,13 +304,11 @@ describe('TaskSidebarSection', () => {
 
       render(<TaskSidebarSection {...defaultProps} />);
 
-      // Should not show statistics section since no unassigned tasks
-      expect(screen.queryByText('done')).not.toBeInTheDocument();
-      expect(screen.queryByText('active')).not.toBeInTheDocument();
-      expect(screen.queryByText('pending')).not.toBeInTheDocument();
+      // TaskListSidebar should receive 0 tasks
+      expect(screen.getByText('Task count: 0')).toBeInTheDocument();
     });
 
-    it('shows statistics when only unassigned tasks exist', () => {
+    it('passes all tasks when none are assigned', () => {
       const tasks = [
         createMockTask('1', 'completed'), // unassigned
         createMockTask('2', 'in_progress'), // unassigned
@@ -322,9 +318,8 @@ describe('TaskSidebarSection', () => {
 
       render(<TaskSidebarSection {...defaultProps} />);
 
-      expect(screen.getByText('1 done')).toBeInTheDocument();
-      expect(screen.getByText('1 active')).toBeInTheDocument();
-      expect(screen.getByText('1 pending')).toBeInTheDocument();
+      // TaskListSidebar should receive all 3 tasks
+      expect(screen.getByText('Task count: 3')).toBeInTheDocument();
     });
   });
 
