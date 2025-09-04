@@ -424,7 +424,30 @@ jobs:
 
       # Keychain cleanup handled by reusable actions
 
+      - name: Cleanup mounted volumes and temporary files
+        if: always()
+        run: |
+          echo "🧹 Cleaning up mounted volumes and temporary files..."
+          
+          # Unmount any Lace-related volumes that may be left behind
+          hdiutil info -plist | grep -A5 -B5 "Lace" || true
+          for volume in $(hdiutil info | grep "Lace" | awk '{print $1}' | sort -u); do
+            echo "🔧 Force unmounting volume: $volume"
+            hdiutil detach "$volume" -force 2>/dev/null || true
+          done
+          
+          # Clean up any temporary DMG files in /tmp
+          find /tmp -name "*Lace*.dmg" -type f -delete 2>/dev/null || true
+          find /tmp -name "*lace*.dmg" -type f -delete 2>/dev/null || true
+          
+          # Clean up any build artifacts that might be holding references
+          rm -rf build/dmg-temp 2>/dev/null || true
+          rm -rf build/*-temp.dmg 2>/dev/null || true
+          
+          echo "✅ Cleanup completed"
+
       - name: Notify completion
+        if: always()
         run: |
           echo "🎉 CI complete!"
           echo "📦 Channel: ${{ steps.channel.outputs.channel }}"
