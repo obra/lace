@@ -89,6 +89,22 @@ export function TaskListSidebar({
   }) => {
     const isExpanded = expandedSections.has(status);
 
+    // Get color for status
+    const getStatusColor = (status: string) => {
+      switch (status) {
+        case 'in_progress':
+          return 'bg-warning'; // yellow/orange
+        case 'pending':
+          return 'bg-base-content/40'; // gray
+        case 'blocked':
+          return 'bg-error'; // red
+        case 'completed':
+          return 'bg-success'; // green
+        default:
+          return 'bg-base-content/40';
+      }
+    };
+
     return (
       <div className="space-y-1">
         <button
@@ -99,7 +115,10 @@ export function TaskListSidebar({
             icon={isExpanded ? faChevronDown : faChevronRight}
             className="w-2.5 h-2.5"
           />
-          <span>{title}</span>
+          <div className={`w-2 h-2 rounded-full ${getStatusColor(status)}`} />
+          <span>
+            {title} ({tasks.length})
+          </span>
         </button>
         {isExpanded && (
           <div className="ml-4 space-y-1">
