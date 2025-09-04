@@ -5,15 +5,12 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTrash } from '@/lib/fontawesome';
+import { faPlus } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { AccentButton } from '@/components/ui/AccentButton';
 import { DirectoryField } from '@/components/ui';
-import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
-import type { ProviderInfo } from '@/types/api';
-import { useAvailableTools } from '@/hooks/useAvailableTools';
 import { DIRECTORY_BROWSER, WIZARD_PROGRESS } from '@/lib/constants/ui';
 
 interface ProjectConfiguration {
@@ -55,8 +52,7 @@ export function ProjectCreateModal({
   onAddProvider,
 }: ProjectCreateModalProps) {
   // Get providers from ProviderInstanceProvider context
-  const { availableProviders: providers, instancesLoading } = useProviderInstances();
-  const { availableTools, loading: toolsLoading, error: toolsError } = useAvailableTools();
+  const { availableProviders: providers } = useProviderInstances();
   const [createStep, setCreateStep] = useState<number>(2);
   const [createName, setCreateName] = useState('');
   const [createDescription, setCreateDescription] = useState('');

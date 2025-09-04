@@ -4,6 +4,11 @@
 import { useState, useEffect } from 'react';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 
+// Type guard to check if value is a string array
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item): item is string => typeof item === 'string');
+}
+
 export function useAvailableTools() {
   const [availableTools, setAvailableTools] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,14 +29,11 @@ export function useAvailableTools() {
             // Defensive type validation
             if (config && typeof config === 'object' && 'availableTools' in config) {
               const configObj = config as Record<string, unknown>;
-              const availableTools = configObj.availableTools;
-              if (
-                Array.isArray(availableTools) &&
-                availableTools.every((tool): tool is string => typeof tool === 'string')
-              ) {
-                setAvailableTools(availableTools);
+              const toolsFromConfig = configObj.availableTools;
+              if (isStringArray(toolsFromConfig)) {
+                setAvailableTools(toolsFromConfig);
               } else {
-                console.warn('Invalid availableTools format:', availableTools);
+                console.warn('Invalid availableTools format:', toolsFromConfig);
                 setAvailableTools([]);
               }
             } else {

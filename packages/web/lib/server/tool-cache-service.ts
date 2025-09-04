@@ -21,21 +21,33 @@ class ToolCacheService {
 
   getUserConfigurableTools(): string[] {
     if (this.userConfigurableTools === null) {
-      this.initializeTools();
+      try {
+        this.initializeTools();
+      } catch (error) {
+        console.error('Failed to initialize tool registry:', error);
+        this.userConfigurableTools = [];
+      }
     }
-    return this.userConfigurableTools!;
+    // Return immutable copy to prevent cache mutation
+    return [...(this.userConfigurableTools ?? [])];
   }
 
   private initializeTools(): void {
-    if (!this.toolExecutor) {
-      this.toolExecutor = new ToolExecutor();
-      this.toolExecutor.registerAllAvailableTools();
-    }
+    try {
+      if (!this.toolExecutor) {
+        this.toolExecutor = new ToolExecutor();
+        this.toolExecutor.registerAllAvailableTools();
+      }
 
-    this.userConfigurableTools = this.toolExecutor
-      .getAllTools()
-      .filter((tool) => !tool.annotations?.safeInternal)
-      .map((tool) => tool.name);
+      this.userConfigurableTools = this.toolExecutor
+        .getAllTools()
+        .filter((tool) => !tool.annotations?.safeInternal)
+        .map((tool) => tool.name);
+    } catch (error) {
+      console.error('Failed to register tools:', error);
+      this.userConfigurableTools = [];
+      throw error; // Re-throw for caller to handle
+    }
   }
 
   // Method to refresh cache if needed (for testing or tool changes)
