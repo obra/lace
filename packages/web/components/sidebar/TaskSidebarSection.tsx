@@ -67,13 +67,6 @@ export const TaskSidebarSection = memo(function TaskSidebarSection({
 
   // Filter to only show unassigned tasks
   const unassignedTasks = taskManager.tasks.filter((task: Task) => !task.assignedTo);
-  const unassignedCompletedCount = unassignedTasks.filter(
-    (t: Task) => t.status === 'completed'
-  ).length;
-  const unassignedActiveCount = unassignedTasks.filter(
-    (t: Task) => t.status === 'in_progress'
-  ).length;
-  const unassignedPendingCount = unassignedTasks.filter((t: Task) => t.status === 'pending').length;
 
   const addTaskButton = (
     <button
@@ -94,26 +87,6 @@ export const TaskSidebarSection = memo(function TaskSidebarSection({
       collapsible={true}
       headerActions={addTaskButton}
     >
-      {/* Task Overview - only for unassigned tasks */}
-      {unassignedTasks.length > 0 && (
-        <div className="bg-base-300/20 backdrop-blur-sm border border-base-300/15 rounded-xl p-3 mb-3 shadow-sm -ml-1">
-          <div className="flex items-center gap-3 text-xs text-base-content/60">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-success rounded-full"></div>
-              <span>{unassignedCompletedCount} done</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-warning rounded-full"></div>
-              <span>{unassignedActiveCount} active</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-base-content/40 rounded-full"></div>
-              <span>{unassignedPendingCount} pending</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Task List - only unassigned tasks */}
       <TaskListSidebar
         taskManager={{
