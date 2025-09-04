@@ -58,6 +58,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
     name: string;
     providerInstanceId: string;
     modelId: string;
+    persona: string;
   } | null>(null);
 
   const [showSessionEditModal, setShowSessionEditModal] = useState(false);
@@ -84,6 +85,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
           name: agentDetails.name,
           providerInstanceId: agentDetails.providerInstanceId,
           modelId: agentDetails.modelId,
+          persona: agentDetails.persona || 'lace',
         });
         setShowEditAgent(true);
       } catch (error) {

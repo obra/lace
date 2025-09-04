@@ -61,24 +61,6 @@ export const AgentEditModal = memo(function AgentEditModal({
 
         <div>
           <label className="label">
-            <span className="label-text font-medium">Persona</span>
-          </label>
-          <input
-            type="text"
-            value={editingAgent.persona}
-            readOnly
-            className="input input-bordered w-full bg-base-200/50 cursor-not-allowed"
-            title="Persona cannot be changed after agent creation"
-          />
-          <div className="label">
-            <span className="label-text-alt text-base-content/60">
-              Persona is set when the agent is created and cannot be modified
-            </span>
-          </div>
-        </div>
-
-        <div>
-          <label className="label">
             <span className="label-text font-medium">Provider</span>
           </label>
           <select
@@ -126,6 +108,10 @@ export const AgentEditModal = memo(function AgentEditModal({
                 </option>
               )) || []}
           </select>
+        </div>
+
+        <div className="pt-2 border-t border-base-300/50">
+          <span className="text-sm text-base-content/60">Persona: {editingAgent.persona}</span>
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t border-base-300">
