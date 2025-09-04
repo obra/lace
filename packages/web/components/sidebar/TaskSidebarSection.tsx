@@ -65,54 +65,34 @@ export const TaskSidebarSection = memo(function TaskSidebarSection({
     onCloseMobileNav?.();
   };
 
-  const completedCount = taskManager.tasks.filter((t: Task) => t.status === 'completed').length;
-  const activeCount = taskManager.tasks.filter((t: Task) => t.status === 'in_progress').length;
-  const pendingCount = taskManager.tasks.filter((t: Task) => t.status === 'pending').length;
+  // Filter to only show unassigned tasks
+  const unassignedTasks = taskManager.tasks.filter((task: Task) => !task.assignedTo);
+
+  const addTaskButton = (
+    <button
+      onClick={handleTaskCreationClick}
+      className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 border border-transparent hover:border-base-300/30"
+      title="Add task"
+      data-testid="add-task-button"
+    >
+      <FontAwesomeIcon icon={faPlus} className="w-3 h-3 text-base-content/60" />
+    </button>
+  );
 
   return (
-    <SidebarSection title="Tasks" icon={faTasks} defaultCollapsed={false} collapsible={true}>
-      {/* Task Overview */}
-      <div className="bg-base-300/20 backdrop-blur-sm border border-base-300/15 rounded-xl p-3 mb-3 shadow-sm -ml-1">
-        <div className="flex items-center justify-between mb-2">
-          <button
-            onClick={handleTaskBoardClick}
-            className="text-sm font-medium text-base-content hover:text-base-content/80 transition-colors"
-            disabled={taskManager.tasks.length === 0}
-            data-testid="task-board-button"
-          >
-            Task Board ({taskManager.tasks.length})
-          </button>
-          <button
-            onClick={handleTaskCreationClick}
-            className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 border border-transparent hover:border-base-300/30"
-            title="Add task"
-            data-testid="add-task-button"
-          >
-            <FontAwesomeIcon icon={faPlus} className="w-3 h-3 text-base-content/60" />
-          </button>
-        </div>
-
-        {taskManager.tasks.length > 0 && (
-          <div className="flex items-center gap-3 text-xs text-base-content/60">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-success rounded-full"></div>
-              <span>{completedCount} done</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-warning rounded-full"></div>
-              <span>{activeCount} active</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-base-content/40 rounded-full"></div>
-              <span>{pendingCount} pending</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Task List */}
+    <SidebarSection
+      title="Tasks"
+      icon={faTasks}
+      defaultCollapsed={false}
+      collapsible={true}
+      headerActions={addTaskButton}
+    >
+      {/* Task List - only unassigned tasks */}
       <TaskListSidebar
-        taskManager={taskManager}
+        taskManager={{
+          ...taskManager,
+          tasks: unassignedTasks,
+        }}
         onOpenTaskBoard={handleOpenTaskBoard}
         onCreateTask={handleCreateTask}
       />

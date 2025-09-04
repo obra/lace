@@ -137,28 +137,31 @@ describe('TaskListSidebar', () => {
     expect(screen.queryByText('3 tasks • 1 in progress')).not.toBeInTheDocument();
   });
 
-  it('should show in progress tasks first', () => {
+  it('should show in progress tasks section with chevron and count', () => {
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(<TaskListSidebar taskManager={mockTaskManager} />);
 
-    expect(screen.getByText('In Progress')).toBeInTheDocument();
+    expect(screen.getByText('In Progress (1)')).toBeInTheDocument();
+    // Tasks are initially expanded, so should see the task
     expect(screen.getByText('High Priority Task')).toBeInTheDocument();
   });
 
-  it('should show pending tasks', () => {
+  it('should show pending tasks section collapsed by default', () => {
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(<TaskListSidebar taskManager={mockTaskManager} />);
 
-    expect(screen.getByText('Pending')).toBeInTheDocument();
-    expect(screen.getByText('Pending Task')).toBeInTheDocument();
+    expect(screen.getByText('Pending (1)')).toBeInTheDocument();
+    // Pending section starts collapsed, so task should not be visible initially
+    expect(screen.queryByText('Pending Task')).not.toBeInTheDocument();
   });
 
-  it('should show blocked tasks', () => {
+  it('should show blocked tasks section collapsed by default', () => {
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(<TaskListSidebar taskManager={mockTaskManager} />);
 
-    expect(screen.getByText('Blocked')).toBeInTheDocument();
-    expect(screen.getByText('Blocked Task')).toBeInTheDocument();
+    expect(screen.getByText('Blocked (1)')).toBeInTheDocument();
+    // Blocked section starts collapsed, so task should not be visible initially
+    expect(screen.queryByText('Blocked Task')).not.toBeInTheDocument();
   });
 
   it('should call onOpenTaskBoard when task is clicked', async () => {
@@ -236,9 +239,27 @@ describe('TaskListSidebar', () => {
 
     // Verify that no tasks are shown and no "No tasks yet" message is displayed
     expect(screen.queryByText('No tasks yet')).not.toBeInTheDocument();
-    expect(screen.queryByText('In Progress')).not.toBeInTheDocument();
-    expect(screen.queryByText('Pending')).not.toBeInTheDocument();
-    expect(screen.queryByText('Blocked')).not.toBeInTheDocument();
+    expect(screen.queryByText(/In Progress/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Pending/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Blocked/)).not.toBeInTheDocument();
+  });
+
+  it('should expand and collapse task sections when clicked', async () => {
+    const user = userEvent.setup();
+    const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
+    render(<TaskListSidebar taskManager={mockTaskManager} />);
+
+    // Pending section should start collapsed
+    expect(screen.getByText('Pending (1)')).toBeInTheDocument();
+    expect(screen.queryByText('Pending Task')).not.toBeInTheDocument();
+
+    // Click to expand pending section
+    await user.click(screen.getByTestId('section-header-pending'));
+    expect(screen.getByText('Pending Task')).toBeInTheDocument();
+
+    // Click to collapse it again
+    await user.click(screen.getByTestId('section-header-pending'));
+    expect(screen.queryByText('Pending Task')).not.toBeInTheDocument();
   });
 
   it('should limit tasks shown per section', () => {
@@ -295,17 +316,19 @@ describe('TaskListSidebar', () => {
     const mockTaskManager = useTaskManager('test-project', 'lace_20250101_sess01');
     render(<TaskListSidebar taskManager={mockTaskManager} />);
 
-    // Should show max 3 in progress tasks
+    // Should show section headers with correct counts
+    expect(screen.getByText('In Progress (5)')).toBeInTheDocument();
+    expect(screen.getByText('Pending (4)')).toBeInTheDocument();
+
+    // In progress is expanded by default, should show max 3 tasks
     expect(screen.getByText('In Progress Task 1')).toBeInTheDocument();
     expect(screen.getByText('In Progress Task 2')).toBeInTheDocument();
     expect(screen.getByText('In Progress Task 3')).toBeInTheDocument();
     expect(screen.queryByText('In Progress Task 4')).not.toBeInTheDocument();
     expect(screen.queryByText('In Progress Task 5')).not.toBeInTheDocument();
 
-    // Should show max 2 pending tasks
-    expect(screen.getByText('Pending Task 1')).toBeInTheDocument();
-    expect(screen.getByText('Pending Task 2')).toBeInTheDocument();
-    expect(screen.queryByText('Pending Task 3')).not.toBeInTheDocument();
-    expect(screen.queryByText('Pending Task 4')).not.toBeInTheDocument();
+    // Pending starts collapsed, so no tasks should be visible initially
+    expect(screen.queryByText('Pending Task 1')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pending Task 2')).not.toBeInTheDocument();
   });
 });

@@ -82,4 +82,5 @@ export {
   // Error display icons (faExclamationTriangle and faClock already imported above)
   faRedo,
   faInfo,
+  faSquare,
 } from '@fortawesome/free-solid-svg-icons';

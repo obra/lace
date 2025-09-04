@@ -12,6 +12,7 @@ import '@testing-library/jest-dom/vitest';
 import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
 import { TaskProvider } from '@/components/providers/TaskProvider';
 import type { SessionInfo, ThreadId, Task, AgentInfo } from '@/types/core';
+import { asAssigneeId } from '@/types/core';
 import {
   createMockSessionContext,
   createMockAgentContext,
@@ -65,8 +66,17 @@ const mockUseOptionalAgentContext = vi.mocked(useOptionalAgentContext);
 
 // Mock child components
 vi.mock('@/components/layout/Sidebar', () => ({
-  SidebarSection: ({ title, children }: { title: string; children: React.ReactNode }) => (
+  SidebarSection: ({
+    title,
+    children,
+    headerActions,
+  }: {
+    title?: string;
+    children: React.ReactNode;
+    headerActions?: React.ReactNode;
+  }) => (
     <div data-testid="sidebar-section" data-title={title}>
+      {headerActions && <div data-testid="header-actions">{headerActions}</div>}
       {children}
     </div>
   ),
@@ -268,65 +278,53 @@ describe('TaskSidebarSection', () => {
     });
   });
 
-  describe('Task Statistics', () => {
-    it('displays correct task counts with mixed statuses', () => {
+  describe('Unassigned Task Filtering', () => {
+    it('filters and passes only unassigned tasks to TaskListSidebar', () => {
       const tasks = [
-        createMockTask('1', 'completed'),
-        createMockTask('2', 'completed'),
-        createMockTask('3', 'in_progress'),
-        createMockTask('4', 'pending'),
-        createMockTask('5', 'pending'),
-        createMockTask('6', 'pending'),
+        createMockTask('1', 'completed'), // unassigned
+        createMockTask('2', 'completed'), // unassigned
+        { ...createMockTask('3', 'in_progress'), assignedTo: asAssigneeId('agent-1') }, // assigned - should be filtered out
+        createMockTask('4', 'pending'), // unassigned
+        createMockTask('5', 'pending'), // unassigned
+        { ...createMockTask('6', 'pending'), assignedTo: asAssigneeId('agent-2') }, // assigned - should be filtered out
       ];
       mockTaskContext.taskManager = createMockTaskManager(tasks);
 
       render(<TaskSidebarSection {...defaultProps} />);
 
-      expect(screen.getByText('Task Board (6)')).toBeInTheDocument();
-      expect(screen.getByText('2 done')).toBeInTheDocument();
-      expect(screen.getByText('1 active')).toBeInTheDocument();
-      expect(screen.getByText('3 pending')).toBeInTheDocument();
+      // Should only pass 4 unassigned tasks (2 completed, 2 pending) to TaskListSidebar
+      expect(screen.getByText('Task count: 4')).toBeInTheDocument();
     });
 
-    it('hides statistics when no tasks exist', () => {
-      mockTaskContext.taskManager = createMockTaskManager([]);
-
-      render(<TaskSidebarSection {...defaultProps} />);
-
-      expect(screen.getByText('Task Board (0)')).toBeInTheDocument();
-      expect(screen.queryByText('done')).not.toBeInTheDocument();
-      expect(screen.queryByText('active')).not.toBeInTheDocument();
-      expect(screen.queryByText('pending')).not.toBeInTheDocument();
-    });
-
-    it('displays correct counts with only completed tasks', () => {
+    it('passes zero tasks when all tasks are assigned', () => {
       const tasks = [
-        createMockTask('1', 'completed'),
-        createMockTask('2', 'completed'),
-        createMockTask('3', 'completed'),
+        { ...createMockTask('1', 'in_progress'), assignedTo: asAssigneeId('agent-1') }, // all assigned
+        { ...createMockTask('2', 'pending'), assignedTo: asAssigneeId('agent-2') },
       ];
       mockTaskContext.taskManager = createMockTaskManager(tasks);
 
       render(<TaskSidebarSection {...defaultProps} />);
 
-      expect(screen.getByText('3 done')).toBeInTheDocument();
-      expect(screen.getByText('0 active')).toBeInTheDocument();
-      expect(screen.getByText('0 pending')).toBeInTheDocument();
+      // TaskListSidebar should receive 0 tasks
+      expect(screen.getByText('Task count: 0')).toBeInTheDocument();
+    });
+
+    it('passes all tasks when none are assigned', () => {
+      const tasks = [
+        createMockTask('1', 'completed'), // unassigned
+        createMockTask('2', 'in_progress'), // unassigned
+        createMockTask('3', 'pending'), // unassigned
+      ];
+      mockTaskContext.taskManager = createMockTaskManager(tasks);
+
+      render(<TaskSidebarSection {...defaultProps} />);
+
+      // TaskListSidebar should receive all 3 tasks
+      expect(screen.getByText('Task count: 3')).toBeInTheDocument();
     });
   });
 
   describe('Button Interactions', () => {
-    it('calls showTaskBoard when task board button is clicked', () => {
-      const tasks = [createMockTask('1')];
-      mockTaskContext.taskManager = createMockTaskManager(tasks);
-
-      render(<TaskSidebarSection {...defaultProps} />);
-
-      fireEvent.click(screen.getByText('Task Board (1)'));
-      expect(mockTaskContext.showTaskBoard).toHaveBeenCalledTimes(1);
-      expect(defaultProps.onCloseMobileNav).toHaveBeenCalledTimes(1);
-    });
-
     it('calls showTaskCreation when add task button is clicked', () => {
       mockTaskContext.taskManager = createMockTaskManager([]);
 
@@ -337,41 +335,32 @@ describe('TaskSidebarSection', () => {
       expect(defaultProps.onCloseMobileNav).toHaveBeenCalledTimes(1);
     });
 
-    it('disables task board button when no tasks exist', () => {
+    it('renders add task button in header actions', () => {
       mockTaskContext.taskManager = createMockTaskManager([]);
 
       render(<TaskSidebarSection {...defaultProps} />);
 
-      const taskBoardButton = screen.getByText('Task Board (0)');
-      expect(taskBoardButton).toBeDisabled();
-    });
-
-    it('enables task board button when tasks exist', () => {
-      const tasks = [createMockTask('1')];
-      mockTaskContext.taskManager = createMockTaskManager(tasks);
-
-      render(<TaskSidebarSection {...defaultProps} />);
-
-      const taskBoardButton = screen.getByText('Task Board (1)');
-      expect(taskBoardButton).not.toBeDisabled();
+      expect(screen.getByTestId('header-actions')).toBeInTheDocument();
+      expect(screen.getByTestId('add-task-button')).toBeInTheDocument();
     });
   });
 
   describe('TaskListSidebar Integration', () => {
-    it('passes taskManager to TaskListSidebar', () => {
+    it('passes only unassigned tasks to TaskListSidebar', () => {
       const tasks = [
-        createMockTask('1', 'completed'),
-        createMockTask('2', 'in_progress'),
-        createMockTask('3', 'pending'),
-        createMockTask('4', 'pending'),
-        createMockTask('5', 'pending'),
+        createMockTask('1', 'completed'), // unassigned
+        { ...createMockTask('2', 'in_progress'), assignedTo: asAssigneeId('agent-1') }, // assigned - filtered out
+        createMockTask('3', 'pending'), // unassigned
+        createMockTask('4', 'pending'), // unassigned
+        { ...createMockTask('5', 'pending'), assignedTo: asAssigneeId('agent-2') }, // assigned - filtered out
       ];
       mockTaskContext.taskManager = createMockTaskManager(tasks);
 
       render(<TaskSidebarSection {...defaultProps} />);
 
       expect(screen.getByTestId('task-list-sidebar')).toBeInTheDocument();
-      expect(screen.getByText('Task count: 5')).toBeInTheDocument();
+      // Should only pass 3 unassigned tasks (1 completed, 2 pending)
+      expect(screen.getByText('Task count: 3')).toBeInTheDocument();
     });
 
     it('handles TaskListSidebar callbacks correctly', () => {
@@ -420,9 +409,8 @@ describe('TaskSidebarSection', () => {
 
       render(<TaskSidebarSection {...defaultProps} onCloseMobileNav={undefined} />);
 
-      // Should not throw error
+      // Should not throw error when clicking add task button
       expect(() => {
-        fireEvent.click(screen.getByText('Task Board (1)'));
         fireEvent.click(screen.getByTestId('add-task-button'));
       }).not.toThrow();
     });
