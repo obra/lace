@@ -3,6 +3,7 @@
 
 import path from 'path';
 import { fileURLToPath } from 'url';
+import * as fs from 'fs';
 import { logger } from '~/utils/logger';
 
 /**
@@ -133,7 +134,6 @@ export function scanEmbeddedFiles(
   } else {
     // Fallback to filesystem (development mode)
     try {
-      const fs = require('fs'); // Use require for sync import
       const fsFiles = fs.readdirSync(fallbackFsPath);
       for (const file of fsFiles) {
         if (file.endsWith(extension)) {
