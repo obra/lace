@@ -69,7 +69,7 @@ describe('TaskFormatter', () => {
       prompt: 'Fix the blocker first',
       status: 'blocked',
       priority: 'high',
-      assignedTo: createNewAgentSpec('anthropic', 'claude-3-haiku'),
+      assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-3-haiku'),
       createdBy: agent1ThreadId,
       threadId: parentThreadId,
       createdAt: new Date('2025-01-01T08:00:00Z'),

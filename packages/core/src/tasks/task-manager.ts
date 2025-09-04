@@ -4,7 +4,7 @@
 import { EventEmitter } from 'events';
 import { DatabasePersistence } from '~/persistence/database';
 import { Task, CreateTaskRequest, TaskFilters, TaskContext, TaskSummary } from '~/tasks/types';
-import { ThreadId, AssigneeId, isNewAgentSpec } from '~/threads/types';
+import { ThreadId, AssigneeId, isNewAgentSpec, parseNewAgentSpec } from '~/threads/types';
 import { logger } from '~/utils/logger';
 
 // Type for agent creation callback
@@ -56,7 +56,7 @@ export class TaskManager extends EventEmitter {
       notes: [],
     };
 
-    // Handle agent spawning if assigned to "new:provider/model"
+    // Handle agent spawning if assigned to "new:persona:provider/model"
     if (task.assignedTo && isNewAgentSpec(task.assignedTo)) {
       await this.handleAgentSpawning(task);
     }
@@ -130,7 +130,7 @@ export class TaskManager extends EventEmitter {
       notes: existingTask.notes, // Preserve notes
     };
 
-    // Handle agent spawning if assignedTo is being updated to "new:provider/model"
+    // Handle agent spawning if assignedTo is being updated to "new:persona:provider/model"
     if (updates.assignedTo && isNewAgentSpec(updates.assignedTo)) {
       await this.handleAgentSpawning(updatedTask);
       // handleAgentSpawning modifies updatedTask.assignedTo to the spawned agent thread ID
@@ -289,7 +289,7 @@ export class TaskManager extends EventEmitter {
   }
 
   /**
-   * Handle agent spawning for tasks assigned to "new:provider/model"
+   * Handle agent spawning for tasks assigned to "new:persona:provider/model"
    * Updates the task's assignedTo field with the actual agent thread ID
    */
   private async handleAgentSpawning(task: Task): Promise<void> {
@@ -301,16 +301,9 @@ export class TaskManager extends EventEmitter {
       throw new Error('Agent creation callback not provided - cannot spawn agents');
     }
 
-    // Parse "new:provider/model" format
-    const [, providerModel] = task.assignedTo.split(':');
-    if (!providerModel) {
-      throw new Error(`Invalid agent spec format: ${task.assignedTo}`);
-    }
-
-    const [provider, model] = providerModel.split('/');
-    if (!provider || !model) {
-      throw new Error(`Invalid provider/model format in: ${task.assignedTo}`);
-    }
+    // Parse "new:persona:provider/model" format using proper parser
+    const parsed = parseNewAgentSpec(task.assignedTo);
+    const { provider, model } = parsed;
 
     try {
       // Create the agent and get its thread ID

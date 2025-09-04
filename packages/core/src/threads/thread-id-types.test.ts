@@ -74,8 +74,8 @@ describe('NewAgentSpec types', () => {
 
   describe('createNewAgentSpec', () => {
     it('should create valid new agent specs', () => {
-      const spec = createNewAgentSpec('anthropic', 'claude-3-haiku');
-      expect(spec).toBe('new:anthropic/claude-3-haiku');
+      const spec = createNewAgentSpec('lace', 'anthropic', 'claude-3-haiku');
+      expect(spec).toBe('new:lace:anthropic/claude-3-haiku');
       // TypeScript should see this as NewAgentSpec type
       const _typeCheck: NewAgentSpec = spec;
     });
