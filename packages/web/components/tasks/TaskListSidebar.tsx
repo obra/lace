@@ -3,9 +3,9 @@
 
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus } from '@/lib/fontawesome';
+import { faPlus, faChevronRight, faChevronDown } from '@/lib/fontawesome';
 import { SidebarButton } from '@/components/layout/Sidebar';
 import type { useTaskManager } from '@/hooks/useTaskManager';
 import { TaskSidebarItem } from './TaskSidebarItem';
@@ -32,6 +32,9 @@ export function TaskListSidebar({
   onCreateTask,
 }: TaskListSidebarProps) {
   const { tasks, isLoading, error } = taskManager;
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(['in_progress']) // Default to in_progress expanded
+  );
 
   const tasksByStatus = useMemo(
     () => ({
@@ -43,6 +46,18 @@ export function TaskListSidebar({
     }),
     [tasks]
   );
+
+  const toggleSection = (section: string) => {
+    setExpandedSections((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(section)) {
+        newSet.delete(section);
+      } else {
+        newSet.add(section);
+      }
+      return newSet;
+    });
+  };
 
   if (isLoading) {
     return (
@@ -61,36 +76,72 @@ export function TaskListSidebar({
     );
   }
 
+  const TaskSection = ({
+    status,
+    title,
+    tasks,
+    limit,
+  }: {
+    status: string;
+    title: string;
+    tasks: Task[];
+    limit: number;
+  }) => {
+    const isExpanded = expandedSections.has(status);
+
+    return (
+      <div className="space-y-1">
+        <button
+          onClick={() => toggleSection(status)}
+          className="flex items-center gap-1.5 text-xs font-medium text-base-content/80 hover:text-base-content transition-colors w-full text-left"
+        >
+          <FontAwesomeIcon
+            icon={isExpanded ? faChevronDown : faChevronRight}
+            className="w-2.5 h-2.5"
+          />
+          <span>{title}</span>
+        </button>
+        {isExpanded && (
+          <div className="ml-4 space-y-1">
+            {tasks.slice(0, limit).map((task) => (
+              <TaskSidebarItem key={task.id} task={task} onClick={() => onOpenTaskBoard?.()} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-2">
-      {/* Active Tasks - In Progress */}
+      {/* In Progress Tasks */}
       {tasksByStatus.in_progress.length > 0 && (
-        <div className="space-y-1">
-          <div className="text-xs font-medium text-base-content/80 pr-2">In Progress</div>
-          {tasksByStatus.in_progress.slice(0, TASK_DISPLAY_LIMITS.in_progress).map((task) => (
-            <TaskSidebarItem key={task.id} task={task} onClick={() => onOpenTaskBoard?.()} />
-          ))}
-        </div>
+        <TaskSection
+          status="in_progress"
+          title="In Progress"
+          tasks={tasksByStatus.in_progress}
+          limit={TASK_DISPLAY_LIMITS.in_progress}
+        />
       )}
 
       {/* Pending Tasks */}
       {tasksByStatus.pending.length > 0 && (
-        <div className="space-y-1">
-          <div className="text-xs font-medium text-base-content/80 pr-2">Pending</div>
-          {tasksByStatus.pending.slice(0, TASK_DISPLAY_LIMITS.pending).map((task) => (
-            <TaskSidebarItem key={task.id} task={task} onClick={() => onOpenTaskBoard?.()} />
-          ))}
-        </div>
+        <TaskSection
+          status="pending"
+          title="Pending"
+          tasks={tasksByStatus.pending}
+          limit={TASK_DISPLAY_LIMITS.pending}
+        />
       )}
 
       {/* Blocked Tasks */}
       {tasksByStatus.blocked.length > 0 && (
-        <div className="space-y-1">
-          <div className="text-xs font-medium text-base-content/80 pr-2">Blocked</div>
-          {tasksByStatus.blocked.slice(0, TASK_DISPLAY_LIMITS.blocked).map((task) => (
-            <TaskSidebarItem key={task.id} task={task} onClick={() => onOpenTaskBoard?.()} />
-          ))}
-        </div>
+        <TaskSection
+          status="blocked"
+          title="Blocked"
+          tasks={tasksByStatus.blocked}
+          limit={TASK_DISPLAY_LIMITS.blocked}
+        />
       )}
     </div>
   );
