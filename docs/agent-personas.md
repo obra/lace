@@ -7,7 +7,7 @@ Lace supports multiple agent personas - different system prompts that give agent
 - `lace`: Default general-purpose assistant
 - `coding-agent`: Specialized for software development with TDD focus
 - `helper-agent`: Focused on productivity and task completion
-
+- `session-summary`: Ultra-minimal prompt for top-of-screen session summaries
 ## Using Personas
 
 When creating agents through the task system:
