@@ -64,7 +64,7 @@ describe('Agent Spawning on Assignment', () => {
     expect(task.status).toBe('in_progress');
   });
 
-  it('should spawn agent during task update with new:provider/model assignment', async () => {
+  it('should spawn agent during task update with new:persona:provider/model assignment', async () => {
     const taskContext = { actor: sessionId, isHuman: false };
 
     // Create task without assignment
@@ -176,12 +176,14 @@ describe('Agent Spawning on Assignment', () => {
     expect(mockAgentCreator).toHaveBeenCalledTimes(2);
     expect(mockAgentCreator).toHaveBeenNthCalledWith(
       1,
+      'lace',
       'anthropic',
       'claude-3-5-haiku-20241022',
       task1
     );
     expect(mockAgentCreator).toHaveBeenNthCalledWith(
       2,
+      'lace',
       'anthropic',
       'claude-sonnet-4-20250514',
       task2
