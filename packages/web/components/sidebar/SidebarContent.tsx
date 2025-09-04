@@ -39,6 +39,7 @@ export const SidebarContent = memo(function SidebarContent({
   // Conditionally use AgentContext - it may not be available on all pages
   const agentContext = useOptionalAgentContext();
   const sessionDetails = agentContext?.sessionDetails ?? null;
+  const selectedAgent = agentContext?.selectedAgent ?? null;
   // Single container with responsive classes to prevent hydration mismatches
   // Mobile: Normal flow layout, Desktop: Flex layout with feedback anchored to bottom
   return (
@@ -66,6 +67,7 @@ export const SidebarContent = memo(function SidebarContent({
         {/* AGENTS */}
         {sessionDetails && (
           <AgentsSection
+            key={`${sessionDetails.id}-${selectedAgent || 'no-agent'}`} // Force remount when agent changes
             isMobile={isMobile}
             onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
             onAgentSelect={onAgentSelect}
