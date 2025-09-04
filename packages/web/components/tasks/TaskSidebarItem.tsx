@@ -20,7 +20,7 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
   }[task.priority];
 
   const getAssignmentText = (assignedTo?: string): string => {
-    if (!assignedTo) return 'Unassigned';
+    if (!assignedTo) return ''; // Don't show "Unassigned" in tasks section since all tasks there are unassigned
     if (assignedTo === 'human') return 'Assigned to you';
     return 'Assigned to agent';
   };
@@ -52,9 +52,11 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
           <div className="text-sm font-medium text-base-content truncate group-hover:text-base-content/90 transition-colors">
             {task.title}
           </div>
-          <div className="text-xs text-base-content/60 truncate group-hover:text-base-content/70 transition-colors">
-            {getAssignmentText(task.assignedTo)}
-          </div>
+          {getAssignmentText(task.assignedTo) && (
+            <div className="text-xs text-base-content/60 truncate group-hover:text-base-content/70 transition-colors">
+              {getAssignmentText(task.assignedTo)}
+            </div>
+          )}
         </div>
 
         {/* Status Indicator */}
