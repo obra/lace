@@ -9,7 +9,8 @@ import { faRobot, faCog, faSquare, faChevronRight, faChevronDown } from '@/lib/f
 import { SidebarItem } from '@/components/layout/Sidebar';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useOptionalTaskContext } from '@/components/providers/TaskProvider';
-import type { ThreadId, AgentInfo } from '@/types/core';
+import { getStatusBgColor } from '@/lib/task-status-ui';
+import type { ThreadId, AgentInfo, Task } from '@/types/core';
 
 interface AgentsSectionProps {
   isMobile?: boolean;
@@ -159,15 +160,7 @@ export const AgentsSection = memo(function AgentsSection({
                           className="flex items-center gap-1.5 text-xs text-base-content/50"
                         >
                           <div
-                            className={`w-2 h-2 rounded-full ${
-                              task.status === 'pending'
-                                ? 'bg-yellow-500/50'
-                                : task.status === 'completed'
-                                  ? 'bg-green-500/50'
-                                  : task.status === 'blocked'
-                                    ? 'bg-red-500/50'
-                                    : 'bg-gray-500/50'
-                            }`}
+                            className={`w-2 h-2 rounded-full ${getStatusBgColor(task.status)}`}
                           />
                           <span className="truncate">{task.title}</span>
                         </div>

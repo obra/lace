@@ -9,6 +9,7 @@ import { faPlus, faChevronRight, faChevronDown } from '@/lib/fontawesome';
 import { SidebarButton } from '@/components/layout/Sidebar';
 import type { useTaskManager } from '@/hooks/useTaskManager';
 import { TaskSidebarItem } from './TaskSidebarItem';
+import { getStatusBgColor } from '@/lib/task-status-ui';
 import type { Task } from '@/types/core';
 
 // Task display limits for each status section
@@ -89,33 +90,18 @@ export function TaskListSidebar({
   }) => {
     const isExpanded = expandedSections.has(status);
 
-    // Get color for status
-    const getStatusColor = (status: string) => {
-      switch (status) {
-        case 'in_progress':
-          return 'bg-warning'; // yellow/orange
-        case 'pending':
-          return 'bg-base-content/40'; // gray
-        case 'blocked':
-          return 'bg-error'; // red
-        case 'completed':
-          return 'bg-success'; // green
-        default:
-          return 'bg-base-content/40';
-      }
-    };
-
     return (
       <div className="space-y-1">
         <button
           onClick={() => toggleSection(status)}
           className="flex items-center gap-1.5 text-xs font-medium text-base-content/80 hover:text-base-content transition-colors w-full text-left"
+          data-testid={`section-header-${status}`}
         >
           <FontAwesomeIcon
             icon={isExpanded ? faChevronDown : faChevronRight}
             className="w-2.5 h-2.5"
           />
-          <div className={`w-2 h-2 rounded-full ${getStatusColor(status)}`} />
+          <div className={`w-2 h-2 rounded-full ${getStatusBgColor(status as Task['status'])}`} />
           <span>
             {title} ({tasks.length})
           </span>

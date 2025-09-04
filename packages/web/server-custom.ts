@@ -1,7 +1,7 @@
 // ABOUTME: Custom React Router v7 server with enhanced CLI options and port detection
 // ABOUTME: Provides single-process server with Lace-specific startup logic and port selection
 
-import './lib/server/data-dir-init';
+import '@/lib/server/data-dir-init';
 import { parseArgs } from 'util';
 import type express from 'express';
 
@@ -89,20 +89,19 @@ async function startLaceServer() {
   app.use(compression.default());
   app.disable('x-powered-by');
 
-  console.error('Starting development server with Vite middleware');
+  console.info('Starting development server with Vite middleware');
 
   // Development mode - use Vite middleware
-  const hmrPort = port + 1000; // Use main port + 1000 for HMR websocket
-  const viteDevServer = await import('vite').then((vite) =>
-    vite.createServer({
-      server: {
-        middlewareMode: true,
-        hmr: {
-          port: hmrPort,
-        },
+  const vite = await import('vite');
+  const hmrPort = await findAvailablePort(port + 1000, false, hostname);
+  const viteDevServer = await vite.createServer({
+    server: {
+      middlewareMode: true,
+      hmr: {
+        port: hmrPort,
       },
-    })
-  );
+    },
+  });
 
   app.use(viteDevServer.middlewares);
   app.use(async (req, res, next) => {

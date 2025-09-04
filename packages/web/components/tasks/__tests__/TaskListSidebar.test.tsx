@@ -254,11 +254,11 @@ describe('TaskListSidebar', () => {
     expect(screen.queryByText('Pending Task')).not.toBeInTheDocument();
 
     // Click to expand pending section
-    await user.click(screen.getByText('Pending (1)'));
+    await user.click(screen.getByTestId('section-header-pending'));
     expect(screen.getByText('Pending Task')).toBeInTheDocument();
 
     // Click to collapse it again
-    await user.click(screen.getByText('Pending (1)'));
+    await user.click(screen.getByTestId('section-header-pending'));
     expect(screen.queryByText('Pending Task')).not.toBeInTheDocument();
   });
 

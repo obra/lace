@@ -51,11 +51,14 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
           <div className="text-sm font-medium text-base-content truncate group-hover:text-base-content/90 transition-colors">
             {task.title}
           </div>
-          {getAssignmentText(task.assignedTo) && (
-            <div className="text-xs text-base-content/60 truncate group-hover:text-base-content/70 transition-colors">
-              {getAssignmentText(task.assignedTo)}
-            </div>
-          )}
+          {(() => {
+            const assignmentText = getAssignmentText(task.assignedTo);
+            return assignmentText ? (
+              <div className="text-xs text-base-content/60 truncate group-hover:text-base-content/70 transition-colors">
+                {assignmentText}
+              </div>
+            ) : null;
+          })()}
         </div>
       </div>
     </div>
