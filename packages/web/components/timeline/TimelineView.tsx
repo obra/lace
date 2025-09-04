@@ -38,9 +38,18 @@ export function TimelineView({
 }: TimelineViewProps) {
   // Generate unique instance ID to prevent key conflicts across multiple TimelineView instances
   const instanceId = useRef<string>(
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? `tl-${crypto.randomUUID()}`
-      : `tl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    (() => {
+      if (typeof crypto !== 'undefined') {
+        if (typeof crypto.randomUUID === 'function') {
+          return `tl-${crypto.randomUUID()}`;
+        }
+        // Fallback to crypto.getRandomValues if available
+        const array = new Uint32Array(2);
+        crypto.getRandomValues(array);
+        return `tl-${array[0]}-${array[1]}`;
+      }
+      return `tl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    })()
   );
 
   // Process events (filtering, aggregation, etc.)

@@ -59,7 +59,7 @@ interface TaskProviderProps {
 export function TaskProvider({ children, projectId, sessionId }: TaskProviderProps) {
   // Get agents from AgentProvider context instead of props
   const agentContext = useOptionalAgentContext();
-  const agents = agentContext?.sessionDetails?.agents || [];
+  const agents: AgentInfo[] = agentContext?.sessionDetails?.agents ?? [];
   // Task modal states
   const [showTaskBoardModal, setShowTaskBoardModal] = useState(false);
   const [showTaskCreationModal, setShowTaskCreationModal] = useState(false);
