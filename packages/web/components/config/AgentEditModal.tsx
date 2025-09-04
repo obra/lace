@@ -12,6 +12,7 @@ interface EditingAgent {
   name: string;
   providerInstanceId: string;
   modelId: string;
+  persona: string;
 }
 
 interface AgentEditModalProps {
@@ -56,6 +57,24 @@ export const AgentEditModal = memo(function AgentEditModal({
             required
             autoFocus
           />
+        </div>
+
+        <div>
+          <label className="label">
+            <span className="label-text font-medium">Persona</span>
+          </label>
+          <input
+            type="text"
+            value={editingAgent.persona}
+            readOnly
+            className="input input-bordered w-full bg-base-200/50 cursor-not-allowed"
+            title="Persona cannot be changed after agent creation"
+          />
+          <div className="label">
+            <span className="label-text-alt text-base-content/60">
+              Persona is set when the agent is created and cannot be modified
+            </span>
+          </div>
         </div>
 
         <div>
