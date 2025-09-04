@@ -336,9 +336,9 @@ jobs:
           mkdir -p "build/appcast/$CHANNEL"
           
           # Copy final signed DMG to appcast directory with correct name (using same timestamp)
-          export BUILD_TIMESTAMP=$BUILD_TIMESTAMP
-          VERSION_INFO=$(bun -e "import('./scripts/create-dmg.ts').then(m => { const info = m.getVersionInfo(); process.stdout.write(info.fullVersion); })")
-          cp "$DMG_FILE" "build/appcast/$CHANNEL/Lace-$VERSION_INFO.dmg"
+          # Use the existing DMG filename instead of reconstructing version
+          DMG_BASENAME=$(basename "$DMG_FILE")
+          cp "$DMG_FILE" "build/appcast/$CHANNEL/$DMG_BASENAME"
           
           # Generate appcast using Sparkle tools
           cd platforms/macos
@@ -346,8 +346,8 @@ jobs:
           cd ../..
           
           # Replace placeholder URLs in appcast
-          echo "🔧 Replacing placeholder URL with: https://fsck.com/lace/dist/$CHANNEL/Lace-$VERSION_INFO.dmg"
-          node -e "const fs = require('fs'); const filePath = 'build/appcast/$CHANNEL/appcast.xml'; let content = fs.readFileSync(filePath, 'utf8'); content = content.replace(/PLACEHOLDER_URL_TO_BE_REPLACED/g, 'https://fsck.com/lace/dist/$CHANNEL/Lace-$VERSION_INFO.dmg'); fs.writeFileSync(filePath, content); console.log('✅ URL replacement completed');"
+          echo "🔧 Replacing placeholder URL with: https://fsck.com/lace/dist/$CHANNEL/$DMG_BASENAME"
+          node -e "const fs = require('fs'); const filePath = 'build/appcast/$CHANNEL/appcast.xml'; let content = fs.readFileSync(filePath, 'utf8'); content = content.replace(/PLACEHOLDER_URL_TO_BE_REPLACED/g, 'https://fsck.com/lace/dist/$CHANNEL/$DMG_BASENAME'); fs.writeFileSync(filePath, content); console.log('✅ URL replacement completed');"
           
           echo "✅ Appcast generated with correct signature for signed DMG"
           
