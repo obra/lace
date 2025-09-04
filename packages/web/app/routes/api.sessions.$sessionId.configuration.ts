@@ -2,7 +2,7 @@
 // ABOUTME: Handles session configuration retrieval and updates with validation and inheritance
 
 import { getSessionService } from '@/lib/server/session-service';
-import { ToolExecutor } from '@/lib/server/lace-imports';
+import { toolCacheService } from '@/lib/server/tool-cache-service';
 import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
@@ -43,13 +43,8 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     const configuration = session.getEffectiveConfiguration();
 
-    // Get user-configurable tools from tool registry
-    const toolExecutor = new ToolExecutor();
-    toolExecutor.registerAllAvailableTools();
-    const userConfigurableTools = toolExecutor
-      .getAllTools()
-      .filter((tool) => !tool.annotations?.safeInternal)
-      .map((tool) => tool.name);
+    // Get user-configurable tools from cached registry
+    const userConfigurableTools = toolCacheService.getUserConfigurableTools();
 
     return createSuperjsonResponse({
       configuration: {
@@ -96,13 +91,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     session.updateConfiguration(validatedData);
     const configuration = session.getEffectiveConfiguration();
 
-    // Get user-configurable tools from tool registry (same as GET)
-    const toolExecutor = new ToolExecutor();
-    toolExecutor.registerAllAvailableTools();
-    const userConfigurableTools = toolExecutor
-      .getAllTools()
-      .filter((tool) => !tool.annotations?.safeInternal)
-      .map((tool) => tool.name);
+    // Get user-configurable tools from cached registry (same as GET)
+    const userConfigurableTools = toolCacheService.getUserConfigurableTools();
 
     return createSuperjsonResponse({
       configuration: {

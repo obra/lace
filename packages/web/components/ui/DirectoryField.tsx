@@ -58,7 +58,12 @@ export function DirectoryField({
   // Add click outside handler
   const handleClickOutside = useCallback(
     (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(event.target as Node)
+      ) {
         // Don't close dropdown in inline mode
         if (!inline) {
           setIsDropdownOpen(false);
@@ -117,7 +122,7 @@ export function DirectoryField({
 
     // Extract the search term from the current input
     // This should be the part after the last slash
-    const searchTerm = value.split('/').pop()?.toLowerCase() || '';
+    const searchTerm = value.split(/[/\\]/).pop()?.toLowerCase() || '';
 
     // Filter out dot files unless user is typing them
     if (!searchTerm.startsWith('.')) {
@@ -290,6 +295,7 @@ export function DirectoryField({
                     <div className="flex items-center gap-2">
                       {parentPath && (
                         <button
+                          type="button"
                           onClick={handleNavigateToParent}
                           className="btn btn-ghost btn-xs"
                           title="Go up one level"
@@ -298,6 +304,7 @@ export function DirectoryField({
                         </button>
                       )}
                       <button
+                        type="button"
                         onClick={handleNavigateToHome}
                         className="btn btn-ghost btn-xs"
                         title="Go to home directory"
@@ -321,6 +328,7 @@ export function DirectoryField({
                     >
                       {getVisibleDirectories().map((dir) => (
                         <button
+                          type="button"
                           key={dir.path}
                           onClick={() => handleDirectorySelect(dir)}
                           onDoubleClick={() => handleDirectoryDoubleClick(dir)}
@@ -336,6 +344,7 @@ export function DirectoryField({
                       {getFilteredDirectories().length > 10 && !showMore && (
                         <div className="border-t border-base-300 p-2">
                           <button
+                            type="button"
                             onClick={() => setShowMore(true)}
                             className="w-full text-center text-sm text-primary hover:text-primary-focus py-1"
                           >
@@ -347,6 +356,7 @@ export function DirectoryField({
                       {showMore && getFilteredDirectories().length > 10 && (
                         <div className="border-t border-base-300 p-2">
                           <button
+                            type="button"
                             onClick={() => setShowMore(false)}
                             className="w-full text-center text-sm text-base-content/60 hover:text-base-content py-1"
                           >

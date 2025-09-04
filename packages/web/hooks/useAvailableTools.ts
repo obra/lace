@@ -22,8 +22,22 @@ export function useAvailableTools() {
           const config = await loadProjectConfiguration(projects[0].id);
 
           if (!isCancelled) {
-            const configResponse = config as ConfigurationResponse['configuration'];
-            setAvailableTools(configResponse.availableTools ?? []);
+            // Defensive type validation
+            if (config && typeof config === 'object' && 'availableTools' in config) {
+              const availableTools = (config as any).availableTools;
+              if (
+                Array.isArray(availableTools) &&
+                availableTools.every((tool) => typeof tool === 'string')
+              ) {
+                setAvailableTools(availableTools);
+              } else {
+                console.warn('Invalid availableTools format:', availableTools);
+                setAvailableTools([]);
+              }
+            } else {
+              console.warn('Configuration missing availableTools:', config);
+              setAvailableTools([]);
+            }
           }
         } else {
           if (!isCancelled) {
