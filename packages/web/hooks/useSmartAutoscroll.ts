@@ -1,7 +1,7 @@
 // ABOUTME: Smart autoscroll hook for chat timeline
 // ABOUTME: Handles autoscroll logic based on user scroll position and message events
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useScrollContext } from '@/components/providers/ScrollProvider';
 
 interface UseSmartAutoscrollOptions {
@@ -82,7 +82,7 @@ export function useSmartAutoscroll({
 export function useTimelineAutoscroll(
   events: unknown[],
   isTyping: boolean,
-  streamingContent?: string,
+  _streamingContent?: string, // Deprecated: now detected from events
   options?: UseSmartAutoscrollOptions
 ) {
   const { containerRef, scrollToBottom, isNearBottom } = useSmartAutoscroll(options);
@@ -128,19 +128,31 @@ export function useTimelineAutoscroll(
     prevEventsLengthRef.current = currentLength;
   }, [events, scrollToBottom]);
 
+  // Detect streaming content from events
+  const hasStreamingContent = useMemo(() => {
+    return events.some((e) => {
+      return (
+        typeof e === 'object' &&
+        e !== null &&
+        'type' in e &&
+        (e as { type: unknown }).type === 'AGENT_STREAMING'
+      );
+    });
+  }, [events]);
+
   // Handle typing indicator and streaming content
   useEffect(() => {
     const recentUserMessage = Date.now() - lastUserMessageTimeRef.current < 30000; // 30 seconds
 
     // Scroll for typing/streaming if we just had a user message or if user is near bottom
-    if (isTyping || streamingContent) {
+    if (isTyping || hasStreamingContent) {
       if (recentUserMessage) {
         scrollToBottom(true); // Force scroll if recent user interaction
       } else {
         scrollToBottom(false); // Smart scroll based on position
       }
     }
-  }, [isTyping, streamingContent, scrollToBottom]);
+  }, [isTyping, hasStreamingContent, scrollToBottom]);
 
   return {
     containerRef,

@@ -10,7 +10,6 @@ import { useTimelineAutoscroll } from '@/hooks/useSmartAutoscroll';
 import {
   useSessionEvents,
   useAgentAPI,
-  useEventStreamContext,
   useCompactionState,
 } from '@/components/providers/EventStreamProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
@@ -20,7 +19,6 @@ import type { ThreadId, AgentInfo, LaceEvent } from '@/types/core';
 export const Chat = memo(function Chat(): React.JSX.Element {
   // Get data from providers
   const { events } = useSessionEvents();
-  const { streamingContent } = useEventStreamContext();
   const compactionState = useCompactionState();
   const { sessionDetails, selectedAgent, agentBusy } = useAgentContext();
   const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useAgentAPI();
@@ -29,7 +27,7 @@ export const Chat = memo(function Chat(): React.JSX.Element {
   const agents = sessionDetails?.agents;
 
   // Smart autoscroll for the main conversation container
-  const { containerRef } = useTimelineAutoscroll(events, agentBusy, streamingContent, {
+  const { containerRef } = useTimelineAutoscroll(events, agentBusy, undefined, {
     nearBottomThreshold: 150,
     scrollDelay: 50,
   });
@@ -75,7 +73,6 @@ export const Chat = memo(function Chat(): React.JSX.Element {
             isTyping={agentBusy}
             currentAgent={currentAgent?.threadId}
             selectedAgent={inputAgentId}
-            streamingContent={streamingContent}
             compactionState={compactionState}
           />
         </div>

@@ -22,7 +22,6 @@ interface TimelineViewProps {
   agents?: AgentInfo[];
   isTyping: boolean;
   currentAgent?: string;
-  streamingContent?: string;
   selectedAgent?: string;
   compactionState?: CompactionState;
 }
@@ -32,7 +31,6 @@ export function TimelineView({
   agents,
   isTyping,
   currentAgent,
-  streamingContent,
   selectedAgent,
   compactionState,
 }: TimelineViewProps) {
@@ -102,43 +100,21 @@ export function TimelineView({
           </AnimatePresence>
 
           <AnimatePresence>
-            {streamingContent &&
-              (() => {
-                const streamingEvent = {
-                  id: 'streaming',
-                  type: 'AGENT_STREAMING' as const,
-                  threadId: currentAgent ? asThreadId(currentAgent) : STREAMING_THREAD_ID,
-                  timestamp: new Date(),
-                  data: { content: streamingContent },
-                  transient: true,
-                };
-
-                return (
-                  <motion.div
-                    key="streaming"
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -2 }}
-                    transition={{ duration: 0.1, ease: 'easeOut' }}
-                  >
-                    <TimelineEntryErrorBoundary event={streamingEvent}>
-                      <TimelineMessageWithDetails event={streamingEvent} agents={agents} />
-                    </TimelineEntryErrorBoundary>
-                  </motion.div>
-                );
-              })()}
-
-            {isTyping && !streamingContent && currentAgent && (
-              <motion.div
-                key="typing"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -2 }}
-                transition={{ duration: 0.1, ease: 'easeOut' }}
-              >
-                <TypingIndicator agent={currentAgent} />
-              </motion.div>
-            )}
+            {isTyping &&
+              currentAgent &&
+              !processedEvents.some(
+                (e) => e.type === 'AGENT_STREAMING' && e.threadId === asThreadId(currentAgent)
+              ) && (
+                <motion.div
+                  key="typing"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -2 }}
+                  transition={{ duration: 0.1, ease: 'easeOut' }}
+                >
+                  <TypingIndicator agent={currentAgent} />
+                </motion.div>
+              )}
 
             {compactionState?.isCompacting && (
               <motion.div

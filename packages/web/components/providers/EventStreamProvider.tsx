@@ -55,9 +55,6 @@ interface EventStreamContextType {
   // Agent events
   agentEvents: AgentEventsState;
 
-  // Streaming content
-  streamingContent: string | undefined;
-
   // Compaction state
   compactionState: CompactionState;
 
@@ -98,8 +95,7 @@ export function EventStreamProvider({
   const sessionAPI = useSessionAPIHook();
   const agentAPI = useAgentAPIHook();
 
-  // Streaming content state
-  const [streamingContent, setStreamingContent] = useState<string | undefined>(undefined);
+  // Streaming content now handled by useProcessedEvents hook
 
   // Compaction state
   const [compactionState, setCompactionState] = useState<CompactionState>({
@@ -122,18 +118,14 @@ export function EventStreamProvider({
     [updateAgentState, onAgentStateChange]
   );
 
-  // Agent token handler for streaming content
-  const handleAgentToken = useCallback((event: LaceEvent) => {
-    if (event.data && typeof event.data === 'object' && 'token' in event.data) {
-      const tokenData = event.data as { token: string };
-      // console.warn('[STREAMING] Adding token:', JSON.stringify(tokenData.token));
-      setStreamingContent((prev) => {
-        const newContent = (prev || '') + tokenData.token;
-        // console.warn('[STREAMING] New content length:', newContent.length);
-        return newContent;
-      });
-    }
-  }, []);
+  // Agent token handler - forward events to useProcessedEvents for token aggregation
+  const handleAgentToken = useCallback(
+    (event: LaceEvent) => {
+      // Forward AGENT_TOKEN events so useProcessedEvents can aggregate them
+      addAgentEvent(event);
+    },
+    [addAgentEvent]
+  );
 
   // Compaction event handlers
   const handleCompactionStart = useCallback((event: LaceEvent) => {
@@ -195,13 +187,9 @@ export function EventStreamProvider({
     [agentId, addAgentEvent]
   );
 
-  // Agent message handler to clear streaming content when complete
-  const stableAddAgentEventWithStreaming = useCallback(
+  // Agent message handler
+  const stableAddAgentEventMessage = useCallback(
     (event: LaceEvent) => {
-      // Clear streaming content when we get the complete agent message or a new user message
-      if (event.type === 'AGENT_MESSAGE' || event.type === 'USER_MESSAGE') {
-        setStreamingContent(undefined);
-      }
       addAgentEvent(event);
     },
     [addAgentEvent]
@@ -234,8 +222,8 @@ export function EventStreamProvider({
       },
       onAgentError: handleAgentError,
       // Agent event handlers - use single stable handler to prevent stale closures
-      onUserMessage: stableAddAgentEventWithStreaming,
-      onAgentMessage: stableAddAgentEventWithStreaming,
+      onUserMessage: stableAddAgentEventMessage,
+      onAgentMessage: stableAddAgentEventMessage,
       onAgentToken: handleAgentToken,
       onToolCall: stableAddAgentEvent,
       onToolResult: stableAddAgentEvent,
@@ -258,7 +246,7 @@ export function EventStreamProvider({
     sessionId,
     threadIds,
     stableAddAgentEvent,
-    stableAddAgentEventWithStreaming,
+    stableAddAgentEventMessage,
     handleAgentToken,
     handleAgentStateChangeCallback,
     handleApprovalRequest,
@@ -288,8 +276,7 @@ export function EventStreamProvider({
         addAgentEvent,
       },
 
-      // Streaming content
-      streamingContent,
+      // Streaming content removed - now handled by useProcessedEvents
 
       // Compaction state
       compactionState,
@@ -310,7 +297,6 @@ export function EventStreamProvider({
       events,
       loadingHistory,
       addAgentEvent,
-      streamingContent,
       compactionState,
       agentAPI.sendMessage,
       agentAPI.stopAgent,
