@@ -2,12 +2,11 @@
 // ABOUTME: Proves MCP integration works with real server, not just mocks
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { writeFileSync, mkdirSync, rmSync, existsSync } from 'fs';
+import { writeFileSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtempSync } from 'fs';
 import { ToolExecutor } from '~/tools/executor';
-import { MCPConfigLoader } from './config-loader';
 import type { ToolCall } from '~/tools/types';
 
 describe('Real MCP Server Integration', () => {
