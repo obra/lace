@@ -12,6 +12,7 @@ import { Alert } from '@/components/ui/Alert';
 import { SystemPromptEntry } from '@/components/timeline/SystemPromptEntry';
 import { UserSystemPromptEntry } from '@/components/timeline/UserSystemPromptEntry';
 import { CompactionEntry } from '@/components/timeline/CompactionEntry';
+import { AgentErrorEntry } from '@/components/timeline/AgentErrorEntry';
 import { formatTime } from '@/lib/format';
 
 interface TimelineMessageProps {
@@ -261,6 +262,9 @@ export function TimelineMessage({
     case 'PROJECT_DELETED':
     case 'TASK_NOTE_ADDED':
       return null;
+
+    case 'AGENT_ERROR':
+      return <AgentErrorEntry event={event} />;
 
     default:
       // Unknown event type - show debug info in development
