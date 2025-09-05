@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { MCPConfigLoader } from './config-loader';
+import { MCPConfigLoader } from './mcp-config-loader';
 
 describe('MCPConfigLoader', () => {
   let tempDir: string;
@@ -47,7 +47,7 @@ describe('MCPConfigLoader', () => {
     expect(config.servers.filesystem.tools.read_file).toBe('allow-session');
   });
 
-  it('should validate configuration structure', () => {
+  it('should gracefully handle invalid server configurations', () => {
     const validConfig = {
       servers: {
         test: {
@@ -67,10 +67,24 @@ describe('MCPConfigLoader', () => {
           enabled: true,
           tools: {},
         },
+        valid: {
+          command: 'echo',
+          enabled: true,
+          tools: { test: 'allow-session' },
+        },
       },
     };
 
-    expect(() => MCPConfigLoader.validateConfig(invalidConfig)).toThrow();
+    // Should not throw, should disable invalid servers
+    const result = MCPConfigLoader.validateConfig(invalidConfig);
+
+    // Invalid server should be disabled
+    expect(result.servers.test.enabled).toBe(false);
+    expect(result.servers.test.tools).toEqual({});
+
+    // Valid server should remain unchanged
+    expect(result.servers.valid.enabled).toBe(true);
+    expect(result.servers.valid.command).toBe('echo');
   });
 
   it('should merge configs with project replacing global servers', () => {

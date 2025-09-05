@@ -5,7 +5,7 @@ import { z, ZodType } from 'zod';
 import { Tool } from '~/tools/tool';
 import type { ToolResult, ToolContext, ContentBlock } from '~/tools/types';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { MCPTool } from '~/mcp/types';
+import type { MCPTool } from '~/config/mcp-types';
 
 /**
  * Converts MCP JSON Schema to Zod schema

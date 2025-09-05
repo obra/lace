@@ -6,6 +6,7 @@ import type { CompactionData } from '~/threads/compaction/types';
 import type { ApprovalDecision } from '~/tools/approval-types';
 import type { CombinedTokenUsage } from '~/token-management/types';
 import type { Task, TaskContext } from '~/tasks/types';
+import type { MCPServerConfig } from '~/config/mcp-types';
 
 // Single source of truth for all event types
 export const EVENT_TYPES = [
@@ -42,6 +43,9 @@ export const EVENT_TYPES = [
   'SYSTEM_NOTIFICATION',
   // Error events (transient)
   'AGENT_ERROR',
+  // MCP events (transient)
+  'MCP_CONFIG_CHANGED', // When project MCP config changes
+  'MCP_SERVER_STATUS_CHANGED', // When MCP server starts/stops/fails
 ] as const;
 
 // Derive LaceEventType union from the array
@@ -72,6 +76,9 @@ export function isTransientEventType(type: LaceEventType): boolean {
     'SYSTEM_NOTIFICATION',
     // Error events
     'AGENT_ERROR',
+    // MCP events
+    'MCP_CONFIG_CHANGED',
+    'MCP_SERVER_STATUS_CHANGED',
   ].includes(type);
 }
 
@@ -294,6 +301,19 @@ interface SystemNotificationData {
   type: 'system:notification'; // For compatibility
 }
 
+// MCP event data types
+interface MCPConfigChangedData {
+  serverId: string;
+  action: 'created' | 'updated' | 'deleted';
+  serverConfig?: MCPServerConfig;
+}
+
+interface MCPServerStatusChangedData {
+  serverId: string;
+  status: 'starting' | 'running' | 'stopped' | 'failed';
+  error?: string;
+}
+
 // Error type definitions - centralized for reuse
 export type ErrorType = 'provider_failure' | 'tool_execution' | 'processing_error' | 'timeout';
 export type ErrorPhase =
@@ -453,6 +473,14 @@ export type LaceEvent =
   | (BaseLaceEvent & {
       type: 'AGENT_ERROR';
       data: AgentErrorData;
+    })
+  | (BaseLaceEvent & {
+      type: 'MCP_CONFIG_CHANGED';
+      data: MCPConfigChangedData;
+    })
+  | (BaseLaceEvent & {
+      type: 'MCP_SERVER_STATUS_CHANGED';
+      data: MCPServerStatusChangedData;
     });
 
 export interface Thread {

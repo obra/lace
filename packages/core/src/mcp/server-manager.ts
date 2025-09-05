@@ -4,7 +4,7 @@
 import { EventEmitter } from 'events';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import type { MCPServerConfig, MCPServerConnection } from '~/mcp/types';
+import type { MCPServerConfig, MCPServerConnection } from '~/config/mcp-types';
 
 export interface ServerManagerEvents {
   'server-status-changed': (serverId: string, status: MCPServerConnection['status']) => void;
