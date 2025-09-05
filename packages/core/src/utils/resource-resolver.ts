@@ -3,6 +3,7 @@
 
 import path from 'path';
 import { fileURLToPath } from 'url';
+import * as fs from 'fs';
 import { logger } from '~/utils/logger';
 
 /**
@@ -24,8 +25,8 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
     // Running from Bun executable - return special markers for embedded file loading
     if (relativePath === 'data') {
       return '__BUN_EMBEDDED_DATA__';
-    } else if (relativePath === 'prompts') {
-      return '__BUN_EMBEDDED_PROMPTS__';
+    } else if (relativePath === 'agent-personas') {
+      return '__BUN_EMBEDDED_AGENT_PERSONAS__';
     } else if (relativePath === 'templates') {
       return '__BUN_EMBEDDED_TEMPLATES__';
     } else {
@@ -51,8 +52,11 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
         projectRoot.replace('file://', ''),
         'packages/core/src/providers/catalog/data'
       );
-    } else if (relativePath === 'prompts') {
-      return path.resolve(projectRoot.replace('file://', ''), 'packages/core/src/config/prompts');
+    } else if (relativePath === 'agent-personas') {
+      return path.resolve(
+        projectRoot.replace('file://', ''),
+        'packages/core/config/agent-personas'
+      );
     } else {
       throw new Error(
         `Unknown resource path '${relativePath}' in bundled mode. Add explicit mapping.`
@@ -83,6 +87,11 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
     const prefixLength = srcIndex + `/${srcPrefix}/`.length;
     const relativeFromSrc = moduleDir.substring(prefixLength);
 
+    // Special case for agent-personas which moved from src/config/ to config/
+    if (relativePath === 'config/agent-personas') {
+      return path.resolve(process.cwd(), 'packages/core/config/agent-personas');
+    }
+
     // Combine with the relative path and resolve from current working directory
     return path.resolve(process.cwd(), srcPrefix, relativeFromSrc, relativePath);
   } else {
@@ -90,6 +99,70 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
     const currentDir = path.dirname(fileURLToPath(importMetaUrl));
     return path.resolve(currentDir, relativePath);
   }
+}
+
+/**
+ * Scans for files in embedded or filesystem mode
+ * @param directoryPath - The logical directory path (e.g., 'providers/catalog/data', 'agent-personas')
+ * @param extension - File extension to filter by (e.g., '.json', '.md')
+ * @param fallbackFsPath - Filesystem path to use in development mode
+ * @returns Array of objects with file name and loading function
+ */
+export interface EmbeddedFileInfo {
+  name: string; // Just the filename without extension
+  fullPath: string; // Full path for reference
+  loadContent: () => Promise<string>;
+}
+
+export function scanEmbeddedFiles(
+  directoryPath: string,
+  extension: string,
+  fallbackFsPath: string
+): EmbeddedFileInfo[] {
+  const files: EmbeddedFileInfo[] = [];
+
+  // Try embedded files first (production/bundled mode)
+  if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
+    for (const file of Bun.embeddedFiles) {
+      const fileName = (file as File).name;
+      if (fileName.includes(`/${directoryPath}/`) && fileName.endsWith(extension)) {
+        const baseName = fileName.split('/').pop()?.slice(0, -extension.length);
+        if (baseName) {
+          files.push({
+            name: baseName,
+            fullPath: fileName,
+            loadContent: async () => await file.text(),
+          });
+        }
+      }
+    }
+  } else {
+    // Fallback to filesystem (development mode)
+    try {
+      const fsFiles = fs.readdirSync(fallbackFsPath);
+      for (const file of fsFiles) {
+        if (file.endsWith(extension)) {
+          const baseName = file.slice(0, -extension.length);
+          const fullPath = path.join(fallbackFsPath, file);
+          files.push({
+            name: baseName,
+            fullPath,
+            loadContent: () => {
+              return Promise.resolve(fs.readFileSync(fullPath, 'utf8'));
+            },
+          });
+        }
+      }
+    } catch (error) {
+      // Directory may not exist in development, that's ok
+      logger.warn('Failed to scan directory in filesystem mode', {
+        fallbackFsPath,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return files;
 }
 
 /**

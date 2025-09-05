@@ -8,6 +8,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { AIProvider, ProviderMessage } from '~/providers/base-provider';
 import { CombinedTokenUsage } from '~/token-management/types';
 import { logger } from '~/utils/logger';
+import { loadPromptConfig } from '~/config/prompts';
 
 /**
  * Base class for helper agents
@@ -47,6 +48,13 @@ export abstract class BaseHelper {
   protected abstract getModel(): string;
 
   /**
+   * Get the persona to use for this helper (optional - defaults to no system prompt)
+   */
+  protected getPersona(): string | undefined {
+    return undefined;
+  }
+
+  /**
    * Execute a prompt and return the complete result
    * May involve multiple LLM calls and tool executions internally
    */
@@ -54,9 +62,25 @@ export abstract class BaseHelper {
     const provider = await this.getProvider();
     const tools = this.getTools();
     const model = this.getModel();
+    const persona = this.getPersona();
 
-    // Build initial conversation
-    const conversation: ProviderMessage[] = [{ role: 'user', content: prompt }];
+    // Build initial conversation with optional system prompt
+    const conversation: ProviderMessage[] = [];
+
+    // Add system prompt if persona is specified
+    if (persona) {
+      try {
+        const promptConfig = await loadPromptConfig({ persona });
+        conversation.push({ role: 'system', content: promptConfig.systemPrompt });
+      } catch (error) {
+        logger.warn('Failed to load persona system prompt, continuing without it', {
+          persona,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    conversation.push({ role: 'user', content: prompt });
 
     // Track all tool usage
     const allToolCalls: ToolCall[] = [];

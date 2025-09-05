@@ -12,6 +12,7 @@ interface EditingAgent {
   name: string;
   providerInstanceId: string;
   modelId: string;
+  persona: string;
 }
 
 interface AgentEditModalProps {
@@ -107,6 +108,10 @@ export const AgentEditModal = memo(function AgentEditModal({
                 </option>
               )) || []}
           </select>
+        </div>
+
+        <div className="pt-2 border-t border-base-300/50">
+          <span className="text-sm text-base-content/60">Persona: {editingAgent.persona}</span>
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t border-base-300">

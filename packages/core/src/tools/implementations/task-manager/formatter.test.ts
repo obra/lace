@@ -69,7 +69,7 @@ describe('TaskFormatter', () => {
       prompt: 'Fix the blocker first',
       status: 'blocked',
       priority: 'high',
-      assignedTo: createNewAgentSpec('anthropic', 'claude-3-haiku'),
+      assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-3-haiku'),
       createdBy: agent1ThreadId,
       threadId: parentThreadId,
       createdAt: new Date('2025-01-01T08:00:00Z'),
@@ -105,7 +105,7 @@ describe('TaskFormatter', () => {
 
       expect(result).toContain('→ 2'); // Last part of agent2ThreadId
       expect(result).toContain('→ 1'); // Last part of agent1ThreadId
-      expect(result).toContain('new:anthropic/claude-3-haiku');
+      expect(result).toContain('new:lace:anthropic/claude-3-haiku');
     });
 
     it('should group by status', () => {
@@ -230,9 +230,9 @@ describe('TaskFormatter', () => {
     });
 
     it('should handle new agent spec format', () => {
-      const newAgentSpec = createNewAgentSpec('anthropic', 'claude-3-haiku');
+      const newAgentSpec = createNewAgentSpec('lace', 'anthropic', 'claude-3-haiku');
       const result = TaskFormatter['formatAssignee'](newAgentSpec);
-      expect(result).toBe('new:anthropic/claude-3-haiku');
+      expect(result).toBe('new:lace:anthropic/claude-3-haiku');
     });
 
     it('should handle base thread ID without hierarchy', () => {

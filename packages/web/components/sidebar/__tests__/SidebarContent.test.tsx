@@ -11,6 +11,7 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import type { SessionInfo, ThreadId, AgentInfo, ProjectInfo } from '@/types/core';
+import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 import {
   createMockSessionContext,
   createMockAgentContext,
@@ -140,13 +141,14 @@ const createMockProject = (): ProjectInfo => ({
   isArchived: false,
 });
 
-const createMockAgent = (id: string, name: string): AgentInfo => ({
-  threadId: id as ThreadId,
-  name,
-  providerInstanceId: 'test-provider',
-  modelId: 'test-model',
-  status: 'idle',
-});
+const createMockAgent = (id: string, name: string): AgentInfo =>
+  createMockAgentInfo({
+    threadId: id as ThreadId,
+    name,
+    providerInstanceId: 'test-provider',
+    modelId: 'test-model',
+    status: 'idle',
+  });
 
 const createMockSessionDetails = (): SessionInfo => ({
   id: 'test-session' as ThreadId,

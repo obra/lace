@@ -57,9 +57,9 @@ describe('Enhanced Task Data Model', () => {
     });
 
     it('should accept task with new agent spec assignee', () => {
-      const newAgentSpec = createNewAgentSpec('anthropic', 'claude-3-haiku');
+      const newAgentSpec = createNewAgentSpec('lace', 'anthropic', 'claude-3-haiku');
       testTask.assignedTo = newAgentSpec;
-      expect(testTask.assignedTo).toBe('new:anthropic/claude-3-haiku');
+      expect(testTask.assignedTo).toBe('new:lace:anthropic/claude-3-haiku');
       expect(isAssigneeId(testTask.assignedTo)).toBe(true);
     });
   });

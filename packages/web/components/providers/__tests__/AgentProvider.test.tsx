@@ -12,6 +12,7 @@ import '@testing-library/jest-dom/vitest';
 import { AgentProvider, useAgentContext } from '@/components/providers/AgentProvider';
 import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
 import type { CreateAgentRequest } from '@/types/api';
+import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
 // Mock the hooks
 vi.mock('@/hooks/useAgentManagement', () => ({
@@ -25,14 +26,15 @@ import { useAgentManagement } from '@/hooks/useAgentManagement';
 const mockUseAgentManagement = vi.mocked(useAgentManagement);
 
 // Test data factories
-const createMockAgent = (overrides?: Partial<AgentInfo>): AgentInfo => ({
-  threadId: 'lace_20240101_agent1' as ThreadId,
-  name: 'Test Agent',
-  providerInstanceId: 'test-provider',
-  modelId: 'test-model',
-  status: 'idle',
-  ...overrides,
-});
+const createMockAgent = (overrides?: Partial<AgentInfo>): AgentInfo =>
+  createMockAgentInfo({
+    threadId: 'lace_20240101_agent1' as ThreadId,
+    name: 'Test Agent',
+    providerInstanceId: 'test-provider',
+    modelId: 'test-model',
+    status: 'idle',
+    ...overrides,
+  });
 
 const createMockSession = (overrides?: Partial<SessionInfo>): SessionInfo => ({
   id: 'lace_20240101_sess01' as ThreadId,

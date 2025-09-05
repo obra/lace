@@ -63,9 +63,9 @@ function generateAllImports() {
   const jsonFiles = scanForFiles('packages/core/src/providers/catalog/data', '.json', 'catalog');
   console.log(`📋 Found ${jsonFiles.length} catalog files`);
 
-  // Scan for MD prompts
-  const mdFiles = scanForFiles('packages/core/src/config/prompts', '.md', 'prompt');
-  console.log(`📄 Found ${mdFiles.length} prompt files`);
+  // Scan for MD personas
+  const mdFiles = scanForFiles('packages/core/config/agent-personas', '.md', 'persona');
+  console.log(`📄 Found ${mdFiles.length} persona files`);
 
   // Scan for client assets
   const clientAssetsRaw = scanForFiles('packages/web/build/client', '', 'asset');
@@ -108,7 +108,7 @@ import '../../packages/web/server-production';
 
   console.log(`✅ Generated ${outputFile} with ${allFiles.length} imports`);
   console.log(`   📋 ${jsonFiles.length} JSON catalogs`);
-  console.log(`   📄 ${mdFiles.length} MD prompts`);
+  console.log(`   📄 ${mdFiles.length} MD personas`);
   console.log(`   🎨 ${clientAssets.length} client assets`);
 }
 

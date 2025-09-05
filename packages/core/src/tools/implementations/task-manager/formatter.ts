@@ -173,7 +173,7 @@ export class TaskFormatter {
     assignee: AssigneeId,
     metadata?: Map<ThreadId, { displayName?: string }>
   ): string {
-    // Handle "new:provider/model" format
+    // Handle "new:persona:provider/model" format
     if (assignee.startsWith('new:')) {
       return assignee;
     }

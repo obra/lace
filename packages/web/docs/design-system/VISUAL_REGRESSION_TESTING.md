@@ -1,10 +1,12 @@
 # Visual Regression Testing Workflow
 
-This document outlines the visual regression testing setup and workflow for the Lace project using Chromatic and Lighthouse CI.
+This document outlines the visual regression testing setup and workflow for the
+Lace project using Chromatic and Lighthouse CI.
 
 ## Overview
 
 Our visual regression testing infrastructure includes:
+
 - **Chromatic**: Automated visual regression testing for Storybook components
 - **Lighthouse CI**: Performance monitoring and regression detection
 - **Bundle Analysis**: Automated bundle size tracking and optimization alerts
@@ -39,7 +41,8 @@ The Chromatic configuration is defined in `.chromatic.config.json`:
 
 - **Multi-theme Testing**: Automatically tests both light and dark themes
 - **Optimized Performance**: Only tests changed components (`onlyChanged: true`)
-- **Threshold Configuration**: Tolerates minor visual differences (anti-aliasing, color, layout)
+- **Threshold Configuration**: Tolerates minor visual differences
+  (anti-aliasing, color, layout)
 - **File Hashing**: Efficient change detection using file hashing
 - **Compression**: Uploads compressed snapshots for faster processing
 
@@ -64,11 +67,11 @@ Performance monitoring is configured in `.lighthouserc.json`:
   "ci": {
     "assert": {
       "assertions": {
-        "categories:performance": ["error", {"minScore": 0.8}],
-        "categories:accessibility": ["error", {"minScore": 0.9}],
-        "first-contentful-paint": ["error", {"maxNumericValue": 2000}],
-        "largest-contentful-paint": ["error", {"maxNumericValue": 4000}],
-        "cumulative-layout-shift": ["error", {"maxNumericValue": 0.1}]
+        "categories:performance": ["error", { "minScore": 0.8 }],
+        "categories:accessibility": ["error", { "minScore": 0.9 }],
+        "first-contentful-paint": ["error", { "maxNumericValue": 2000 }],
+        "largest-contentful-paint": ["error", { "maxNumericValue": 4000 }],
+        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }]
       }
     }
   }
@@ -85,21 +88,25 @@ Performance monitoring is configured in `.lighthouserc.json`:
 
 ## GitHub Actions Workflow
 
-The automated testing workflow (`.github/workflows/chromatic.yml`) includes three jobs:
+The automated testing workflow (`.github/workflows/chromatic.yml`) includes
+three jobs:
 
 ### 1. Chromatic Job
+
 - Builds Storybook
 - Runs Chromatic visual regression testing
 - Uploads Storybook artifacts
 - Tests both light and dark themes
 
 ### 2. Lighthouse Job
+
 - Runs performance analysis on key stories
 - Tests multiple story endpoints
 - Generates performance reports
 - Uploads artifacts to temporary public storage
 
 ### 3. Bundle Analysis Job
+
 - Analyzes bundle size and composition
 - Identifies files over 100KB
 - Generates bundle analysis report
@@ -112,6 +119,7 @@ The automated testing workflow (`.github/workflows/chromatic.yml`) includes thre
 The Storybook configuration includes several performance optimizations:
 
 #### Code Splitting (`.storybook/main.ts`)
+
 ```typescript
 build: {
   rollupOptions: {
@@ -128,6 +136,7 @@ build: {
 ```
 
 #### Lazy Loading (`.storybook/preview.ts`)
+
 ```typescript
 const lazyImports = {
   syntaxHighlighting: () => import('highlight.js'),
@@ -138,6 +147,7 @@ const lazyImports = {
 ### Bundle Size Results
 
 Current optimized bundle sizes:
+
 - **vendor**: 11.80kb (React core)
 - **ui**: 158.30kb (UI components)
 - **icons**: 82.66kb (FontAwesome icons)
@@ -168,6 +178,7 @@ npm run chromatic
 ### CI/CD Integration
 
 The workflow automatically:
+
 - Runs on `main` and `develop` branches
 - Executes on all pull requests
 - Uploads artifacts for 30-day retention
@@ -178,8 +189,10 @@ The workflow automatically:
 
 ### Performance Regression Detection
 
-- **Lighthouse CI**: Automatically fails builds if performance thresholds are exceeded
-- **Bundle Analysis**: Tracks bundle size changes and alerts on significant increases
+- **Lighthouse CI**: Automatically fails builds if performance thresholds are
+  exceeded
+- **Bundle Analysis**: Tracks bundle size changes and alerts on significant
+  increases
 - **Visual Regression**: Chromatic detects and flags visual changes
 
 ### Artifact Management
@@ -201,7 +214,8 @@ The workflow automatically:
 
 1. **Skip Complex Stories**: Use `chromatic.skip` for interactive demos
 2. **Delay Configuration**: 300ms delay reduces visual diff noise
-3. **Threshold Tuning**: Adjust thresholds for anti-aliasing and color differences
+3. **Threshold Tuning**: Adjust thresholds for anti-aliasing and color
+   differences
 
 ### CI/CD Optimization
 
@@ -213,8 +227,10 @@ The workflow automatically:
 
 ### Common Issues
 
-1. **Project ID Setup**: Update `PROJECT_ID_PLACEHOLDER` in `.chromatic.config.json`
-2. **Secret Configuration**: Ensure `CHROMATIC_PROJECT_TOKEN` is set in GitHub secrets
+1. **Project ID Setup**: Update `PROJECT_ID_PLACEHOLDER` in
+   `.chromatic.config.json`
+2. **Secret Configuration**: Ensure `CHROMATIC_PROJECT_TOKEN` is set in GitHub
+   secrets
 3. **Bundle Size Alerts**: Check for unexpectedly large dependencies
 4. **Performance Failures**: Review Lighthouse CI reports for specific issues
 
@@ -229,4 +245,6 @@ find storybook-static -name "*.js" -size +100k -exec ls -lh {} \;
 npx lighthouse-ci autorun
 ```
 
-This comprehensive visual regression testing setup ensures consistent visual quality and performance across all components while providing automated feedback during development.
+This comprehensive visual regression testing setup ensures consistent visual
+quality and performance across all components while providing automated feedback
+during development.

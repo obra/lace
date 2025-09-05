@@ -2,21 +2,20 @@
 // ABOUTME: Called after user messages to create real-time activity summaries
 
 import { SessionHelper } from '@/lib/server/lace-imports';
-import { logger } from '~/utils/logger';
 import type { Agent } from '@/lib/server/lace-imports';
 import type { LaceEvent } from '@/types/core';
 
-class AgentSummaryError extends Error {
+class SummaryHelperError extends Error {
   public readonly code: string;
-  public readonly agentId: string;
-  public readonly cause?: Error;
+  public readonly helperName: string;
+  public readonly originalResult?: unknown;
 
-  constructor(message: string, context: { agentId: string; code: string; cause?: unknown }) {
+  constructor(code: string, message: string, context?: { originalResult?: unknown }) {
     super(message);
-    this.name = 'AgentSummaryError';
-    this.code = context.code;
-    this.agentId = context.agentId;
-    this.cause = context.cause instanceof Error ? context.cause : undefined;
+    this.name = 'SummaryHelperError';
+    this.code = code;
+    this.helperName = 'SessionHelper';
+    this.originalResult = context?.originalResult;
   }
 }
 
@@ -36,62 +35,34 @@ export async function generateAgentSummary(
     const helper = new SessionHelper({
       model: 'fast',
       parentAgent: agent,
+      persona: 'session-summary', // Use our minimal summary persona
     });
 
-    // Build context for the summary
+    // Build simplified context for the persona
     let context = `User message: "${userMessage}"`;
     if (lastAgentResponse) {
       context += `\n\nAgent's last response: "${lastAgentResponse}"`;
     }
 
-    const prompt = `Based on this conversation context, put together a clear one-sentence summary of what the agent is currently working on. It should be casual and sometimes a little playful, like you're talking to someone you trust. This will be shown at the top of the chat window.
+    // Simplified prompt - let the persona handle the behavior guidelines
+    const prompt = `Based on this conversation context, generate a one-sentence summary of what the agent is currently working on:
 
-${context}
-
-Respond with just the summary sentence, nothing else. Keep it concise and focused on the current task or activity.`;
+${context}`;
 
     const result = await helper.execute(prompt);
 
-    if (result.content && result.content.trim()) {
+    if (result?.content && typeof result.content === 'string' && result.content.trim()) {
       return result.content.trim();
     } else {
-      const agentId = getAgentId(agent);
-      throw new AgentSummaryError('No summary content returned from helper', {
-        agentId,
-        code: 'NO_CONTENT',
+      throw new SummaryHelperError('NO_SUMMARY', 'No summary content returned from helper', {
+        originalResult: result,
       });
     }
-  } catch (error) {
-    const agentId = getAgentId(agent);
-
-    if (error instanceof AgentSummaryError) {
-      // Already structured, just log and re-throw
-      logger.error('Agent summary helper error', {
-        agentId: error.agentId,
-        code: error.code,
-        message: error.message,
-        stack: error.stack,
-        cause: error.cause?.message,
-      });
+  } catch (error: unknown) {
+    if (error instanceof SummaryHelperError) {
       throw error;
     }
-
-    // Wrap other errors in structured format
-    const wrappedError = new AgentSummaryError('Agent summary helper execution failed', {
-      agentId,
-      code: 'EXECUTION_FAILED',
-      cause: error,
-    });
-
-    logger.error('Agent summary helper error', {
-      agentId: wrappedError.agentId,
-      code: wrappedError.code,
-      message: wrappedError.message,
-      stack: wrappedError.stack,
-      cause: wrappedError.cause?.message,
-    });
-
-    throw wrappedError;
+    throw new SummaryHelperError('EXECUTION_FAILED', 'Agent summary helper execution failed');
   }
 }
 
@@ -113,19 +84,4 @@ export function getLastAgentResponse(events: LaceEvent[]): string | undefined {
     }
   }
   return undefined;
-}
-
-/**
- * Helper to safely get agent ID
- */
-function getAgentId(agent: Agent): string {
-  try {
-    // Try to get the thread ID from agent
-    if (agent && typeof agent === 'object' && 'threadId' in agent) {
-      return String(agent.threadId);
-    }
-    return 'unknown';
-  } catch {
-    return 'unknown';
-  }
 }

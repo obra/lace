@@ -5,6 +5,8 @@
 export type {
   ThreadId,
   AssigneeId,
+  NewAgentSpec,
+  ParsedNewAgentSpec,
   LaceEventType,
   LaceEvent,
   AgentMessageData,
@@ -49,6 +51,9 @@ export {
   asThreadId,
   isThreadId,
   asNewAgentSpec,
+  isNewAgentSpec,
+  parseNewAgentSpec,
+  createNewAgentSpec,
   asAssigneeId,
   EVENT_TYPES,
   isTransientEventType,

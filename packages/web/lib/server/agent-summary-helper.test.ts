@@ -9,14 +9,31 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { generateAgentSummary, getLastAgentResponse } from './agent-summary-helper';
 import type { Agent } from '@/lib/server/lace-imports';
-import type { LaceEvent } from '@/types/core';
+import type { LaceEvent, ThreadId } from '@/types/core';
+import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
-// Mock SessionHelper
+// Mock logger to avoid console output and potential undefined errors
+vi.mock('~/utils/logger', () => ({
+  logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+// Mock SessionHelper and capture constructor options
 const mockExecute = vi.fn();
+let capturedSessionHelperOptions:
+  | { model: string; parentAgent: Agent; persona?: string }
+  | undefined;
 vi.mock('@/lib/server/lace-imports', () => ({
-  SessionHelper: vi.fn().mockImplementation(() => ({
-    execute: mockExecute,
-  })),
+  SessionHelper: vi.fn().mockImplementation((options) => {
+    capturedSessionHelperOptions = options;
+    return {
+      execute: mockExecute,
+    };
+  }),
   Agent: vi.fn(),
 }));
 
@@ -25,9 +42,18 @@ describe('agent-summary-helper', () => {
   let _mockSessionHelper: { execute: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
+    // Use the centralized mock factory for consistent agent structure
+    const agentInfo = createMockAgentInfo({
+      threadId: 'test-agent-123' as ThreadId,
+      name: 'Test Agent',
+      persona: 'lace',
+    });
+
     mockAgent = {
-      threadId: 'test-agent-123',
-    } as Agent;
+      threadId: agentInfo.threadId,
+      getInfo: vi.fn().mockReturnValue(agentInfo),
+      toString: vi.fn().mockReturnValue('test-agent-123'),
+    } as unknown as Agent;
 
     _mockSessionHelper = { execute: mockExecute };
     vi.clearAllMocks();
@@ -38,6 +64,23 @@ describe('agent-summary-helper', () => {
   });
 
   describe('generateAgentSummary', () => {
+    it('should use session-summary persona when creating SessionHelper', async () => {
+      mockExecute.mockResolvedValue({
+        content: 'Working on user authentication setup',
+        toolCalls: [],
+        toolResults: [],
+      });
+
+      await generateAgentSummary(mockAgent, 'Help me set up user authentication');
+
+      // Verify SessionHelper was created with session-summary persona
+      expect(capturedSessionHelperOptions).toEqual({
+        model: 'fast',
+        parentAgent: mockAgent,
+        persona: 'session-summary',
+      });
+    });
+
     it('should generate summary with user message only', async () => {
       mockExecute.mockResolvedValue({
         content: 'Working on user authentication setup',
@@ -52,7 +95,9 @@ describe('agent-summary-helper', () => {
         expect.stringContaining('User message: "Help me set up user authentication"')
       );
       expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('put together a clear one-sentence summary')
+        expect.stringContaining(
+          'generate a one-sentence summary of what the agent is currently working on'
+        )
       );
     });
 
@@ -80,24 +125,41 @@ describe('agent-summary-helper', () => {
       );
     });
 
-    it('should throw when helper returns no content', async () => {
+    it('should handle empty content from helper gracefully', async () => {
       mockExecute.mockResolvedValue({
         content: '',
         toolCalls: [],
         toolResults: [],
+        tokenUsage: undefined,
       });
 
-      await expect(generateAgentSummary(mockAgent, 'Test message')).rejects.toThrow(
-        'No summary content returned from helper'
-      );
+      // Should reject the promise when no content is returned
+      let errorThrown = false;
+      try {
+        await generateAgentSummary(mockAgent, 'Test message');
+      } catch (error) {
+        errorThrown = true;
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toContain('No summary content');
+      }
+
+      expect(errorThrown).toBe(true);
     });
 
-    it('should re-throw when helper throws', async () => {
+    it('should handle helper execution failures gracefully', async () => {
       mockExecute.mockRejectedValue(new Error('Network error'));
 
-      await expect(generateAgentSummary(mockAgent, 'Test message')).rejects.toThrow(
-        'Agent summary helper execution failed'
-      );
+      // Should reject with wrapped error when helper fails
+      let errorThrown = false;
+      try {
+        await generateAgentSummary(mockAgent, 'Test message');
+      } catch (error) {
+        errorThrown = true;
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toContain('execution failed');
+      }
+
+      expect(errorThrown).toBe(true);
     });
 
     it('should trim whitespace from successful response', async () => {

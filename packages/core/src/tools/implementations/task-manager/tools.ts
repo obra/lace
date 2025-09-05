@@ -19,7 +19,7 @@ const createTaskSchema = z.object({
         description: z.string().max(1000).optional(),
         prompt: z.string().min(1),
         priority: z.enum(['high', 'medium', 'low'] as const).default('medium'),
-        assignedTo: z.string().optional().describe('Thread ID or "new:provider/model"'),
+        assignedTo: z.string().optional().describe('Thread ID or "new:persona:provider/model"'),
       })
     )
     .min(1, 'Must provide at least 1 task')
@@ -372,7 +372,7 @@ const updateTaskSchema = z
   .object({
     taskId: NonEmptyString,
     status: TaskStatusSchema.optional(),
-    assignTo: z.string().describe('Thread ID or "new:provider/model"').optional(),
+    assignTo: z.string().describe('Thread ID or "new:persona:provider/model"').optional(),
     priority: z.enum(['high', 'medium', 'low'] as const).optional(),
     title: z.string().max(200).optional(),
     description: z.string().max(1000).optional(),
@@ -390,7 +390,7 @@ export class TaskUpdateTool extends Tool {
 Use for:
 - Marking tasks in progress: task_update({ taskId: "task_123", status: "in_progress" })
 - Changing priority: task_update({ taskId: "task_123", priority: "high" })
-- Reassigning work: task_update({ taskId: "task_123", assignTo: "new:anthropic/claude-3-5-haiku-20241022" })
+- Reassigning work: task_update({ taskId: "task_123", assignTo: "new:lace:anthropic/claude-3-5-haiku-20241022" })
 - Updating requirements: task_update({ taskId: "task_123", prompt: "Updated requirements..." })
 
 Status options: pending, in_progress, completed, blocked, archived

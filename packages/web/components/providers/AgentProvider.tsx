@@ -41,7 +41,7 @@ export interface AgentContextType {
   reloadSessionDetails: () => Promise<void>;
   loadAgentConfiguration: (
     agentId: string
-  ) => Promise<{ name: string; providerInstanceId: string; modelId: string }>;
+  ) => Promise<{ name: string; providerInstanceId: string; modelId: string; persona: string }>;
   updateAgent: (
     agentId: string,
     config: { name: string; providerInstanceId: string; modelId: string }

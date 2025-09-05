@@ -14,6 +14,7 @@ import {
   ContextDisclaimerProvider,
 } from '~/config/variable-providers';
 import { getLaceDir } from '~/config/lace-dir';
+import { personaRegistry } from '~/config/persona-registry';
 import { logger } from '~/utils/logger';
 
 interface PromptManagerOptions {
@@ -52,16 +53,26 @@ export class PromptManager {
   }
 
   /**
-   * Generate the system prompt using template system
+   * Generate the system prompt using template system for specified persona (defaults to 'lace')
    */
-  async generateSystemPrompt(): Promise<string> {
+  async generateSystemPrompt(persona: string = 'lace'): Promise<string> {
     try {
-      logger.debug('Generating system prompt using template system');
+      logger.debug('Generating system prompt using template system', { persona });
+
+      // Validate persona exists
+      personaRegistry.validatePersona(persona);
+
+      // Get persona template path
+      const personaPath = personaRegistry.getPersonaPath(persona);
+      if (!personaPath) {
+        throw new Error(`Persona '${persona}' not found`);
+      }
 
       const context = await this.variableManager.getTemplateContext();
-      const prompt = this.templateEngine.render('system.md', context);
+      const prompt = this.templateEngine.render(`${persona}.md`, context);
 
       logger.debug('System prompt generated successfully', {
+        persona,
         contextKeys: Object.keys(context),
         promptLength: prompt.length,
       });
@@ -69,6 +80,7 @@ export class PromptManager {
       return prompt;
     } catch (error) {
       logger.error('Failed to generate system prompt', {
+        persona,
         error: error instanceof Error ? error.message : String(error),
       });
       return this.getFallbackPrompt();
@@ -90,14 +102,14 @@ export class PromptManager {
    */
   private getUserTemplateDir(): string {
     const laceDir = getLaceDir();
-    return path.join(laceDir, 'prompts');
+    return path.join(laceDir, 'agent-personas');
   }
 
   /**
    * Get the embedded template directory path
    */
   private getEmbeddedTemplateDir(): string {
-    return resolveResourcePath(import.meta.url, 'prompts');
+    return resolveResourcePath(import.meta.url, 'agent-personas');
   }
 
   /**
@@ -115,12 +127,12 @@ export class PromptManager {
       // Check embedded first (Bun executable)
       if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
         for (const f of Bun.embeddedFiles) {
-          if ((f as File).name.endsWith('/prompts/system.md')) return true;
+          if ((f as File).name.endsWith('/agent-personas/lace.md')) return true;
         }
       }
       // Fallback: check file system (dev)
       for (const templateDir of this.templateDirs) {
-        const systemTemplatePath = path.join(templateDir, 'system.md');
+        const systemTemplatePath = path.join(templateDir, 'lace.md');
         if (fs.existsSync(systemTemplatePath)) return true;
       }
       return false;

@@ -161,7 +161,7 @@ describe('Bulk Task Creation', () => {
             title: 'Valid Task',
             prompt: 'This task has valid assignment',
             priority: 'medium' as const,
-            assignedTo: 'new:anthropic/claude-3-5-haiku-20241022',
+            assignedTo: 'new:lace:anthropic/claude-3-5-haiku-20241022',
           },
           {
             title: 'Invalid Task',

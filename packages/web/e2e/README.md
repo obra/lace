@@ -1,6 +1,7 @@
 # End-to-End Tests
 
-This directory contains both unit/integration tests and true end-to-end tests using Playwright.
+This directory contains both unit/integration tests and true end-to-end tests
+using Playwright.
 
 ## Test Files
 
@@ -102,15 +103,20 @@ The tests use `data-testid` attributes to identify UI elements:
 
 ## Known Issues
 
-The tests currently expect these test IDs to exist in the React UI components. The actual web UI implementation will need to include these `data-testid` attributes for the tests to pass.
+The tests currently expect these test IDs to exist in the React UI components.
+The actual web UI implementation will need to include these `data-testid`
+attributes for the tests to pass.
 
 ## Architecture Testing
 
 These tests verify the complete architecture:
 
-1. **Browser** → **Next.js API Routes** → **SessionService** → **Session Class** → **Agent** → **Database**
+1. **Browser** → **Next.js API Routes** → **SessionService** → **Session Class**
+   → **Agent** → **Database**
 2. **Real-time updates** via **SSE** back to the **Browser**
 3. **Session persistence** and **restoration** functionality
 4. **Full conversation history** loading (like CLI's `--continue` command)
 
-This ensures that the web UI provides the same functionality as the CLI interface, including proper session restoration with full conversational context.
+This ensures that the web UI provides the same functionality as the CLI
+interface, including proper session restoration with full conversational
+context.

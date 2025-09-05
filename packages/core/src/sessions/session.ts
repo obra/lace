@@ -677,6 +677,7 @@ export class Session {
     name?: string;
     providerInstanceId?: string;
     modelId?: string;
+    persona?: string;
   }): Agent {
     // Generate thread ID first to create proper agent name
     const targetThreadId =
@@ -731,6 +732,7 @@ export class Session {
       threadManager: this._threadManager,
       threadId: targetThreadId,
       tools: agentToolExecutor.getAllTools(),
+      persona: config.persona,
       metadata: {
         // Set metadata in constructor
         name: agentName,
@@ -859,6 +861,7 @@ export class Session {
    */
   private setupAgentCreationCallback(): void {
     const agentCreationCallback: AgentCreationCallback = async (
+      persona: string,
       provider: string,
       model: string,
       task
@@ -874,6 +877,7 @@ export class Session {
         name: agentName,
         providerInstanceId: provider, // Use the provider instance ID directly
         modelId: model, // Pass the model from the task assignment
+        persona: persona, // Pass the persona from the NewAgentSpec
       });
 
       // Start the agent to ensure token budget is initialized

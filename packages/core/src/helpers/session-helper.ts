@@ -21,6 +21,9 @@ export interface SessionHelperOptions {
 
   /** Optional abort signal for cancellation */
   abortSignal?: AbortSignal;
+
+  /** Optional persona to use - defaults to 'lace' */
+  persona?: string;
 }
 
 /**
@@ -107,6 +110,10 @@ export class SessionHelper extends BaseHelper {
     // Get tool executor from parent agent
     this.toolExecutor = this.options.parentAgent.toolExecutor;
     return this.toolExecutor;
+  }
+
+  protected getPersona(): string | undefined {
+    return this.options.persona;
   }
 
   protected getModel(): string {

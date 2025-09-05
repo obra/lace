@@ -5,6 +5,8 @@
 
 import React from 'react';
 import type { Task } from '@/types/core';
+import { getStatusBgColor } from '@/lib/task-status-ui';
+import { isNewAgentSpec, parseNewAgentSpec } from '@/types/core';
 
 interface TaskSidebarItemProps {
   task: Task;
@@ -19,8 +21,19 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
   }[task.priority];
 
   const getAssignmentText = (assignedTo?: string): string => {
-    if (!assignedTo) return ''; // Don't show "Unassigned" in tasks section since all tasks there are unassigned
+    if (!assignedTo) return 'Unassigned';
     if (assignedTo === 'human') return 'Assigned to you';
+
+    // Handle NewAgentSpec format
+    if (isNewAgentSpec(assignedTo)) {
+      try {
+        const parsed = parseNewAgentSpec(assignedTo);
+        return `${parsed.persona} agent (${parsed.provider}/${parsed.model})`;
+      } catch {
+        return 'New agent (invalid format)';
+      }
+    }
+
     return 'Assigned to agent';
   };
 
@@ -51,14 +64,18 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
           <div className="text-sm font-medium text-base-content truncate group-hover:text-base-content/90 transition-colors">
             {task.title}
           </div>
-          {(() => {
-            const assignmentText = getAssignmentText(task.assignedTo);
-            return assignmentText ? (
-              <div className="text-xs text-base-content/60 truncate group-hover:text-base-content/70 transition-colors">
-                {assignmentText}
-              </div>
-            ) : null;
-          })()}
+          <div className="text-xs text-base-content/60 truncate group-hover:text-base-content/70 transition-colors">
+            {getAssignmentText(task.assignedTo)}
+          </div>
+        </div>
+
+        {/* Status Indicator */}
+        <div className="flex items-center justify-center">
+          <div
+            className={`w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-200 ${getStatusBgColor(task.status)}`}
+            role="presentation"
+            aria-label={`Status: ${task.status.replace('_', ' ')}`}
+          />
         </div>
       </div>
     </div>
