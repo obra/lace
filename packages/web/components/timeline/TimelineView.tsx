@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { LaceEvent, AgentInfo, ThreadId } from '@/types/core';
 import type { CompactionState } from '@/components/providers/EventStreamProvider';
@@ -11,7 +11,7 @@ import { asThreadId } from '@/types/core';
 import { TimelineMessageWithDetails } from './TimelineMessageWithDetails';
 import { TypingIndicator } from './TypingIndicator';
 import { CompactionIndicator } from './CompactionIndicator';
-import { useProcessedEvents } from '@/hooks/useProcessedEvents';
+import { useProcessedEvents, type ProcessedEvent } from '@/hooks/useProcessedEvents';
 import TimelineEntryErrorBoundary from './TimelineEntryErrorBoundary';
 
 // Placeholder for when currentAgent is not available - use valid thread ID format
@@ -93,14 +93,21 @@ export function TimelineView({
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(event.type) &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(nextEvent.type);
 
+              // Generate a more unique key to prevent duplicates
+              const eventKey =
+                event.id ||
+                `${instanceId.current}-${event.threadId}-${event.type}-${
+                  event.timestamp instanceof Date ? event.timestamp.getTime() : event.timestamp
+                }-${index}-${JSON.stringify(event.data).slice(0, 50)}`;
+
+              // Debug: log when using fallback key generation
+              if (!event.id && process.env.NODE_ENV === 'development') {
+                console.warn('Using fallback key for event:', eventKey, event);
+              }
+
               return (
                 <motion.div
-                  key={
-                    event.id ||
-                    `${instanceId.current}-${event.threadId}-${
-                      event.timestamp instanceof Date ? event.timestamp.getTime() : event.timestamp
-                    }-${index}`
-                  }
+                  key={eventKey}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}

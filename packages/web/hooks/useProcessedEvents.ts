@@ -93,6 +93,7 @@ function processStreamingTokens(events: LaceEvent[]): LaceEvent[] {
   // Add remaining streaming messages as AGENT_STREAMING events
   for (const [threadId, { content, timestamp }] of streamingMessages.entries()) {
     const streamingEvent: LaceEvent = {
+      id: `streaming_${timestamp.getTime()}_${threadId}_${content.slice(0, 10).replace(/\s/g, '_')}`,
       type: 'AGENT_STREAMING',
       threadId: threadId as ThreadId,
       timestamp: timestamp,
