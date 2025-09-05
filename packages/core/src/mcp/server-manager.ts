@@ -2,8 +2,8 @@
 // ABOUTME: Handles server lifecycle, connection state, and provides SDK client access
 
 import { EventEmitter } from 'events';
-import { Client } from '../../../vendor/typescript-sdk/src/client/index.js';
-import { StdioClientTransport } from '../../../vendor/typescript-sdk/src/client/stdio.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { MCPServerConfig, MCPServerConnection } from './types';
 
 export interface ServerManagerEvents {

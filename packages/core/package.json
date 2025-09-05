@@ -23,6 +23,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",
     "@lmstudio/sdk": "^1.2.1",
+    "@modelcontextprotocol/sdk": "^1.17.5",
     "@typescript-eslint/utils": "^8.39.1",
     "better-sqlite3": "^11.10.0",
     "mustache": "^4.2.0",

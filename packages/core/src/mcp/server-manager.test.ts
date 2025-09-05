@@ -3,14 +3,14 @@ import { MCPServerManager } from './server-manager';
 import type { MCPServerConfig } from './types';
 
 // Mock the MCP SDK modules
-vi.mock('../../../vendor/typescript-sdk/src/client/index.js', () => ({
+vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
   Client: vi.fn().mockImplementation(() => ({
     connect: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
   })),
 }));
 
-vi.mock('../../../vendor/typescript-sdk/src/client/stdio.js', () => ({
+vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
   StdioClientTransport: vi.fn().mockImplementation(() => ({
     close: vi.fn().mockResolvedValue(undefined),
     onerror: null,
@@ -53,10 +53,8 @@ describe('MCPServerManager', () => {
   });
 
   it('should create client and transport instances', async () => {
-    const { Client } = await import('../../../vendor/typescript-sdk/src/client/index.js');
-    const { StdioClientTransport } = await import(
-      '../../../vendor/typescript-sdk/src/client/stdio.js'
-    );
+    const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+    const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
 
     const config: MCPServerConfig = {
       command: 'node',
@@ -88,7 +86,7 @@ describe('MCPServerManager', () => {
   });
 
   it('should handle connection errors', async () => {
-    const { Client } = await import('../../../vendor/typescript-sdk/src/client/index.js');
+    const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
 
     // Mock client.connect to throw error
     const mockClient = {

@@ -1,8 +1,8 @@
 // ABOUTME: TypeScript interfaces for MCP client communication and configuration
 // ABOUTME: Defines server configuration and state management types (SDK handles JSON-RPC)
 
-import type { Client } from '../../../vendor/typescript-sdk/src/client/index.js';
-import type { StdioClientTransport } from '../../../vendor/typescript-sdk/src/client/stdio.js';
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 // MCP Server Configuration (matches mcp-config.json structure)
 export interface MCPServerConfig {
@@ -39,8 +39,6 @@ export interface MCPServerConnection {
 }
 
 // Re-export key SDK types for convenience
-export type { Tool as MCPTool } from '../../../vendor/typescript-sdk/src/types.js';
-export type {
-  CallToolRequest,
-  ListToolsRequest,
-} from '../../../vendor/typescript-sdk/src/types.js';
+export type { Tool as MCPTool } from '@modelcontextprotocol/sdk/types.js';
+export type { CallToolRequest, ListToolsRequest } from '@modelcontextprotocol/sdk/types.js';
+export type { Client, StdioClientTransport };
