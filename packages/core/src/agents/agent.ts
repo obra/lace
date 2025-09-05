@@ -947,18 +947,6 @@ export class Agent extends EventEmitter {
       this.emit('token_usage_update', { usage });
     };
 
-    const errorListener = ({ error }: { error: Error }) => {
-      if (error.name !== 'AbortError') {
-        this._emitError(error, {
-          phase: 'provider_response',
-          threadId: this._threadId,
-          errorType: 'streaming_error' as ErrorType,
-          isRetryable: this.isRetryableError(error),
-          retryCount: 0,
-        });
-      }
-    };
-
     const retryAttemptListener = ({
       attempt,
       delay,
@@ -997,7 +985,8 @@ export class Agent extends EventEmitter {
     if (this.providerInstance) {
       this.providerInstance.on('token', tokenListener);
       this.providerInstance.on('token_usage_update', tokenUsageListener);
-      this.providerInstance.on('error', errorListener);
+      // Note: Removed error listener to prevent duplicate error emissions
+      // Errors are now handled exclusively in try/catch blocks
       this.providerInstance.on('retry_attempt', retryAttemptListener);
       this.providerInstance.on('retry_exhausted', retryExhaustedListener);
     }
@@ -1051,7 +1040,7 @@ export class Agent extends EventEmitter {
       if (this.providerInstance) {
         this.providerInstance.removeListener('token', tokenListener);
         this.providerInstance.removeListener('token_usage_update', tokenUsageListener);
-        this.providerInstance.removeListener('error', errorListener);
+        // Note: No error listener to remove (handled in try/catch blocks)
         this.providerInstance.removeListener('retry_attempt', retryAttemptListener);
         this.providerInstance.removeListener('retry_exhausted', retryExhaustedListener);
       }
@@ -1807,7 +1796,56 @@ export class Agent extends EventEmitter {
       }
     }
 
-    return messages;
+    return this._ensureToolCallCompleteness(messages);
+  }
+
+  // Ensure all tool calls have corresponding results to prevent API errors
+  private _ensureToolCallCompleteness(messages: ProviderMessage[]): ProviderMessage[] {
+    const pendingToolCalls = new Map<string, { name: string; arguments: unknown }>();
+    const completedMessages: ProviderMessage[] = [];
+
+    for (const message of messages) {
+      completedMessages.push(message);
+
+      if (message.role === 'assistant' && message.toolCalls) {
+        // Track tool calls that need results
+        for (const toolCall of message.toolCalls) {
+          pendingToolCalls.set(toolCall.id, {
+            name: toolCall.name,
+            arguments: toolCall.arguments,
+          });
+        }
+      } else if (message.role === 'user' && message.toolResults) {
+        // Mark tool calls as completed
+        for (const toolResult of message.toolResults) {
+          if (toolResult.id) {
+            pendingToolCalls.delete(toolResult.id);
+          }
+        }
+      }
+    }
+
+    // If there are still pending tool calls, create synthetic results
+    if (pendingToolCalls.size > 0) {
+      const syntheticResults = Array.from(pendingToolCalls.entries()).map(([id, toolCall]) => ({
+        id,
+        content: [
+          {
+            type: 'text' as const,
+            text: `Tool execution interrupted. The ${toolCall.name} tool was called but no result was captured.`,
+          },
+        ],
+        status: 'failed' as const,
+      }));
+
+      completedMessages.push({
+        role: 'user',
+        content: '',
+        toolResults: syntheticResults,
+      });
+    }
+
+    return completedMessages;
   }
 
   // Override emit to provide type safety
