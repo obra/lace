@@ -6,6 +6,7 @@ import { basename } from 'path';
 import { getPersistence, ProjectData, SessionData } from '~/persistence/database';
 import { logger } from '~/utils/logger';
 import { Session } from '~/sessions/session';
+import type { ThreadId } from '~/threads/types';
 import { ThreadManager } from '~/threads/thread-manager';
 import type { SessionConfiguration } from '~/sessions/session-config';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
@@ -74,7 +75,7 @@ export class Project {
 
     // Auto-create a default session with project configuration
     try {
-      Session.create({
+      void Session.create({
         name: 'Main Session',
         description: 'Default session for project',
         projectId: projectData.id,
@@ -418,15 +419,21 @@ export class Project {
   private notifySessionsMCPChange(
     serverId: string,
     action: 'created' | 'updated' | 'deleted',
-    _serverConfig?: MCPServerConfig
+    serverConfig?: MCPServerConfig
   ): void {
-    // TODO: Implement session notification when Session class has MCP support
-    // For now, just log the change
-    const sessions = this.getSessions();
-    console.warn(
-      `MCP config change: ${serverId} ${action} (${sessions.length} sessions to notify)`
-    );
-    // Will implement actual session notification in next task
+    // Get session data and look up actual Session instances
+    const sessionDataList = this.getSessions();
+
+    sessionDataList.forEach((sessionData) => {
+      const session = Session.getByIdSync(sessionData.id as ThreadId);
+      if (session) {
+        session.announceMCPConfigChange(serverId, action, serverConfig);
+      } else {
+        logger.warn(
+          `Session ${sessionData.id} not found in registry for MCP config change notification`
+        );
+      }
+    });
   }
 
   private static generateNameFromDirectory(workingDirectory: string): string {
