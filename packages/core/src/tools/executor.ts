@@ -30,17 +30,26 @@ import {
 } from '~/tools/implementations/task-manager/index';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url-fetch';
+import { MCPToolRegistry } from '~/mcp/tool-registry';
+import { MCPServerManager } from '~/mcp/server-manager';
+import { MCPConfigLoader } from '~/mcp/config-loader';
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
   private approvalCallback?: ApprovalCallback;
   private envManager: ProjectEnvironmentManager;
+  private mcpRegistry?: MCPToolRegistry;
 
   // Constants for temp directory naming
   private static readonly TOOL_CALL_TEMP_PREFIX = 'tool-call-';
 
   constructor() {
     this.envManager = new ProjectEnvironmentManager();
+
+    // Initialize MCP registry in background
+    this.initializeMCPRegistry().catch((error) => {
+      console.warn('Failed to initialize MCP registry:', error);
+    });
   }
 
   registerTool(name: string, tool: Tool): void {
@@ -99,6 +108,51 @@ export class ToolExecutor {
     this.registerTools(tools);
   }
 
+  private async initializeMCPRegistry(): Promise<void> {
+    try {
+      // Use current working directory as project root fallback
+      const projectRoot = process.cwd();
+      const config = MCPConfigLoader.loadConfig(projectRoot);
+
+      const serverManager = new MCPServerManager();
+      this.mcpRegistry = new MCPToolRegistry(serverManager);
+
+      // Listen for tool updates and register them
+      this.mcpRegistry.on('tools-updated', (serverId, tools) => {
+        this.registerMCPTools(tools, config);
+      });
+
+      // Initialize (starts servers and discovers tools)
+      await this.mcpRegistry.initialize(config);
+    } catch (error) {
+      // Log but don't fail - continue without MCP support
+      console.warn('MCP initialization failed:', error);
+    }
+  }
+
+  private registerMCPTools(tools: Tool[], config: any): void {
+    // Register new MCP tools
+    tools.forEach((tool) => {
+      // Check if tool should be disabled (won't appear in tool lists)
+      const approvalLevel = this.getMCPApprovalLevel(tool.name, config);
+      if (approvalLevel !== 'disable') {
+        this.tools.set(tool.name, tool);
+      }
+    });
+  }
+
+  private getMCPApprovalLevel(toolName: string, config: any): string {
+    if (!this.mcpRegistry || !toolName.includes('/')) {
+      return 'require-approval'; // Safe default
+    }
+
+    try {
+      return this.mcpRegistry.getToolApprovalLevel(config, toolName);
+    } catch {
+      return 'require-approval'; // Safe default
+    }
+  }
+
   /**
    * Create temp directory for a tool call
    */
@@ -131,7 +185,28 @@ export class ToolExecutor {
       throw new Error(`Tool '${call.name}' not found`);
     }
 
-    // 2. SECURITY: Fail-safe - require agent context for policy enforcement
+    // 2. Check if tool is marked as safe internal (bypasses all approval)
+    if (tool.annotations?.safeInternal === true) {
+      return 'granted';
+    }
+
+    // 3. Check if this is an MCP tool with allow-always approval (bypasses agent requirement)
+    if (call.name.includes('/')) {
+      // MCP tools have serverId/toolName format
+      try {
+        const projectRoot = process.cwd();
+        const config = MCPConfigLoader.loadConfig(projectRoot);
+        const approvalLevel = this.getMCPApprovalLevel(call.name, config);
+        if (approvalLevel === 'allow-always') {
+          return 'granted';
+        }
+      } catch (error) {
+        // Log but continue with normal flow
+        console.warn('Failed to check MCP approval level:', error);
+      }
+    }
+
+    // 4. SECURITY: Fail-safe - require agent context for policy enforcement
     if (!context?.agent) {
       return createToolResult(
         'denied',
@@ -145,12 +220,7 @@ export class ToolExecutor {
       );
     }
 
-    // 3. Check if tool is marked as safe internal (bypasses all approval)
-    if (tool.annotations?.safeInternal === true) {
-      return 'granted';
-    }
-
-    // 4. Check tool policy with agent context
+    // 5. Check tool policy with agent context
     const session = await context.agent.getFullSession();
     if (!session) {
       return createToolResult(
@@ -197,9 +267,14 @@ export class ToolExecutor {
     try {
       const decision = await this.approvalCallback.requestApproval(call);
 
-      if (decision === ApprovalDecision.ALLOW_ONCE || decision === ApprovalDecision.ALLOW_SESSION) {
+      if (
+        decision === ApprovalDecision.ALLOW_ONCE ||
+        decision === ApprovalDecision.ALLOW_SESSION ||
+        decision === ApprovalDecision.ALLOW_PROJECT ||
+        decision === ApprovalDecision.ALLOW_ALWAYS
+      ) {
         return 'granted';
-      } else if (decision === ApprovalDecision.DENY) {
+      } else if (decision === ApprovalDecision.DENY || decision === ApprovalDecision.DISABLE) {
         return createToolResult(
           'denied',
           [{ type: 'text', text: 'Tool execution denied by approval policy' }],
@@ -321,6 +396,15 @@ export class ToolExecutor {
         error instanceof Error ? error.message : 'Unknown error occurred',
         call.id
       );
+    }
+  }
+
+  /**
+   * Cleanup MCP resources on shutdown
+   */
+  async shutdown(): Promise<void> {
+    if (this.mcpRegistry) {
+      await this.mcpRegistry.shutdown();
     }
   }
 }
