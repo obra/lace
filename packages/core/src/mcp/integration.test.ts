@@ -7,7 +7,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtempSync } from 'fs';
 import { ToolExecutor } from '~/tools/executor';
-import { MCPConfigLoader } from './config-loader';
+import { MCPConfigLoader } from '~/config/mcp-config-loader';
 import { ApprovalDecision } from '~/tools/approval-types';
 import type { ToolCall, ApprovalCallback } from '~/tools/types';
 

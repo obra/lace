@@ -32,8 +32,8 @@ import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url-fetch';
 import { MCPToolRegistry } from '~/mcp/tool-registry';
 import { MCPServerManager } from '~/mcp/server-manager';
-import { MCPConfigLoader } from '~/mcp/config-loader';
-import type { MCPConfig } from '~/mcp/types';
+import { MCPConfigLoader } from '~/config/mcp-config-loader';
+import type { MCPConfig } from '~/config/mcp-types';
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();

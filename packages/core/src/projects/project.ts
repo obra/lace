@@ -10,6 +10,8 @@ import { ThreadManager } from '~/threads/thread-manager';
 import type { SessionConfiguration } from '~/sessions/session-config';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { getProcessTempDir } from '~/config/lace-dir';
+import { MCPConfigLoader } from '~/config/mcp-config-loader';
+import type { MCPServerConfig } from '~/config/mcp-types';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 
@@ -373,6 +375,58 @@ export class Project {
     const projectTempPath = join(processTempDir, `project-${projectId}`);
     mkdirSync(projectTempPath, { recursive: true });
     return projectTempPath;
+  }
+
+  /**
+   * Get MCP servers configured for this project
+   */
+  getMCPServers(): Record<string, MCPServerConfig> {
+    const config = MCPConfigLoader.loadConfig(this.getWorkingDirectory());
+    return config.servers;
+  }
+
+  /**
+   * Add new MCP server to project configuration
+   */
+  addMCPServer(serverId: string, serverConfig: MCPServerConfig): void {
+    // Check for duplicates
+    const existingServers = this.getMCPServers();
+    if (existingServers[serverId]) {
+      throw new Error(`MCP server '${serverId}' already exists in project`);
+    }
+
+    MCPConfigLoader.updateServerConfig(serverId, serverConfig, this.getWorkingDirectory());
+    this.notifySessionsMCPChange(serverId, 'created', serverConfig);
+  }
+
+  /**
+   * Update existing MCP server configuration
+   */
+  updateMCPServer(serverId: string, serverConfig: MCPServerConfig): void {
+    MCPConfigLoader.updateServerConfig(serverId, serverConfig, this.getWorkingDirectory());
+    this.notifySessionsMCPChange(serverId, 'updated', serverConfig);
+  }
+
+  /**
+   * Remove MCP server from project configuration
+   */
+  deleteMCPServer(serverId: string): void {
+    MCPConfigLoader.deleteServerConfig(serverId, this.getWorkingDirectory());
+    this.notifySessionsMCPChange(serverId, 'deleted');
+  }
+
+  private notifySessionsMCPChange(
+    serverId: string,
+    action: 'created' | 'updated' | 'deleted',
+    _serverConfig?: MCPServerConfig
+  ): void {
+    // TODO: Implement session notification when Session class has MCP support
+    // For now, just log the change
+    const sessions = this.getSessions();
+    console.warn(
+      `MCP config change: ${serverId} ${action} (${sessions.length} sessions to notify)`
+    );
+    // Will implement actual session notification in next task
   }
 
   private static generateNameFromDirectory(workingDirectory: string): string {

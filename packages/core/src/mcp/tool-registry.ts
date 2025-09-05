@@ -5,7 +5,7 @@ import { EventEmitter } from 'events';
 import { Tool } from '~/tools/tool';
 import { MCPToolAdapter } from '~/mcp/tool-adapter';
 import { MCPServerManager } from '~/mcp/server-manager';
-import type { MCPConfig, ApprovalLevel } from '~/mcp/types';
+import type { MCPConfig, ApprovalLevel } from '~/config/mcp-types';
 
 export interface ToolRegistryEvents {
   'tools-updated': (serverId: string, tools: Tool[]) => void;
