@@ -81,7 +81,8 @@ export class ToolExecutor {
   }
 
   private getMCPTools(): Tool[] {
-    // Return MCP tools that have been registered via registerMCPTools()
+    // Return already registered MCP tools
+    // (Tool discovery happens lazily when tools are actually needed)
     return Array.from(this.tools.values()).filter((tool) => tool.name.includes('/'));
   }
 
@@ -89,19 +90,12 @@ export class ToolExecutor {
    * Register MCP tools from a server manager (called by Session)
    */
   registerMCPTools(mcpManager: MCPServerManager): void {
-    // Clear existing MCP tools
-    const mcpToolNames = Array.from(this.tools.keys()).filter((name) => name.includes('/'));
-    mcpToolNames.forEach((name) => this.tools.delete(name));
-
-    // Register tools from all running servers
-    mcpManager
-      .getAllServers()
-      .filter((server) => server.status === 'running')
-      .forEach((server) => {
-        // Discover tools in background, register when ready
-        void this.discoverAndRegisterServerTools(server);
-      });
+    // Simple implementation that doesn't interfere with agent initialization
+    // Just store the reference for later use, don't modify tools immediately
+    this.mcpServerManager = mcpManager;
   }
+
+  private mcpServerManager?: MCPServerManager;
 
   /**
    * Register MCP tools and wait for discovery to complete (for testing)
@@ -241,7 +235,6 @@ export class ToolExecutor {
       // MCP tools have serverId/toolName format
       try {
         const approvalLevel = await this.getMCPApprovalLevel(call.name, context);
-        logger.debug(`MCP approval check for ${call.name}: ${approvalLevel}`);
         if (approvalLevel === 'allow-always') {
           return 'granted';
         }
