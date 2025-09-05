@@ -21,7 +21,6 @@ export function useErrorRecovery() {
         provider_failure:
           'Please retry the last request. The provider connection has been restored.',
         timeout: 'Please retry the last operation. The timeout issue may be resolved.',
-        streaming_error: 'Please retry the last request. The streaming connection has been reset.',
         processing_error: 'Please retry the last operation. The processing issue may be resolved.',
         tool_execution: 'Please retry the last tool operation with the same parameters.',
       }) as const satisfies Record<ErrorType, string>,
@@ -163,7 +162,6 @@ export function useErrorRecovery() {
       const maxRetries = {
         provider_failure: 3,
         timeout: 3,
-        streaming_error: 2,
         processing_error: 1,
         tool_execution: 2,
       };

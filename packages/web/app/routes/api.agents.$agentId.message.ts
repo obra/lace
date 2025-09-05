@@ -134,7 +134,7 @@ function classifyAgentError(error: unknown): {
 
   // Streaming errors
   if (message.includes('stream') || message.includes('streaming')) {
-    return { errorType: 'streaming_error', phase: 'provider_response', isRetryable: true };
+    return { errorType: 'provider_failure', phase: 'provider_response', isRetryable: true };
   }
 
   // Check stack trace for more context

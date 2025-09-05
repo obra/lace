@@ -295,12 +295,7 @@ interface SystemNotificationData {
 }
 
 // Error type definitions - centralized for reuse
-export type ErrorType =
-  | 'provider_failure'
-  | 'tool_execution'
-  | 'processing_error'
-  | 'timeout'
-  | 'streaming_error';
+export type ErrorType = 'provider_failure' | 'tool_execution' | 'processing_error' | 'timeout';
 export type ErrorPhase =
   | 'provider_response'
   | 'tool_execution'
@@ -335,6 +330,7 @@ export interface AgentErrorData {
   errorType: ErrorType;
   message: string;
   stack?: string;
+  fullError?: unknown; // Full error object for structured access
   context: {
     phase: ErrorPhase;
     // Available from Agent

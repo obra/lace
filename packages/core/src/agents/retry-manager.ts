@@ -44,16 +44,12 @@ export class RetryManager {
       switch (errorType) {
         case 'provider_failure':
           // Retry the last conversation turn by processing queued messages
+          // (handles both streaming and non-streaming provider failures)
           await agent.processQueuedMessages();
           break;
 
         case 'processing_error':
           // Restart conversation processing
-          await agent.processQueuedMessages();
-          break;
-
-        case 'streaming_error':
-          // Retry with non-streaming mode - for now just retry normally
           await agent.processQueuedMessages();
           break;
 
