@@ -8,7 +8,6 @@ import { logger } from '~/utils/logger';
 import { Session } from '~/sessions/session';
 import { ThreadManager } from '~/threads/thread-manager';
 import type { SessionConfiguration } from '~/sessions/session-config';
-import { PromptTemplateManager, PromptTemplate } from '~/projects/prompt-templates';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { getProcessTempDir } from '~/config/lace-dir';
 import { mkdirSync } from 'fs';
@@ -30,13 +29,11 @@ export class Project {
 
   private _id: string;
   private _projectData: ProjectData; // 👈 NEW: Cache the project data
-  private _promptTemplateManager: PromptTemplateManager;
   private _environmentManager: ProjectEnvironmentManager;
 
   constructor(projectData: ProjectData) {
     this._id = projectData.id;
     this._projectData = projectData; // 👈 NEW: Store the data
-    this._promptTemplateManager = new PromptTemplateManager();
     this._environmentManager = new ProjectEnvironmentManager();
 
     // Register this project in the registry for cache consistency
@@ -329,10 +326,6 @@ export class Project {
   }
 
   // Advanced Feature Managers
-  getPromptTemplateManager(): PromptTemplateManager {
-    return this._promptTemplateManager;
-  }
-
   getEnvironmentManager(): ProjectEnvironmentManager {
     return this._environmentManager;
   }
@@ -355,46 +348,6 @@ export class Project {
 
   deleteEnvironmentVariable(key: string): void {
     this._environmentManager.deleteEnvironmentVariable(this._id, key);
-  }
-
-  // Prompt Templates Management
-  savePromptTemplate(template: PromptTemplate): void {
-    this._promptTemplateManager.saveTemplate(template);
-  }
-
-  createPromptTemplate(config: {
-    id: string;
-    name: string;
-    description?: string;
-    content: string;
-    variables?: string[];
-    parentTemplateId?: string;
-    isDefault?: boolean;
-  }): PromptTemplate {
-    const template = new PromptTemplate({
-      ...config,
-      description: config.description || '',
-      variables: config.variables || [],
-      projectId: this._id,
-    });
-    this._promptTemplateManager.saveTemplate(template);
-    return template;
-  }
-
-  getPromptTemplate(templateId: string): PromptTemplate | undefined {
-    return this._promptTemplateManager.getTemplate(this._id, templateId);
-  }
-
-  getAllPromptTemplates(): PromptTemplate[] {
-    return this._promptTemplateManager.getTemplatesForProject(this._id);
-  }
-
-  renderPromptTemplate(templateId: string, variables: Record<string, string>): string {
-    return this._promptTemplateManager.renderTemplate(this._id, templateId, variables);
-  }
-
-  deletePromptTemplate(templateId: string): boolean {
-    return this._promptTemplateManager.deleteTemplate(this._id, templateId);
   }
 
   /**
