@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { MockedFunction } from 'vitest';
 import { SessionHelper } from './session-helper';
-import { Agent } from '~/agents/agent';
-import { Session } from '~/sessions/session';
+import type { Agent } from '~/agents/agent';
+import type { Session } from '~/sessions/session';
 import { GlobalConfigManager } from '~/config/global-config';
 import { ProviderRegistry } from '~/providers/registry';
 import { TestProvider } from '~/test-utils/test-provider';
@@ -72,17 +73,25 @@ describe('SessionHelper', () => {
 
     // Mock session
     mockSession = {
-      getToolPolicy: vi.fn().mockReturnValue('require-approval'),
-      getWorkingDirectory: vi.fn().mockReturnValue('/session/dir'),
-      getTools: vi.fn().mockReturnValue([testTool]),
-    } as any;
+      getToolPolicy: vi.fn().mockReturnValue('require-approval') as MockedFunction<
+        Session['getToolPolicy']
+      >,
+      getWorkingDirectory: vi.fn().mockReturnValue('/session/dir') as MockedFunction<
+        Session['getWorkingDirectory']
+      >,
+      getTools: vi.fn().mockReturnValue([testTool]) as MockedFunction<Session['getTools']>,
+    } as Partial<Session> as Session;
 
     // Mock agent
     mockAgent = {
-      getFullSession: vi.fn().mockResolvedValue(mockSession),
-      getAvailableTools: vi.fn().mockReturnValue([testTool]),
+      getFullSession: vi.fn().mockResolvedValue(mockSession) as MockedFunction<
+        Agent['getFullSession']
+      >,
+      getAvailableTools: vi.fn().mockReturnValue([testTool]) as MockedFunction<
+        Agent['getAvailableTools']
+      >,
       toolExecutor,
-    } as any;
+    } as Partial<Agent> as Agent;
 
     // Mock global config
     vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue('test-instance:test-model');

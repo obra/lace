@@ -6,11 +6,26 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { getLaceDir } from '~/config/lace-dir';
 import { scanEmbeddedFiles } from '~/utils/resource-resolver';
+import { logger } from '~/utils/logger';
 
 export interface PersonaInfo {
   name: string;
   isUserDefined: boolean;
   path: string;
+}
+
+export class PersonaNotFoundError extends Error {
+  public readonly personaName: string;
+  public readonly availablePersonas: string[];
+
+  constructor(personaName: string, availablePersonas: string[]) {
+    super(
+      `Persona '${personaName}' not found. Available personas: ${availablePersonas.join(', ')}`
+    );
+    this.name = 'PersonaNotFoundError';
+    this.personaName = personaName;
+    this.availablePersonas = availablePersonas;
+  }
 }
 
 export class PersonaRegistry {
@@ -38,9 +53,12 @@ export class PersonaRegistry {
           this.bundledPersonasCache.add(file.name);
         }
       }
-    } catch (_error) {
+    } catch (error) {
       // Bundled personas should always exist, but handle gracefully
-      console.warn('Failed to load bundled personas:', _error);
+      logger.warn('Failed to load bundled personas', {
+        error: error instanceof Error ? error.message : String(error),
+        bundledPersonasPath: this.bundledPersonasPath,
+      });
     }
   }
 
@@ -92,8 +110,8 @@ export class PersonaRegistry {
     // Built-in personas (only if not overridden)
     for (const name of this.bundledPersonasCache) {
       if (!seen.has(name)) {
-        const filePath = path.join(this.bundledPersonasPath, `${name}.md`);
-        personas.push({ name, isUserDefined: false, path: filePath });
+        const logicalPath = this.getPersonaPath(name);
+        personas.push({ name, isUserDefined: false, path: logicalPath || `${name}.md` });
       }
     }
 
@@ -134,7 +152,7 @@ export class PersonaRegistry {
   validatePersona(name: string): void {
     if (!this.hasPersona(name)) {
       const available = this.listAvailablePersonas().map((p) => p.name);
-      throw new Error(`Persona '${name}' not found. Available personas: ${available.join(', ')}`);
+      throw new PersonaNotFoundError(name, available);
     }
   }
 }

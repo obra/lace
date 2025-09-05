@@ -5,6 +5,20 @@ import { SessionHelper } from '@/lib/server/lace-imports';
 import type { Agent } from '@/lib/server/lace-imports';
 import type { LaceEvent } from '@/types/core';
 
+class SummaryHelperError extends Error {
+  public readonly code: string;
+  public readonly helperName: string;
+  public readonly originalResult?: unknown;
+
+  constructor(code: string, message: string, context?: { originalResult?: unknown }) {
+    super(message);
+    this.name = 'SummaryHelperError';
+    this.code = code;
+    this.helperName = 'SessionHelper';
+    this.originalResult = context?.originalResult;
+  }
+}
+
 /**
  * Generate a one-sentence summary of what the agent is currently working on
  * @param agent The agent to generate summary for
@@ -40,13 +54,15 @@ ${context}`;
     if (result?.content && typeof result.content === 'string' && result.content.trim()) {
       return result.content.trim();
     } else {
-      throw new Error('No summary content returned from helper');
+      throw new SummaryHelperError('NO_SUMMARY', 'No summary content returned from helper', {
+        originalResult: result,
+      });
     }
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('No summary content')) {
+  } catch (error: unknown) {
+    if (error instanceof SummaryHelperError) {
       throw error;
     }
-    throw new Error('Agent summary helper execution failed');
+    throw new SummaryHelperError('EXECUTION_FAILED', 'Agent summary helper execution failed');
   }
 }
 

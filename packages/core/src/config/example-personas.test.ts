@@ -5,14 +5,14 @@ import { personaRegistry } from './persona-registry';
 describe('Example Personas', () => {
   it('loads all example personas without error', async () => {
     const personas = personaRegistry.listAvailablePersonas();
-    const builtInPersonas = personas.filter(p => !p.isUserDefined);
-    
+    const builtInPersonas = personas.filter((p) => !p.isUserDefined);
+
     // Should have at least lace, coding-agent, helper-agent
     expect(builtInPersonas.length).toBeGreaterThanOrEqual(3);
-    
-    const personaNames = builtInPersonas.map(p => p.name);
+
+    const personaNames = builtInPersonas.map((p) => p.name);
     expect(personaNames).toContain('lace');
-    expect(personaNames).toContain('coding-agent'); 
+    expect(personaNames).toContain('coding-agent');
     expect(personaNames).toContain('helper-agent');
   });
 
@@ -24,7 +24,7 @@ describe('Example Personas', () => {
 
   it('all personas have valid file paths', () => {
     const personas = ['lace', 'coding-agent', 'helper-agent'];
-    
+
     for (const persona of personas) {
       const path = personaRegistry.getPersonaPath(persona);
       expect(path).toBeTruthy();
@@ -35,10 +35,10 @@ describe('Example Personas', () => {
   it('generates valid prompts for all example personas', async () => {
     const promptManager = new PromptManager({});
     const personas = ['lace', 'coding-agent', 'helper-agent'];
-    
+
     for (const persona of personas) {
       const prompt = await promptManager.generateSystemPrompt(persona);
-      
+
       expect(prompt).toBeTruthy();
       expect(typeof prompt).toBe('string');
       expect(prompt.length).toBeGreaterThan(50); // Should be non-empty
@@ -48,7 +48,7 @@ describe('Example Personas', () => {
 
   it('persona prompt generation does not throw errors', async () => {
     const promptManager = new PromptManager({});
-    
+
     // Should not throw, even if falling back to default
     await expect(promptManager.generateSystemPrompt('coding-agent')).resolves.toBeTruthy();
     await expect(promptManager.generateSystemPrompt('helper-agent')).resolves.toBeTruthy();
@@ -58,7 +58,7 @@ describe('Example Personas', () => {
   it('lace persona loads successfully', async () => {
     const promptManager = new PromptManager({});
     const prompt = await promptManager.generateSystemPrompt('lace');
-    
+
     expect(prompt).toBeTruthy();
     expect(typeof prompt).toBe('string');
     expect(prompt.length).toBeGreaterThan(50);
@@ -66,21 +66,21 @@ describe('Example Personas', () => {
 
   it('personas are sorted alphabetically', () => {
     const personas = personaRegistry.listAvailablePersonas();
-    const names = personas.map(p => p.name);
+    const names = personas.map((p) => p.name);
     const sortedNames = [...names].sort();
-    
+
     expect(names).toEqual(sortedNames);
   });
 
   it('built-in personas are marked correctly', () => {
     const personas = personaRegistry.listAvailablePersonas();
-    const builtInPersonas = personas.filter(p => !p.isUserDefined);
-    
+    const builtInPersonas = personas.filter((p) => !p.isUserDefined);
+
     expect(builtInPersonas.length).toBeGreaterThanOrEqual(3);
-    
+
     for (const persona of builtInPersonas) {
       expect(persona.isUserDefined).toBe(false);
-      expect(persona.path).toContain('config/agent-personas');
+      expect(persona.path).toMatch(/.*\.md$/); // Should be logical path ending in .md
     }
   });
 
@@ -89,7 +89,7 @@ describe('Example Personas', () => {
     expect(() => personaRegistry.validatePersona('lace')).not.toThrow();
     expect(() => personaRegistry.validatePersona('coding-agent')).not.toThrow();
     expect(() => personaRegistry.validatePersona('helper-agent')).not.toThrow();
-    
+
     // Should throw for invalid persona
     expect(() => personaRegistry.validatePersona('nonexistent')).toThrow();
   });

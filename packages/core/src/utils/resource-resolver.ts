@@ -87,6 +87,11 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
     const prefixLength = srcIndex + `/${srcPrefix}/`.length;
     const relativeFromSrc = moduleDir.substring(prefixLength);
 
+    // Special case for agent-personas which moved from src/config/ to config/
+    if (relativePath === 'config/agent-personas') {
+      return path.resolve(process.cwd(), 'packages/core/config/agent-personas');
+    }
+
     // Combine with the relative path and resolve from current working directory
     return path.resolve(process.cwd(), srcPrefix, relativeFromSrc, relativePath);
   } else {
