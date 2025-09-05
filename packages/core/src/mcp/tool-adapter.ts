@@ -4,7 +4,7 @@
 import { z, ZodType } from 'zod';
 import { Tool } from '~/tools/tool';
 import type { ToolResult, ToolContext, ContentBlock } from '~/tools/types';
-import type { Client } from '../../../vendor/typescript-sdk/src/client/index.js';
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { MCPTool } from './types';
 
 /**
@@ -85,14 +85,16 @@ export class MCPToolAdapter extends Tool {
 
       // Convert MCP result to Lace ToolResult format
       if (result.isError) {
+        const contentArray = Array.isArray(result.content) ? result.content : [result.content];
         return this.createError(
-          `MCP tool error: ${result.content.map((c) => c.text || '').join(' ')}`,
+          `MCP tool error: ${contentArray.map((c: any) => c.text || '').join(' ')}`,
           { toolName: this.mcpTool.name }
         );
       }
 
       // Convert MCP content blocks to Lace format
-      const content: ContentBlock[] = result.content.map((block) => {
+      const contentArray = Array.isArray(result.content) ? result.content : [result.content];
+      const content: ContentBlock[] = contentArray.map((block: any) => {
         if (block.type === 'text') {
           return { type: 'text' as const, text: block.text || '' };
         } else if (block.type === 'image') {

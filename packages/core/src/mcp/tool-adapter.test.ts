@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MCPToolAdapter } from './tool-adapter';
 import type { MCPTool } from './types';
-import type { Client } from '../../../vendor/typescript-sdk/src/client/index.js';
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 describe('MCPToolAdapter', () => {
   const mockMCPTool: MCPTool = {
