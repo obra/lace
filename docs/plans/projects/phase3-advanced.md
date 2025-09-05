@@ -368,321 +368,8 @@ export class TokenBudgetManager {
 
 **Commit**: "feat: implement token budget management"
 
-## Task 3.2: Custom Prompt Templates ✅ **FULLY IMPLEMENTED**
 
-**Goal**: Allow projects to define custom prompt templates
-
-**Current Status**: ✅ **FULLY IMPLEMENTED** - Complete implementation with comprehensive test coverage
-
-**Test First** (`src/projects/prompt-templates.test.ts`):
-```typescript
-describe('Custom prompt templates', () => {
-  let templateManager: PromptTemplateManager;
-  let projectId: string;
-
-  beforeEach(() => {
-    templateManager = new PromptTemplateManager();
-    projectId = 'project1';
-  });
-
-  it('should store and retrieve custom templates', () => {
-    const template = new PromptTemplate({
-      id: 'custom-template',
-      name: 'Custom Code Review',
-      description: 'Template for code review sessions',
-      content: 'You are a senior software engineer reviewing code. Focus on: {{focus_areas}}',
-      variables: ['focus_areas'],
-      projectId
-    });
-
-    templateManager.saveTemplate(template);
-    const retrieved = templateManager.getTemplate(projectId, 'custom-template');
-
-    expect(retrieved).toBeDefined();
-    expect(retrieved?.name).toBe('Custom Code Review');
-    expect(retrieved?.variables).toEqual(['focus_areas']);
-  });
-
-  it('should render template with variables', () => {
-    const template = new PromptTemplate({
-      id: 'custom-template',
-      name: 'Custom Code Review',
-      description: 'Template for code review sessions',
-      content: 'You are a {{role}} reviewing {{type}}. Focus on: {{focus_areas}}',
-      variables: ['role', 'type', 'focus_areas'],
-      projectId
-    });
-
-    templateManager.saveTemplate(template);
-
-    const rendered = templateManager.renderTemplate(projectId, 'custom-template', {
-      role: 'senior software engineer',
-      type: 'TypeScript code',
-      focus_areas: 'type safety, performance, maintainability'
-    });
-
-    expect(rendered).toBe('You are a senior software engineer reviewing TypeScript code. Focus on: type safety, performance, maintainability');
-  });
-
-  it('should validate required variables', () => {
-    const template = new PromptTemplate({
-      id: 'custom-template',
-      name: 'Custom Template',
-      description: 'A template with required variables',
-      content: 'Hello {{name}}, you are working on {{project}}',
-      variables: ['name', 'project'],
-      projectId
-    });
-
-    templateManager.saveTemplate(template);
-
-    expect(() => {
-      templateManager.renderTemplate(projectId, 'custom-template', {
-        name: 'John'
-        // missing 'project' variable
-      });
-    }).toThrow('Missing required variable: project');
-  });
-
-  it('should list templates for project', () => {
-    const template1 = new PromptTemplate({
-      id: 'template1',
-      name: 'Template 1',
-      description: 'First template',
-      content: 'Content 1',
-      variables: [],
-      projectId
-    });
-
-    const template2 = new PromptTemplate({
-      id: 'template2',
-      name: 'Template 2',
-      description: 'Second template',
-      content: 'Content 2',
-      variables: [],
-      projectId
-    });
-
-    templateManager.saveTemplate(template1);
-    templateManager.saveTemplate(template2);
-
-    const templates = templateManager.getTemplatesForProject(projectId);
-    expect(templates).toHaveLength(2);
-    expect(templates.map(t => t.id)).toContain('template1');
-    expect(templates.map(t => t.id)).toContain('template2');
-  });
-
-  it('should inherit from parent templates', () => {
-    const parentTemplate = new PromptTemplate({
-      id: 'parent-template',
-      name: 'Parent Template',
-      description: 'Base template',
-      content: 'Base instructions: {{base_instructions}}',
-      variables: ['base_instructions'],
-      projectId
-    });
-
-    const childTemplate = new PromptTemplate({
-      id: 'child-template',
-      name: 'Child Template',
-      description: 'Extended template',
-      content: '{{parent}} Additional instructions: {{additional_instructions}}',
-      variables: ['additional_instructions'],
-      parentTemplateId: 'parent-template',
-      projectId
-    });
-
-    templateManager.saveTemplate(parentTemplate);
-    templateManager.saveTemplate(childTemplate);
-
-    const rendered = templateManager.renderTemplate(projectId, 'child-template', {
-      base_instructions: 'Be helpful and accurate',
-      additional_instructions: 'Focus on TypeScript best practices'
-    });
-
-    expect(rendered).toBe('Base instructions: Be helpful and accurate Additional instructions: Focus on TypeScript best practices');
-  });
-});
-```
-
-**Implementation** (`src/projects/prompt-templates.ts`):
-```typescript
-export interface PromptTemplateConfig {
-  id: string;
-  name: string;
-  description: string;
-  content: string;
-  variables: string[];
-  projectId: string;
-  parentTemplateId?: string;
-  isDefault?: boolean;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-export class PromptTemplate {
-  private config: PromptTemplateConfig;
-
-  constructor(config: PromptTemplateConfig) {
-    this.config = {
-      ...config,
-      createdAt: config.createdAt || new Date(),
-      updatedAt: config.updatedAt || new Date()
-    };
-  }
-
-  getId(): string {
-    return this.config.id;
-  }
-
-  getName(): string {
-    return this.config.name;
-  }
-
-  getDescription(): string {
-    return this.config.description;
-  }
-
-  getContent(): string {
-    return this.config.content;
-  }
-
-  getVariables(): string[] {
-    return this.config.variables;
-  }
-
-  getProjectId(): string {
-    return this.config.projectId;
-  }
-
-  getParentTemplateId(): string | undefined {
-    return this.config.parentTemplateId;
-  }
-
-  isDefault(): boolean {
-    return this.config.isDefault || false;
-  }
-
-  render(variables: Record<string, string>): string {
-    let content = this.config.content;
-
-    // Replace variables in content
-    for (const [key, value] of Object.entries(variables)) {
-      const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-      content = content.replace(regex, value);
-    }
-
-    // Check for unresolved variables
-    const unresolvedVariables = content.match(/\{\{[^}]+\}\}/g);
-    if (unresolvedVariables) {
-      throw new Error(`Unresolved variables: ${unresolvedVariables.join(', ')}`);
-    }
-
-    return content;
-  }
-
-  validateVariables(variables: Record<string, string>): void {
-    for (const requiredVar of this.config.variables) {
-      if (!(requiredVar in variables)) {
-        throw new Error(`Missing required variable: ${requiredVar}`);
-      }
-    }
-  }
-
-  update(updates: Partial<PromptTemplateConfig>): void {
-    this.config = {
-      ...this.config,
-      ...updates,
-      updatedAt: new Date()
-    };
-  }
-
-  toJSON(): PromptTemplateConfig {
-    return { ...this.config };
-  }
-}
-
-export class PromptTemplateManager {
-  private templates = new Map<string, Map<string, PromptTemplate>>();
-
-  saveTemplate(template: PromptTemplate): void {
-    const projectId = template.getProjectId();
-    let projectTemplates = this.templates.get(projectId);
-
-    if (!projectTemplates) {
-      projectTemplates = new Map();
-      this.templates.set(projectId, projectTemplates);
-    }
-
-    projectTemplates.set(template.getId(), template);
-  }
-
-  getTemplate(projectId: string, templateId: string): PromptTemplate | undefined {
-    const projectTemplates = this.templates.get(projectId);
-    return projectTemplates?.get(templateId);
-  }
-
-  getTemplatesForProject(projectId: string): PromptTemplate[] {
-    const projectTemplates = this.templates.get(projectId);
-    if (!projectTemplates) return [];
-
-    return Array.from(projectTemplates.values());
-  }
-
-  renderTemplate(projectId: string, templateId: string, variables: Record<string, string>): string {
-    const template = this.getTemplate(projectId, templateId);
-    if (!template) {
-      throw new Error(`Template not found: ${templateId}`);
-    }
-
-    // Handle parent template inheritance
-    let renderedContent = template.getContent();
-    
-    if (template.getParentTemplateId()) {
-      const parentTemplate = this.getTemplate(projectId, template.getParentTemplateId()!);
-      if (parentTemplate) {
-        const parentContent = parentTemplate.render(variables);
-        renderedContent = renderedContent.replace(/\{\{parent\}\}/g, parentContent);
-      }
-    }
-
-    // Validate all required variables are provided
-    template.validateVariables(variables);
-
-    // Create temporary template for rendering
-    const tempTemplate = new PromptTemplate({
-      ...template.toJSON(),
-      content: renderedContent
-    });
-
-    return tempTemplate.render(variables);
-  }
-
-  deleteTemplate(projectId: string, templateId: string): boolean {
-    const projectTemplates = this.templates.get(projectId);
-    if (!projectTemplates) return false;
-
-    return projectTemplates.delete(templateId);
-  }
-
-  getDefaultTemplate(projectId: string): PromptTemplate | undefined {
-    const projectTemplates = this.templates.get(projectId);
-    if (!projectTemplates) return undefined;
-
-    return Array.from(projectTemplates.values()).find(t => t.isDefault());
-  }
-}
-```
-
-**Implementation Details**:
-- **File**: `src/projects/prompt-templates.ts` - Complete PromptTemplate and PromptTemplateManager classes
-- **Tests**: `src/projects/prompt-templates.test.ts` - Comprehensive test coverage
-- **Features**: Variable substitution, template inheritance, validation, default template support
-- **Status**: ✅ **IMPLEMENTATION COMPLETE** - Only integration with Project class needed
-
-**Commit**: "feat: implement custom prompt templates"
-
-## Task 3.3: Environment Variables per Project ✅ **FULLY IMPLEMENTED**
+## Task 3.2: Environment Variables per Project ✅ **FULLY IMPLEMENTED**
 
 **Goal**: Allow projects to define environment variables for tool execution
 
@@ -976,7 +663,7 @@ export class ToolExecutor {
 
 **Commit**: "feat: add project-level environment variables"
 
-## Task 3.4: Session/Agent Configuration ✅ **FULLY IMPLEMENTED**
+## Task 3.3: Session/Agent Configuration ✅ **FULLY IMPLEMENTED**
 
 **Goal**: Rich configuration for sessions and agents with validation
 
@@ -1432,7 +1119,7 @@ export class Agent {
 
 **Commit**: "feat: add rich configuration for sessions and agents"
 
-## Task 3.5: Project Settings UI ✅ **COMPLETED**
+## Task 3.4: Project Settings UI ✅ **COMPLETED**
 
 **Goal**: Add comprehensive UI for managing project settings
 
@@ -1984,25 +1671,22 @@ const handleSaveProject = async (updatedProject: Project) => {
 
 ## Phase 3 Status Summary
 
-**Overall Phase 3 Status**: ✅ **95% COMPLETE** - 5 of 5 tasks implemented, integration in progress
+**Overall Phase 3 Status**: ✅ **95% COMPLETE** - 4 of 4 tasks implemented, integration in progress
 
 ### Task Status Overview:
 1. **Task 3.1**: ✅ **FULLY IMPLEMENTED** - Token Budget Management (Complete with tests)
-2. **Task 3.2**: ✅ **FULLY IMPLEMENTED** - Custom Prompt Templates (Complete with tests)
-3. **Task 3.3**: ✅ **FULLY IMPLEMENTED** - Environment Variables per Project (Complete with tests)
-4. **Task 3.4**: ✅ **FULLY IMPLEMENTED** - Session/Agent Configuration (Complete with tests)
-5. **Task 3.5**: ✅ **FULLY IMPLEMENTED** - Project Settings UI (Complete with integration)
+2. **Task 3.2**: ✅ **FULLY IMPLEMENTED** - Environment Variables per Project (Complete with tests)
+3. **Task 3.3**: ✅ **FULLY IMPLEMENTED** - Session/Agent Configuration (Complete with tests)
+4. **Task 3.4**: ✅ **FULLY IMPLEMENTED** - Project Settings UI (Complete with integration)
 
 ### What's Been Completed:
 - **Token Budget Management**: Complete TokenBudgetManager with usage tracking, enforcement, and recommendations
-- **Custom Prompt Templates**: Complete PromptTemplate and PromptTemplateManager with variable substitution and inheritance
 - **Environment Variables**: Complete ProjectEnvironmentManager with encryption, inheritance, and validation
 - **Session/Agent Configuration**: Complete schemas, validation, and preset management with Zod
 - **Project Settings UI**: Full React component with comprehensive form validation and API integration
 
 ### Current Status - Integration Phase:
 **All core functionality is implemented!** The remaining work is integrating the implemented classes:
-- Connect PromptTemplateManager to Project class
 - Connect ProjectEnvironmentManager to Project class  
 - Connect TokenBudgetManager to Project class
 - Connect SessionConfiguration to Session/Agent classes
