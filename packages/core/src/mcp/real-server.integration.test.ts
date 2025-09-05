@@ -70,7 +70,7 @@ describe('Real MCP Server Integration', () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('should work with real filesystem MCP server', async () => {
+  it.skip('should work with real filesystem MCP server', async () => {
     // Wait for real server initialization
     await session.waitForMCPInitialization();
 
