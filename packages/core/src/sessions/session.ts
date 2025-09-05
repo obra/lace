@@ -31,6 +31,8 @@ import { logger } from '~/utils/logger';
 import type { ApprovalCallback } from '~/tools/approval-types';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { getEnvVar } from '~/config/env-loader';
+import { MCPServerManager } from '~/mcp/server-manager';
+import type { MCPServerConnection, MCPServerConfig } from '~/config/mcp-types';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 
@@ -51,6 +53,7 @@ export class Session {
   private _agents: Map<ThreadId, Agent> = new Map(); // All agents, including coordinator
   private _taskManager: TaskManager;
   private _threadManager: ThreadManager;
+  private _mcpServerManager: MCPServerManager;
   private _destroyed = false;
   private _projectId?: string;
 
@@ -64,8 +67,11 @@ export class Session {
     // Initialize TaskManager for this session
     this._taskManager = new TaskManager(this._sessionId, getPersistence());
 
-    // NOTE: Session registration moved to after reconstruction completes
-    // This prevents the session from being found before agents are ready
+    // Create session-scoped MCP server manager
+    this._mcpServerManager = new MCPServerManager();
+
+    // Start enabled MCP servers eagerly for tool discovery
+    void this.initializeMCPServers();
   }
 
   static create(options: {
@@ -231,6 +237,9 @@ export class Session {
     const delegateTool = new DelegateTool();
     toolExecutor.registerTool('delegate', delegateTool);
 
+    // Register MCP tools from session's servers
+    toolExecutor.registerMCPTools(session._mcpServerManager);
+
     // Set up coordinator agent with approval callback if provided
     const coordinatorAgent = session.getCoordinatorAgent();
     if (coordinatorAgent && options.approvalCallback) {
@@ -394,6 +403,9 @@ export class Session {
 
     // Create session instance
     const session = new Session(sessionId, sessionData, threadManager);
+
+    // Register MCP tools from session's servers
+    toolExecutor.registerMCPTools(session._mcpServerManager);
 
     // Create and initialize coordinator agent
     let coordinatorAgent: Agent;
@@ -795,6 +807,9 @@ export class Session {
     const delegateTool = new DelegateTool();
     agentToolExecutor.registerTool('delegate', delegateTool);
 
+    // Register MCP tools from this session's servers
+    agentToolExecutor.registerMCPTools(this._mcpServerManager);
+
     // Thread ID already generated above for agent naming
 
     // Create agent with metadata
@@ -834,6 +849,8 @@ export class Session {
         spawnMethod: 'manual', // vs 'task-based'
       },
     });
+
+    // Agent initialization will happen lazily when first used
 
     return agent;
   }
@@ -925,6 +942,9 @@ export class Session {
       agent.removeAllListeners();
     }
     this._agents.clear();
+
+    // Shutdown MCP servers for this session
+    void this._mcpServerManager.shutdown();
   }
 
   /**
@@ -1097,6 +1117,160 @@ Use your task_add_note tool to record important notes as you work and your task_
     // Initialize the agent (loads prompts, records events)
     await agent.initialize();
     return agent;
+  }
+
+  /**
+   * Initialize MCP servers for this session
+   */
+  private async initializeMCPServers(): Promise<void> {
+    try {
+      const projectId = this.getProjectId();
+      if (!projectId) {
+        logger.warn(`Session ${this.getId()} has no project ID, skipping MCP initialization`);
+        return;
+      }
+
+      const project = Project.getById(projectId);
+      if (!project) {
+        logger.warn(`Project ${this.getProjectId()} not found during MCP initialization`);
+        return;
+      }
+
+      const mcpServers = project.getMCPServers();
+
+      // Start all enabled servers for tool discovery
+      const startPromises = Object.entries(mcpServers)
+        .filter(([_, config]) => config.enabled)
+        .map(([serverId, config]) =>
+          this._mcpServerManager.startServer(serverId, config).catch((error) => {
+            // Continue with server disabled on failure (graceful degradation)
+            logger.warn(`MCP server ${serverId} failed to start, continuing disabled:`, error);
+          })
+        );
+
+      await Promise.allSettled(startPromises);
+      logger.info(`Initialized MCP servers for session ${this.getId()}`);
+
+      // Register MCP tools with all existing ToolExecutors
+      await this.refreshMCPToolsInExecutors();
+    } catch (error) {
+      logger.warn(`Failed to initialize MCP servers for session ${this.getId()}:`, error);
+    }
+  }
+
+  /**
+   * Refresh MCP tools in all ToolExecutors for this session
+   */
+  private async refreshMCPToolsInExecutors(): Promise<void> {
+    // Update MCP tools in all agents' ToolExecutors
+    const refreshPromises = [];
+    for (const agent of this._agents.values()) {
+      const toolExecutor = agent.toolExecutor;
+      if (toolExecutor?.registerMCPTools) {
+        refreshPromises.push(toolExecutor.registerMCPTools(this._mcpServerManager));
+      }
+    }
+    await Promise.all(refreshPromises);
+  }
+
+  /**
+   * Handle MCP configuration changes from project (auto-restart changed servers)
+   */
+  private async handleMCPConfigChange(data: {
+    serverId: string;
+    action: 'created' | 'updated' | 'deleted';
+    serverConfig?: MCPServerConfig;
+  }): Promise<void> {
+    const { serverId, action, serverConfig } = data;
+
+    try {
+      // Auto-restart only the specific server that changed
+      switch (action) {
+        case 'created':
+        case 'updated':
+          await this._mcpServerManager.stopServer(serverId);
+          if (serverConfig?.enabled) {
+            await this._mcpServerManager.startServer(serverId, serverConfig);
+            logger.info(`Restarted MCP server ${serverId} with new configuration`);
+          }
+          // Refresh tools in all ToolExecutors
+          await this.refreshMCPToolsInExecutors();
+          break;
+
+        case 'deleted':
+          await this._mcpServerManager.stopServer(serverId);
+          logger.info(`Stopped and removed MCP server ${serverId}`);
+          // Refresh tools in all ToolExecutors
+          await this.refreshMCPToolsInExecutors();
+          break;
+      }
+    } catch (error) {
+      logger.warn(`Failed to handle MCP config change for server ${serverId}:`, error);
+    }
+  }
+
+  /**
+   * Server control methods (delegate to MCPServerManager)
+   */
+  async startMCPServer(serverId: string): Promise<void> {
+    const projectId = this.getProjectId();
+    if (!projectId) {
+      throw new Error(`Session ${this.getId()} has no project ID`);
+    }
+
+    const project = Project.getById(projectId);
+    if (!project) {
+      throw new Error(`Project ${this.getProjectId()} not found`);
+    }
+
+    const serverConfig = project.getMCPServers()[serverId];
+    if (!serverConfig) {
+      throw new Error(`MCP server '${serverId}' not found in project configuration`);
+    }
+    await this._mcpServerManager.startServer(serverId, serverConfig);
+    await this.refreshMCPToolsInExecutors();
+  }
+
+  async stopMCPServer(serverId: string): Promise<void> {
+    await this._mcpServerManager.stopServer(serverId);
+    await this.refreshMCPToolsInExecutors();
+  }
+
+  async restartMCPServer(serverId: string): Promise<void> {
+    await this.stopMCPServer(serverId);
+    await this.startMCPServer(serverId);
+    // Note: refreshMCPToolsInExecutors() called by startMCPServer()
+  }
+
+  getMCPServerStatus(serverId: string): MCPServerConnection | undefined {
+    return this._mcpServerManager.getServer(serverId);
+  }
+
+  /**
+   * Provide MCPServerManager access for ToolExecutor to query directly
+   */
+  getMCPServerManager(): MCPServerManager {
+    return this._mcpServerManager;
+  }
+
+  /**
+   * Announce MCP configuration change to this session's thread
+   */
+  announceMCPConfigChange(
+    serverId: string,
+    action: 'created' | 'updated' | 'deleted',
+    serverConfig?: MCPServerConfig
+  ): void {
+    this._threadManager.addEvent({
+      type: 'MCP_CONFIG_CHANGED',
+      threadId: this.getId(),
+      data: { serverId, action, serverConfig },
+      context: {
+        sessionId: this.getId(),
+        projectId: this.getProjectId(),
+      },
+      transient: true,
+    });
   }
 
   /**

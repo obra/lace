@@ -30,27 +30,21 @@ import {
 } from '~/tools/implementations/task-manager/index';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url-fetch';
-import { MCPToolRegistry } from '~/mcp/tool-registry';
 import { MCPServerManager } from '~/mcp/server-manager';
-import { MCPConfigLoader } from '~/config/mcp-config-loader';
-import type { MCPConfig } from '~/config/mcp-types';
+import type { MCPServerConnection } from '~/config/mcp-types';
+import { MCPToolAdapter } from '~/mcp/tool-adapter';
+import { logger } from '~/utils/logger';
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
   private approvalCallback?: ApprovalCallback;
   private envManager: ProjectEnvironmentManager;
-  private mcpRegistry?: MCPToolRegistry;
 
   // Constants for temp directory naming
   private static readonly TOOL_CALL_TEMP_PREFIX = 'tool-call-';
 
   constructor() {
     this.envManager = new ProjectEnvironmentManager();
-
-    // Initialize MCP registry in background
-    this.initializeMCPRegistry().catch((error) => {
-      console.warn('Failed to initialize MCP registry:', error);
-    });
   }
 
   registerTool(name: string, tool: Tool): void {
@@ -76,7 +70,72 @@ export class ToolExecutor {
   }
 
   getAllTools(): Tool[] {
-    return Array.from(this.tools.values());
+    const nativeTools = this.getNativeTools();
+    const mcpTools = this.getMCPTools();
+    return [...nativeTools, ...mcpTools];
+  }
+
+  private getNativeTools(): Tool[] {
+    // Return all registered native tools (non-MCP)
+    return Array.from(this.tools.values()).filter((tool) => !tool.name.includes('/'));
+  }
+
+  private getMCPTools(): Tool[] {
+    // Return MCP tools that have been registered via registerMCPTools()
+    return Array.from(this.tools.values()).filter((tool) => tool.name.includes('/'));
+  }
+
+  /**
+   * Register MCP tools from a server manager (called by Session)
+   */
+  registerMCPTools(mcpManager: MCPServerManager): void {
+    // Clear existing MCP tools
+    const mcpToolNames = Array.from(this.tools.keys()).filter((name) => name.includes('/'));
+    mcpToolNames.forEach((name) => this.tools.delete(name));
+
+    // Register tools from all running servers
+    mcpManager
+      .getAllServers()
+      .filter((server) => server.status === 'running')
+      .forEach((server) => {
+        // Discover tools in background, register when ready
+        void this.discoverAndRegisterServerTools(server);
+      });
+  }
+
+  /**
+   * Discover and register tools from a server (async, non-blocking)
+   */
+  private async discoverAndRegisterServerTools(server: MCPServerConnection): Promise<void> {
+    try {
+      const serverTools = await this.discoverMCPServerTools(server);
+      serverTools.forEach((tool) => {
+        this.tools.set(tool.name, tool);
+      });
+      logger.debug(`Registered ${serverTools.length} tools from MCP server ${server.id}`);
+    } catch (error) {
+      logger.warn(`Failed to discover and register tools from server ${server.id}:`, error);
+    }
+  }
+
+  private async discoverMCPServerTools(server: MCPServerConnection): Promise<Tool[]> {
+    try {
+      if (!server.client) return [];
+
+      // Use MCP SDK's listTools() to get available tools
+      const result = await server.client.listTools();
+
+      // Create MCPToolAdapter instances for each tool
+      const tools = result.tools.map(
+        (mcpTool) => new MCPToolAdapter(mcpTool, server.id, server.client!)
+      );
+
+      logger.debug(`Discovered ${tools.length} tools from MCP server ${server.id}`);
+      return tools;
+    } catch (error) {
+      logger.warn(`Failed to discover tools from server ${server.id}:`, error);
+      return [];
+    }
   }
 
   getApprovalCallback(): ApprovalCallback | undefined {
@@ -107,51 +166,6 @@ export class ToolExecutor {
     ];
 
     this.registerTools(tools);
-  }
-
-  private async initializeMCPRegistry(): Promise<void> {
-    try {
-      // Use current working directory as project root fallback
-      const projectRoot = process.cwd();
-      const config = MCPConfigLoader.loadConfig(projectRoot);
-
-      const serverManager = new MCPServerManager();
-      this.mcpRegistry = new MCPToolRegistry(serverManager);
-
-      // Listen for tool updates and register them
-      this.mcpRegistry.on('tools-updated', (_serverId, tools: Tool[]) => {
-        this.registerMCPTools(tools, config);
-      });
-
-      // Initialize (starts servers and discovers tools)
-      await this.mcpRegistry.initialize(config);
-    } catch (error) {
-      // Log but don't fail - continue without MCP support
-      console.warn('MCP initialization failed:', error);
-    }
-  }
-
-  private registerMCPTools(tools: Tool[], config: MCPConfig): void {
-    // Register new MCP tools
-    tools.forEach((tool) => {
-      // Check if tool should be disabled (won't appear in tool lists)
-      const approvalLevel = this.getMCPApprovalLevel(tool.name, config);
-      if (approvalLevel !== 'disable') {
-        this.tools.set(tool.name, tool);
-      }
-    });
-  }
-
-  private getMCPApprovalLevel(toolName: string, config: MCPConfig): string {
-    if (!this.mcpRegistry || !toolName.includes('/')) {
-      return 'require-approval'; // Safe default
-    }
-
-    try {
-      return this.mcpRegistry.getToolApprovalLevel(config, toolName);
-    } catch {
-      return 'require-approval'; // Safe default
-    }
   }
 
   /**
@@ -191,21 +205,7 @@ export class ToolExecutor {
       return 'granted';
     }
 
-    // 3. Check if this is an MCP tool with allow-always approval (bypasses agent requirement)
-    if (call.name.includes('/')) {
-      // MCP tools have serverId/toolName format
-      try {
-        const projectRoot = process.cwd();
-        const config = MCPConfigLoader.loadConfig(projectRoot);
-        const approvalLevel = this.getMCPApprovalLevel(call.name, config);
-        if (approvalLevel === 'allow-always') {
-          return 'granted';
-        }
-      } catch (error) {
-        // Log but continue with normal flow
-        console.warn('Failed to check MCP approval level:', error);
-      }
-    }
+    // Note: MCP tools (serverId/toolName format) go through normal approval flow
 
     // 4. SECURITY: Fail-safe - require agent context for policy enforcement
     if (!context?.agent) {
@@ -401,11 +401,9 @@ export class ToolExecutor {
   }
 
   /**
-   * Cleanup MCP resources on shutdown
+   * Cleanup resources on shutdown (MCP servers are managed by Session)
    */
   async shutdown(): Promise<void> {
-    if (this.mcpRegistry) {
-      await this.mcpRegistry.shutdown();
-    }
+    // No cleanup needed - Session manages MCP server lifecycle
   }
 }
