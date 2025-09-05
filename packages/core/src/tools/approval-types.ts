@@ -6,7 +6,10 @@ import { ToolCall } from '~/tools/types';
 export enum ApprovalDecision {
   ALLOW_ONCE = 'allow_once',
   ALLOW_SESSION = 'allow_session',
+  ALLOW_PROJECT = 'allow_project', // NEW - for MCP tools
+  ALLOW_ALWAYS = 'allow_always', // NEW - for MCP tools
   DENY = 'deny',
+  DISABLE = 'disable', // NEW - tool won't appear in lists
 }
 
 export interface ApprovalCallback {
