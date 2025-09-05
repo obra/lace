@@ -70,7 +70,7 @@ export class Session {
     // Create session-scoped MCP server manager
     this._mcpServerManager = new MCPServerManager();
 
-    // Start enabled MCP servers eagerly for tool discovery
+    // Initialize MCP servers in background (non-blocking)
     void this.initializeMCPServers();
   }
 
@@ -446,6 +446,9 @@ export class Session {
       });
       throw error; // Re-throw to fail reconstruction
     }
+
+    // Register MCP tools for this specific agent's ToolExecutor
+    coordinatorAgent.toolExecutor.registerMCPTools(session._mcpServerManager);
 
     // Load delegate threads (child agents) for this session
     const delegateThreadIds = threadManager.listThreadIdsForSession(sessionId);
@@ -1160,8 +1163,8 @@ Use your task_add_note tool to record important notes as you work and your task_
       await Promise.allSettled(startPromises);
       logger.info(`Initialized MCP servers for session ${this.getId()}`);
 
-      // Register MCP tools with all existing ToolExecutors
-      await this.refreshMCPToolsInExecutors();
+      // Note: MCP tools will be registered when agents are created
+      // Don't call refreshMCPToolsInExecutors here as agents don't exist yet
     } catch (error) {
       logger.warn(`Failed to initialize MCP servers for session ${this.getId()}:`, error);
     }
@@ -1172,11 +1175,15 @@ Use your task_add_note tool to record important notes as you work and your task_
    */
   private async refreshMCPToolsInExecutors(): Promise<void> {
     // Update MCP tools in all agents' ToolExecutors
+    // Only register for fully initialized agents to avoid timing issues
     const refreshPromises = [];
     for (const agent of this._agents.values()) {
-      const toolExecutor = agent.toolExecutor;
-      if (toolExecutor?.registerMCPTools) {
-        refreshPromises.push(toolExecutor.registerMCPTools(this._mcpServerManager));
+      if (agent.isRunning) {
+        // Only update initialized agents
+        const toolExecutor = agent.toolExecutor;
+        if (toolExecutor?.registerMCPTools) {
+          refreshPromises.push(toolExecutor.registerMCPTools(this._mcpServerManager));
+        }
       }
     }
     await Promise.all(refreshPromises);
