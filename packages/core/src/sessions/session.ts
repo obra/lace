@@ -1119,10 +1119,19 @@ Use your task_add_note tool to record important notes as you work and your task_
     return agent;
   }
 
+  private mcpInitializationPromise?: Promise<void>;
+
   /**
    * Initialize MCP servers for this session
    */
   private async initializeMCPServers(): Promise<void> {
+    if (!this.mcpInitializationPromise) {
+      this.mcpInitializationPromise = this.doInitializeMCPServers();
+    }
+    return this.mcpInitializationPromise;
+  }
+
+  private async doInitializeMCPServers(): Promise<void> {
     try {
       const projectId = this.getProjectId();
       if (!projectId) {
@@ -1251,6 +1260,15 @@ Use your task_add_note tool to record important notes as you work and your task_
    */
   getMCPServerManager(): MCPServerManager {
     return this._mcpServerManager;
+  }
+
+  /**
+   * Wait for MCP server initialization to complete (for testing)
+   */
+  async waitForMCPInitialization(): Promise<void> {
+    if (this.mcpInitializationPromise) {
+      await this.mcpInitializationPromise;
+    }
   }
 
   /**

@@ -1,13 +1,13 @@
-// ABOUTME: End-to-end integration test for complete MCP functionality using ToolExecutor
-// ABOUTME: Tests that MCP tools are properly integrated with existing tool approval system
+// ABOUTME: End-to-end integration test for complete MCP functionality using Session-based architecture
+// ABOUTME: Tests that MCP tools are properly integrated from Project → Session → ToolExecutor
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { writeFileSync, mkdirSync, rmSync } from 'fs';
+import { rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtempSync } from 'fs';
-import { ToolExecutor } from '~/tools/executor';
-import { MCPConfigLoader } from '~/config/mcp-config-loader';
+import { Project } from '~/projects/project';
+import { Session } from '~/sessions/session';
 import { ApprovalDecision } from '~/tools/approval-types';
 import type { ToolCall, ApprovalCallback } from '~/tools/types';
 
@@ -55,7 +55,8 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
 
 describe('MCP Integration E2E', () => {
   let tempDir: string;
-  let toolExecutor: ToolExecutor;
+  let project: Project;
+  let session: Session;
   let mockApprovalCallback: ApprovalCallback;
 
   let originalCwd: string;
@@ -64,26 +65,7 @@ describe('MCP Integration E2E', () => {
     originalCwd = process.cwd();
     tempDir = mkdtempSync(join(tmpdir(), 'mcp-integration-test-'));
 
-    // Create test MCP configuration
-    const laceDir = join(tempDir, '.lace');
-    mkdirSync(laceDir, { recursive: true });
-
-    const testConfig = {
-      servers: {
-        'test-server': {
-          command: 'node',
-          args: ['test-server.js'],
-          enabled: true,
-          tools: {
-            echo_test: 'allow-always',
-          },
-        },
-      },
-    };
-
-    writeFileSync(join(laceDir, 'mcp-config.json'), JSON.stringify(testConfig, null, 2));
-
-    // Change to temp directory so config loader finds it
+    // Change to temp directory for project working directory
     process.chdir(tempDir);
 
     // Setup mock approval callback
@@ -91,9 +73,29 @@ describe('MCP Integration E2E', () => {
       requestApproval: vi.fn().mockResolvedValue(ApprovalDecision.ALLOW_ALWAYS),
     };
 
-    // Create tool executor
-    toolExecutor = new ToolExecutor();
-    toolExecutor.setApprovalCallback(mockApprovalCallback);
+    // Create project with MCP server configuration
+    project = Project.create('Test Project', tempDir, 'Integration test project');
+
+    // Add MCP server to project
+    project.addMCPServer('test-server', {
+      command: 'node',
+      args: ['test-server.js'],
+      enabled: true,
+      tools: {
+        echo_test: 'allow-always',
+      },
+    });
+
+    // Create session (will auto-initialize MCP servers)
+    session = Session.create({
+      name: 'Test Session',
+      projectId: project.getId(),
+      approvalCallback: mockApprovalCallback,
+      configuration: {
+        providerInstanceId: 'test-provider',
+        modelId: 'test-model',
+      },
+    });
 
     vi.clearAllMocks();
   });
@@ -102,25 +104,35 @@ describe('MCP Integration E2E', () => {
     // Restore working directory BEFORE cleanup
     process.chdir(originalCwd);
 
-    // Shutdown executor
-    await toolExecutor.shutdown();
+    // Cleanup session (shuts down MCP servers)
+    if (session) {
+      session.destroy();
+    }
 
     // Remove temp directory
     rmSync(tempDir, { recursive: true, force: true });
   });
 
   it('should complete full integration: config → server start → tool discovery → tool execution via ToolExecutor', async () => {
-    // Step 1: Verify configuration can be loaded
-    const config = MCPConfigLoader.loadConfig(tempDir);
-    expect(config.servers['test-server']).toBeDefined();
-    expect(config.servers['test-server'].enabled).toBe(true);
-    expect(config.servers['test-server'].tools.echo_test).toBe('allow-always');
+    // Step 1: Verify project MCP configuration was added
+    const projectServers = project.getMCPServers();
+    expect(projectServers['test-server']).toBeDefined();
+    expect(projectServers['test-server'].enabled).toBe(true);
+    expect(projectServers['test-server'].tools.echo_test).toBe('allow-always');
 
-    // Step 2: Wait for MCP initialization to complete
-    // Since MCP initialization is async in background, we need to wait
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Step 2: Wait for MCP server initialization to complete
+    await session.waitForMCPInitialization();
 
-    // Step 3: Verify MCP tool is available through ToolExecutor
+    // Step 3: Get ToolExecutor from session's coordinator agent
+    const coordinatorAgent = session.getCoordinatorAgent();
+    expect(coordinatorAgent).toBeDefined();
+    const toolExecutor = coordinatorAgent!.toolExecutor;
+
+    // Step 4: Wait for MCP tool discovery to complete properly
+    const mcpManager = session.getMCPServerManager();
+    await toolExecutor.registerMCPToolsAndWait(mcpManager);
+
+    // Step 5: Verify MCP tool is available through ToolExecutor
     const availableToolNames = toolExecutor.getAvailableToolNames();
 
     // Should contain the MCP tool (with server prefix)
@@ -140,9 +152,10 @@ describe('MCP Integration E2E', () => {
       arguments: { message: 'Hello MCP Integration!' },
     };
 
-    // Create minimal context for execution
+    // Create proper context for execution with agent (required for approval)
     const context = {
       signal: new AbortController().signal,
+      agent: coordinatorAgent,
     };
 
     // Step 6: Execute tool through ToolExecutor (this tests the full approval flow)
@@ -157,30 +170,26 @@ describe('MCP Integration E2E', () => {
   });
 
   it('should respect MCP approval policies - DISABLE should not appear in available tools', async () => {
-    // Create a config with a disabled tool
-    const disabledConfig = {
-      servers: {
-        'test-server': {
-          command: 'node',
-          args: ['test-server.js'],
-          enabled: true,
-          tools: {
-            echo_test: 'disable', // This tool should not appear in available tools
-          },
-        },
+    // Update the project MCP server configuration to disable the tool
+    project.updateMCPServer('test-server', {
+      command: 'node',
+      args: ['test-server.js'],
+      enabled: true,
+      tools: {
+        echo_test: 'disable', // This tool should not appear in available tools
       },
-    };
+    });
 
-    const laceDir = join(tempDir, '.lace');
-    writeFileSync(join(laceDir, 'mcp-config.json'), JSON.stringify(disabledConfig));
+    // Manually restart the MCP server with new config since event handling isn't fully set up yet
+    await session.restartMCPServer('test-server');
 
-    // Create new executor to pick up the new config
-    await toolExecutor.shutdown();
-    toolExecutor = new ToolExecutor();
-    toolExecutor.setApprovalCallback(mockApprovalCallback);
+    // Get updated toolExecutor from session after config change
+    const updatedAgent = session.getCoordinatorAgent();
+    const toolExecutor = updatedAgent!.toolExecutor;
 
-    // Wait for initialization
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Wait for tool discovery with updated config
+    const mcpManager = session.getMCPServerManager();
+    await toolExecutor.registerMCPToolsAndWait(mcpManager);
 
     // Disabled tools should not appear in available tool names
     const availableToolNames = toolExecutor.getAvailableToolNames();
@@ -192,8 +201,16 @@ describe('MCP Integration E2E', () => {
   });
 
   it('should handle MCP tool execution failures gracefully', async () => {
-    // Wait for initialization first
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Wait for MCP initialization and tool discovery
+    await session.waitForMCPInitialization();
+
+    // Get toolExecutor from session
+    const agent = session.getCoordinatorAgent();
+    const toolExecutor = agent!.toolExecutor;
+
+    // Wait for tool discovery
+    const mcpManager = session.getMCPServerManager();
+    await toolExecutor.registerMCPToolsAndWait(mcpManager);
 
     // Test that the tool exists and can be retrieved
     const mcpTool = toolExecutor.getTool('test-server/echo_test');
@@ -216,8 +233,16 @@ describe('MCP Integration E2E', () => {
   it('should verify MCP approval levels are working in ToolExecutor', async () => {
     // Test that our approval level integration is working correctly
 
-    // Wait for initialization
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Wait for MCP initialization
+    await session.waitForMCPInitialization();
+
+    // Get toolExecutor from session
+    const agent = session.getCoordinatorAgent();
+    const toolExecutor = agent!.toolExecutor;
+
+    // Wait for tool discovery
+    const mcpManager = session.getMCPServerManager();
+    await toolExecutor.registerMCPToolsAndWait(mcpManager);
 
     // Verify tool is available (with allow-always config from beforeEach)
     const availableTools = toolExecutor.getAvailableToolNames();
@@ -232,6 +257,7 @@ describe('MCP Integration E2E', () => {
 
     const result = await toolExecutor.executeTool(toolCall, {
       signal: new AbortController().signal,
+      agent: agent,
     });
 
     // Should execute successfully because of allow-always approval level

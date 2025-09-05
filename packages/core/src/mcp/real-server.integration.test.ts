@@ -6,13 +6,15 @@ import { writeFileSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtempSync } from 'fs';
-import { ToolExecutor } from '~/tools/executor';
+import { Project } from '~/projects/project';
+import { Session } from '~/sessions/session';
 import type { ToolCall } from '~/tools/types';
 
 describe('Real MCP Server Integration', () => {
   let tempDir: string;
   let testDataDir: string;
-  let toolExecutor: ToolExecutor;
+  let project: Project;
+  let session: Session;
   let originalCwd: string;
 
   beforeEach(() => {
@@ -26,49 +28,59 @@ describe('Real MCP Server Integration', () => {
     // Create a test file
     writeFileSync(join(testDataDir, 'test.txt'), 'Hello from real MCP server!');
 
-    // Create test MCP configuration using real filesystem server
-    const laceDir = join(tempDir, '.lace');
-    mkdirSync(laceDir, { recursive: true });
-
-    const testConfig = {
-      servers: {
-        filesystem: {
-          command: 'npx',
-          args: ['-y', '@modelcontextprotocol/server-filesystem', testDataDir],
-          cwd: testDataDir, // Set working directory to the allowed directory
-          enabled: true,
-          tools: {
-            read_text_file: 'allow-always',
-            list_directory: 'allow-always',
-            list_allowed_directories: 'allow-always',
-          },
-        },
-      },
-    };
-
-    writeFileSync(join(laceDir, 'mcp-config.json'), JSON.stringify(testConfig, null, 2));
-
-    // Change to temp directory so config loader finds it
+    // Change to temp directory for project working directory
     process.chdir(tempDir);
 
-    // Create tool executor
-    toolExecutor = new ToolExecutor();
+    // Create project with real MCP server configuration
+    project = Project.create('Real MCP Test Project', tempDir, 'Testing real MCP server');
+
+    // Add real filesystem MCP server to project
+    project.addMCPServer('filesystem', {
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-filesystem', testDataDir],
+      enabled: true,
+      tools: {
+        read_text_file: 'allow-always',
+        list_directory: 'allow-always',
+        list_allowed_directories: 'allow-always',
+      },
+    });
+
+    // Create session (will auto-initialize real MCP servers)
+    session = Session.create({
+      name: 'Real MCP Test Session',
+      projectId: project.getId(),
+      configuration: {
+        providerInstanceId: 'test-provider',
+        modelId: 'test-model',
+      },
+    });
   });
 
   afterEach(async () => {
     // Restore working directory BEFORE cleanup
     process.chdir(originalCwd);
 
-    // Shutdown executor (this should stop MCP servers)
-    await toolExecutor.shutdown();
+    // Cleanup session (shuts down real MCP servers)
+    if (session) {
+      session.destroy();
+    }
 
     // Remove temp directory
     rmSync(tempDir, { recursive: true, force: true });
   });
 
   it('should work with real filesystem MCP server', async () => {
-    // Wait longer for real server initialization
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    // Wait for real server initialization
+    await session.waitForMCPInitialization();
+
+    // Get toolExecutor from session
+    const agent = session.getCoordinatorAgent();
+    const toolExecutor = agent!.toolExecutor;
+
+    // Wait for tool discovery
+    const mcpManager = session.getMCPServerManager();
+    await toolExecutor.registerMCPToolsAndWait(mcpManager);
 
     // Step 1: Verify filesystem MCP tools are discovered
     const availableToolNames = toolExecutor.getAvailableToolNames();
@@ -85,6 +97,7 @@ describe('Real MCP Server Integration', () => {
 
     const readResult = await toolExecutor.executeTool(readToolCall, {
       signal: new AbortController().signal,
+      agent: agent,
     });
 
     // Should successfully read the real file
@@ -100,6 +113,7 @@ describe('Real MCP Server Integration', () => {
 
     const listResult = await toolExecutor.executeTool(listToolCall, {
       signal: new AbortController().signal,
+      agent: agent,
     });
 
     expect(listResult.status).toBe('completed');
@@ -107,35 +121,32 @@ describe('Real MCP Server Integration', () => {
   }, 10000); // Longer timeout for real server startup
 
   it('should handle real server startup failures gracefully', async () => {
-    // Create config with invalid command
-    const invalidConfig = {
-      servers: {
-        'invalid-server': {
-          command: 'nonexistent-command-12345',
-          args: ['--invalid'],
-          enabled: true,
-          tools: {
-            fake_tool: 'allow-always',
-          },
-        },
+    // Add invalid MCP server to project
+    project.addMCPServer('invalid-server', {
+      command: 'nonexistent-command-12345',
+      args: ['--invalid'],
+      enabled: true,
+      tools: {
+        fake_tool: 'allow-always',
       },
-    };
+    });
 
-    const laceDir = join(tempDir, '.lace');
-    writeFileSync(join(laceDir, 'mcp-config.json'), JSON.stringify(invalidConfig));
+    // Wait for initialization attempt (server will fail but session continues)
+    await session.waitForMCPInitialization();
 
-    // Create new executor
-    await toolExecutor.shutdown();
-    toolExecutor = new ToolExecutor();
+    // Get toolExecutor from session
+    const agent = session.getCoordinatorAgent();
+    const toolExecutor = agent!.toolExecutor;
 
-    // Wait for initialization attempt
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // Wait for tool discovery from working servers
+    const mcpManager = session.getMCPServerManager();
+    await toolExecutor.registerMCPToolsAndWait(mcpManager);
 
     // Invalid server tools should not appear
     const availableTools = toolExecutor.getAvailableToolNames();
     expect(availableTools).not.toContain('invalid-server/fake_tool');
 
-    // System should continue working (not crash)
-    expect(toolExecutor).toBeDefined();
+    // System should continue working (not crash) - working MCP server should still be available
+    expect(availableTools).toContain('filesystem/read_text_file');
   }, 5000);
 });
