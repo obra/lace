@@ -23,16 +23,24 @@ export class SessionService {
     if (session) {
       // Set up approval callbacks and event handlers for all agents in the session
       const agents = session.getAgents();
+      let allAgentsReady = true;
+
       for (const agentInfo of agents) {
         const agent = session.getAgent(agentInfo.threadId);
         if (agent) {
           setupAgentApprovals(agent, sessionId);
           await this.setupAgentEventHandlers(agent);
+        } else {
+          // Agent not ready yet - don't register session with EventStreamManager
+          allAgentsReady = false;
         }
       }
 
-      // Register Session with EventStreamManager (WeakSet prevents duplicates)
-      EventStreamManager.getInstance().registerSession(session);
+      // Only register Session with EventStreamManager when all agents are available
+      // This prevents race conditions where tool approval requests fail with "Agent not found"
+      if (allAgentsReady) {
+        EventStreamManager.getInstance().registerSession(session);
+      }
     }
 
     return session;
@@ -213,28 +221,6 @@ export class SessionService {
     // Listen for any errors
     agent.on('error', ({ error }: { error: Error }) => {
       logger.error(`Agent ${threadId} error:`, error);
-
-      // Filter out abort-related errors from UI messages to prevent duplicates
-      // (These should already be filtered at the agent level, but this is defense-in-depth)
-      const isAbortError =
-        error.name === 'AbortError' ||
-        error.message === 'Request was aborted' ||
-        error.message === 'Aborted';
-
-      if (!isAbortError) {
-        sseManager.broadcast({
-          type: 'LOCAL_SYSTEM_MESSAGE',
-          threadId,
-          timestamp: new Date(),
-          data: `Agent error: ${error.message}`,
-          context: {
-            sessionId,
-            projectId,
-            taskId: undefined,
-            agentId: undefined,
-          },
-        });
-      }
     });
 
     // Listen for conversation complete
