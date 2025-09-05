@@ -33,6 +33,7 @@ import { UrlFetchTool } from '~/tools/implementations/url-fetch';
 import { MCPToolRegistry } from '~/mcp/tool-registry';
 import { MCPServerManager } from '~/mcp/server-manager';
 import { MCPConfigLoader } from '~/mcp/config-loader';
+import type { MCPConfig } from '~/mcp/types';
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
@@ -118,7 +119,7 @@ export class ToolExecutor {
       this.mcpRegistry = new MCPToolRegistry(serverManager);
 
       // Listen for tool updates and register them
-      this.mcpRegistry.on('tools-updated', (serverId, tools) => {
+      this.mcpRegistry.on('tools-updated', (_serverId, tools: Tool[]) => {
         this.registerMCPTools(tools, config);
       });
 
@@ -130,7 +131,7 @@ export class ToolExecutor {
     }
   }
 
-  private registerMCPTools(tools: Tool[], config: any): void {
+  private registerMCPTools(tools: Tool[], config: MCPConfig): void {
     // Register new MCP tools
     tools.forEach((tool) => {
       // Check if tool should be disabled (won't appear in tool lists)
@@ -141,7 +142,7 @@ export class ToolExecutor {
     });
   }
 
-  private getMCPApprovalLevel(toolName: string, config: any): string {
+  private getMCPApprovalLevel(toolName: string, config: MCPConfig): string {
     if (!this.mcpRegistry || !toolName.includes('/')) {
       return 'require-approval'; // Safe default
     }

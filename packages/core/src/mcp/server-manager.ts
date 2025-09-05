@@ -4,19 +4,11 @@
 import { EventEmitter } from 'events';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import type { MCPServerConfig, MCPServerConnection } from './types';
+import type { MCPServerConfig, MCPServerConnection } from '~/mcp/types';
 
 export interface ServerManagerEvents {
   'server-status-changed': (serverId: string, status: MCPServerConnection['status']) => void;
   'server-error': (serverId: string, error: string) => void;
-}
-
-export declare interface MCPServerManager {
-  on<K extends keyof ServerManagerEvents>(event: K, listener: ServerManagerEvents[K]): this;
-  emit<K extends keyof ServerManagerEvents>(
-    event: K,
-    ...args: Parameters<ServerManagerEvents[K]>
-  ): boolean;
 }
 
 export class MCPServerManager extends EventEmitter {

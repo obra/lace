@@ -3,21 +3,13 @@
 
 import { EventEmitter } from 'events';
 import { Tool } from '~/tools/tool';
-import { MCPToolAdapter } from './tool-adapter';
-import { MCPServerManager } from './server-manager';
-import type { MCPConfig, MCPServerConnection, ApprovalLevel } from './types';
+import { MCPToolAdapter } from '~/mcp/tool-adapter';
+import { MCPServerManager } from '~/mcp/server-manager';
+import type { MCPConfig, ApprovalLevel } from '~/mcp/types';
 
 export interface ToolRegistryEvents {
   'tools-updated': (serverId: string, tools: Tool[]) => void;
   'tool-discovery-error': (serverId: string, error: string) => void;
-}
-
-export declare interface MCPToolRegistry {
-  on<K extends keyof ToolRegistryEvents>(event: K, listener: ToolRegistryEvents[K]): this;
-  emit<K extends keyof ToolRegistryEvents>(
-    event: K,
-    ...args: Parameters<ToolRegistryEvents[K]>
-  ): boolean;
 }
 
 export class MCPToolRegistry extends EventEmitter {
@@ -29,10 +21,14 @@ export class MCPToolRegistry extends EventEmitter {
     this.serverManager = serverManager;
 
     // Listen for server status changes to discover tools
-    this.serverManager.on('server-status-changed', (serverId, status) => {
+    this.serverManager.on('server-status-changed', (serverId: string, status: string) => {
       if (status === 'running') {
-        this.discoverServerTools(serverId).catch((error) => {
-          this.emit('tool-discovery-error', serverId, error.message);
+        this.discoverServerTools(serverId).catch((error: unknown) => {
+          this.emit(
+            'tool-discovery-error',
+            serverId,
+            error instanceof Error ? error.message : String(error)
+          );
         });
       } else if (status === 'stopped' || status === 'failed') {
         this.clearServerTools(serverId);
@@ -48,8 +44,11 @@ export class MCPToolRegistry extends EventEmitter {
     const startPromises = Object.entries(config.servers)
       .filter(([_, serverConfig]) => serverConfig.enabled)
       .map(([serverId, serverConfig]) =>
-        this.serverManager.startServer(serverId, serverConfig).catch((error) => {
-          console.error(`Failed to start MCP server ${serverId}:`, error);
+        this.serverManager.startServer(serverId, serverConfig).catch((error: unknown) => {
+          console.error(
+            `Failed to start MCP server ${serverId}:`,
+            error instanceof Error ? error.message : String(error)
+          );
           // Don't fail entire initialization if one server fails
         })
       );

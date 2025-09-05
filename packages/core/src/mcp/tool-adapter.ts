@@ -5,18 +5,30 @@ import { z, ZodType } from 'zod';
 import { Tool } from '~/tools/tool';
 import type { ToolResult, ToolContext, ContentBlock } from '~/tools/types';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { MCPTool } from './types';
+import type { MCPTool } from '~/mcp/types';
 
 /**
  * Converts MCP JSON Schema to Zod schema
  * Simplified converter - handles basic types needed for MCP tools
  */
-function jsonSchemaToZod(schema: any): ZodType {
+interface JsonSchemaProperty {
+  type: string;
+  description?: string;
+  items?: JsonSchemaProperty;
+}
+
+interface JsonSchema {
+  type: string;
+  properties?: Record<string, JsonSchemaProperty>;
+  required?: string[];
+}
+
+function jsonSchemaToZod(schema: JsonSchema): ZodType {
   if (schema.type === 'object') {
     const shape: Record<string, ZodType> = {};
 
     for (const [key, prop] of Object.entries(schema.properties || {})) {
-      const propSchema = prop as any;
+      const propSchema = prop;
 
       let zodType: ZodType;
 
@@ -69,12 +81,12 @@ export class MCPToolAdapter extends Tool {
     super();
     this.name = `${serverId}/${mcpTool.name}`;
     this.description = mcpTool.description || `MCP tool: ${mcpTool.name}`;
-    this.schema = jsonSchemaToZod(mcpTool.inputSchema);
+    this.schema = jsonSchemaToZod(mcpTool.inputSchema as JsonSchema);
   }
 
   protected async executeValidated(
     args: Record<string, unknown>,
-    context?: ToolContext
+    _context?: ToolContext
   ): Promise<ToolResult> {
     try {
       // Use MCP SDK's high-level callTool method
@@ -87,25 +99,32 @@ export class MCPToolAdapter extends Tool {
       if (result.isError) {
         const contentArray = Array.isArray(result.content) ? result.content : [result.content];
         return this.createError(
-          `MCP tool error: ${contentArray.map((c: any) => c.text || '').join(' ')}`,
+          `MCP tool error: ${contentArray.map((c: unknown) => (c as { text?: string }).text || '').join(' ')}`,
           { toolName: this.mcpTool.name }
         );
       }
 
       // Convert MCP content blocks to Lace format
       const contentArray = Array.isArray(result.content) ? result.content : [result.content];
-      const content: ContentBlock[] = contentArray.map((block: any) => {
-        if (block.type === 'text') {
-          return { type: 'text' as const, text: block.text || '' };
-        } else if (block.type === 'image') {
+      const content: ContentBlock[] = contentArray.map((block: unknown) => {
+        const typedBlock = block as {
+          type: string;
+          text?: string;
+          data?: string;
+          resource?: { uri?: string };
+        };
+
+        if (typedBlock.type === 'text') {
+          return { type: 'text' as const, text: typedBlock.text || '' };
+        } else if (typedBlock.type === 'image') {
           return {
             type: 'image' as const,
-            data: block.data,
+            data: typedBlock.data,
           };
-        } else if (block.type === 'resource') {
+        } else if (typedBlock.type === 'resource') {
           return {
             type: 'resource' as const,
-            uri: block.resource?.uri,
+            uri: typedBlock.resource?.uri,
           };
         } else {
           // Fallback for unknown content types

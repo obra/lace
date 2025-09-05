@@ -192,20 +192,6 @@ describe('MCP Integration E2E', () => {
   });
 
   it('should handle MCP tool execution failures gracefully', async () => {
-    // Create new config that returns error
-    const errorConfig = {
-      servers: {
-        'test-server': {
-          command: 'node',
-          args: ['test-server.js'],
-          enabled: true,
-          tools: {
-            echo_test: 'allow-always',
-          },
-        },
-      },
-    };
-
     // Wait for initialization first
     await new Promise((resolve) => setTimeout(resolve, 100));
 
