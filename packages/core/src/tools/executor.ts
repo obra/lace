@@ -104,15 +104,46 @@ export class ToolExecutor {
   }
 
   /**
+   * Register MCP tools and wait for discovery to complete (for testing)
+   */
+  async registerMCPToolsAndWait(mcpManager: MCPServerManager): Promise<void> {
+    // Clear existing MCP tools
+    const mcpToolNames = Array.from(this.tools.keys()).filter((name) => name.includes('/'));
+    mcpToolNames.forEach((name) => this.tools.delete(name));
+
+    // Register tools from all running servers and wait for completion
+    const runningServers = mcpManager
+      .getAllServers()
+      .filter((server) => server.status === 'running');
+
+    const discoveryPromises = runningServers.map((server) =>
+      this.discoverAndRegisterServerTools(server)
+    );
+
+    await Promise.all(discoveryPromises);
+  }
+
+  /**
    * Discover and register tools from a server (async, non-blocking)
    */
   private async discoverAndRegisterServerTools(server: MCPServerConnection): Promise<void> {
     try {
       const serverTools = await this.discoverMCPServerTools(server);
-      serverTools.forEach((tool) => {
+
+      // Filter tools based on approval policy - don't register disabled tools
+      const enabledTools = serverTools.filter((tool) => {
+        const [_serverId, toolId] = tool.name.split('/', 2);
+        const approvalLevel = server.config.tools[toolId] || 'require-approval';
+        return approvalLevel !== 'disable';
+      });
+
+      enabledTools.forEach((tool) => {
         this.tools.set(tool.name, tool);
       });
-      logger.debug(`Registered ${serverTools.length} tools from MCP server ${server.id}`);
+
+      logger.debug(
+        `Registered ${enabledTools.length}/${serverTools.length} tools from MCP server ${server.id} (filtered out disabled tools)`
+      );
     } catch (error) {
       logger.warn(`Failed to discover and register tools from server ${server.id}:`, error);
     }
@@ -205,7 +236,20 @@ export class ToolExecutor {
       return 'granted';
     }
 
-    // Note: MCP tools (serverId/toolName format) go through normal approval flow
+    // 3. Check if this is an MCP tool with allow-always approval (bypasses agent requirement)
+    if (call.name.includes('/') && context?.agent) {
+      // MCP tools have serverId/toolName format
+      try {
+        const approvalLevel = await this.getMCPApprovalLevel(call.name, context);
+        logger.debug(`MCP approval check for ${call.name}: ${approvalLevel}`);
+        if (approvalLevel === 'allow-always') {
+          return 'granted';
+        }
+      } catch (error) {
+        // Log but continue with normal flow
+        logger.warn('Failed to check MCP approval level:', error);
+      }
+    }
 
     // 4. SECURITY: Fail-safe - require agent context for policy enforcement
     if (!context?.agent) {
@@ -397,6 +441,42 @@ export class ToolExecutor {
         error instanceof Error ? error.message : 'Unknown error occurred',
         call.id
       );
+    }
+  }
+
+  /**
+   * Get MCP tool approval level from session context
+   */
+  private async getMCPApprovalLevel(toolName: string, context?: ToolContext): Promise<string> {
+    if (!toolName.includes('/') || !context?.agent) {
+      return 'require-approval'; // Safe default
+    }
+
+    try {
+      // Get session from agent context
+      const session = await context.agent.getFullSession();
+      if (!session) {
+        return 'require-approval';
+      }
+
+      const [serverId, toolId] = toolName.split('/', 2);
+      const serverStatus = session.getMCPServerStatus(serverId);
+
+      logger.debug(
+        `MCP approval lookup: ${toolName} → server: ${serverId}, tool: ${toolId}, status: ${serverStatus?.status}`
+      );
+
+      if (serverStatus?.status === 'running') {
+        const approvalLevel = serverStatus.config.tools[toolId] || 'require-approval';
+        logger.debug(`MCP approval result: ${toolName} → ${approvalLevel}`);
+        return approvalLevel;
+      }
+
+      logger.debug(`MCP approval fallback: ${toolName} → require-approval (server not running)`);
+      return 'require-approval';
+    } catch (error) {
+      logger.warn(`Failed to get MCP approval level for ${toolName}:`, error);
+      return 'require-approval';
     }
   }
 
