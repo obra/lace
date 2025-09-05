@@ -186,6 +186,10 @@
     "./tools/implementations/bash": {
       "types": "./dist/tools/implementations/bash.d.ts",
       "import": "./dist/tools/implementations/bash.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "import": "./dist/mcp/index.js"
     }
   }
 }
