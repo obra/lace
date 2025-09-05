@@ -4,7 +4,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { z } from 'zod';
-import type { MCPConfig, MCPServerConfig } from './types';
+import type { MCPConfig } from '~/mcp/types';
 
 // Zod schemas for validation
 const ApprovalLevelSchema = z.enum([
@@ -66,7 +66,7 @@ export class MCPConfigLoader {
 
     try {
       const content = readFileSync(filepath, 'utf-8');
-      const parsed = JSON.parse(content);
+      const parsed: unknown = JSON.parse(content);
       return MCPConfigSchema.parse(parsed);
     } catch (error) {
       throw new Error(
