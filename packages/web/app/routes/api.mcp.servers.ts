@@ -5,7 +5,13 @@ import { MCPConfigLoader } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 
-export async function loader({ request }: { request: Request; params: unknown; context: unknown }) {
+export async function loader({
+  request: _request,
+}: {
+  request: Request;
+  params: unknown;
+  context: unknown;
+}) {
   try {
     // Load global MCP configuration only (no project context)
     const globalConfig = MCPConfigLoader.loadGlobalConfig();

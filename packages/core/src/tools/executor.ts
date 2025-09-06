@@ -34,6 +34,7 @@ import { MCPServerManager } from '~/mcp/server-manager';
 import type { MCPServerConnection } from '~/config/mcp-types';
 import { MCPToolAdapter } from '~/mcp/tool-adapter';
 import { logger } from '~/utils/logger';
+import type { Session } from '~/sessions/session';
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
@@ -117,22 +118,11 @@ export class ToolExecutor {
   /**
    * Set session reference for callbacks (called during agent creation)
    */
-  setSession(session: any): void {
+  setSession(session: Session): void {
     this.session = session;
-    // Kick off MCP server initialization when first agent ToolExecutor is created
-    void this.ensureMCPServersStarted();
   }
 
-  private session?: any;
-
-  private async ensureMCPServersStarted(): Promise<void> {
-    if (!this.session?.initializeMCPServers) return;
-    try {
-      await this.session.initializeMCPServers();
-    } catch (error) {
-      logger.warn('Failed to ensure MCP servers started:', error);
-    }
-  }
+  private session?: Session;
 
   private mcpServerManager?: MCPServerManager;
   private mcpDiscoveryPromise?: Promise<void>;
