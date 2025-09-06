@@ -10,7 +10,7 @@ import { getLaceFilePath, ensureLaceDir } from '~/config/lace-dir';
  */
 export class UserSettingsManager {
   private static readonly SETTINGS_FILENAME = 'user-settings.json';
-  private static cachedSettings: Record<string, any> | null = null;
+  private static cachedSettings: Record<string, unknown> | null = null;
 
   /**
    * Get the path to the user settings file
@@ -23,7 +23,7 @@ export class UserSettingsManager {
    * Load user settings from disk
    * Returns empty object if file doesn't exist or is invalid
    */
-  static load(): Record<string, any> {
+  static load(): Record<string, unknown> {
     if (this.cachedSettings) {
       return this.cachedSettings;
     }
@@ -33,7 +33,7 @@ export class UserSettingsManager {
     try {
       if (fs.existsSync(settingsPath)) {
         const settingsContent = fs.readFileSync(settingsPath, 'utf-8');
-        this.cachedSettings = JSON.parse(settingsContent);
+        this.cachedSettings = JSON.parse(settingsContent) as Record<string, unknown>;
       } else {
         this.cachedSettings = {};
       }
@@ -49,7 +49,7 @@ export class UserSettingsManager {
   /**
    * Save user settings to disk
    */
-  static save(settings: Record<string, any>): void {
+  static save(settings: Record<string, unknown>): void {
     const settingsPath = this.getFilePath();
 
     // Ensure directory exists
@@ -65,7 +65,7 @@ export class UserSettingsManager {
   /**
    * Update specific settings (merges with existing)
    */
-  static update(partialSettings: Record<string, any>): Record<string, any> {
+  static update(partialSettings: Record<string, unknown>): Record<string, unknown> {
     const currentSettings = this.load();
     const updatedSettings = { ...currentSettings, ...partialSettings };
     this.save(updatedSettings);
@@ -75,7 +75,7 @@ export class UserSettingsManager {
   /**
    * Reset settings to empty object
    */
-  static reset(): Record<string, any> {
+  static reset(): Record<string, unknown> {
     const emptySettings = {};
     this.save(emptySettings);
     return emptySettings;
