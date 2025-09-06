@@ -78,8 +78,11 @@ export class UserSettingsManager {
     // Ensure directory exists
     ensureLaceDir();
 
-    // Write settings to file
-    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+    // Write settings to file with secure permissions
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), {
+      encoding: 'utf-8',
+      mode: 0o600,
+    });
 
     // Update cache
     this.cachedSettings = settings;
