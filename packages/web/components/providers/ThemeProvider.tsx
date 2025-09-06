@@ -61,7 +61,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         if (savedTheme === 'light' || savedTheme === 'dark') {
           // Migrate to settings API
           await api.patch('/api/settings', { theme: savedTheme });
-          if (!cancelled) setThemeState(savedTheme);
+          if (cancelled) return;
+          setThemeState(savedTheme);
           // Remove from localStorage after successful migration
           localStorage.removeItem('lace-theme');
           return;
