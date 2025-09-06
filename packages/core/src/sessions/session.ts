@@ -70,8 +70,6 @@ export class Session {
     // Create session-scoped MCP server manager
     this._mcpServerManager = new MCPServerManager();
 
-    // Initialize MCP servers in background (non-blocking)
-    void this.initializeMCPServers();
   }
 
   static create(options: {
@@ -108,9 +106,7 @@ export class Session {
     // Note: We'll update this with agent creation callback after session is created
     const taskManager = new TaskManager(asThreadId(threadId), getPersistence());
 
-    // Create tool executor
-    const toolExecutor = new ToolExecutor();
-    Session.initializeTools(toolExecutor);
+    // Note: ToolExecutor will be created after session is created
 
     // Get effective configuration by merging project and session configs
     const effectiveConfig = Session.getEffectiveConfiguration(
@@ -208,6 +204,12 @@ export class Session {
 
     // Agent will auto-initialize token budget based on model
 
+    // Create session instance first
+    const session = new Session(asThreadId(threadId), sessionData, threadManager);
+
+    // Create configured tool executor
+    const toolExecutor = session.createConfiguredToolExecutor();
+
     // Create coordinator agent (not initialized yet - will be lazy initialized)
     const sessionAgent = Session.createAgentSync({
       sessionData,
@@ -224,21 +226,13 @@ export class Session {
       isSession: true,
     });
 
-    // Create session instance and add coordinator
-    const session = new Session(asThreadId(threadId), sessionData, threadManager);
+    // Add coordinator to session
     session._agents.set(asThreadId(threadId), sessionAgent);
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
 
     // Set up agent creation callback for task-based agent spawning
     session.setupAgentCreationCallback();
-
-    // Register delegate tool (TaskManager accessed via context)
-    const delegateTool = new DelegateTool();
-    toolExecutor.registerTool('delegate', delegateTool);
-
-    // Register MCP tools from session's servers
-    toolExecutor.registerMCPTools(session._mcpServerManager);
 
     // Set up coordinator agent with approval callback if provided
     const coordinatorAgent = session.getCoordinatorAgent();
@@ -395,17 +389,13 @@ export class Session {
     // Create TaskManager using global persistence
     const taskManager = new TaskManager(sessionId, getPersistence());
 
-    // Create tool executor
-    const toolExecutor = new ToolExecutor();
-    Session.initializeTools(toolExecutor);
-
     logger.debug(`Creating session for ${sessionId}`);
 
     // Create session instance
     const session = new Session(sessionId, sessionData, threadManager);
 
-    // Register MCP tools from session's servers
-    toolExecutor.registerMCPTools(session._mcpServerManager);
+    // Create fully configured tool executor
+    const toolExecutor = session.createConfiguredToolExecutor();
 
     // Create and initialize coordinator agent
     let coordinatorAgent: Agent;
@@ -802,16 +792,8 @@ export class Session {
       effectiveModelId: targetModelId,
     });
 
-    // Create new toolExecutor for this agent
-    const agentToolExecutor = new ToolExecutor();
-    Session.initializeTools(agentToolExecutor);
-
-    // Register delegate tool (TaskManager accessed via context)
-    const delegateTool = new DelegateTool();
-    agentToolExecutor.registerTool('delegate', delegateTool);
-
-    // Register MCP tools from this session's servers
-    agentToolExecutor.registerMCPTools(this._mcpServerManager);
+    // Create configured tool executor for this agent
+    const agentToolExecutor = this.createConfiguredToolExecutor();
 
     // Thread ID already generated above for agent naming
 
@@ -927,6 +909,26 @@ export class Session {
     ];
 
     toolExecutor.registerTools(tools);
+  }
+
+  /**
+   * Create fully configured ToolExecutor for this session's agents
+   */
+  createConfiguredToolExecutor(): ToolExecutor {
+    const toolExecutor = new ToolExecutor();
+    Session.initializeTools(toolExecutor);
+
+    // Add delegate tool
+    const delegateTool = new DelegateTool();
+    toolExecutor.registerTool('delegate', delegateTool);
+
+    // Kick off MCP tool discovery (non-blocking)
+    toolExecutor.registerMCPTools(this._mcpServerManager);
+
+    // Start MCP servers if not already started
+    void this.initializeMCPServers();
+
+    return toolExecutor;
   }
 
   destroy(): void {
