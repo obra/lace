@@ -404,6 +404,7 @@ export abstract class AIProvider extends EventEmitter {
               lastError: error as Error,
             });
           }
+
           throw error;
         }
 
