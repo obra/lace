@@ -22,7 +22,7 @@ export async function action({ request }: Route.ActionArgs) {
   try {
     if (request.method === 'PUT') {
       // Replace entire settings
-      const body = await request.json();
+      const body = (await request.json()) as unknown;
 
       // Validate that body is a plain object
       if (typeof body !== 'object' || body === null || Array.isArray(body)) {
@@ -35,7 +35,7 @@ export async function action({ request }: Route.ActionArgs) {
       return createSuperjsonResponse(body);
     } else if (request.method === 'PATCH') {
       // Merge partial settings
-      const partialSettings = await request.json();
+      const partialSettings = (await request.json()) as unknown;
 
       // Validate that partialSettings is a plain object
       if (

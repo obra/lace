@@ -24,7 +24,7 @@ vi.mock('@/lib/api-client', () => ({
 }));
 
 // Mock localStorage
-const localStorageMock: Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'clear'> = {
+const localStorageMock = {
   getItem: vi.fn(),
   setItem: vi.fn(),
   removeItem: vi.fn(),

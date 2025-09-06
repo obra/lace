@@ -3,6 +3,7 @@
 
 import * as fs from 'fs';
 import { getLaceFilePath, ensureLaceDir } from '~/config/lace-dir';
+import { logger } from '~/utils/logger';
 
 /**
  * Manages user settings stored in ~/.lace/user-settings.json
@@ -25,7 +26,10 @@ export class UserSettingsManager {
    */
   static load(): Record<string, unknown> {
     if (this.cachedSettings) {
-      return this.cachedSettings;
+      // Return a deep clone to prevent accidental mutation of cache
+      return structuredClone
+        ? structuredClone(this.cachedSettings)
+        : (JSON.parse(JSON.stringify(this.cachedSettings)) as Record<string, unknown>);
     }
 
     const settingsPath = this.getFilePath();
@@ -39,11 +43,18 @@ export class UserSettingsManager {
       }
     } catch (error) {
       // If file is malformed or can't be read, return empty object
-      console.warn(`Failed to load user settings from ${settingsPath}:`, error);
+      logger.warn('Failed to load user settings', {
+        settingsPath,
+        error: error instanceof Error ? error.message : String(error),
+      });
       this.cachedSettings = {};
     }
 
-    return this.cachedSettings || {};
+    // Return a deep clone to prevent accidental mutation of cache
+    const settings = this.cachedSettings || {};
+    return structuredClone
+      ? structuredClone(settings)
+      : (JSON.parse(JSON.stringify(settings)) as Record<string, unknown>);
   }
 
   /**
@@ -67,9 +78,19 @@ export class UserSettingsManager {
    */
   static update(partialSettings: Record<string, unknown>): Record<string, unknown> {
     const currentSettings = this.load();
-    const updatedSettings = { ...currentSettings, ...partialSettings };
+
+    // Filter out dangerous prototype pollution keys
+    const dangerous = new Set(['__proto__', 'constructor', 'prototype']);
+    const sanitized = Object.fromEntries(
+      Object.entries(partialSettings).filter(([key]) => !dangerous.has(key))
+    ) as Record<string, unknown>;
+
+    const updatedSettings = { ...currentSettings, ...sanitized };
     this.save(updatedSettings);
-    return updatedSettings;
+    // Return a deep clone to prevent accidental mutation
+    return structuredClone
+      ? structuredClone(updatedSettings)
+      : (JSON.parse(JSON.stringify(updatedSettings)) as Record<string, unknown>);
   }
 
   /**
@@ -78,7 +99,10 @@ export class UserSettingsManager {
   static reset(): Record<string, unknown> {
     const emptySettings = {};
     this.save(emptySettings);
-    return emptySettings;
+    // Return a deep clone to prevent accidental mutation
+    return structuredClone
+      ? structuredClone(emptySettings)
+      : (JSON.parse(JSON.stringify(emptySettings)) as Record<string, unknown>);
   }
 
   /**
