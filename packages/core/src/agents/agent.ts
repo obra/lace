@@ -982,12 +982,26 @@ export class Agent extends EventEmitter {
     };
 
     // Defensive error listener to prevent uncaught EventEmitter errors from crashing
-    const providerErrorListener = (error: Error) => {
-      // No-op: errors are handled via try/catch blocks in agent methods
-      // This prevents uncaught 'error' events from crashing the process
-      logger.debug('Provider emitted error event (handled defensively)', {
+    const providerErrorListener = (err: unknown) => {
+      let msg = '';
+      let stack: string | undefined;
+      if (err instanceof Error) {
+        msg = err.message;
+        stack = err.stack;
+      } else if (typeof err === 'string') {
+        msg = err;
+      } else {
+        try {
+          msg = JSON.stringify(err);
+        } catch {
+          msg = String(err);
+        }
+      }
+
+      logger.warn('Provider emitted unexpected error event (handled defensively)', {
         threadId: this._threadId,
-        errorMessage: error.message.slice(0, 100),
+        errorMessage: msg.slice(0, 200),
+        errorStack: stack,
       });
     };
 
@@ -1096,10 +1110,35 @@ export class Agent extends EventEmitter {
       this.emit('retry_exhausted', { attempts, lastError });
     };
 
+    // Defensive error listener (mirrors streaming path)
+    const providerErrorListener = (err: unknown) => {
+      let msg = '';
+      let stack: string | undefined;
+      if (err instanceof Error) {
+        msg = err.message;
+        stack = err.stack;
+      } else if (typeof err === 'string') {
+        msg = err;
+      } else {
+        try {
+          msg = JSON.stringify(err);
+        } catch {
+          msg = String(err);
+        }
+      }
+
+      logger.warn('Provider emitted unexpected error event (handled defensively)', {
+        threadId: this._threadId,
+        errorMessage: msg.slice(0, 200),
+        errorStack: stack,
+      });
+    };
+
     // Subscribe to provider retry events
     if (this.providerInstance) {
       this.providerInstance.on('retry_attempt', retryAttemptListener);
       this.providerInstance.on('retry_exhausted', retryExhaustedListener);
+      this.providerInstance.on('error', providerErrorListener);
     }
 
     try {
@@ -1146,6 +1185,7 @@ export class Agent extends EventEmitter {
       if (this.providerInstance) {
         this.providerInstance.removeListener('retry_attempt', retryAttemptListener);
         this.providerInstance.removeListener('retry_exhausted', retryExhaustedListener);
+        this.providerInstance.removeListener('error', providerErrorListener);
       }
     }
   }
