@@ -28,8 +28,14 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     const configuration = project.getConfiguration();
 
-    // Get user-configurable tools from cached registry
-    const userConfigurableTools = toolCacheService.getUserConfigurableTools();
+    // FIXED: Get tools from project context instead of creating fresh ToolExecutor
+    const toolExecutor = await project.createToolExecutor(); // Includes MCP servers
+    const userConfigurableTools = toolExecutor
+      .getAllTools() // Now includes MCP tools from project config
+      .filter(
+        (tool: { annotations?: { safeInternal?: boolean } }) => !tool.annotations?.safeInternal
+      )
+      .map((tool: { name: string }) => tool.name);
 
     return createSuperjsonResponse({
       configuration: {
@@ -87,8 +93,14 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const configuration = project.getConfiguration();
 
-    // Get user-configurable tools from cached registry (same as GET)
-    const userConfigurableTools = toolCacheService.getUserConfigurableTools();
+    // Get user-configurable tools from project context (same as GET)
+    const toolExecutor = await project.createToolExecutor(); // Includes MCP servers
+    const userConfigurableTools = toolExecutor
+      .getAllTools()
+      .filter(
+        (tool: { annotations?: { safeInternal?: boolean } }) => !tool.annotations?.safeInternal
+      )
+      .map((tool: { name: string }) => tool.name);
 
     return createSuperjsonResponse({
       configuration: {

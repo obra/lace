@@ -2,7 +2,6 @@
 // ABOUTME: Handles session configuration retrieval and updates with validation and inheritance
 
 import { getSessionService } from '@/lib/server/session-service';
-import { toolCacheService } from '@/lib/server/tool-cache-service';
 import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
@@ -43,8 +42,14 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     const configuration = session.getEffectiveConfiguration();
 
-    // Get user-configurable tools from cached registry
-    const userConfigurableTools = toolCacheService.getUserConfigurableTools();
+    // FIXED: Get tools from session's ToolExecutor instead of creating fresh one
+    const toolExecutor = session.createConfiguredToolExecutor(); // Includes MCP servers
+    const userConfigurableTools = toolExecutor
+      .getAllTools() // Now includes MCP tools with session context
+      .filter(
+        (tool: { annotations?: { safeInternal?: boolean } }) => !tool.annotations?.safeInternal
+      )
+      .map((tool: { name: string }) => tool.name);
 
     return createSuperjsonResponse({
       configuration: {
@@ -91,8 +96,14 @@ export async function action({ request, params }: Route.ActionArgs) {
     session.updateConfiguration(validatedData);
     const configuration = session.getEffectiveConfiguration();
 
-    // Get user-configurable tools from cached registry (same as GET)
-    const userConfigurableTools = toolCacheService.getUserConfigurableTools();
+    // Get user-configurable tools from session's ToolExecutor (same as GET)
+    const toolExecutor = session.createConfiguredToolExecutor(); // Includes MCP servers
+    const userConfigurableTools = toolExecutor
+      .getAllTools()
+      .filter(
+        (tool: { annotations?: { safeInternal?: boolean } }) => !tool.annotations?.safeInternal
+      )
+      .map((tool: { name: string }) => tool.name);
 
     return createSuperjsonResponse({
       configuration: {

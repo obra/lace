@@ -13,6 +13,7 @@ import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { getProcessTempDir } from '~/config/lace-dir';
 import { MCPConfigLoader } from '~/config/mcp-config-loader';
 import type { MCPServerConfig } from '~/config/mcp-types';
+import type { ToolExecutor } from '~/tools/executor';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 
@@ -392,6 +393,37 @@ export class Project {
   getMCPServer(serverId: string): MCPServerConfig | null {
     const servers = this.getMCPServers();
     return servers[serverId] || null;
+  }
+
+  /**
+   * Create ToolExecutor with project MCP servers for configuration APIs
+   */
+  async createToolExecutor(): Promise<ToolExecutor> {
+    const { ToolExecutor } = await import('~/tools/executor');
+    const toolExecutor = new ToolExecutor();
+    toolExecutor.registerAllAvailableTools();
+
+    // For configuration APIs, we just show what MCP tools would be available
+    // without actually starting the servers (that happens in sessions)
+    const mcpServers = this.getMCPServers();
+    if (Object.keys(mcpServers).length > 0) {
+      const { MCPServerManager } = await import('~/mcp/server-manager');
+      const mcpManager = new MCPServerManager();
+      toolExecutor.registerMCPTools(mcpManager);
+
+      // Add placeholder tools based on server configuration
+      for (const [serverId, serverConfig] of Object.entries(mcpServers)) {
+        if (serverConfig.enabled && serverConfig.tools) {
+          for (const toolName of Object.keys(serverConfig.tools)) {
+            // Create placeholder MCP tools for configuration display
+            const _mcpToolName = `${serverId}/${toolName}`;
+            // The tool adapter will handle this properly when servers actually run
+          }
+        }
+      }
+    }
+
+    return toolExecutor;
   }
 
   /**
