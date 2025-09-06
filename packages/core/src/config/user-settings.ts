@@ -27,8 +27,8 @@ export class UserSettingsManager {
   static load(): Record<string, unknown> {
     if (this.cachedSettings) {
       // Return a deep clone to prevent accidental mutation of cache
-      return structuredClone
-        ? structuredClone(this.cachedSettings)
+      return globalThis.structuredClone
+        ? globalThis.structuredClone(this.cachedSettings)
         : (JSON.parse(JSON.stringify(this.cachedSettings)) as Record<string, unknown>);
     }
 
@@ -37,23 +37,35 @@ export class UserSettingsManager {
     try {
       if (fs.existsSync(settingsPath)) {
         const settingsContent = fs.readFileSync(settingsPath, 'utf-8');
-        this.cachedSettings = JSON.parse(settingsContent) as Record<string, unknown>;
+        const parsed = JSON.parse(settingsContent) as unknown;
+
+        // Validate that parsed JSON is a plain object
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+          this.cachedSettings = parsed as Record<string, unknown>;
+        } else {
+          logger.warn('Settings file contains non-object JSON, using empty settings', {
+            settingsPath,
+            parsedType: Array.isArray(parsed) ? 'array' : typeof parsed,
+          });
+          this.cachedSettings = {};
+        }
       } else {
         this.cachedSettings = {};
       }
     } catch (error) {
       // If file is malformed or can't be read, return empty object
-      logger.warn('Failed to load user settings', {
-        settingsPath,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      const err =
+        error instanceof Error
+          ? { name: error.name, message: error.message, stack: error.stack }
+          : { message: String(error) };
+      logger.warn('Failed to load user settings', { settingsPath, err });
       this.cachedSettings = {};
     }
 
     // Return a deep clone to prevent accidental mutation of cache
     const settings = this.cachedSettings || {};
-    return structuredClone
-      ? structuredClone(settings)
+    return globalThis.structuredClone
+      ? globalThis.structuredClone(settings)
       : (JSON.parse(JSON.stringify(settings)) as Record<string, unknown>);
   }
 
@@ -77,6 +89,19 @@ export class UserSettingsManager {
    * Update specific settings (merges with existing)
    */
   static update(partialSettings: Record<string, unknown>): Record<string, unknown> {
+    // Validate that partialSettings is a plain object
+    if (
+      typeof partialSettings !== 'object' ||
+      partialSettings === null ||
+      Array.isArray(partialSettings)
+    ) {
+      logger.warn('UserSettingsManager.update() called with non-object input, skipping update', {
+        inputType: Array.isArray(partialSettings) ? 'array' : typeof partialSettings,
+      });
+      // Return current settings unchanged
+      return this.load();
+    }
+
     const currentSettings = this.load();
 
     // Filter out dangerous prototype pollution keys
@@ -88,8 +113,8 @@ export class UserSettingsManager {
     const updatedSettings = { ...currentSettings, ...sanitized };
     this.save(updatedSettings);
     // Return a deep clone to prevent accidental mutation
-    return structuredClone
-      ? structuredClone(updatedSettings)
+    return globalThis.structuredClone
+      ? globalThis.structuredClone(updatedSettings)
       : (JSON.parse(JSON.stringify(updatedSettings)) as Record<string, unknown>);
   }
 
@@ -100,8 +125,8 @@ export class UserSettingsManager {
     const emptySettings = {};
     this.save(emptySettings);
     // Return a deep clone to prevent accidental mutation
-    return structuredClone
-      ? structuredClone(emptySettings)
+    return globalThis.structuredClone
+      ? globalThis.structuredClone(emptySettings)
       : (JSON.parse(JSON.stringify(emptySettings)) as Record<string, unknown>);
   }
 
