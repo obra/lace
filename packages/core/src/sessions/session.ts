@@ -423,9 +423,12 @@ export class Session {
         logger.debug(`Coordinator agent successfully registered for ${sessionId}`);
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       logger.error(`Failed to create coordinator agent for ${sessionId}:`, {
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage,
+        stack: errorStack,
         providerInstanceId,
         modelId,
       });
