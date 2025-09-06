@@ -27,8 +27,9 @@ export function UserSettingsPanel({
   const [internalUserName, setInternalUserName] = useState('');
   const [internalUserEmail, setInternalUserEmail] = useState('');
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Ref for timeout cleanup
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -41,11 +42,15 @@ export function UserSettingsPanel({
   // Load settings from API on mount (only in uncontrolled mode)
   useEffect(() => {
     if (!isControlled) {
+      let cancelled = false;
+
       const loadSettings = async () => {
         try {
-          setIsLoading(true);
-          setLoadError(null);
+          setIsFetching(true);
+          setErrorMessage(null);
           const settings = await api.get<Record<string, unknown>>('/api/settings');
+
+          if (cancelled) return;
 
           const name = settings.name;
           const email = settings.email;
@@ -53,13 +58,17 @@ export function UserSettingsPanel({
           if (typeof email === 'string') setInternalUserEmail(email);
         } catch (error) {
           console.warn('Failed to load user settings:', error);
-          setLoadError('Failed to load settings');
+          if (!cancelled) setErrorMessage('Failed to load settings');
         } finally {
-          setIsLoading(false);
+          if (!cancelled) setIsFetching(false);
         }
       };
 
       void loadSettings();
+
+      return () => {
+        cancelled = true;
+      };
     }
   }, [isControlled]);
 
@@ -106,21 +115,22 @@ export function UserSettingsPanel({
       clearTimeout(successTimeoutRef.current);
     }
 
+    // Validate and sanitize data before saving
+    const nameValidation = validateUserName(userName);
+    const emailValidation = validateEmail(userEmail);
+
+    // Check for validation errors
+    if (!nameValidation.isValid || !emailValidation.isValid) {
+      console.warn('Validation errors detected:', {
+        name: nameValidation.error,
+        email: emailValidation.error,
+      });
+      return;
+    }
+
     try {
-      setIsLoading(true);
-
-      // Validate and sanitize data before saving
-      const nameValidation = validateUserName(userName);
-      const emailValidation = validateEmail(userEmail);
-
-      // Check for validation errors
-      if (!nameValidation.isValid || !emailValidation.isValid) {
-        console.warn('Validation errors detected:', {
-          name: nameValidation.error,
-          email: emailValidation.error,
-        });
-        return;
-      }
+      setIsSaving(true);
+      setErrorMessage(null);
 
       // Save to settings API
       await api.patch('/api/settings', {
@@ -136,9 +146,9 @@ export function UserSettingsPanel({
       }, 3000);
     } catch (error) {
       console.error('Failed to save user settings:', error);
-      setLoadError('Failed to save settings');
+      setErrorMessage('Failed to save settings');
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   }, [userName, userEmail]);
 
@@ -147,13 +157,8 @@ export function UserSettingsPanel({
       title="User Settings"
       description="Manage your personal information and preferences"
     >
-      {loadError && (
-        <Alert
-          variant="error"
-          title="Error loading settings"
-          description={loadError}
-          className="mb-6"
-        />
+      {errorMessage && (
+        <Alert variant="error" title="Settings error" description={errorMessage} className="mb-6" />
       )}
 
       <div className="space-y-6">
@@ -163,14 +168,14 @@ export function UserSettingsPanel({
             value={userName}
             onChange={handleUserNameChange}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              if (e.key === 'Enter' && !isFetching && !isSaving) {
                 void handleSave();
               }
             }}
             className="input input-bordered w-full"
             placeholder="Enter your display name"
             aria-label="Display Name"
-            disabled={isLoading}
+            disabled={isFetching || isSaving}
           />
         </SettingField>
 
@@ -183,14 +188,14 @@ export function UserSettingsPanel({
             value={userEmail}
             onChange={handleUserEmailChange}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              if (e.key === 'Enter' && !isFetching && !isSaving) {
                 void handleSave();
               }
             }}
             className="input input-bordered w-full"
             placeholder="Enter your email address"
             aria-label="Email"
-            disabled={isLoading}
+            disabled={isFetching || isSaving}
           />
         </SettingField>
 
@@ -203,9 +208,9 @@ export function UserSettingsPanel({
           <button
             onClick={handleSave}
             className="btn btn-primary vapor-button ring-hover"
-            disabled={isLoading}
+            disabled={isFetching || isSaving}
           >
-            {isLoading ? 'Saving...' : 'Save'}
+            {isFetching ? 'Loading...' : isSaving ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>

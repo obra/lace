@@ -4,7 +4,7 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { userEvent } from '@testing-library/user-event';
+import userEvent from '@testing-library/user-event';
 import { UserSettingsPanel } from './UserSettingsPanel';
 import { api } from '@/lib/api-client';
 
@@ -106,7 +106,7 @@ describe('UserSettingsPanel', () => {
 
     // Should show error message
     await waitFor(() => {
-      expect(screen.getByText('Error loading settings')).toBeInTheDocument();
+      expect(screen.getByText('Settings error')).toBeInTheDocument();
       expect(screen.getByText('Failed to load settings')).toBeInTheDocument();
     });
   });

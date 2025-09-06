@@ -22,16 +22,42 @@ export async function action({ request }: Route.ActionArgs) {
   try {
     if (request.method === 'PUT') {
       // Replace entire settings
-      const body = (await request.json()) as Record<string, unknown>;
-      UserSettingsManager.save(body);
+      const body = await request.json();
+
+      // Validate that body is a plain object
+      if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+        return createErrorResponse('Request body must be a plain object', 400, {
+          code: 'INVALID_PAYLOAD_TYPE',
+        });
+      }
+
+      UserSettingsManager.save(body as Record<string, unknown>);
       return createSuperjsonResponse(body);
     } else if (request.method === 'PATCH') {
       // Merge partial settings
-      const partialSettings = (await request.json()) as Record<string, unknown>;
-      const updatedSettings = UserSettingsManager.update(partialSettings);
+      const partialSettings = await request.json();
+
+      // Validate that partialSettings is a plain object
+      if (
+        typeof partialSettings !== 'object' ||
+        partialSettings === null ||
+        Array.isArray(partialSettings)
+      ) {
+        return createErrorResponse('Request body must be a plain object', 400, {
+          code: 'INVALID_PAYLOAD_TYPE',
+        });
+      }
+
+      const updatedSettings = UserSettingsManager.update(
+        partialSettings as Record<string, unknown>
+      );
       return createSuperjsonResponse(updatedSettings);
     } else {
-      return createErrorResponse('Method not allowed', 405, { code: 'METHOD_NOT_ALLOWED' });
+      const response = createErrorResponse('Method not allowed', 405, {
+        code: 'METHOD_NOT_ALLOWED',
+      });
+      response.headers.set('Allow', 'PUT, PATCH');
+      return response;
     }
   } catch (error: unknown) {
     if (error instanceof SyntaxError) {

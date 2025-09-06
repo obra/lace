@@ -38,7 +38,7 @@ function TestComponent() {
 }
 
 // Mock localStorage
-const mockLocalStorage = {
+const mockLocalStorage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'clear'> = {
   getItem: vi.fn(),
   setItem: vi.fn(),
   removeItem: vi.fn(),

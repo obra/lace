@@ -42,6 +42,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   // Load theme from settings API after component mounts
   useEffect(() => {
     setMounted(true);
+    let cancelled = false;
 
     const loadTheme = async () => {
       try {
@@ -49,9 +50,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         const settings = await api.get<Record<string, unknown>>('/api/settings');
 
         // Check if theme exists in settings
-        const theme = settings.theme;
-        if (theme === 'light' || theme === 'dark') {
-          setThemeState(theme);
+        const apiTheme = settings.theme;
+        if (apiTheme === 'light' || apiTheme === 'dark') {
+          if (!cancelled) setThemeState(apiTheme);
           return;
         }
 
@@ -60,22 +61,26 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         if (savedTheme === 'light' || savedTheme === 'dark') {
           // Migrate to settings API
           await api.patch('/api/settings', { theme: savedTheme });
-          setThemeState(savedTheme);
+          if (!cancelled) setThemeState(savedTheme);
           // Remove from localStorage after successful migration
           localStorage.removeItem('lace-theme');
           return;
         }
 
         // Default to dark theme
-        setThemeState('dark');
+        if (!cancelled) setThemeState('dark');
       } catch (error) {
         console.warn('Failed to load theme from settings:', error);
         // Default to dark theme if API fails
-        setThemeState('dark');
+        if (!cancelled) setThemeState('dark');
       }
     };
 
     void loadTheme();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Apply theme to document
@@ -92,7 +97,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         document.documentElement.setAttribute('data-theme', newTheme);
 
         // Save to settings API
-        api.patch('/api/settings', { theme: newTheme }).catch((error) => {
+        void api.patch('/api/settings', { theme: newTheme }).catch((error) => {
           console.warn('Failed to save theme to settings:', error);
         });
       }
