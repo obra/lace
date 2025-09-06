@@ -387,6 +387,14 @@ export class Project {
   }
 
   /**
+   * Get specific MCP server configuration for this project
+   */
+  getMCPServer(serverId: string): MCPServerConfig | null {
+    const servers = this.getMCPServers();
+    return servers[serverId] || null;
+  }
+
+  /**
    * Add new MCP server to project configuration
    */
   addMCPServer(serverId: string, serverConfig: MCPServerConfig): void {

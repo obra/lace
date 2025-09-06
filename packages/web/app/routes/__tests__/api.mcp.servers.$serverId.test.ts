@@ -2,7 +2,7 @@
 // ABOUTME: Validates CRUD operations for specific global MCP servers
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { loader, action } from '../api.mcp.servers.$serverId';
+import { loader, action } from '@/app/routes/api.mcp.servers.$serverId';
 import { parseResponse } from '@/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 

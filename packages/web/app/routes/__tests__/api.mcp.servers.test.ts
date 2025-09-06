@@ -2,7 +2,7 @@
 // ABOUTME: Validates server list retrieval and error handling
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { loader } from '../api.mcp.servers';
+import { loader } from '@/app/routes/api.mcp.servers';
 import { parseResponse } from '@/lib/serialization';
 import { createLoaderArgs } from '@/test-utils/route-test-helpers';
 
