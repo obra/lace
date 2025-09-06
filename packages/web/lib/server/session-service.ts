@@ -23,24 +23,17 @@ export class SessionService {
     if (session) {
       // Set up approval callbacks and event handlers for all agents in the session
       const agents = session.getAgents();
-      let allAgentsReady = true;
 
       for (const agentInfo of agents) {
         const agent = session.getAgent(agentInfo.threadId);
         if (agent) {
           setupAgentApprovals(agent, sessionId);
           await this.setupAgentEventHandlers(agent);
-        } else {
-          // Agent not ready yet - don't register session with EventStreamManager
-          allAgentsReady = false;
         }
       }
 
-      // Only register Session with EventStreamManager when all agents are available
-      // This prevents race conditions where tool approval requests fail with "Agent not found"
-      if (allAgentsReady) {
-        EventStreamManager.getInstance().registerSession(session);
-      }
+      // Register Session with EventStreamManager (WeakSet prevents duplicates)
+      EventStreamManager.getInstance().registerSession(session);
     }
 
     return session;

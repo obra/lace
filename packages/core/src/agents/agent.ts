@@ -981,12 +981,21 @@ export class Agent extends EventEmitter {
       this.emit('retry_exhausted', { attempts, lastError });
     };
 
+    // Defensive error listener to prevent uncaught EventEmitter errors from crashing
+    const providerErrorListener = (error: Error) => {
+      // No-op: errors are handled via try/catch blocks in agent methods
+      // This prevents uncaught 'error' events from crashing the process
+      logger.debug('Provider emitted error event (handled defensively)', {
+        threadId: this._threadId,
+        errorMessage: error.message.slice(0, 100),
+      });
+    };
+
     // Subscribe to provider events
     if (this.providerInstance) {
       this.providerInstance.on('token', tokenListener);
       this.providerInstance.on('token_usage_update', tokenUsageListener);
-      // Note: Removed error listener to prevent duplicate error emissions
-      // Errors are now handled exclusively in try/catch blocks
+      this.providerInstance.on('error', providerErrorListener);
       this.providerInstance.on('retry_attempt', retryAttemptListener);
       this.providerInstance.on('retry_exhausted', retryExhaustedListener);
     }
@@ -1040,7 +1049,7 @@ export class Agent extends EventEmitter {
       if (this.providerInstance) {
         this.providerInstance.removeListener('token', tokenListener);
         this.providerInstance.removeListener('token_usage_update', tokenUsageListener);
-        // Note: No error listener to remove (handled in try/catch blocks)
+        this.providerInstance.removeListener('error', providerErrorListener);
         this.providerInstance.removeListener('retry_attempt', retryAttemptListener);
         this.providerInstance.removeListener('retry_exhausted', retryExhaustedListener);
       }
