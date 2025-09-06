@@ -447,7 +447,7 @@ describe('LACE_DIR initialization', () => {
         const timeout = setTimeout(() => {
           serverProcess.kill('SIGTERM');
           reject(new Error('Server startup timeout'));
-        }, 10000);
+        }, 20000); // Increased for MCP server startup
 
         serverProcess.stdout?.on('data', (data) => {
           output += data.toString();
@@ -499,7 +499,7 @@ describe('LACE_DIR initialization', () => {
         const timeout = setTimeout(() => {
           serverProcess.kill('SIGTERM');
           reject(new Error('Server startup timeout'));
-        }, 10000);
+        }, 20000); // Increased for MCP server startup
 
         serverProcess.stdout?.on('data', (data) => {
           output += data.toString();
