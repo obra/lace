@@ -1,5 +1,5 @@
 // ABOUTME: Theme provider component for DaisyUI theme switching
-// ABOUTME: Manages theme state and localStorage persistence with proper hydration
+// ABOUTME: Manages theme state and settings API persistence with localStorage migration
 
 'use client';
 
@@ -12,6 +12,7 @@ import React, {
   useCallback,
   ReactNode,
 } from 'react';
+import { api } from '@/lib/api-client';
 
 type ThemeValue = 'light' | 'dark';
 
@@ -38,17 +39,49 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<ThemeValue>('dark'); // Always start with dark to avoid hydration mismatch
   const [mounted, setMounted] = useState(false);
 
-  // Load theme from localStorage after component mounts
+  // Load theme from settings API after component mounts
   useEffect(() => {
     setMounted(true);
-    const savedTheme = localStorage.getItem('lace-theme');
-    // Type-safe theme parsing - only accept known theme values
-    if (savedTheme === 'light' || savedTheme === 'dark') {
-      setThemeState(savedTheme);
-    } else {
-      // Default to dark theme for invalid or missing values
-      setThemeState('dark');
-    }
+    let cancelled = false;
+
+    const loadTheme = async () => {
+      try {
+        // Load from settings API
+        const settings = await api.get<Record<string, unknown>>('/api/settings');
+
+        // Check if theme exists in settings
+        const apiTheme = settings.theme;
+        if (apiTheme === 'light' || apiTheme === 'dark') {
+          if (!cancelled) setThemeState(apiTheme);
+          return;
+        }
+
+        // Migration: Check localStorage for existing theme
+        const savedTheme = localStorage.getItem('lace-theme');
+        if (savedTheme === 'light' || savedTheme === 'dark') {
+          // Migrate to settings API
+          await api.patch('/api/settings', { theme: savedTheme });
+          if (cancelled) return;
+          setThemeState(savedTheme);
+          // Remove from localStorage after successful migration
+          localStorage.removeItem('lace-theme');
+          return;
+        }
+
+        // Default to dark theme
+        if (!cancelled) setThemeState('dark');
+      } catch (error) {
+        console.warn('Failed to load theme from settings:', error);
+        // Default to dark theme if API fails
+        if (!cancelled) setThemeState('dark');
+      }
+    };
+
+    void loadTheme();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Apply theme to document
@@ -61,9 +94,13 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const setTheme = useCallback(
     (newTheme: ThemeValue) => {
       setThemeState(newTheme);
-      localStorage.setItem('lace-theme', newTheme);
       if (mounted) {
         document.documentElement.setAttribute('data-theme', newTheme);
+
+        // Save to settings API
+        void api.patch('/api/settings', { theme: newTheme }).catch((error) => {
+          console.warn('Failed to save theme to settings:', error);
+        });
       }
     },
     [mounted]

@@ -134,6 +134,10 @@
       "types": "./dist/config/lace-dir.d.ts",
       "import": "./dist/config/lace-dir.js"
     },
+    "./config/user-settings": {
+      "types": "./dist/config/user-settings.d.ts",
+      "import": "./dist/config/user-settings.js"
+    },
     "./utils/logger": {
       "types": "./dist/utils/logger.d.ts",
       "import": "./dist/utils/logger.js"
