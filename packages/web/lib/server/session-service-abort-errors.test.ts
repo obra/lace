@@ -99,33 +99,27 @@ describe('SessionService abort error filtering', () => {
     expect(mockBroadcast).not.toHaveBeenCalled();
   });
 
-  it('should still broadcast non-abort errors to UI', async () => {
+  it('should still process non-abort errors (AGENT_ERROR events handled by EventStreamManager)', async () => {
     const _sessionId = asThreadId('lace_20250101_sess01');
 
     await sessionService.setupAgentEventHandlers(mockAgent as unknown as Agent);
 
-    // Emit a regular error
+    // Emit a regular error with context
     const regularError = new Error('Network connection failed');
-    mockAgent.emit('error', { error: regularError });
+    const errorContext = {
+      phase: 'provider_response',
+      errorType: 'provider_failure',
+      isRetryable: true,
+    };
+    mockAgent.emit('error', { error: regularError, context: errorContext });
 
-    // Should log the error AND broadcast to UI
+    // Should log the error
     expect(logger.error).toHaveBeenCalledWith(
       expect.stringContaining('Agent lace_20250101_sess01.1 error:'),
       regularError
     );
 
-    // Check that broadcast was called with the correct parameters
-    expect(mockBroadcast).toHaveBeenCalledWith({
-      type: 'LOCAL_SYSTEM_MESSAGE',
-      threadId: 'lace_20250101_sess01.1',
-      timestamp: expect.any(Date),
-      data: 'Agent error: Network connection failed',
-      context: {
-        sessionId: _sessionId,
-        projectId: undefined,
-        agentId: undefined,
-        taskId: undefined,
-      },
-    });
+    // Should NOT broadcast LOCAL_SYSTEM_MESSAGE (now handled by EventStreamManager as AGENT_ERROR)
+    expect(mockBroadcast).not.toHaveBeenCalled();
   });
 });

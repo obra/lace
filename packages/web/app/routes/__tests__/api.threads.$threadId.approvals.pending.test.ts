@@ -22,6 +22,7 @@ interface MockAgent {
 
 interface MockSession {
   getAgent: ReturnType<typeof vi.fn>;
+  getAgents: ReturnType<typeof vi.fn>;
 }
 
 interface MockSessionService {
@@ -52,6 +53,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     // Create mock Session
     mockSession = {
       getAgent: vi.fn().mockReturnValue(mockAgent),
+      getAgents: vi.fn().mockReturnValue([{ threadId: 'lace_20250101_test12' }]),
     };
 
     // Create mock SessionService
@@ -153,6 +155,7 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
 
     // Mock agent not found
     mockSession.getAgent.mockReturnValue(null);
+    mockSession.getAgents.mockReturnValue([]);
 
     const request = new Request(`http://localhost:3000/api/threads/${threadId}/approvals/pending`);
     const response = await GET(createLoaderArgs(request, { threadId }));
@@ -161,8 +164,15 @@ describe('GET /api/threads/[threadId]/approvals/pending', () => {
     expect(mockAgent.getPendingApprovals).not.toHaveBeenCalled();
 
     expect(response.status).toBe(404);
-    const data = await parseResponse<{ error: string; code?: string }>(response);
-    expect(data).toEqual({ error: 'Agent not found for thread', code: 'RESOURCE_NOT_FOUND' });
+    const data = await parseResponse<{ error: string; code?: string; details?: unknown }>(response);
+    expect(data).toEqual({
+      error: 'Agent not found for thread lace_20250101_fake01. Available agents: ',
+      code: 'RESOURCE_NOT_FOUND',
+      details: {
+        requestedAgent: 'lace_20250101_fake01',
+        availableAgents: [],
+      },
+    });
   });
 
   it('should handle multiple pending approvals with different tool types', async () => {

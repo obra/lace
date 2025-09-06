@@ -394,7 +394,6 @@ describe('useEventStream Error Handling', () => {
         'tool_execution',
         'processing_error',
         'timeout',
-        'streaming_error',
       ];
 
       validErrorTypes.forEach((errorType) => {
