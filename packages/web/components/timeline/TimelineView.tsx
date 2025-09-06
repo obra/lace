@@ -93,17 +93,12 @@ export function TimelineView({
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(event.type) &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(nextEvent.type);
 
-              // Generate a more unique key to prevent duplicates
+              // Generate unique key for React
               const eventKey =
                 event.id ||
                 `${instanceId.current}-${event.threadId}-${event.type}-${
                   event.timestamp instanceof Date ? event.timestamp.getTime() : event.timestamp
                 }-${index}-${JSON.stringify(event.data).slice(0, 50)}`;
-
-              // Debug: log when using fallback key generation
-              if (!event.id && process.env.NODE_ENV === 'development') {
-                console.warn('Using fallback key for event:', eventKey, event);
-              }
 
               return (
                 <motion.div
