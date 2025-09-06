@@ -13,6 +13,15 @@ import { SettingsContainer } from './SettingsContainer';
 import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { stringify } from '@/lib/serialization';
+import { api } from '@/lib/api-client';
+
+// Mock the API client
+vi.mock('@/lib/api-client', () => ({
+  api: {
+    get: vi.fn(),
+    patch: vi.fn(),
+  },
+}));
 
 // Mock localStorage
 const localStorageMock = {
@@ -61,6 +70,12 @@ describe('SettingsContainer', () => {
 
     // Mock document.documentElement.setAttribute
     vi.spyOn(document.documentElement, 'setAttribute').mockImplementation(vi.fn());
+
+    // Mock API client
+    const mockApiGet = vi.mocked(api.get);
+    const mockApiPatch = vi.mocked(api.patch);
+    mockApiGet.mockResolvedValue({}); // Default empty settings
+    mockApiPatch.mockResolvedValue({});
 
     // Mock fetch API responses with proper superjson serialized content
     mockFetch.mockImplementation((url: string) => {
@@ -155,8 +170,9 @@ describe('SettingsContainer', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('loads initial theme from localStorage', () => {
-    localStorageMock.getItem.mockReturnValue('light');
+  it('loads initial theme from settings API', async () => {
+    const mockApiGet = vi.mocked(api.get);
+    mockApiGet.mockResolvedValue({ theme: 'light' });
 
     render(
       <ThemeProvider>
@@ -170,12 +186,18 @@ describe('SettingsContainer', () => {
       </ThemeProvider>
     );
 
-    expect(localStorageMock.getItem).toHaveBeenCalledWith('lace-theme');
-    expect(document.documentElement.setAttribute).toHaveBeenCalledWith('data-theme', 'light');
+    await waitFor(() => {
+      expect(mockApiGet).toHaveBeenCalledWith('/api/settings');
+    });
+
+    await waitFor(() => {
+      expect(document.documentElement.setAttribute).toHaveBeenCalledWith('data-theme', 'light');
+    });
   });
 
-  it('defaults to dark theme when no theme in localStorage', () => {
-    localStorageMock.getItem.mockReturnValue(null);
+  it('defaults to dark theme when no theme in settings API', async () => {
+    const mockApiGet = vi.mocked(api.get);
+    mockApiGet.mockResolvedValue({}); // No theme in settings
 
     render(
       <ThemeProvider>
@@ -189,7 +211,13 @@ describe('SettingsContainer', () => {
       </ThemeProvider>
     );
 
-    expect(document.documentElement.setAttribute).toHaveBeenCalledWith('data-theme', 'dark');
+    await waitFor(() => {
+      expect(mockApiGet).toHaveBeenCalledWith('/api/settings');
+    });
+
+    await waitFor(() => {
+      expect(document.documentElement.setAttribute).toHaveBeenCalledWith('data-theme', 'dark');
+    });
   });
 
   it('changes theme when selected in settings', async () => {
@@ -221,8 +249,10 @@ describe('SettingsContainer', () => {
       expect(document.documentElement.setAttribute).toHaveBeenCalledWith('data-theme', 'light');
     });
 
-    // Verify theme was saved to localStorage
-    expect(localStorageMock.setItem).toHaveBeenCalledWith('lace-theme', 'light');
+    // Verify theme was saved to settings API
+    await waitFor(() => {
+      expect(vi.mocked(api.patch)).toHaveBeenCalledWith('/api/settings', { theme: 'light' });
+    });
   });
 
   it('displays UI settings panel in modal', async () => {
@@ -366,6 +396,5 @@ describe('SettingsContainer', () => {
     expect(screen.getByText('User Settings')).toBeInTheDocument();
     expect(screen.getByLabelText('Display Name')).toBeInTheDocument();
     expect(screen.getByLabelText('Email')).toBeInTheDocument();
-    expect(screen.getByLabelText('Bio')).toBeInTheDocument();
   });
 });

@@ -27,6 +27,7 @@ export default [
   route('api/events/stream', 'routes/api.events.stream.ts'),
   route('api/sentry-test', 'routes/api.sentry-test.ts'),
   route('api/tunnel', 'routes/api.tunnel.ts'),
+  route('api/settings', 'routes/api.settings.ts'),
 
   // Agent management routes
   route('api/agents/:agentId', 'routes/api.agents.$agentId.ts'),

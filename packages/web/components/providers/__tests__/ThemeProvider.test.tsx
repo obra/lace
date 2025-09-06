@@ -1,5 +1,5 @@
 // ABOUTME: Unit tests for ThemeProvider component
-// ABOUTME: Tests theme initialization, localStorage persistence, and context access
+// ABOUTME: Tests theme initialization, API persistence, and context access
 
 /**
  * @vitest-environment jsdom
@@ -7,9 +7,18 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act, cleanup } from '@testing-library/react';
+import { render, screen, act, cleanup, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { ThemeProvider, useTheme } from '@/components/providers/ThemeProvider';
+import { api } from '@/lib/api-client';
+
+// Mock the API client
+vi.mock('@/lib/api-client', () => ({
+  api: {
+    get: vi.fn(),
+    patch: vi.fn(),
+  },
+}));
 
 // Test component that uses the theme hook
 function TestComponent() {
@@ -41,23 +50,24 @@ Object.defineProperty(window, 'localStorage', {
   writable: true,
 });
 
-// Mock console.log to avoid noise in tests
-const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
 describe('ThemeProvider', () => {
+  const mockApiGet = vi.mocked(api.get);
+  const mockApiPatch = vi.mocked(api.patch);
+
   beforeEach(() => {
     vi.clearAllMocks();
-    mockLocalStorage.getItem.mockReturnValue('dark');
+    mockLocalStorage.getItem.mockReturnValue(null);
     // Mock document.documentElement.setAttribute
     vi.spyOn(document.documentElement, 'setAttribute').mockImplementation(() => {});
   });
 
   afterEach(() => {
     cleanup();
-    consoleSpy.mockClear();
   });
 
   it('should render children and provide theme context', () => {
+    mockApiGet.mockResolvedValue({});
+
     render(
       <ThemeProvider>
         <TestComponent />
@@ -69,8 +79,8 @@ describe('ThemeProvider', () => {
     expect(screen.getByTestId('set-dark')).toBeInTheDocument();
   });
 
-  it('should initialize theme from localStorage', () => {
-    mockLocalStorage.getItem.mockReturnValue('light');
+  it('should load theme from settings API', async () => {
+    mockApiGet.mockResolvedValue({ theme: 'light' });
 
     render(
       <ThemeProvider>
@@ -78,13 +88,21 @@ describe('ThemeProvider', () => {
       </ThemeProvider>
     );
 
-    expect(mockLocalStorage.getItem).toHaveBeenCalledWith('lace-theme');
+    await waitFor(() => {
+      expect(mockApiGet).toHaveBeenCalledWith('/api/settings');
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('current-theme')).toHaveTextContent('light');
+    });
+
     expect(document.documentElement.setAttribute).toHaveBeenCalledWith('data-theme', 'light');
-    expect(screen.getByTestId('current-theme')).toHaveTextContent('light');
   });
 
-  it('should default to dark theme when no localStorage value', () => {
-    mockLocalStorage.getItem.mockReturnValue(null);
+  it('should migrate from localStorage to settings API', async () => {
+    mockApiGet.mockResolvedValue({}); // No theme in settings yet
+    mockLocalStorage.getItem.mockReturnValue('light');
+    mockApiPatch.mockResolvedValue({ theme: 'light' });
 
     render(
       <ThemeProvider>
@@ -92,16 +110,33 @@ describe('ThemeProvider', () => {
       </ThemeProvider>
     );
 
-    expect(document.documentElement.setAttribute).toHaveBeenCalledWith('data-theme', 'dark');
-    expect(screen.getByTestId('current-theme')).toHaveTextContent('dark');
+    await waitFor(() => {
+      expect(mockApiPatch).toHaveBeenCalledWith('/api/settings', { theme: 'light' });
+    });
+
+    await waitFor(() => {
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('lace-theme');
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('current-theme')).toHaveTextContent('light');
+    });
   });
 
-  it('should update theme when setTheme is called', async () => {
+  it('should save theme changes to settings API', async () => {
+    mockApiGet.mockResolvedValue({ theme: 'dark' });
+    mockApiPatch.mockResolvedValue({ theme: 'light' });
+
     render(
       <ThemeProvider>
         <TestComponent />
       </ThemeProvider>
     );
+
+    // Wait for initial load
+    await waitFor(() => {
+      expect(screen.getByTestId('current-theme')).toHaveTextContent('dark');
+    });
 
     const setLightButton = screen.getByTestId('set-light');
 
@@ -109,9 +144,8 @@ describe('ThemeProvider', () => {
       setLightButton.click();
     });
 
-    expect(mockLocalStorage.setItem).toHaveBeenCalledWith('lace-theme', 'light');
-    expect(document.documentElement.setAttribute).toHaveBeenCalledWith('data-theme', 'light');
     expect(screen.getByTestId('current-theme')).toHaveTextContent('light');
+    expect(document.documentElement.setAttribute).toHaveBeenCalledWith('data-theme', 'light');
   });
 
   it('should throw error when useTheme is called outside provider', () => {
@@ -125,8 +159,8 @@ describe('ThemeProvider', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it('should default to dark theme for invalid localStorage values', () => {
-    mockLocalStorage.getItem.mockReturnValue('cupcake'); // Invalid theme value
+  it('should default to dark theme when API fails', async () => {
+    mockApiGet.mockRejectedValue(new Error('API Error'));
 
     render(
       <ThemeProvider>
@@ -134,9 +168,10 @@ describe('ThemeProvider', () => {
       </ThemeProvider>
     );
 
-    expect(mockLocalStorage.getItem).toHaveBeenCalledWith('lace-theme');
-    // Should default to 'dark' for invalid theme values
+    await waitFor(() => {
+      expect(screen.getByTestId('current-theme')).toHaveTextContent('dark');
+    });
+
     expect(document.documentElement.setAttribute).toHaveBeenCalledWith('data-theme', 'dark');
-    expect(screen.getByTestId('current-theme')).toHaveTextContent('dark');
   });
 });

@@ -1,52 +1,67 @@
-// ABOUTME: User settings panel for managing display name, email, and user preferences
-// ABOUTME: Supports both controlled and uncontrolled modes with input validation
+// ABOUTME: User settings panel for managing display name and email preferences
+// ABOUTME: Persists settings to API and loads on component mount
 
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { SettingField } from '@/components/settings/SettingField';
-import { TextAreaField } from '@/components/ui/TextAreaField';
 import { Alert } from '@/components/ui/Alert';
-import { validateUserName, validateEmail, validateBio } from '@/lib/validation';
+import { validateUserName, validateEmail } from '@/lib/validation';
+import { api } from '@/lib/api-client';
 
 interface UserSettingsPanelProps {
+  // Props for controlled mode (optional)
   userName?: string;
   userEmail?: string;
-  userBio?: string;
   onUserNameChange?: (name: string) => void;
   onUserEmailChange?: (email: string) => void;
-  onUserBioChange?: (bio: string) => void;
-  onSave?: (data: { userName: string; userEmail: string; userBio: string }) => void;
 }
 
 export function UserSettingsPanel({
   userName: controlledUserName,
   userEmail: controlledUserEmail,
-  userBio: controlledUserBio,
   onUserNameChange,
   onUserEmailChange,
-  onUserBioChange,
-  onSave,
 }: UserSettingsPanelProps) {
   const [internalUserName, setInternalUserName] = useState('');
   const [internalUserEmail, setInternalUserEmail] = useState('');
-  const [internalUserBio, setInternalUserBio] = useState('');
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Ref for timeout cleanup
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Determine if we're in controlled or uncontrolled mode
-  const isControlled =
-    controlledUserName !== undefined ||
-    controlledUserEmail !== undefined ||
-    controlledUserBio !== undefined;
+  const isControlled = controlledUserName !== undefined || controlledUserEmail !== undefined;
   const userName = isControlled ? controlledUserName || '' : internalUserName;
   const userEmail = isControlled ? controlledUserEmail || '' : internalUserEmail;
-  const userBio = isControlled ? controlledUserBio || '' : internalUserBio;
 
-  // No localStorage - component is stateless except for form state
+  // Load settings from API on mount (only in uncontrolled mode)
+  useEffect(() => {
+    if (!isControlled) {
+      const loadSettings = async () => {
+        try {
+          setIsLoading(true);
+          setLoadError(null);
+          const settings = await api.get<Record<string, unknown>>('/api/settings');
+
+          const name = settings.name;
+          const email = settings.email;
+          if (typeof name === 'string') setInternalUserName(name);
+          if (typeof email === 'string') setInternalUserEmail(email);
+        } catch (error) {
+          console.warn('Failed to load user settings:', error);
+          setLoadError('Failed to load settings');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      void loadSettings();
+    }
+  }, [isControlled]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -85,78 +100,77 @@ export function UserSettingsPanel({
     [isControlled, onUserEmailChange]
   );
 
-  const handleUserBioChange = useCallback(
-    (newBio: string) => {
-      const validated = validateBio(newBio);
-
-      if (isControlled) {
-        onUserBioChange?.(validated.value);
-      } else {
-        setInternalUserBio(validated.value);
-      }
-    },
-    [isControlled, onUserBioChange]
-  );
-
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     // Clear any existing timeout
     if (successTimeoutRef.current) {
       clearTimeout(successTimeoutRef.current);
     }
 
-    // Validate and sanitize all data before saving
-    const nameValidation = validateUserName(userName);
-    const emailValidation = validateEmail(userEmail);
-    const bioValidation = validateBio(userBio);
+    try {
+      setIsLoading(true);
 
-    // Check for validation errors
-    if (!nameValidation.isValid || !emailValidation.isValid || !bioValidation.isValid) {
-      // For now, we'll save what we can. In a real app, you might want to show error messages
-      console.warn('Validation errors detected:', {
-        name: nameValidation.error,
-        email: emailValidation.error,
-        bio: bioValidation.error,
+      // Validate and sanitize data before saving
+      const nameValidation = validateUserName(userName);
+      const emailValidation = validateEmail(userEmail);
+
+      // Check for validation errors
+      if (!nameValidation.isValid || !emailValidation.isValid) {
+        console.warn('Validation errors detected:', {
+          name: nameValidation.error,
+          email: emailValidation.error,
+        });
+        return;
+      }
+
+      // Save to settings API
+      await api.patch('/api/settings', {
+        name: nameValidation.value,
+        email: emailValidation.value,
       });
+
+      // Show success message with proper cleanup
+      setShowSuccessMessage(true);
+      successTimeoutRef.current = setTimeout(() => {
+        setShowSuccessMessage(false);
+        successTimeoutRef.current = null;
+      }, 3000);
+    } catch (error) {
+      console.error('Failed to save user settings:', error);
+      setLoadError('Failed to save settings');
+    } finally {
+      setIsLoading(false);
     }
-
-    // Use validated/sanitized values
-    const sanitizedData = {
-      userName: nameValidation.value,
-      userEmail: emailValidation.value,
-      userBio: bioValidation.value,
-    };
-
-    // Call onSave callback with sanitized data
-    onSave?.(sanitizedData);
-
-    // Show success message with proper cleanup
-    setShowSuccessMessage(true);
-    successTimeoutRef.current = setTimeout(() => {
-      setShowSuccessMessage(false);
-      successTimeoutRef.current = null;
-    }, 3000);
-  }, [userName, userEmail, userBio, onSave]);
+  }, [userName, userEmail]);
 
   return (
     <SettingsPanel
       title="User Settings"
       description="Manage your personal information and preferences"
     >
-      <Alert
-        variant="warning"
-        title="Settings are not saved"
-        description="Your user preferences are only stored during this session and will be lost when you close the application."
-        className="mb-6"
-      />
+      {loadError && (
+        <Alert
+          variant="error"
+          title="Error loading settings"
+          description={loadError}
+          className="mb-6"
+        />
+      )}
+
       <div className="space-y-6">
         <SettingField label="Display Name" description="Your name as it appears in the application">
           <input
             type="text"
             value={userName}
             onChange={handleUserNameChange}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                void handleSave();
+              }
+            }}
             className="input input-bordered w-full"
             placeholder="Enter your display name"
             aria-label="Display Name"
+            disabled={isLoading}
           />
         </SettingField>
 
@@ -168,20 +182,15 @@ export function UserSettingsPanel({
             type="email"
             value={userEmail}
             onChange={handleUserEmailChange}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                void handleSave();
+              }
+            }}
             className="input input-bordered w-full"
             placeholder="Enter your email address"
             aria-label="Email"
-          />
-        </SettingField>
-
-        <SettingField label="Bio" description="Tell us a bit about yourself (optional)">
-          <TextAreaField
-            label="Bio"
-            value={userBio}
-            onChange={handleUserBioChange}
-            placeholder="Enter your bio..."
-            rows={3}
-            helpText="Max 500 characters"
+            disabled={isLoading}
           />
         </SettingField>
 
@@ -191,8 +200,12 @@ export function UserSettingsPanel({
               <div className="text-success text-sm font-medium">Settings saved successfully!</div>
             )}
           </div>
-          <button onClick={handleSave} className="btn btn-primary vapor-button ring-hover">
-            Save
+          <button
+            onClick={handleSave}
+            className="btn btn-primary vapor-button ring-hover"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>
