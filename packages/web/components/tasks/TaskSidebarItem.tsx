@@ -23,7 +23,7 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
   const getAssignmentText = (assignedTo?: string): string => {
     if (!assignedTo) return 'Unassigned';
     if (assignedTo === 'human') return 'Assigned to you';
-
+    
     // Handle NewAgentSpec format
     if (isNewAgentSpec(assignedTo)) {
       try {
@@ -33,7 +33,7 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
         return 'New agent (invalid format)';
       }
     }
-
+    
     return 'Assigned to agent';
   };
 
