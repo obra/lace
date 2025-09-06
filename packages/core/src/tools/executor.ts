@@ -75,6 +75,25 @@ export class ToolExecutor {
     return [...nativeTools, ...mcpTools];
   }
 
+  /**
+   * Ensure MCP tool discovery is complete before proceeding (called before LLM calls)
+   */
+  async ensureMCPToolsReady(timeoutMs: number = 5000): Promise<void> {
+    if (this.mcpDiscoveryPromise) {
+      try {
+        await Promise.race([
+          this.mcpDiscoveryPromise,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('MCP tool discovery timeout')), timeoutMs)
+          ),
+        ]);
+      } catch (error) {
+        logger.warn(`MCP tool discovery timed out after ${timeoutMs}ms:`, error);
+        // Continue with whatever tools we have
+      }
+    }
+  }
+
   private getNativeTools(): Tool[] {
     // Return all registered native tools (non-MCP)
     return Array.from(this.tools.values()).filter((tool) => !tool.name.includes('/'));
@@ -90,12 +109,56 @@ export class ToolExecutor {
    * Register MCP tools from a server manager (called by Session)
    */
   registerMCPTools(mcpManager: MCPServerManager): void {
-    // Simple implementation that doesn't interfere with agent initialization
-    // Just store the reference for later use, don't modify tools immediately
+    // Store reference and start discovery in background (non-blocking)
     this.mcpServerManager = mcpManager;
+    this.mcpDiscoveryPromise = this.discoverAllMCPTools();
+  }
+
+  /**
+   * Set session reference for callbacks (called during agent creation)
+   */
+  setSession(session: any): void {
+    this.session = session;
+    // Kick off MCP server initialization when first agent ToolExecutor is created
+    void this.ensureMCPServersStarted();
+  }
+
+  private session?: any;
+
+  private async ensureMCPServersStarted(): Promise<void> {
+    if (!this.session?.initializeMCPServers) return;
+    try {
+      await this.session.initializeMCPServers();
+    } catch (error) {
+      logger.warn('Failed to ensure MCP servers started:', error);
+    }
   }
 
   private mcpServerManager?: MCPServerManager;
+  private mcpDiscoveryPromise?: Promise<void>;
+
+  private async discoverAllMCPTools(): Promise<void> {
+    if (!this.mcpServerManager) return;
+
+    try {
+      // Clear existing MCP tools
+      const mcpToolNames = Array.from(this.tools.keys()).filter((name) => name.includes('/'));
+      mcpToolNames.forEach((name) => this.tools.delete(name));
+
+      // Discover tools from all running servers
+      const runningServers = this.mcpServerManager
+        .getAllServers()
+        .filter((server) => server.status === 'running');
+
+      const discoveryPromises = runningServers.map((server) =>
+        this.discoverAndRegisterServerTools(server)
+      );
+
+      await Promise.all(discoveryPromises);
+    } catch (error) {
+      logger.warn('Failed to discover MCP tools:', error);
+    }
+  }
 
   /**
    * Register MCP tools and wait for discovery to complete (for testing)
