@@ -26,14 +26,16 @@ function isAgentErrorData(obj: unknown): obj is AgentErrorData {
   if (!obj || typeof obj !== 'object') return false;
 
   const data = obj as Record<string, unknown>;
+  const context = data.context as Record<string, unknown>;
+
   return (
     typeof data.errorType === 'string' &&
     typeof data.message === 'string' &&
     typeof data.isRetryable === 'boolean' &&
-    data.context &&
-    typeof data.context === 'object' &&
-    data.context !== null &&
-    typeof (data.context as Record<string, unknown>).phase === 'string'
+    context &&
+    typeof context === 'object' &&
+    context !== null &&
+    typeof context.phase === 'string'
   );
 }
 
