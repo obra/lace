@@ -38,3 +38,4 @@ export { ApprovalPendingError, ApprovalDecision } from '~/tools/approval-types';
 // Database and configuration
 export { ensureLaceDir } from '~/config/lace-dir';
 export { UserSettingsManager } from '~/config/user-settings';
+export { MCPConfigLoader } from '~/config/mcp-config-loader';

@@ -5,7 +5,6 @@ import { MCPConfigLoader } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
-import type { Route } from './+types/api.mcp.servers.$serverId';
 
 const ServerIdSchema = z.string().min(1, 'Server ID is required');
 
@@ -53,9 +52,9 @@ const CreateServerSchema = z.object({
     .default({}),
 });
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params }: { params: unknown; context: unknown; request: Request }) {
   try {
-    const serverId = ServerIdSchema.parse(params.serverId);
+    const serverId = ServerIdSchema.parse((params as { serverId: string }).serverId);
 
     const globalConfig = MCPConfigLoader.loadGlobalConfig();
     const serverConfig = globalConfig?.servers[serverId];
@@ -78,9 +77,16 @@ export async function loader({ params }: Route.LoaderArgs) {
   }
 }
 
-export async function action({ request, params }: Route.ActionArgs) {
+export async function action({
+  request,
+  params,
+}: {
+  request: Request;
+  params: unknown;
+  context: unknown;
+}) {
   try {
-    const serverId = ServerIdSchema.parse(params.serverId);
+    const serverId = ServerIdSchema.parse((params as { serverId: string }).serverId);
 
     if (request.method === 'PUT') {
       // Update existing global server

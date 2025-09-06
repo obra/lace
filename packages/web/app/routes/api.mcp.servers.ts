@@ -4,9 +4,8 @@
 import { MCPConfigLoader } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
-import type { Route } from './+types/api.mcp.servers';
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request }: { request: Request; params: unknown; context: unknown }) {
   try {
     // Load global MCP configuration only (no project context)
     const globalConfig = MCPConfigLoader.loadGlobalConfig();
