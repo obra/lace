@@ -24,6 +24,16 @@ interface ErrorResponse {
   details?: unknown;
 }
 
+const mockToolExecutor = {
+  registerAllAvailableTools: vi.fn(),
+  getAllTools: vi.fn(() => [
+    { name: 'file-read', annotations: {} },
+    { name: 'file-write', annotations: {} },
+    { name: 'bash', annotations: {} },
+    { name: 'internal-tool', annotations: { safeInternal: true } },
+  ]),
+};
+
 // Mock project instance
 const mockProject = {
   getId: vi.fn().mockReturnValue('test-project'),
@@ -40,23 +50,13 @@ const mockProject = {
     environmentVariables: { NODE_ENV: 'test' },
   }),
   updateConfiguration: vi.fn(),
-};
-
-const mockToolExecutor = {
-  registerAllAvailableTools: vi.fn(),
-  getAllTools: vi.fn(() => [
-    { name: 'file-read', annotations: {} },
-    { name: 'file-write', annotations: {} },
-    { name: 'bash', annotations: {} },
-    { name: 'internal-tool', annotations: { safeInternal: true } },
-  ]),
+  createToolExecutor: vi.fn().mockResolvedValue(mockToolExecutor),
 };
 
 vi.mock('@/lib/server/lace-imports', () => ({
   Project: {
     getById: vi.fn(),
   },
-  ToolExecutor: vi.fn(() => mockToolExecutor),
   ProviderRegistry: {
     getInstance: vi.fn(() => ({
       getConfiguredInstances: vi.fn(() => []),
