@@ -44,6 +44,7 @@ export interface SessionInfo {
 
 export class Session {
   private static _sessionRegistry = new Map<ThreadId, Session>();
+  private static _reconstructionPromises = new Map<ThreadId, Promise<Session | null>>();
 
   private _sessionId: ThreadId;
   private _sessionData: SessionData;
@@ -63,8 +64,8 @@ export class Session {
     // Initialize TaskManager for this session
     this._taskManager = new TaskManager(this._sessionId, getPersistence());
 
-    // Register this session in the registry
-    Session._sessionRegistry.set(this._sessionId, this);
+    // NOTE: Session registration moved to after reconstruction completes
+    // This prevents the session from being found before agents are ready
   }
 
   static create(options: {
@@ -236,6 +237,10 @@ export class Session {
       coordinatorAgent.toolExecutor.setApprovalCallback(options.approvalCallback);
     }
 
+    // Register session in registry after creation is complete
+    Session._sessionRegistry.set(asThreadId(sessionData.id), session);
+    logger.debug(`Session registered in registry after creation: ${sessionData.id}`);
+
     return session;
   }
 
@@ -291,6 +296,31 @@ export class Session {
       Session._sessionRegistry.delete(sessionId);
     }
 
+    // Check if reconstruction is already in progress for this session
+    const existingPromise = Session._reconstructionPromises.get(sessionId);
+    if (existingPromise) {
+      logger.debug(`Waiting for existing reconstruction of session ${sessionId}`);
+      return await existingPromise;
+    }
+
+    // Start new reconstruction and cache the promise
+    const reconstructionPromise = Session._performReconstruction(sessionId);
+    Session._reconstructionPromises.set(sessionId, reconstructionPromise);
+
+    try {
+      const result = await reconstructionPromise;
+      return result;
+    } finally {
+      // Always clean up the promise from cache when done
+      Session._reconstructionPromises.delete(sessionId);
+    }
+  }
+
+  /**
+   * Internal method that performs the actual session reconstruction
+   * Separated for better testing and cleaner deduplication logic
+   */
+  private static async _performReconstruction(sessionId: ThreadId): Promise<Session | null> {
     // Get session from the sessions table
     const sessionData = Session.getSession(sessionId);
     if (!sessionData) {
@@ -366,20 +396,44 @@ export class Session {
     const session = new Session(sessionId, sessionData, threadManager);
 
     // Create and initialize coordinator agent
-    const coordinatorAgent = await session.createAgent({
-      sessionData,
-      toolExecutor,
-      threadManager,
-      threadId: sessionId,
-      providerInstanceId,
-      modelId,
-      isCoordinator: true,
-    });
+    let coordinatorAgent: Agent;
+    try {
+      coordinatorAgent = await session.createAgent({
+        sessionData,
+        toolExecutor,
+        threadManager,
+        threadId: sessionId,
+        providerInstanceId,
+        modelId,
+        isCoordinator: true,
+      });
 
-    logger.debug(`Coordinator agent created and initialized for ${sessionId}`);
+      logger.debug(`Coordinator agent created and initialized for ${sessionId}`);
 
-    // Add coordinator to agents map
-    session._agents.set(sessionId, coordinatorAgent);
+      // Add coordinator to agents map
+      session._agents.set(sessionId, coordinatorAgent);
+
+      // Verify agent was added successfully
+      const verifyAgent = session.getCoordinatorAgent();
+      if (!verifyAgent) {
+        logger.error(
+          `CRITICAL: Coordinator agent not found in registry after adding for ${sessionId}`
+        );
+      } else {
+        logger.debug(`Coordinator agent successfully registered for ${sessionId}`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      logger.error(`Failed to create coordinator agent for ${sessionId}:`, {
+        error: errorMessage,
+        stack: errorStack,
+        providerInstanceId,
+        modelId,
+      });
+      throw error; // Re-throw to fail reconstruction
+    }
 
     // Load delegate threads (child agents) for this session
     const delegateThreadIds = threadManager.listThreadIdsForSession(sessionId);
@@ -459,9 +513,26 @@ export class Session {
     const delegateTool = new DelegateTool();
     toolExecutor.registerTool('delegate', delegateTool);
 
-    logger.debug(`Session reconstruction complete for ${sessionId}`);
+    // Final verification before completing reconstruction
+    const finalAgents = session.getAgents();
+    const coordinatorExists = session.getCoordinatorAgent() !== null;
 
-    // Session is automatically registered in the registry via constructor
+    logger.debug(`Session reconstruction complete for ${sessionId}`, {
+      agentCount: finalAgents.length,
+      hasCoordinator: coordinatorExists,
+      agentIds: finalAgents.map((a) => a.threadId),
+    });
+
+    if (!coordinatorExists) {
+      logger.error(
+        `CRITICAL: Session reconstruction completed but coordinator agent is missing for ${sessionId}`
+      );
+    }
+
+    // Register session in registry ONLY after full reconstruction is complete
+    Session._sessionRegistry.set(sessionId, session);
+    logger.debug(`Session registered in registry after full reconstruction: ${sessionId}`);
+
     return session;
   }
 
