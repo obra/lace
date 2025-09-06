@@ -23,6 +23,7 @@ export class SessionService {
     if (session) {
       // Set up approval callbacks and event handlers for all agents in the session
       const agents = session.getAgents();
+
       for (const agentInfo of agents) {
         const agent = session.getAgent(agentInfo.threadId);
         if (agent) {
@@ -213,28 +214,6 @@ export class SessionService {
     // Listen for any errors
     agent.on('error', ({ error }: { error: Error }) => {
       logger.error(`Agent ${threadId} error:`, error);
-
-      // Filter out abort-related errors from UI messages to prevent duplicates
-      // (These should already be filtered at the agent level, but this is defense-in-depth)
-      const isAbortError =
-        error.name === 'AbortError' ||
-        error.message === 'Request was aborted' ||
-        error.message === 'Aborted';
-
-      if (!isAbortError) {
-        sseManager.broadcast({
-          type: 'LOCAL_SYSTEM_MESSAGE',
-          threadId,
-          timestamp: new Date(),
-          data: `Agent error: ${error.message}`,
-          context: {
-            sessionId,
-            projectId,
-            taskId: undefined,
-            agentId: undefined,
-          },
-        });
-      }
     });
 
     // Listen for conversation complete

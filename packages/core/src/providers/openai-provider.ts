@@ -598,8 +598,6 @@ export class OpenAIProvider extends AIProvider {
         } catch (error) {
           const errorObj = error as Error;
           logger.error('Streaming error from OpenAI', { error: errorObj.message });
-          // Emit error event for compatibility with existing tests
-          this.emit('error', { error: errorObj });
           throw error;
         }
       },

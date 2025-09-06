@@ -4,11 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, AgentConfig, AgentState } from '~/agents/agent';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import {
-  ProviderMessage,
-  ProviderResponse,
-  ProviderConfig,
-} from '~/providers/base-provider';
+import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
 import { ToolCall, ToolResult, ToolContext } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
@@ -142,10 +138,7 @@ describe('Enhanced Agent', () => {
   });
 
   // Helper function to create a provider that returns tool calls only once
-  function createOneTimeToolProvider(
-    toolCalls: ToolCall[],
-    content = 'I will use the tool.'
-  ) {
+  function createOneTimeToolProvider(toolCalls: ToolCall[], content = 'I will use the tool.') {
     let callCount = 0;
     const provider = new MockProvider({ content, toolCalls });
 
@@ -1498,12 +1491,16 @@ describe('Enhanced Agent', () => {
         },
       });
 
-      // Should not throw error
+      // Should not throw error and create synthetic tool result
       const history = agent.buildThreadMessages();
-      expect(history).toHaveLength(2); // user message + tool call as assistant message
+      expect(history).toHaveLength(3); // user message + assistant message with tool call + synthetic tool result
       expect(history[1].role).toBe('assistant');
       expect(history[1].toolCalls).toBeDefined();
       expect(history[1].toolCalls).toHaveLength(1);
+      expect(history[2].role).toBe('user');
+      expect(history[2].toolResults).toBeDefined();
+      expect(history[2].toolResults).toHaveLength(1);
+      expect(history[2].toolResults![0].id).toBe('orphaned-call');
     });
   });
 

@@ -947,18 +947,6 @@ export class Agent extends EventEmitter {
       this.emit('token_usage_update', { usage });
     };
 
-    const errorListener = ({ error }: { error: Error }) => {
-      if (error.name !== 'AbortError') {
-        this._emitError(error, {
-          phase: 'provider_response',
-          threadId: this._threadId,
-          errorType: 'streaming_error' as ErrorType,
-          isRetryable: this.isRetryableError(error),
-          retryCount: 0,
-        });
-      }
-    };
-
     const retryAttemptListener = ({
       attempt,
       delay,
@@ -993,11 +981,35 @@ export class Agent extends EventEmitter {
       this.emit('retry_exhausted', { attempts, lastError });
     };
 
+    // Defensive error listener to prevent uncaught EventEmitter errors from crashing
+    const providerErrorListener = (err: unknown) => {
+      let msg = '';
+      let stack: string | undefined;
+      if (err instanceof Error) {
+        msg = err.message;
+        stack = err.stack;
+      } else if (typeof err === 'string') {
+        msg = err;
+      } else {
+        try {
+          msg = JSON.stringify(err);
+        } catch {
+          msg = String(err);
+        }
+      }
+
+      logger.warn('Provider emitted unexpected error event (handled defensively)', {
+        threadId: this._threadId,
+        errorMessage: msg.slice(0, 200),
+        errorStack: stack,
+      });
+    };
+
     // Subscribe to provider events
     if (this.providerInstance) {
       this.providerInstance.on('token', tokenListener);
       this.providerInstance.on('token_usage_update', tokenUsageListener);
-      this.providerInstance.on('error', errorListener);
+      this.providerInstance.on('error', providerErrorListener);
       this.providerInstance.on('retry_attempt', retryAttemptListener);
       this.providerInstance.on('retry_exhausted', retryExhaustedListener);
     }
@@ -1051,7 +1063,7 @@ export class Agent extends EventEmitter {
       if (this.providerInstance) {
         this.providerInstance.removeListener('token', tokenListener);
         this.providerInstance.removeListener('token_usage_update', tokenUsageListener);
-        this.providerInstance.removeListener('error', errorListener);
+        this.providerInstance.removeListener('error', providerErrorListener);
         this.providerInstance.removeListener('retry_attempt', retryAttemptListener);
         this.providerInstance.removeListener('retry_exhausted', retryExhaustedListener);
       }
@@ -1098,10 +1110,35 @@ export class Agent extends EventEmitter {
       this.emit('retry_exhausted', { attempts, lastError });
     };
 
+    // Defensive error listener (mirrors streaming path)
+    const providerErrorListener = (err: unknown) => {
+      let msg = '';
+      let stack: string | undefined;
+      if (err instanceof Error) {
+        msg = err.message;
+        stack = err.stack;
+      } else if (typeof err === 'string') {
+        msg = err;
+      } else {
+        try {
+          msg = JSON.stringify(err);
+        } catch {
+          msg = String(err);
+        }
+      }
+
+      logger.warn('Provider emitted unexpected error event (handled defensively)', {
+        threadId: this._threadId,
+        errorMessage: msg.slice(0, 200),
+        errorStack: stack,
+      });
+    };
+
     // Subscribe to provider retry events
     if (this.providerInstance) {
       this.providerInstance.on('retry_attempt', retryAttemptListener);
       this.providerInstance.on('retry_exhausted', retryExhaustedListener);
+      this.providerInstance.on('error', providerErrorListener);
     }
 
     try {
@@ -1148,6 +1185,7 @@ export class Agent extends EventEmitter {
       if (this.providerInstance) {
         this.providerInstance.removeListener('retry_attempt', retryAttemptListener);
         this.providerInstance.removeListener('retry_exhausted', retryExhaustedListener);
+        this.providerInstance.removeListener('error', providerErrorListener);
       }
     }
   }
@@ -1807,7 +1845,56 @@ export class Agent extends EventEmitter {
       }
     }
 
-    return messages;
+    return this._ensureToolCallCompleteness(messages);
+  }
+
+  // Ensure all tool calls have corresponding results to prevent API errors
+  private _ensureToolCallCompleteness(messages: ProviderMessage[]): ProviderMessage[] {
+    const pendingToolCalls = new Map<string, { name: string; arguments: unknown }>();
+    const completedMessages: ProviderMessage[] = [];
+
+    for (const message of messages) {
+      completedMessages.push(message);
+
+      if (message.role === 'assistant' && message.toolCalls) {
+        // Track tool calls that need results
+        for (const toolCall of message.toolCalls) {
+          pendingToolCalls.set(toolCall.id, {
+            name: toolCall.name,
+            arguments: toolCall.arguments,
+          });
+        }
+      } else if (message.role === 'user' && message.toolResults) {
+        // Mark tool calls as completed
+        for (const toolResult of message.toolResults) {
+          if (toolResult.id) {
+            pendingToolCalls.delete(toolResult.id);
+          }
+        }
+      }
+    }
+
+    // If there are still pending tool calls, create synthetic results
+    if (pendingToolCalls.size > 0) {
+      const syntheticResults = Array.from(pendingToolCalls.entries()).map(([id, toolCall]) => ({
+        id,
+        content: [
+          {
+            type: 'text' as const,
+            text: `Tool execution interrupted. The ${toolCall.name} tool was called but no result was captured.`,
+          },
+        ],
+        status: 'failed' as const,
+      }));
+
+      completedMessages.push({
+        role: 'user',
+        content: '',
+        toolResults: syntheticResults,
+      });
+    }
+
+    return completedMessages;
   }
 
   // Override emit to provide type safety

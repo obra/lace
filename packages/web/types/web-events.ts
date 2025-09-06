@@ -10,7 +10,6 @@ export function getErrorOrigin(errorType: ErrorType): 'agent' | 'tool' | 'provid
     case 'tool_execution':
       return 'tool';
     case 'provider_failure':
-    case 'streaming_error':
     case 'timeout':
       return 'provider';
     case 'processing_error':

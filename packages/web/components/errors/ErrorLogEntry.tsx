@@ -28,8 +28,6 @@ export function ErrorLogEntry({
       case 'tool_execution':
       case 'processing_error':
         return 'text-error';
-      case 'streaming_error':
-        return 'text-info';
       default:
         return 'text-base-content';
     }

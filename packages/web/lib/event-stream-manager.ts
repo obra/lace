@@ -242,6 +242,7 @@ export class EventStreamManager {
         data: {
           errorType: context.errorType as ErrorType,
           message: error.message,
+          fullError: error,
           stack: error.stack,
           context: {
             phase: context.phase as ErrorPhase,

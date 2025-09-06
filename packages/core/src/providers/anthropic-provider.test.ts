@@ -266,8 +266,7 @@ describe('AnthropicProvider', () => {
         provider.createStreamingResponse(messages, [], 'claude-sonnet-4-20250514')
       ).rejects.toThrow('Stream failed');
 
-      expect(errorEvents).toHaveLength(1);
-      expect(errorEvents[0].message).toBe('Stream failed');
+      // Provider no longer emits error events (handled at agent level to prevent duplicates)
     });
 
     it('should handle tool calls in streaming response', async () => {

@@ -178,7 +178,7 @@ describe('Error Display Components', () => {
       const onDismiss = vi.fn();
       render(
         <ErrorToast
-          errorType="streaming_error"
+          errorType="provider_failure"
           message="Stream interrupted"
           autoDismiss={100} // 100ms for fast test
           onDismiss={onDismiss}

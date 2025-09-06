@@ -35,7 +35,6 @@ describe('Error Web Event Types', () => {
         'tool_execution',
         'processing_error',
         'timeout',
-        'streaming_error',
       ] as const;
 
       errorTypes.forEach((errorType) => {

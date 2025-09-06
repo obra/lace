@@ -7,6 +7,7 @@ import { asThreadId } from '@/types/core';
 import { ThreadIdSchema } from '@/lib/validation/schemas';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
+import { logger } from '~/utils/logger';
 import type { Route } from './+types/api.threads.$threadId.approvals.pending';
 
 // Validation schema
@@ -42,7 +43,25 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     const agent = session.getAgent(asThreadId(threadId));
     if (!agent) {
-      return createErrorResponse('Agent not found for thread', 404, { code: 'RESOURCE_NOT_FOUND' });
+      // Enhanced diagnostics for agent not found error
+      const availableAgents = session.getAgents();
+      const agentIds = availableAgents.map((a) => a.threadId);
+
+      logger.error(`[TOOL_APPROVAL] Agent not found for thread ${threadId}. Available agents:`, {
+        agentIds,
+      });
+
+      return createErrorResponse(
+        `Agent not found for thread ${threadId}. Available agents: ${agentIds.join(', ')}`,
+        404,
+        {
+          code: 'RESOURCE_NOT_FOUND',
+          details: {
+            requestedAgent: threadId,
+            availableAgents: agentIds,
+          },
+        }
+      );
     }
 
     // Use Agent interface to get pending approvals

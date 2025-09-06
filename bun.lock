@@ -51,7 +51,7 @@
     },
     "packages/core": {
       "name": "@lace/core",
-      "version": "0.0.1",
+      "version": "0.1.0",
       "dependencies": {
         "@anthropic-ai/sdk": "^0.54.0",
         "@lmstudio/sdk": "^1.2.1",
@@ -88,7 +88,7 @@
     },
     "packages/web": {
       "name": "lace-web",
-      "version": "0.0.1",
+      "version": "0.1.0",
       "dependencies": {
         "@fontsource-variable/dm-sans": "^5.2.6",
         "@fontsource/google-sans-code": "^5.2.1",
