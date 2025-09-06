@@ -64,8 +64,8 @@ export class Session {
     // Initialize TaskManager for this session
     this._taskManager = new TaskManager(this._sessionId, getPersistence());
 
-    // Register this session in the registry
-    Session._sessionRegistry.set(this._sessionId, this);
+    // NOTE: Session registration moved to after reconstruction completes
+    // This prevents the session from being found before agents are ready
   }
 
   static create(options: {
@@ -237,6 +237,10 @@ export class Session {
       coordinatorAgent.toolExecutor.setApprovalCallback(options.approvalCallback);
     }
 
+    // Register session in registry after creation is complete
+    Session._sessionRegistry.set(asThreadId(sessionData.id), session);
+    logger.debug(`Session registered in registry after creation: ${sessionData.id}`);
+
     return session;
   }
 
@@ -392,20 +396,41 @@ export class Session {
     const session = new Session(sessionId, sessionData, threadManager);
 
     // Create and initialize coordinator agent
-    const coordinatorAgent = await session.createAgent({
-      sessionData,
-      toolExecutor,
-      threadManager,
-      threadId: sessionId,
-      providerInstanceId,
-      modelId,
-      isCoordinator: true,
-    });
+    let coordinatorAgent: Agent;
+    try {
+      coordinatorAgent = await session.createAgent({
+        sessionData,
+        toolExecutor,
+        threadManager,
+        threadId: sessionId,
+        providerInstanceId,
+        modelId,
+        isCoordinator: true,
+      });
 
-    logger.debug(`Coordinator agent created and initialized for ${sessionId}`);
+      logger.debug(`Coordinator agent created and initialized for ${sessionId}`);
 
-    // Add coordinator to agents map
-    session._agents.set(sessionId, coordinatorAgent);
+      // Add coordinator to agents map
+      session._agents.set(sessionId, coordinatorAgent);
+
+      // Verify agent was added successfully
+      const verifyAgent = session.getCoordinatorAgent();
+      if (!verifyAgent) {
+        logger.error(
+          `CRITICAL: Coordinator agent not found in registry after adding for ${sessionId}`
+        );
+      } else {
+        logger.debug(`Coordinator agent successfully registered for ${sessionId}`);
+      }
+    } catch (error) {
+      logger.error(`Failed to create coordinator agent for ${sessionId}:`, {
+        error: error.message,
+        stack: error.stack,
+        providerInstanceId,
+        modelId,
+      });
+      throw error; // Re-throw to fail reconstruction
+    }
 
     // Load delegate threads (child agents) for this session
     const delegateThreadIds = threadManager.listThreadIdsForSession(sessionId);
@@ -485,9 +510,26 @@ export class Session {
     const delegateTool = new DelegateTool();
     toolExecutor.registerTool('delegate', delegateTool);
 
-    logger.debug(`Session reconstruction complete for ${sessionId}`);
+    // Final verification before completing reconstruction
+    const finalAgents = session.getAgents();
+    const coordinatorExists = session.getCoordinatorAgent() !== null;
 
-    // Session is automatically registered in the registry via constructor
+    logger.debug(`Session reconstruction complete for ${sessionId}`, {
+      agentCount: finalAgents.length,
+      hasCoordinator: coordinatorExists,
+      agentIds: finalAgents.map((a) => a.threadId),
+    });
+
+    if (!coordinatorExists) {
+      logger.error(
+        `CRITICAL: Session reconstruction completed but coordinator agent is missing for ${sessionId}`
+      );
+    }
+
+    // Register session in registry ONLY after full reconstruction is complete
+    Session._sessionRegistry.set(sessionId, session);
+    logger.debug(`Session registered in registry after full reconstruction: ${sessionId}`);
+
     return session;
   }
 

@@ -668,6 +668,61 @@ describe('Session', () => {
         // This assertion will FAIL with current implementation, demonstrating the race condition
         expect(reconstructionCount).toBe(1); // Should only reconstruct once, not 5 times!
       });
+
+      it('should not register session in registry until reconstruction completes', async () => {
+        // Arrange: Create a session in the database but not in registry
+        const session = Session.create({
+          name: 'Registry Timing Test',
+          projectId: testProject.getId(),
+          configuration: { providerInstanceId, modelId: 'claude-3-5-haiku-20241022' },
+        });
+
+        // Force session out of registry to simulate server restart
+        Session._sessionRegistry.delete(session.getId());
+
+        // Track when session appears in registry vs when reconstruction starts/completes
+        const registryChecks: Array<{ time: number; inRegistry: boolean; phase: string }> = [];
+
+        // Spy on the reconstruction to track timing
+        const originalPerformReconstruction = Session._performReconstruction;
+        vi.spyOn(Session, '_performReconstruction' as any).mockImplementation(async (sessionId) => {
+          // Check registry at start of reconstruction
+          registryChecks.push({
+            time: Date.now(),
+            inRegistry: Session._sessionRegistry.has(sessionId),
+            phase: 'reconstruction_start',
+          });
+
+          const result = await originalPerformReconstruction.call(Session, sessionId);
+
+          // Check registry at end of reconstruction (should be registered now)
+          registryChecks.push({
+            time: Date.now(),
+            inRegistry: Session._sessionRegistry.has(sessionId),
+            phase: 'reconstruction_end',
+          });
+
+          return result;
+        });
+
+        // Act: Get the session (triggers reconstruction)
+        const result = await Session.getById(session.getId());
+
+        // Assert: Session should not have been in registry until reconstruction completed
+        expect(result).not.toBeNull();
+        expect(registryChecks).toHaveLength(2);
+
+        const [startCheck, endCheck] = registryChecks;
+        expect(startCheck.phase).toBe('reconstruction_start');
+        expect(startCheck.inRegistry).toBe(false); // Not in registry at start
+
+        expect(endCheck.phase).toBe('reconstruction_end');
+        expect(endCheck.inRegistry).toBe(true); // In registry after completion
+
+        // Verify final state
+        expect(Session._sessionRegistry.has(session.getId())).toBe(true);
+        expect(result!.getAgents()).toHaveLength(1); // Should have coordinator
+      });
     });
   });
 
