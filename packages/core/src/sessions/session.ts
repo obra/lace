@@ -44,6 +44,7 @@ export interface SessionInfo {
 
 export class Session {
   private static _sessionRegistry = new Map<ThreadId, Session>();
+  private static _reconstructionPromises = new Map<ThreadId, Promise<Session | null>>();
 
   private _sessionId: ThreadId;
   private _sessionData: SessionData;
@@ -291,6 +292,31 @@ export class Session {
       Session._sessionRegistry.delete(sessionId);
     }
 
+    // Check if reconstruction is already in progress for this session
+    const existingPromise = Session._reconstructionPromises.get(sessionId);
+    if (existingPromise) {
+      logger.debug(`Waiting for existing reconstruction of session ${sessionId}`);
+      return await existingPromise;
+    }
+
+    // Start new reconstruction and cache the promise
+    const reconstructionPromise = Session._performReconstruction(sessionId);
+    Session._reconstructionPromises.set(sessionId, reconstructionPromise);
+
+    try {
+      const result = await reconstructionPromise;
+      return result;
+    } finally {
+      // Always clean up the promise from cache when done
+      Session._reconstructionPromises.delete(sessionId);
+    }
+  }
+
+  /**
+   * Internal method that performs the actual session reconstruction
+   * Separated for better testing and cleaner deduplication logic
+   */
+  private static async _performReconstruction(sessionId: ThreadId): Promise<Session | null> {
     // Get session from the sessions table
     const sessionData = Session.getSession(sessionId);
     if (!sessionData) {

@@ -600,6 +600,74 @@ describe('Session', () => {
         const session = await Session.getById(asThreadId('lace_20250101_nofind'));
         expect(session).toBeNull();
       });
+
+      it('should handle concurrent getById calls without race conditions', async () => {
+        // Arrange: Create a session in the database that needs reconstruction
+        const session = Session.create({
+          name: 'Concurrent Test Session',
+          projectId: testProject.getId(),
+          configuration: { providerInstanceId, modelId: 'claude-3-5-haiku-20241022' },
+        });
+
+        // Force session out of registry to simulate server restart scenario
+        Session._sessionRegistry.delete(session.getId());
+
+        // Track session reconstruction attempts by spying on the internal method
+        const originalPerformReconstruction = Session._performReconstruction;
+        let reconstructionCount = 0;
+        const reconstructionStartTimes: number[] = [];
+
+        vi.spyOn(Session, '_performReconstruction' as any).mockImplementation(async (sessionId) => {
+          reconstructionStartTimes.push(Date.now());
+          reconstructionCount++;
+          console.log(`Reconstruction attempt ${reconstructionCount} for ${sessionId}`);
+          return await originalPerformReconstruction.call(Session, sessionId);
+        });
+
+        // Act: Simulate multiple concurrent API calls that all try to get the same session
+        const concurrentCalls = Promise.all([
+          Session.getById(session.getId()), // Call 1: approvals/pending
+          Session.getById(session.getId()), // Call 2: token usage
+          Session.getById(session.getId()), // Call 3: agent status
+          Session.getById(session.getId()), // Call 4: session info
+          Session.getById(session.getId()), // Call 5: more requests
+        ]);
+
+        const results = await concurrentCalls;
+
+        // Assert: All calls should succeed and return the same session instance
+        expect(results).toHaveLength(5);
+        results.forEach((result) => {
+          expect(result).not.toBeNull();
+          expect(result!.getId()).toBe(session.getId());
+        });
+
+        // Critical assertion: All results should be the exact same instance (no duplicate reconstructions)
+        const firstSession = results[0]!;
+        results.forEach((result) => {
+          expect(result).toBe(firstSession); // Same object reference
+        });
+
+        // Verify agents are available and functional
+        const agents = firstSession.getAgents();
+        expect(agents).toHaveLength(1); // Should have coordinator agent
+
+        const coordinatorAgent = firstSession.getAgent(session.getId());
+        expect(coordinatorAgent).not.toBeNull();
+
+        // This would fail with the race condition - agents wouldn't be ready
+        expect(coordinatorAgent!.threadId).toBe(session.getId().toString());
+
+        // Ideally, we should only have 1 reconstruction, but due to the race condition
+        // we currently get multiple. This test will fail until we fix the deduplication.
+        console.log(`Total reconstruction attempts: ${reconstructionCount}`);
+        console.log(
+          `Reconstruction timing spread: ${Math.max(...reconstructionStartTimes) - Math.min(...reconstructionStartTimes)}ms`
+        );
+
+        // This assertion will FAIL with current implementation, demonstrating the race condition
+        expect(reconstructionCount).toBe(1); // Should only reconstruct once, not 5 times!
+      });
     });
   });
 
