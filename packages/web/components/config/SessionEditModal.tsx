@@ -272,7 +272,7 @@ export const SessionEditModal = memo(function SessionEditModal({
                   policies={sessionConfig.toolPolicies || {}}
                   onChange={handleToolPolicyChange}
                   context="session"
-                  parentPolicies={(currentProject as any).configuration?.toolPolicies || {}}
+                  parentPolicies={currentProject.configuration?.toolPolicies || {}}
                 />
               </div>
             </div>
