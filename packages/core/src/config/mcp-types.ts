@@ -30,14 +30,7 @@ export interface MCPConfig {
   servers: Record<string, MCPServerConfig>;
 }
 
-export type ApprovalLevel =
-  | 'disable'
-  | 'deny'
-  | 'require-approval'
-  | 'allow-session'
-  | 'allow-project'
-  | 'allow-always'
-  | 'allow'; // Legacy compatibility
+export type ApprovalLevel = 'allow' | 'ask' | 'deny' | 'disable';
 
 // Runtime server connection state
 export interface MCPServerConnection {

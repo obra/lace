@@ -7,15 +7,7 @@ import { z } from 'zod';
 import type { MCPConfig, MCPServerConfig } from '~/config/mcp-types';
 
 // Zod schemas for validation
-const ApprovalLevelSchema = z.enum([
-  'disable',
-  'deny',
-  'require-approval',
-  'allow-session',
-  'allow-project',
-  'allow-always',
-  'allow', // Legacy compatibility
-]);
+const ApprovalLevelSchema = z.enum(['allow', 'ask', 'deny', 'disable']);
 
 const DiscoveredToolSchema = z.object({
   name: z.string(),
