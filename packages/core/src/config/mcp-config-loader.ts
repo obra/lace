@@ -11,7 +11,6 @@ const ApprovalLevelSchema = z.enum([
   'disable',
   'deny',
   'require-approval',
-  'allow-once',
   'allow-session',
   'allow-project',
   'allow-always',
