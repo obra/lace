@@ -202,7 +202,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     [theme, saveTheme]
   );
 
-  const getTimelineMaxWidthClass = useCallback(() => {
+  const getTimelineMaxWidthClassForTheme = useCallback(() => {
     return getTimelineMaxWidthClass(theme.timeline.width);
   }, [theme.timeline.width]);
 
@@ -212,9 +212,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       setDaisyUITheme,
       setTimelineWidth,
       setTheme,
-      getTimelineMaxWidthClass,
+      getTimelineMaxWidthClass: getTimelineMaxWidthClassForTheme,
     }),
-    [theme, setDaisyUITheme, setTimelineWidth, setTheme, getTimelineMaxWidthClass]
+    [theme, setDaisyUITheme, setTimelineWidth, setTheme, getTimelineMaxWidthClassForTheme]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
