@@ -1,200 +1,203 @@
-// ABOUTME: Tests for session configuration API tool permissions with explicit hierarchy structure
-// ABOUTME: Validates that API returns tool policies with parent values and allowed options for progressive restriction
+// ABOUTME: Integration tests for session configuration API tool permissions with explicit hierarchy structure
+// ABOUTME: Uses real sessions and projects to test progressive restriction without mocking
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { loader, action } from '@/app/routes/api.sessions.$sessionId.configuration';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { loader as GET, action as PUT } from '@/app/routes/api.sessions.$sessionId.configuration';
+import { getSessionService } from '@/lib/server/session-service';
+import { Project, Session } from '@/lib/server/lace-imports';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '@/lib/server/lace-imports';
+import { parseResponse } from '@/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 
-// Mock the session service
-const mockSession = {
-  getEffectiveConfiguration: vi.fn(),
-  updateConfiguration: vi.fn(),
-  getProjectId: vi.fn(),
-};
+// Type interfaces for new API structure
+interface ToolPermissionInfo {
+  value: 'allow' | 'ask' | 'deny' | 'disable';
+  allowedValues: Array<'allow' | 'ask' | 'deny' | 'disable'>;
+  projectValue?: 'allow' | 'ask' | 'deny' | 'disable';
+  globalValue?: 'allow' | 'ask' | 'deny' | 'disable';
+}
 
-const mockProject = {
-  getConfiguration: vi.fn(),
-};
-
-vi.mock('@/lib/server/session-service', () => ({
-  getSessionService: vi.fn(() => ({
-    getSession: vi.fn(() => mockSession),
-  })),
-}));
-
-vi.mock('@/lib/server/lace-imports', () => ({
-  ToolCatalog: {
-    getAvailableTools: vi.fn(() => ['bash', 'file_read', 'filesystem/move_file']),
-  },
-  Project: {
-    getById: vi.fn(() => mockProject),
-  },
-}));
+interface ConfigurationResponse {
+  configuration: {
+    tools?: Record<string, ToolPermissionInfo>;
+    availableTools?: string[];
+    [key: string]: unknown;
+  };
+}
 
 describe('Session Configuration API - Tool Permissions Structure', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockSession.getProjectId.mockReturnValue('test-project-id');
+  const _tempLaceDir = setupWebTest();
+  let sessionService: ReturnType<typeof getSessionService>;
+  let testProject: ReturnType<typeof Project.create>;
+  let sessionId: string;
+  let providerInstanceId: string;
+
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+    process.env.LACE_DB_PATH = ':memory:';
+
+    sessionService = getSessionService();
+
+    // Create provider instance
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
+    // Create test project with tool policies
+    testProject = Project.create('Tool Permission Test Project', '/test/path');
+    testProject.updateConfiguration({
+      toolPolicies: {
+        bash: 'allow', // Project allows bash
+        file_read: 'ask', // Project asks for file_read
+        'filesystem/move_file': 'deny', // Project denies move_file
+      },
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
+
+    // Create session with tool policy overrides
+    const sessionInstance = Session.create({
+      name: 'Test Session',
+      projectId: testProject.getId(),
+    });
+
+    // Update session configuration with tool policies
+    sessionInstance.updateConfiguration({
+      toolPolicies: {
+        bash: 'ask', // Session overrides bash to ask (more restrictive than project allow)
+      },
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
+
+    const session = sessionInstance.getInfo()!;
+    sessionId = session.id;
+  });
+
+  afterEach(async () => {
+    await cleanupTestProviderInstances();
+    cleanupTestProviderDefaults();
   });
 
   describe('GET loader - Tool permissions with hierarchy', () => {
-    it('should debug what API actually returns', async () => {
-      mockSession.getEffectiveConfiguration.mockReturnValue({
-        toolPolicies: { bash: 'ask' },
+    it('should return tool permissions with explicit parent values and allowed options', async () => {
+      const loaderArgs = createLoaderArgs({ sessionId });
+
+      const response = await GET(loaderArgs);
+      const data = parseResponse<ConfigurationResponse>(response);
+
+      // Verify tools structure exists
+      expect(data.configuration.tools).toBeDefined();
+
+      // Test bash: session=ask, project=allow
+      expect(data.configuration.tools?.bash).toEqual({
+        value: 'ask', // Current session value
+        allowedValues: ['ask', 'deny', 'disable'], // More restrictive than project 'allow'
+        projectValue: 'allow', // What project has set
       });
 
-      mockProject.getConfiguration.mockReturnValue({
-        toolPolicies: { bash: 'allow' },
+      // Test file_read: no session override, inherits from project
+      expect(data.configuration.tools?.file_read).toEqual({
+        value: 'ask', // Inherited from project
+        allowedValues: ['ask', 'deny', 'disable'], // More restrictive than project 'ask'
+        projectValue: 'ask', // What project has set
       });
 
-      const request = new Request('http://localhost/api/sessions/test-session/configuration');
-      const params = { sessionId: 'test-session' };
-
-      const response = await loader({ request, params, context: {} });
-      const data = await response.json();
-
-      console.log('API Response:', JSON.stringify(data, null, 2));
-      expect(data.configuration).toBeDefined();
-    });
-
-    it('should return tool permissions with parent values and allowed options', async () => {
-      // Setup: Session has some overrides, project has policies, global has different policies
-      mockSession.getEffectiveConfiguration.mockReturnValue({
-        toolPolicies: {
-          bash: 'ask', // Session overrides to ask
-          'filesystem/move_file': null, // Session inherits from project
-        },
-      });
-
-      mockProject.getConfiguration.mockReturnValue({
-        toolPolicies: {
-          bash: 'allow', // Project allows bash
-          'filesystem/move_file': 'deny', // Project denies move_file
-          file_read: 'ask', // Project asks for file_read
-        },
-      });
-
-      const request = new Request('http://localhost/api/sessions/test-session/configuration');
-      const params = { sessionId: 'test-session' };
-
-      const response = await loader({ request, params, context: {} });
-      const data = await response.json();
-
-      expect(data.configuration.tools).toEqual({
-        bash: {
-          value: 'ask', // Current effective value
-          allowedValues: ['ask', 'deny', 'disable'], // Can be equal or more restrictive than parent 'allow'
-          projectValue: 'allow', // What project has set
-        },
-        file_read: {
-          value: 'ask', // Inherited from project
-          allowedValues: ['ask', 'deny', 'disable'], // Can be equal or more restrictive than parent 'ask'
-          projectValue: 'ask', // What project has set
-        },
-        'filesystem/move_file': {
-          value: 'deny', // Inherited from project
-          allowedValues: ['deny', 'disable'], // Can only be equal or more restrictive than parent 'deny'
-          projectValue: 'deny', // What project has set
-        },
-      });
-    });
-
-    it('should handle tools with no project override (inherit from global)', async () => {
-      mockSession.getEffectiveConfiguration.mockReturnValue({
-        toolPolicies: {},
-      });
-
-      mockProject.getConfiguration.mockReturnValue({
-        toolPolicies: {}, // No project overrides
-      });
-
-      const request = new Request('http://localhost/api/sessions/test-session/configuration');
-      const params = { sessionId: 'test-session' };
-
-      const response = await loader({ request, params, context: {} });
-      const data = await response.json();
-
-      // When no project override, should show what options are available
-      expect(data.configuration.tools['bash']).toEqual({
-        value: 'ask', // Default policy
-        allowedValues: ['allow', 'ask', 'deny', 'disable'], // All options available (no restrictions)
-        // No projectValue since project doesn't override
-      });
-    });
-
-    it('should calculate allowedValues based on most restrictive parent policy', async () => {
-      mockSession.getEffectiveConfiguration.mockReturnValue({
-        toolPolicies: {},
-      });
-
-      // Project denies the tool
-      mockProject.getConfiguration.mockReturnValue({
-        toolPolicies: {
-          bash: 'deny',
-        },
-      });
-
-      const request = new Request('http://localhost/api/sessions/test-session/configuration');
-      const params = { sessionId: 'test-session' };
-
-      const response = await loader({ request, params, context: {} });
-      const data = await response.json();
-
-      expect(data.configuration.tools['bash']).toEqual({
+      // Test filesystem/move_file: no session override, inherits deny from project
+      expect(data.configuration.tools?.['filesystem/move_file']).toEqual({
         value: 'deny', // Inherited from project
-        allowedValues: ['deny', 'disable'], // Can only be equal or more restrictive
+        allowedValues: ['deny', 'disable'], // More restrictive than project 'deny'
         projectValue: 'deny', // What project has set
+      });
+    });
+
+    it('should handle tools with no project override (full permissions)', async () => {
+      // Create project with no tool policy overrides
+      const cleanProject = Project.create('Clean Project', '/test/path');
+      cleanProject.updateConfiguration({
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+        toolPolicies: {}, // Explicitly empty
+      });
+
+      const cleanSessionInstance = Session.create({
+        name: 'Clean Session',
+        projectId: cleanProject.getId(),
+      });
+
+      cleanSessionInstance.updateConfiguration({
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+        toolPolicies: {}, // Explicitly empty
+      });
+
+      const cleanSession = cleanSessionInstance.getInfo()!;
+      const cleanSessionId = cleanSession.id;
+
+      const loaderArgs = createLoaderArgs({ sessionId: cleanSessionId });
+      const response = await GET(loaderArgs);
+      const data = parseResponse<ConfigurationResponse>(response);
+
+      // When no project override, should show full options
+      expect(data.configuration.tools?.bash).toEqual({
+        value: 'ask', // Default policy
+        allowedValues: ['allow', 'ask', 'deny', 'disable'], // All options available
+        // No projectValue since project doesn't set policy
       });
     });
   });
 
-  describe('PUT action - Tool permissions validation', () => {
+  describe('PUT action - Progressive restriction validation', () => {
     it('should accept valid tool policy changes within allowed values', async () => {
-      const request = new Request('http://localhost/api/sessions/test-session/configuration', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const actionArgs = createActionArgs(
+        'PUT',
+        { sessionId },
+        {
           toolPolicies: {
             bash: 'deny', // More restrictive than project 'allow' - should be valid
           },
-        }),
-      });
-      const params = { sessionId: 'test-session' };
+        }
+      );
 
-      mockSession.getEffectiveConfiguration.mockReturnValue({
-        toolPolicies: {},
-      });
-      mockProject.getConfiguration.mockReturnValue({
-        toolPolicies: { bash: 'allow' },
-      });
-
-      const response = await action({ request, params, context: {} });
-
+      const response = await PUT(actionArgs);
       expect(response.status).toBe(200);
-      expect(mockSession.updateConfiguration).toHaveBeenCalledWith({
-        toolPolicies: { bash: 'deny' },
-      });
+
+      // Verify the policy was actually saved - reload and check
+      const updatedResponse = await GET(createLoaderArgs({ sessionId }));
+      const updatedData = parseResponse<ConfigurationResponse>(updatedResponse);
+      expect(updatedData.configuration.tools?.bash?.value).toBe('deny');
     });
 
     it('should reject tool policy changes that are more permissive than parent', async () => {
-      const request = new Request('http://localhost/api/sessions/test-session/configuration', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // First set project to deny bash
+      testProject.updateConfiguration({
+        toolPolicies: { bash: 'deny' },
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      });
+
+      const actionArgs = createActionArgs(
+        'PUT',
+        { sessionId },
+        {
           toolPolicies: {
             bash: 'allow', // More permissive than project 'deny' - should fail
           },
-        }),
-      });
-      const params = { sessionId: 'test-session' };
+        }
+      );
 
-      mockProject.getConfiguration.mockReturnValue({
-        toolPolicies: { bash: 'deny' },
-      });
-
-      const response = await action({ request, params, context: {} });
-
+      const response = await PUT(actionArgs);
       expect(response.status).toBe(400);
-      const data = await response.json();
+
+      const data = parseResponse<{ error: string }>(response);
       expect(data.error).toContain('more permissive than project policy');
     });
   });
