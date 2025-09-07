@@ -13,11 +13,22 @@ import React, {
   ReactNode,
 } from 'react';
 
-type ThemeValue = 'light' | 'dark';
+type DaisyUITheme = 'light' | 'dark';
+type TimelineWidth = 'narrow' | 'medium' | 'wide' | 'full';
+
+interface LaceTheme {
+  daisyui: DaisyUITheme;
+  timeline: {
+    width: TimelineWidth;
+  };
+}
 
 interface ThemeContextType {
-  theme: ThemeValue;
-  setTheme: (theme: ThemeValue) => void;
+  theme: LaceTheme;
+  setDaisyUITheme: (theme: DaisyUITheme) => void;
+  setTimelineWidth: (width: TimelineWidth) => void;
+  setTheme: (theme: Partial<LaceTheme>) => void;
+  getTimelineMaxWidthClass: () => string;
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
@@ -34,42 +45,123 @@ interface ThemeProviderProps {
   children: ReactNode;
 }
 
+const defaultTheme: LaceTheme = {
+  daisyui: 'dark',
+  timeline: {
+    width: 'medium',
+  },
+};
+
+function getTimelineMaxWidthClass(width: TimelineWidth): string {
+  switch (width) {
+    case 'narrow':
+      return 'max-w-2xl';
+    case 'medium':
+      return 'max-w-3xl';
+    case 'wide':
+      return 'max-w-5xl';
+    case 'full':
+      return 'max-w-none';
+    default:
+      return 'max-w-3xl';
+  }
+}
+
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setThemeState] = useState<ThemeValue>('dark'); // Always start with dark to avoid hydration mismatch
+  const [theme, setThemeState] = useState<LaceTheme>(defaultTheme);
   const [mounted, setMounted] = useState(false);
 
   // Load theme from localStorage after component mounts
   useEffect(() => {
     setMounted(true);
     const savedTheme = localStorage.getItem('lace-theme');
-    // Type-safe theme parsing - only accept known theme values
-    if (savedTheme === 'light' || savedTheme === 'dark') {
-      setThemeState(savedTheme);
-    } else {
-      // Default to dark theme for invalid or missing values
-      setThemeState('dark');
+    if (savedTheme) {
+      try {
+        const parsed = JSON.parse(savedTheme) as LaceTheme;
+        // Validate the parsed theme has required structure
+        if (
+          parsed &&
+          typeof parsed === 'object' &&
+          (parsed.daisyui === 'light' || parsed.daisyui === 'dark') &&
+          parsed.timeline &&
+          ['narrow', 'medium', 'wide', 'full'].includes(parsed.timeline.width)
+        ) {
+          setThemeState(parsed);
+        } else {
+          // Invalid saved theme, use default
+          setThemeState(defaultTheme);
+        }
+      } catch {
+        // Failed to parse, use default
+        setThemeState(defaultTheme);
+      }
     }
   }, []);
 
   // Apply theme to document
   useEffect(() => {
     if (mounted) {
-      document.documentElement.setAttribute('data-theme', theme);
+      // Set DaisyUI theme
+      document.documentElement.setAttribute('data-theme', theme.daisyui);
     }
   }, [theme, mounted]);
 
-  const setTheme = useCallback(
-    (newTheme: ThemeValue) => {
+  const saveTheme = useCallback(
+    (newTheme: LaceTheme) => {
       setThemeState(newTheme);
-      localStorage.setItem('lace-theme', newTheme);
+      localStorage.setItem('lace-theme', JSON.stringify(newTheme));
       if (mounted) {
-        document.documentElement.setAttribute('data-theme', newTheme);
+        document.documentElement.setAttribute('data-theme', newTheme.daisyui);
       }
     },
     [mounted]
   );
 
-  const value = useMemo(() => ({ theme, setTheme }), [theme, setTheme]);
+  const setDaisyUITheme = useCallback(
+    (daisyui: DaisyUITheme) => {
+      const newTheme = { ...theme, daisyui };
+      saveTheme(newTheme);
+    },
+    [theme, saveTheme]
+  );
+
+  const setTimelineWidth = useCallback(
+    (width: TimelineWidth) => {
+      const newTheme = {
+        ...theme,
+        timeline: { ...theme.timeline, width },
+      };
+      saveTheme(newTheme);
+    },
+    [theme, saveTheme]
+  );
+
+  const setTheme = useCallback(
+    (partialTheme: Partial<LaceTheme>) => {
+      const newTheme = {
+        ...theme,
+        ...partialTheme,
+        timeline: { ...theme.timeline, ...partialTheme.timeline },
+      };
+      saveTheme(newTheme);
+    },
+    [theme, saveTheme]
+  );
+
+  const getTimelineMaxWidthClassForTheme = useCallback(() => {
+    return getTimelineMaxWidthClass(theme.timeline.width);
+  }, [theme.timeline.width]);
+
+  const value = useMemo(
+    () => ({
+      theme,
+      setDaisyUITheme,
+      setTimelineWidth,
+      setTheme,
+      getTimelineMaxWidthClass: getTimelineMaxWidthClassForTheme,
+    }),
+    [theme, setDaisyUITheme, setTimelineWidth, setTheme, getTimelineMaxWidthClassForTheme]
+  );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

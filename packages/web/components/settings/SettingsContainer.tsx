@@ -19,13 +19,13 @@ interface SettingsContainerProps {
 
 export function SettingsContainer({ children }: SettingsContainerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { theme, setTheme } = useTheme();
+  const { theme, setDaisyUITheme } = useTheme();
 
   const handleThemeChange = useCallback(
     (newTheme: string) => {
-      setTheme(newTheme as 'light' | 'dark');
+      setDaisyUITheme(newTheme as 'light' | 'dark');
     },
-    [setTheme]
+    [setDaisyUITheme]
   );
 
   const handleOpenSettings = useCallback(() => setIsOpen(true), []);
@@ -41,8 +41,8 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
 
   // Memoize the settings panels to avoid recreating on every render
   const uiSettingsPanel = useMemo(
-    () => <UISettingsPanel currentTheme={theme} onThemeChange={handleThemeChange} />,
-    [theme, handleThemeChange]
+    () => <UISettingsPanel currentTheme={theme.daisyui} onThemeChange={handleThemeChange} />,
+    [theme.daisyui, handleThemeChange]
   );
 
   const userSettingsPanel = useMemo(() => <UserSettingsPanel />, []);
