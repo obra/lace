@@ -2,6 +2,7 @@
 // ABOUTME: Handles session configuration retrieval and updates with validation and inheritance
 
 import { getSessionService } from '@/lib/server/session-service';
+import { ToolCatalog, Project } from '@/lib/server/lace-imports';
 import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
@@ -42,19 +43,25 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     const configuration = session.getEffectiveConfiguration();
 
-    // FIXED: Get tools from session's ToolExecutor instead of creating fresh one
-    const toolExecutor = session.createConfiguredToolExecutor(); // Includes MCP servers
-    const userConfigurableTools = toolExecutor
-      .getAllTools() // Now includes MCP tools with session context
-      .filter(
-        (tool: { annotations?: { safeInternal?: boolean } }) => !tool.annotations?.safeInternal
-      )
-      .map((tool: { name: string }) => tool.name);
+    // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
+    const projectId = session.getProjectId();
+    if (!projectId) {
+      return createErrorResponse('Session has no associated project', 500, {
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+    }
+    const project = Project.getById(projectId);
+    if (!project) {
+      return createErrorResponse('Associated project not found', 500, {
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+    }
+    const availableTools = ToolCatalog.getAvailableTools(project);
 
     return createSuperjsonResponse({
       configuration: {
         ...configuration,
-        availableTools: userConfigurableTools,
+        availableTools,
       },
     });
   } catch (error: unknown) {
@@ -96,19 +103,25 @@ export async function action({ request, params }: Route.ActionArgs) {
     session.updateConfiguration(validatedData);
     const configuration = session.getEffectiveConfiguration();
 
-    // Get user-configurable tools from session's ToolExecutor (same as GET)
-    const toolExecutor = session.createConfiguredToolExecutor(); // Includes MCP servers
-    const userConfigurableTools = toolExecutor
-      .getAllTools()
-      .filter(
-        (tool: { annotations?: { safeInternal?: boolean } }) => !tool.annotations?.safeInternal
-      )
-      .map((tool: { name: string }) => tool.name);
+    // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
+    const projectId = session.getProjectId();
+    if (!projectId) {
+      return createErrorResponse('Session has no associated project', 500, {
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+    }
+    const project = Project.getById(projectId);
+    if (!project) {
+      return createErrorResponse('Associated project not found', 500, {
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+    }
+    const availableTools = ToolCatalog.getAvailableTools(project);
 
     return createSuperjsonResponse({
       configuration: {
         ...configuration,
-        availableTools: userConfigurableTools,
+        availableTools,
       },
     });
   } catch (error: unknown) {

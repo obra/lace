@@ -62,6 +62,9 @@ vi.mock('@/lib/server/lace-imports', () => ({
       getConfiguredInstances: vi.fn(() => []),
     })),
   },
+  ToolCatalog: {
+    getAvailableTools: vi.fn(() => ['file_read', 'file_write', 'bash']),
+  },
 }));
 
 describe('Project Configuration API', () => {
@@ -90,7 +93,7 @@ describe('Project Configuration API', () => {
         },
         workingDirectory: '/test/path',
         environmentVariables: { NODE_ENV: 'test' },
-        availableTools: ['file-read', 'file-write', 'bash'], // Added by API route
+        availableTools: ['file_read', 'file_write', 'bash'], // Added by ToolCatalog
       });
     });
 
