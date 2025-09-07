@@ -9,11 +9,13 @@ import { faPlus, faTrash, faServer } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { DirectoryField } from '@/components/ui';
 import { ToolPolicyList } from '@/components/config/ToolPolicyList';
-import { MCPProjectPanel } from '@/components/mcp/MCPProjectPanel';
-import type { ProjectInfo } from '@/types/core';
+import { MCPProjectConfig } from '@/components/mcp/MCPProjectConfig';
+import { AddMCPServerModal } from '@/components/modals/AddMCPServerModal';
+import type { ProjectInfo, MCPServerConfig } from '@/types/core';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import type { ProviderInfo, SessionConfiguration } from '@/types/api';
+import { api } from '@/lib/api-client';
 
 interface ProjectConfiguration {
   providerInstanceId?: string;
@@ -59,6 +61,10 @@ export function ProjectEditModal({
   const [editConfig, setEditConfig] = useState<ProjectConfiguration>(initialConfig);
   const [newEnvKey, setNewEnvKey] = useState('');
   const [newEnvValue, setNewEnvValue] = useState('');
+
+  // MCP modal state
+  const [showMcpAddModal, setShowMcpAddModal] = useState(false);
+  const [addingMcpServer, setAddingMcpServer] = useState(false);
 
   // Update state when project changes
   React.useEffect(() => {
@@ -114,6 +120,28 @@ export function ProjectEditModal({
         [tool]: policy,
       },
     }));
+  };
+
+  // MCP server management
+  const handleOpenMcpAddModal = () => {
+    setShowMcpAddModal(true);
+  };
+
+  const handleCloseMcpAddModal = () => {
+    setShowMcpAddModal(false);
+  };
+
+  const handleAddMcpServer = async (serverId: string, config: MCPServerConfig) => {
+    setAddingMcpServer(true);
+    try {
+      await api.post(`/api/projects/${project?.id}/mcp/servers`, { id: serverId, ...config });
+      setShowMcpAddModal(false);
+      // The MCPProjectConfig component will reload its data
+    } catch (error) {
+      // Error handling
+    } finally {
+      setAddingMcpServer(false);
+    }
   };
 
   // Handle form submission
@@ -307,7 +335,7 @@ export function ProjectEditModal({
               <span className="text-lg font-medium">MCP Servers</span>
             </div>
             <div className="rounded-xl p-4 bg-base-100/60 backdrop-blur-sm border border-base-300/60">
-              <MCPProjectPanel projectId={project.id} />
+              <MCPProjectConfig projectId={project.id} onOpenAddModal={handleOpenMcpAddModal} />
             </div>
           </div>
 
@@ -345,6 +373,14 @@ export function ProjectEditModal({
           </button>
         </div>
       </form>
+
+      {/* MCP Add Server Modal - managed by this component */}
+      <AddMCPServerModal
+        isOpen={showMcpAddModal}
+        onClose={handleCloseMcpAddModal}
+        onAddServer={handleAddMcpServer}
+        loading={addingMcpServer}
+      />
     </Modal>
   );
 }
