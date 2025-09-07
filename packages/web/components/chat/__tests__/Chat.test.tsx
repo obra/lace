@@ -11,6 +11,7 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { Chat } from '@/components/chat/Chat';
 import { ScrollProvider } from '@/components/providers/ScrollProvider';
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import type { ThreadId, AgentInfo, LaceEvent } from '@/types/core';
 import { createMockAgentContext } from '@/__tests__/utils/provider-mocks';
 import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
@@ -92,6 +93,13 @@ vi.mock('@/components/providers/AgentProvider', () => ({
   useAgentContext: vi.fn(),
 }));
 
+vi.mock('@/lib/api-client', () => ({
+  api: {
+    get: vi.fn(),
+    patch: vi.fn(),
+  },
+}));
+
 // Import mocked hooks
 import {
   useSessionEvents,
@@ -100,12 +108,14 @@ import {
   useCompactionState,
 } from '@/components/providers/EventStreamProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
+import { api } from '@/lib/api-client';
 
 const mockUseSessionEvents = vi.mocked(useSessionEvents);
 const mockUseAgentAPI = vi.mocked(useAgentAPI);
 const mockUseEventStreamContext = vi.mocked(useEventStreamContext);
 const mockUseCompactionState = vi.mocked(useCompactionState);
 const mockUseAgentContext = vi.mocked(useAgentContext);
+const mockApi = vi.mocked(api);
 
 // Test data factories
 const createMockAgent = (id: string, name: string): AgentInfo =>
@@ -132,14 +142,20 @@ describe('Chat', () => {
   // Helper to render Chat with required providers
   const renderChat = () => {
     return render(
-      <ScrollProvider>
-        <Chat />
-      </ScrollProvider>
+      <ThemeProvider>
+        <ScrollProvider>
+          <Chat />
+        </ScrollProvider>
+      </ThemeProvider>
     );
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Mock API for ThemeProvider
+    mockApi.get.mockResolvedValue({});
+    mockApi.patch.mockResolvedValue({});
 
     // Set up default provider mocks
     mockUseSessionEvents.mockReturnValue({
