@@ -8,7 +8,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faServer, faEdit, faTrash } from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
 import type { MCPServerConfig } from '@/types/core';
-import type { ToolPolicy } from './MCPServerCard';
+import { ToolPolicySelector } from '@/components/ui/ToolPolicySelector';
+import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 
 interface MCPProjectConfigProps {
   projectId: string;
@@ -169,22 +170,12 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
                     const currentPolicy = config.tools[tool.name] || 'require-approval';
                     return (
                       <div key={tool.name} className="flex items-center gap-2 text-xs">
-                        <select
-                          className="select select-xs select-bordered"
-                          value={currentPolicy}
-                          onChange={(e) =>
-                            handleToolPolicyChange(
-                              serverId,
-                              tool.name,
-                              e.target.value as ToolPolicy
-                            )
-                          }
-                        >
-                          <option value="allow-always">Allow Always</option>
-                          <option value="allow-session">Allow Session</option>
-                          <option value="require-approval">Require Approval</option>
-                          <option value="deny">Deny</option>
-                        </select>
+                        <ToolPolicySelector
+                          value={currentPolicy as ToolPolicy}
+                          onChange={(policy) => handleToolPolicyChange(serverId, tool.name, policy)}
+                          size="xs"
+                          context="project"
+                        />
                         <span className="font-mono">{tool.name}</span>
                       </div>
                     );
@@ -237,22 +228,12 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
                     const currentPolicy = config.tools[tool.name] || 'require-approval';
                     return (
                       <div key={tool.name} className="flex items-center gap-2 text-xs">
-                        <select
-                          className="select select-xs select-bordered"
-                          value={currentPolicy}
-                          onChange={(e) =>
-                            handleToolPolicyChange(
-                              serverId,
-                              tool.name,
-                              e.target.value as ToolPolicy
-                            )
-                          }
-                        >
-                          <option value="allow-always">Allow Always</option>
-                          <option value="allow-session">Allow Session</option>
-                          <option value="require-approval">Require Approval</option>
-                          <option value="deny">Deny</option>
-                        </select>
+                        <ToolPolicySelector
+                          value={currentPolicy as ToolPolicy}
+                          onChange={(policy) => handleToolPolicyChange(serverId, tool.name, policy)}
+                          size="xs"
+                          context="project"
+                        />
                         <span className="font-mono">{tool.name}</span>
                       </div>
                     );

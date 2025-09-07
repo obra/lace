@@ -271,6 +271,7 @@ export const SessionEditModal = memo(function SessionEditModal({
                   tools={sessionConfig.availableTools || []}
                   policies={sessionConfig.toolPolicies || {}}
                   onChange={handleToolPolicyChange}
+                  context="session"
                 />
               </div>
             </div>
