@@ -67,47 +67,45 @@ function getTimelineMaxWidthClass(width: TimelineWidth): string {
   }
 }
 
+function loadThemeFromStorage(): LaceTheme {
+  if (typeof window === 'undefined') {
+    return defaultTheme;
+  }
+
+  const savedTheme = localStorage.getItem('lace-theme');
+  if (!savedTheme) {
+    return defaultTheme;
+  }
+
+  try {
+    const parsed = JSON.parse(savedTheme) as LaceTheme;
+    // Validate the parsed theme has required structure
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      (parsed.daisyui === 'light' || parsed.daisyui === 'dark') &&
+      parsed.timeline &&
+      ['narrow', 'medium', 'wide', 'full'].includes(parsed.timeline.width)
+    ) {
+      return parsed;
+    }
+  } catch {
+    // Failed to parse, use default
+  }
+
+  return defaultTheme;
+}
+
 export function ThemeProvider({ children }: ThemeProviderProps) {
+  // Always start with default theme to avoid hydration mismatch
   const [theme, setThemeState] = useState<LaceTheme>(defaultTheme);
   const [mounted, setMounted] = useState(false);
 
-  // Provide a fallback context value during server-side rendering
-  const fallbackValue = useMemo(
-    () => ({
-      theme: defaultTheme,
-      setDaisyUITheme: () => {},
-      setTimelineWidth: () => {},
-      setTheme: () => {},
-      getTimelineMaxWidthClass: () => 'max-w-3xl',
-    }),
-    []
-  );
-
-  // Load theme from localStorage after component mounts
+  // Load user's saved theme after mounting
   useEffect(() => {
     setMounted(true);
-    const savedTheme = localStorage.getItem('lace-theme');
-    if (savedTheme) {
-      try {
-        const parsed = JSON.parse(savedTheme) as LaceTheme;
-        // Validate the parsed theme has required structure
-        if (
-          parsed &&
-          typeof parsed === 'object' &&
-          (parsed.daisyui === 'light' || parsed.daisyui === 'dark') &&
-          parsed.timeline &&
-          ['narrow', 'medium', 'wide', 'full'].includes(parsed.timeline.width)
-        ) {
-          setThemeState(parsed);
-        } else {
-          // Invalid saved theme, use default
-          setThemeState(defaultTheme);
-        }
-      } catch {
-        // Failed to parse, use default
-        setThemeState(defaultTheme);
-      }
-    }
+    const savedTheme = loadThemeFromStorage();
+    setThemeState(savedTheme);
   }, []);
 
   // Apply theme to document
@@ -173,6 +171,18 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       getTimelineMaxWidthClass: getTimelineMaxWidthClassForTheme,
     }),
     [theme, setDaisyUITheme, setTimelineWidth, setTheme, getTimelineMaxWidthClassForTheme]
+  );
+
+  // Create fallback with default theme for SSR
+  const fallbackValue = useMemo(
+    () => ({
+      theme: defaultTheme,
+      setDaisyUITheme: () => {},
+      setTimelineWidth: () => {},
+      setTheme: () => {},
+      getTimelineMaxWidthClass: () => getTimelineMaxWidthClass(defaultTheme.timeline.width),
+    }),
+    []
   );
 
   // Use fallback during SSR or before mount
