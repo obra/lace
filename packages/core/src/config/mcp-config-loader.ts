@@ -17,6 +17,11 @@ const ApprovalLevelSchema = z.enum([
   'allow-always',
 ]);
 
+const DiscoveredToolSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+});
+
 const MCPServerConfigSchema = z.object({
   command: z.string().min(1, 'Command is required'),
   args: z.array(z.string()).optional(),
@@ -24,6 +29,11 @@ const MCPServerConfigSchema = z.object({
   cwd: z.string().optional(),
   enabled: z.boolean(),
   tools: z.record(z.string(), ApprovalLevelSchema),
+  // Tool discovery cache fields
+  discoveredTools: z.array(DiscoveredToolSchema).optional(),
+  lastDiscovery: z.string().optional(),
+  discoveryError: z.string().optional(),
+  discoveryStatus: z.enum(['never', 'discovering', 'success', 'failed']).optional(),
 });
 
 const MCPConfigSchema = z.object({
