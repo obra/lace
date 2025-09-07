@@ -71,6 +71,18 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<LaceTheme>(defaultTheme);
   const [mounted, setMounted] = useState(false);
 
+  // Provide a fallback context value during server-side rendering
+  const fallbackValue = useMemo(
+    () => ({
+      theme: defaultTheme,
+      setDaisyUITheme: () => {},
+      setTimelineWidth: () => {},
+      setTheme: () => {},
+      getTimelineMaxWidthClass: () => 'max-w-3xl',
+    }),
+    []
+  );
+
   // Load theme from localStorage after component mounts
   useEffect(() => {
     setMounted(true);
@@ -163,5 +175,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     [theme, setDaisyUITheme, setTimelineWidth, setTheme, getTimelineMaxWidthClassForTheme]
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  // Use fallback during SSR or before mount
+  const contextValue = mounted ? value : fallbackValue;
+
+  return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>;
 }
