@@ -5,10 +5,11 @@
 
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTrash } from '@/lib/fontawesome';
+import { faPlus, faTrash, faServer } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { DirectoryField } from '@/components/ui';
 import { ToolPolicyList } from '@/components/config/ToolPolicyList';
+import { MCPProjectPanel } from '@/components/mcp/MCPProjectPanel';
 import type { ProjectInfo } from '@/types/core';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
@@ -296,6 +297,17 @@ export function ProjectEditModal({
                   <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* MCP Configuration */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <FontAwesomeIcon icon={faServer} className="w-5 h-5 text-primary" />
+              <span className="text-lg font-medium">MCP Servers</span>
+            </div>
+            <div className="rounded-xl p-4 bg-base-100/60 backdrop-blur-sm border border-base-300/60">
+              <MCPProjectPanel projectId={project.id} />
             </div>
           </div>
 
