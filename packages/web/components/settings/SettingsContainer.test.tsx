@@ -251,7 +251,10 @@ describe('SettingsContainer', () => {
 
     // Verify theme was saved to settings API
     await waitFor(() => {
-      expect(vi.mocked(api.patch)).toHaveBeenCalledWith('/api/settings', { theme: 'light' });
+      expect(vi.mocked(api.patch)).toHaveBeenCalledWith('/api/settings', {
+        theme: 'light',
+        timelineWidth: 'medium',
+      });
     });
   });
 
