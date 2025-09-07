@@ -42,14 +42,20 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
           globalRecord[id] = config;
         });
 
-        // Load project-specific servers
+        // The project API returns ALL servers (global + project merged)
+        // We need to separate project-specific servers from global ones
         const projectData = await api.get<ProjectMCPServersResponse>(
           `/api/projects/${projectId}/mcp/servers`
         );
+
+        // Project-specific servers are those NOT in global config
         const projectRecord: Record<string, MCPServerConfig> = {};
         projectData.servers.forEach((server) => {
           const { id, ...config } = server;
-          projectRecord[id] = config;
+          // Only include if it's NOT a global server
+          if (!globalRecord[id]) {
+            projectRecord[id] = config;
+          }
         });
 
         setGlobalServers(globalRecord);
@@ -125,7 +131,15 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
     <div className="space-y-4">
       {/* Add Server Button */}
       <div className="flex justify-end">
-        <button className="btn btn-primary btn-sm" onClick={onOpenAddModal}>
+        <button
+          className="btn btn-primary btn-sm"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.warn('[MCP Debug] Add Project Server button clicked');
+            onOpenAddModal?.();
+          }}
+        >
           <FontAwesomeIcon icon={faPlus} className="w-4 h-4 mr-2" />
           Add Project Server
         </button>

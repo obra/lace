@@ -124,10 +124,12 @@ export function ProjectEditModal({
 
   // MCP server management
   const handleOpenMcpAddModal = () => {
+    console.warn('[MCP Debug] Opening MCP add modal');
     setShowMcpAddModal(true);
   };
 
   const handleCloseMcpAddModal = () => {
+    console.warn('[MCP Debug] Closing MCP add modal');
     setShowMcpAddModal(false);
   };
 
