@@ -191,9 +191,9 @@ export function AddMCPServerModal({
       onClose={onClose}
       title={isEditMode ? 'Edit MCP Server' : 'Add MCP Server'}
       size="lg"
-      className="max-w-2xl"
+      className="max-w-2xl z-[60]"
     >
-      <div className="space-y-6">
+      <div className="space-y-6" onClick={(e) => e.stopPropagation()}>
         {/* Common Servers */}
         <div>
           <label className="text-sm font-medium mb-3 block">Quick Setup</label>
