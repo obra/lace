@@ -14,6 +14,7 @@ import {
 } from '@/components/providers/EventStreamProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useScrollContext } from '@/components/providers/ScrollProvider';
+import { useTheme } from '@/components/providers/ThemeProvider';
 import type { ThreadId, AgentInfo, LaceEvent } from '@/types/core';
 
 export const Chat = memo(function Chat(): React.JSX.Element {
@@ -23,6 +24,7 @@ export const Chat = memo(function Chat(): React.JSX.Element {
   const { sessionDetails, selectedAgent, agentBusy } = useAgentContext();
   const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useAgentAPI();
   const { triggerAutoscroll } = useScrollContext();
+  const { getTimelineMaxWidthClass } = useTheme();
 
   const agents = sessionDetails?.agents;
 
@@ -64,9 +66,12 @@ export const Chat = memo(function Chat(): React.JSX.Element {
 
   return (
     <div className="flex-1 flex flex-col h-full">
-      {/* Conversation Display - scrollable area left-aligned */}
+      {/* Conversation Display - scrollable area with timeline width control */}
       <div ref={containerRef} className="flex-1 overflow-y-auto" data-testid="conversation-scroll">
-        <div className="px-4 sm:px-6 lg:px-8" data-testid="conversation-inner">
+        <div
+          className={`px-4 sm:px-6 lg:px-8 mx-auto ${getTimelineMaxWidthClass()}`}
+          data-testid="conversation-inner"
+        >
           <TimelineView
             events={events}
             agents={agents}
@@ -78,9 +83,12 @@ export const Chat = memo(function Chat(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Chat Input - Fixed at bottom left-aligned */}
+      {/* Chat Input - Fixed at bottom with matching timeline width */}
       <div className="flex-shrink-0 pb-6 pt-2 min-h-[80px]" data-testid="chat-input-container">
-        <div className="px-4 sm:px-6 lg:px-8" data-testid="chat-input-inner">
+        <div
+          className={`px-4 sm:px-6 lg:px-8 mx-auto ${getTimelineMaxWidthClass()}`}
+          data-testid="chat-input-inner"
+        >
           <MemoizedChatInput
             onSubmit={onSendMessage}
             onInterrupt={onStopGeneration}

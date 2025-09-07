@@ -8,6 +8,7 @@ import { ThemeSelector } from '@/components/ui/ThemeSelector';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { SettingField } from '@/components/settings/SettingField';
 import { Alert } from '@/components/ui/Alert';
+import { useTheme, TIMELINE_WIDTHS } from '@/components/providers/ThemeProvider';
 
 interface UISettingsPanelProps {
   currentTheme?: string;
@@ -15,6 +16,7 @@ interface UISettingsPanelProps {
 }
 
 export function UISettingsPanel({ currentTheme, onThemeChange }: UISettingsPanelProps) {
+  const { theme, setTimelineWidth } = useTheme();
   return (
     <SettingsPanel title="UI Settings">
       <Alert
@@ -23,8 +25,29 @@ export function UISettingsPanel({ currentTheme, onThemeChange }: UISettingsPanel
         description="Your UI preferences are automatically saved and will persist between sessions."
         className="mb-6"
       />
-      <SettingField>
+      <SettingField label="Color Theme" description="Choose between light and dark appearance">
         <ThemeSelector currentTheme={currentTheme} onThemeChange={onThemeChange} />
+      </SettingField>
+
+      <SettingField
+        label="Timeline Width"
+        description="Control how wide the conversation timeline appears"
+      >
+        <div className="flex gap-2">
+          {TIMELINE_WIDTHS.map((width) => (
+            <button
+              key={width}
+              type="button"
+              onClick={() => setTimelineWidth(width)}
+              aria-pressed={theme.timeline.width === width}
+              className={`btn btn-sm ${
+                theme.timeline.width === width ? 'btn-primary' : 'btn-outline btn-neutral'
+              }`}
+            >
+              {width.charAt(0).toUpperCase() + width.slice(1)}
+            </button>
+          ))}
+        </div>
       </SettingField>
     </SettingsPanel>
   );

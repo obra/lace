@@ -19,13 +19,15 @@ interface SettingsContainerProps {
 
 export function SettingsContainer({ children }: SettingsContainerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { theme, setTheme } = useTheme();
+  const { theme, setDaisyUITheme } = useTheme();
 
   const handleThemeChange = useCallback(
     (newTheme: string) => {
-      setTheme(newTheme as 'light' | 'dark');
+      if (newTheme === 'light' || newTheme === 'dark') {
+        setDaisyUITheme(newTheme);
+      }
     },
-    [setTheme]
+    [setDaisyUITheme]
   );
 
   const handleOpenSettings = useCallback(() => setIsOpen(true), []);
@@ -41,8 +43,8 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
 
   // Memoize the settings panels to avoid recreating on every render
   const uiSettingsPanel = useMemo(
-    () => <UISettingsPanel currentTheme={theme} onThemeChange={handleThemeChange} />,
-    [theme, handleThemeChange]
+    () => <UISettingsPanel currentTheme={theme.daisyui} onThemeChange={handleThemeChange} />,
+    [theme.daisyui, handleThemeChange]
   );
 
   const userSettingsPanel = useMemo(() => <UserSettingsPanel />, []);
@@ -69,7 +71,7 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
         onClose={handleCloseSettings}
         title="Configuration"
         size="full"
-        className="w-[80vw] h-[80vh] max-w-none max-h-none lg:w-[80vw] lg:h-[80vh] md:w-[90vw] md:h-[85vh] sm:w-[95vw] sm:h-[90vh] bg-base-100/60 backdrop-blur-md border border-base-300/60 shadow-xl"
+        className="w-[80vw] h-[80vh] max-w-none max-h-none md:w-[90vw] md:h-[85vh] sm:w-[95vw] sm:h-[90vh] bg-base-100/60 backdrop-blur-md border border-base-300/60 shadow-xl"
       >
         <div className="h-[calc(80vh-8rem)] -m-4 flex flex-col rounded-xl overflow-hidden">
           <SettingsTabs defaultTab="providers" tabs={tabConfig}>
