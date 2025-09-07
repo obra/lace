@@ -114,7 +114,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         if (savedTheme) {
           try {
             // Try to parse as new LaceTheme format
-            const parsedUnknown = JSON.parse(savedTheme);
+            const parsedUnknown = JSON.parse(savedTheme) as unknown;
             const themeResult = LaceThemeSchema.safeParse(parsedUnknown);
             if (themeResult.success) {
               // Migrate complete theme to settings API

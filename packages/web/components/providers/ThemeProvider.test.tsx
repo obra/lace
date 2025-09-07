@@ -18,15 +18,15 @@ vi.mock('@/lib/api-client', () => ({
 
 // Test component that uses the theme context
 function TestComponent() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setDaisyUITheme } = useTheme();
 
   return (
     <div>
-      <div data-testid="current-theme">{theme}</div>
-      <button data-testid="set-light" onClick={() => setTheme('light')}>
+      <div data-testid="current-theme">{theme.daisyui}</div>
+      <button data-testid="set-light" onClick={() => setDaisyUITheme('light')}>
         Set Light
       </button>
-      <button data-testid="set-dark" onClick={() => setTheme('dark')}>
+      <button data-testid="set-dark" onClick={() => setDaisyUITheme('dark')}>
         Set Dark
       </button>
     </div>
@@ -102,7 +102,10 @@ describe('ThemeProvider', () => {
 
     // Should migrate theme from localStorage to settings API
     await waitFor(() => {
-      expect(mockApiPatch).toHaveBeenCalledWith('/api/settings', { theme: 'light' });
+      expect(mockApiPatch).toHaveBeenCalledWith('/api/settings', {
+        theme: 'light',
+        timelineWidth: 'medium',
+      });
     });
 
     // Should remove from localStorage after migration
@@ -133,7 +136,10 @@ describe('ThemeProvider', () => {
 
     // Should save to settings API
     await waitFor(() => {
-      expect(mockApiPatch).toHaveBeenCalledWith('/api/settings', { theme: 'light' });
+      expect(mockApiPatch).toHaveBeenCalledWith('/api/settings', {
+        theme: 'light',
+        timelineWidth: 'medium',
+      });
     });
   });
 

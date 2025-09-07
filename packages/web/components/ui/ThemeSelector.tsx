@@ -22,16 +22,16 @@ interface ThemeSelectorProps {
 }
 
 export function ThemeSelector({ currentTheme: propTheme, onThemeChange }: ThemeSelectorProps) {
-  const { theme: contextTheme, setTheme: setContextTheme } = useTheme();
+  const { theme: contextTheme, setDaisyUITheme } = useTheme();
 
   // Use prop theme if provided, otherwise use context theme
-  const currentTheme = propTheme ?? contextTheme;
+  const currentTheme = propTheme ?? contextTheme.daisyui;
 
   const handleThemeChange = (themeName: string) => {
     if (onThemeChange) {
       onThemeChange(themeName);
     } else {
-      setContextTheme(themeName as 'light' | 'dark');
+      setDaisyUITheme(themeName as 'light' | 'dark');
     }
   };
 

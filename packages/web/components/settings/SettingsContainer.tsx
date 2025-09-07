@@ -22,8 +22,10 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
   const { theme, setDaisyUITheme } = useTheme();
 
   const handleThemeChange = useCallback(
-    (newTheme: 'light' | 'dark') => {
-      setDaisyUITheme(newTheme);
+    (newTheme: string) => {
+      if (newTheme === 'light' || newTheme === 'dark') {
+        setDaisyUITheme(newTheme);
+      }
     },
     [setDaisyUITheme]
   );
