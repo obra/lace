@@ -167,7 +167,7 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
                 {/* Tool policies */}
                 <div className="ml-2 space-y-1">
                   {config.discoveredTools?.map((tool) => {
-                    const currentPolicy = config.tools[tool.name] || 'require-approval';
+                    const currentPolicy = config.tools[tool.name] || 'ask';
                     return (
                       <div key={tool.name} className="flex items-center gap-2 text-xs">
                         <ToolPolicySelector
@@ -225,7 +225,7 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
                 {/* Tool policies */}
                 <div className="ml-2 space-y-1">
                   {config.discoveredTools?.map((tool) => {
-                    const currentPolicy = config.tools[tool.name] || 'require-approval';
+                    const currentPolicy = config.tools[tool.name] || 'ask';
                     return (
                       <div key={tool.name} className="flex items-center gap-2 text-xs">
                         <ToolPolicySelector
