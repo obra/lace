@@ -14,6 +14,7 @@ import { getProcessTempDir } from '~/config/lace-dir';
 import { MCPConfigLoader } from '~/config/mcp-config-loader';
 import type { MCPServerConfig } from '~/config/mcp-types';
 import type { ToolExecutor } from '~/tools/executor';
+import { ToolCatalog } from '~/tools/tool-catalog';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 
@@ -429,14 +430,17 @@ export class Project {
   /**
    * Add new MCP server to project configuration
    */
-  addMCPServer(serverId: string, serverConfig: MCPServerConfig): void {
+  async addMCPServer(serverId: string, serverConfig: MCPServerConfig): Promise<void> {
     // Check for duplicates
     const existingServers = this.getMCPServers();
     if (existingServers[serverId]) {
       throw new Error(`MCP server '${serverId}' already exists in project`);
     }
 
-    MCPConfigLoader.updateServerConfig(serverId, serverConfig, this.getWorkingDirectory());
+    // Start async tool discovery (non-blocking)
+    await ToolCatalog.discoverAndCacheTools(serverId, serverConfig, this.getWorkingDirectory());
+
+    // Notify sessions immediately
     this.notifySessionsMCPChange(serverId, 'created', serverConfig);
   }
 

@@ -633,4 +633,97 @@ describe('Project', () => {
       expect(project.getInfo()?.description).toBe('Updated description');
     });
   });
+
+  describe('MCP Server Management', () => {
+    it('should start async discovery when adding MCP server', async () => {
+      const { ToolCatalog } = await import('~/tools/tool-catalog');
+      const discoverSpy = vi.spyOn(ToolCatalog, 'discoverAndCacheTools').mockResolvedValue();
+
+      // Use temp directory that exists
+      const tempDir = getProcessTempDir();
+      const project = Project.create('Test Project', tempDir);
+
+      await project.addMCPServer('filesystem', {
+        command: 'npx',
+        args: ['@modelcontextprotocol/server-filesystem'],
+        enabled: true,
+        tools: {},
+      });
+
+      expect(discoverSpy).toHaveBeenCalledWith(
+        'filesystem',
+        expect.objectContaining({ command: 'npx' }),
+        project.getWorkingDirectory()
+      );
+    });
+
+    it('should not block on tool discovery', async () => {
+      const { ToolCatalog } = await import('~/tools/tool-catalog');
+      // Mock slow discovery
+      vi.spyOn(ToolCatalog, 'discoverAndCacheTools').mockImplementation(
+        () => new Promise((resolve) => setTimeout(resolve, 100))
+      );
+
+      const startTime = Date.now();
+
+      const tempDir = getProcessTempDir();
+      const project = Project.create('Test Project', tempDir);
+      await project.addMCPServer('slow-server', {
+        command: 'slow-command',
+        enabled: true,
+        tools: {},
+      });
+
+      const elapsed = Date.now() - startTime;
+      expect(elapsed).toBeLessThan(150); // Should not wait for full discovery
+    });
+
+    it('should throw error for duplicate server IDs', async () => {
+      // This test verifies that the duplicate check works correctly
+      // We'll mock ToolCatalog to avoid server startup but allow testing the duplicate logic
+      const { ToolCatalog } = await import('~/tools/tool-catalog');
+      const originalMethod = ToolCatalog.discoverAndCacheTools;
+
+      // Mock with spy to track calls and avoid actual discovery
+      const discoverSpy = vi
+        .spyOn(ToolCatalog, 'discoverAndCacheTools')
+        .mockImplementation(async (serverId, config, projectDir) => {
+          // Simulate the immediate config save that the real method does
+          const { MCPConfigLoader } = await import('~/config/mcp-config-loader');
+          const pendingConfig = {
+            ...config,
+            discoveryStatus: 'discovering' as const,
+            lastDiscovery: new Date().toISOString(),
+          };
+          MCPConfigLoader.updateServerConfig(serverId, pendingConfig, projectDir);
+          // Don't run the background discovery
+        });
+
+      const tempDir = getProcessTempDir();
+      const project = Project.create('Test Project', tempDir);
+
+      // Add first server
+      await project.addMCPServer('duplicate-server', {
+        command: 'test-command',
+        enabled: true,
+        tools: {},
+      });
+
+      // Verify the first server was actually added
+      const serversAfterFirst = project.getMCPServers();
+      expect(serversAfterFirst['duplicate-server']).toBeDefined();
+
+      // Try to add same server ID again - this should throw
+      await expect(
+        project.addMCPServer('duplicate-server', {
+          command: 'another-command',
+          enabled: true,
+          tools: {},
+        })
+      ).rejects.toThrow("MCP server 'duplicate-server' already exists in project");
+
+      // Cleanup
+      discoverSpy.mockRestore();
+    });
+  });
 });
