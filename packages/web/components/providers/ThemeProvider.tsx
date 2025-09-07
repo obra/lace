@@ -84,12 +84,20 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
         // Check if theme exists in settings API
         const apiTheme = settings.theme;
+        const apiTimelineWidth = settings.timelineWidth;
+
         if (apiTheme === 'light' || apiTheme === 'dark') {
-          // Use API theme with default timeline width
+          // Use API theme with API timeline width or default
+          const timelineWidth = ['narrow', 'medium', 'wide', 'full'].includes(
+            apiTimelineWidth as string
+          )
+            ? (apiTimelineWidth as TimelineWidth)
+            : 'medium';
+
           if (!cancelled) {
             setThemeState({
               daisyui: apiTheme,
-              timeline: { width: 'medium' },
+              timeline: { width: timelineWidth },
             });
           }
           return;
@@ -109,7 +117,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
               ['narrow', 'medium', 'wide', 'full'].includes(parsed.timeline.width)
             ) {
               // Migrate complete theme to settings API
-              await api.patch('/api/settings', { theme: parsed.daisyui });
+              await api.patch('/api/settings', {
+                theme: parsed.daisyui,
+                timelineWidth: parsed.timeline.width,
+              });
               if (cancelled) return;
               setThemeState(parsed);
               localStorage.removeItem('lace-theme');
@@ -122,7 +133,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
           // Try old format (simple string)
           if (savedTheme === 'light' || savedTheme === 'dark') {
             // Migrate to settings API with default timeline width
-            await api.patch('/api/settings', { theme: savedTheme });
+            await api.patch('/api/settings', {
+              theme: savedTheme,
+              timelineWidth: 'medium',
+            });
             if (cancelled) return;
             setThemeState({
               daisyui: savedTheme,
@@ -162,10 +176,15 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       if (mounted) {
         document.documentElement.setAttribute('data-theme', newTheme.daisyui);
 
-        // Save DaisyUI theme to settings API (timeline width stays in client state for now)
-        void api.patch('/api/settings', { theme: newTheme.daisyui }).catch((error) => {
-          console.warn('Failed to save theme to settings:', error);
-        });
+        // Save both theme and timeline width to settings API
+        void api
+          .patch('/api/settings', {
+            theme: newTheme.daisyui,
+            timelineWidth: newTheme.timeline.width,
+          })
+          .catch((error) => {
+            console.warn('Failed to save theme to settings:', error);
+          });
       }
     },
     [mounted]
