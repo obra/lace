@@ -6,12 +6,13 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlug, faUser, faCog } from '@/lib/fontawesome';
+import { faPlug, faUser, faCog, faServer } from '@/lib/fontawesome';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { SettingsTabs } from './SettingsTabs';
 import { UISettingsPanel } from './panels/UISettingsPanel';
 import { UserSettingsPanel } from './panels/UserSettingsPanel';
 import { ProvidersPanel } from './panels/ProvidersPanel';
+import { MCPPanel } from './panels/MCPPanel';
 
 interface SettingsContainerProps {
   children: (props: { onOpenSettings: () => void }) => React.ReactNode;
@@ -51,12 +52,19 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
 
   const providersPanel = useMemo(() => <ProvidersPanel />, []);
 
+  const mcpPanel = useMemo(() => <MCPPanel />, []);
+
   // Tab configuration with icons
   const tabConfig = [
     {
       id: 'providers',
       label: 'Providers',
       icon: <FontAwesomeIcon icon={faPlug} className="w-4 h-4" />,
+    },
+    {
+      id: 'mcp',
+      label: 'MCP Servers',
+      icon: <FontAwesomeIcon icon={faServer} className="w-4 h-4" />,
     },
     { id: 'ui', label: 'UI', icon: <FontAwesomeIcon icon={faCog} className="w-4 h-4" /> },
     { id: 'user', label: 'User', icon: <FontAwesomeIcon icon={faUser} className="w-4 h-4" /> },
@@ -77,6 +85,9 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
           <SettingsTabs defaultTab="providers" tabs={tabConfig}>
             <div data-tab="providers" className="flex-1 overflow-y-auto p-6">
               {providersPanel}
+            </div>
+            <div data-tab="mcp" className="flex-1 overflow-y-auto p-6">
+              {mcpPanel}
             </div>
             <div data-tab="ui" className="flex-1 overflow-y-auto p-6">
               {uiSettingsPanel}
