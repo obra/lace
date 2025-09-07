@@ -4,7 +4,7 @@
 'use client';
 
 import React from 'react';
-import { ToolPolicySelector } from '@/components/ui/ToolPolicySelector';
+import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 
 interface ToolPolicyListProps {
@@ -89,7 +89,7 @@ export function ToolPolicyList({
                 className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
               >
                 <span className="font-medium text-sm font-mono">{tool}</span>
-                <ToolPolicySelector
+                <ToolPolicyToggle
                   value={(policies[tool] || 'require-approval') as ToolPolicy}
                   onChange={(policy) => onChange(tool, policy)}
                   size="sm"
@@ -114,7 +114,7 @@ export function ToolPolicyList({
                   className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
                 >
                   <span className="font-medium text-sm font-mono">{toolName}</span>
-                  <ToolPolicySelector
+                  <ToolPolicyToggle
                     value={(policies[fullToolName] || 'require-approval') as ToolPolicy}
                     onChange={(policy) => onChange(fullToolName, policy)}
                     size="sm"
