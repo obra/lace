@@ -23,6 +23,7 @@ export type { ProviderInfo, ProviderResponse } from './providers/base-provider';
 
 // Tool system
 export { ToolExecutor } from './tools/executor';
+export { ToolCatalog } from './tools/tool-catalog';
 export type { ToolCall, ToolResult } from './tools/types';
 
 // Session and project management
