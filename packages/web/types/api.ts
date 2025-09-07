@@ -18,7 +18,7 @@ export interface SessionConfiguration {
   modelId?: string;
   maxTokens?: number;
   tools?: string[];
-  toolPolicies?: Record<string, 'allow' | 'require-approval' | 'deny'>;
+  toolPolicies?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
   workingDirectory?: string;
   environmentVariables?: Record<string, string>;
   availableTools?: string[];

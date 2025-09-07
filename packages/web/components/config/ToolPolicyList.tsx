@@ -90,7 +90,7 @@ export function ToolPolicyList({
               >
                 <span className="font-medium text-sm font-mono">{tool}</span>
                 <ToolPolicyToggle
-                  value={(policies[tool] || 'require-approval') as ToolPolicy}
+                  value={(policies[tool] || 'ask') as ToolPolicy}
                   onChange={(policy) => onChange(tool, policy)}
                   size="sm"
                   context={context}
@@ -115,7 +115,7 @@ export function ToolPolicyList({
                 >
                   <span className="font-medium text-sm font-mono">{toolName}</span>
                   <ToolPolicyToggle
-                    value={(policies[fullToolName] || 'require-approval') as ToolPolicy}
+                    value={(policies[fullToolName] || 'ask') as ToolPolicy}
                     onChange={(policy) => onChange(fullToolName, policy)}
                     size="sm"
                     context={context}

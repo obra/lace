@@ -14,7 +14,7 @@ describe('ToolPolicyToggle', () => {
   });
 
   it('renders all three policy options', () => {
-    render(<ToolPolicyToggle value="require-approval" onChange={mockOnChange} />);
+    render(<ToolPolicyToggle value="ask" onChange={mockOnChange} />);
 
     expect(screen.getByRole('button', { name: 'Allow' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ask' })).toBeInTheDocument();
@@ -37,7 +37,7 @@ describe('ToolPolicyToggle', () => {
     const { rerender } = render(<ToolPolicyToggle value="allow" onChange={mockOnChange} />);
     expect(screen.getByRole('button', { name: 'Allow' })).toHaveClass('bg-green-950');
 
-    rerender(<ToolPolicyToggle value="require-approval" onChange={mockOnChange} />);
+    rerender(<ToolPolicyToggle value="ask" onChange={mockOnChange} />);
     expect(screen.getByRole('button', { name: 'Ask' })).toHaveClass('bg-yellow-950');
 
     rerender(<ToolPolicyToggle value="deny" onChange={mockOnChange} />);
@@ -45,7 +45,7 @@ describe('ToolPolicyToggle', () => {
   });
 
   it('calls onChange when a different policy is selected', () => {
-    render(<ToolPolicyToggle value="require-approval" onChange={mockOnChange} />);
+    render(<ToolPolicyToggle value="ask" onChange={mockOnChange} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
     expect(mockOnChange).toHaveBeenCalledWith('allow');
@@ -145,7 +145,7 @@ describe('ToolPolicyToggle', () => {
   });
 
   it('handles all valid policy values', () => {
-    const policies: ToolPolicy[] = ['allow', 'require-approval', 'deny'];
+    const policies: ToolPolicy[] = ['allow', 'ask', 'deny'];
 
     policies.forEach((policy) => {
       const { unmount } = render(<ToolPolicyToggle value={policy} onChange={mockOnChange} />);

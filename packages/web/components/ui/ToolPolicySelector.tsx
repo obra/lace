@@ -22,39 +22,15 @@ const ALL_POLICY_OPTIONS: Array<{
   contexts: string[];
 }> = [
   {
-    value: 'allow-always',
-    label: 'Allow Always',
-    description: 'Execute without any restrictions (global only)',
-    contexts: ['global'],
-  },
-  {
-    value: 'allow-project',
-    label: 'Allow Project',
-    description: 'Allow for this project only',
-    contexts: ['global', 'project'],
-  },
-  {
-    value: 'allow-session',
-    label: 'Allow Session',
-    description: 'Allow for this session only',
-    contexts: ['global', 'project', 'session'],
-  },
-  {
-    value: 'allow-once',
-    label: 'Allow Once',
-    description: 'Allow once then ask again',
-    contexts: ['global', 'project', 'session'],
-  },
-  {
     value: 'allow',
     label: 'Allow',
-    description: 'Allow execution (legacy)',
+    description: 'Auto-approve without prompting',
     contexts: ['global', 'project', 'session'],
   },
   {
-    value: 'require-approval',
+    value: 'ask',
     label: 'Ask',
-    description: 'Require user approval each time',
+    description: 'Prompt user each time',
     contexts: ['global', 'project', 'session'],
   },
   {
@@ -65,7 +41,7 @@ const ALL_POLICY_OPTIONS: Array<{
   },
   {
     value: 'disable',
-    label: 'Disabled',
+    label: 'Disable',
     description: 'Tool not available',
     contexts: ['global', 'project', 'session'],
   },

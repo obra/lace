@@ -209,7 +209,7 @@ export function MCPPanel() {
               <div className="ml-5 space-y-1">
                 {config.discoveredTools.map((tool, index) => {
                   const isLast = index === config.discoveredTools!.length - 1;
-                  const currentPolicy = config.tools[tool.name] || 'require-approval';
+                  const currentPolicy = config.tools[tool.name] || 'ask';
 
                   return (
                     <div key={tool.name} className="flex items-center gap-3 text-sm">
