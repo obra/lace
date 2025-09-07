@@ -64,7 +64,7 @@ export class ToolCatalog {
   /**
    * Discover MCP server tools and cache results (async, non-blocking)
    */
-  static async discoverAndCacheTools(
+  static discoverAndCacheTools(
     serverId: string,
     config: MCPServerConfig,
     projectDir?: string
@@ -80,6 +80,8 @@ export class ToolCatalog {
 
     // Start background discovery (don't await)
     void this.performBackgroundDiscovery(serverId, config, projectDir);
+
+    return Promise.resolve();
   }
 
   /**
@@ -137,6 +139,9 @@ export class ToolCatalog {
 
       // Discover available tools
       const client = tempManager.getClient(serverId);
+      if (!client) {
+        throw new Error(`Failed to get client for server ${serverId}`);
+      }
       const response = await client.listTools();
 
       const discoveredTools: DiscoveredTool[] = response.tools.map((tool) => ({
@@ -167,10 +172,13 @@ export class ToolCatalog {
 
       MCPConfigLoader.updateServerConfig(serverId, failureConfig, projectDir);
 
-      logger.warn(`Tool discovery failed for ${serverId}:`, error);
+      logger.warn(
+        `Tool discovery failed for ${serverId}:`,
+        error instanceof Error ? error.message : 'Unknown error'
+      );
     } finally {
       // Always cleanup temporary server
-      await tempManager.cleanup();
+      await tempManager.shutdown();
     }
   }
 }

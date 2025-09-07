@@ -682,7 +682,6 @@ describe('Project', () => {
       // This test verifies that the duplicate check works correctly
       // We'll mock ToolCatalog to avoid server startup but allow testing the duplicate logic
       const { ToolCatalog } = await import('~/tools/tool-catalog');
-      const originalMethod = ToolCatalog.discoverAndCacheTools;
 
       // Mock with spy to track calls and avoid actual discovery
       const discoverSpy = vi

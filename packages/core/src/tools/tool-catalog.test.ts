@@ -3,7 +3,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ToolCatalog } from './tool-catalog';
-import type { Project } from '~/projects/project';
 import type { MCPServerConfig } from '~/config/mcp-types';
 
 // Mock dependencies
@@ -15,7 +14,7 @@ const mockProject = {
 const mockServerManager = {
   startServer: vi.fn(),
   getClient: vi.fn(),
-  cleanup: vi.fn(),
+  shutdown: vi.fn(),
 };
 
 const mockClient = {
@@ -188,6 +187,10 @@ describe('ToolCatalog', () => {
     });
 
     it('should handle server startup failure', async () => {
+      // Reset mocks to avoid interference from previous tests
+      vi.clearAllMocks();
+      mockServerManager.getClient.mockReturnValue(mockClient);
+
       mockServerManager.startServer.mockRejectedValue(new Error('Startup failed'));
 
       await ToolCatalog.discoverAndCacheTools('broken-server', testConfig);
