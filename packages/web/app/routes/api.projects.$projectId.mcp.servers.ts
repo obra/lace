@@ -1,7 +1,7 @@
 // ABOUTME: Project-scoped MCP server list API following Lace project hierarchy patterns
 // ABOUTME: Provides project MCP server configurations with inheritance from global config
 
-import { Project, ToolCatalog } from '@/lib/server/lace-imports';
+import { Project } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { z } from 'zod';
