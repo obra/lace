@@ -16,23 +16,25 @@ interface ToolPolicyToggleProps {
   parentPolicy?: ToolPolicy; // For progressive restriction
 }
 
-// Progressive restriction logic: each level can only be equal or more restrictive than parent
-const getAvailablePolicies = (
+// Progressive restriction logic: determines which options are disabled
+const isOptionDisabled = (
+  option: ToolPolicy,
   parentPolicy?: ToolPolicy,
   context: string = 'session'
-): ToolPolicy[] => {
-  const allPolicies: ToolPolicy[] = ['allow', 'ask', 'deny', 'disable'];
-
+): boolean => {
+  // Global level: all options available
   if (context === 'global' || !parentPolicy) {
-    return allPolicies; // Global level can set any policy
+    return false;
   }
 
   // Progressive restriction: can only choose equal or more restrictive than parent
   const restrictionOrder: ToolPolicy[] = ['allow', 'ask', 'deny', 'disable'];
   const parentIndex = restrictionOrder.indexOf(parentPolicy);
+  const optionIndex = restrictionOrder.indexOf(option);
 
-  // Can choose current parent level or more restrictive + always allow disable as ultimate restriction
-  return restrictionOrder.slice(parentIndex).concat(parentIndex === 3 ? [] : ['disable']);
+  // Can choose current parent level or more restrictive
+  // Disable is always available as ultimate restriction
+  return optionIndex < parentIndex && option !== 'disable';
 };
 
 const POLICY_CONFIG = {
@@ -87,29 +89,36 @@ export const ToolPolicyToggle = memo(function ToolPolicyToggle({
 }: ToolPolicyToggleProps) {
   const sizeConfig = SIZE_CONFIG[size];
 
-  // Get available policies based on progressive restriction
-  const availablePolicies = getAvailablePolicies(parentPolicy, context);
+  // Show all options but disable invalid ones
+  const allPolicies: ToolPolicy[] = ['allow', 'ask', 'deny', 'disable'];
 
   return (
     <div className={`inline-flex rounded-md bg-base-200 p-0.5 ${sizeConfig.container}`}>
-      {availablePolicies.map((policy) => {
+      {allPolicies.map((policy) => {
         const config = POLICY_CONFIG[policy];
         const isSelected = value === policy;
+        const isOptionInvalid = isOptionDisabled(policy, parentPolicy, context);
 
         return (
           <button
             key={policy}
             type="button"
-            onClick={() => onChange(policy)}
-            disabled={disabled}
-            title={config.description}
+            onClick={() => !isOptionInvalid && onChange(policy)}
+            disabled={disabled || isOptionInvalid}
+            title={
+              isOptionInvalid
+                ? 'Not available - more restrictive than parent policy'
+                : config.description
+            }
             className={`
               ${sizeConfig.button}
               relative font-medium transition-all duration-200 ease-out rounded-sm
               ${
                 isSelected
                   ? `${config.selectedStyle} shadow-sm ring-1`
-                  : `text-base-content/70 hover:text-base-content ${config.hoverStyle}`
+                  : isOptionInvalid
+                    ? 'text-base-content/30 bg-base-200 cursor-not-allowed'
+                    : `text-base-content/70 hover:text-base-content ${config.hoverStyle}`
               }
               ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
               focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-1 focus:ring-offset-base-200
