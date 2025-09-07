@@ -93,7 +93,7 @@ describe('Project Configuration API', () => {
         },
         workingDirectory: '/test/path',
         environmentVariables: { NODE_ENV: 'test' },
-        availableTools: ['file_read', 'file_write', 'bash'], // Added by ToolCatalog
+        availableTools: ['file_read', 'file_write', 'bash'], // From ToolCatalog
       });
     });
 
