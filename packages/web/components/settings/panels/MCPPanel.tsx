@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { MCPSettingsPanel } from '@/components/mcp/MCPSettingsPanel';
+import { AddMCPServerModal } from '@/components/modals/AddMCPServerModal';
 import { api } from '@/lib/api-client';
 import type { MCPServerConfig } from '@/types/core';
 import type { ServerStatus, ToolPolicy } from '@/components/mcp/MCPServerCard';
@@ -18,6 +19,8 @@ export function MCPPanel() {
   const [serverStatuses, setServerStatuses] = useState<Record<string, ServerStatus>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addingServer, setAddingServer] = useState(false);
 
   // Load global MCP configuration
   useEffect(() => {
@@ -52,7 +55,28 @@ export function MCPPanel() {
   }, []);
 
   const handleAddServer = () => {
-    // TODO: Implement add server modal
+    setShowAddModal(true);
+  };
+
+  const handleCloseAddModal = () => {
+    setShowAddModal(false);
+  };
+
+  const handleCreateServer = async (serverId: string, config: MCPServerConfig) => {
+    setAddingServer(true);
+    try {
+      await api.post('/api/mcp/servers', { id: serverId, ...config });
+
+      // Add to local state immediately
+      setServers((prev) => ({ ...prev, [serverId]: config }));
+      setServerStatuses((prev) => ({ ...prev, [serverId]: 'discovering' }));
+
+      setShowAddModal(false);
+    } catch (error) {
+      // Error handled by modal or could show toast
+    } finally {
+      setAddingServer(false);
+    }
   };
 
   const handleStartServer = async (serverId: string) => {
@@ -137,18 +161,27 @@ export function MCPPanel() {
   }
 
   return (
-    <MCPSettingsPanel
-      title="🌍 Global MCP Settings"
-      description="Configure MCP servers available to all projects. These settings apply globally and can be overridden at the project level."
-      servers={servers}
-      serverStatuses={serverStatuses}
-      onAddServer={handleAddServer}
-      onStartServer={handleStartServer}
-      onStopServer={handleStopServer}
-      onEditServer={handleEditServer}
-      onDeleteServer={handleDeleteServer}
-      onToolPolicyChange={handleToolPolicyChange}
-      isProjectLevel={false}
-    />
+    <>
+      <MCPSettingsPanel
+        title="🌍 Global MCP Settings"
+        description="Configure MCP servers available to all projects. These settings apply globally and can be overridden at the project level."
+        servers={servers}
+        serverStatuses={serverStatuses}
+        onAddServer={handleAddServer}
+        onStartServer={handleStartServer}
+        onStopServer={handleStopServer}
+        onEditServer={handleEditServer}
+        onDeleteServer={handleDeleteServer}
+        onToolPolicyChange={handleToolPolicyChange}
+        isProjectLevel={false}
+      />
+
+      <AddMCPServerModal
+        isOpen={showAddModal}
+        onClose={handleCloseAddModal}
+        onAddServer={handleCreateServer}
+        loading={addingServer}
+      />
+    </>
   );
 }
