@@ -14,6 +14,11 @@ interface AddMCPServerModalProps {
   onClose: () => void;
   onAddServer: (serverId: string, config: MCPServerConfig) => void;
   loading?: boolean;
+  initialData?: {
+    id: string;
+    config: MCPServerConfig;
+  };
+  isEditMode?: boolean;
 }
 
 interface NewServerData {
@@ -54,6 +59,8 @@ export function AddMCPServerModal({
   onClose,
   onAddServer,
   loading = false,
+  initialData,
+  isEditMode = false,
 }: AddMCPServerModalProps) {
   const [serverData, setServerData] = useState<NewServerData>({
     id: '',
@@ -78,7 +85,7 @@ export function AddMCPServerModal({
     }
   }, [isOpen]);
 
-  // Reset form when modal closes
+  // Reset form when modal closes or populate with initial data
   useEffect(() => {
     if (!isOpen) {
       setServerData({
@@ -91,8 +98,23 @@ export function AddMCPServerModal({
       });
       setErrors({});
       setSelectedPreset('');
+    } else if (initialData && isEditMode) {
+      // Populate form with existing data for editing
+      const { config } = initialData;
+      setServerData({
+        id: initialData.id,
+        command: config.command,
+        args: config.args?.join(' ') || '',
+        env: config.env
+          ? Object.entries(config.env)
+              .map(([k, v]) => `${k}=${v}`)
+              .join('\n')
+          : '',
+        cwd: config.cwd || '',
+        enabled: config.enabled,
+      });
     }
-  }, [isOpen]);
+  }, [isOpen, initialData, isEditMode]);
 
   const handleInputChange = (field: keyof NewServerData, value: string | boolean) => {
     setServerData((prev) => ({ ...prev, [field]: value }));
@@ -164,7 +186,13 @@ export function AddMCPServerModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Add MCP Server" size="lg" className="max-w-2xl">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEditMode ? 'Edit MCP Server' : 'Add MCP Server'}
+      size="lg"
+      className="max-w-2xl"
+    >
       <div className="space-y-6">
         {/* Common Servers */}
         <div>
@@ -202,8 +230,14 @@ export function AddMCPServerModal({
               placeholder="my-server"
               value={serverData.id}
               onChange={(e) => handleInputChange('id', e.target.value)}
+              disabled={isEditMode}
             />
             {errors.id && <div className="text-error text-sm mt-1">{errors.id}</div>}
+            {isEditMode && (
+              <div className="text-xs text-base-content/60 mt-1">
+                Server ID cannot be changed when editing
+              </div>
+            )}
           </div>
 
           <div>
@@ -286,7 +320,7 @@ export function AddMCPServerModal({
           >
             {loading && <span className="loading loading-spinner loading-sm"></span>}
             <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-            Add Server
+            {isEditMode ? 'Update Server' : 'Add Server'}
           </button>
         </div>
       </div>

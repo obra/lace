@@ -21,6 +21,7 @@ export function MCPPanel() {
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addingServer, setAddingServer] = useState(false);
+  const [editingServerId, setEditingServerId] = useState<string | null>(null);
 
   // Load global MCP configuration
   useEffect(() => {
@@ -79,27 +80,28 @@ export function MCPPanel() {
     }
   };
 
-  const handleStartServer = async (serverId: string) => {
-    try {
-      await api.post(`/api/mcp/servers/${serverId}/control`, { action: 'start' });
-      setServerStatuses((prev) => ({ ...prev, [serverId]: 'running' }));
-    } catch (error) {
-      setServerStatuses((prev) => ({ ...prev, [serverId]: 'failed' }));
-    }
-  };
-
-  const handleStopServer = async (serverId: string) => {
-    try {
-      await api.post(`/api/mcp/servers/${serverId}/control`, { action: 'stop' });
-      setServerStatuses((prev) => ({ ...prev, [serverId]: 'stopped' }));
-    } catch (error) {
-      // Error handling - status remains unchanged
-    }
-  };
+  // Global servers are configuration only - no start/stop controls
+  const handleStartServer = undefined;
+  const handleStopServer = undefined;
 
   const handleEditServer = (serverId: string) => {
-    // TODO: Implement edit server modal
-    void serverId;
+    setEditingServerId(serverId);
+  };
+
+  const handleCloseEditModal = () => {
+    setEditingServerId(null);
+  };
+
+  const handleUpdateServer = async (serverId: string, config: MCPServerConfig) => {
+    try {
+      await api.put(`/api/mcp/servers/${serverId}`, config);
+
+      // Update local state
+      setServers((prev) => ({ ...prev, [serverId]: config }));
+      setEditingServerId(null);
+    } catch (error) {
+      // Error handling - could show toast notification
+    }
   };
 
   const handleDeleteServer = async (serverId: string) => {
@@ -182,6 +184,21 @@ export function MCPPanel() {
         onAddServer={handleCreateServer}
         loading={addingServer}
       />
+
+      {/* Edit Modal - reuse AddMCPServerModal with initial data */}
+      {editingServerId && (
+        <AddMCPServerModal
+          isOpen={!!editingServerId}
+          onClose={handleCloseEditModal}
+          onAddServer={handleUpdateServer}
+          loading={false}
+          initialData={{
+            id: editingServerId,
+            config: servers[editingServerId],
+          }}
+          isEditMode={true}
+        />
+      )}
     </>
   );
 }
