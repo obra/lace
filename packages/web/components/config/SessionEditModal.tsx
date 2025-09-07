@@ -5,7 +5,7 @@
 
 import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTrash } from '@/lib/fontawesome';
+import { faPlus, faTrash, faUser, faCog, faTools } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import { ModelSelectionForm } from './ModelSelectionForm';
@@ -101,145 +101,179 @@ export const SessionEditModal = memo(function SessionEditModal({
 
   if (!selectedSession) return null;
 
+  const modalId = `session-edit-modal-${selectedSession.id}`;
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
       title={selectedSession ? `Edit Session: ${selectedSession.name}` : 'Edit Session'}
       size="xl"
-      className="max-h-[90vh] flex flex-col"
+      className="flex flex-col h-[80vh] max-h-[80vh]"
+      closeOnBackdropClick={false}
     >
-      <form onSubmit={handleSubmit} className="flex flex-col max-h-[80vh]">
-        <div className="flex-1 overflow-y-auto px-1 space-y-6">
-          {/* Basic Information */}
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="label">
-                <span className="label-text font-medium">Session Name *</span>
-              </label>
-              <input
-                type="text"
-                value={sessionName}
-                onChange={(e) => handleSessionNameChange(e.target.value)}
-                className="input input-bordered w-full"
-                placeholder="e.g., Backend API Development"
-                required
-                autoFocus
-              />
-            </div>
-
-            <div>
-              <label className="label">
-                <span className="label-text font-medium">Description</span>
-              </label>
-              <input
-                type="text"
-                value={sessionDescription}
-                onChange={(e) => handleSessionDescriptionChange(e.target.value)}
-                className="input input-bordered w-full"
-                placeholder="Optional description"
-              />
-            </div>
-          </div>
-
-          {/* Provider and Model Selection */}
-          <ModelSelectionForm
-            providers={availableProviders}
-            providerInstanceId={sessionConfig.providerInstanceId}
-            modelId={sessionConfig.modelId}
-            onProviderChange={(instanceId) => {
-              updateProviderInstanceId(instanceId);
-            }}
-            onModelChange={(modelId) => updateModelId(modelId)}
-          />
-
-          {/* Working Directory */}
-          <div>
-            <label className="label">
-              <span className="label-text font-medium">Working Directory</span>
-            </label>
+      <form onSubmit={handleSubmit} className="flex flex-col h-full">
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* DaisyUI Tabs with Radio Inputs */}
+          <div role="tablist" className="tabs tabs-bordered mb-4">
             <input
-              type="text"
-              value={sessionConfig.workingDirectory || currentProject.workingDirectory}
-              onChange={(e) =>
-                handleSessionConfigChange((prev) => ({
-                  ...prev,
-                  workingDirectory: e.target.value,
-                }))
-              }
-              className="input input-bordered w-full"
-              placeholder={currentProject.workingDirectory}
+              type="radio"
+              name={`${modalId}-tabs`}
+              role="tab"
+              className="tab"
+              aria-label="Basics"
+              defaultChecked
             />
-          </div>
-
-          {/* Environment Variables */}
-          <div>
-            <label className="label">
-              <span className="label-text font-medium">Environment Variables</span>
-            </label>
-            <div className="space-y-2">
-              {Object.entries(sessionConfig.environmentVariables || {}).map(([key, value]) => (
-                <div key={key} className="flex items-center gap-2">
+            <div role="tabpanel" className="tab-content p-6 space-y-6 overflow-y-auto max-h-[60vh]">
+              {/* Basic Information */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">
+                    <span className="label-text font-medium">Session Name *</span>
+                  </label>
                   <input
                     type="text"
-                    value={key}
-                    className="input input-bordered input-sm flex-1"
-                    readOnly
+                    value={sessionName}
+                    onChange={(e) => handleSessionNameChange(e.target.value)}
+                    className="input input-bordered w-full"
+                    placeholder="e.g., Backend API Development"
+                    required
+                    autoFocus
                   />
-                  <span className="text-base-content/60">=</span>
-                  <input
-                    type="text"
-                    value={value}
-                    className="input input-bordered input-sm flex-1"
-                    readOnly
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveEnvironmentVariable(key)}
-                    className="btn btn-error btn-sm btn-square"
-                  >
-                    <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-                  </button>
                 </div>
-              ))}
-              <div className="flex items-center gap-2">
+
+                <div>
+                  <label className="label">
+                    <span className="label-text font-medium">Description</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={sessionDescription}
+                    onChange={(e) => handleSessionDescriptionChange(e.target.value)}
+                    className="input input-bordered w-full"
+                    placeholder="Optional description"
+                  />
+                </div>
+              </div>
+
+              {/* Provider and Model Selection */}
+              <ModelSelectionForm
+                providers={availableProviders}
+                providerInstanceId={sessionConfig.providerInstanceId}
+                modelId={sessionConfig.modelId}
+                onProviderChange={(instanceId) => {
+                  updateProviderInstanceId(instanceId);
+                }}
+                onModelChange={(modelId) => updateModelId(modelId)}
+              />
+            </div>
+
+            <input
+              type="radio"
+              name={`${modalId}-tabs`}
+              role="tab"
+              className="tab"
+              aria-label="Environment"
+            />
+            <div role="tabpanel" className="tab-content p-6 space-y-6 overflow-y-auto max-h-[60vh]">
+              {/* Working Directory */}
+              <div>
+                <label className="label">
+                  <span className="label-text font-medium">Working Directory</span>
+                </label>
                 <input
                   type="text"
-                  value={newEnvKey}
-                  onChange={(e) => setNewEnvKey(e.target.value)}
-                  className="input input-bordered input-sm flex-1"
-                  placeholder="Key"
+                  value={sessionConfig.workingDirectory || currentProject.workingDirectory}
+                  onChange={(e) =>
+                    handleSessionConfigChange((prev) => ({
+                      ...prev,
+                      workingDirectory: e.target.value,
+                    }))
+                  }
+                  className="input input-bordered w-full"
+                  placeholder={currentProject.workingDirectory}
                 />
-                <span className="text-base-content/60">=</span>
-                <input
-                  type="text"
-                  value={newEnvValue}
-                  onChange={(e) => setNewEnvValue(e.target.value)}
-                  className="input input-bordered input-sm flex-1"
-                  placeholder="Value"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddEnvironmentVariable}
-                  className="btn btn-primary btn-sm"
-                  disabled={!newEnvKey.trim() || !newEnvValue.trim()}
-                >
-                  <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
-                </button>
+              </div>
+
+              {/* Environment Variables */}
+              <div>
+                <label className="label">
+                  <span className="label-text font-medium">Environment Variables</span>
+                </label>
+                <div className="space-y-2">
+                  {Object.entries(sessionConfig.environmentVariables || {}).map(([key, value]) => (
+                    <div key={key} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={key}
+                        className="input input-bordered input-sm flex-1"
+                        readOnly
+                      />
+                      <span className="text-base-content/60">=</span>
+                      <input
+                        type="text"
+                        value={value}
+                        className="input input-bordered input-sm flex-1"
+                        readOnly
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveEnvironmentVariable(key)}
+                        className="btn btn-error btn-sm btn-square"
+                      >
+                        <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newEnvKey}
+                      onChange={(e) => setNewEnvKey(e.target.value)}
+                      className="input input-bordered input-sm flex-1"
+                      placeholder="Key"
+                    />
+                    <span className="text-base-content/60">=</span>
+                    <input
+                      type="text"
+                      value={newEnvValue}
+                      onChange={(e) => setNewEnvValue(e.target.value)}
+                      className="input input-bordered input-sm flex-1"
+                      placeholder="Value"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddEnvironmentVariable}
+                      className="btn btn-primary btn-sm"
+                      disabled={!newEnvKey.trim() || !newEnvValue.trim()}
+                    >
+                      <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Tool Configuration */}
-          <div>
-            <label className="label">
-              <span className="label-text font-medium">Tool Access Policies</span>
-            </label>
-            <ToolPolicyList
-              tools={sessionConfig.availableTools || []}
-              policies={sessionConfig.toolPolicies || {}}
-              onChange={handleToolPolicyChange}
+            <input
+              type="radio"
+              name={`${modalId}-tabs`}
+              role="tab"
+              className="tab"
+              aria-label="Tool Policies"
             />
+            <div role="tabpanel" className="tab-content p-6 space-y-6 overflow-y-auto max-h-[60vh]">
+              {/* Tool Configuration */}
+              <div>
+                <label className="label">
+                  <span className="label-text font-medium">Tool Access Policies</span>
+                </label>
+                <ToolPolicyList
+                  tools={sessionConfig.availableTools || []}
+                  policies={sessionConfig.toolPolicies || {}}
+                  onChange={handleToolPolicyChange}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
