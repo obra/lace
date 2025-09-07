@@ -3,6 +3,7 @@
 
 import { getSessionService } from '@/lib/server/session-service';
 import { ToolCatalog, Project } from '@/lib/server/lace-imports';
+import { ToolPolicyResolver } from '@/lib/tool-policy-resolver';
 import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
@@ -58,10 +59,25 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     }
     const availableTools = ToolCatalog.getAvailableTools(project);
 
+    // Get project policies for hierarchy resolution
+    const projectConfig = project.getConfiguration();
+
+    // Resolve tool policy hierarchy for progressive restriction
+    const toolPolicyHierarchy = {
+      project: projectConfig.toolPolicies || {},
+      session: configuration.toolPolicies || {},
+    };
+
+    const resolvedTools = ToolPolicyResolver.resolveSessionToolPolicies(
+      availableTools,
+      toolPolicyHierarchy
+    );
+
     return createSuperjsonResponse({
       configuration: {
         ...configuration,
         availableTools,
+        tools: resolvedTools,
       },
     });
   } catch (error: unknown) {
