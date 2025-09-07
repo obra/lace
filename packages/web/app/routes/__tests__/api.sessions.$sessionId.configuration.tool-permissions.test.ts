@@ -2,8 +2,7 @@
 // ABOUTME: Validates that API returns tool policies with parent values and allowed options for progressive restriction
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { Route } from '../api.sessions.$sessionId.configuration';
-import { loader, action } from '../api.sessions.$sessionId.configuration';
+import { loader, action } from '@/app/routes/api.sessions.$sessionId.configuration';
 
 // Mock the session service
 const mockSession = {
@@ -38,6 +37,25 @@ describe('Session Configuration API - Tool Permissions Structure', () => {
   });
 
   describe('GET loader - Tool permissions with hierarchy', () => {
+    it('should debug what API actually returns', async () => {
+      mockSession.getEffectiveConfiguration.mockReturnValue({
+        toolPolicies: { bash: 'ask' },
+      });
+
+      mockProject.getConfiguration.mockReturnValue({
+        toolPolicies: { bash: 'allow' },
+      });
+
+      const request = new Request('http://localhost/api/sessions/test-session/configuration');
+      const params = { sessionId: 'test-session' };
+
+      const response = await loader({ request, params, context: {} });
+      const data = await response.json();
+
+      console.log('API Response:', JSON.stringify(data, null, 2));
+      expect(data.configuration).toBeDefined();
+    });
+
     it('should return tool permissions with parent values and allowed options', async () => {
       // Setup: Session has some overrides, project has policies, global has different policies
       mockSession.getEffectiveConfiguration.mockReturnValue({
