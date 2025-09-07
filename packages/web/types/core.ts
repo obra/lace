@@ -44,6 +44,8 @@ export type { ProjectInfo } from '~/projects/project';
 
 export type { SessionInfo } from '~/sessions/session';
 
+export type { MCPServerConfig, DiscoveredTool, MCPConfig } from '~/config/mcp-types';
+
 export type { CompactionData } from '~/threads/compaction/types';
 
 // Re-export utility functions
