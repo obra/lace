@@ -7,7 +7,8 @@ import React, { useState, useEffect } from 'react';
 import { AddMCPServerModal } from '@/components/modals/AddMCPServerModal';
 import { api } from '@/lib/api-client';
 import type { MCPServerConfig } from '@/types/core';
-import type { ToolPolicy } from '@/components/mcp/MCPServerCard';
+import { ToolPolicySelector } from '@/components/ui/ToolPolicySelector';
+import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 
 type ServerStatus = 'running' | 'stopped' | 'failed' | 'discovering';
 
@@ -212,18 +213,12 @@ export function MCPPanel() {
 
                   return (
                     <div key={tool.name} className="flex items-center gap-3 text-sm">
-                      <select
-                        className="select select-xs select-bordered w-auto"
-                        value={currentPolicy}
-                        onChange={(e) =>
-                          handleToolPolicyChange(serverId, tool.name, e.target.value as ToolPolicy)
-                        }
-                      >
-                        <option value="allow-always">Allow Always</option>
-                        <option value="allow-session">Allow Session</option>
-                        <option value="require-approval">Require Approval</option>
-                        <option value="deny">Deny</option>
-                      </select>
+                      <ToolPolicySelector
+                        value={currentPolicy as ToolPolicy}
+                        onChange={(policy) => handleToolPolicyChange(serverId, tool.name, policy)}
+                        size="xs"
+                        context="global"
+                      />
                       <span className="font-mono">
                         {isLast ? '└─' : '├─'} {tool.name}
                       </span>

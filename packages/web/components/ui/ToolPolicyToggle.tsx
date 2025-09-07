@@ -5,7 +5,15 @@
 
 import React, { memo } from 'react';
 
-export type ToolPolicy = 'allow' | 'require-approval' | 'deny';
+export type ToolPolicy =
+  | 'allow'
+  | 'require-approval'
+  | 'deny'
+  | 'disable'
+  | 'allow-once'
+  | 'allow-session'
+  | 'allow-project'
+  | 'allow-always';
 
 interface ToolPolicyToggleProps {
   value: ToolPolicy;

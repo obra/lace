@@ -4,7 +4,7 @@
 'use client';
 
 import React from 'react';
-import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
+import { ToolPolicySelector } from '@/components/ui/ToolPolicySelector';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 
 interface ToolPolicyListProps {
@@ -13,7 +13,30 @@ interface ToolPolicyListProps {
   onChange: (tool: string, policy: ToolPolicy) => void;
   loading?: boolean;
   error?: string | null;
+  context?: 'global' | 'project' | 'session';
 }
+
+// Helper function to group tools by source
+const groupToolsBySource = (tools: string[]) => {
+  const coreTools: string[] = [];
+  const mcpTools: Record<string, string[]> = {};
+
+  tools.forEach((tool) => {
+    if (tool.includes('/')) {
+      // MCP tool (format: serverId/toolName)
+      const [serverId, toolName] = tool.split('/', 2);
+      if (!mcpTools[serverId]) {
+        mcpTools[serverId] = [];
+      }
+      mcpTools[serverId].push(toolName);
+    } else {
+      // Core tool
+      coreTools.push(tool);
+    }
+  });
+
+  return { coreTools, mcpTools };
+};
 
 export function ToolPolicyList({
   tools,
@@ -21,6 +44,7 @@ export function ToolPolicyList({
   onChange,
   loading = false,
   error = null,
+  context = 'session',
 }: ToolPolicyListProps) {
   if (error) {
     return (
@@ -50,19 +74,56 @@ export function ToolPolicyList({
     );
   }
 
+  const { coreTools, mcpTools } = groupToolsBySource(tools);
+
   return (
-    <div className="grid md:grid-cols-2 gap-3">
-      {tools.map((tool) => (
-        <div
-          key={tool}
-          className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
-        >
-          <span className="font-medium text-sm">{tool}</span>
-          <ToolPolicyToggle
-            value={(policies[tool] || 'require-approval') as ToolPolicy}
-            onChange={(policy) => onChange(tool, policy)}
-            size="sm"
-          />
+    <div className="space-y-6">
+      {/* Core Tools */}
+      {coreTools.length > 0 && (
+        <div>
+          <h4 className="text-sm font-semibold mb-3 text-base-content/80">Core Tools</h4>
+          <div className="space-y-2">
+            {coreTools.map((tool) => (
+              <div
+                key={tool}
+                className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
+              >
+                <span className="font-medium text-sm font-mono">{tool}</span>
+                <ToolPolicySelector
+                  value={(policies[tool] || 'require-approval') as ToolPolicy}
+                  onChange={(policy) => onChange(tool, policy)}
+                  size="sm"
+                  context={context}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* MCP Tools by Server */}
+      {Object.entries(mcpTools).map(([serverId, serverTools]) => (
+        <div key={serverId}>
+          <h4 className="text-sm font-semibold mb-3 text-primary">{serverId} MCP Tools</h4>
+          <div className="space-y-2">
+            {serverTools.map((toolName) => {
+              const fullToolName = `${serverId}/${toolName}`;
+              return (
+                <div
+                  key={fullToolName}
+                  className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
+                >
+                  <span className="font-medium text-sm font-mono">{toolName}</span>
+                  <ToolPolicySelector
+                    value={(policies[fullToolName] || 'require-approval') as ToolPolicy}
+                    onChange={(policy) => onChange(fullToolName, policy)}
+                    size="sm"
+                    context={context}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
       ))}
     </div>

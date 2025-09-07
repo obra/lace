@@ -15,6 +15,7 @@ const ApprovalLevelSchema = z.enum([
   'allow-session',
   'allow-project',
   'allow-always',
+  'allow', // Legacy compatibility
 ]);
 
 const DiscoveredToolSchema = z.object({

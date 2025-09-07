@@ -386,6 +386,7 @@ export function ProjectEditModal({
                   tools={(initialConfig as SessionConfiguration).availableTools || []}
                   policies={editConfig.toolPolicies || {}}
                   onChange={handleToolPolicyChange}
+                  context="project"
                 />
               </div>
             </div>

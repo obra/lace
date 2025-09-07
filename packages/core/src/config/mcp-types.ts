@@ -37,7 +37,8 @@ export type ApprovalLevel =
   | 'allow-once'
   | 'allow-session'
   | 'allow-project'
-  | 'allow-always';
+  | 'allow-always'
+  | 'allow'; // Legacy compatibility
 
 // Runtime server connection state
 export interface MCPServerConnection {
