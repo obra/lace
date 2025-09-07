@@ -7,6 +7,7 @@ export { ProviderRegistry } from '~/providers/registry';
 export { ProviderCatalogManager } from '~/providers/catalog/manager';
 export { ProviderInstanceManager } from '~/providers/instance/manager';
 export { ToolExecutor } from '~/tools/executor';
+export { ToolCatalog } from '~/tools/tool-catalog';
 export { EventApprovalCallback } from '~/tools/event-approval-callback';
 export { Session } from '~/sessions/session';
 export { Project } from '~/projects/project';

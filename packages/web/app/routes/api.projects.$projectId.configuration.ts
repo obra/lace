@@ -1,7 +1,7 @@
 // ABOUTME: REST API endpoints for project configuration - GET, PUT for configuration management
 // ABOUTME: Handles project configuration retrieval and updates with validation and error handling
 
-import { Project, ProviderRegistry } from '@/lib/server/lace-imports';
+import { Project, ProviderRegistry, ToolCatalog } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { toolCacheService } from '@/lib/server/tool-cache-service';
@@ -28,19 +28,13 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     const configuration = project.getConfiguration();
 
-    // FIXED: Get tools from project context instead of creating fresh ToolExecutor
-    const toolExecutor = await project.createToolExecutor(); // Includes MCP servers
-    const userConfigurableTools = toolExecutor
-      .getAllTools() // Now includes MCP tools from project config
-      .filter(
-        (tool: { annotations?: { safeInternal?: boolean } }) => !tool.annotations?.safeInternal
-      )
-      .map((tool: { name: string }) => tool.name);
+    // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
+    const availableTools = ToolCatalog.getAvailableTools(project);
 
     return createSuperjsonResponse({
       configuration: {
         ...configuration,
-        availableTools: userConfigurableTools,
+        availableTools,
       },
     });
   } catch (error: unknown) {
@@ -93,19 +87,13 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const configuration = project.getConfiguration();
 
-    // Get user-configurable tools from project context (same as GET)
-    const toolExecutor = await project.createToolExecutor(); // Includes MCP servers
-    const userConfigurableTools = toolExecutor
-      .getAllTools()
-      .filter(
-        (tool: { annotations?: { safeInternal?: boolean } }) => !tool.annotations?.safeInternal
-      )
-      .map((tool: { name: string }) => tool.name);
+    // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
+    const availableTools = ToolCatalog.getAvailableTools(project);
 
     return createSuperjsonResponse({
       configuration: {
         ...configuration,
-        availableTools: userConfigurableTools,
+        availableTools,
       },
     });
   } catch (error: unknown) {
