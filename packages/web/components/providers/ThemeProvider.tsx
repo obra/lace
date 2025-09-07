@@ -12,17 +12,25 @@ import React, {
   useCallback,
   ReactNode,
 } from 'react';
+import { z } from 'zod';
 import { api } from '@/lib/api-client';
 
-type DaisyUITheme = 'light' | 'dark';
-type TimelineWidth = 'narrow' | 'medium' | 'wide' | 'full';
+const DaisyUIThemeSchema = z.enum(['light', 'dark']);
+const TIMELINE_WIDTHS = ['narrow', 'medium', 'wide', 'full'] as const;
+const TimelineWidthSchema = z.enum(TIMELINE_WIDTHS);
 
-interface LaceTheme {
-  daisyui: DaisyUITheme;
-  timeline: {
-    width: TimelineWidth;
-  };
-}
+export { TIMELINE_WIDTHS };
+
+const LaceThemeSchema = z.object({
+  daisyui: DaisyUIThemeSchema,
+  timeline: z.object({
+    width: TimelineWidthSchema,
+  }),
+});
+
+type DaisyUITheme = z.infer<typeof DaisyUIThemeSchema>;
+type TimelineWidth = z.infer<typeof TimelineWidthSchema>;
+type LaceTheme = z.infer<typeof LaceThemeSchema>;
 
 interface ThemeContextType {
   theme: LaceTheme;
@@ -86,17 +94,15 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         const apiTheme = settings.theme;
         const apiTimelineWidth = settings.timelineWidth;
 
-        if (apiTheme === 'light' || apiTheme === 'dark') {
+        const daisyUIResult = DaisyUIThemeSchema.safeParse(apiTheme);
+        if (daisyUIResult.success) {
           // Use API theme with API timeline width or default
-          const timelineWidth = ['narrow', 'medium', 'wide', 'full'].includes(
-            apiTimelineWidth as string
-          )
-            ? (apiTimelineWidth as TimelineWidth)
-            : 'medium';
+          const timelineWidthResult = TimelineWidthSchema.safeParse(apiTimelineWidth);
+          const timelineWidth = timelineWidthResult.success ? timelineWidthResult.data : 'medium';
 
           if (!cancelled) {
             setThemeState({
-              daisyui: apiTheme,
+              daisyui: daisyUIResult.data,
               timeline: { width: timelineWidth },
             });
           }
@@ -108,21 +114,16 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         if (savedTheme) {
           try {
             // Try to parse as new LaceTheme format
-            const parsed = JSON.parse(savedTheme) as LaceTheme;
-            if (
-              parsed &&
-              typeof parsed === 'object' &&
-              (parsed.daisyui === 'light' || parsed.daisyui === 'dark') &&
-              parsed.timeline &&
-              ['narrow', 'medium', 'wide', 'full'].includes(parsed.timeline.width)
-            ) {
+            const parsedUnknown = JSON.parse(savedTheme);
+            const themeResult = LaceThemeSchema.safeParse(parsedUnknown);
+            if (themeResult.success) {
               // Migrate complete theme to settings API
               await api.patch('/api/settings', {
-                theme: parsed.daisyui,
-                timelineWidth: parsed.timeline.width,
+                theme: themeResult.data.daisyui,
+                timelineWidth: themeResult.data.timeline.width,
               });
               if (cancelled) return;
-              setThemeState(parsed);
+              setThemeState(themeResult.data);
               localStorage.removeItem('lace-theme');
               return;
             }
@@ -131,15 +132,16 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
           }
 
           // Try old format (simple string)
-          if (savedTheme === 'light' || savedTheme === 'dark') {
+          const oldThemeResult = DaisyUIThemeSchema.safeParse(savedTheme);
+          if (oldThemeResult.success) {
             // Migrate to settings API with default timeline width
             await api.patch('/api/settings', {
-              theme: savedTheme,
+              theme: oldThemeResult.data,
               timelineWidth: 'medium',
             });
             if (cancelled) return;
             setThemeState({
-              daisyui: savedTheme,
+              daisyui: oldThemeResult.data,
               timeline: { width: 'medium' },
             });
             localStorage.removeItem('lace-theme');

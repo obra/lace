@@ -22,8 +22,8 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
   const { theme, setDaisyUITheme } = useTheme();
 
   const handleThemeChange = useCallback(
-    (newTheme: string) => {
-      setDaisyUITheme(newTheme as 'light' | 'dark');
+    (newTheme: 'light' | 'dark') => {
+      setDaisyUITheme(newTheme);
     },
     [setDaisyUITheme]
   );
@@ -69,7 +69,7 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
         onClose={handleCloseSettings}
         title="Configuration"
         size="full"
-        className="w-[80vw] h-[80vh] max-w-none max-h-none lg:w-[80vw] lg:h-[80vh] md:w-[90vw] md:h-[85vh] sm:w-[95vw] sm:h-[90vh] bg-base-100/60 backdrop-blur-md border border-base-300/60 shadow-xl"
+        className="w-[80vw] h-[80vh] max-w-none max-h-none md:w-[90vw] md:h-[85vh] sm:w-[95vw] sm:h-[90vh] bg-base-100/60 backdrop-blur-md border border-base-300/60 shadow-xl"
       >
         <div className="h-[calc(80vh-8rem)] -m-4 flex flex-col rounded-xl overflow-hidden">
           <SettingsTabs defaultTab="providers" tabs={tabConfig}>

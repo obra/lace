@@ -8,7 +8,7 @@ import { ThemeSelector } from '@/components/ui/ThemeSelector';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { SettingField } from '@/components/settings/SettingField';
 import { Alert } from '@/components/ui/Alert';
-import { useTheme } from '@/components/providers/ThemeProvider';
+import { useTheme, TIMELINE_WIDTHS } from '@/components/providers/ThemeProvider';
 
 interface UISettingsPanelProps {
   currentTheme?: string;
@@ -34,10 +34,12 @@ export function UISettingsPanel({ currentTheme, onThemeChange }: UISettingsPanel
         description="Control how wide the conversation timeline appears"
       >
         <div className="flex gap-2">
-          {(['narrow', 'medium', 'wide', 'full'] as const).map((width) => (
+          {TIMELINE_WIDTHS.map((width) => (
             <button
               key={width}
+              type="button"
               onClick={() => setTimelineWidth(width)}
+              aria-pressed={theme.timeline.width === width}
               className={`btn btn-sm ${
                 theme.timeline.width === width ? 'btn-primary' : 'btn-outline btn-neutral'
               }`}
