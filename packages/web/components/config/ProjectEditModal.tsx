@@ -131,12 +131,15 @@ export function ProjectEditModal({
     setShowMcpAddModal(false);
   };
 
+  const [mcpConfigKey, setMcpConfigKey] = useState(0); // Force reload
+
   const handleAddMcpServer = async (serverId: string, config: MCPServerConfig) => {
     setAddingMcpServer(true);
     try {
       await api.post(`/api/projects/${project?.id}/mcp/servers`, { id: serverId, ...config });
       setShowMcpAddModal(false);
-      // The MCPProjectConfig component will reload its data
+      // Force reload of MCP configuration
+      setMcpConfigKey((prev) => prev + 1);
     } catch (error) {
       // Error handling
     } finally {
@@ -335,7 +338,11 @@ export function ProjectEditModal({
               <span className="text-lg font-medium">MCP Servers</span>
             </div>
             <div className="rounded-xl p-4 bg-base-100/60 backdrop-blur-sm border border-base-300/60">
-              <MCPProjectConfig projectId={project.id} onOpenAddModal={handleOpenMcpAddModal} />
+              <MCPProjectConfig
+                key={mcpConfigKey}
+                projectId={project.id}
+                onOpenAddModal={handleOpenMcpAddModal}
+              />
             </div>
           </div>
 
