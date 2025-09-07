@@ -4,6 +4,12 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
+// Discovered tool information from MCP server
+export interface DiscoveredTool {
+  name: string;
+  description?: string;
+}
+
 // MCP Server Configuration (matches mcp-config.json structure)
 export interface MCPServerConfig {
   command: string; // Executable name
@@ -12,6 +18,12 @@ export interface MCPServerConfig {
   cwd?: string; // Working directory
   enabled: boolean;
   tools: Record<string, ApprovalLevel>; // Tool name -> approval policy
+
+  // Tool discovery cache
+  discoveredTools?: DiscoveredTool[];
+  lastDiscovery?: string; // ISO timestamp
+  discoveryError?: string;
+  discoveryStatus?: 'never' | 'discovering' | 'success' | 'failed';
 }
 
 export interface MCPConfig {
