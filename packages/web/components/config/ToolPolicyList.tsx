@@ -14,6 +14,7 @@ interface ToolPolicyListProps {
   loading?: boolean;
   error?: string | null;
   context?: 'global' | 'project' | 'session';
+  parentPolicies?: Record<string, ToolPolicy>; // For progressive restriction
 }
 
 // Helper function to group tools by source
@@ -45,6 +46,7 @@ export function ToolPolicyList({
   loading = false,
   error = null,
   context = 'session',
+  parentPolicies = {},
 }: ToolPolicyListProps) {
   if (error) {
     return (
@@ -94,6 +96,7 @@ export function ToolPolicyList({
                   onChange={(policy) => onChange(tool, policy)}
                   size="sm"
                   context={context}
+                  parentPolicy={parentPolicies[tool]}
                 />
               </div>
             ))}
@@ -119,6 +122,7 @@ export function ToolPolicyList({
                     onChange={(policy) => onChange(fullToolName, policy)}
                     size="sm"
                     context={context}
+                    parentPolicy={parentPolicies[fullToolName]}
                   />
                 </div>
               );
