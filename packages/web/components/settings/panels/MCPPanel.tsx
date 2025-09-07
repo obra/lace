@@ -1,14 +1,15 @@
-// ABOUTME: MCP configuration panel for global settings with server management
+// ABOUTME: MCP configuration panel for global settings with simplified inline implementation
 // ABOUTME: Provides global MCP server configuration interface integrated with settings system
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { MCPSettingsPanel } from '@/components/mcp/MCPSettingsPanel';
 import { AddMCPServerModal } from '@/components/modals/AddMCPServerModal';
 import { api } from '@/lib/api-client';
 import type { MCPServerConfig } from '@/types/core';
-import type { ServerStatus, ToolPolicy } from '@/components/mcp/MCPServerCard';
+import type { ToolPolicy } from '@/components/mcp/MCPServerCard';
+
+type ServerStatus = 'running' | 'stopped' | 'failed' | 'discovering';
 
 interface GlobalMCPServersResponse {
   servers: Array<MCPServerConfig & { id: string }>;
@@ -16,7 +17,6 @@ interface GlobalMCPServersResponse {
 
 export function MCPPanel() {
   const [servers, setServers] = useState<Record<string, MCPServerConfig>>({});
-  const [serverStatuses, setServerStatuses] = useState<Record<string, ServerStatus>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -37,14 +37,6 @@ export function MCPPanel() {
         });
 
         setServers(serversRecord);
-
-        // Initialize server statuses - default to discovering if status not known
-        const statuses: Record<string, ServerStatus> = {};
-        data.servers.forEach((server) => {
-          statuses[server.id] =
-            server.discoveryStatus === 'discovering' ? 'discovering' : 'stopped';
-        });
-        setServerStatuses(statuses);
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Failed to load MCP servers');
       } finally {
@@ -70,19 +62,13 @@ export function MCPPanel() {
 
       // Add to local state immediately
       setServers((prev) => ({ ...prev, [serverId]: config }));
-      setServerStatuses((prev) => ({ ...prev, [serverId]: 'discovering' }));
-
       setShowAddModal(false);
     } catch (error) {
-      // Error handled by modal or could show toast
+      // Error handling
     } finally {
       setAddingServer(false);
     }
   };
-
-  // Global servers are configuration only - no start/stop controls
-  const handleStartServer = undefined;
-  const handleStopServer = undefined;
 
   const handleEditServer = (serverId: string) => {
     setEditingServerId(serverId);
@@ -100,7 +86,7 @@ export function MCPPanel() {
       setServers((prev) => ({ ...prev, [serverId]: config }));
       setEditingServerId(null);
     } catch (error) {
-      // Error handling - could show toast notification
+      // Error handling
     }
   };
 
@@ -113,14 +99,8 @@ export function MCPPanel() {
         delete updated[serverId];
         return updated;
       });
-
-      setServerStatuses((prev) => {
-        const updated = { ...prev };
-        delete updated[serverId];
-        return updated;
-      });
     } catch (error) {
-      // Error handling - could show toast notification
+      // Error handling
     }
   };
 
@@ -142,7 +122,7 @@ export function MCPPanel() {
         [serverId]: updatedConfig,
       }));
     } catch (error) {
-      // Error handling - could revert the change or show error
+      // Error handling
     }
   };
 
@@ -163,20 +143,110 @@ export function MCPPanel() {
   }
 
   return (
-    <>
-      <MCPSettingsPanel
-        title="🌍 Global MCP Settings"
-        description="Configure MCP servers available to all projects. These settings apply globally and can be overridden at the project level."
-        servers={servers}
-        serverStatuses={serverStatuses}
-        onAddServer={handleAddServer}
-        onStartServer={handleStartServer}
-        onStopServer={handleStopServer}
-        onEditServer={handleEditServer}
-        onDeleteServer={handleDeleteServer}
-        onToolPolicyChange={handleToolPolicyChange}
-        isProjectLevel={false}
-      />
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-bold mb-2">🌍 Global MCP Settings</h2>
+        <p className="text-base-content/70">
+          Configure MCP servers available to all projects. These settings apply globally and can be
+          overridden at the project level.
+        </p>
+      </div>
+
+      {/* Add Server Button */}
+      <div className="flex justify-end">
+        <button className="btn btn-primary btn-sm" onClick={handleAddServer}>
+          Add Server
+        </button>
+      </div>
+
+      {/* Server List */}
+      <div className="space-y-4">
+        {Object.entries(servers).map(([serverId, config]) => (
+          <div
+            key={serverId}
+            className="border-l-4 border-base-300 pl-4 py-3 bg-base-50 rounded-lg"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-3">
+                <span className="w-2 h-2 bg-base-400 rounded-full"></span>
+                <span className="font-semibold">{serverId}</span>
+                <code className="bg-base-200 px-2 py-1 rounded text-xs">
+                  {config.command} {config.args?.join(' ')}
+                </code>
+                {config.discoveryStatus === 'discovering' && (
+                  <span className="loading loading-spinner loading-xs"></span>
+                )}
+              </div>
+              <div className="flex gap-1">
+                <button
+                  className="btn btn-xs btn-outline"
+                  onClick={() => handleEditServer(serverId)}
+                  title="Edit Server"
+                >
+                  Edit
+                </button>
+                <button
+                  className="btn btn-xs btn-outline btn-error"
+                  onClick={() => handleDeleteServer(serverId)}
+                  title="Delete Server"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+
+            {/* Discovery Status */}
+            {config.discoveryStatus === 'failed' && (
+              <div className="text-xs text-error mb-2 ml-5">
+                Discovery failed: {config.discoveryError}
+              </div>
+            )}
+
+            {/* Tools */}
+            {config.discoveredTools && config.discoveredTools.length > 0 && (
+              <div className="ml-5 space-y-1">
+                {config.discoveredTools.map((tool, index) => {
+                  const isLast = index === config.discoveredTools!.length - 1;
+                  const currentPolicy = config.tools[tool.name] || 'require-approval';
+
+                  return (
+                    <div key={tool.name} className="flex items-center gap-3 text-sm">
+                      <select
+                        className="select select-xs select-bordered w-auto"
+                        value={currentPolicy}
+                        onChange={(e) =>
+                          handleToolPolicyChange(serverId, tool.name, e.target.value as ToolPolicy)
+                        }
+                      >
+                        <option value="allow-always">Allow Always</option>
+                        <option value="allow-session">Allow Session</option>
+                        <option value="require-approval">Require Approval</option>
+                        <option value="deny">Deny</option>
+                      </select>
+                      <span className="font-mono">
+                        {isLast ? '└─' : '├─'} {tool.name}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {Object.keys(servers).length === 0 && (
+          <div className="text-center text-base-content/60 py-8">
+            <div className="text-sm font-medium mb-1">No MCP servers configured</div>
+            <div className="text-xs mb-3">
+              Add your first MCP server to extend Lace's capabilities
+            </div>
+            <button className="btn btn-primary btn-sm" onClick={handleAddServer}>
+              Add Server
+            </button>
+          </div>
+        )}
+      </div>
 
       <AddMCPServerModal
         isOpen={showAddModal}
@@ -185,7 +255,7 @@ export function MCPPanel() {
         loading={addingServer}
       />
 
-      {/* Edit Modal - reuse AddMCPServerModal with initial data */}
+      {/* Edit Modal */}
       {editingServerId && (
         <AddMCPServerModal
           isOpen={!!editingServerId}
@@ -199,6 +269,6 @@ export function MCPPanel() {
           isEditMode={true}
         />
       )}
-    </>
+    </div>
   );
 }

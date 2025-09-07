@@ -1,10 +1,7 @@
 // ABOUTME: Index file for MCP UI components
-// ABOUTME: Provides clean imports for MCP configuration and monitoring components
+// ABOUTME: Provides clean imports for MCP configuration components
 
 export { MCPServerCard } from './MCPServerCard';
-export { MCPSettingsPanel } from './MCPSettingsPanel';
-export { MCPToolsSidebar } from './MCPToolsSidebar';
-export { MCPProjectPanel } from './MCPProjectPanel';
+export { MCPProjectConfig } from './MCPProjectConfig';
 
 export type { ServerStatus, ToolPolicy } from './MCPServerCard';
-export type { ToolStatus } from './MCPToolsSidebar';
