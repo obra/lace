@@ -387,6 +387,7 @@ export function ProjectEditModal({
                   policies={editConfig.toolPolicies || {}}
                   onChange={handleToolPolicyChange}
                   context="project"
+                  parentPolicies={{}} // TODO: Get global tool policies
                 />
               </div>
             </div>
