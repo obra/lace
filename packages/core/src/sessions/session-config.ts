@@ -11,7 +11,7 @@ export const SessionConfigurationSchema = z.object({
   topP: z.number().min(0).max(1).optional(),
   systemPrompt: z.string().optional(),
   tools: z.array(z.string()).optional(),
-  toolPolicies: z.record(z.enum(['allow', 'require-approval', 'deny'])).optional(),
+  toolPolicies: z.record(z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
   workingDirectory: z.string().optional(),
   environmentVariables: z.record(z.string()).optional(),
   promptTemplate: z.string().optional(),
