@@ -47,7 +47,7 @@ describe('MCPToolRegistry', () => {
           command: 'node',
           args: ['fs.js'],
           enabled: true,
-          tools: { read_file: 'allow-session' },
+          tools: { read_file: 'allow' },
         },
         browser: {
           command: 'python',
@@ -107,7 +107,7 @@ describe('MCPToolRegistry', () => {
           command: 'node',
           enabled: true,
           tools: {
-            read_file: 'allow-session',
+            read_file: 'allow',
             write_file: 'disable', // This should be filtered out
           },
         },
@@ -127,14 +127,14 @@ describe('MCPToolRegistry', () => {
           command: 'node',
           enabled: true,
           tools: {
-            read_file: 'allow-session',
+            read_file: 'allow',
             write_file: 'ask',
           },
         },
       },
     };
 
-    expect(registry.getToolApprovalLevel(config, 'filesystem/read_file')).toBe('allow-session');
+    expect(registry.getToolApprovalLevel(config, 'filesystem/read_file')).toBe('allow');
     expect(registry.getToolApprovalLevel(config, 'filesystem/write_file')).toBe('ask');
     expect(registry.getToolApprovalLevel(config, 'filesystem/unknown_tool')).toBe('ask');
   });

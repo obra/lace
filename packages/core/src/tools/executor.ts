@@ -283,12 +283,12 @@ export class ToolExecutor {
       return 'granted';
     }
 
-    // 3. Check if this is an MCP tool with allow-always approval (bypasses agent requirement)
+    // 3. Check if this is an MCP tool with allow approval (bypasses agent requirement)
     if (call.name.includes('/') && context?.agent) {
       // MCP tools have serverId/toolName format
       try {
         const approvalLevel = await this.getMCPApprovalLevel(call.name, context);
-        if (approvalLevel === 'allow-always') {
+        if (approvalLevel === 'allow') {
           return 'granted';
         }
       } catch (error) {

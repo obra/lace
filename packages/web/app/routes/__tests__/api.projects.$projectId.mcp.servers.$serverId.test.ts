@@ -52,7 +52,7 @@ describe('Individual Project MCP Server Management API', () => {
         command: 'npx',
         args: ['-y', '@modelcontextprotocol/server-filesystem'],
         enabled: true,
-        tools: { read_file: 'allow-session' },
+        tools: { read_file: 'allow' },
       });
 
       const request = new Request(
@@ -118,7 +118,7 @@ describe('Individual Project MCP Server Management API', () => {
           command: 'echo',
           args: ['hello'],
           enabled: true,
-          tools: { echo: 'allow-session' },
+          tools: { echo: 'allow' },
         }),
       });
 
@@ -198,7 +198,7 @@ describe('Individual Project MCP Server Management API', () => {
       mockProject.getMCPServer = vi.fn().mockReturnValue({
         command: 'npx',
         enabled: true,
-        tools: { read_file: 'allow-session' },
+        tools: { read_file: 'allow' },
       });
 
       const request = new Request(

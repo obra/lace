@@ -54,7 +54,7 @@ describe('ToolCatalog', () => {
       mockProject.getMCPServers.mockReturnValue({
         filesystem: {
           enabled: true,
-          tools: { read_file: 'allow-once', write_file: 'deny' },
+          tools: { read_file: 'ask', write_file: 'deny' },
           discoveredTools: [
             { name: 'read_file', description: 'Read files' },
             { name: 'write_file', description: 'Write files' },
@@ -73,7 +73,7 @@ describe('ToolCatalog', () => {
       mockProject.getMCPServers.mockReturnValue({
         git: {
           enabled: true,
-          tools: { git_status: 'allow-once', git_commit: 'ask' },
+          tools: { git_status: 'ask', git_commit: 'ask' },
           // No discoveredTools - should use keys from tools config
         },
       });
@@ -88,7 +88,7 @@ describe('ToolCatalog', () => {
       mockProject.getMCPServers.mockReturnValue({
         disabled_server: {
           enabled: false,
-          tools: { some_tool: 'allow-once' },
+          tools: { some_tool: 'ask' },
         },
       });
 

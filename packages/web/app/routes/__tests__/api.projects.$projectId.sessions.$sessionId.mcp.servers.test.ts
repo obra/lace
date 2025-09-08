@@ -34,7 +34,7 @@ const mockProject = {
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-filesystem'],
       enabled: true,
-      tools: { read_file: 'allow-session' },
+      tools: { read_file: 'allow' },
     },
     git: {
       command: 'npx',
@@ -61,7 +61,7 @@ const mockMCPServerManager = {
         command: 'npx',
         args: ['-y', '@modelcontextprotocol/server-filesystem'],
         enabled: true,
-        tools: { read_file: 'allow-session' },
+        tools: { read_file: 'allow' },
       },
       status: 'running',
       connectedAt: '2023-01-01T00:00:00Z',

@@ -96,7 +96,7 @@ describe('MCPConfigLoader', () => {
         fs: {
           command: 'global',
           enabled: true,
-          tools: { read: 'allow-always' },
+          tools: { read: 'allow' },
         },
       },
     };
