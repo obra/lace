@@ -108,7 +108,8 @@ export function EventStreamMonitor({ maxEvents = 50 }: EventStreamMonitorProps) 
     }
   };
 
-  const getEventTypeColor = (type: string) => {
+  const getEventTypeColor = (type?: string) => {
+    if (!type) return 'text-base-content';
     if (type.includes('TASK')) return 'text-info';
     if (type.includes('AGENT')) return 'text-primary';
     if (type.includes('ERROR')) return 'text-error';
@@ -153,7 +154,9 @@ export function EventStreamMonitor({ maxEvents = 50 }: EventStreamMonitorProps) 
               className="border-b border-base-content/10 pb-1 mb-1 last:border-b-0"
             >
               <div className="flex items-center justify-between">
-                <span className={`font-medium ${getEventTypeColor(event.type)}`}>{event.type}</span>
+                <span className={`font-medium ${getEventTypeColor(event.type)}`}>
+                  {event.type || 'UNKNOWN_TYPE'}
+                </span>
                 <span className="text-base-content/50 text-xs">
                   {event.timestamp
                     ? new Date(event.timestamp).toLocaleTimeString()
@@ -161,7 +164,9 @@ export function EventStreamMonitor({ maxEvents = 50 }: EventStreamMonitorProps) 
                 </span>
               </div>
 
-              <div className="text-base-content/70 text-xs">Thread: {event.threadId}</div>
+              <div className="text-base-content/70 text-xs">
+                Thread: {event.threadId || 'unknown'}
+              </div>
 
               {event.data && (
                 <div className="text-base-content/60 text-xs mt-1 break-words">
