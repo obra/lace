@@ -126,16 +126,7 @@ export function ProjectEditModal({
         toolPolicies: updatedPolicies,
       };
 
-      // Also update the tools structure if it exists to reflect the new value
-      if (isToolPolicyData(prev.tools) && prev.tools[tool]) {
-        updatedConfig.tools = {
-          ...prev.tools,
-          [tool]: {
-            ...prev.tools[tool],
-            value: policy,
-          },
-        };
-      }
+      // Note: tools structure will be refreshed from API on next load
 
       return updatedConfig;
     });
