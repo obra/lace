@@ -89,7 +89,8 @@ describe('Session Configuration API - Tool Permissions Structure', () => {
 
   describe('GET loader - Tool permissions with hierarchy', () => {
     it('should return tool permissions with explicit parent values and allowed options', async () => {
-      const loaderArgs = createLoaderArgs({ sessionId });
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/configuration`);
+      const loaderArgs = createLoaderArgs(request, { sessionId });
 
       const response = await GET(loaderArgs);
       const data = parseResponse<ConfigurationResponse>(response);
@@ -142,7 +143,8 @@ describe('Session Configuration API - Tool Permissions Structure', () => {
       const cleanSession = cleanSessionInstance.getInfo()!;
       const cleanSessionId = cleanSession.id;
 
-      const loaderArgs = createLoaderArgs({ sessionId: cleanSessionId });
+      const request = new Request(`http://localhost/api/sessions/${cleanSessionId}/configuration`);
+      const loaderArgs = createLoaderArgs(request, { sessionId: cleanSessionId });
       const response = await GET(loaderArgs);
       const data = parseResponse<ConfigurationResponse>(response);
 
@@ -157,21 +159,23 @@ describe('Session Configuration API - Tool Permissions Structure', () => {
 
   describe('PUT action - Progressive restriction validation', () => {
     it('should accept valid tool policy changes within allowed values', async () => {
-      const actionArgs = createActionArgs(
-        'PUT',
-        { sessionId },
-        {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/configuration`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           toolPolicies: {
             bash: 'deny', // More restrictive than project 'allow' - should be valid
           },
-        }
-      );
+        }),
+      });
+      const actionArgs = createActionArgs(request, { sessionId });
 
       const response = await PUT(actionArgs);
       expect(response.status).toBe(200);
 
       // Verify the policy was actually saved - reload and check
-      const updatedResponse = await GET(createLoaderArgs({ sessionId }));
+      const verifyRequest = new Request(`http://localhost/api/sessions/${sessionId}/configuration`);
+      const updatedResponse = await GET(createLoaderArgs(verifyRequest, { sessionId }));
       const updatedData = parseResponse<ConfigurationResponse>(updatedResponse);
       expect(updatedData.configuration.tools?.bash?.value).toBe('deny');
     });
@@ -184,15 +188,16 @@ describe('Session Configuration API - Tool Permissions Structure', () => {
         modelId: 'claude-3-5-haiku-20241022',
       });
 
-      const actionArgs = createActionArgs(
-        'PUT',
-        { sessionId },
-        {
+      const request = new Request(`http://localhost/api/sessions/${sessionId}/configuration`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           toolPolicies: {
             bash: 'allow', // More permissive than project 'deny' - should fail
           },
-        }
-      );
+        }),
+      });
+      const actionArgs = createActionArgs(request, { sessionId });
 
       const response = await PUT(actionArgs);
       expect(response.status).toBe(400);
