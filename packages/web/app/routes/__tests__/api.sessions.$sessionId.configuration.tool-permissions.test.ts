@@ -176,7 +176,7 @@ describe('Session Configuration API - Tool Permissions Structure', () => {
       // Verify the policy was actually saved - reload and check
       const verifyRequest = new Request(`http://localhost/api/sessions/${sessionId}/configuration`);
       const updatedResponse = await GET(createLoaderArgs(verifyRequest, { sessionId }));
-      const updatedData = parseResponse<ConfigurationResponse>(updatedResponse);
+      const updatedData = await parseResponse<ConfigurationResponse>(updatedResponse);
       expect(updatedData.configuration.tools?.bash?.value).toBe('deny');
     });
 
