@@ -5,7 +5,8 @@ import { EventEmitter } from 'events';
 import { Tool } from '~/tools/tool';
 import { MCPToolAdapter } from '~/mcp/tool-adapter';
 import { MCPServerManager } from '~/mcp/server-manager';
-import type { MCPConfig, ApprovalLevel } from '~/config/mcp-types';
+import type { MCPConfig } from '~/config/mcp-types';
+import type { ToolPolicy } from '~/tools/types';
 
 export interface ToolRegistryEvents {
   'tools-updated': (serverId: string, tools: Tool[]) => void;
@@ -130,7 +131,7 @@ export class MCPToolRegistry extends EventEmitter {
   /**
    * Get approval level for a specific tool
    */
-  getToolApprovalLevel(config: MCPConfig, toolName: string): ApprovalLevel {
+  getToolApprovalLevel(config: MCPConfig, toolName: string): ToolPolicy {
     // Tool name format is "serverId/toolName"
     const [serverId, actualToolName] = toolName.split('/', 2);
 

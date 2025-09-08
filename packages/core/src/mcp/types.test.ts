@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import type { MCPServerConfig, ApprovalLevel } from './types';
+import type { MCPServerConfig } from './types';
+import type { ToolPolicy } from '~/tools/types';
 
 describe('MCP Types', () => {
   it('should define valid approval levels', () => {
-    const levels: ApprovalLevel[] = ['disable', 'deny', 'ask', 'ask', 'allow', 'allow', 'allow'];
+    const levels: ToolPolicy[] = ['disable', 'deny', 'ask', 'ask', 'allow', 'allow', 'allow'];
 
     // Type check - if types are wrong, TS will error
     expect(levels).toHaveLength(7);

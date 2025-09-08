@@ -10,10 +10,11 @@ export type {
   MCPConfig,
   MCPServerConfig,
   MCPServerConnection,
-  ApprovalLevel,
   MCPTool,
   CallToolRequest,
   ListToolsRequest,
   Client,
   StdioClientTransport,
 } from '~/config/mcp-types';
+
+export type { ToolPolicy } from '~/tools/types';
