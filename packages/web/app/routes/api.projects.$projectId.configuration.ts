@@ -5,7 +5,7 @@ import { Project, ProviderRegistry, ToolCatalog } from '@/lib/server/lace-import
 import { ToolPolicyResolver } from '@/lib/tool-policy-resolver';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
-import { toolCacheService } from '@/lib/server/tool-cache-service';
+// Using ToolCatalog instead of toolCacheService for better performance
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.configuration';
 
