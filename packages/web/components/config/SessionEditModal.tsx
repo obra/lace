@@ -268,6 +268,7 @@ export const SessionEditModal = memo(function SessionEditModal({
                   <span className="label-text font-medium">Tool Access Policies</span>
                 </label>
                 <ToolPolicyList
+                  toolPolicyData={(sessionConfig as any).tools}
                   tools={sessionConfig.availableTools || []}
                   policies={sessionConfig.toolPolicies || {}}
                   onChange={handleToolPolicyChange}
