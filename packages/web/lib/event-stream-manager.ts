@@ -319,6 +319,18 @@ export class EventStreamManager {
 
     this.connections.set(connectionId, connection);
 
+    // Log new connection
+    logger.info('[EVENT_STREAM] New connection established', {
+      connectionId,
+      totalConnections: this.connections.size,
+      subscription: {
+        projects: subscription.projects?.length || 0,
+        sessions: subscription.sessions?.length || 0,
+        threads: subscription.threads?.length || 0,
+        global: subscription.global,
+      },
+    });
+
     // Start keepalive if this is the first connection
     if (this.connections.size === 1) {
       this.startKeepAlive();
@@ -341,6 +353,15 @@ export class EventStreamManager {
   removeConnection(connectionId: string): void {
     const connection = this.connections.get(connectionId);
     if (connection) {
+      const connectionDuration = Date.now() - connection.connectedAt.getTime();
+
+      logger.info('[EVENT_STREAM] Removing connection', {
+        connectionId,
+        durationMs: connectionDuration,
+        remainingConnections: this.connections.size - 1,
+        lastEventId: connection.lastEventId,
+      });
+
       try {
         // Check if controller is still open before trying to close
         if (connection.controller.desiredSize !== null) {
@@ -353,6 +374,8 @@ export class EventStreamManager {
         }
       }
       this.connections.delete(connectionId);
+    } else {
+      logger.debug('[EVENT_STREAM] Attempted to remove non-existent connection', { connectionId });
     }
   }
 
@@ -365,10 +388,22 @@ export class EventStreamManager {
       timestamp: event.timestamp || new Date(),
     };
 
-    // Debug logging for event broadcasting
-    if (process.env.NODE_ENV === 'development') {
-      // Development debug info
-    }
+    // Comprehensive trace logging for event broadcasting
+    logger.debug('[EVENT_STREAM] Broadcasting event', {
+      eventId: fullEvent.id,
+      type: fullEvent.type,
+      threadId: fullEvent.threadId,
+      dataSize:
+        typeof fullEvent.data === 'string'
+          ? fullEvent.data.length
+          : JSON.stringify(fullEvent.data || {}).length,
+      dataPreview: this.truncateEventData(fullEvent.data),
+      contextProjectId: fullEvent.context?.projectId,
+      contextSessionId: fullEvent.context?.sessionId,
+      contextTaskId: fullEvent.context?.taskId,
+      connectionCount: this.connections.size,
+      timestamp: fullEvent.timestamp,
+    });
 
     // Optional: Add debug logging for error events
     if (fullEvent.type === 'AGENT_ERROR') {
@@ -458,10 +493,20 @@ export class EventStreamManager {
     const eventData = `id: ${event.id}\ndata: ${stringify(event)}\n\n`;
     const chunk = this.encoder.encode(eventData);
 
-    // Debug logging for individual sends
-    if (process.env.NODE_ENV === 'development') {
-      // Development debug info
-    }
+    // Trace logging for individual sends
+    logger.debug('[EVENT_STREAM] Sending event to connection', {
+      connectionId: connection.id,
+      eventId: event.id,
+      eventType: event.type,
+      payloadSize: chunk.length,
+      connectedAt: connection.connectedAt,
+      subscription: {
+        projects: connection.subscription.projects?.length || 0,
+        sessions: connection.subscription.sessions?.length || 0,
+        threads: connection.subscription.threads?.length || 0,
+        global: connection.subscription.global,
+      },
+    });
 
     try {
       connection.controller.enqueue(chunk);
@@ -478,6 +523,34 @@ export class EventStreamManager {
   // Generate unique event IDs
   private generateEventId(): string {
     return `${Date.now()}-${++this.eventIdCounter}`;
+  }
+
+  // Helper to truncate event data for logging
+  private truncateEventData(data: unknown): string {
+    if (data === undefined || data === null) {
+      return 'null';
+    }
+
+    const maxLength = 200;
+    let dataStr: string;
+
+    if (typeof data === 'string') {
+      dataStr = data;
+    } else if (typeof data === 'object') {
+      try {
+        dataStr = JSON.stringify(data);
+      } catch (_error) {
+        dataStr = '[Circular or non-serializable object]';
+      }
+    } else {
+      dataStr = String(data);
+    }
+
+    if (dataStr.length <= maxLength) {
+      return dataStr;
+    }
+
+    return dataStr.substring(0, maxLength) + '...[truncated]';
   }
 
   // Get connection stats for debugging
