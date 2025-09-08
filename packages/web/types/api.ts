@@ -12,12 +12,20 @@ import type {
 
 import type { ToolApprovalRequestData } from '@/types/web-events';
 
+// Tool policy information structure
+interface ToolPolicyInfo {
+  value: 'allow' | 'ask' | 'deny' | 'disable';
+  allowedValues: Array<'allow' | 'ask' | 'deny' | 'disable'>;
+  projectValue?: 'allow' | 'ask' | 'deny' | 'disable';
+  globalValue?: 'allow' | 'ask' | 'deny' | 'disable';
+}
+
 // Session configuration interface
 export interface SessionConfiguration {
   providerInstanceId?: string;
   modelId?: string;
   maxTokens?: number;
-  tools?: string[];
+  tools?: string[] | Record<string, ToolPolicyInfo>; // Can be either array or policy info
   toolPolicies?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
   workingDirectory?: string;
   environmentVariables?: Record<string, string>;
