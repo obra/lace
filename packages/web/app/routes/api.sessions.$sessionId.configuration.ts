@@ -119,6 +119,32 @@ export async function action({ request, params }: Route.ActionArgs) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
+    // Validate progressive restriction if toolPolicies are being updated
+    if (validatedData.toolPolicies) {
+      const projectId = session.getProjectId();
+      if (projectId) {
+        const project = Project.getById(projectId);
+        if (project) {
+          const projectConfig = project.getConfiguration();
+
+          // Check each tool policy change against project restrictions
+          for (const [tool, newPolicy] of Object.entries(validatedData.toolPolicies)) {
+            const projectPolicy = projectConfig.toolPolicies?.[tool];
+            if (
+              projectPolicy &&
+              !ToolPolicyResolver.isValidPolicyChange(tool, newPolicy, projectPolicy)
+            ) {
+              return createErrorResponse(
+                `Tool '${tool}' cannot be set to '${newPolicy}' - more permissive than project policy '${projectPolicy}'`,
+                400,
+                { code: 'POLICY_VIOLATION' }
+              );
+            }
+          }
+        }
+      }
+    }
+
     // Update session configuration directly
     session.updateConfiguration(validatedData);
     const configuration = session.getEffectiveConfiguration();
