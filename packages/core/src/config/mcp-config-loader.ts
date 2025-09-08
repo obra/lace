@@ -4,6 +4,7 @@
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { z } from 'zod';
+import { getLaceDir } from '~/config/lace-dir';
 import type { MCPConfig, MCPServerConfig } from '~/config/mcp-types';
 
 // Zod schemas for validation
@@ -78,12 +79,8 @@ export class MCPConfigLoader {
   }
 
   private static loadGlobalConfigInternal(): MCPConfig | null {
-    const homePath = process.env.HOME || process.env.USERPROFILE;
-    if (!homePath) {
-      return null;
-    }
-
-    const globalConfigPath = join(homePath, '.lace', this.CONFIG_FILENAME);
+    const laceDir = getLaceDir();
+    const globalConfigPath = join(laceDir, this.CONFIG_FILENAME);
     return this.loadConfigFile(globalConfigPath);
   }
 
@@ -130,12 +127,8 @@ export class MCPConfigLoader {
    * Load global configuration only (for API use)
    */
   static loadGlobalConfig(): MCPConfig | null {
-    const homePath = process.env.HOME || process.env.USERPROFILE;
-    if (!homePath) {
-      return null;
-    }
-
-    const globalConfigPath = join(homePath, '.lace', this.CONFIG_FILENAME);
+    const laceDir = getLaceDir();
+    const globalConfigPath = join(laceDir, this.CONFIG_FILENAME);
     return this.loadConfigFile(globalConfigPath);
   }
 
@@ -143,14 +136,8 @@ export class MCPConfigLoader {
    * Save global configuration
    */
   static saveGlobalConfig(config: MCPConfig): void {
-    const homePath = process.env.HOME || process.env.USERPROFILE;
-    if (!homePath) {
-      throw new Error('Cannot determine home directory for global config');
-    }
-
-    const laceDir = join(homePath, '.lace');
+    const laceDir = getLaceDir();
     const globalConfigPath = join(laceDir, this.CONFIG_FILENAME);
-
     this.saveConfigFile(globalConfigPath, config);
   }
 
