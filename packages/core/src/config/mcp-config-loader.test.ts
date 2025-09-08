@@ -1,27 +1,20 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'fs';
+import { describe, it, expect } from 'vitest';
+import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
 import { MCPConfigLoader } from './mcp-config-loader';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 describe('MCPConfigLoader', () => {
-  let tempDir: string;
-
-  beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'mcp-test-'));
-  });
-
-  afterEach(() => {
-    rmSync(tempDir, { recursive: true, force: true });
-  });
+  const tempLaceContext = useTempLaceDir();
 
   it('should return empty config when no files exist', () => {
-    const config = MCPConfigLoader.loadConfig('/nonexistent');
+    // Use nonexistent path within temp directory to ensure isolation
+    const config = MCPConfigLoader.loadConfig(join(tempLaceContext.tempDir, 'nonexistent'));
     expect(config).toEqual({ servers: {} });
   });
 
   it('should load and validate server configuration', () => {
-    const laceDir = join(tempDir, '.lace');
+    const laceDir = join(tempLaceContext.tempDir, '.lace');
     mkdirSync(laceDir, { recursive: true });
 
     writeFileSync(
@@ -41,7 +34,7 @@ describe('MCPConfigLoader', () => {
       })
     );
 
-    const config = MCPConfigLoader.loadConfig(tempDir);
+    const config = MCPConfigLoader.loadConfig(tempLaceContext.tempDir);
     expect(config.servers.filesystem.command).toBe('node');
     expect(config.servers.filesystem.args).toEqual(['fs-server.js']);
     expect(config.servers.filesystem.tools.read_file).toBe('allow');

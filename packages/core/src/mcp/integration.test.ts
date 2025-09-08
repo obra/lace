@@ -10,6 +10,7 @@ import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { ApprovalDecision } from '~/tools/types';
 import type { ToolCall, ApprovalCallback } from '~/tools/types';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 
 // Mock the MCP SDK to avoid spawning real processes
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
@@ -54,6 +55,7 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
 }));
 
 describe('MCP Integration E2E', () => {
+  const tempLaceContext = useTempLaceDir();
   let tempDir: string;
   let project: Project;
   let session: Session;
