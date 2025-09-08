@@ -63,31 +63,18 @@ export const ToolPolicyToggle = memo(function ToolPolicyToggle({
   disabled = false,
   size = 'sm',
   allowedValues,
-  context = 'session',
-  parentPolicy,
 }: ToolPolicyToggleProps) {
   const sizeConfig = SIZE_CONFIG[size];
-  const allPolicies: ToolPolicy[] = ['allow', 'ask', 'deny', 'disable'];
+  const policiesToShow = allowedValues || ['allow', 'ask', 'deny', 'disable'];
 
   return (
     <div className={`inline-flex rounded-md bg-base-200 p-0.5 ${sizeConfig.container}`}>
-      {allPolicies.map((policy) => {
+      {policiesToShow.map((policy) => {
         const config = POLICY_CONFIG[policy];
         const isSelected = value === policy;
 
-        // Clean approach: check if policy is in allowedValues array
-        const isNotAllowed = allowedValues ? !allowedValues.includes(policy) : false;
-
-        // Legacy fallback: compute from parent policy if no allowedValues provided
-        let isLegacyDisabled = false;
-        if (!allowedValues && parentPolicy && context !== 'global') {
-          const restrictionOrder: ToolPolicy[] = ['allow', 'ask', 'deny', 'disable'];
-          const parentIndex = restrictionOrder.indexOf(parentPolicy);
-          const optionIndex = restrictionOrder.indexOf(policy);
-          isLegacyDisabled = optionIndex < parentIndex && policy !== 'disable';
-        }
-
-        const isOptionDisabled = isNotAllowed || isLegacyDisabled;
+        // All policies shown are allowed (filtered at map level)
+        const isOptionDisabled = false;
 
         return (
           <button

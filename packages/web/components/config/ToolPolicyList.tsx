@@ -16,7 +16,7 @@ interface ToolPolicyInfo {
 }
 
 interface ToolPolicyListProps {
-  toolPolicyData: Record<string, ToolPolicyInfo>;
+  toolPolicyData?: Record<string, ToolPolicyInfo>;
   onChange: (tool: string, policy: ToolPolicy) => void;
   loading?: boolean;
   error?: string | null;
@@ -45,7 +45,7 @@ const groupToolsBySource = (tools: string[]) => {
 };
 
 export function ToolPolicyList({
-  toolPolicyData,
+  toolPolicyData = {},
   onChange,
   loading = false,
   error = null,

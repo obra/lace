@@ -729,9 +729,9 @@ export class Session {
     Session.updateSession(this._sessionId, { configuration: newConfig });
   }
 
-  getToolPolicy(toolName: string): 'allow' | 'require-approval' | 'deny' {
+  getToolPolicy(toolName: string): 'allow' | 'ask' | 'deny' | 'disable' {
     const config = this.getEffectiveConfiguration();
-    return config.toolPolicies?.[toolName] || 'require-approval';
+    return config.toolPolicies?.[toolName] || 'ask';
   }
 
   getInfo(): SessionInfo | null {

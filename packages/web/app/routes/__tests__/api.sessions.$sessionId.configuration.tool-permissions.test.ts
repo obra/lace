@@ -83,7 +83,7 @@ describe('Session Configuration API - Tool Permissions Structure', () => {
   });
 
   afterEach(async () => {
-    await cleanupTestProviderInstances();
+    await cleanupTestProviderInstances([providerInstanceId]);
     cleanupTestProviderDefaults();
   });
 
@@ -93,7 +93,7 @@ describe('Session Configuration API - Tool Permissions Structure', () => {
       const loaderArgs = createLoaderArgs(request, { sessionId });
 
       const response = await GET(loaderArgs);
-      const data = parseResponse<ConfigurationResponse>(response);
+      const data = await parseResponse<ConfigurationResponse>(response);
 
       // Verify tools structure exists
       expect(data.configuration.tools).toBeDefined();
@@ -146,7 +146,7 @@ describe('Session Configuration API - Tool Permissions Structure', () => {
       const request = new Request(`http://localhost/api/sessions/${cleanSessionId}/configuration`);
       const loaderArgs = createLoaderArgs(request, { sessionId: cleanSessionId });
       const response = await GET(loaderArgs);
-      const data = parseResponse<ConfigurationResponse>(response);
+      const data = await parseResponse<ConfigurationResponse>(response);
 
       // When no project override, should show full options
       expect(data.configuration.tools?.bash).toEqual({
@@ -202,7 +202,7 @@ describe('Session Configuration API - Tool Permissions Structure', () => {
       const response = await PUT(actionArgs);
       expect(response.status).toBe(400);
 
-      const data = parseResponse<{ error: string }>(response);
+      const data = await parseResponse<{ error: string }>(response);
       expect(data.error).toContain('more permissive than project policy');
     });
   });

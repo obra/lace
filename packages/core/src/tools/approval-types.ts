@@ -23,4 +23,4 @@ export class ApprovalPendingError extends Error {
   }
 }
 
-export type ToolPolicy = 'allow' | 'require-approval' | 'deny';
+export type ToolPolicy = 'allow' | 'ask' | 'deny' | 'disable';

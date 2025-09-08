@@ -345,7 +345,7 @@ export class ToolExecutor {
       case 'allow':
         return 'granted'; // Skip approval system
 
-      case 'require-approval':
+      case 'ask':
         // Fall through to approval system
         break;
     }

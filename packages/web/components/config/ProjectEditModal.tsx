@@ -15,7 +15,7 @@ import type { ProjectInfo, MCPServerConfig } from '@/types/core';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import type { SessionConfiguration } from '@/types/api';
-import { isToolPolicyData } from '@/lib/type-guards';
+import { isToolPolicyData, type ToolPolicyInfo } from '@/lib/type-guards';
 import { api } from '@/lib/api-client';
 
 interface ProjectConfiguration {
@@ -127,7 +127,7 @@ export function ProjectEditModal({
       };
 
       // Also update the tools structure if it exists to reflect the new value
-      if (prev.tools && prev.tools[tool]) {
+      if (isToolPolicyData(prev.tools) && prev.tools[tool]) {
         updatedConfig.tools = {
           ...prev.tools,
           [tool]: {

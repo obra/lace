@@ -35,8 +35,8 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     // Resolve tool policy hierarchy for progressive restriction
     // TODO: Get global policies for full hierarchy
     const toolPolicyHierarchy = {
-      global: {}, // TODO: Load actual global policies
-      project: configuration.toolPolicies || {},
+      global: undefined, // TODO: Load actual global policies
+      project: configuration.toolPolicies,
     };
 
     const resolvedTools = ToolPolicyResolver.resolveProjectToolPolicies(
