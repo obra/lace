@@ -6,8 +6,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCircle, faTrash, faPause, faPlay } from '@/lib/fontawesome';
+import { parse } from '@/lib/serialization';
 import type { LaceEvent } from '@/types/core';
-
 interface EventStreamMonitorProps {
   maxEvents?: number;
 }
@@ -47,14 +47,15 @@ export function EventStreamMonitor({ maxEvents = 50 }: EventStreamMonitorProps) 
         if (isPaused) return;
 
         try {
-          const parsedEvent = JSON.parse(event.data as string) as LaceEvent;
+          // Use SuperJSON parse instead of JSON.parse
+          const parsedEvent = parse(event.data as string) as LaceEvent;
 
           setEvents((prev) => {
             const newEvents = [...prev, parsedEvent].slice(-maxEvents);
             return newEvents;
           });
         } catch (error) {
-          console.warn('Failed to parse SSE event:', error);
+          console.warn('Failed to parse SSE event with SuperJSON:', error, 'Raw data:', event.data);
         }
       };
 
