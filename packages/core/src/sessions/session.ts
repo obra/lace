@@ -69,7 +69,6 @@ export class Session {
 
     // Create session-scoped MCP server manager
     this._mcpServerManager = new MCPServerManager();
-
   }
 
   static create(options: {
