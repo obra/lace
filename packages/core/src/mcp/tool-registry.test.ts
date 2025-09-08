@@ -128,17 +128,15 @@ describe('MCPToolRegistry', () => {
           enabled: true,
           tools: {
             read_file: 'allow-session',
-            write_file: 'require-approval',
+            write_file: 'ask',
           },
         },
       },
     };
 
     expect(registry.getToolApprovalLevel(config, 'filesystem/read_file')).toBe('allow-session');
-    expect(registry.getToolApprovalLevel(config, 'filesystem/write_file')).toBe('require-approval');
-    expect(registry.getToolApprovalLevel(config, 'filesystem/unknown_tool')).toBe(
-      'require-approval'
-    );
+    expect(registry.getToolApprovalLevel(config, 'filesystem/write_file')).toBe('ask');
+    expect(registry.getToolApprovalLevel(config, 'filesystem/unknown_tool')).toBe('ask');
   });
 
   it('should handle tool discovery errors gracefully', async () => {

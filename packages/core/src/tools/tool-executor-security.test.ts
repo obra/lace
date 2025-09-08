@@ -139,15 +139,15 @@ describe('ToolExecutor Security with Real Session Context', () => {
         workingDirectory: tempLaceDirContext.tempDir,
       };
 
-      // Should return 'pending' because default policy is 'require-approval'
+      // Should return 'pending' because default policy is 'ask'
       const permission = await toolExecutor.requestToolPermission(toolCall, toolContext);
       expect(permission).toBe('pending');
     });
 
     it('should check session tool policy correctly', async () => {
-      // Verify that session.getToolPolicy() returns 'require-approval' by default
+      // Verify that session.getToolPolicy() returns 'ask' by default
       const policy = session.getToolPolicy('file_read');
-      expect(policy).toBe('require-approval');
+      expect(policy).toBe('ask');
 
       const toolCall: ToolCall = {
         id: 'test-call-789',
@@ -161,7 +161,7 @@ describe('ToolExecutor Security with Real Session Context', () => {
         workingDirectory: tempLaceDirContext.tempDir,
       };
 
-      // Should return 'pending' since default policy is 'require-approval'
+      // Should return 'pending' since default policy is 'ask'
       const permission = await toolExecutor.requestToolPermission(toolCall, toolContext);
       expect(permission).toBe('pending');
     });

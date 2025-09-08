@@ -135,11 +135,11 @@ export class MCPToolRegistry extends EventEmitter {
     const [serverId, actualToolName] = toolName.split('/', 2);
 
     if (!serverId || !actualToolName) {
-      return 'require-approval'; // Default for malformed names
+      return 'ask'; // Default for malformed names
     }
 
     const serverConfig = config.servers[serverId];
-    return serverConfig?.tools[actualToolName] || 'require-approval';
+    return serverConfig?.tools[actualToolName] || 'ask';
   }
 
   /**

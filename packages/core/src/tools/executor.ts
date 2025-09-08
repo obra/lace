@@ -180,7 +180,7 @@ export class ToolExecutor {
       // Filter tools based on approval policy - don't register disabled tools
       const enabledTools = serverTools.filter((tool) => {
         const [_serverId, toolId] = tool.name.split('/', 2);
-        const approvalLevel = server.config.tools[toolId] || 'require-approval';
+        const approvalLevel = server.config.tools[toolId] || 'ask';
         return approvalLevel !== 'disable';
       });
 
@@ -495,14 +495,14 @@ export class ToolExecutor {
    */
   private async getMCPApprovalLevel(toolName: string, context?: ToolContext): Promise<string> {
     if (!toolName.includes('/') || !context?.agent) {
-      return 'require-approval'; // Safe default
+      return 'ask'; // Safe default
     }
 
     try {
       // Get session from agent context
       const session = await context.agent.getFullSession();
       if (!session) {
-        return 'require-approval';
+        return 'ask';
       }
 
       const [serverId, toolId] = toolName.split('/', 2);
@@ -513,16 +513,16 @@ export class ToolExecutor {
       );
 
       if (serverStatus?.status === 'running') {
-        const approvalLevel = serverStatus.config.tools[toolId] || 'require-approval';
+        const approvalLevel = serverStatus.config.tools[toolId] || 'ask';
         logger.debug(`MCP approval result: ${toolName} → ${approvalLevel}`);
         return approvalLevel;
       }
 
-      logger.debug(`MCP approval fallback: ${toolName} → require-approval (server not running)`);
-      return 'require-approval';
+      logger.debug(`MCP approval fallback: ${toolName} → ask (server not running)`);
+      return 'ask';
     } catch (error) {
       logger.warn(`Failed to get MCP approval level for ${toolName}:`, error);
-      return 'require-approval';
+      return 'ask';
     }
   }
 

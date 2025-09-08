@@ -12,7 +12,7 @@ export type ServerStatus = 'running' | 'stopped' | 'failed' | 'discovering';
 export type ToolPolicy =
   | 'disable'
   | 'deny'
-  | 'require-approval'
+  | 'ask'
   | 'allow-once'
   | 'allow-session'
   | 'allow-project'
@@ -58,7 +58,7 @@ const policyOptions: { value: ToolPolicy; label: string }[] = [
   { value: 'allow-project', label: 'Allow Project' },
   { value: 'allow-session', label: 'Allow Session' },
   { value: 'allow-once', label: 'Allow Once' },
-  { value: 'require-approval', label: 'Require Approval' },
+  { value: 'ask', label: 'Require Approval' },
   { value: 'deny', label: 'Deny' },
   { value: 'disable', label: 'Disable' },
 ];
@@ -157,7 +157,7 @@ export function MCPServerCard({
         <div className="ml-5 space-y-1">
           {tools.map((tool, index) => {
             const isLast = index === tools.length - 1;
-            const currentPolicy = config.tools[tool.name] || 'require-approval';
+            const currentPolicy = config.tools[tool.name] || 'ask';
 
             return (
               <div key={tool.name} className="flex items-center gap-3">

@@ -31,7 +31,7 @@ function createMockSession(
   } = {}
 ): MockSession {
   return {
-    getToolPolicy: overrides.getToolPolicy || (() => 'require-approval'),
+    getToolPolicy: overrides.getToolPolicy || (() => 'ask'),
     getEffectiveConfiguration: overrides.getEffectiveConfiguration || (() => ({})),
     getId: overrides.getId || (() => 'lace_20250101_sess01'),
     getProjectId: overrides.getProjectId || (() => 'mock-project-id'),

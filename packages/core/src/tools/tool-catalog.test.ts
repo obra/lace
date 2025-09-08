@@ -73,7 +73,7 @@ describe('ToolCatalog', () => {
       mockProject.getMCPServers.mockReturnValue({
         git: {
           enabled: true,
-          tools: { git_status: 'allow-once', git_commit: 'require-approval' },
+          tools: { git_status: 'allow-once', git_commit: 'ask' },
           // No discoveredTools - should use keys from tools config
         },
       });

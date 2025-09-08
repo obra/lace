@@ -1,5 +1,5 @@
 // ABOUTME: Test file for ToolExecutor policy enforcement functionality
-// ABOUTME: Tests tool policy enforcement with allow/require-approval/deny logic
+// ABOUTME: Tests tool policy enforcement with allow/ask/deny logic
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
@@ -29,7 +29,7 @@ describe('ToolExecutor policy enforcement', () => {
       tools: ['file-read', 'file-write', 'bash'],
       toolPolicies: {
         'file-read': 'allow',
-        'file-write': 'require-approval',
+        'file-write': 'ask',
         bash: 'deny',
       },
     });
@@ -47,7 +47,7 @@ describe('ToolExecutor policy enforcement', () => {
         tools: ['file-read', 'file-write', 'bash'],
         toolPolicies: {
           'file-read': 'allow',
-          'file-write': 'require-approval',
+          'file-write': 'ask',
           bash: 'deny',
         },
       }),
@@ -81,8 +81,8 @@ describe('ToolExecutor policy enforcement', () => {
     expect(result.content[0].text).not.toContain('Tool execution denied by policy');
   });
 
-  it('should require approval when policy is require-approval', async () => {
-    vi.mocked(mockSession.getToolPolicy).mockReturnValue('require-approval');
+  it('should require approval when policy is ask', async () => {
+    vi.mocked(mockSession.getToolPolicy).mockReturnValue('ask');
 
     // Mock approval system to auto-approve
     const mockApprovalCallback = {
@@ -142,7 +142,7 @@ describe('ToolExecutor policy enforcement', () => {
   });
 
   it('should deny approval when user rejects', async () => {
-    vi.mocked(mockSession.getToolPolicy).mockReturnValue('require-approval');
+    vi.mocked(mockSession.getToolPolicy).mockReturnValue('ask');
 
     // Mock approval system to reject
     const mockApprovalCallback = {

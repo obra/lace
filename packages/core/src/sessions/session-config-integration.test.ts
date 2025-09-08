@@ -61,7 +61,7 @@ describe('Session Configuration Integration', () => {
         systemPrompt: 'You are a helpful assistant.',
         tools: ['file-read', 'bash'],
         toolPolicies: {
-          bash: 'require-approval',
+          bash: 'ask',
         },
       };
 
@@ -72,7 +72,7 @@ describe('Session Configuration Integration', () => {
       expect(validated.temperature).toBe(0.7);
       expect(validated.systemPrompt).toBe('You are a helpful assistant.');
       expect(validated.tools).toEqual(['file-read', 'bash']);
-      expect(validated.toolPolicies).toEqual({ bash: 'require-approval' });
+      expect(validated.toolPolicies).toEqual({ bash: 'ask' });
     });
 
     it('should reject invalid session configuration', () => {
@@ -144,7 +144,7 @@ describe('Session Configuration Integration', () => {
       testProject.updateConfiguration({
         toolPolicies: {
           'file-read': 'allow',
-          bash: 'require-approval',
+          bash: 'ask',
         },
       });
 
@@ -161,7 +161,7 @@ describe('Session Configuration Integration', () => {
       session.updateConfiguration({
         toolPolicies: {
           bash: 'allow', // Override project policy
-          'file-write': 'require-approval', // Add new policy
+          'file-write': 'ask', // Add new policy
         },
       });
 
@@ -170,7 +170,7 @@ describe('Session Configuration Integration', () => {
       expect(effectiveConfig.toolPolicies).toEqual({
         'file-read': 'allow', // From project
         bash: 'allow', // Overridden by session
-        'file-write': 'require-approval', // Added by session
+        'file-write': 'ask', // Added by session
       });
 
       session.destroy();
@@ -189,8 +189,8 @@ describe('Session Configuration Integration', () => {
           systemPrompt: 'You are a senior software engineer conducting code reviews.',
           tools: ['file-read', 'file-write', 'bash'],
           toolPolicies: {
-            'file-write': 'require-approval',
-            bash: 'require-approval',
+            'file-write': 'ask',
+            bash: 'ask',
           },
         },
         {
@@ -223,8 +223,8 @@ describe('Session Configuration Integration', () => {
       );
       expect(effectiveConfig.tools).toEqual(['file-read', 'file-write', 'bash']);
       expect(effectiveConfig.toolPolicies).toEqual({
-        'file-write': 'require-approval',
-        bash: 'require-approval',
+        'file-write': 'ask',
+        bash: 'ask',
       });
 
       session.destroy();
@@ -246,15 +246,15 @@ describe('Session Configuration Integration', () => {
       session.updateConfiguration({
         toolPolicies: {
           'file-read': 'allow',
-          bash: 'require-approval',
+          bash: 'ask',
           'file-write': 'deny',
         },
       });
 
       expect(session.getToolPolicy('file-read')).toBe('allow');
-      expect(session.getToolPolicy('bash')).toBe('require-approval');
+      expect(session.getToolPolicy('bash')).toBe('ask');
       expect(session.getToolPolicy('file-write')).toBe('deny');
-      expect(session.getToolPolicy('unknown-tool')).toBe('require-approval'); // Default
+      expect(session.getToolPolicy('unknown-tool')).toBe('ask'); // Default
 
       session.destroy();
     });

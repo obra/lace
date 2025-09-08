@@ -6,7 +6,7 @@ describe('MCP Types', () => {
     const levels: ApprovalLevel[] = [
       'disable',
       'deny',
-      'require-approval',
+      'ask',
       'allow-once',
       'allow-session',
       'allow-project',
@@ -26,7 +26,7 @@ describe('MCP Types', () => {
       enabled: true,
       tools: {
         read_file: 'allow-session',
-        write_file: 'require-approval',
+        write_file: 'ask',
       },
     };
 

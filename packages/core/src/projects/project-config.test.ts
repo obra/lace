@@ -37,7 +37,7 @@ describe('Project configuration', () => {
       tools: ['file-read', 'file-write', 'bash'],
       toolPolicies: {
         'file-write': 'allow',
-        bash: 'require-approval',
+        bash: 'ask',
       },
     });
     projectId = project.getId();
@@ -116,7 +116,7 @@ describe('Project configuration', () => {
     // Update configuration with toolPolicies
     session.updateConfiguration({
       toolPolicies: {
-        'file-write': 'require-approval', // Override
+        'file-write': 'ask', // Override
         'url-fetch': 'allow', // Add new
       },
     });
@@ -126,12 +126,12 @@ describe('Project configuration', () => {
 
     expect(sessionFromGet).toBeDefined();
     expect(sessionFromGet?.configuration.toolPolicies).toEqual({
-      'file-write': 'require-approval', // Overridden
+      'file-write': 'ask', // Overridden
       'url-fetch': 'allow', // Added
     });
     expect(projectConfig.toolPolicies).toEqual({
       'file-write': 'allow', // From project (original)
-      bash: 'require-approval', // From project
+      bash: 'ask', // From project
     });
   });
 
