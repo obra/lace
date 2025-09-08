@@ -83,4 +83,14 @@ export {
   faRedo,
   faInfo,
   faSquare,
+  // Debug panel icons
+  faBug,
+  faXmark as faX,
+  faStream,
+  faCircle,
+  faPause,
+  faPlay,
 } from '@fortawesome/free-solid-svg-icons';
+
+// Re-export faXmark as faXmark for consistency
+export { faXmark } from '@fortawesome/free-solid-svg-icons';

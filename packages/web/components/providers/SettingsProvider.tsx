@@ -1,5 +1,5 @@
-// ABOUTME: Theme provider component for DaisyUI theme switching
-// ABOUTME: Manages theme state and settings API persistence with localStorage migration
+// ABOUTME: Settings provider component managing all user preferences
+// ABOUTME: Handles theme, UI settings, debugging preferences with API persistence
 
 'use client';
 
@@ -21,44 +21,80 @@ const TimelineWidthSchema = z.enum(TIMELINE_WIDTHS);
 
 export { TIMELINE_WIDTHS };
 
-const LaceThemeSchema = z.object({
-  daisyui: DaisyUIThemeSchema,
-  timeline: z.object({
-    width: TimelineWidthSchema,
-  }),
+// Flat settings structure - matches existing API pattern
+const LaceSettingsSchema = z.object({
+  // Theme settings (keeping existing structure for compatibility)
+  theme: DaisyUIThemeSchema,
+  timelineWidth: TimelineWidthSchema,
+
+  // Debugging settings
+  debugPanelEnabled: z.boolean(),
 });
 
 type DaisyUITheme = z.infer<typeof DaisyUIThemeSchema>;
 type TimelineWidth = z.infer<typeof TimelineWidthSchema>;
-type LaceTheme = z.infer<typeof LaceThemeSchema>;
+type LaceSettings = z.infer<typeof LaceSettingsSchema>;
 
-interface ThemeContextType {
-  theme: LaceTheme;
+interface SettingsContextType {
+  // Settings state
+  settings: LaceSettings;
+
+  // Theme methods (keeping useTheme compatibility)
   setDaisyUITheme: (theme: DaisyUITheme) => void;
   setTimelineWidth: (width: TimelineWidth) => void;
-  setTheme: (theme: Partial<LaceTheme>) => void;
   getTimelineMaxWidthClass: () => string;
+
+  // Debugging methods
+  setDebugPanelEnabled: (enabled: boolean) => void;
 }
 
-const ThemeContext = createContext<ThemeContextType | null>(null);
+const SettingsContext = createContext<SettingsContextType | null>(null);
 
-export function useTheme(): ThemeContextType {
-  const context = useContext(ThemeContext);
+// Legacy theme hook for backward compatibility
+export function useTheme() {
+  const context = useContext(SettingsContext);
   if (!context) {
     throw new Error('useTheme must be used within SettingsProvider');
   }
-  return context;
+  return {
+    theme: {
+      daisyui: context.settings.theme,
+      timeline: { width: context.settings.timelineWidth },
+    },
+    setDaisyUITheme: context.setDaisyUITheme,
+    setTimelineWidth: context.setTimelineWidth,
+    setTheme: (partialTheme: { daisyui?: DaisyUITheme; timeline?: { width?: TimelineWidth } }) => {
+      if (partialTheme.daisyui) {
+        context.setDaisyUITheme(partialTheme.daisyui);
+      }
+      if (partialTheme.timeline?.width) {
+        context.setTimelineWidth(partialTheme.timeline.width);
+      }
+    },
+    getTimelineMaxWidthClass: context.getTimelineMaxWidthClass,
+  };
+}
+
+// New debugging settings hook
+export function useDebuggingSettings() {
+  const context = useContext(SettingsContext);
+  if (!context) {
+    throw new Error('useDebuggingSettings must be used within SettingsProvider');
+  }
+  return {
+    debugPanelEnabled: context.settings.debugPanelEnabled,
+    setDebugPanelEnabled: context.setDebugPanelEnabled,
+  };
 }
 
 interface SettingsProviderProps {
   children: ReactNode;
 }
 
-const defaultTheme: LaceTheme = {
-  daisyui: 'dark',
-  timeline: {
-    width: 'medium',
-  },
+const defaultSettings: LaceSettings = {
+  theme: 'dark',
+  timelineWidth: 'medium',
+  debugPanelEnabled: false,
 };
 
 function getTimelineMaxWidthClass(width: TimelineWidth): string {
@@ -77,88 +113,45 @@ function getTimelineMaxWidthClass(width: TimelineWidth): string {
 }
 
 export function SettingsProvider({ children }: SettingsProviderProps) {
-  const [theme, setThemeState] = useState<LaceTheme>(defaultTheme);
+  const [settings, setSettingsState] = useState<LaceSettings>(defaultSettings);
   const [mounted, setMounted] = useState(false);
 
-  // Load theme from settings API after component mounts
+  // Load settings from API after component mounts
   useEffect(() => {
     setMounted(true);
     let cancelled = false;
 
-    const loadTheme = async () => {
+    const loadSettings = async () => {
       try {
         // Load from settings API
-        const settings = await api.get<Record<string, unknown>>('/api/settings');
+        const apiSettings = await api.get<Record<string, unknown>>('/api/settings');
 
-        // Check if theme exists in settings API
-        const apiTheme = settings.theme;
-        const apiTimelineWidth = settings.timelineWidth;
+        // Parse each setting with fallbacks
+        const parsedSettings: LaceSettings = {
+          theme: DaisyUIThemeSchema.safeParse(apiSettings.theme).success
+            ? DaisyUIThemeSchema.parse(apiSettings.theme)
+            : defaultSettings.theme,
+          timelineWidth: TimelineWidthSchema.safeParse(apiSettings.timelineWidth).success
+            ? TimelineWidthSchema.parse(apiSettings.timelineWidth)
+            : defaultSettings.timelineWidth,
+          debugPanelEnabled:
+            typeof apiSettings.debugPanelEnabled === 'boolean'
+              ? apiSettings.debugPanelEnabled
+              : defaultSettings.debugPanelEnabled,
+        };
 
-        const daisyUIResult = DaisyUIThemeSchema.safeParse(apiTheme);
-        if (daisyUIResult.success) {
-          // Use API theme with API timeline width or default
-          const timelineWidthResult = TimelineWidthSchema.safeParse(apiTimelineWidth);
-          const timelineWidth = timelineWidthResult.success ? timelineWidthResult.data : 'medium';
-
-          if (!cancelled) {
-            setThemeState({
-              daisyui: daisyUIResult.data,
-              timeline: { width: timelineWidth },
-            });
-          }
-          return;
+        if (!cancelled) {
+          setSettingsState(parsedSettings);
         }
-
-        // Migration: Check localStorage for existing theme
-        const savedTheme = localStorage.getItem('lace-theme');
-        if (savedTheme) {
-          try {
-            // Try to parse as new LaceTheme format
-            const parsedUnknown = JSON.parse(savedTheme) as unknown;
-            const themeResult = LaceThemeSchema.safeParse(parsedUnknown);
-            if (themeResult.success) {
-              // Migrate complete theme to settings API
-              await api.patch('/api/settings', {
-                theme: themeResult.data.daisyui,
-                timelineWidth: themeResult.data.timeline.width,
-              });
-              if (cancelled) return;
-              setThemeState(themeResult.data);
-              localStorage.removeItem('lace-theme');
-              return;
-            }
-          } catch {
-            // Fall through to simple string check
-          }
-
-          // Try old format (simple string)
-          const oldThemeResult = DaisyUIThemeSchema.safeParse(savedTheme);
-          if (oldThemeResult.success) {
-            // Migrate to settings API with default timeline width
-            await api.patch('/api/settings', {
-              theme: oldThemeResult.data,
-              timelineWidth: 'medium',
-            });
-            if (cancelled) return;
-            setThemeState({
-              daisyui: oldThemeResult.data,
-              timeline: { width: 'medium' },
-            });
-            localStorage.removeItem('lace-theme');
-            return;
-          }
-        }
-
-        // Default theme
-        if (!cancelled) setThemeState(defaultTheme);
       } catch (error) {
-        console.warn('Failed to load theme from settings:', error);
-        // Default theme if API fails
-        if (!cancelled) setThemeState(defaultTheme);
+        console.warn('Failed to load settings from API:', error);
+        if (!cancelled) {
+          setSettingsState(defaultSettings);
+        }
       }
     };
 
-    void loadTheme();
+    void loadSettings();
 
     return () => {
       cancelled = true;
@@ -168,24 +161,25 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
   // Apply theme to document
   useEffect(() => {
     if (mounted) {
-      document.documentElement.setAttribute('data-theme', theme.daisyui);
+      document.documentElement.setAttribute('data-theme', settings.theme);
     }
-  }, [theme, mounted]);
+  }, [settings.theme, mounted]);
 
-  const saveTheme = useCallback(
-    (newTheme: LaceTheme) => {
-      setThemeState(newTheme);
+  const saveSettings = useCallback(
+    (newSettings: LaceSettings) => {
+      setSettingsState(newSettings);
       if (mounted) {
-        document.documentElement.setAttribute('data-theme', newTheme.daisyui);
+        document.documentElement.setAttribute('data-theme', newSettings.theme);
 
-        // Save both theme and timeline width to settings API
+        // Save all settings to API
         void api
           .patch('/api/settings', {
-            theme: newTheme.daisyui,
-            timelineWidth: newTheme.timeline.width,
+            theme: newSettings.theme,
+            timelineWidth: newSettings.timelineWidth,
+            debugPanelEnabled: newSettings.debugPanelEnabled,
           })
           .catch((error) => {
-            console.warn('Failed to save theme to settings:', error);
+            console.warn('Failed to save settings to API:', error);
           });
       }
     },
@@ -193,50 +187,49 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
   );
 
   const setDaisyUITheme = useCallback(
-    (daisyui: DaisyUITheme) => {
-      const newTheme = { ...theme, daisyui };
-      saveTheme(newTheme);
+    (theme: DaisyUITheme) => {
+      const newSettings = { ...settings, theme };
+      saveSettings(newSettings);
     },
-    [theme, saveTheme]
+    [settings, saveSettings]
   );
 
   const setTimelineWidth = useCallback(
-    (width: TimelineWidth) => {
-      const newTheme = {
-        ...theme,
-        timeline: { ...theme.timeline, width },
-      };
-      saveTheme(newTheme);
+    (timelineWidth: TimelineWidth) => {
+      const newSettings = { ...settings, timelineWidth };
+      saveSettings(newSettings);
     },
-    [theme, saveTheme]
+    [settings, saveSettings]
   );
 
-  const setTheme = useCallback(
-    (partialTheme: Partial<LaceTheme>) => {
-      const newTheme = {
-        ...theme,
-        ...partialTheme,
-        timeline: { ...theme.timeline, ...partialTheme.timeline },
-      };
-      saveTheme(newTheme);
+  const setDebugPanelEnabled = useCallback(
+    (debugPanelEnabled: boolean) => {
+      const newSettings = { ...settings, debugPanelEnabled };
+      saveSettings(newSettings);
     },
-    [theme, saveTheme]
+    [settings, saveSettings]
   );
 
-  const getTimelineMaxWidthClassForTheme = useCallback(() => {
-    return getTimelineMaxWidthClass(theme.timeline.width);
-  }, [theme.timeline.width]);
+  const getTimelineMaxWidthClassForSettings = useCallback(() => {
+    return getTimelineMaxWidthClass(settings.timelineWidth);
+  }, [settings.timelineWidth]);
 
   const value = useMemo(
     () => ({
-      theme,
+      settings,
       setDaisyUITheme,
       setTimelineWidth,
-      setTheme,
-      getTimelineMaxWidthClass: getTimelineMaxWidthClassForTheme,
+      setDebugPanelEnabled,
+      getTimelineMaxWidthClass: getTimelineMaxWidthClassForSettings,
     }),
-    [theme, setDaisyUITheme, setTimelineWidth, setTheme, getTimelineMaxWidthClassForTheme]
+    [
+      settings,
+      setDaisyUITheme,
+      setTimelineWidth,
+      setDebugPanelEnabled,
+      getTimelineMaxWidthClassForSettings,
+    ]
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }
