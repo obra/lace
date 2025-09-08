@@ -3,6 +3,7 @@
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import type { ToolPolicy } from '~/tools/types';
 
 // Discovered tool information from MCP server
 export interface DiscoveredTool {
@@ -17,7 +18,7 @@ export interface MCPServerConfig {
   env?: Record<string, string>; // Environment variables
   cwd?: string; // Working directory
   enabled: boolean;
-  tools: Record<string, ApprovalLevel>; // Tool name -> approval policy
+  tools: Record<string, ToolPolicy>; // Tool name -> approval policy
 
   // Tool discovery cache
   discoveredTools?: DiscoveredTool[];
@@ -29,8 +30,6 @@ export interface MCPServerConfig {
 export interface MCPConfig {
   servers: Record<string, MCPServerConfig>;
 }
-
-export type { ToolPolicy as ApprovalLevel } from '~/tools/types';
 
 // Runtime server connection state
 export interface MCPServerConnection {
