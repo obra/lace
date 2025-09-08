@@ -10,14 +10,7 @@ import { Modal } from '@/components/ui/Modal';
 import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import { ModelSelectionForm } from './ModelSelectionForm';
 import type { ProviderInfo, SessionConfiguration } from '@/types/api';
-
-// Tool policy information for type safety
-interface ToolPolicyInfo {
-  value: ToolPolicy;
-  allowedValues: ToolPolicy[];
-  projectValue?: ToolPolicy;
-  globalValue?: ToolPolicy;
-}
+import { isToolPolicyData } from '@/lib/type-guards';
 import type { ProjectInfo, SessionInfo } from '@/types/core';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 import { useSessionEditModal } from '@/hooks/useSessionEditModal';
@@ -295,9 +288,7 @@ export const SessionEditModal = memo(function SessionEditModal({
                 </label>
                 <ToolPolicyList
                   toolPolicyData={
-                    typeof sessionConfig.tools === 'object' && !Array.isArray(sessionConfig.tools)
-                      ? (sessionConfig.tools as Record<string, ToolPolicyInfo>)
-                      : undefined
+                    isToolPolicyData(sessionConfig.tools) ? sessionConfig.tools : undefined
                   }
                   onChange={handleToolPolicyChange}
                 />

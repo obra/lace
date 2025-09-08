@@ -1,0 +1,39 @@
+// ABOUTME: Shared type guard functions for runtime type checking
+// ABOUTME: Eliminates unsafe type assertions throughout the application
+
+import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
+
+// Tool policy information structure
+export interface ToolPolicyInfo {
+  value: ToolPolicy;
+  allowedValues: ToolPolicy[];
+  projectValue?: ToolPolicy;
+  globalValue?: ToolPolicy;
+}
+
+/**
+ * Type guard to check if tools field contains policy information structure
+ */
+export function isToolPolicyData(tools: unknown): tools is Record<string, ToolPolicyInfo> {
+  return (
+    typeof tools === 'object' &&
+    tools !== null &&
+    !Array.isArray(tools) &&
+    Object.keys(tools).length > 0 &&
+    Object.values(tools).every(
+      (tool) =>
+        tool &&
+        typeof tool === 'object' &&
+        'value' in tool &&
+        'allowedValues' in tool &&
+        Array.isArray((tool as any).allowedValues)
+    )
+  );
+}
+
+/**
+ * Type guard to check if tools field is a simple string array
+ */
+export function isToolStringArray(tools: unknown): tools is string[] {
+  return Array.isArray(tools) && tools.every((item) => typeof item === 'string');
+}
