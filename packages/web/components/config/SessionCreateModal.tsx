@@ -7,12 +7,10 @@ import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrash, faExclamationTriangle } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
-import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import { ModelSelectionForm } from './ModelSelectionForm';
 import { Alert } from '@/components/ui/Alert';
 import type { ProviderInfo, SessionConfiguration } from '@/types/api';
 import type { ProjectInfo } from '@/types/core';
-import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 import { useAvailableTools } from '@/hooks/useAvailableTools';
 
 interface SessionCreateModalProps {
@@ -74,15 +72,7 @@ export const SessionCreateModal = memo(function SessionCreateModal({
     });
   };
 
-  const handleToolPolicyChange = (tool: string, policy: ToolPolicy) => {
-    onSessionConfigChange({
-      ...sessionConfig,
-      toolPolicies: {
-        ...(sessionConfig.toolPolicies ?? {}),
-        [tool]: policy,
-      },
-    });
-  };
+  // Tool policies can be configured after session creation in session edit modal
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,19 +250,7 @@ export const SessionCreateModal = memo(function SessionCreateModal({
             </div>
           </div>
 
-          {/* Tool Configuration */}
-          <div>
-            <label className="label">
-              <span className="label-text font-medium">Tool Access Policies</span>
-            </label>
-            <ToolPolicyList
-              tools={availableTools}
-              policies={sessionConfig.toolPolicies || {}}
-              onChange={handleToolPolicyChange}
-              loading={toolsLoading}
-              error={toolsError}
-            />
-          </div>
+          {/* Tool policies can be configured after session creation in session settings */}
         </div>
 
         {/* Actions */}
