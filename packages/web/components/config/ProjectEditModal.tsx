@@ -15,14 +15,7 @@ import type { ProjectInfo, MCPServerConfig } from '@/types/core';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import type { SessionConfiguration } from '@/types/api';
-
-// Tool policy information for type safety
-interface ToolPolicyInfo {
-  value: ToolPolicy;
-  allowedValues: ToolPolicy[];
-  projectValue?: ToolPolicy;
-  globalValue?: ToolPolicy;
-}
+import { isToolPolicyData } from '@/lib/type-guards';
 import { api } from '@/lib/api-client';
 
 interface ProjectConfiguration {
@@ -410,9 +403,7 @@ export function ProjectEditModal({
                 </label>
                 <ToolPolicyList
                   toolPolicyData={
-                    typeof initialConfig.tools === 'object' && !Array.isArray(initialConfig.tools)
-                      ? (initialConfig.tools as Record<string, ToolPolicyInfo>)
-                      : undefined
+                    isToolPolicyData(initialConfig.tools) ? initialConfig.tools : undefined
                   }
                   onChange={handleToolPolicyChange}
                 />
