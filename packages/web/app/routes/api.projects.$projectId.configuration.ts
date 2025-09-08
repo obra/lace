@@ -2,7 +2,7 @@
 // ABOUTME: Handles project configuration retrieval and updates with validation and error handling
 
 import { Project, ProviderRegistry, ToolCatalog } from '@/lib/server/lace-imports';
-import { ToolPolicyResolver } from '@/lib/tool-policy-resolver';
+import { ToolPolicyResolver, type ToolPolicy } from '@/lib/tool-policy-resolver';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 // Using ToolCatalog instead of toolCacheService for better performance

@@ -3,7 +3,7 @@
 
 import { getSessionService } from '@/lib/server/session-service';
 import { ToolCatalog, Project } from '@/lib/server/lace-imports';
-import { ToolPolicyResolver } from '@/lib/tool-policy-resolver';
+import { ToolPolicyResolver, type ToolPolicy } from '@/lib/tool-policy-resolver';
 import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
@@ -124,10 +124,13 @@ export async function action({ request, params }: Route.ActionArgs) {
           const projectConfig = project.getConfiguration();
 
           // Check each tool policy change against project restrictions
-          for (const [tool, newPolicy] of Object.entries(validatedData.toolPolicies)) {
+          for (const [tool, newPolicy] of Object.entries(validatedData.toolPolicies) as [
+            string,
+            ToolPolicy,
+          ][]) {
             const projectPolicies = projectConfig.toolPolicies;
             if (projectPolicies) {
-              const projectPolicy = projectPolicies[tool];
+              const projectPolicy = projectPolicies[tool] as ToolPolicy | undefined;
               if (
                 projectPolicy &&
                 !ToolPolicyResolver.isValidPolicyChange(tool, newPolicy, projectPolicy)
