@@ -14,12 +14,13 @@ describe('ToolPolicyToggle', () => {
     mockOnChange.mockClear();
   });
 
-  it('renders all three policy options', () => {
+  it('renders all four policy options', () => {
     render(<ToolPolicyToggle value="ask" onChange={mockOnChange} />);
 
     expect(screen.getByRole('button', { name: 'Allow' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ask' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Block' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Deny' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Disable' })).toBeInTheDocument();
   });
 
   it('highlights the selected policy option', () => {
@@ -27,11 +28,11 @@ describe('ToolPolicyToggle', () => {
 
     const allowButton = screen.getByRole('button', { name: 'Allow' });
     const askButton = screen.getByRole('button', { name: 'Ask' });
-    const blockButton = screen.getByRole('button', { name: 'Block' });
+    const denyButton = screen.getByRole('button', { name: 'Deny' });
 
     expect(allowButton).toHaveClass('bg-green-950');
     expect(askButton).not.toHaveClass('bg-yellow-950');
-    expect(blockButton).not.toHaveClass('bg-red-950');
+    expect(denyButton).not.toHaveClass('bg-red-950');
   });
 
   it('applies correct color coding for each policy', () => {
@@ -42,7 +43,7 @@ describe('ToolPolicyToggle', () => {
     expect(screen.getByRole('button', { name: 'Ask' })).toHaveClass('bg-yellow-950');
 
     rerender(<ToolPolicyToggle value="deny" onChange={mockOnChange} />);
-    expect(screen.getByRole('button', { name: 'Block' })).toHaveClass('bg-red-950');
+    expect(screen.getByRole('button', { name: 'Deny' })).toHaveClass('bg-red-950');
   });
 
   it('calls onChange when a different policy is selected', () => {
@@ -51,7 +52,7 @@ describe('ToolPolicyToggle', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
     expect(mockOnChange).toHaveBeenCalledWith('allow');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Block' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Deny' }));
     expect(mockOnChange).toHaveBeenCalledWith('deny');
   });
 
@@ -67,7 +68,8 @@ describe('ToolPolicyToggle', () => {
 
     expect(screen.getByRole('button', { name: 'Allow' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Ask' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Block' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Deny' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Disable' })).toBeDisabled();
   });
 
   it('does not call onChange when disabled', () => {
@@ -98,13 +100,20 @@ describe('ToolPolicyToggle', () => {
 
     expect(screen.getByRole('button', { name: 'Allow' })).toHaveAttribute(
       'title',
-      'Execute automatically'
+      'Auto-approve without prompting'
     );
     expect(screen.getByRole('button', { name: 'Ask' })).toHaveAttribute(
       'title',
-      'Require user approval'
+      'Prompt user each time'
     );
-    expect(screen.getByRole('button', { name: 'Block' })).toHaveAttribute('title', 'Never allow');
+    expect(screen.getByRole('button', { name: 'Deny' })).toHaveAttribute(
+      'title',
+      'Block execution'
+    );
+    expect(screen.getByRole('button', { name: 'Disable' })).toHaveAttribute(
+      'title',
+      'Tool not available'
+    );
   });
 
   it('has proper focus management and keyboard navigation', () => {
@@ -146,11 +155,11 @@ describe('ToolPolicyToggle', () => {
   });
 
   it('handles all valid policy values', () => {
-    const policies: ToolPolicy[] = ['allow', 'ask', 'deny'];
+    const policies: ToolPolicy[] = ['allow', 'ask', 'deny', 'disable'];
 
     policies.forEach((policy) => {
       const { unmount } = render(<ToolPolicyToggle value={policy} onChange={mockOnChange} />);
-      expect(screen.getAllByRole('button')).toHaveLength(3);
+      expect(screen.getAllByRole('button')).toHaveLength(4);
       unmount();
     });
   });

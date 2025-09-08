@@ -102,14 +102,14 @@ describe('Session Configuration API - Tool Permissions Structure', () => {
       // Test bash: session=ask, project=allow
       expect(data.configuration.tools?.bash).toEqual({
         value: 'ask', // Current session value
-        allowedValues: ['ask', 'deny', 'disable'], // More restrictive than project 'allow'
+        allowedValues: ['allow', 'ask', 'deny', 'disable'], // Equal or more restrictive than project 'allow'
         projectValue: 'allow', // What project has set
       });
 
       // Test file_read: no session override, inherits from project
       expect(data.configuration.tools?.file_read).toEqual({
         value: 'ask', // Inherited from project
-        allowedValues: ['ask', 'deny', 'disable'], // More restrictive than project 'ask'
+        allowedValues: ['ask', 'deny', 'disable'], // Equal or more restrictive than project 'ask'
         projectValue: 'ask', // What project has set
       });
 
