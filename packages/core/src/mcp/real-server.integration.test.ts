@@ -40,9 +40,9 @@ describe('Real MCP Server Integration', () => {
       args: ['-y', '@modelcontextprotocol/server-filesystem', testDataDir],
       enabled: true,
       tools: {
-        read_text_file: 'allow-always',
-        list_directory: 'allow-always',
-        list_allowed_directories: 'allow-always',
+        read_text_file: 'allow',
+        list_directory: 'allow',
+        list_allowed_directories: 'allow',
       },
     });
 
@@ -127,7 +127,7 @@ describe('Real MCP Server Integration', () => {
       args: ['--invalid'],
       enabled: true,
       tools: {
-        fake_tool: 'allow-always',
+        fake_tool: 'allow',
       },
     });
 

@@ -3,15 +3,7 @@ import type { MCPServerConfig, ApprovalLevel } from './types';
 
 describe('MCP Types', () => {
   it('should define valid approval levels', () => {
-    const levels: ApprovalLevel[] = [
-      'disable',
-      'deny',
-      'ask',
-      'allow-once',
-      'allow-session',
-      'allow-project',
-      'allow-always',
-    ];
+    const levels: ApprovalLevel[] = ['disable', 'deny', 'ask', 'ask', 'allow', 'allow', 'allow'];
 
     // Type check - if types are wrong, TS will error
     expect(levels).toHaveLength(7);
@@ -25,12 +17,12 @@ describe('MCP Types', () => {
       cwd: '/path/to/server',
       enabled: true,
       tools: {
-        read_file: 'allow-session',
+        read_file: 'allow',
         write_file: 'ask',
       },
     };
 
     expect(config.command).toBe('node');
-    expect(config.tools.read_file).toBe('allow-session');
+    expect(config.tools.read_file).toBe('allow');
   });
 });

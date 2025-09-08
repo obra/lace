@@ -82,7 +82,7 @@ describe('MCP Integration E2E', () => {
       args: ['test-server.js'],
       enabled: true,
       tools: {
-        echo_test: 'allow-always',
+        echo_test: 'allow',
       },
     });
 
@@ -118,7 +118,7 @@ describe('MCP Integration E2E', () => {
     const projectServers = project.getMCPServers();
     expect(projectServers['test-server']).toBeDefined();
     expect(projectServers['test-server'].enabled).toBe(true);
-    expect(projectServers['test-server'].tools.echo_test).toBe('allow-always');
+    expect(projectServers['test-server'].tools.echo_test).toBe('allow');
 
     // Step 2: Wait for MCP server initialization to complete
     await session.waitForMCPInitialization();
@@ -165,7 +165,7 @@ describe('MCP Integration E2E', () => {
     expect(result.content).toHaveLength(1);
     expect(result.content[0].text).toBe('Echo: Hello MCP Integration!');
 
-    // For allow-always tools, approval callback should NOT be called (bypassed)
+    // For allow tools, approval callback should NOT be called (bypassed)
     expect(mockApprovalCallback.requestApproval).not.toHaveBeenCalled();
   });
 
@@ -244,11 +244,11 @@ describe('MCP Integration E2E', () => {
     const mcpManager = session.getMCPServerManager();
     await toolExecutor.registerMCPToolsAndWait(mcpManager);
 
-    // Verify tool is available (with allow-always config from beforeEach)
+    // Verify tool is available (with allow config from beforeEach)
     const availableTools = toolExecutor.getAvailableToolNames();
     expect(availableTools).toContain('test-server/echo_test');
 
-    // Test execution of allow-always tool (should work without Agent context)
+    // Test execution of allow tool (should work without Agent context)
     const toolCall: ToolCall = {
       id: 'test-approval-level',
       name: 'test-server/echo_test',
@@ -260,11 +260,11 @@ describe('MCP Integration E2E', () => {
       agent: agent,
     });
 
-    // Should execute successfully because of allow-always approval level
+    // Should execute successfully because of allow approval level
     expect(result.status).toBe('completed');
     expect(result.content[0].text).toBe('Echo: Testing approval levels');
 
-    // Approval callback should not be called for allow-always tools
+    // Approval callback should not be called for allow tools
     expect(mockApprovalCallback.requestApproval).not.toHaveBeenCalled();
   });
 });

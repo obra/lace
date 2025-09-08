@@ -40,7 +40,7 @@ describe('Global MCP Server List API', () => {
           command: 'npx',
           args: ['-y', '@modelcontextprotocol/server-filesystem'],
           enabled: true,
-          tools: { read_file: 'allow-session' },
+          tools: { read_file: 'allow' },
         },
       },
     });

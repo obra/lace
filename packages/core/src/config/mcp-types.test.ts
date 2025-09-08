@@ -10,7 +10,7 @@ describe('MCPServerConfig Discovery Fields', () => {
       command: 'npx',
       args: ['test-server'],
       enabled: true,
-      tools: { test_tool: 'allow-once' },
+      tools: { test_tool: 'ask' },
       // NEW fields
       discoveredTools: [{ name: 'test_tool', description: 'Test tool' }],
       discoveryStatus: 'success',
