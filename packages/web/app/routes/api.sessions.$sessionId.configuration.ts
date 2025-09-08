@@ -3,7 +3,7 @@
 
 import { getSessionService } from '@/lib/server/session-service';
 import { ToolCatalog, Project } from '@/lib/server/lace-imports';
-import { ToolPolicyResolver } from '@/lib/tool-policy-resolver';
+import { ToolPolicyResolver } from '../../lib/tool-policy-resolver';
 import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
@@ -72,6 +72,8 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       availableTools,
       toolPolicyHierarchy
     );
+
+    console.warn('[DEBUG] ToolPolicyResolver result:', JSON.stringify(resolvedTools, null, 2));
 
     return createSuperjsonResponse({
       configuration: {
