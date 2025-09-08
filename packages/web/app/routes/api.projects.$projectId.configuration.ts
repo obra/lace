@@ -2,6 +2,7 @@
 // ABOUTME: Handles project configuration retrieval and updates with validation and error handling
 
 import { Project, ProviderRegistry, ToolCatalog } from '@/lib/server/lace-imports';
+import { ToolPolicyResolver } from '../../lib/tool-policy-resolver';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { toolCacheService } from '@/lib/server/tool-cache-service';
@@ -31,10 +32,23 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
     const availableTools = ToolCatalog.getAvailableTools(project);
 
+    // Resolve tool policy hierarchy for progressive restriction
+    // TODO: Get global policies for full hierarchy
+    const toolPolicyHierarchy = {
+      global: {}, // TODO: Load actual global policies
+      project: configuration.toolPolicies || {},
+    };
+
+    const resolvedTools = ToolPolicyResolver.resolveProjectToolPolicies(
+      availableTools,
+      toolPolicyHierarchy
+    );
+
     return createSuperjsonResponse({
       configuration: {
         ...configuration,
         availableTools,
+        tools: resolvedTools,
       },
     });
   } catch (error: unknown) {

@@ -113,13 +113,31 @@ export function ProjectEditModal({
 
   // Tool policy handlers
   const handleToolPolicyChange = (tool: string, policy: ToolPolicy) => {
-    setEditConfig((prev) => ({
-      ...prev,
-      toolPolicies: {
+    setEditConfig((prev) => {
+      const updatedPolicies = {
         ...(prev.toolPolicies ?? {}),
         [tool]: policy,
-      },
-    }));
+      };
+
+      // Update both structures to keep them in sync
+      const updatedConfig = {
+        ...prev,
+        toolPolicies: updatedPolicies,
+      };
+
+      // Also update the tools structure if it exists to reflect the new value
+      if (prev.tools && prev.tools[tool]) {
+        updatedConfig.tools = {
+          ...prev.tools,
+          [tool]: {
+            ...prev.tools[tool],
+            value: policy,
+          },
+        };
+      }
+
+      return updatedConfig;
+    });
   };
 
   // MCP server management
@@ -383,11 +401,8 @@ export function ProjectEditModal({
                   <span className="label-text font-medium">Tool Access Policies</span>
                 </label>
                 <ToolPolicyList
-                  tools={(initialConfig as SessionConfiguration).availableTools || []}
-                  policies={editConfig.toolPolicies || {}}
+                  toolPolicyData={(initialConfig as any).tools}
                   onChange={handleToolPolicyChange}
-                  context="project"
-                  parentPolicies={{}} // TODO: Get global tool policies
                 />
               </div>
             </div>
