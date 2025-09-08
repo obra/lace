@@ -2,7 +2,7 @@
 // ABOUTME: Tests policy hierarchy resolution, allowedValues computation, and validation without API complexity
 
 import { describe, it, expect } from 'vitest';
-import { ToolPolicyResolver } from '../tool-policy-resolver';
+import { ToolPolicyResolver } from '@/lib/tool-policy-resolver';
 
 describe('ToolPolicyResolver', () => {
   describe('resolveSessionToolPolicies', () => {
