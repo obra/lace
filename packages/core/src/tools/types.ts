@@ -107,3 +107,26 @@ export function createErrorResult(
   }
   return createToolResult('failed', input, id, metadata);
 }
+
+// Tool approval types (consolidated from approval-types.ts)
+export enum ApprovalDecision {
+  ALLOW_ONCE = 'allow_once',
+  ALLOW_SESSION = 'allow_session',
+  ALLOW_PROJECT = 'allow_project',
+  ALLOW_ALWAYS = 'allow_always',
+  DENY = 'deny',
+  DISABLE = 'disable',
+}
+
+export interface ApprovalCallback {
+  requestApproval(toolCall: ToolCall): Promise<ApprovalDecision>;
+}
+
+export class ApprovalPendingError extends Error {
+  constructor(public readonly toolCallId: string) {
+    super(`Tool approval pending for ${toolCallId}`);
+    this.name = 'ApprovalPendingError';
+  }
+}
+
+export type ToolPolicy = 'allow' | 'ask' | 'deny' | 'disable';
