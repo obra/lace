@@ -3,7 +3,7 @@
 
 import { getSessionService } from '@/lib/server/session-service';
 import { ToolCatalog, Project } from '@/lib/server/lace-imports';
-import { ToolPolicyResolver } from '../../lib/tool-policy-resolver';
+import { ToolPolicyResolver } from '@/lib/tool-policy-resolver';
 import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
@@ -27,7 +27,6 @@ const ConfigurationSchema = z.object({
 });
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
-  console.warn('[DEBUG] Session config loader called with params:', params);
   try {
     const { sessionId: sessionIdParam } = params as { sessionId: string };
 
@@ -44,7 +43,6 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     }
 
     const configuration = session.getEffectiveConfiguration();
-    console.warn('[DEBUG] Session configuration loaded:', JSON.stringify(configuration, null, 2));
 
     // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
     const projectId = session.getProjectId();
@@ -74,8 +72,6 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       availableTools,
       toolPolicyHierarchy
     );
-
-    console.warn('[DEBUG] ToolPolicyResolver result:', JSON.stringify(resolvedTools, null, 2));
 
     return createSuperjsonResponse({
       configuration: {
