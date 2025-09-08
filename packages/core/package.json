@@ -99,10 +99,6 @@
       "types": "./dist/tools/types.d.ts",
       "import": "./dist/tools/types.js"
     },
-    "./tools/types": {
-      "types": "./dist/tools/types.d.ts",
-      "import": "./dist/tools/types.js"
-    },
     "./tools/tool": {
       "types": "./dist/tools/tool.d.ts",
       "import": "./dist/tools/tool.js"
