@@ -9,7 +9,7 @@ import { ProviderResponse } from '~/providers/base-provider';
 import { logger } from '~/utils/logger';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 import { EVENT_TYPES } from '~/threads/types';
 
 // Helper function to wait for agent to return to idle state

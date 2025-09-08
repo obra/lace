@@ -21,7 +21,7 @@ export { isAgentSummaryUpdatedData } from '~/threads/types';
 
 export type { CombinedTokenUsage, ThreadTokenUsage } from '~/token-management/types';
 
-export type { ToolCall, ToolResult, ToolAnnotations } from '~/tools/types';
+export type { ToolCall, ToolResult, ToolAnnotations, ToolPolicy } from '~/tools/types';
 
 export type { FileEditDiffContext } from '~/tools/implementations/file-edit';
 
@@ -38,7 +38,7 @@ export type { AgentState, AgentInfo } from '~/agents/agent';
 
 export type { ProviderInfo, ProviderResponse, ModelInfo } from '~/providers/base-provider';
 
-export { ApprovalDecision } from '~/tools/approval-types';
+export { ApprovalDecision } from '~/tools/types';
 
 export type { ProjectInfo } from '~/projects/project';
 

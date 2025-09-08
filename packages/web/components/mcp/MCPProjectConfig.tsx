@@ -9,7 +9,7 @@ import { faPlus, faServer, faEdit, faTrash } from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
 import type { MCPServerConfig } from '@/types/core';
 import { ToolPolicySelector } from '@/components/ui/ToolPolicySelector';
-import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
+import type { ToolPolicy } from '@/types/core';
 
 interface MCPProjectConfigProps {
   projectId: string;

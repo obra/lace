@@ -430,7 +430,7 @@ This eliminates all the complex `findRecentToolCallEvent` logic and race conditi
 **Objective:** Fix the fundamental design flaw where approvals are requested by toolName+input instead of toolCallId.
 
 **Files to Modify:**
-- `src/tools/approval-types.ts`
+- `src/tools/types.ts`
 - `src/tools/event-approval-callback.ts`  
 - `src/tools/executor.ts`
 - `packages/web/lib/server/agent-utils.ts`
@@ -442,7 +442,7 @@ The current approval system is backwards. When the Agent gets a ToolCall from th
 
 1. **Update ApprovalCallback interface:**
 ```typescript
-// In src/tools/approval-types.ts
+// In src/tools/types.ts
 export interface ApprovalCallback {
   requestApproval(toolCallId: string): Promise<ApprovalDecision>;
 }

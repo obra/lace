@@ -1860,7 +1860,7 @@ The Lace tool approval system uses a hybrid callback-event architecture that all
    - Requires an `ApprovalCallback` to be set via `setApprovalCallback()`
    - Calls the callback before executing any tool that requires approval
 
-2. **ApprovalCallback Interface** (`src/tools/approval-types.ts`)
+2. **ApprovalCallback Interface** (`src/tools/types.ts`)
    ```typescript
    interface ApprovalCallback {
      requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision>;

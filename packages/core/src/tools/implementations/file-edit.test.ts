@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, rm, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { FileEditTool } from '~/tools/implementations/file-edit';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   createTestProviderInstance,

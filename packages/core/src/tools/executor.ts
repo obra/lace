@@ -9,7 +9,7 @@ import {
   createToolResult,
 } from '~/tools/types';
 import { Tool } from '~/tools/tool';
-import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
+import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/types';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { mkdirSync } from 'fs';
 import { join } from 'path';

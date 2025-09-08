@@ -34,7 +34,7 @@ export {
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
 export { TestProvider } from '~/test-utils/test-provider';
-export { ApprovalPendingError, ApprovalDecision } from '~/tools/approval-types';
+export { ApprovalPendingError, ApprovalDecision } from '~/tools/types';
 
 // Database and configuration
 export { ensureLaceDir } from '~/config/lace-dir';

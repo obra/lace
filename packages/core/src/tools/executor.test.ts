@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
 import { FileReadTool } from '~/tools/implementations/file-read';
-import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
+import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/types';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { createTestTempDir } from '~/test-utils/temp-directory';

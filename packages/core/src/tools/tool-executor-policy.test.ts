@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
 import { ToolContext } from '~/tools/types';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 import { asThreadId } from '~/threads/types';
 import { Session } from '~/sessions/session';
 import type { Agent } from '~/agents/agent';

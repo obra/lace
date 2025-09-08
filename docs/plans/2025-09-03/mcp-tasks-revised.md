@@ -18,7 +18,7 @@ Lace is a TypeScript/Node.js AI coding assistant using event-sourcing architectu
 - `docs/plans/mcp-client.md` - Full specification
 - `packages/core/src/tools/tool.ts` - Base class for all tools
 - `packages/core/src/tools/executor.ts` - Tool execution engine  
-- `packages/core/src/tools/approval-types.ts` - Approval system
+- `packages/core/src/tools/types.ts` - Approval system
 - `packages/core/src/tools/implementations/bash.ts` - Example tool implementation
 - `vendor/typescript-sdk/src/client/index.ts` - MCP Client API
 - `vendor/typescript-sdk/src/client/stdio.ts` - Stdio transport for process spawning
@@ -1367,7 +1367,7 @@ describe('MCPToolRegistry', () => {
 **Objective**: Add new approval levels to existing approval system
 
 **Files to Modify:**
-- `packages/core/src/tools/approval-types.ts`
+- `packages/core/src/tools/types.ts`
 
 **Changes:**
 ```typescript

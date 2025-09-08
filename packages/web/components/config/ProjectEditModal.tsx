@@ -12,7 +12,7 @@ import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import { MCPProjectConfig } from '@/components/mcp/MCPProjectConfig';
 import { AddMCPServerModal } from '@/components/modals/AddMCPServerModal';
 import type { ProjectInfo, MCPServerConfig } from '@/types/core';
-import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
+import type { ToolPolicy } from '@/types/core';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import type { SessionConfiguration } from '@/types/api';
 import { isToolPolicyData, type ToolPolicyInfo } from '@/lib/type-guards';

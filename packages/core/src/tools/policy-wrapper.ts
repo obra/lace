@@ -1,7 +1,7 @@
 // ABOUTME: Global policy wrapper that applies CLI options to any approval callback interface
 // ABOUTME: Ensures CLI tool policies work regardless of which interface is running (CLI, web, React/Ink)
 
-import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalCallback, ApprovalDecision } from '~/tools/types';
 import { ToolCall } from '~/tools/types';
 // Note: CLIOptions type removed with CLI refactor, defining minimal type here for policy wrapper
 type CLIOptions = {

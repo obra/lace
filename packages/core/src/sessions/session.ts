@@ -28,7 +28,7 @@ import { FileFindTool } from '~/tools/implementations/file-find';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url-fetch';
 import { logger } from '~/utils/logger';
-import type { ApprovalCallback } from '~/tools/approval-types';
+import type { ApprovalCallback, ToolPolicy } from '~/tools/types';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { getEnvVar } from '~/config/env-loader';
 import { MCPServerManager } from '~/mcp/server-manager';
@@ -729,7 +729,7 @@ export class Session {
     Session.updateSession(this._sessionId, { configuration: newConfig });
   }
 
-  getToolPolicy(toolName: string): 'allow' | 'ask' | 'deny' | 'disable' {
+  getToolPolicy(toolName: string): ToolPolicy {
     const config = this.getEffectiveConfiguration();
     return config.toolPolicies?.[toolName] || 'ask';
   }

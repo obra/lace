@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
-import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
+import type { ToolPolicy } from '@/types/core';
 
 // Clean API structure with explicit policy information
 interface ToolPolicyInfo {

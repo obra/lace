@@ -12,7 +12,7 @@ import { ModelSelectionForm } from './ModelSelectionForm';
 import type { ProviderInfo, SessionConfiguration } from '@/types/api';
 import { isToolPolicyData, type ToolPolicyInfo } from '@/lib/type-guards';
 import type { ProjectInfo, SessionInfo } from '@/types/core';
-import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
+import type { ToolPolicy } from '@/types/core';
 import { useSessionEditModal } from '@/hooks/useSessionEditModal';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 

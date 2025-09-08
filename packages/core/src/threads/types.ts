@@ -3,7 +3,7 @@
 
 import type { ToolCall, ToolResult } from '~/tools/types';
 import type { CompactionData } from '~/threads/compaction/types';
-import type { ApprovalDecision } from '~/tools/approval-types';
+import type { ApprovalDecision } from '~/tools/types';
 import type { CombinedTokenUsage } from '~/token-management/types';
 import type { Task, TaskContext } from '~/tasks/types';
 import type { MCPServerConfig } from '~/config/mcp-types';

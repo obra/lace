@@ -8,7 +8,7 @@ import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/b
 import { ToolCall, ToolResult, ToolContext } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
-import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
+import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/types';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';

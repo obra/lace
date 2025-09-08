@@ -8,16 +8,17 @@ import type {
   ModelInfo as BackendModelInfo,
   AgentInfo,
   ThreadTokenUsage,
+  ToolPolicy,
 } from '@/types/core';
 
 import type { ToolApprovalRequestData } from '@/types/web-events';
 
 // Tool policy information structure
 interface ToolPolicyInfo {
-  value: 'allow' | 'ask' | 'deny' | 'disable';
-  allowedValues: Array<'allow' | 'ask' | 'deny' | 'disable'>;
-  projectValue?: 'allow' | 'ask' | 'deny' | 'disable';
-  globalValue?: 'allow' | 'ask' | 'deny' | 'disable';
+  value: ToolPolicy;
+  allowedValues: ToolPolicy[];
+  projectValue?: ToolPolicy;
+  globalValue?: ToolPolicy;
 }
 
 // Session configuration interface
@@ -26,7 +27,7 @@ export interface SessionConfiguration {
   modelId?: string;
   maxTokens?: number;
   tools?: string[] | Record<string, ToolPolicyInfo>; // Can be either array or policy info
-  toolPolicies?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
+  toolPolicies?: Record<string, ToolPolicy>;
   workingDirectory?: string;
   environmentVariables?: Record<string, string>;
   availableTools?: string[];

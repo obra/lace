@@ -15,7 +15,7 @@ import {
   faEdit,
   faTrash,
 } from '@/lib/fontawesome';
-import type { ProjectInfo } from '@/types/core';
+import type { ProjectInfo, ToolPolicy } from '@/types/core';
 import { AddInstanceModal } from '@/components/providers/AddInstanceModal';
 import { ProjectEditModal } from '@/components/config/ProjectEditModal';
 import { ProjectCreateModal } from '@/components/config/ProjectCreateModal';
@@ -38,7 +38,7 @@ interface ProjectConfiguration {
   modelId?: string;
   maxTokens?: number;
   tools?: string[];
-  toolPolicies?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
+  toolPolicies?: Record<string, ToolPolicy>;
   workingDirectory?: string;
   environmentVariables?: Record<string, string>;
   [key: string]: unknown;

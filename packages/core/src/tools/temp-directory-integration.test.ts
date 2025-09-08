@@ -12,7 +12,7 @@ import { existsSync } from 'fs';
 import { writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import type { ToolContext, ToolResult } from '~/tools/types';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   createTestProviderInstance,

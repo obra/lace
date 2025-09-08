@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
 import { createGlobalPolicyCallback } from '~/tools/policy-wrapper';
-import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalCallback, ApprovalDecision } from '~/tools/types';
 // Note: CLIOptions type removed with CLI refactor, defining minimal type here for approval tests
 type CLIOptions = {
   approveAll?: boolean;

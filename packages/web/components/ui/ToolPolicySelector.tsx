@@ -4,7 +4,7 @@
 'use client';
 
 import React from 'react';
-import type { ToolPolicy } from './ToolPolicyToggle';
+import type { ToolPolicy } from '@/types/core';
 
 interface ToolPolicySelectorProps {
   value: ToolPolicy;

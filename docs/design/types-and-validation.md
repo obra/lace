@@ -31,7 +31,7 @@ export type { CompactionData } from '~/threads/compaction/types';
 
 // Tool system
 export type { ToolCall, ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
-export { ApprovalDecision } from '~/tools/approval-types';
+export { ApprovalDecision } from '~/tools/types';
 
 // Task management
 export type { Task, TaskNote, TaskStatus, TaskPriority } from '~/tasks/types';
