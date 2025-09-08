@@ -33,8 +33,8 @@ describe('MCPConfigLoader', () => {
             args: ['fs-server.js'],
             enabled: true,
             tools: {
-              read_file: 'allow-session',
-              write_file: 'require-approval',
+              read_file: 'allow',
+              write_file: 'ask',
             },
           },
         },
@@ -44,7 +44,7 @@ describe('MCPConfigLoader', () => {
     const config = MCPConfigLoader.loadConfig(tempDir);
     expect(config.servers.filesystem.command).toBe('node');
     expect(config.servers.filesystem.args).toEqual(['fs-server.js']);
-    expect(config.servers.filesystem.tools.read_file).toBe('allow-session');
+    expect(config.servers.filesystem.tools.read_file).toBe('allow');
   });
 
   it('should gracefully handle invalid server configurations', () => {
@@ -53,7 +53,7 @@ describe('MCPConfigLoader', () => {
         test: {
           command: 'node',
           enabled: true,
-          tools: { tool1: 'allow-session' },
+          tools: { tool1: 'allow' },
         },
       },
     };
@@ -70,7 +70,7 @@ describe('MCPConfigLoader', () => {
         valid: {
           command: 'echo',
           enabled: true,
-          tools: { test: 'allow-session' },
+          tools: { test: 'allow' },
         },
       },
     };

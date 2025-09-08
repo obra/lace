@@ -27,7 +27,7 @@ describe('Session configuration', () => {
         systemPrompt: 'You are a helpful assistant.',
         tools: ['file-read', 'bash'],
         toolPolicies: {
-          bash: 'require-approval',
+          bash: 'ask',
         },
       };
 
@@ -117,7 +117,7 @@ describe('Session configuration', () => {
         maxTokens: 4000,
         toolPolicies: {
           'file-read': 'allow',
-          bash: 'require-approval',
+          bash: 'ask',
         },
         environmentVariables: {
           BASE_VAR: 'base-value',
@@ -130,7 +130,7 @@ describe('Session configuration', () => {
         temperature: 0.8,
         toolPolicies: {
           bash: 'allow',
-          'file-write': 'require-approval',
+          'file-write': 'ask',
         },
         environmentVariables: {
           OVERRIDE_VAR: 'override-value',
@@ -147,7 +147,7 @@ describe('Session configuration', () => {
       expect(merged.toolPolicies).toEqual({
         'file-read': 'allow',
         bash: 'allow', // Overridden
-        'file-write': 'require-approval', // Added
+        'file-write': 'ask', // Added
       });
       expect(merged.environmentVariables).toEqual({
         BASE_VAR: 'base-value',
@@ -166,8 +166,8 @@ describe('Session configuration', () => {
         systemPrompt: 'You are a senior software engineer conducting code reviews.',
         tools: ['file-read', 'file-write', 'bash'],
         toolPolicies: {
-          'file-write': 'require-approval' as const,
-          bash: 'require-approval' as const,
+          'file-write': 'ask' as const,
+          bash: 'ask' as const,
         },
       };
 
