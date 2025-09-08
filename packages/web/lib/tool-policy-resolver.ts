@@ -1,7 +1,7 @@
 // ABOUTME: Tool policy hierarchy resolver for progressive restriction enforcement
 // ABOUTME: Computes effective policies, allowed values, and parent values for UI components
 
-export type ToolPolicy = 'allow' | 'ask' | 'deny' | 'disable';
+import type { ToolPolicy } from '~/tools/types';
 
 export interface ToolPolicyInfo {
   value: ToolPolicy;

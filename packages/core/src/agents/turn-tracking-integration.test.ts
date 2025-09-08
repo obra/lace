@@ -11,7 +11,7 @@ import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
 import { z } from 'zod';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 
 // Mock provider for controlled testing
 class MockIntegrationProvider extends BaseMockProvider {

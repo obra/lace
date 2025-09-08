@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { DatabasePersistence, getPersistence } from '~/persistence/database';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 import { vi } from 'vitest';
 
 describe('Project and Session database schema', () => {
@@ -490,9 +490,14 @@ describe('tool approval unique constraint', () => {
     });
 
     it('should throw TransientEventError for all transient event types', () => {
-      const transientTypes = ['AGENT_ERROR', 'AGENT_STREAMING', 'AGENT_STATE_CHANGE', 'SYSTEM_NOTIFICATION'];
-      
-      transientTypes.forEach(eventType => {
+      const transientTypes = [
+        'AGENT_ERROR',
+        'AGENT_STREAMING',
+        'AGENT_STATE_CHANGE',
+        'SYSTEM_NOTIFICATION',
+      ];
+
+      transientTypes.forEach((eventType) => {
         const event = {
           id: `evt-${eventType}`,
           threadId: 'thread-test',

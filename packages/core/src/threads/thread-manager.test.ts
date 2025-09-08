@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { expectEventAdded } from '~/test-utils/event-helpers';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 
 describe('ThreadManager', () => {
   const _tempLaceDir = setupCoreTest();

@@ -14,7 +14,7 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 
 describe('Agent Configuration', () => {
   const _tempLaceDir = setupCoreTest();

@@ -4,8 +4,7 @@
 'use client';
 
 import React, { memo } from 'react';
-
-export type ToolPolicy = 'allow' | 'ask' | 'deny' | 'disable';
+import type { ToolPolicy } from '~/tools/types';
 
 interface ToolPolicyToggleProps {
   value: ToolPolicy;

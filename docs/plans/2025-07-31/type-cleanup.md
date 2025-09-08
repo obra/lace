@@ -203,7 +203,7 @@ export type {
 
 export { 
   ApprovalDecision 
-} from '~/tools/approval-types';
+} from '~/tools/types';
 
 export type {
   ProjectInfo

@@ -22,7 +22,7 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 
 class MockProviderWithTools extends BaseMockProvider {
   private mockToolCalls: ToolCall[];

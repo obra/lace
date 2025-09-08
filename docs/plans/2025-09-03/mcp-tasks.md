@@ -18,7 +18,7 @@ Lace is a TypeScript/Node.js AI coding assistant using event-sourcing architectu
 - `docs/plans/mcp-client.md` - Full specification (you just created this)
 - `packages/core/src/tools/tool.ts` - Base class for all tools
 - `packages/core/src/tools/executor.ts` - Tool execution engine  
-- `packages/core/src/tools/approval-types.ts` - Approval system
+- `packages/core/src/tools/types.ts` - Approval system
 - `packages/core/src/tools/implementations/bash.ts` - Example tool implementation
 - `vendor/typescript-sdk/src/client/index.ts` - MCP Client API
 - `vendor/typescript-sdk/src/client/stdio.ts` - Stdio transport for process spawning
@@ -1355,7 +1355,7 @@ describe('MCPToolRegistry', () => {
 **Objective**: Add new approval levels to existing approval system
 
 **Files to Modify:**
-- `packages/core/src/tools/approval-types.ts`
+- `packages/core/src/tools/types.ts`
 
 **What to Change:**
 1. Add new approval levels to `ApprovalDecision` enum
@@ -1363,7 +1363,7 @@ describe('MCPToolRegistry', () => {
 
 **Implementation:**
 ```typescript
-// In packages/core/src/tools/approval-types.ts
+// In packages/core/src/tools/types.ts
 
 export enum ApprovalDecision {
   ALLOW_ONCE = 'allow_once',
@@ -1375,7 +1375,7 @@ export enum ApprovalDecision {
 }
 ```
 
-**Test to Add (`packages/core/src/tools/approval-types.test.ts`):**
+**Test to Add (`packages/core/src/tools/types.test.ts`):**
 ```typescript
 // Add this test to existing file, or create if it doesn't exist
 

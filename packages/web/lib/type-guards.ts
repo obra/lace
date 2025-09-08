@@ -1,7 +1,7 @@
 // ABOUTME: Shared type guard functions for runtime type checking
 // ABOUTME: Eliminates unsafe type assertions throughout the application
 
-import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
+import type { ToolPolicy } from '@/types/core';
 
 // Tool policy information structure
 export interface ToolPolicyInfo {

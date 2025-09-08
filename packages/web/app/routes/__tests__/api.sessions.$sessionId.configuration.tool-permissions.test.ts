@@ -13,13 +13,14 @@ import {
 } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
+import type { ToolPolicy } from '@/types/core';
 
 // Type interfaces for new API structure
 interface ToolPermissionInfo {
-  value: 'allow' | 'ask' | 'deny' | 'disable';
-  allowedValues: Array<'allow' | 'ask' | 'deny' | 'disable'>;
-  projectValue?: 'allow' | 'ask' | 'deny' | 'disable';
-  globalValue?: 'allow' | 'ask' | 'deny' | 'disable';
+  value: ToolPolicy;
+  allowedValues: ToolPolicy[];
+  projectValue?: ToolPolicy;
+  globalValue?: ToolPolicy;
 }
 
 interface ConfigurationResponse {

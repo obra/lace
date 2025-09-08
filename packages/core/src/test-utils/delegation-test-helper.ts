@@ -4,7 +4,7 @@
 import { vi } from 'vitest';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,

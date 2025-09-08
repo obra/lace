@@ -7,7 +7,7 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 
 // Mock provider for testing command handling
 class MockProvider extends BaseMockProvider {

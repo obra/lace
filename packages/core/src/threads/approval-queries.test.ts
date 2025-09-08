@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { DatabasePersistence, getPersistence } from '~/persistence/database';
 import { LaceEvent } from '~/threads/types';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('Approval Database Queries', () => {

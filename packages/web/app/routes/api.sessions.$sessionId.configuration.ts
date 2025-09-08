@@ -3,7 +3,8 @@
 
 import { getSessionService } from '@/lib/server/session-service';
 import { ToolCatalog, Project } from '@/lib/server/lace-imports';
-import { ToolPolicyResolver, type ToolPolicy } from '@/lib/tool-policy-resolver';
+import { ToolPolicyResolver } from '@/lib/tool-policy-resolver';
+import type { ToolPolicy } from '@/types/core';
 import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
@@ -64,7 +65,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     // Resolve tool policy hierarchy for progressive restriction
     const toolPolicyHierarchy = {
-      project: projectConfig.toolPolicies,
+      project: projectConfig.toolPolicies as Record<string, ToolPolicy> | undefined,
       session: configuration.toolPolicies,
     };
 
@@ -128,9 +129,11 @@ export async function action({ request, params }: Route.ActionArgs) {
             string,
             ToolPolicy,
           ][]) {
-            const projectPolicies = projectConfig.toolPolicies;
+            const projectPolicies = projectConfig.toolPolicies as
+              | Record<string, ToolPolicy>
+              | undefined;
             if (projectPolicies) {
-              const projectPolicy = projectPolicies[tool] as ToolPolicy | undefined;
+              const projectPolicy = projectPolicies[tool];
               if (
                 projectPolicy &&
                 !ToolPolicyResolver.isValidPolicyChange(tool, newPolicy, projectPolicy)

@@ -8,7 +8,7 @@ import { tmpdir } from 'os';
 import { mkdtempSync } from 'fs';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 import type { ToolCall, ApprovalCallback } from '~/tools/types';
 
 // Mock the MCP SDK to avoid spawning real processes

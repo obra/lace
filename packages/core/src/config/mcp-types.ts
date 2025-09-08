@@ -30,7 +30,7 @@ export interface MCPConfig {
   servers: Record<string, MCPServerConfig>;
 }
 
-export type ApprovalLevel = 'allow' | 'ask' | 'deny' | 'disable';
+export type { ToolPolicy as ApprovalLevel } from '~/tools/types';
 
 // Runtime server connection state
 export interface MCPServerConnection {

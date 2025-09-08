@@ -8,7 +8,7 @@ import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { expectEventAdded } from '~/test-utils/event-helpers';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';

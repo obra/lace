@@ -7,7 +7,7 @@ import { AIProvider, ProviderMessage } from '~/providers/base-provider';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
-import { ApprovalDecision, ToolPolicy } from '~/tools/approval-types';
+import { ApprovalDecision, ToolPolicy } from '~/tools/types';
 import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
 import {
   LaceEvent,

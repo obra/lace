@@ -23,7 +23,7 @@ interface ToolResult {
 }
 ```
 
-### 2. Approval Types (`src/tools/approval-types.ts`)
+### 2. Approval Types (`src/tools/types.ts`)
 
 ```typescript
 enum ApprovalDecision {

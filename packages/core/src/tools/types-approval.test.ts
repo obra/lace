@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ApprovalDecision } from './approval-types';
+import { ApprovalDecision } from './types';
 
 describe('ApprovalTypes', () => {
   describe('ApprovalDecision', () => {
