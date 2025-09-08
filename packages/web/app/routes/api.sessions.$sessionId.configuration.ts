@@ -27,6 +27,7 @@ const ConfigurationSchema = z.object({
 });
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
+  console.warn('[DEBUG] Session config loader called with params:', params);
   try {
     const { sessionId: sessionIdParam } = params as { sessionId: string };
 
@@ -43,6 +44,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     }
 
     const configuration = session.getEffectiveConfiguration();
+    console.warn('[DEBUG] Session configuration loaded:', JSON.stringify(configuration, null, 2));
 
     // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
     const projectId = session.getProjectId();
