@@ -17,20 +17,7 @@ const UpdateServerSchema = z.object({
   env: z.record(z.string(), z.string()).optional(),
   cwd: z.string().optional(),
   enabled: z.boolean().optional(),
-  tools: z
-    .record(
-      z.string(),
-      z.enum([
-        'disable',
-        'deny',
-        'require-approval',
-        'allow-once',
-        'allow-session',
-        'allow-project',
-        'allow-always',
-      ])
-    )
-    .optional(),
+  tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
 });
 
 const CreateServerSchema = z.object({
@@ -39,20 +26,7 @@ const CreateServerSchema = z.object({
   env: z.record(z.string(), z.string()).optional(),
   cwd: z.string().optional(),
   enabled: z.boolean().default(true),
-  tools: z
-    .record(
-      z.string(),
-      z.enum([
-        'disable',
-        'deny',
-        'require-approval',
-        'allow-once',
-        'allow-session',
-        'allow-project',
-        'allow-always',
-      ])
-    )
-    .default({}),
+  tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).default({}),
 });
 
 export async function loader({ params }: { params: unknown; context: unknown; request: Request }) {
