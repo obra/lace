@@ -97,6 +97,12 @@ export async function action({ request, params }: Route.ActionArgs) {
       }
     }
 
+    // Validate progressive restriction if toolPolicies are being updated
+    if (validatedData.toolPolicies) {
+      // TODO: Add global policy validation when global configuration is available
+      // For now, project level has no restrictions (can set any policy)
+    }
+
     project.updateConfiguration(validatedData);
 
     const configuration = project.getConfiguration();
