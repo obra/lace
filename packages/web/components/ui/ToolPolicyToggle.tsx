@@ -12,10 +12,7 @@ interface ToolPolicyToggleProps {
   onChange: (policy: ToolPolicy) => void;
   disabled?: boolean;
   size?: 'sm' | 'md' | 'lg';
-  allowedValues?: ToolPolicy[]; // Explicit array from backend (preferred)
-  // Legacy support
-  context?: 'global' | 'project' | 'session';
-  parentPolicy?: ToolPolicy;
+  allowedValues?: ToolPolicy[]; // Explicit array from backend
 }
 
 const POLICY_CONFIG = {
