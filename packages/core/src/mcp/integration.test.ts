@@ -63,7 +63,7 @@ describe('MCP Integration E2E', () => {
 
   let originalCwd: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     originalCwd = process.cwd();
     tempDir = mkdtempSync(join(tmpdir(), 'mcp-integration-test-'));
 
@@ -75,8 +75,9 @@ describe('MCP Integration E2E', () => {
       requestApproval: vi.fn().mockResolvedValue(ApprovalDecision.ALLOW_ALWAYS),
     };
 
-    // Create project with MCP server configuration
-    project = Project.create('Test Project', tempDir, 'Integration test project');
+    // Create project with MCP server configuration (use unique name per test)
+    const projectName = `Test Project ${Date.now()}`;
+    project = Project.create(projectName, tempDir, 'Integration test project');
 
     // Add MCP server to project
     project.addMCPServer('test-server', {
@@ -103,16 +104,23 @@ describe('MCP Integration E2E', () => {
   });
 
   afterEach(async () => {
-    // Restore working directory BEFORE cleanup
-    process.chdir(originalCwd);
-
     // Cleanup session (shuts down MCP servers)
     if (session) {
       session.destroy();
     }
 
+    // Explicit project cleanup if it has a cleanup method
+    if (project && typeof project.destroy === 'function') {
+      project.destroy();
+    }
+
+    // Restore working directory AFTER cleanup
+    process.chdir(originalCwd);
+
     // Remove temp directory
-    rmSync(tempDir, { recursive: true, force: true });
+    if (tempDir) {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('should complete full integration: config → server start → tool discovery → tool execution via ToolExecutor', async () => {

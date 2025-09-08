@@ -8,16 +8,18 @@ import { tmpdir } from 'os';
 import { mkdtempSync } from 'fs';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
+import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import type { ToolCall } from '~/tools/types';
 
 describe('Real MCP Server Integration', () => {
+  const _tempLaceContext = useTempLaceDir();
   let tempDir: string;
   let testDataDir: string;
   let project: Project;
   let session: Session;
   let originalCwd: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     originalCwd = process.cwd();
     tempDir = mkdtempSync(join(tmpdir(), 'mcp-real-test-'));
 
@@ -31,8 +33,9 @@ describe('Real MCP Server Integration', () => {
     // Change to temp directory for project working directory
     process.chdir(tempDir);
 
-    // Create project with real MCP server configuration
-    project = Project.create('Real MCP Test Project', tempDir, 'Testing real MCP server');
+    // Create project with real MCP server configuration (use unique name per test)
+    const projectName = `Real MCP Test Project ${Date.now()}`;
+    project = Project.create(projectName, tempDir, 'Testing real MCP server');
 
     // Add real filesystem MCP server to project
     project.addMCPServer('filesystem', {
@@ -58,16 +61,23 @@ describe('Real MCP Server Integration', () => {
   });
 
   afterEach(async () => {
-    // Restore working directory BEFORE cleanup
-    process.chdir(originalCwd);
-
     // Cleanup session (shuts down real MCP servers)
     if (session) {
       session.destroy();
     }
 
+    // Explicit project cleanup if it has a cleanup method
+    if (project && typeof project.destroy === 'function') {
+      project.destroy();
+    }
+
+    // Restore working directory AFTER cleanup
+    process.chdir(originalCwd);
+
     // Remove temp directory
-    rmSync(tempDir, { recursive: true, force: true });
+    if (tempDir) {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   it.skip('should work with real filesystem MCP server', async () => {
