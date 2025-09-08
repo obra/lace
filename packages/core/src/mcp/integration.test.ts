@@ -55,7 +55,7 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
 }));
 
 describe('MCP Integration E2E', () => {
-  const tempLaceContext = useTempLaceDir();
+  const _tempLaceContext = useTempLaceDir();
   let tempDir: string;
   let project: Project;
   let session: Session;
