@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useTheme } from '@/components/providers/ThemeProvider';
+import { useTheme } from '@/components/providers/SettingsProvider';
 
 // Limit app-visible themes to core options for now. Others retained for quick restore.
 const availableThemes = [

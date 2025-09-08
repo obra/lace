@@ -11,7 +11,7 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { Chat } from '@/components/chat/Chat';
 import { ScrollProvider } from '@/components/providers/ScrollProvider';
-import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { SettingsProvider } from '@/components/providers/SettingsProvider';
 import type { ThreadId, AgentInfo, LaceEvent } from '@/types/core';
 import { createMockAgentContext } from '@/__tests__/utils/provider-mocks';
 import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
@@ -142,18 +142,18 @@ describe('Chat', () => {
   // Helper to render Chat with required providers
   const renderChat = () => {
     return render(
-      <ThemeProvider>
+      <SettingsProvider>
         <ScrollProvider>
           <Chat />
         </ScrollProvider>
-      </ThemeProvider>
+      </SettingsProvider>
     );
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Mock API for ThemeProvider
+    // Mock API for SettingsProvider
     mockApi.get.mockResolvedValue({});
     mockApi.patch.mockResolvedValue({});
 

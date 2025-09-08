@@ -12,7 +12,7 @@ import {
 } from './EventStreamProvider';
 import { ToolApprovalProvider } from './ToolApprovalProvider';
 import { AgentProvider } from './AgentProvider';
-import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { SettingsProvider } from '@/components/providers/SettingsProvider';
 import { createMockResponse } from '@/test-utils/mock-fetch';
 import type { ThreadId } from '@/types/core';
 import { asThreadId } from '@/types/core';
@@ -184,7 +184,7 @@ describe('EventStreamProvider Integration', () => {
 
     await act(async () => {
       render(
-        <ThemeProvider>
+        <SettingsProvider>
           <AgentProvider sessionId="test-session" selectedAgentId="lace_20250101_abc123">
             <ToolApprovalProvider agentId={'lace_20250101_abc123' as ThreadId}>
               <EventStreamProvider
@@ -202,7 +202,7 @@ describe('EventStreamProvider Integration', () => {
               </EventStreamProvider>
             </ToolApprovalProvider>
           </AgentProvider>
-        </ThemeProvider>
+        </SettingsProvider>
       );
     });
 
@@ -219,7 +219,7 @@ describe('EventStreamProvider Integration', () => {
 
     await act(async () => {
       render(
-        <ThemeProvider>
+        <SettingsProvider>
           <AgentProvider sessionId="test-session" selectedAgentId="lace_20250101_abc123">
             <ToolApprovalProvider agentId={'lace_20250101_abc123' as ThreadId}>
               <EventStreamProvider
@@ -237,7 +237,7 @@ describe('EventStreamProvider Integration', () => {
               </EventStreamProvider>
             </ToolApprovalProvider>
           </AgentProvider>
-        </ThemeProvider>
+        </SettingsProvider>
       );
     });
 
@@ -255,9 +255,9 @@ describe('EventStreamProvider Integration', () => {
 
     expect(() => {
       render(
-        <ThemeProvider>
+        <SettingsProvider>
           <TestComponentWithoutProvider />
-        </ThemeProvider>
+        </SettingsProvider>
       );
     }).toThrow('useEventStreamConnection must be used within EventStreamProvider');
 
@@ -268,7 +268,7 @@ describe('EventStreamProvider Integration', () => {
     let rerender: ReturnType<typeof render>['rerender'];
     await act(async () => {
       const result = render(
-        <ThemeProvider>
+        <SettingsProvider>
           <AgentProvider sessionId="test-session" selectedAgentId="lace_20250101_abc123">
             <ToolApprovalProvider agentId={'lace_20250101_abc123' as ThreadId}>
               <EventStreamProvider
@@ -280,7 +280,7 @@ describe('EventStreamProvider Integration', () => {
               </EventStreamProvider>
             </ToolApprovalProvider>
           </AgentProvider>
-        </ThemeProvider>
+        </SettingsProvider>
       );
       rerender = result.rerender;
     });
@@ -305,7 +305,7 @@ describe('EventStreamProvider Integration', () => {
     // Force re-render with new mock data
     await act(async () => {
       rerender(
-        <ThemeProvider>
+        <SettingsProvider>
           <AgentProvider sessionId="test-session" selectedAgentId="lace_20250101_abc123">
             <ToolApprovalProvider agentId={'lace_20250101_abc123' as ThreadId}>
               <EventStreamProvider
@@ -317,7 +317,7 @@ describe('EventStreamProvider Integration', () => {
               </EventStreamProvider>
             </ToolApprovalProvider>
           </AgentProvider>
-        </ThemeProvider>
+        </SettingsProvider>
       );
     });
 
@@ -361,7 +361,7 @@ describe('EventStreamProvider Integration', () => {
 
     await act(async () => {
       render(
-        <ThemeProvider>
+        <SettingsProvider>
           <AgentProvider sessionId="my-session" selectedAgentId="lace_20250101_xyz789">
             <ToolApprovalProvider agentId={'lace_20250101_xyz789' as ThreadId}>
               <EventStreamProvider
@@ -373,7 +373,7 @@ describe('EventStreamProvider Integration', () => {
               </EventStreamProvider>
             </ToolApprovalProvider>
           </AgentProvider>
-        </ThemeProvider>
+        </SettingsProvider>
       );
     });
 
@@ -406,7 +406,7 @@ describe('EventStreamProvider Integration', () => {
   it('handles null agentId gracefully without breaking', async () => {
     await act(async () => {
       render(
-        <ThemeProvider>
+        <SettingsProvider>
           <AgentProvider sessionId="test-session" selectedAgentId={null}>
             <ToolApprovalProvider agentId={null}>
               <EventStreamProvider
@@ -418,7 +418,7 @@ describe('EventStreamProvider Integration', () => {
               </EventStreamProvider>
             </ToolApprovalProvider>
           </AgentProvider>
-        </ThemeProvider>
+        </SettingsProvider>
       );
     });
 

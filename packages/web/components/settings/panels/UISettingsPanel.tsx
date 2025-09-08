@@ -8,7 +8,7 @@ import { ThemeSelector } from '@/components/ui/ThemeSelector';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { SettingField } from '@/components/settings/SettingField';
 import { Alert } from '@/components/ui/Alert';
-import { useTheme, TIMELINE_WIDTHS } from '@/components/providers/ThemeProvider';
+import { useTheme, TIMELINE_WIDTHS } from '@/components/providers/SettingsProvider';
 
 interface UISettingsPanelProps {
   currentTheme?: string;

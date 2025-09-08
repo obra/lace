@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import React from 'react';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
-import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { SettingsProvider } from '@/components/providers/SettingsProvider';
 import { VaporBackground } from '@/components/ui/VaporBackground';
 import { dmSans, lato, jetBrainsMono } from '@/app/fonts';
 
@@ -38,7 +38,7 @@ const meta: Meta<typeof ProjectSelectorPanel> = {
   },
   decorators: [
     (Story) => (
-      <ThemeProvider>
+      <SettingsProvider>
         <div
           data-theme="dim"
           className={`${dmSans.className} ${lato.variable} ${jetBrainsMono.variable} relative min-h-screen text-base-content`}
@@ -48,7 +48,7 @@ const meta: Meta<typeof ProjectSelectorPanel> = {
             <Story />
           </div>
         </div>
-      </ThemeProvider>
+      </SettingsProvider>
     ),
   ],
   args: {

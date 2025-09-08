@@ -7,7 +7,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlug, faUser, faCog } from '@/lib/fontawesome';
-import { useTheme } from '@/components/providers/ThemeProvider';
+import { useTheme } from '@/components/providers/SettingsProvider';
 import { SettingsTabs } from './SettingsTabs';
 import { UISettingsPanel } from './panels/UISettingsPanel';
 import { UserSettingsPanel } from './panels/UserSettingsPanel';

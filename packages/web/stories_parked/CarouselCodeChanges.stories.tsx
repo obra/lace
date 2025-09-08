@@ -134,7 +134,7 @@ const mixedChanges = [
     maxDisplayFiles: 3,
     files: [
       {
-        path: 'src/theme/ThemeProvider.tsx',
+        path: 'src/theme/SettingsProvider.tsx',
         additions: 67,
         deletions: 5,
         impact: 'high' as const,

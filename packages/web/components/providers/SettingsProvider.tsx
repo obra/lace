@@ -45,12 +45,12 @@ const ThemeContext = createContext<ThemeContextType | null>(null);
 export function useTheme(): ThemeContextType {
   const context = useContext(ThemeContext);
   if (!context) {
-    throw new Error('useTheme must be used within ThemeProvider');
+    throw new Error('useTheme must be used within SettingsProvider');
   }
   return context;
 }
 
-interface ThemeProviderProps {
+interface SettingsProviderProps {
   children: ReactNode;
 }
 
@@ -76,7 +76,7 @@ function getTimelineMaxWidthClass(width: TimelineWidth): string {
   }
 }
 
-export function ThemeProvider({ children }: ThemeProviderProps) {
+export function SettingsProvider({ children }: SettingsProviderProps) {
   const [theme, setThemeState] = useState<LaceTheme>(defaultTheme);
   const [mounted, setMounted] = useState(false);
 
