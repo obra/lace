@@ -110,9 +110,9 @@ describe('Tool Approval System Integration', () => {
         tools: ['bash', 'file_read', 'file_write'], // Enable tools for testing
         toolPolicies: {
           // All tools require approval by default
-          bash: 'require-approval',
-          file_read: 'require-approval',
-          file_write: 'require-approval',
+          bash: 'ask',
+          file_read: 'ask',
+          file_write: 'ask',
         },
       }
     );

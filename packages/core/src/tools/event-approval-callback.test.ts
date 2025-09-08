@@ -100,7 +100,7 @@ describe('EventApprovalCallback Integration Tests', () => {
         modelId: 'claude-3-5-haiku-20241022',
         tools: ['bash'], // Enable bash tool
         toolPolicies: {
-          bash: 'require-approval',
+          bash: 'ask',
         },
       }
     );

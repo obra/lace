@@ -36,7 +36,7 @@ const mockProject = {
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-git'],
       enabled: false,
-      tools: { git_status: 'require-approval' },
+      tools: { git_status: 'ask' },
     },
   }),
 };

@@ -44,7 +44,7 @@ const mockProject = {
     tools: ['file-read', 'file-write'],
     toolPolicies: {
       'file-read': 'allow',
-      'file-write': 'require-approval',
+      'file-write': 'ask',
     },
     workingDirectory: '/test/path',
     environmentVariables: { NODE_ENV: 'test' },
@@ -89,7 +89,7 @@ describe('Project Configuration API', () => {
         tools: ['file-read', 'file-write'],
         toolPolicies: {
           'file-read': 'allow',
-          'file-write': 'require-approval',
+          'file-write': 'ask',
         },
         workingDirectory: '/test/path',
         environmentVariables: { NODE_ENV: 'test' },
@@ -136,7 +136,7 @@ describe('Project Configuration API', () => {
         tools: ['file-read', 'file-write', 'bash'],
         toolPolicies: {
           'file-read': 'allow',
-          'file-write': 'require-approval',
+          'file-write': 'ask',
           bash: 'deny',
         },
       };
