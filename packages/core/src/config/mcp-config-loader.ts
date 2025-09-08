@@ -8,7 +8,7 @@ import { getLaceDir } from '~/config/lace-dir';
 import type { MCPConfig, MCPServerConfig } from '~/config/mcp-types';
 
 // Zod schemas for validation
-const ApprovalLevelSchema = z.enum(['allow', 'ask', 'deny', 'disable']);
+const ToolPolicySchema = z.enum(['allow', 'ask', 'deny', 'disable']);
 
 const DiscoveredToolSchema = z.object({
   name: z.string(),
@@ -21,7 +21,7 @@ const MCPServerConfigSchema = z.object({
   env: z.record(z.string(), z.string()).optional(),
   cwd: z.string().optional(),
   enabled: z.boolean(),
-  tools: z.record(z.string(), ApprovalLevelSchema),
+  tools: z.record(z.string(), ToolPolicySchema),
   // Tool discovery cache fields
   discoveredTools: z.array(DiscoveredToolSchema).optional(),
   lastDiscovery: z.string().optional(),
