@@ -1,5 +1,5 @@
-// ABOUTME: Multi-stage toggle component for tool access policies with context-aware options
-// ABOUTME: Provides visual radio button UI for better UX than dropdowns with all MCP approval levels
+// ABOUTME: Multi-stage toggle component for tool access policies with explicit allowed values
+// ABOUTME: Clean implementation using allowedValues array from backend with legacy fallback
 
 'use client';
 
@@ -12,30 +12,11 @@ interface ToolPolicyToggleProps {
   onChange: (policy: ToolPolicy) => void;
   disabled?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  allowedValues?: ToolPolicy[]; // Explicit array from backend (preferred)
+  // Legacy support
   context?: 'global' | 'project' | 'session';
-  parentPolicy?: ToolPolicy; // For progressive restriction
+  parentPolicy?: ToolPolicy;
 }
-
-// Progressive restriction logic: determines which options are disabled
-const isOptionDisabled = (
-  option: ToolPolicy,
-  parentPolicy?: ToolPolicy,
-  context: string = 'session'
-): boolean => {
-  // Global level: all options available
-  if (context === 'global' || !parentPolicy) {
-    return false;
-  }
-
-  // Progressive restriction: can only choose equal or more restrictive than parent
-  const restrictionOrder: ToolPolicy[] = ['allow', 'ask', 'deny', 'disable'];
-  const parentIndex = restrictionOrder.indexOf(parentPolicy);
-  const optionIndex = restrictionOrder.indexOf(option);
-
-  // Can choose current parent level or more restrictive
-  // Disable is always available as ultimate restriction
-  return optionIndex < parentIndex && option !== 'disable';
-};
 
 const POLICY_CONFIG = {
   allow: {
@@ -84,12 +65,11 @@ export const ToolPolicyToggle = memo(function ToolPolicyToggle({
   onChange,
   disabled = false,
   size = 'sm',
+  allowedValues,
   context = 'session',
   parentPolicy,
 }: ToolPolicyToggleProps) {
   const sizeConfig = SIZE_CONFIG[size];
-
-  // Show all options but disable invalid ones
   const allPolicies: ToolPolicy[] = ['allow', 'ask', 'deny', 'disable'];
 
   return (
@@ -97,17 +77,30 @@ export const ToolPolicyToggle = memo(function ToolPolicyToggle({
       {allPolicies.map((policy) => {
         const config = POLICY_CONFIG[policy];
         const isSelected = value === policy;
-        const isOptionInvalid = isOptionDisabled(policy, parentPolicy, context);
+
+        // Clean approach: check if policy is in allowedValues array
+        const isNotAllowed = allowedValues ? !allowedValues.includes(policy) : false;
+
+        // Legacy fallback: compute from parent policy if no allowedValues provided
+        let isLegacyDisabled = false;
+        if (!allowedValues && parentPolicy && context !== 'global') {
+          const restrictionOrder: ToolPolicy[] = ['allow', 'ask', 'deny', 'disable'];
+          const parentIndex = restrictionOrder.indexOf(parentPolicy);
+          const optionIndex = restrictionOrder.indexOf(policy);
+          isLegacyDisabled = optionIndex < parentIndex && policy !== 'disable';
+        }
+
+        const isOptionDisabled = isNotAllowed || isLegacyDisabled;
 
         return (
           <button
             key={policy}
             type="button"
-            onClick={() => !isOptionInvalid && onChange(policy)}
-            disabled={disabled || isOptionInvalid}
+            onClick={() => !isOptionDisabled && onChange(policy)}
+            disabled={disabled || isOptionDisabled}
             title={
-              isOptionInvalid
-                ? 'Not available - more restrictive than parent policy'
+              isOptionDisabled
+                ? 'Not available - restricted by policy hierarchy'
                 : config.description
             }
             className={`
@@ -116,7 +109,7 @@ export const ToolPolicyToggle = memo(function ToolPolicyToggle({
               ${
                 isSelected
                   ? `${config.selectedStyle} shadow-sm ring-1`
-                  : isOptionInvalid
+                  : isOptionDisabled
                     ? 'text-base-content/30 bg-base-200 cursor-not-allowed'
                     : `text-base-content/70 hover:text-base-content ${config.hoverStyle}`
               }

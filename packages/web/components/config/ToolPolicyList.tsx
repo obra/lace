@@ -7,14 +7,27 @@ import React from 'react';
 import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 
+// New API structure with explicit policy information
+interface ToolPolicyInfo {
+  value: ToolPolicy;
+  allowedValues: ToolPolicy[];
+  projectValue?: ToolPolicy;
+  globalValue?: ToolPolicy;
+}
+
 interface ToolPolicyListProps {
-  tools: string[];
-  policies: Record<string, ToolPolicy>;
+  // New structure (preferred)
+  toolPolicyData?: Record<string, ToolPolicyInfo>;
+
+  // Legacy structure (for backward compatibility)
+  tools?: string[];
+  policies?: Record<string, ToolPolicy>;
+  parentPolicies?: Record<string, ToolPolicy>;
+
   onChange: (tool: string, policy: ToolPolicy) => void;
   loading?: boolean;
   error?: string | null;
   context?: 'global' | 'project' | 'session';
-  parentPolicies?: Record<string, ToolPolicy>; // For progressive restriction
 }
 
 // Helper function to group tools by source
@@ -40,8 +53,9 @@ const groupToolsBySource = (tools: string[]) => {
 };
 
 export function ToolPolicyList({
-  tools,
-  policies,
+  toolPolicyData,
+  tools = [],
+  policies = {},
   onChange,
   loading = false,
   error = null,
@@ -68,7 +82,11 @@ export function ToolPolicyList({
     );
   }
 
-  if (tools.length === 0) {
+  // Determine which data structure to use
+  const usingNewStructure = toolPolicyData != null;
+  const toolList = usingNewStructure ? Object.keys(toolPolicyData!) : tools;
+
+  if (toolList.length === 0) {
     return (
       <div className="text-center py-8 text-base-content/60">
         No user-configurable tools available
@@ -76,7 +94,7 @@ export function ToolPolicyList({
     );
   }
 
-  const { coreTools, mcpTools } = groupToolsBySource(tools);
+  const { coreTools, mcpTools } = groupToolsBySource(toolList);
 
   return (
     <div className="space-y-6">
@@ -85,21 +103,49 @@ export function ToolPolicyList({
         <div>
           <h4 className="text-sm font-semibold mb-3 text-base-content/80">Core Tools</h4>
           <div className="space-y-2">
-            {coreTools.map((tool) => (
-              <div
-                key={tool}
-                className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
-              >
-                <span className="font-medium text-sm font-mono">{tool}</span>
-                <ToolPolicyToggle
-                  value={(policies[tool] || 'ask') as ToolPolicy}
-                  onChange={(policy) => onChange(tool, policy)}
-                  size="sm"
-                  context={context}
-                  parentPolicy={parentPolicies[tool]}
-                />
-              </div>
-            ))}
+            {coreTools.map((tool) => {
+              if (usingNewStructure) {
+                const toolInfo = toolPolicyData![tool];
+                return (
+                  <div
+                    key={tool}
+                    className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
+                  >
+                    <div>
+                      <span className="font-medium text-sm font-mono">{tool}</span>
+                      {toolInfo.projectValue && (
+                        <div className="text-xs text-base-content/60">
+                          Project: {toolInfo.projectValue}
+                        </div>
+                      )}
+                    </div>
+                    <ToolPolicyToggle
+                      value={toolInfo.value}
+                      allowedValues={toolInfo.allowedValues}
+                      onChange={(policy) => onChange(tool, policy)}
+                      size="sm"
+                    />
+                  </div>
+                );
+              } else {
+                // Legacy structure
+                return (
+                  <div
+                    key={tool}
+                    className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
+                  >
+                    <span className="font-medium text-sm font-mono">{tool}</span>
+                    <ToolPolicyToggle
+                      value={(policies[tool] || 'ask') as ToolPolicy}
+                      onChange={(policy) => onChange(tool, policy)}
+                      size="sm"
+                      context={context}
+                      parentPolicy={parentPolicies[tool]}
+                    />
+                  </div>
+                );
+              }
+            })}
           </div>
         </div>
       )}
@@ -111,21 +157,48 @@ export function ToolPolicyList({
           <div className="space-y-2">
             {serverTools.map((toolName) => {
               const fullToolName = `${serverId}/${toolName}`;
-              return (
-                <div
-                  key={fullToolName}
-                  className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
-                >
-                  <span className="font-medium text-sm font-mono">{toolName}</span>
-                  <ToolPolicyToggle
-                    value={(policies[fullToolName] || 'ask') as ToolPolicy}
-                    onChange={(policy) => onChange(fullToolName, policy)}
-                    size="sm"
-                    context={context}
-                    parentPolicy={parentPolicies[fullToolName]}
-                  />
-                </div>
-              );
+
+              if (usingNewStructure) {
+                const toolInfo = toolPolicyData![fullToolName];
+                return (
+                  <div
+                    key={fullToolName}
+                    className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
+                  >
+                    <div>
+                      <span className="font-medium text-sm font-mono">{toolName}</span>
+                      {toolInfo.projectValue && (
+                        <div className="text-xs text-base-content/60">
+                          Project: {toolInfo.projectValue}
+                        </div>
+                      )}
+                    </div>
+                    <ToolPolicyToggle
+                      value={toolInfo.value}
+                      allowedValues={toolInfo.allowedValues}
+                      onChange={(policy) => onChange(fullToolName, policy)}
+                      size="sm"
+                    />
+                  </div>
+                );
+              } else {
+                // Legacy structure
+                return (
+                  <div
+                    key={fullToolName}
+                    className="flex items-center justify-between p-3 border border-base-300 rounded-lg"
+                  >
+                    <span className="font-medium text-sm font-mono">{toolName}</span>
+                    <ToolPolicyToggle
+                      value={(policies[fullToolName] || 'ask') as ToolPolicy}
+                      onChange={(policy) => onChange(fullToolName, policy)}
+                      size="sm"
+                      context={context}
+                      parentPolicy={parentPolicies[fullToolName]}
+                    />
+                  </div>
+                );
+              }
             })}
           </div>
         </div>
