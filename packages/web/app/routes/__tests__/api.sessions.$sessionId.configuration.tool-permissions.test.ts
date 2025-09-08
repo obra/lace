@@ -1,7 +1,7 @@
 // ABOUTME: Integration tests for session configuration API tool permissions with explicit hierarchy structure
 // ABOUTME: Uses real sessions and projects to test progressive restriction without mocking
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { loader as GET, action as PUT } from '@/app/routes/api.sessions.$sessionId.configuration';
 import { getSessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
@@ -32,7 +32,7 @@ interface ConfigurationResponse {
 
 describe('Session Configuration API - Tool Permissions Structure', () => {
   const _tempLaceDir = setupWebTest();
-  let sessionService: ReturnType<typeof getSessionService>;
+  let _sessionService: ReturnType<typeof getSessionService>;
   let testProject: ReturnType<typeof Project.create>;
   let sessionId: string;
   let providerInstanceId: string;
@@ -41,7 +41,7 @@ describe('Session Configuration API - Tool Permissions Structure', () => {
     setupTestProviderDefaults();
     process.env.LACE_DB_PATH = ':memory:';
 
-    sessionService = getSessionService();
+    _sessionService = getSessionService();
 
     // Create provider instance
     providerInstanceId = await createTestProviderInstance({
