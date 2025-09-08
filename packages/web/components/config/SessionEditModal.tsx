@@ -90,13 +90,31 @@ export const SessionEditModal = memo(function SessionEditModal({
   };
 
   const handleToolPolicyChange = (tool: string, policy: ToolPolicy) => {
-    handleSessionConfigChange((prev) => ({
-      ...prev,
-      toolPolicies: {
+    handleSessionConfigChange((prev) => {
+      const updatedPolicies = {
         ...(prev.toolPolicies ?? {}),
         [tool]: policy,
-      },
-    }));
+      };
+
+      // Update both structures to keep them in sync
+      const updatedConfig = {
+        ...prev,
+        toolPolicies: updatedPolicies,
+      };
+
+      // Also update the tools structure if it exists to reflect the new value
+      if (prev.tools && prev.tools[tool]) {
+        updatedConfig.tools = {
+          ...prev.tools,
+          [tool]: {
+            ...prev.tools[tool],
+            value: policy,
+          },
+        };
+      }
+
+      return updatedConfig;
+    });
   };
 
   if (!selectedSession) return null;
@@ -269,11 +287,7 @@ export const SessionEditModal = memo(function SessionEditModal({
                 </label>
                 <ToolPolicyList
                   toolPolicyData={(sessionConfig as any).tools}
-                  tools={sessionConfig.availableTools || []}
-                  policies={sessionConfig.toolPolicies || {}}
                   onChange={handleToolPolicyChange}
-                  context="session"
-                  parentPolicies={currentProject.configuration?.toolPolicies || {}}
                 />
               </div>
             </div>
