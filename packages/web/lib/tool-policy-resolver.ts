@@ -11,9 +11,9 @@ export interface ToolPolicyInfo {
 }
 
 export interface ToolPolicyHierarchy {
-  global?: Record<string, ToolPolicy>;
-  project?: Record<string, ToolPolicy>;
-  session?: Record<string, ToolPolicy>;
+  global?: Record<string, ToolPolicy> | {};
+  project?: Record<string, ToolPolicy> | {};
+  session?: Record<string, ToolPolicy> | {};
 }
 
 /**
