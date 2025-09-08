@@ -26,7 +26,7 @@ export function isToolPolicyData(tools: unknown): tools is Record<string, ToolPo
         typeof tool === 'object' &&
         'value' in tool &&
         'allowedValues' in tool &&
-        Array.isArray((tool as any).allowedValues)
+        Array.isArray((tool as Record<string, unknown>).allowedValues)
     )
   );
 }

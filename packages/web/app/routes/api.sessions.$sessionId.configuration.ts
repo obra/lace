@@ -64,8 +64,8 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     // Resolve tool policy hierarchy for progressive restriction
     const toolPolicyHierarchy = {
-      project: projectConfig.toolPolicies || {},
-      session: configuration.toolPolicies || {},
+      project: projectConfig.toolPolicies,
+      session: configuration.toolPolicies,
     };
 
     const resolvedTools = ToolPolicyResolver.resolveSessionToolPolicies(
@@ -125,16 +125,19 @@ export async function action({ request, params }: Route.ActionArgs) {
 
           // Check each tool policy change against project restrictions
           for (const [tool, newPolicy] of Object.entries(validatedData.toolPolicies)) {
-            const projectPolicy = projectConfig.toolPolicies?.[tool];
-            if (
-              projectPolicy &&
-              !ToolPolicyResolver.isValidPolicyChange(tool, newPolicy, projectPolicy)
-            ) {
-              return createErrorResponse(
-                `Tool '${tool}' cannot be set to '${newPolicy}' - more permissive than project policy '${projectPolicy}'`,
-                400,
-                { code: 'POLICY_VIOLATION' }
-              );
+            const projectPolicies = projectConfig.toolPolicies;
+            if (projectPolicies) {
+              const projectPolicy = projectPolicies[tool];
+              if (
+                projectPolicy &&
+                !ToolPolicyResolver.isValidPolicyChange(tool, newPolicy, projectPolicy)
+              ) {
+                return createErrorResponse(
+                  `Tool '${tool}' cannot be set to '${newPolicy}' - more permissive than project policy '${projectPolicy}'`,
+                  400,
+                  { code: 'POLICY_VIOLATION' }
+                );
+              }
             }
           }
         }

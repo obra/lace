@@ -10,7 +10,7 @@ import { Modal } from '@/components/ui/Modal';
 import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import { ModelSelectionForm } from './ModelSelectionForm';
 import type { ProviderInfo, SessionConfiguration } from '@/types/api';
-import { isToolPolicyData } from '@/lib/type-guards';
+import { isToolPolicyData, type ToolPolicyInfo } from '@/lib/type-guards';
 import type { ProjectInfo, SessionInfo } from '@/types/core';
 import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
 import { useSessionEditModal } from '@/hooks/useSessionEditModal';
@@ -104,7 +104,7 @@ export const SessionEditModal = memo(function SessionEditModal({
       };
 
       // Also update the tools structure if it exists to reflect the new value
-      if (prev.tools && prev.tools[tool]) {
+      if (isToolPolicyData(prev.tools) && prev.tools[tool]) {
         updatedConfig.tools = {
           ...prev.tools,
           [tool]: {
