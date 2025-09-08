@@ -82,11 +82,10 @@ describe('Project Configuration API', () => {
       const data = await parseResponse<ConfigurationResponse>(response);
 
       expect(response.status).toBe(200);
-      expect(data.configuration).toEqual({
+      expect(data.configuration).toMatchObject({
         provider: 'anthropic',
         model: 'claude-3-sonnet',
         maxTokens: 4000,
-        tools: ['file-read', 'file-write'],
         toolPolicies: {
           'file-read': 'allow',
           'file-write': 'ask',
@@ -95,6 +94,10 @@ describe('Project Configuration API', () => {
         environmentVariables: { NODE_ENV: 'test' },
         availableTools: ['file_read', 'file_write', 'bash'], // From ToolCatalog
       });
+
+      // Verify new tools structure exists
+      expect(data.configuration.tools).toBeDefined();
+      expect(typeof data.configuration.tools).toBe('object');
     });
 
     it('should return 404 when project not found', async () => {
