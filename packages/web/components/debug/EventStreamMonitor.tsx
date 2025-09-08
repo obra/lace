@@ -5,21 +5,27 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCircle, faTrash, faPause, faPlay } from '@/lib/fontawesome';
-import { parse } from '@/lib/serialization';
+import { faCircle, faTrash, faPause, faPlay, faFilter } from '@/lib/fontawesome';
+import { parseTyped } from '@/lib/serialization';
 import type { LaceEvent } from '@/types/core';
 interface EventStreamMonitorProps {
   maxEvents?: number;
 }
 
-export function EventStreamMonitor({ maxEvents = 50 }: EventStreamMonitorProps) {
+export function EventStreamMonitor({ maxEvents = 1000 }: EventStreamMonitorProps) {
   const [events, setEvents] = useState<LaceEvent[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<
     'connecting' | 'connected' | 'disconnected'
   >('disconnected');
   const [isPaused, setIsPaused] = useState(false);
+  const [hideTokenEvents, setHideTokenEvents] = useState(true); // Hide noisy token events by default
   const eventSourceRef = useRef<EventSource | null>(null);
   const eventsEndRef = useRef<HTMLDivElement>(null);
+
+  // Filter events for display
+  const filteredEvents = hideTokenEvents
+    ? events.filter((event) => event.type !== 'AGENT_TOKEN')
+    : events;
 
   // Scroll to bottom when new events arrive
   useEffect(() => {
@@ -47,8 +53,8 @@ export function EventStreamMonitor({ maxEvents = 50 }: EventStreamMonitorProps) 
         if (isPaused) return;
 
         try {
-          // Use SuperJSON parse instead of JSON.parse
-          const parsedEvent = parse(event.data as string) as LaceEvent;
+          // Use SuperJSON parseTyped instead of JSON.parse
+          const parsedEvent = parseTyped<LaceEvent>(event.data as string);
 
           setEvents((prev) => {
             const newEvents = [...prev, parsedEvent].slice(-maxEvents);
@@ -125,10 +131,19 @@ export function EventStreamMonitor({ maxEvents = 50 }: EventStreamMonitorProps) 
         <div className="flex items-center gap-2">
           <FontAwesomeIcon icon={faCircle} className={`w-2 h-2 ${getStatusColor()}`} />
           <span className="text-xs font-medium capitalize">{connectionStatus}</span>
-          <span className="text-xs text-base-content/60">({events.length} events)</span>
+          <span className="text-xs text-base-content/60">
+            ({filteredEvents.length}/{events.length} events)
+          </span>
         </div>
 
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => setHideTokenEvents((prev) => !prev)}
+            className={`btn btn-xs ${hideTokenEvents ? 'btn-primary' : 'btn-ghost'}`}
+            title={hideTokenEvents ? 'Show Token Events' : 'Hide Token Events'}
+          >
+            <FontAwesomeIcon icon={faFilter} className="w-3 h-3" />
+          </button>
           <button
             onClick={togglePause}
             className="btn btn-xs btn-ghost"
@@ -144,12 +159,16 @@ export function EventStreamMonitor({ maxEvents = 50 }: EventStreamMonitorProps) 
 
       {/* Events list */}
       <div className="flex-1 overflow-y-auto space-y-1 bg-base-300 rounded p-2 text-xs font-mono">
-        {events.length === 0 ? (
+        {filteredEvents.length === 0 ? (
           <div className="text-base-content/60 text-center py-4">
-            {isPaused ? 'Paused - click play to resume' : 'Waiting for events...'}
+            {isPaused
+              ? 'Paused - click play to resume'
+              : hideTokenEvents && events.length > 0
+                ? 'Only token events (filtered out)'
+                : 'Waiting for events...'}
           </div>
         ) : (
-          events.map((event, index) => (
+          filteredEvents.map((event, index) => (
             <div
               key={event.id || index}
               className="border-b border-base-content/10 pb-1 mb-1 last:border-b-0"
