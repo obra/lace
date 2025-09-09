@@ -93,14 +93,14 @@ describe('SummarizeCompactionStrategy', () => {
     const events: LaceEvent[] = [
       {
         id: '1',
-        threadId: context.threadId,
+        context: { threadId: context.threadId },
         type: 'USER_MESSAGE',
         timestamp: new Date('2024-01-01T10:00:00Z'),
         data: 'Help me write a function to calculate fibonacci numbers',
       },
       {
         id: '2',
-        threadId: context.threadId,
+        context: { threadId: context.threadId },
         type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:01:00Z'),
         data: {
@@ -120,7 +120,7 @@ describe('SummarizeCompactionStrategy', () => {
       },
       {
         id: '3',
-        threadId: context.threadId,
+        context: { threadId: context.threadId },
         type: 'TOOL_CALL',
         timestamp: new Date('2024-01-01T10:02:00Z'),
         data: {
@@ -157,28 +157,28 @@ describe('SummarizeCompactionStrategy', () => {
       // Old events
       {
         id: '1',
-        threadId: 'test-thread-123',
+        context: { threadId: 'test-thread-123' },
         type: 'USER_MESSAGE',
         timestamp: new Date('2024-01-01T10:00:00Z'),
         data: 'Old message 1',
       },
       {
         id: '2',
-        threadId: 'test-thread-123',
+        context: { threadId: 'test-thread-123' },
         type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:01:00Z'),
         data: { content: 'Old response 1' },
       },
       {
         id: '3',
-        threadId: 'test-thread-123',
+        context: { threadId: 'test-thread-123' },
         type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:02:00Z'),
         data: { content: 'Old response 2' },
       },
       {
         id: '4',
-        threadId: 'test-thread-123',
+        context: { threadId: 'test-thread-123' },
         type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:03:00Z'),
         data: { content: 'Old response 3' },
@@ -186,14 +186,14 @@ describe('SummarizeCompactionStrategy', () => {
       // Recent agent events (last 2)
       {
         id: '5',
-        threadId: 'test-thread-123',
+        context: { threadId: 'test-thread-123' },
         type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:10:00Z'),
         data: { content: 'Recent response 1' },
       },
       {
         id: '6',
-        threadId: 'test-thread-123',
+        context: { threadId: 'test-thread-123' },
         type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:11:00Z'),
         data: { content: 'Recent response 2' },
@@ -225,15 +225,15 @@ describe('SummarizeCompactionStrategy', () => {
     const events: LaceEvent[] = [
       {
         id: '1',
-        threadId: 'test-thread-123',
+        context: { threadId: 'test-thread-123' },
         type: 'USER_MESSAGE',
         timestamp: new Date('2024-01-01T10:00:00Z'),
         data: 'Create a file',
       },
       {
         id: '2',
-        threadId: 'test-thread-123',
         type: 'TOOL_CALL',
+        context: { threadId: 'test-thread-123' },
         timestamp: new Date('2024-01-01T10:01:00Z'),
         data: {
           id: 'tool-123',
@@ -243,8 +243,8 @@ describe('SummarizeCompactionStrategy', () => {
       },
       {
         id: '3',
-        threadId: 'test-thread-123',
         type: 'TOOL_RESULT',
+        context: { threadId: 'test-thread-123' },
         timestamp: new Date('2024-01-01T10:02:00Z'),
         data: {
           content: [{ type: 'text', text: 'File created successfully' }],
@@ -273,7 +273,7 @@ describe('SummarizeCompactionStrategy', () => {
     const events: LaceEvent[] = [
       {
         id: '1',
-        threadId: 'test-thread-123',
+        context: { threadId: 'test-thread-123' },
         type: 'USER_MESSAGE',
         timestamp: new Date(),
         data: 'Test message',
@@ -305,14 +305,14 @@ describe('SummarizeCompactionStrategy', () => {
     const events: LaceEvent[] = [
       {
         id: '1',
-        threadId: 'test-thread-123',
+        context: { threadId: 'test-thread-123' },
         type: 'USER_MESSAGE',
         timestamp: new Date(),
         data: 'Test message',
       },
       {
         id: '2',
-        threadId: 'test-thread-123',
+        context: { threadId: 'test-thread-123' },
         type: 'AGENT_MESSAGE',
         timestamp: new Date(),
         data: { content: 'Response to test' },
@@ -332,7 +332,7 @@ describe('SummarizeCompactionStrategy', () => {
     const events: LaceEvent[] = [
       {
         id: '1',
-        threadId: 'test-thread-123',
+        context: { threadId: 'test-thread-123' },
         type: 'COMPACTION',
         timestamp: new Date('2024-01-01T10:00:00Z'),
         data: {
@@ -343,14 +343,14 @@ describe('SummarizeCompactionStrategy', () => {
       },
       {
         id: '2',
-        threadId: 'test-thread-123',
+        context: { threadId: 'test-thread-123' },
         type: 'USER_MESSAGE',
         timestamp: new Date('2024-01-01T10:01:00Z'),
         data: 'New message after compaction',
       },
       {
         id: '3',
-        threadId: 'test-thread-123',
+        context: { threadId: 'test-thread-123' },
         type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:02:00Z'),
         data: { content: 'Response' },

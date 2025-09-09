@@ -12,7 +12,7 @@ describe('ThreadManager - Stateless Behavior', () => {
     expectEventAdded(
       manager1.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'Test message',
       })
     );
@@ -35,14 +35,14 @@ describe('ThreadManager - Stateless Behavior', () => {
     expectEventAdded(
       manager1.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'From manager 1',
       })
     );
     expectEventAdded(
       manager2.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'From manager 2',
       })
     );
@@ -67,14 +67,14 @@ describe('ThreadManager - Stateless Behavior', () => {
     expectEventAdded(
       manager.addEvent({
         type: 'USER_MESSAGE',
-        threadId: thread1,
+        context: { threadId: thread1 },
         data: 'Message 1',
       })
     );
     expectEventAdded(
       manager.addEvent({
         type: 'USER_MESSAGE',
-        threadId: thread2,
+        context: { threadId: thread2 },
         data: 'Message 2',
       })
     );

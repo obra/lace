@@ -27,14 +27,14 @@ describe('ThreadManager - Core Behavior', () => {
       expectEventAdded(
         threadManager.addEvent({
           type: 'USER_MESSAGE',
-          threadId,
+          context: { threadId },
           data: 'Hello',
         })
       );
       expectEventAdded(
         threadManager.addEvent({
           type: 'AGENT_MESSAGE',
-          threadId,
+          context: { threadId },
           data: { content: 'Hi there' },
         })
       );
@@ -52,14 +52,14 @@ describe('ThreadManager - Core Behavior', () => {
       expectEventAdded(
         threadManager.addEvent({
           type: 'USER_MESSAGE',
-          threadId: thread1,
+          context: { threadId: thread1 },
           data: 'Thread 1 message',
         })
       );
       expectEventAdded(
         threadManager.addEvent({
           type: 'USER_MESSAGE',
-          threadId: thread2,
+          context: { threadId: thread2 },
           data: 'Thread 2 message',
         })
       );
@@ -84,7 +84,7 @@ describe('ThreadManager - Core Behavior', () => {
       expectEventAdded(
         threadManager.addEvent({
           type: 'USER_MESSAGE',
-          threadId,
+          context: { threadId },
           data: 'Persistent message',
         })
       );
@@ -115,14 +115,14 @@ describe('ThreadManager - Core Behavior', () => {
       expectEventAdded(
         threadManager.addEvent({
           type: 'USER_MESSAGE',
-          threadId,
+          context: { threadId },
           data: 'Parent message',
         })
       );
       expectEventAdded(
         threadManager.addEvent({
           type: 'USER_MESSAGE',
-          threadId: delegateId,
+          context: { threadId: delegateId },
           data: 'Delegate message',
         })
       );

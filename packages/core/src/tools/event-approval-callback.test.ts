@@ -213,7 +213,7 @@ describe('EventApprovalCallback Integration Tests', () => {
     const responseEvent = expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           toolCallId: 'call_test',
           decision: ApprovalDecision.ALLOW_ONCE,
@@ -263,7 +263,7 @@ describe('EventApprovalCallback Integration Tests', () => {
     const responseEvent = expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           toolCallId: 'call_deny',
           decision: ApprovalDecision.DENY,
@@ -324,7 +324,7 @@ describe('EventApprovalCallback Integration Tests', () => {
     const response1Event = expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           toolCallId: 'call_multi_1',
           decision: ApprovalDecision.ALLOW_ONCE,
@@ -348,7 +348,7 @@ describe('EventApprovalCallback Integration Tests', () => {
     const response2Event = expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           toolCallId: 'call_multi_2',
           decision: ApprovalDecision.ALLOW_ONCE,
@@ -374,7 +374,7 @@ describe('EventApprovalCallback Integration Tests', () => {
     // Pre-populate thread with existing approval (simulating recovery scenario)
     threadManager.addEvent({
       type: 'TOOL_CALL',
-      threadId: agent.threadId,
+      context: { threadId: agent.threadId },
       data: {
         id: 'call_recovery',
         name: 'bash',
@@ -384,7 +384,7 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     threadManager.addEvent({
       type: 'TOOL_APPROVAL_REQUEST',
-      threadId: agent.threadId,
+      context: { threadId: agent.threadId },
       data: {
         toolCallId: 'call_recovery',
       },
@@ -392,7 +392,7 @@ describe('EventApprovalCallback Integration Tests', () => {
 
     threadManager.addEvent({
       type: 'TOOL_APPROVAL_RESPONSE',
-      threadId: agent.threadId,
+      context: { threadId: agent.threadId },
       data: {
         toolCallId: 'call_recovery',
         decision: ApprovalDecision.ALLOW_SESSION,
@@ -465,7 +465,7 @@ describe('EventApprovalCallback Integration Tests', () => {
     const responseEvent = expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           toolCallId: 'call_emit_test',
           decision: ApprovalDecision.ALLOW_ONCE,
@@ -494,7 +494,7 @@ describe('EventApprovalCallback Integration Tests', () => {
       // Setup tool call event
       threadManager.addEvent({
         type: 'TOOL_CALL',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           id: 'call_test',
           name: 'bash',
@@ -524,7 +524,7 @@ describe('EventApprovalCallback Integration Tests', () => {
       // Setup tool call and approval response events
       threadManager.addEvent({
         type: 'TOOL_CALL',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           id: 'call_existing',
           name: 'bash',
@@ -534,7 +534,7 @@ describe('EventApprovalCallback Integration Tests', () => {
 
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           toolCallId: 'call_existing',
           decision: ApprovalDecision.ALLOW_SESSION,
@@ -556,7 +556,7 @@ describe('EventApprovalCallback Integration Tests', () => {
       // Setup tool call event
       threadManager.addEvent({
         type: 'TOOL_CALL',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           id: 'call_duplicate',
           name: 'bash',
@@ -567,7 +567,7 @@ describe('EventApprovalCallback Integration Tests', () => {
       // Add existing approval request
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_REQUEST',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           toolCallId: 'call_duplicate',
         },

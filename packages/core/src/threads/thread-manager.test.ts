@@ -29,7 +29,7 @@ describe('ThreadManager', () => {
       const event = expectEventAdded(
         threadManager.addEvent({
           type: 'USER_MESSAGE',
-          threadId,
+          context: { threadId },
           data: 'Test message',
         })
       );
@@ -53,14 +53,14 @@ describe('ThreadManager', () => {
       const event1 = expectEventAdded(
         threadManager.addEvent({
           type: 'USER_MESSAGE',
-          threadId,
+          context: { threadId },
           data: 'Hello',
         })
       );
       const event2 = expectEventAdded(
         threadManager.addEvent({
           type: 'AGENT_MESSAGE',
-          threadId,
+          context: { threadId },
           data: { content: 'Hi there' },
         })
       );
@@ -84,7 +84,7 @@ describe('ThreadManager', () => {
       expectEventAdded(
         threadManager.addEvent({
           type: 'TOOL_APPROVAL_RESPONSE',
-          threadId,
+          context: { threadId },
           data: {
             toolCallId: 'tool-123',
             decision: ApprovalDecision.ALLOW_ONCE,
@@ -96,7 +96,7 @@ describe('ThreadManager', () => {
       // Second approval should be ignored due to database constraint
       const secondEvent = threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId,
+        context: { threadId },
         data: {
           toolCallId: 'tool-123',
           decision: ApprovalDecision.ALLOW_ONCE,
@@ -113,7 +113,7 @@ describe('ThreadManager', () => {
       expect(() => {
         threadManager.addEvent({
           type: 'USER_MESSAGE',
-          threadId: 'non-existent-thread',
+          context: { threadId: 'non-existent-thread' },
           data: 'test',
         });
       }).toThrow('Thread non-existent-thread not found');

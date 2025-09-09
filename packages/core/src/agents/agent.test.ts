@@ -308,7 +308,7 @@ describe('Enhanced Agent', () => {
       // Add a user message first so there's conversation to continue
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId: agent.getThreadId(),
+        context: { threadId: agent.getThreadId() },
         data: 'Previous message',
       });
 
@@ -1430,17 +1430,17 @@ describe('Enhanced Agent', () => {
     it('should ignore LOCAL_SYSTEM_MESSAGE events in conversation', () => {
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId: agent.getThreadId(),
+        context: { threadId: agent.getThreadId() },
         data: 'Test',
       });
       threadManager.addEvent({
         type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId: agent.getThreadId(),
+        context: { threadId: agent.getThreadId() },
         data: 'System info message',
       });
       threadManager.addEvent({
         type: 'AGENT_MESSAGE',
-        threadId: agent.getThreadId(),
+        context: { threadId: agent.getThreadId() },
         data: { content: 'Response' },
       });
 
@@ -1455,12 +1455,12 @@ describe('Enhanced Agent', () => {
     it('should handle orphaned tool results gracefully', () => {
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId: agent.getThreadId(),
+        context: { threadId: agent.getThreadId() },
         data: 'Test',
       });
       threadManager.addEvent({
         type: 'TOOL_RESULT',
-        threadId: agent.getThreadId(),
+        context: { threadId: agent.getThreadId() },
         data: {
           id: 'missing-call-id',
           content: [{ type: 'text', text: 'Some output' }],
@@ -1478,12 +1478,12 @@ describe('Enhanced Agent', () => {
     it('should handle orphaned tool calls gracefully', () => {
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId: agent.getThreadId(),
+        context: { threadId: agent.getThreadId() },
         data: 'Test',
       });
       threadManager.addEvent({
         type: 'TOOL_CALL',
-        threadId: agent.getThreadId(),
+        context: { threadId: agent.getThreadId() },
         data: {
           name: 'bash',
           arguments: { command: 'ls' },
@@ -1945,19 +1945,19 @@ describe('Enhanced Agent', () => {
       // Manually add system prompt events to thread (simulating what Agent.start() does)
       threadManager.addEvent({
         type: 'SYSTEM_PROMPT',
-        threadId: agent.getThreadId(),
+        context: { threadId: agent.getThreadId() },
         data: 'You are a helpful AI assistant.',
       });
       threadManager.addEvent({
         type: 'USER_SYSTEM_PROMPT',
-        threadId: agent.getThreadId(),
+        context: { threadId: agent.getThreadId() },
         data: 'Always be concise.',
       });
 
       // Add a user message
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId: agent.getThreadId(),
+        context: { threadId: agent.getThreadId() },
         data: 'Hello, how are you?',
       });
 
@@ -2022,7 +2022,7 @@ describe('Enhanced Agent', () => {
         const agent2 = new Agent({
           toolExecutor,
           threadManager,
-          threadId: agent.getThreadId(), // Use same thread ID
+          context: { threadId: agent.getThreadId() }, // Use same thread ID
           tools: [],
           metadata: {
             name: 'test-agent',
@@ -2056,7 +2056,7 @@ describe('Enhanced Agent', () => {
         // Pre-populate thread with a user message (conversation started)
         threadManager.addEvent({
           type: 'USER_MESSAGE',
-          threadId: agent.getThreadId(),
+          context: { threadId: agent.getThreadId() },
           data: 'Hello there!',
         });
 
@@ -2078,7 +2078,7 @@ describe('Enhanced Agent', () => {
         // Pre-populate thread with system prompts (e.g., from previous agent run)
         threadManager.addEvent({
           type: 'SYSTEM_PROMPT',
-          threadId: agent.getThreadId(),
+          context: { threadId: agent.getThreadId() },
           data: 'Existing system prompt',
         });
 
@@ -2118,7 +2118,7 @@ describe('Enhanced Agent', () => {
         // Pre-populate thread with some system messages but no conversation or prompts
         threadManager.addEvent({
           type: 'LOCAL_SYSTEM_MESSAGE',
-          threadId: agent.getThreadId(),
+          context: { threadId: agent.getThreadId() },
           data: 'Connection established',
         });
 
@@ -2142,17 +2142,17 @@ describe('Enhanced Agent', () => {
         // Pre-populate with both conversation events and existing prompts
         threadManager.addEvent({
           type: 'USER_MESSAGE',
-          threadId: agent.getThreadId(),
+          context: { threadId: agent.getThreadId() },
           data: 'Hello',
         });
         threadManager.addEvent({
           type: 'AGENT_MESSAGE',
-          threadId: agent.getThreadId(),
+          context: { threadId: agent.getThreadId() },
           data: { content: 'Hi there!' },
         });
         threadManager.addEvent({
           type: 'SYSTEM_PROMPT',
-          threadId: agent.getThreadId(),
+          context: { threadId: agent.getThreadId() },
           data: 'You are helpful',
         });
 

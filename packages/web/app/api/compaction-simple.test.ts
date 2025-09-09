@@ -216,9 +216,11 @@ describe('Compaction Integration Test', () => {
     expect(compactionStartEvents.length).toBe(1);
     expect(compactionStartEvents[0]).toMatchObject({
       type: 'COMPACTION_START',
-      threadId: sessionId,
       data: {
         auto: false,
+      },
+      context: {
+        threadId: sessionId,
       },
     });
 
@@ -233,9 +235,11 @@ describe('Compaction Integration Test', () => {
     expect(compactionCompleteEvents.length).toBe(1);
     expect(compactionCompleteEvents[0]).toMatchObject({
       type: 'COMPACTION_COMPLETE',
-      threadId: sessionId,
       data: {
         success: true,
+      },
+      context: {
+        threadId: sessionId,
       },
     });
   });

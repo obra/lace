@@ -92,7 +92,6 @@ describe('SessionService compaction event streaming', () => {
     // Verify broadcast was called with COMPACTION_START LaceEvent
     expect(mockEventStreamManager.broadcast).toHaveBeenCalledWith({
       type: 'COMPACTION_START',
-      threadId: 'thread_123',
       timestamp: expect.any(Date),
       data: {
         auto: true,
@@ -102,6 +101,7 @@ describe('SessionService compaction event streaming', () => {
         sessionId: 'session_123',
         agentId: undefined,
         taskId: undefined,
+        threadId: 'thread_123',
       },
       transient: true,
     });
@@ -134,7 +134,6 @@ describe('SessionService compaction event streaming', () => {
     // Verify broadcast was called with COMPACTION_COMPLETE LaceEvent
     expect(mockEventStreamManager.broadcast).toHaveBeenCalledWith({
       type: 'COMPACTION_COMPLETE',
-      threadId: 'thread_123',
       timestamp: expect.any(Date),
       data: {
         success: true,
@@ -144,6 +143,7 @@ describe('SessionService compaction event streaming', () => {
         sessionId: 'session_123',
         agentId: undefined,
         taskId: undefined,
+        threadId: 'thread_123',
       },
       transient: true,
     });
@@ -165,7 +165,6 @@ describe('SessionService compaction event streaming', () => {
     // Verify broadcast was called
     expect(mockEventStreamManager.broadcast).toHaveBeenCalledWith({
       type: 'COMPACTION_START',
-      threadId: 'thread_123',
       timestamp: expect.any(Date),
       data: {
         auto: true, // Auto-compaction flag
@@ -175,6 +174,7 @@ describe('SessionService compaction event streaming', () => {
         sessionId: 'session_123',
         agentId: undefined,
         taskId: undefined,
+        threadId: 'thread_123',
       },
       transient: true,
     });

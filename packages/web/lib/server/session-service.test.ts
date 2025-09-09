@@ -316,9 +316,11 @@ describe('SessionService approval event forwarding', () => {
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'TOOL_APPROVAL_REQUEST',
-        threadId: session.getId(),
         data: expect.objectContaining({
           toolCallId: 'test-call-123',
+        }),
+        context: expect.objectContaining({
+          threadId: session.getId(),
         }),
       })
     );
@@ -425,13 +427,15 @@ describe('SessionService agent state change broadcasting', () => {
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'AGENT_STATE_CHANGE',
-        threadId: agent.threadId,
         transient: true,
         data: {
           agentId: agent.threadId,
           from: 'idle',
           to: 'thinking',
         },
+        context: expect.objectContaining({
+          threadId: agent.threadId,
+        }),
       }) satisfies Partial<LaceEvent>
     );
   });
@@ -450,13 +454,15 @@ describe('SessionService agent state change broadcasting', () => {
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'AGENT_STATE_CHANGE',
-        threadId: agent.threadId,
         transient: true,
         data: {
           agentId: agent.threadId,
           from: 'thinking',
           to: 'streaming',
         },
+        context: expect.objectContaining({
+          threadId: agent.threadId,
+        }),
       }) satisfies Partial<LaceEvent>
     );
   });
@@ -475,13 +481,15 @@ describe('SessionService agent state change broadcasting', () => {
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'AGENT_STATE_CHANGE',
-        threadId: agent.threadId,
         transient: true,
         data: {
           agentId: agent.threadId,
           from: 'streaming',
           to: 'tool_execution',
         },
+        context: expect.objectContaining({
+          threadId: agent.threadId,
+        }),
       }) satisfies Partial<LaceEvent>
     );
   });
@@ -500,13 +508,15 @@ describe('SessionService agent state change broadcasting', () => {
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'AGENT_STATE_CHANGE',
-        threadId: agent.threadId,
         transient: true,
         data: {
           agentId: agent.threadId,
           from: 'tool_execution',
           to: 'idle',
         },
+        context: expect.objectContaining({
+          threadId: agent.threadId,
+        }),
       }) satisfies Partial<LaceEvent>
     );
   });
@@ -528,13 +538,15 @@ describe('SessionService agent state change broadcasting', () => {
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'AGENT_STATE_CHANGE',
-        threadId: agent.threadId,
         timestamp: expect.any(Date),
         transient: true,
         data: expect.objectContaining({
           agentId: agent.threadId,
           from: 'idle',
           to: 'thinking',
+        }),
+        context: expect.objectContaining({
+          threadId: agent.threadId,
         }),
       })
     );

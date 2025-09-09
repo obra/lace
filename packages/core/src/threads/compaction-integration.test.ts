@@ -22,14 +22,14 @@ describe('Compaction Integration', () => {
     expectEventAdded(
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'Hello',
       })
     );
     expectEventAdded(
       threadManager.addEvent({
         type: 'AGENT_MESSAGE',
-        threadId,
+        context: { threadId },
         data: { content: 'Hi there' },
       })
     );
@@ -47,14 +47,14 @@ describe('Compaction Integration', () => {
     expectEventAdded(
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'List files',
       })
     );
     expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_CALL',
-        threadId,
+        context: { threadId },
         data: {
           id: 'call1',
           name: 'list_files',
@@ -65,7 +65,7 @@ describe('Compaction Integration', () => {
     expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_RESULT',
-        threadId,
+        context: { threadId },
         data: {
           id: 'call1',
           content: [
@@ -78,7 +78,7 @@ describe('Compaction Integration', () => {
     expectEventAdded(
       threadManager.addEvent({
         type: 'AGENT_MESSAGE',
-        threadId,
+        context: { threadId },
         data: { content: 'Found 5 files' },
       })
     );
@@ -126,14 +126,14 @@ describe('Compaction Integration', () => {
     expectEventAdded(
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'Hello',
       })
     );
     expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_RESULT',
-        threadId,
+        context: { threadId },
         data: {
           id: 'call-hello',
           content: [{ type: 'text', text: 'line1\nline2\nline3\nline4\nline5' }],
@@ -148,14 +148,14 @@ describe('Compaction Integration', () => {
     expectEventAdded(
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'What next?',
       })
     );
     expectEventAdded(
       threadManager.addEvent({
         type: 'AGENT_MESSAGE',
-        threadId,
+        context: { threadId },
         data: { content: 'Let me help' },
       })
     );
@@ -199,14 +199,14 @@ describe('Compaction Integration', () => {
     expectEventAdded(
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'Hello',
       })
     );
     expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_RESULT',
-        threadId,
+        context: { threadId },
         data: {
           id: 'call-first',
           content: [{ type: 'text', text: 'long\nresult\nhere\nextra\nlines' }],
@@ -222,14 +222,14 @@ describe('Compaction Integration', () => {
     expectEventAdded(
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'Continue',
       })
     );
     expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_RESULT',
-        threadId,
+        context: { threadId },
         data: {
           id: 'call-second',
           content: [{ type: 'text', text: 'another\nlong\nresult\nwith\nextra\nlines' }],
@@ -325,7 +325,7 @@ describe('Compaction Integration', () => {
     expectEventAdded(
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'Hello',
       })
     );
@@ -349,7 +349,7 @@ describe('Compaction Integration', () => {
     expectEventAdded(
       newThreadManager.addEvent({
         type: 'TOOL_RESULT',
-        threadId: newThreadId,
+        context: { threadId: newThreadId },
         data: {
           id: 'call-auto',
           content: [{ type: 'text', text: 'line1\nline2\nline3\nline4' }],
@@ -368,21 +368,21 @@ describe('Compaction Integration', () => {
     expectEventAdded(
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'First message',
       })
     );
     expectEventAdded(
       threadManager.addEvent({
         type: 'AGENT_MESSAGE',
-        threadId,
+        context: { threadId },
         data: { content: 'First response' },
       })
     );
     expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_RESULT',
-        threadId,
+        context: { threadId },
         data: {
           id: 'call-order',
           content: [{ type: 'text', text: 'long\ntool\nresult\nwith\nmany\nlines' }],
@@ -393,7 +393,7 @@ describe('Compaction Integration', () => {
     expectEventAdded(
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'Second message',
       })
     );
