@@ -23,46 +23,19 @@ describe('MCP Tool Renderer', () => {
   });
 
   describe('getSummary', () => {
-    it('should format simple string parameters', () => {
+    it('should return empty string to keep title clean', () => {
       const args = { path: '/test/file.txt', mode: 'read' };
       const summary = mcpRenderer.getSummary?.(args);
-      expect(summary).toBe('path: "/test/file.txt", mode: "read"');
+      expect(summary).toBe('');
     });
 
-    it('should handle long strings with truncation', () => {
-      const longContent = 'a'.repeat(150);
-      const args = { content: longContent };
-      const summary = mcpRenderer.getSummary?.(args);
-      expect(summary).toContain('content: "' + 'a'.repeat(100) + '..."');
-    });
-
-    it('should format different parameter types', () => {
-      const args = {
-        name: 'test',
-        count: 42,
-        enabled: true,
-        tags: ['a', 'b', 'c'],
-        metadata: { key: 'value' },
-      };
-      const summary = mcpRenderer.getSummary?.(args);
-
-      expect(summary).toContain('name: "test"');
-      expect(summary).toContain('count: 42');
-      expect(summary).toContain('enabled: true');
-      expect(summary).toContain('tags: [3 items]');
-      expect(summary).toContain('metadata: {1 properties}');
-    });
-
-    it('should handle empty or null parameters', () => {
+    it('should return empty string for all parameter types', () => {
       expect(mcpRenderer.getSummary?.({})).toBe('');
-      expect(mcpRenderer.getSummary?.(null)).toBe('null');
+      expect(mcpRenderer.getSummary?.(null)).toBe('');
       expect(mcpRenderer.getSummary?.(undefined)).toBe('');
-    });
-
-    it('should handle non-object parameters', () => {
-      expect(mcpRenderer.getSummary?.('simple string')).toBe('simple string');
-      expect(mcpRenderer.getSummary?.(123)).toBe('123');
-      expect(mcpRenderer.getSummary?.(true)).toBe('true');
+      expect(mcpRenderer.getSummary?.('simple string')).toBe('');
+      expect(mcpRenderer.getSummary?.(123)).toBe('');
+      expect(mcpRenderer.getSummary?.(true)).toBe('');
     });
   });
 
