@@ -254,6 +254,7 @@ describe('SettingsContainer', () => {
       expect(vi.mocked(api.patch)).toHaveBeenCalledWith('/api/settings', {
         theme: 'light',
         timelineWidth: 'medium',
+        debugPanelEnabled: false,
       });
     });
   });

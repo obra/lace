@@ -134,7 +134,7 @@ describe('SummarizeCompactionStrategy', () => {
     const result = await strategy.compact(events, context);
 
     expect(result.type).toBe('COMPACTION');
-    expect(result.threadId).toBe(context.threadId);
+    expect(result.context?.threadId).toBe(context.threadId);
 
     const compactionData = getCompactionData(result);
     expect(compactionData.strategyId).toBe('summarize');

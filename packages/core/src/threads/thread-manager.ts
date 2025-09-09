@@ -544,8 +544,8 @@ export class ThreadManager {
     const compactionData = compactionEvent.data as CompactionData;
     this.addEvent({
       type: 'COMPACTION',
-      threadId,
       data: compactionData,
+      context: { threadId },
     } as LaceEvent);
   }
 

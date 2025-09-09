@@ -245,7 +245,7 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       // Create a tool call event
       threadManager.addEvent({
         type: 'TOOL_CALL',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           id: 'constraint-test',
           name: 'bash',
@@ -284,7 +284,7 @@ describe('Tool Approval Race Condition Integration Tests', () => {
 
       threadManager.addEvent({
         type: 'TOOL_CALL',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           id: toolCallId,
           name: 'bash',
@@ -295,7 +295,7 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       // Manually add duplicate TOOL_RESULT events (simulating race condition)
       threadManager.addEvent({
         type: 'TOOL_RESULT',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           id: toolCallId,
           content: [{ type: 'text', text: 'Result 1' }],
@@ -305,7 +305,7 @@ describe('Tool Approval Race Condition Integration Tests', () => {
 
       threadManager.addEvent({
         type: 'TOOL_RESULT',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           id: toolCallId,
           content: [{ type: 'text', text: 'Result 2' }],
@@ -331,7 +331,7 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       // Create tool call
       threadManager.addEvent({
         type: 'TOOL_CALL',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           id: 'rapid-test',
           name: 'bash',
@@ -370,7 +370,7 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       expect(approvalResponses).toHaveLength(1);
 
       // Events should be properly ordered and uncorrupted
-      expect(events.every((e) => e.id && e.threadId && e.type && e.timestamp)).toBe(true);
+      expect(events.every((e) => e.id && e.context?.threadId && e.type && e.timestamp)).toBe(true);
     });
   });
 });

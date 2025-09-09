@@ -145,7 +145,7 @@ describe('Agent Message Endpoint with Summary Generation', () => {
     expect(summaryEvent!.context).toEqual({
       projectId,
       sessionId,
-      agentId,
+      threadId: agentId,
     });
 
     // Verify event data structure - check that we got a real summary

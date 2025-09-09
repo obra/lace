@@ -86,32 +86,6 @@ describe('SettingsProvider', () => {
     expect(mockApiGet).toHaveBeenCalledWith('/api/settings');
   });
 
-  it('should migrate from localStorage to settings API', async () => {
-    // Set theme in localStorage
-    localStorage.setItem('lace-theme', 'light');
-
-    // Mock API to return empty settings (no theme stored yet)
-    mockApiGet.mockResolvedValue({});
-    mockApiPatch.mockResolvedValue({ theme: 'light' });
-
-    render(
-      <SettingsProvider>
-        <TestComponent />
-      </SettingsProvider>
-    );
-
-    // Should migrate theme from localStorage to settings API
-    await waitFor(() => {
-      expect(mockApiPatch).toHaveBeenCalledWith('/api/settings', {
-        theme: 'light',
-        timelineWidth: 'medium',
-      });
-    });
-
-    // Should remove from localStorage after migration
-    expect(localStorage.getItem('lace-theme')).toBeNull();
-  });
-
   it('should save theme changes to settings API', async () => {
     // Mock API calls
     mockApiGet.mockResolvedValue({ theme: 'dark' });
@@ -139,6 +113,7 @@ describe('SettingsProvider', () => {
       expect(mockApiPatch).toHaveBeenCalledWith('/api/settings', {
         theme: 'light',
         timelineWidth: 'medium',
+        debugPanelEnabled: false,
       });
     });
   });

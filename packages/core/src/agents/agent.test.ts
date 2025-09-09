@@ -2255,7 +2255,7 @@ describe('Enhanced Agent', () => {
 
       agent.threadManager.addEvent({
         type: 'TOOL_CALL',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: toolCall,
       });
 
@@ -2268,7 +2268,7 @@ describe('Enhanced Agent', () => {
 
       agent.threadManager.addEvent({
         type: 'TOOL_RESULT',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: existingResult,
       });
 
@@ -2279,7 +2279,7 @@ describe('Enhanced Agent', () => {
       const approvalEvent = expectEventAdded(
         agent.threadManager.addEvent({
           type: 'TOOL_APPROVAL_RESPONSE',
-          threadId: agent.threadId,
+          context: { threadId: agent.threadId },
           data: {
             toolCallId: 'tool-123',
             decision: ApprovalDecision.ALLOW_ONCE,
@@ -2322,7 +2322,7 @@ describe('Enhanced Agent', () => {
 
       agent.threadManager.addEvent({
         type: 'TOOL_CALL',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: toolCall,
       });
 
@@ -2338,7 +2338,7 @@ describe('Enhanced Agent', () => {
       const approvalEvent = expectEventAdded(
         agent.threadManager.addEvent({
           type: 'TOOL_APPROVAL_RESPONSE',
-          threadId: agent.threadId,
+          context: { threadId: agent.threadId },
           data: {
             toolCallId: 'tool-456',
             decision: ApprovalDecision.ALLOW_ONCE,

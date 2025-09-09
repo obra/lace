@@ -100,12 +100,12 @@ describe('Agent Thread Events', () => {
       // Check USER_MESSAGE event
       expect(userMessageCalls[0][0].event.type).toBe('USER_MESSAGE');
       expect(userMessageCalls[0][0].event.data).toBe('Test message');
-      expect(typeof userMessageCalls[0][0].context.threadId).toBe('string');
+      expect(typeof userMessageCalls[0][0].event.context?.threadId).toBe('string');
 
       // Check AGENT_MESSAGE event
       expect(agentMessageCalls[0][0].event.type).toBe('AGENT_MESSAGE');
       expect((agentMessageCalls[0][0].event.data as { content: string }).content).toBeDefined();
-      expect(typeof agentMessageCalls[0][0].context.threadId).toBe('string');
+      expect(typeof agentMessageCalls[0][0].event.context?.threadId).toBe('string');
     });
 
     it('should emit thread_event_added with consistent threadId', async () => {
@@ -340,7 +340,7 @@ describe('Agent Thread Events', () => {
           type: 'USER_MESSAGE',
           data: 'Existing message',
         }) as LaceEvent,
-        context: { threadId: existingThreadId },
+        threadId: existingThreadId,
       });
     });
 
