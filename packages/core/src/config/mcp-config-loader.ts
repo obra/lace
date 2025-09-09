@@ -1,7 +1,7 @@
 // ABOUTME: Configuration loader for MCP servers with hierarchical merging
 // ABOUTME: Supports global and project-level configs with server-level replacement
 
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, renameSync } from 'fs';
 import { join, dirname } from 'path';
 import { z } from 'zod';
 import { getLaceDir } from '~/config/lace-dir';
@@ -220,7 +220,11 @@ export class MCPConfigLoader {
     mkdirSync(dirname(filepath), { recursive: true });
 
     const content = JSON.stringify(config, null, 2);
-    writeFileSync(filepath, content, 'utf-8');
+
+    // Atomic write to prevent corruption on crash/interruption
+    const tmpPath = `${filepath}.tmp-${process.pid}-${Date.now()}`;
+    writeFileSync(tmpPath, content, 'utf-8');
+    renameSync(tmpPath, filepath);
   }
 
   /**
