@@ -185,7 +185,7 @@ export function EventStreamMonitor({ maxEvents = 1000 }: EventStreamMonitorProps
               </div>
 
               <div className="text-base-content/70 text-xs">
-                Thread: {event.threadId || 'unknown'}
+                Thread: {event.context?.threadId || 'none'}
               </div>
 
               {event.data && (

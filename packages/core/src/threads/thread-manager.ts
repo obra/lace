@@ -302,15 +302,16 @@ export class ThreadManager {
     }
 
     // Non-thread events pass through without persistence
-    if (!event.threadId) {
+    const threadId = event.context?.threadId;
+    if (!threadId) {
       // Just return the event - caller will broadcast it
       return event;
     }
 
     // Thread events require the thread to exist
-    const thread = this.getThread(event.threadId);
+    const thread = this.getThread(threadId);
     if (!thread) {
-      throw new Error(`Thread ${event.threadId} not found`);
+      throw new Error(`Thread ${threadId} not found`);
     }
 
     // Determine if this event should be persisted
@@ -320,7 +321,7 @@ export class ThreadManager {
       // Don't persist transient events to database
       thread.events.push(event);
       thread.updatedAt = new Date();
-      processLocalThreadCache.set(event.threadId, thread);
+      processLocalThreadCache.set(threadId, thread);
       return event;
     }
 
@@ -335,7 +336,7 @@ export class ThreadManager {
         thread.updatedAt = new Date();
 
         // Update process-local cache
-        processLocalThreadCache.set(event.threadId, thread);
+        processLocalThreadCache.set(threadId, thread);
 
         return event;
       } else {

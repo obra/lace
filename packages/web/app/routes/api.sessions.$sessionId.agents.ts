@@ -136,14 +136,13 @@ export async function action({ request, params }: Route.ActionArgs) {
     const sseManager = EventStreamManager.getInstance();
     const testEvent = {
       type: 'LOCAL_SYSTEM_MESSAGE' as const,
-      threadId: agentResponse.threadId as ThreadId,
       timestamp: new Date(),
       data: `Agent "${agentResponse.name}" spawned successfully`,
       context: {
         sessionId,
         projectId: undefined,
         taskId: undefined,
-        agentId: undefined,
+        threadId: agentResponse.threadId as ThreadId,
       },
     };
     sseManager.broadcast(testEvent);

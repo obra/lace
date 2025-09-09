@@ -41,9 +41,9 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
     // Create the compaction event with data in the data field
     const compactionEvent: LaceEvent = {
       id: this.generateEventId(),
-      threadId: context.threadId,
       type: 'COMPACTION',
       timestamp: new Date(),
+      context: { threadId: context.threadId },
       data: {
         strategyId: this.id,
         originalEventCount: events.length,

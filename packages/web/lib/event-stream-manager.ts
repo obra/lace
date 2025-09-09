@@ -136,7 +136,6 @@ export class EventStreamManager {
       const e = event as TaskCreatedEvent;
       this.broadcast({
         type: 'TASK_CREATED',
-        threadId: 'task-manager',
         data: { taskId: e.task.id, ...e },
         context: { projectId, sessionId, taskId: e.task.id },
         transient: true,
@@ -147,7 +146,6 @@ export class EventStreamManager {
       const e = event as TaskUpdatedEvent;
       this.broadcast({
         type: 'TASK_UPDATED',
-        threadId: 'task-manager',
         data: { taskId: e.task?.id || '', ...e },
         context: { projectId, sessionId, taskId: e.task?.id },
         transient: true,
@@ -158,7 +156,6 @@ export class EventStreamManager {
       const e = event as TaskDeletedEvent;
       this.broadcast({
         type: 'TASK_DELETED',
-        threadId: 'task-manager',
         data: { ...e },
         context: { projectId, sessionId, taskId: e.taskId },
         transient: true,
@@ -169,7 +166,6 @@ export class EventStreamManager {
       const e = event as TaskNoteAddedEvent;
       this.broadcast({
         type: 'TASK_NOTE_ADDED',
-        threadId: 'task-manager',
         data: { taskId: e.task?.id || '', ...e },
         context: { projectId, sessionId, taskId: e.task?.id },
         transient: true,
@@ -180,7 +176,6 @@ export class EventStreamManager {
       const e = event as AgentSpawnedEvent;
       this.broadcast({
         type: 'AGENT_SPAWNED',
-        threadId: e.agentThreadId,
         data: {
           type: e.type,
           taskId: e.taskId,
@@ -190,7 +185,7 @@ export class EventStreamManager {
           context: e.context,
           timestamp: e.timestamp,
         },
-        context: { projectId, sessionId, taskId: e.taskId },
+        context: { projectId, sessionId, taskId: e.taskId, threadId: e.agentThreadId },
         transient: true,
       });
     });
@@ -237,7 +232,6 @@ export class EventStreamManager {
 
       this.broadcast({
         type: 'AGENT_ERROR',
-        threadId: agentThreadId,
         timestamp: new Date(),
         data: {
           errorType: context.errorType as ErrorType,
@@ -261,7 +255,7 @@ export class EventStreamManager {
         context: {
           projectId,
           sessionId,
-          agentId: agentThreadId,
+          threadId: agentThreadId,
         },
       });
     });
@@ -392,7 +386,7 @@ export class EventStreamManager {
     logger.debug('[EVENT_STREAM] Broadcasting event', {
       eventId: fullEvent.id,
       type: fullEvent.type,
-      threadId: fullEvent.threadId,
+      contextThreadId: fullEvent.context?.threadId,
       dataSize:
         typeof fullEvent.data === 'string'
           ? fullEvent.data.length
@@ -421,14 +415,14 @@ export class EventStreamManager {
       ) {
         const errorData = data as AgentErrorEventData;
         logger.debug('[EVENT_STREAM] Broadcasting agent error event', {
-          threadId: fullEvent.threadId,
+          contextThreadId: fullEvent.context?.threadId,
           errorType: errorData.errorType,
           phase: errorData.context.phase,
           isRetryable: errorData.isRetryable,
         });
       } else {
         logger.debug('[EVENT_STREAM] Broadcasting agent error event with invalid data shape', {
-          threadId: fullEvent.threadId,
+          contextThreadId: fullEvent.context?.threadId,
           rawData: data,
         });
       }
@@ -457,9 +451,10 @@ export class EventStreamManager {
   private shouldSendToConnection(connection: ClientConnection, event: LaceEvent): boolean {
     const { subscription } = connection;
 
-    // Thread filtering
+    // Thread filtering - use context.threadId instead of top-level threadId
     if (subscription.threads && subscription.threads.length > 0) {
-      if (!subscription.threads.includes(event.threadId)) {
+      const eventThreadId = event.context?.threadId;
+      if (!eventThreadId || !subscription.threads.includes(eventThreadId)) {
         return false;
       }
     }

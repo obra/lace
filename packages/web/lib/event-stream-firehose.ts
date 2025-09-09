@@ -181,9 +181,12 @@ class EventStreamFirehose {
       return true;
     }
 
-    // Check thread ID filter
-    if (filter.threadIds?.length && !filter.threadIds.includes(event.threadId)) {
-      return false;
+    // Check thread ID filter - use context.threadId instead of top-level threadId
+    if (filter.threadIds?.length) {
+      const eventThreadId = event.context?.threadId;
+      if (!eventThreadId || !filter.threadIds.includes(eventThreadId)) {
+        return false;
+      }
     }
 
     // Check session ID filter
