@@ -4,6 +4,7 @@
 import { EventEmitter } from 'events';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { logger } from '~/utils/logger';
 import type { MCPServerConfig, MCPServerConnection } from '~/config/mcp-types';
 
 export interface ServerManagerEvents {
@@ -112,7 +113,7 @@ export class MCPServerManager extends EventEmitter {
       }
     } catch (error) {
       // Log but don't throw - we want to clean up state regardless
-      console.warn(`Error stopping server ${serverId}:`, error);
+      logger.warn(`Error stopping server ${serverId}:`, { serverId, error });
     }
 
     connection.status = 'stopped';

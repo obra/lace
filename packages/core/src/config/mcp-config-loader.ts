@@ -5,6 +5,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { z } from 'zod';
 import { getLaceDir } from '~/config/lace-dir';
+import { logger } from '~/utils/logger';
 import type { MCPConfig, MCPServerConfig } from '~/config/mcp-types';
 
 // Zod schemas for validation
@@ -117,10 +118,10 @@ export class MCPConfigLoader {
           validatedServers[serverId] = validServer;
         } catch (serverError) {
           // Log but continue with other servers
-          console.warn(
-            `Skipping invalid MCP server '${serverId}':`,
-            serverError instanceof Error ? serverError.message : 'Unknown error'
-          );
+          logger.warn(`Skipping invalid MCP server '${serverId}':`, {
+            serverId,
+            error: serverError instanceof Error ? serverError.message : 'Unknown error',
+          });
         }
       }
 
@@ -154,9 +155,7 @@ export class MCPConfigLoader {
    * Load global configuration only (for API use)
    */
   static loadGlobalConfig(): MCPConfig | null {
-    const laceDir = getLaceDir();
-    const globalConfigPath = join(laceDir, this.CONFIG_FILENAME);
-    return this.loadConfigFile(globalConfigPath);
+    return this.loadGlobalConfigInternal();
   }
 
   /**

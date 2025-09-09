@@ -12,14 +12,14 @@ import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
 import type { ToolCall } from '~/tools/types';
 
 describe('Real MCP Server Integration', () => {
-  const _tempLaceContext = useTempLaceDir();
+  void useTempLaceDir();
   let tempDir: string;
   let testDataDir: string;
   let project: Project;
   let session: Session;
   let originalCwd: string;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     originalCwd = process.cwd();
     tempDir = mkdtempSync(join(tmpdir(), 'mcp-real-test-'));
 
@@ -37,7 +37,7 @@ describe('Real MCP Server Integration', () => {
     const projectName = `Real MCP Test Project ${Date.now()}`;
     project = Project.create(projectName, tempDir, 'Testing real MCP server');
 
-    // Real MCP server setup moved to specific tests that need it
+    // No MCP servers configured by default - tests set up their own as needed
 
     // Create session (will auto-initialize real MCP servers)
     session = Session.create({
@@ -50,7 +50,7 @@ describe('Real MCP Server Integration', () => {
     });
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     // Cleanup session (shuts down real MCP servers)
     if (session) {
       session.destroy();

@@ -5,6 +5,7 @@ import { EventEmitter } from 'events';
 import { Tool } from '~/tools/tool';
 import { MCPToolAdapter } from '~/mcp/tool-adapter';
 import { MCPServerManager } from '~/mcp/server-manager';
+import { logger } from '~/utils/logger';
 import type { MCPConfig } from '~/config/mcp-types';
 import type { ToolPolicy } from '~/tools/types';
 
@@ -46,10 +47,10 @@ export class MCPToolRegistry extends EventEmitter {
       .filter(([_, serverConfig]) => serverConfig.enabled)
       .map(([serverId, serverConfig]) =>
         this.serverManager.startServer(serverId, serverConfig).catch((error: unknown) => {
-          console.error(
-            `Failed to start MCP server ${serverId}:`,
-            error instanceof Error ? error.message : String(error)
-          );
+          logger.error(`Failed to start MCP server ${serverId}:`, {
+            serverId,
+            error: error instanceof Error ? error.message : String(error),
+          });
           // Don't fail entire initialization if one server fails
         })
       );
