@@ -127,7 +127,7 @@ describe('Agent Thread Events', () => {
       const secondCall: { event: LaceEvent; threadId: string } = relevantCalls[1][0];
 
       expect(firstCall.threadId).toBe(secondCall.threadId);
-      expect(firstCall.event.threadId).toBe(secondCall.event.threadId);
+      expect(firstCall.event.context?.threadId).toBe(secondCall.event.context?.threadId);
     });
   });
 

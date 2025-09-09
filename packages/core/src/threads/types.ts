@@ -133,6 +133,7 @@ interface BaseLaceEvent {
     projectId?: string;
     taskId?: string;
     threadId?: string; // For agent/conversational events - replaces top-level threadId
+    systemMessage?: boolean; // For system-level messages that don't belong to any specific thread
   };
 }
 

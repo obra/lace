@@ -82,21 +82,21 @@ export function TimelineView({
               const shouldGroupWithPrevious =
                 prevEvent &&
                 prevEvent.type === event.type &&
-                prevEvent.threadId === event.threadId &&
+                prevEvent.threadId === event.context?.threadId &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(event.type) &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(prevEvent.type);
 
               const shouldGroupWithNext =
                 nextEvent &&
                 nextEvent.type === event.type &&
-                nextEvent.threadId === event.threadId &&
+                nextEvent.threadId === event.context?.threadId &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(event.type) &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(nextEvent.type);
 
               // Generate unique key for React
               const eventKey =
                 event.id ||
-                `${instanceId.current}-${event.threadId}-${event.type}-${
+                `${instanceId.current}-${event.context?.threadId}-${event.type}-${
                   event.timestamp instanceof Date ? event.timestamp.getTime() : event.timestamp
                 }-${index}-${JSON.stringify(event.data).slice(0, 50)}`;
 

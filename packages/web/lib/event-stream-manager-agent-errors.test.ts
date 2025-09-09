@@ -608,7 +608,7 @@ describe('EventStreamManager Agent Error Handling', () => {
 
       // Verify error was captured (proves error handler was registered)
       const spawnedAgentErrors = capturedEvents.filter(
-        (event) => event.type === 'AGENT_ERROR' && event.threadId === newAgent.threadId
+        (event) => event.type === 'AGENT_ERROR' && event.context?.threadId === newAgent.threadId
       );
       expect(spawnedAgentErrors).toHaveLength(1);
     });

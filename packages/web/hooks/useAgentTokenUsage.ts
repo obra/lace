@@ -89,7 +89,7 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
       // Check if this event is for our agent, is AGENT_MESSAGE type, and has token usage data
       // Note: TokenUsage is now directly at event.data.tokenUsage (no more double nesting)
       if (
-        event.threadId === agentId &&
+        event.context?.threadId === agentId &&
         event.type === 'AGENT_MESSAGE' &&
         event.data &&
         typeof event.data === 'object' &&
@@ -129,7 +129,7 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
     // Reverse scan to find the latest AGENT_MESSAGE for this agent
     for (let i = events.length - 1; i >= 0; i--) {
       const event = events[i];
-      if (event.threadId === agentId && event.type === 'AGENT_MESSAGE') {
+      if (event.context?.threadId === agentId && event.type === 'AGENT_MESSAGE') {
         return event;
       }
     }

@@ -334,10 +334,12 @@ export class EventStreamManager {
     this.sendToConnection(connection, {
       id: this.generateEventId(),
       timestamp: new Date(),
-      threadId: 'system',
       type: 'LOCAL_SYSTEM_MESSAGE',
       data: 'Ready!',
       transient: true,
+      context: {
+        systemMessage: true,
+      },
     });
 
     return connectionId;

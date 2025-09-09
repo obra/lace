@@ -134,7 +134,7 @@ export function EventStreamProvider({
       setCompactionState({
         isCompacting: true,
         isAuto: compactionData.auto,
-        compactingAgentId: event.threadId,
+        compactingAgentId: event.context?.threadId,
       });
     }
   }, []);

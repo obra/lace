@@ -37,7 +37,7 @@ describe('ThreadManager', () => {
       // Assert
       expect(event.type).toBe('USER_MESSAGE');
       expect(event.data).toBe('Test message');
-      expect(event.threadId).toBe(threadId);
+      expect(event.context?.threadId).toBe(threadId);
 
       const events = threadManager.getEvents(threadId);
       expect(events).toHaveLength(1);
