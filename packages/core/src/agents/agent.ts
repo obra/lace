@@ -590,7 +590,7 @@ export class Agent extends EventEmitter {
   }
 
   getAvailableTools(): Tool[] {
-    return this._toolExecutor.getAllTools(); // Dynamic tools including MCP
+    return [...this._toolExecutor.getAllTools()]; // Return copy to prevent mutation
   }
 
   get providerInstance(): AIProvider | null {
