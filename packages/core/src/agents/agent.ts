@@ -450,7 +450,9 @@ export class Agent extends EventEmitter {
 
       const promptConfig = await loadPromptConfig({
         persona: this._persona,
-        tools: this._tools.map((tool) => ({ name: tool.name, description: tool.description })),
+        tools: this._toolExecutor
+          .getAllTools()
+          .map((tool) => ({ name: tool.name, description: tool.description })),
         session: session,
         project: project,
       });
@@ -588,7 +590,7 @@ export class Agent extends EventEmitter {
   }
 
   getAvailableTools(): Tool[] {
-    return [...this._tools]; // Return copy to prevent mutation
+    return this._toolExecutor.getAllTools(); // Dynamic tools including MCP
   }
 
   get providerInstance(): AIProvider | null {
@@ -668,8 +670,8 @@ export class Agent extends EventEmitter {
       logger.debug('AGENT: Requesting response from provider', {
         threadId: this._threadId,
         conversationLength: conversation.length,
-        availableToolCount: this._tools.length,
-        availableToolNames: this._tools.map((t) => t.name),
+        availableToolCount: this._toolExecutor.getAllTools().length,
+        availableToolNames: this._toolExecutor.getAllTools().map((t) => t.name),
       });
 
       // Check if we're approaching token limit (simple threshold check)
@@ -708,7 +710,11 @@ export class Agent extends EventEmitter {
       // Try provider-specific token counting first, fall back to estimation
       let promptTokens: number;
       const providerCount = this.providerInstance
-        ? await this.providerInstance.countTokens(conversation, this._tools, modelId)
+        ? await this.providerInstance.countTokens(
+            conversation,
+            this._toolExecutor.getAllTools(),
+            modelId
+          )
         : null;
       if (providerCount !== null) {
         promptTokens = providerCount;
@@ -744,7 +750,7 @@ export class Agent extends EventEmitter {
       try {
         response = await this._createResponse(
           conversation,
-          this._tools,
+          this._toolExecutor.getAllTools(),
           this._abortController?.signal
         );
 
