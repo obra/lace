@@ -85,17 +85,21 @@ describe('MCPToolRegistry', () => {
   });
 
   it('should discover tools when server comes online', async () => {
-    const toolsUpdated = vi.fn();
-    registry.on('tools-updated', toolsUpdated);
+    // Create promise that resolves when tools-updated event is emitted
+    const toolsUpdatedPromise = new Promise<[string, unknown[]]>((resolve) => {
+      registry.once('tools-updated', (serverId, tools) => {
+        resolve([serverId, tools]);
+      });
+    });
 
     // Simulate server coming online
     mockServerManager.emit('server-status-changed', 'filesystem', 'running');
 
-    // Wait for async tool discovery
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    // Wait for the actual event instead of arbitrary timeout
+    const [serverId, tools] = await toolsUpdatedPromise;
 
-    expect(toolsUpdated).toHaveBeenCalledWith(
-      'filesystem',
+    expect(serverId).toBe('filesystem');
+    expect(tools).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           name: 'filesystem/read_file',
