@@ -94,7 +94,8 @@ describe('MCPServerManager', () => {
       close: vi.fn(),
     };
 
-    (Client as any).mockImplementationOnce(() => mockClient);
+    const MockedClient = vi.mocked(Client);
+    MockedClient.mockImplementationOnce(() => mockClient);
 
     const errorEvents: Array<{ serverId: string; error: string }> = [];
     manager.on('server-error', (serverId, error) => {

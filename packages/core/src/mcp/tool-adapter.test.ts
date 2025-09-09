@@ -57,7 +57,7 @@ describe('MCPToolAdapter', () => {
     });
 
     const adapter = new MCPToolAdapter(mockMCPTool, 'filesystem', mockClient);
-    const result = await adapter.execute({ path: '/test.txt' }, {} as any);
+    const result = await adapter.execute({ path: '/test.txt' }, {}, undefined);
 
     expect(result.status).toBe('completed');
     expect(result.content).toEqual([
@@ -87,7 +87,7 @@ describe('MCPToolAdapter', () => {
     });
 
     const adapter = new MCPToolAdapter(mockMCPTool, 'filesystem', mockClient);
-    const result = await adapter.execute({ path: '/nonexistent.txt' }, {} as any);
+    const result = await adapter.execute({ path: '/nonexistent.txt' }, {}, undefined);
 
     expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('File not found');
@@ -99,7 +99,7 @@ describe('MCPToolAdapter', () => {
     mockCallTool.mockRejectedValue(new Error('Connection refused'));
 
     const adapter = new MCPToolAdapter(mockMCPTool, 'filesystem', mockClient);
-    const result = await adapter.execute({ path: '/test.txt' }, {} as any);
+    const result = await adapter.execute({ path: '/test.txt' }, {}, undefined);
 
     expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('Failed to execute MCP tool');
@@ -119,7 +119,7 @@ describe('MCPToolAdapter', () => {
     });
 
     const adapter = new MCPToolAdapter(mockMCPTool, 'filesystem', mockClient);
-    const result = await adapter.execute({ path: '/test.txt' }, {} as any);
+    const result = await adapter.execute({ path: '/test.txt' }, {}, undefined);
 
     expect(result.status).toBe('completed');
     expect(result.content).toHaveLength(3);

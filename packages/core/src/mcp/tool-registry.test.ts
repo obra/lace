@@ -1,37 +1,54 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { EventEmitter } from 'events';
 import { MCPToolRegistry } from './tool-registry';
-import { MCPServerManager } from './server-manager';
-import type { MCPConfig } from './types';
+import type { MCPServerManager } from './server-manager';
+import type { MCPConfig } from '~/config/mcp-types';
 
-// Mock dependencies
-vi.mock('./server-manager');
+// Minimal interface for test tool mocks
+interface MinimalTool {
+  name?: string;
+  description: string;
+  schema: any;
+  execute: any;
+}
+
+// Typed fake implementation of MCPServerManager
+class FakeMCPServerManager extends EventEmitter implements MCPServerManager {
+  startServer = vi.fn();
+  stopServer = vi.fn();
+  getClient = vi.fn();
+  getAllServers = vi.fn();
+  shutdown = vi.fn();
+  isServerRunning = vi.fn();
+  restartServer = vi.fn();
+}
 
 describe('MCPToolRegistry', () => {
   let registry: MCPToolRegistry;
-  let mockServerManager: MCPServerManager;
+  let mockServerManager: FakeMCPServerManager;
 
   beforeEach(() => {
-    // Create a real EventEmitter for the mock
-    mockServerManager = Object.assign(new (require('events').EventEmitter)(), {
-      startServer: vi.fn().mockResolvedValue(),
-      getClient: vi.fn().mockReturnValue({
-        listTools: vi.fn().mockResolvedValue({
-          tools: [
-            {
-              name: 'read_file',
-              description: 'Read a file',
-              inputSchema: {
-                type: 'object',
-                properties: { path: { type: 'string' } },
-                required: ['path'],
-              },
+    mockServerManager = new FakeMCPServerManager();
+
+    // Set up mock implementations
+    mockServerManager.startServer.mockResolvedValue();
+    mockServerManager.getClient.mockReturnValue({
+      listTools: vi.fn().mockResolvedValue({
+        tools: [
+          {
+            name: 'read_file',
+            description: 'Read a file',
+            inputSchema: {
+              type: 'object',
+              properties: { path: { type: 'string' } },
+              required: ['path'],
             },
-          ],
-        }),
+          },
+        ],
       }),
-      getAllServers: vi.fn().mockReturnValue([]),
-      shutdown: vi.fn().mockResolvedValue(),
     });
+    mockServerManager.getAllServers.mockReturnValue([]);
+    mockServerManager.shutdown.mockResolvedValue();
 
     registry = new MCPToolRegistry(mockServerManager);
   });
@@ -90,11 +107,11 @@ describe('MCPToolRegistry', () => {
 
   it('should filter disabled tools from available tools', () => {
     // Manually set up tools for testing
-    const mockTool = {
+    const mockTool: MinimalTool = {
       description: 'Write file',
       schema: vi.fn(),
       execute: vi.fn(),
-    } as any;
+    };
 
     registry['toolsByServer'].set('filesystem', [
       { name: 'filesystem/read_file', ...mockTool },
