@@ -6,6 +6,7 @@
 import React from 'react';
 import { faServer } from '@/lib/fontawesome';
 import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
+import type { ToolAggregatedEventData } from '@/types/web-events';
 
 /**
  * MCP Parameters display component for the body
@@ -119,11 +120,11 @@ export const mcpRenderer: ToolRenderer = {
 
   getIcon: () => faServer,
 
-  renderResult: (result: ToolResult, metadata?: any) => {
+  renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData) => {
     // Show parameters as the main content for MCP tools
     return (
       <div className="p-3">
-        <MCPParametersDisplay args={metadata?.arguments} />
+        <MCPParametersDisplay args={metadata?.call?.arguments} />
       </div>
     );
   },
