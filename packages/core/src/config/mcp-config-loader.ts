@@ -97,7 +97,34 @@ export class MCPConfigLoader {
     try {
       const content = readFileSync(filepath, 'utf-8');
       const parsed: unknown = JSON.parse(content);
-      return MCPConfigSchema.parse(parsed);
+
+      // Graceful per-server validation - don't fail entire config for one bad server
+      if (typeof parsed !== 'object' || parsed === null || !('servers' in parsed)) {
+        throw new Error('Config must have servers object');
+      }
+
+      const rawConfig = parsed as { servers: unknown };
+      if (typeof rawConfig.servers !== 'object' || rawConfig.servers === null) {
+        throw new Error('servers must be an object');
+      }
+
+      const validatedServers: Record<string, MCPServerConfig> = {};
+      const serverEntries = Object.entries(rawConfig.servers as Record<string, unknown>);
+
+      for (const [serverId, serverConfig] of serverEntries) {
+        try {
+          const validServer = MCPServerConfigSchema.parse(serverConfig);
+          validatedServers[serverId] = validServer;
+        } catch (serverError) {
+          // Log but continue with other servers
+          console.warn(
+            `Skipping invalid MCP server '${serverId}':`,
+            serverError instanceof Error ? serverError.message : 'Unknown error'
+          );
+        }
+      }
+
+      return { servers: validatedServers };
     } catch (error) {
       throw new Error(
         `Invalid MCP config at ${filepath}: ${error instanceof Error ? error.message : 'Unknown error'}`
