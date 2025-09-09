@@ -117,13 +117,13 @@ describe('useEventStream', () => {
     const agentStateChangeEvent: LaceEvent = {
       id: 'event-1',
       type: 'AGENT_STATE_CHANGE',
-      threadId: 'lace_20250101_thread01' as ThreadId,
       transient: true,
       data: {
         agentId: 'lace_20250101_thread01' as ThreadId,
         from: 'idle',
         to: 'thinking',
       } as AgentStateChangeData,
+      context: { threadId: 'lace_20250101_thread01' as ThreadId },
       timestamp: new Date(),
     };
 
@@ -164,8 +164,8 @@ describe('useEventStream', () => {
     capturedCallback!({
       id: 'event-1',
       type: 'USER_MESSAGE',
-      threadId: 'lace_20250101_thread01' as ThreadId,
       data: 'Hello',
+      context: { threadId: 'lace_20250101_thread01' as ThreadId },
       timestamp: new Date(),
     });
 
@@ -173,10 +173,10 @@ describe('useEventStream', () => {
     const agentMessageEvent: LaceEvent = {
       id: 'event-2',
       type: 'AGENT_MESSAGE',
-      threadId: 'lace_20250101_thread01' as ThreadId,
       data: {
         content: 'Hi there',
       } as AgentMessageData,
+      context: { threadId: 'lace_20250101_thread01' as ThreadId },
       timestamp: new Date(),
     };
     expect(capturedCallback).toBeDefined();
@@ -186,12 +186,12 @@ describe('useEventStream', () => {
     const toolCallEvent: LaceEvent = {
       id: 'event-3',
       type: 'TOOL_CALL',
-      threadId: 'lace_20250101_thread01' as ThreadId,
       data: {
         id: 'test-call-123',
         name: 'file-read',
         arguments: { path: '/path/to/file.txt' },
       } as ToolCall,
+      context: { threadId: 'lace_20250101_thread01' as ThreadId },
       timestamp: new Date(),
     };
     expect(capturedCallback).toBeDefined();
@@ -223,13 +223,13 @@ describe('useEventStream', () => {
     const malformedEvent: LaceEvent = {
       id: 'event-1',
       type: 'AGENT_STATE_CHANGE',
-      threadId: 'lace_20250101_thread01' as ThreadId,
       transient: true,
       data: {
         from: 'idle',
         to: 'thinking',
         // Missing required agentId field to test error handling
       } as AgentStateChangeData,
+      context: { threadId: 'lace_20250101_thread01' as ThreadId },
       timestamp: new Date(),
     };
     expect(capturedCallback).toBeDefined();

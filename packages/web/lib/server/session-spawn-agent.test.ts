@@ -173,11 +173,11 @@ describe('Session.spawnAgent Method', () => {
     // This should NOT throw an error
     const event = threadManager.addEvent({
       type: 'USER_MESSAGE',
-      threadId: agentThreadId,
       data: 'Hello agent',
+      context: { threadId: agentThreadId },
     });
     expect(event).not.toBeNull();
-    expect(event?.threadId).toBe(agentThreadId);
+    expect(event?.context?.threadId).toBe(agentThreadId);
     expect(event?.type).toBe('USER_MESSAGE');
     expect(event?.data).toBe('Hello agent');
   });
@@ -219,11 +219,11 @@ describe('Session.spawnAgent Method', () => {
     // Try to add an event using the new ThreadManager instance
     const event = newThreadManager.addEvent({
       type: 'USER_MESSAGE',
-      threadId: agentThreadId,
       data: 'Hello from new manager',
+      context: { threadId: agentThreadId },
     });
     expect(event).not.toBeNull();
-    expect(event?.threadId).toBe(agentThreadId);
+    expect(event?.context?.threadId).toBe(agentThreadId);
 
     // Verify the event is visible from both ThreadManager instances
     const eventsFromSession = sessionThreadManager.getEvents(agentThreadId);
@@ -253,7 +253,11 @@ describe('Session.spawnAgent Method', () => {
         _threadManager: {
           createThread: () => unknown;
           getThread: (id: ThreadId) => unknown;
-          addEvent: (event: { type: string; threadId: ThreadId; data: unknown }) => unknown;
+          addEvent: (event: {
+            type: string;
+            data: unknown;
+            context: { threadId: ThreadId };
+          }) => unknown;
         };
       }
     )._threadManager;
@@ -270,10 +274,10 @@ describe('Session.spawnAgent Method', () => {
     // Try to add event to the delegate thread
     const event = sessionThreadManager.addEvent({
       type: 'USER_MESSAGE',
-      threadId: agentThreadId,
       data: 'Hello after switch',
+      context: { threadId: agentThreadId },
     });
-    expect((event as { threadId: ThreadId }).threadId).toBe(agentThreadId);
+    expect((event as { context: { threadId: ThreadId } }).context.threadId).toBe(agentThreadId);
   });
 
   it('should handle session reconstruction after spawning agents', () => {

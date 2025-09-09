@@ -166,10 +166,9 @@ describe('Event Filtering and Routing', () => {
     const testEvent: LaceEvent = {
       id: 'event-1',
       type: 'USER_MESSAGE',
-      threadId: 'thread-1',
       data: 'test message',
       timestamp: new Date(),
-      context: { sessionId: 'session-1' },
+      context: { threadId: 'thread-1', sessionId: 'session-1' },
     };
 
     // Simulate receiving event
@@ -189,10 +188,10 @@ describe('Event Filtering and Routing', () => {
     const eventWithoutContext: LaceEvent = {
       id: 'event-2',
       type: 'LOCAL_SYSTEM_MESSAGE',
-      threadId: 'system',
       data: 'system event',
       timestamp: new Date(),
-      // No context field
+      context: { threadId: 'system' },
+      // No additional context fields
     } as LaceEvent;
 
     (firehose as unknown as { routeEvent: (event: LaceEvent) => void }).routeEvent(
@@ -214,9 +213,9 @@ describe('Event Filtering and Routing', () => {
     const testEvent: LaceEvent = {
       id: 'event-3',
       type: 'USER_MESSAGE',
-      threadId: 'any-thread',
       data: 'any message',
       timestamp: new Date(),
+      context: { threadId: 'any-thread' },
     };
 
     (firehose as unknown as { routeEvent: (event: LaceEvent) => void }).routeEvent(testEvent);
@@ -238,9 +237,9 @@ describe('Event Filtering and Routing', () => {
     const testEvent: LaceEvent = {
       id: 'event-4',
       type: 'USER_MESSAGE',
-      threadId: 'thread',
       data: 'test',
       timestamp: new Date(),
+      context: { threadId: 'thread' },
     };
 
     expect(() => {
@@ -270,13 +269,13 @@ describe('SuperJSON Event Parsing', () => {
       json: {
         id: 'test-event-1',
         type: 'USER_MESSAGE',
-        threadId: 'test-thread',
         data: 'Hello world',
         timestamp: '2025-08-19T20:55:00.000Z',
+        context: { threadId: 'test-thread' },
       },
       meta: {
         values: {
-          threadId: [['custom', 'ThreadId']],
+          'context.threadId': [['custom', 'ThreadId']],
           timestamp: ['Date'],
         },
       },
@@ -297,9 +296,9 @@ describe('SuperJSON Event Parsing', () => {
       expect.objectContaining({
         id: 'test-event-1',
         type: 'USER_MESSAGE',
-        threadId: 'test-thread',
         data: 'Hello world',
         timestamp: expect.any(Date), // SuperJSON should deserialize this to a Date object
+        context: expect.objectContaining({ threadId: 'test-thread' }),
       })
     );
   });
@@ -339,7 +338,6 @@ describe('SuperJSON Event Parsing', () => {
       json: {
         id: 'state-event-1',
         type: 'AGENT_STATE_CHANGE',
-        threadId: 'agent-thread',
         data: {
           agentId: 'agent-123',
           from: 'idle',
@@ -347,10 +345,11 @@ describe('SuperJSON Event Parsing', () => {
         },
         timestamp: '2025-08-19T20:55:00.000Z',
         transient: true,
+        context: { threadId: 'agent-thread' },
       },
       meta: {
         values: {
-          threadId: [['custom', 'ThreadId']],
+          'context.threadId': [['custom', 'ThreadId']],
           timestamp: ['Date'],
           'data.agentId': [['custom', 'ThreadId']],
         },
@@ -369,13 +368,13 @@ describe('SuperJSON Event Parsing', () => {
     expect(userMessageCallback).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'AGENT_STATE_CHANGE',
-        threadId: 'agent-thread',
         data: {
           agentId: 'agent-123',
           from: 'idle',
           to: 'thinking',
         },
         transient: true,
+        context: expect.objectContaining({ threadId: 'agent-thread' }),
       })
     );
     expect(agentStateCallback).toHaveBeenCalledWith(
@@ -406,13 +405,13 @@ describe('Event Filtering Integration', () => {
       json: {
         id: 'event-thread-1',
         type: 'USER_MESSAGE',
-        threadId: 'thread-1',
         data: 'Message for thread 1',
         timestamp: '2025-08-19T20:55:00.000Z',
+        context: { threadId: 'thread-1' },
       },
       meta: {
         values: {
-          threadId: [['custom', 'ThreadId']],
+          'context.threadId': [['custom', 'ThreadId']],
           timestamp: ['Date'],
         },
       },
@@ -443,10 +442,10 @@ describe('Event Filtering Integration', () => {
       json: {
         id: 'system-event-1',
         type: 'LOCAL_SYSTEM_MESSAGE',
-        threadId: 'system',
         data: 'Ready!',
         timestamp: '2025-08-19T20:55:00.000Z',
         transient: true,
+        context: { threadId: 'system' },
       },
       meta: {
         values: {
@@ -484,11 +483,11 @@ describe('Compaction Events Routing', () => {
     const compactionStartEvent: LaceEvent = {
       id: 'compaction-start-1',
       type: 'COMPACTION_START',
-      threadId: 'lace_20250820_test',
       timestamp: new Date(),
       data: { auto: true },
       transient: true,
       context: {
+        threadId: 'lace_20250820_test',
         sessionId: 'test-session',
         projectId: 'test-project',
       },
@@ -512,11 +511,11 @@ describe('Compaction Events Routing', () => {
     const compactionCompleteEvent: LaceEvent = {
       id: 'compaction-complete-1',
       type: 'COMPACTION_COMPLETE',
-      threadId: 'lace_20250820_test',
       timestamp: new Date(),
       data: { success: true },
       transient: true,
       context: {
+        threadId: 'lace_20250820_test',
         sessionId: 'test-session',
         projectId: 'test-project',
       },
@@ -542,11 +541,11 @@ describe('Compaction Events Routing', () => {
     const compactionEvent: LaceEvent = {
       id: 'compaction-filtered',
       type: 'COMPACTION_START',
-      threadId: 'lace_20250820_test',
       timestamp: new Date(),
       data: { auto: false },
       transient: true,
       context: {
+        threadId: 'lace_20250820_test',
         sessionId: 'session-1',
         projectId: 'project-1',
       },
@@ -570,21 +569,19 @@ describe('Compaction Events Routing', () => {
     const manualCompaction: LaceEvent = {
       id: 'manual-compaction',
       type: 'COMPACTION_START',
-      threadId: 'lace_20250820_test',
       timestamp: new Date(),
       data: { auto: false },
       transient: true,
-      context: { sessionId: 'test-session' },
+      context: { threadId: 'lace_20250820_test', sessionId: 'test-session' },
     };
 
     const autoCompaction: LaceEvent = {
       id: 'auto-compaction',
       type: 'COMPACTION_START',
-      threadId: 'lace_20250820_test',
       timestamp: new Date(),
       data: { auto: true },
       transient: true,
-      context: { sessionId: 'test-session' },
+      context: { threadId: 'lace_20250820_test', sessionId: 'test-session' },
     };
 
     // Route both events

@@ -36,7 +36,7 @@ export function TimelineMessage({
   isLastInGroup = true,
 }: TimelineMessageProps) {
   const timestamp = event.timestamp || new Date();
-  const agentName = getAgentName(event.context?.threadId, agents);
+  const agentName = getAgentName(event.context?.threadId || '', agents);
 
   switch (event.type) {
     case 'USER_MESSAGE':

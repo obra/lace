@@ -389,8 +389,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
         id: 'test-event',
         timestamp: new Date(),
         type: 'TASK_CREATED',
-        threadId: 'task-manager',
-        context: { sessionId: 'test-session', taskId: 'test-task' },
+        context: { threadId: 'task-manager', sessionId: 'test-session', taskId: 'test-task' },
         data: {
           type: 'task:created',
           taskId: 'test-task',

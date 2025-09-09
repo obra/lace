@@ -131,15 +131,15 @@ describe('EventStreamProvider Integration', () => {
         id: 'event-1',
         type: 'USER_MESSAGE',
         timestamp: new Date(),
-        threadId: 'lace_20250101_abc123' as ThreadId,
         data: 'Hello',
+        context: { threadId: 'lace_20250101_abc123' as ThreadId },
       },
       {
         id: 'event-2',
         type: 'AGENT_MESSAGE',
         timestamp: new Date(),
-        threadId: 'lace_20250101_abc123' as ThreadId,
         data: { content: 'Hi there!' },
+        context: { threadId: 'lace_20250101_abc123' as ThreadId },
       },
     ];
 
@@ -381,7 +381,6 @@ describe('EventStreamProvider Integration', () => {
     const summaryEvent: LaceEvent = {
       id: 'test-summary-event',
       type: 'AGENT_SUMMARY_UPDATED',
-      threadId: 'lace_20250101_xyz789',
       timestamp: new Date(),
       data: {
         summary: 'Working on test summary',
@@ -389,6 +388,7 @@ describe('EventStreamProvider Integration', () => {
         timestamp: new Date(),
       },
       transient: true,
+      context: { threadId: 'lace_20250101_xyz789' },
     };
 
     // Trigger the event through the session event handler

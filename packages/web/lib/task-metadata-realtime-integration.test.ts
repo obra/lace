@@ -31,9 +31,9 @@ describe('Task Metadata Event Format', () => {
     // Real-time event format (correct)
     const toolResultEvent: LaceEvent = {
       type: 'TOOL_RESULT',
-      threadId: testThreadId,
       timestamp: new Date(),
       data: toolResult, // Direct result format
+      context: { threadId: testThreadId },
     };
 
     // Verify the structure

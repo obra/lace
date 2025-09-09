@@ -164,7 +164,6 @@ describe('Token Usage Integration Tests', () => {
     // This simulates what would happen during actual conversation
     agent.threadManager.addEvent({
       type: 'AGENT_MESSAGE',
-      threadId: sessionId,
       data: {
         content: 'First test response',
         tokenUsage: {
@@ -179,11 +178,11 @@ describe('Token Usage Integration Tests', () => {
           },
         },
       },
+      context: { threadId: sessionId },
     });
 
     agent.threadManager.addEvent({
       type: 'AGENT_MESSAGE',
-      threadId: sessionId,
       data: {
         content: 'Second test response',
         tokenUsage: {
@@ -198,6 +197,7 @@ describe('Token Usage Integration Tests', () => {
           },
         },
       },
+      context: { threadId: sessionId },
     });
 
     // Allow token budget manager to process events
@@ -255,7 +255,6 @@ describe('Token Usage Integration Tests', () => {
     // Add some initial token usage
     agent.threadManager.addEvent({
       type: 'AGENT_MESSAGE',
-      threadId: sessionId,
       data: {
         content: 'Pre-compaction response',
         tokenUsage: {
@@ -270,6 +269,7 @@ describe('Token Usage Integration Tests', () => {
           },
         },
       },
+      context: { threadId: sessionId },
     });
 
     // Send /compact command to trigger compaction

@@ -82,14 +82,14 @@ export function TimelineView({
               const shouldGroupWithPrevious =
                 prevEvent &&
                 prevEvent.type === event.type &&
-                prevEvent.threadId === event.context?.threadId &&
+                prevEvent.context?.threadId === event.context?.threadId &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(event.type) &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(prevEvent.type);
 
               const shouldGroupWithNext =
                 nextEvent &&
                 nextEvent.type === event.type &&
-                nextEvent.threadId === event.context?.threadId &&
+                nextEvent.context?.threadId === event.context?.threadId &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(event.type) &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(nextEvent.type);
 
@@ -131,7 +131,8 @@ export function TimelineView({
             {isTyping &&
               currentAgent &&
               !processedEvents.some(
-                (e) => e.type === 'AGENT_STREAMING' && e.threadId === asThreadId(currentAgent)
+                (e) =>
+                  e.type === 'AGENT_STREAMING' && e.context?.threadId === asThreadId(currentAgent)
               ) && (
                 <motion.div
                   key="typing"

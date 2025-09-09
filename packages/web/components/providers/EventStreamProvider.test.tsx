@@ -192,8 +192,8 @@ describe('EventStreamProvider', () => {
         id: 'event-1',
         type: 'USER_MESSAGE',
         timestamp: new Date(),
-        threadId: 'lace_20250101_abc123.1' as ThreadId,
         data: 'Hello',
+        context: { threadId: 'lace_20250101_abc123.1' as ThreadId },
       },
     ];
 

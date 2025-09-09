@@ -102,7 +102,7 @@ describe('EventStreamManager Agent Error Handling', () => {
       expect(agentErrorEvents).toHaveLength(1);
 
       const errorEvent = agentErrorEvents[0];
-      expect(errorEvent.threadId).toBe(session.getId());
+      expect(errorEvent.context?.threadId).toBe(session.getId());
       expect(errorEvent.data).toMatchObject({
         errorType: 'provider_failure',
         message: 'Provider API rate limit exceeded',
@@ -341,7 +341,6 @@ describe('EventStreamManager Agent Error Handling', () => {
       expect(errorEvent!.context).toMatchObject({
         projectId: project.getId(),
         sessionId: session.getId(),
-        agentId: session.getId(),
       });
     });
 
@@ -386,8 +385,12 @@ describe('EventStreamManager Agent Error Handling', () => {
       const agentErrorEvents = capturedEvents.filter((event) => event.type === 'AGENT_ERROR');
       expect(agentErrorEvents).toHaveLength(2);
 
-      const coordinatorError = agentErrorEvents.find((e) => e.threadId === session.getId());
-      const delegateError = agentErrorEvents.find((e) => e.threadId === delegateAgent.threadId);
+      const coordinatorError = agentErrorEvents.find(
+        (e) => e.context?.threadId === session.getId()
+      );
+      const delegateError = agentErrorEvents.find(
+        (e) => e.context?.threadId === delegateAgent.threadId
+      );
 
       expect(coordinatorError).toBeDefined();
       expect(delegateError).toBeDefined();
@@ -427,14 +430,13 @@ describe('EventStreamManager Agent Error Handling', () => {
       // Validate complete event structure
       expect(errorEvent).toMatchObject({
         type: 'AGENT_ERROR',
-        threadId: session.getId(),
-        timestamp: expect.any(Date),
-        transient: true,
         context: {
+          threadId: session.getId(),
           projectId: project.getId(),
           sessionId: session.getId(),
-          agentId: session.getId(),
         },
+        timestamp: expect.any(Date),
+        transient: true,
         data: {
           errorType: 'tool_execution',
           message: 'Complete error test',

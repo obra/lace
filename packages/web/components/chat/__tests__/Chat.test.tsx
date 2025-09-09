@@ -130,9 +130,9 @@ const createMockAgent = (id: string, name: string): AgentInfo =>
 const createMockEvent = (id: string): LaceEvent => ({
   id,
   type: 'USER_MESSAGE',
-  threadId: 'test-thread' as ThreadId,
   timestamp: new Date(),
   data: 'Test message',
+  context: { threadId: 'test-thread' as ThreadId },
 });
 
 describe('Chat', () => {

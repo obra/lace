@@ -222,10 +222,12 @@ describe('SessionService.spawnAgent Method', () => {
     // This should NOT throw an error if the thread was properly persisted
     const event = threadManager.addEvent({
       type: 'USER_MESSAGE',
-      threadId: agentThreadId,
       data: 'Hello persistent agent',
+      context: { threadId: agentThreadId },
     });
-    expect((event as unknown as { threadId: ThreadId }).threadId).toBe(agentThreadId);
+    expect((event as unknown as { context: { threadId: ThreadId } }).context.threadId).toBe(
+      agentThreadId
+    );
     expect((event as { type: string }).type).toBe('USER_MESSAGE');
     expect((event as { data: string }).data).toBe('Hello persistent agent');
 
@@ -265,11 +267,11 @@ describe('SessionService.spawnAgent Method', () => {
     // Try to add event using fresh ThreadManager
     const event = freshThreadManager.addEvent({
       type: 'USER_MESSAGE',
-      threadId: agentThreadId,
       data: 'Hello from fresh manager',
+      context: { threadId: agentThreadId },
     });
     expect(event).not.toBeNull();
-    expect(event?.threadId).toBe(agentThreadId);
+    expect(event?.context?.threadId).toBe(agentThreadId);
 
     // Verify event is visible from service's agent
     if (serviceAgent) {

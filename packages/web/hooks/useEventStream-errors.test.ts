@@ -92,7 +92,6 @@ describe('useEventStream Error Handling', () => {
       // Simulate AGENT_ERROR event
       const agentErrorEvent: LaceEvent = {
         type: 'AGENT_ERROR',
-        threadId: 'test-thread',
         timestamp: new Date(),
         data: {
           errorType: 'provider_failure',
@@ -104,6 +103,7 @@ describe('useEventStream Error Handling', () => {
           isRetryable: true,
           retryCount: 1,
         },
+        context: { threadId: 'test-thread' },
       };
 
       // Simulate the event being received
@@ -126,7 +126,6 @@ describe('useEventStream Error Handling', () => {
       // Simulate AGENT_ERROR event (should trigger generic error handler)
       const agentErrorEvent: LaceEvent = {
         type: 'AGENT_ERROR',
-        threadId: 'test-thread',
         timestamp: new Date(),
         data: {
           errorType: 'tool_execution',
@@ -137,6 +136,7 @@ describe('useEventStream Error Handling', () => {
           isRetryable: false,
           retryCount: 0,
         },
+        context: { threadId: 'test-thread' },
       };
 
       simulateEvent(agentErrorEvent);
@@ -160,7 +160,6 @@ describe('useEventStream Error Handling', () => {
       // Simulate AGENT_ERROR event
       const agentErrorEvent: LaceEvent = {
         type: 'AGENT_ERROR',
-        threadId: 'test-thread',
         timestamp: new Date(),
         data: {
           errorType: 'processing_error',
@@ -171,6 +170,7 @@ describe('useEventStream Error Handling', () => {
           isRetryable: false,
           retryCount: 0,
         },
+        context: { threadId: 'test-thread' },
       };
 
       simulateEvent(agentErrorEvent);
@@ -186,7 +186,6 @@ describe('useEventStream Error Handling', () => {
     it('should process provider failure errors correctly', () => {
       const _agentErrorEvent: LaceEvent = {
         type: 'AGENT_ERROR',
-        threadId: 'test-thread',
         timestamp: new Date(),
         data: {
           errorType: 'provider_failure',
@@ -201,6 +200,7 @@ describe('useEventStream Error Handling', () => {
           isRetryable: true,
           retryCount: 2,
         },
+        context: { threadId: 'test-thread' },
         transient: true,
       };
 
@@ -214,7 +214,6 @@ describe('useEventStream Error Handling', () => {
     it('should process tool execution errors correctly', () => {
       const toolErrorEvent: LaceEvent = {
         type: 'AGENT_ERROR',
-        threadId: 'test-thread',
         timestamp: new Date(),
         data: {
           errorType: 'tool_execution',
@@ -228,6 +227,7 @@ describe('useEventStream Error Handling', () => {
           isRetryable: false,
           retryCount: 0,
         },
+        context: { threadId: 'test-thread' },
         transient: true,
       };
 
@@ -245,7 +245,6 @@ describe('useEventStream Error Handling', () => {
     it('should process conversation processing errors correctly', () => {
       const processingErrorEvent: LaceEvent = {
         type: 'AGENT_ERROR',
-        threadId: 'test-thread',
         timestamp: new Date(),
         data: {
           errorType: 'processing_error',
@@ -258,6 +257,7 @@ describe('useEventStream Error Handling', () => {
           isRetryable: false,
           retryCount: 0,
         },
+        context: { threadId: 'test-thread' },
         transient: true,
       };
 
@@ -282,7 +282,6 @@ describe('useEventStream Error Handling', () => {
 
       const agentErrorEvent: LaceEvent = {
         type: 'AGENT_ERROR',
-        threadId: 'test-thread',
         timestamp: new Date(),
         data: {
           errorType: 'provider_failure',
@@ -293,6 +292,7 @@ describe('useEventStream Error Handling', () => {
           isRetryable: true,
           retryCount: 0,
         },
+        context: { threadId: 'test-thread' },
       };
 
       simulateEvent(agentErrorEvent);
@@ -315,7 +315,6 @@ describe('useEventStream Error Handling', () => {
 
       const agentErrorEventWithoutMessage: LaceEvent = {
         type: 'AGENT_ERROR',
-        threadId: 'test-thread',
         timestamp: new Date(),
         data: {
           errorType: 'processing_error' as ErrorType,
@@ -326,6 +325,7 @@ describe('useEventStream Error Handling', () => {
           isRetryable: false,
           retryCount: 0,
         },
+        context: { threadId: 'test-thread' },
       };
 
       simulateEvent(agentErrorEventWithoutMessage);
@@ -342,7 +342,6 @@ describe('useEventStream Error Handling', () => {
       const completeErrorEvent: LaceEvent = {
         id: 'error-event-123',
         type: 'AGENT_ERROR',
-        threadId: 'test-thread',
         timestamp: new Date(),
         data: {
           errorType: 'tool_execution',
@@ -361,13 +360,15 @@ describe('useEventStream Error Handling', () => {
           isRetryable: false,
           retryCount: 1,
         },
+        context: { threadId: 'test-thread' },
         transient: true,
       };
 
       // Validate all required fields are present
       expect(completeErrorEvent).toHaveProperty('id');
       expect(completeErrorEvent).toHaveProperty('type', 'AGENT_ERROR');
-      expect(completeErrorEvent).toHaveProperty('threadId');
+      expect(completeErrorEvent).toHaveProperty('context');
+      expect(completeErrorEvent.context).toHaveProperty('threadId');
       expect(completeErrorEvent).toHaveProperty('timestamp');
       expect(completeErrorEvent).toHaveProperty('data');
       expect(completeErrorEvent).toHaveProperty('transient', true);
@@ -399,7 +400,6 @@ describe('useEventStream Error Handling', () => {
       validErrorTypes.forEach((errorType) => {
         const errorEvent: LaceEvent = {
           type: 'AGENT_ERROR',
-          threadId: 'test-thread',
           timestamp: new Date(),
           data: {
             errorType,
@@ -410,6 +410,7 @@ describe('useEventStream Error Handling', () => {
             isRetryable: false,
             retryCount: 0,
           },
+          context: { threadId: 'test-thread' },
         };
 
         expect((errorEvent.data as TestErrorEventData).errorType).toBe(errorType);
@@ -427,7 +428,6 @@ describe('useEventStream Error Handling', () => {
       validPhases.forEach((phase) => {
         const errorEvent: LaceEvent = {
           type: 'AGENT_ERROR',
-          threadId: 'test-thread',
           timestamp: new Date(),
           data: {
             errorType: 'processing_error',
@@ -438,6 +438,7 @@ describe('useEventStream Error Handling', () => {
             isRetryable: false,
             retryCount: 0,
           },
+          context: { threadId: 'test-thread' },
         };
 
         expect((errorEvent.data as TestErrorEventData).context.phase).toBe(phase);

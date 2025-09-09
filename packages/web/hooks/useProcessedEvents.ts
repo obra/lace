@@ -60,7 +60,7 @@ function processStreamingTokens(events: LaceEvent[]): LaceEvent[] {
   for (const event of events) {
     if (event.type === 'AGENT_TOKEN') {
       // Accumulate tokens by threadId
-      const key = event.context?.threadId;
+      const key = event.context?.threadId || '';
       const existing = streamingMessages.get(key);
 
       if (existing) {
@@ -82,7 +82,7 @@ function processStreamingTokens(events: LaceEvent[]): LaceEvent[] {
       }
     } else if (event.type === 'AGENT_MESSAGE') {
       // Complete message received, remove streaming version if exists
-      streamingMessages.delete(event.context?.threadId);
+      streamingMessages.delete(event.context?.threadId || '');
       processed.push(event);
     } else {
       // Regular event, keep as-is
@@ -95,10 +95,10 @@ function processStreamingTokens(events: LaceEvent[]): LaceEvent[] {
     const streamingEvent: LaceEvent = {
       id: `streaming_${timestamp.getTime()}_${threadId}_${content.slice(0, 10).replace(/\s/g, '_')}`,
       type: 'AGENT_STREAMING',
-      threadId: threadId as ThreadId,
       timestamp: timestamp,
       data: { content },
       transient: true,
+      context: { threadId: threadId as ThreadId },
     };
     processed.push(streamingEvent);
   }
@@ -134,7 +134,9 @@ function processToolCallAggregation(events: LaceEvent[]): ProcessedEvent[] {
       // If no exact match, find the oldest tool call without a result on the same thread
       if (!matchingCall) {
         const threadCalls = Array.from(pendingToolCalls.entries())
-          .filter(([_, data]) => data.call.threadId === event.context?.threadId && !data.result)
+          .filter(
+            ([_, data]) => data.call.context?.threadId === event.context?.threadId && !data.result
+          )
           .sort(([_, a], [__, b]) => {
             const aTime = (a.call.timestamp || new Date()).getTime();
             const bTime = (b.call.timestamp || new Date()).getTime();
@@ -162,7 +164,6 @@ function processToolCallAggregation(events: LaceEvent[]): ProcessedEvent[] {
     const callData = call.data;
     const aggregatedEvent: ProcessedToolEvent = {
       id: call.id,
-      threadId: call.threadId,
       timestamp: call.timestamp,
       type: 'TOOL_AGGREGATED',
       data: {

@@ -108,8 +108,8 @@ describe('Event-Based Tool Approval Integration', () => {
     // Add TOOL_CALL event to thread
     agent.threadManager.addEvent({
       type: 'TOOL_CALL',
-      threadId: agent.threadId,
       data: toolCall,
+      context: { threadId: agent.threadId },
     });
 
     // Get the approval callback that was set up
@@ -155,16 +155,16 @@ describe('Event-Based Tool Approval Integration', () => {
     // Add TOOL_CALL and existing TOOL_APPROVAL_RESPONSE events
     agent.threadManager.addEvent({
       type: 'TOOL_CALL',
-      threadId: agent.threadId,
       data: toolCall,
+      context: { threadId: agent.threadId },
     });
     agent.threadManager.addEvent({
       type: 'TOOL_APPROVAL_RESPONSE',
-      threadId: agent.threadId,
       data: {
         toolCallId: 'existing-call-456',
         decision: ApprovalDecision.ALLOW_SESSION,
       },
+      context: { threadId: agent.threadId },
     });
 
     // Get the approval callback
@@ -204,15 +204,15 @@ describe('Event-Based Tool Approval Integration', () => {
 
     agent.threadManager.addEvent({
       type: 'TOOL_CALL',
-      threadId: agent.threadId,
       data: toolCall,
+      context: { threadId: agent.threadId },
     });
     agent.threadManager.addEvent({
       type: 'TOOL_APPROVAL_REQUEST',
-      threadId: agent.threadId,
       data: {
         toolCallId: 'pending-call-789',
       },
+      context: { threadId: agent.threadId },
     });
 
     // Query pending approvals using ThreadManager
@@ -225,11 +225,11 @@ describe('Event-Based Tool Approval Integration', () => {
     // Add approval response
     agent.threadManager.addEvent({
       type: 'TOOL_APPROVAL_RESPONSE',
-      threadId: agent.threadId,
       data: {
         toolCallId: 'pending-call-789',
         decision: ApprovalDecision.DENY,
       },
+      context: { threadId: agent.threadId },
     });
 
     // Now should have no pending approvals
