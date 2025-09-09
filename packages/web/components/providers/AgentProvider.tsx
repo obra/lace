@@ -13,6 +13,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import { useAgentManagement } from '@/hooks/useAgentManagement';
+import { useEventStream } from '@/hooks/useEventStream';
 import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import type { CreateAgentRequest } from '@/types/api';
@@ -75,6 +76,17 @@ export function AgentProvider({
     loadAgentConfiguration,
     updateAgent,
   } = useAgentManagement(sessionId);
+
+  // Subscribe to agent lifecycle events to refresh agent list in real-time
+  useEventStream({
+    projectId: undefined, // Don't filter by project
+    sessionId: sessionId || undefined,
+    // No threadIds - we want session-level agent events
+    onAgentSpawned: useCallback(() => {
+      // Reload session details when new agents are spawned
+      void reloadSessionDetails();
+    }, [reloadSessionDetails]),
+  });
 
   // Use agent from URL params, not hash router
   const selectedAgent = selectedAgentId ? asThreadId(selectedAgentId) : null;
