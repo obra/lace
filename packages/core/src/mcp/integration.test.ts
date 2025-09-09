@@ -80,7 +80,7 @@ describe('MCP Integration E2E', () => {
     project = Project.create(projectName, tempDir, 'Integration test project');
 
     // Add MCP server to project
-    project.addMCPServer('test-server', {
+    await project.addMCPServer('test-server', {
       command: 'node',
       args: ['test-server.js'],
       enabled: true,
@@ -106,12 +106,12 @@ describe('MCP Integration E2E', () => {
   afterEach(async () => {
     // Cleanup session (shuts down MCP servers)
     if (session) {
-      session.destroy();
+      await session.destroy();
     }
 
     // Explicit project cleanup if it has a cleanup method
     if (project && typeof project.destroy === 'function') {
-      project.destroy();
+      await project.destroy();
     }
 
     // Restore working directory AFTER cleanup
@@ -181,7 +181,7 @@ describe('MCP Integration E2E', () => {
 
   it('should respect MCP approval policies - DISABLE should not appear in available tools', async () => {
     // Update the project MCP server configuration to disable the tool
-    project.updateMCPServer('test-server', {
+    await project.updateMCPServer('test-server', {
       command: 'node',
       args: ['test-server.js'],
       enabled: true,

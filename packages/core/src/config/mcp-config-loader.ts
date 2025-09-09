@@ -24,7 +24,7 @@ const MCPServerConfigSchema = z.object({
   tools: z.record(z.string(), ToolPolicySchema),
   // Tool discovery cache fields
   discoveredTools: z.array(DiscoveredToolSchema).optional(),
-  lastDiscovery: z.string().optional(),
+  lastDiscovery: z.string().datetime().optional(),
   discoveryError: z.string().optional(),
   discoveryStatus: z.enum(['never', 'discovering', 'success', 'failed']).optional(),
 });

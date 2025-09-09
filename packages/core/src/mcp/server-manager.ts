@@ -73,6 +73,16 @@ export class MCPServerManager extends EventEmitter {
       connection.connectedAt = new Date();
       this.emit('server-status-changed', serverId, 'running');
     } catch (error) {
+      // Clean up transport and client on connection failure
+      if (connection.transport) {
+        await connection.transport.close();
+        connection.transport = undefined;
+      }
+      if (connection.client) {
+        await connection.client.close();
+        connection.client = undefined;
+      }
+
       connection.status = 'failed';
       connection.lastError = error instanceof Error ? error.message : 'Unknown error';
       this.emit('server-status-changed', serverId, 'failed');

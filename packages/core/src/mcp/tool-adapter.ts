@@ -81,7 +81,9 @@ export class MCPToolAdapter extends Tool {
     super();
     this.name = `${serverId}/${mcpTool.name}`;
     this.description = mcpTool.description || `MCP tool: ${mcpTool.name}`;
-    this.schema = jsonSchemaToZod(mcpTool.inputSchema as JsonSchema);
+    this.schema = mcpTool.inputSchema
+      ? jsonSchemaToZod(mcpTool.inputSchema as JsonSchema)
+      : z.object({}); // Safe fallback for tools without input schema
   }
 
   protected async executeValidated(
