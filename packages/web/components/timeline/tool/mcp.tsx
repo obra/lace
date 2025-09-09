@@ -119,10 +119,13 @@ export const mcpRenderer: ToolRenderer = {
 
   getIcon: () => faServer,
 
-  renderResult: (result: ToolResult) => {
-    // For now, use default result rendering
-    // Could be enhanced later with MCP-specific result formatting
-    return null; // Falls back to default rendering
+  renderResult: (result: ToolResult, metadata?: any) => {
+    // Show parameters as the main content for MCP tools
+    return (
+      <div className="p-3">
+        <MCPParametersDisplay args={metadata?.arguments} />
+      </div>
+    );
   },
 
   isError: (result: ToolResult): boolean => {
