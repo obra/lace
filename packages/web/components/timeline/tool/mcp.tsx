@@ -8,6 +8,51 @@ import { faServer } from '@/lib/fontawesome';
 import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
 
 /**
+ * MCP Parameters display component for the body
+ */
+export function MCPParametersDisplay({ args }: { args: unknown }) {
+  if (!args || typeof args !== 'object') {
+    if (args === null || args === undefined) return null;
+    return <div className="text-sm text-base-content/70">{String(args)}</div>;
+  }
+
+  const params = args as Record<string, unknown>;
+  const entries = Object.entries(params);
+
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      {entries.map(([key, value]) => (
+        <div key={key} className="border-l-2 border-base-300 pl-3">
+          <div className="text-sm font-medium text-base-content/80 mb-1">{key}:</div>
+          <div className="text-sm text-base-content/70 whitespace-pre-wrap">
+            {formatParameterValue(value)}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Format individual parameter values for display
+ */
+function formatParameterValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  } else if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  } else if (Array.isArray(value)) {
+    return `[${value.length} items]: ${JSON.stringify(value, null, 2)}`;
+  } else if (value && typeof value === 'object') {
+    return JSON.stringify(value, null, 2);
+  } else {
+    return String(value);
+  }
+}
+
+/**
  * Format JSON parameters in a readable way
  */
 function formatParameters(args: unknown): string {
@@ -68,7 +113,8 @@ export const mcpRenderer: ToolRenderer = {
   },
 
   getSummary: (args: unknown, result?: ToolResult): string => {
-    return formatParameters(args);
+    // Keep title clean - parameters will be shown in body
+    return '';
   },
 
   getIcon: () => faServer,

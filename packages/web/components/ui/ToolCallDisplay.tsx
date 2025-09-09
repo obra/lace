@@ -20,6 +20,7 @@ import {
 } from '@/lib/fontawesome';
 import { MessageHeader } from '@/components/ui';
 import { getToolRenderer, type ToolResult } from '@/components/timeline/tool';
+import { MCPParametersDisplay } from '@/components/timeline/tool/mcp';
 import type { ToolAggregatedEventData } from '@/types/web-events';
 import type { ToolCall } from '@/types/core';
 
@@ -228,17 +229,38 @@ export function ToolCallDisplay({
               <div className="text-xs text-base-content/70 mb-1 font-medium">
                 Technical Details:
               </div>
-              <div className="text-xs font-mono text-base-content/80 whitespace-pre-wrap bg-base-100 p-2 rounded border">
-                <strong>Tool:</strong> {tool}
-                {'\n'}
-                <strong>Arguments:</strong> {JSON.stringify(args, null, 2)}
-                {result && (
-                  <>
-                    {'\n\n'}
-                    <strong>Result:</strong> {JSON.stringify(result, null, 2)}
-                  </>
-                )}
-              </div>
+              {tool.includes('/') ? (
+                // MCP tool - use nice parameter formatting
+                <div className="bg-base-100 p-3 rounded border">
+                  <div className="text-xs text-base-content/50 mb-2">
+                    <strong>Tool:</strong> {tool}
+                  </div>
+                  <MCPParametersDisplay args={args} />
+                  {result && (
+                    <div className="mt-3 pt-3 border-t border-base-200">
+                      <div className="text-xs text-base-content/50 mb-2">
+                        <strong>Result:</strong>
+                      </div>
+                      <div className="text-xs font-mono text-base-content/80 whitespace-pre-wrap">
+                        {JSON.stringify(result, null, 2)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Native tool - use original raw JSON display
+                <div className="text-xs font-mono text-base-content/80 whitespace-pre-wrap bg-base-100 p-2 rounded border">
+                  <strong>Tool:</strong> {tool}
+                  {'\n'}
+                  <strong>Arguments:</strong> {JSON.stringify(args, null, 2)}
+                  {result && (
+                    <>
+                      {'\n\n'}
+                      <strong>Result:</strong> {JSON.stringify(result, null, 2)}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
