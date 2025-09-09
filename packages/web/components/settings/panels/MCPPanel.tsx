@@ -7,8 +7,6 @@ import React, { useState, useEffect } from 'react';
 import { AddMCPServerModal } from '@/components/modals/AddMCPServerModal';
 import { api } from '@/lib/api-client';
 import type { MCPServerConfig } from '@/types/core';
-import { ToolPolicySelector } from '@/components/ui/ToolPolicySelector';
-import type { ToolPolicy } from '@/types/core';
 
 type ServerStatus = 'running' | 'stopped' | 'failed' | 'discovering';
 
@@ -105,27 +103,7 @@ export function MCPPanel() {
     }
   };
 
-  const handleToolPolicyChange = async (serverId: string, toolName: string, policy: ToolPolicy) => {
-    try {
-      const currentConfig = servers[serverId];
-      const updatedConfig = {
-        ...currentConfig,
-        tools: {
-          ...currentConfig.tools,
-          [toolName]: policy,
-        },
-      };
-
-      await api.put(`/api/mcp/servers/${serverId}`, updatedConfig);
-
-      setServers((prev) => ({
-        ...prev,
-        [serverId]: updatedConfig,
-      }));
-    } catch (error) {
-      // Error handling
-    }
-  };
+  // Tool policy management moved to Tools tab
 
   if (loading) {
     return (
@@ -204,27 +182,10 @@ export function MCPPanel() {
               </div>
             )}
 
-            {/* Tools */}
+            {/* Tool list summary */}
             {config.discoveredTools && config.discoveredTools.length > 0 && (
-              <div className="ml-5 space-y-1">
-                {config.discoveredTools.map((tool, index) => {
-                  const isLast = index === config.discoveredTools!.length - 1;
-                  const currentPolicy = config.tools[tool.name] || 'ask';
-
-                  return (
-                    <div key={tool.name} className="flex items-center gap-3 text-sm">
-                      <ToolPolicySelector
-                        value={currentPolicy as ToolPolicy}
-                        onChange={(policy) => handleToolPolicyChange(serverId, tool.name, policy)}
-                        size="xs"
-                        context="global"
-                      />
-                      <span className="font-mono">
-                        {isLast ? '└─' : '├─'} {tool.name}
-                      </span>
-                    </div>
-                  );
-                })}
+              <div className="ml-5 text-xs text-base-content/60">
+                Tools: {config.discoveredTools.map((tool) => tool.name).join(', ')}
               </div>
             )}
           </div>
