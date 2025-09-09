@@ -182,11 +182,18 @@ class EventStreamFirehose {
     }
 
     // Check thread ID filter - use context.threadId instead of top-level threadId
+    // BUT allow task events to pass through even without threadId (they route by sessionId)
     if (filter.threadIds?.length) {
       const eventThreadId = event.context?.threadId;
-      if (!eventThreadId || !filter.threadIds.includes(eventThreadId)) {
-        return false;
+      const isTaskEvent = event.type?.includes('TASK');
+
+      if (!isTaskEvent) {
+        // Non-task events must match threadId filter
+        if (!eventThreadId || !filter.threadIds.includes(eventThreadId)) {
+          return false;
+        }
       }
+      // Task events bypass threadId filtering and route by sessionId instead
     }
 
     // Check session ID filter

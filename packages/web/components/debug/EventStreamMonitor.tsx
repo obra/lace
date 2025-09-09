@@ -186,13 +186,23 @@ export function EventStreamMonitor({ maxEvents = 1000 }: EventStreamMonitorProps
 
               <div className="text-base-content/70 text-xs">
                 Thread: {event.context?.threadId || 'none'}
+                {event.context?.sessionId && (
+                  <span className="ml-2">Session: {event.context.sessionId}</span>
+                )}
               </div>
 
-              {event.data && (
-                <div className="text-base-content/60 text-xs mt-1 break-words">
-                  {formatEventData(event.data)}
+              {/* Collapsible full event data */}
+              <div className="collapse collapse-arrow mt-1">
+                <input type="checkbox" />
+                <div className="collapse-title text-xs p-0 min-h-0">
+                  <span className="text-base-content/60">Show full data</span>
                 </div>
-              )}
+                <div className="collapse-content text-xs p-0">
+                  <pre className="text-base-content/50 text-xs mt-1 whitespace-pre-wrap break-words font-mono">
+                    {JSON.stringify(event, null, 2)}
+                  </pre>
+                </div>
+              </div>
             </div>
           ))
         )}
