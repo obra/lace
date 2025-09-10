@@ -15,6 +15,9 @@ import {
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 import { existsSync } from 'fs';
+import { mkdtempSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import { getProcessTempDir } from '~/config/lace-dir';
 
 describe('Project', () => {
@@ -635,6 +638,9 @@ describe('Project', () => {
   });
 
   describe('MCP Server Management', () => {
+    function makeUniqueTempProjectDir(): string {
+      return mkdtempSync(join(tmpdir(), 'lace-project-test-'));
+    }
     it('should start async discovery when adding MCP server', async () => {
       const { ToolCatalog } = await import('~/tools/tool-catalog');
       const discoverSpy = vi.spyOn(ToolCatalog, 'discoverAndCacheTools').mockResolvedValue();
@@ -659,23 +665,31 @@ describe('Project', () => {
 
     it('should not block on tool discovery', async () => {
       const { ToolCatalog } = await import('~/tools/tool-catalog');
-      // Mock slow discovery
-      vi.spyOn(ToolCatalog, 'discoverAndCacheTools').mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 100))
-      );
 
-      const startTime = Date.now();
+      let resolveDiscovery: () => void;
+      const discoveryPromise = new Promise<void>((resolve) => {
+        resolveDiscovery = resolve;
+      });
 
-      const tempDir = getProcessTempDir();
+      // Mock discovery with deferred promise
+      vi.spyOn(ToolCatalog, 'discoverAndCacheTools').mockReturnValue(discoveryPromise);
+
+      const tempDir = makeUniqueTempProjectDir();
       const project = Project.create('Test Project', tempDir);
-      await project.addMCPServer('slow-server', {
+
+      // addMCPServer should resolve before discovery completes
+      const addServerPromise = project.addMCPServer('slow-server', {
         command: 'slow-command',
         enabled: true,
         tools: {},
       });
 
-      const elapsed = Date.now() - startTime;
-      expect(elapsed).toBeLessThan(150); // Should not wait for full discovery
+      // Verify addMCPServer resolves without waiting for discovery
+      await addServerPromise;
+
+      // Now complete the discovery
+      resolveDiscovery!();
+      await discoveryPromise;
     });
 
     it('should throw error for duplicate server IDs', async () => {

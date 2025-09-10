@@ -181,7 +181,7 @@ describe('Agent Tool Abort Functionality', () => {
     expect(aborted).toBe(true);
 
     // Wait for the message processing to complete/abort
-    await expect(messagePromise).resolves.not.toThrow();
+    await messagePromise;
 
     // Check that tool was marked as cancelled
     expect(toolCompletedCount).toBe(1);
@@ -242,7 +242,7 @@ describe('Agent Tool Abort Functionality', () => {
     const aborted = agent.abort();
     expect(aborted).toBe(true);
 
-    await expect(messagePromise).resolves.not.toThrow();
+    await messagePromise;
 
     // All tools should be cancelled
     expect(toolResults.length).toBe(3);
@@ -296,7 +296,7 @@ describe('Agent Tool Abort Functionality', () => {
     const aborted = agent.abort();
     expect(aborted).toBe(true);
 
-    await expect(messagePromise).resolves.not.toThrow();
+    await messagePromise;
 
     // Wait for result to be set
     for (let i = 0; i < 50 && !toolResult; i++) {
@@ -361,7 +361,7 @@ describe('Agent Tool Abort Functionality', () => {
     const aborted = agent.abort();
     expect(aborted).toBe(true);
 
-    await expect(messagePromise).resolves.not.toThrow();
+    await messagePromise;
 
     // Check results
     expect(toolResults.size).toBe(2);
@@ -429,7 +429,7 @@ describe('Agent Tool Abort Functionality', () => {
     const firstMessagePromise = agent.sendMessage('First execution');
     await new Promise((resolve) => setTimeout(resolve, 200));
     agent.abort();
-    await expect(firstMessagePromise).resolves.not.toThrow();
+    await firstMessagePromise;
 
     expect(firstResult).not.toBeNull();
     expect(firstResult!.status).toBe('aborted');
@@ -547,7 +547,7 @@ describe('Agent Tool Abort Functionality', () => {
     // Abort
     agent.abort();
 
-    await expect(messagePromise).resolves.not.toThrow();
+    await messagePromise;
 
     // Wait for state to settle after abort
     await new Promise((resolve) => setTimeout(resolve, 200));

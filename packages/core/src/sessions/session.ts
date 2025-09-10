@@ -921,6 +921,9 @@ export class Session {
     const delegateTool = new DelegateTool();
     toolExecutor.registerTool('delegate', delegateTool);
 
+    // Bind current Session to ToolExecutor for MCP policy lookups
+    toolExecutor.setSession(this);
+
     // Kick off MCP tool discovery (non-blocking)
     toolExecutor.registerMCPTools(this._mcpServerManager);
 
@@ -1169,8 +1172,10 @@ Use your task_add_note tool to record important notes as you work and your task_
       await Promise.allSettled(startPromises);
       logger.info(`Initialized MCP servers for session ${this.getId()}`);
 
-      // Note: MCP tools will be registered when agents are created
-      // Don't call refreshMCPToolsInExecutors here as agents don't exist yet
+      // Fire-and-forget refresh of MCP tools in any existing executors
+      void this.refreshMCPToolsInExecutors().catch((error) => {
+        logger.debug(`Non-blocking MCP tools refresh failed during startup:`, error);
+      });
     } catch (error) {
       logger.warn(`Failed to initialize MCP servers for session ${this.getId()}:`, error);
     }
