@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import { createProject, setupAnthropicProvider, getMessageInput } from './helpers/ui-interactions';
 import * as fs from 'fs';
@@ -96,8 +97,16 @@ test.describe('SSE Event System Reliability', () => {
       {
         name: 'rapid clicks',
         action: async () => {
-          await page.getByTestId('create-first-project-button').click();
-          await page.keyboard.press('Escape');
+          // Try to click settings button (should exist in project context)
+          const settingsButton = page.getByTestId('settings-button');
+          if (await settingsButton.isVisible().catch(() => false)) {
+            await settingsButton.click();
+            await page.keyboard.press('Escape');
+          } else {
+            // Fallback: just press Escape multiple times
+            await page.keyboard.press('Escape');
+            await page.keyboard.press('Escape');
+          }
         },
       },
     ];
@@ -106,18 +115,29 @@ test.describe('SSE Event System Reliability', () => {
 
     for (const interaction of interactions) {
       try {
-        await interaction.action();
-        await page.waitForTimeout(1000);
+        console.warn(`Starting SSE stability test interaction: ${interaction.name}`);
 
-        const stillFunctional = await getMessageInput(page)
-          .then(() => true)
+        await interaction.action();
+
+        console.warn(`Completed interaction: ${interaction.name}, waiting for stabilization`);
+        await page.waitForTimeout(TIMEOUTS.QUICK / 5);
+
+        // Check if message input is still accessible (may be hidden by modals)
+        console.warn(`Checking if message input accessible after: ${interaction.name}`);
+        const stillFunctional = await page
+          .getByTestId('message-input')
+          .isVisible()
           .catch(() => false);
+
+        console.warn(`Interaction ${interaction.name} result: stillFunctional=${stillFunctional}`);
+
         stabilityResults.push({
           interaction: interaction.name,
           stillFunctional,
           connectionEventsAfter: connectionEvents.length,
         });
       } catch (error) {
+        console.warn(`Interaction ${interaction.name} failed with error:`, error);
         stabilityResults.push({
           interaction: interaction.name,
           stillFunctional: false,

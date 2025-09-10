@@ -12,6 +12,7 @@ import {
 import { ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
+import { logProviderRequest, logProviderResponse } from '~/utils/provider-logging';
 import { convertToAnthropicFormat } from '~/providers/format-converters';
 
 interface AnthropicProviderConfig extends ProviderConfig {
@@ -152,39 +153,24 @@ export class AnthropicProvider extends AIProvider {
       async () => {
         const requestPayload = this._createRequestPayload(messages, tools, model);
 
-        logger.debug('Sending request to Anthropic', {
-          provider: 'anthropic',
-          model: requestPayload.model,
-          messageCount: requestPayload.messages.length,
-          systemPromptLength: requestPayload.system?.length,
-          toolCount: requestPayload.tools?.length,
-          toolNames: requestPayload.tools?.map((t) => t.name),
-        });
-
-        // Log full request payload for debugging
-        logger.debug('Anthropic request payload', {
-          provider: 'anthropic',
-          payload: JSON.stringify(requestPayload, null, 2),
-        });
+        // Log request with pretty formatting
+        logProviderRequest('anthropic', requestPayload as unknown as Record<string, unknown>);
 
         const response = (await this.getAnthropicClient().messages.create(requestPayload, {
           signal,
         })) as Anthropic.Messages.Message;
 
-        // Log full response for debugging
-        logger.debug('Anthropic response payload', {
-          provider: 'anthropic',
-          response: JSON.stringify(response, null, 2),
-        });
+        // Log response with pretty formatting
+        logProviderResponse('anthropic', response);
 
-        const textContent = response.content
+        const textContent = (response.content || [])
           .filter(
             (contentBlock): contentBlock is Anthropic.TextBlock => contentBlock.type === 'text'
           )
           .map((contentBlock) => contentBlock.text)
           .join('');
 
-        const toolCalls: ToolCall[] = response.content
+        const toolCalls: ToolCall[] = (response.content || [])
           .filter(
             (contentBlock): contentBlock is Anthropic.ToolUseBlock =>
               contentBlock.type === 'tool_use'
@@ -236,19 +222,9 @@ export class AnthropicProvider extends AIProvider {
       async () => {
         const requestPayload = this._createRequestPayload(messages, tools, model);
 
-        logger.debug('Sending streaming request to Anthropic', {
-          provider: 'anthropic',
-          model: requestPayload.model,
-          messageCount: requestPayload.messages.length,
-          systemPromptLength: requestPayload.system?.length,
-          toolCount: requestPayload.tools?.length,
-          toolNames: requestPayload.tools?.map((t) => t.name),
-        });
-
-        // Log full request payload for debugging
-        logger.debug('Anthropic streaming request payload', {
-          provider: 'anthropic',
-          payload: JSON.stringify(requestPayload, null, 2),
+        // Log streaming request with pretty formatting
+        logProviderRequest('anthropic', requestPayload as unknown as Record<string, unknown>, {
+          streaming: true,
         });
 
         // Use the streaming API
@@ -320,13 +296,13 @@ export class AnthropicProvider extends AIProvider {
           const finalMessage = await stream.finalMessage();
 
           // Extract text content from the final message
-          const textContent = finalMessage.content
+          const textContent = (finalMessage.content || [])
             .filter((content): content is Anthropic.TextBlock => content.type === 'text')
             .map((content) => content.text)
             .join('');
 
           // Extract tool calls from the final message
-          toolCalls = finalMessage.content
+          toolCalls = (finalMessage.content || [])
             .filter((content): content is Anthropic.ToolUseBlock => content.type === 'tool_use')
             .map((content) => ({
               id: content.id,
@@ -334,11 +310,8 @@ export class AnthropicProvider extends AIProvider {
               arguments: content.input as Record<string, unknown>,
             }));
 
-          // Log full response for debugging
-          logger.debug('Anthropic streaming response payload', {
-            provider: 'anthropic',
-            response: JSON.stringify(finalMessage, null, 2),
-          });
+          // Log streaming response with pretty formatting
+          logProviderResponse('anthropic', finalMessage, { streaming: true });
 
           logger.debug('Received streaming response from Anthropic', {
             provider: 'anthropic',

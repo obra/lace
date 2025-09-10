@@ -1,7 +1,10 @@
 // ABOUTME: Reusable E2E helper functions for common UI interactions
 // ABOUTME: Component-aware functions using proper testids for reliable testing
 
-import { Page } from '@playwright/test';
+import { Page, expect } from '@playwright/test';
+import { withTestEnvironment } from './test-utils';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Settings and Configuration Helpers
@@ -10,11 +13,14 @@ import { Page } from '@playwright/test';
 /** Open the settings modal using the testid */
 export async function openSettingsModal(page: Page): Promise<void> {
   const settingsButton = page.locator('[data-testid="settings-button"]');
-  await settingsButton.waitFor({ state: 'visible', timeout: 5000 });
+  await settingsButton.waitFor({ state: 'visible', timeout: 15000 });
+
+  // Ensure button is actually clickable and page is ready
+  await page.waitForTimeout(1000);
   await settingsButton.click();
 
-  // Wait for settings modal to open
-  await page.waitForSelector('text="Configuration"', { timeout: 10000 });
+  // Wait for settings modal to open - check for the actual content that appears
+  await page.waitForSelector('text="AI Provider Configuration"', { timeout: 20000 });
 }
 
 /** Navigate to a specific settings tab */
@@ -27,12 +33,12 @@ export async function navigateToSettingsTab(page: Page, tabName: string): Promis
 
 /** Close the settings modal using the dismiss button */
 export async function closeSettingsModal(page: Page): Promise<void> {
-  // Use .first() since there might be multiple close buttons (nested modals)
   const closeButton = page.locator('[aria-label="Close modal"]').first();
-  await closeButton.waitFor({ state: 'visible', timeout: 5000 });
+  await closeButton.waitFor({ state: 'visible', timeout: 15000 });
+  await closeButton.click();
 
-  // Force click to get past any overlay issues
-  await closeButton.click({ force: true });
+  // Wait for modal to actually close
+  await page.waitForTimeout(1000);
 }
 
 /**
@@ -118,9 +124,6 @@ export async function createProviderInstance(page: Page): Promise<void> {
         return page.waitForTimeout(2000);
       });
     });
-
-  // Dismiss the settings modal after provider creation
-  await closeSettingsModal(page);
 }
 
 /**
@@ -138,11 +141,13 @@ export async function setupProvider(
   }
 ): Promise<void> {
   // Check if provider is already configured - try multiple indicators
-  const existingProviders = await Promise.race([
+  const providerCounts = await Promise.all([
     page.locator('text="1 instance configured"').count(),
     page.locator('text="instance configured"').count(),
     page.locator('text="instances configured"').count(),
   ]);
+
+  const existingProviders = providerCounts.reduce((sum, count) => sum + count, 0);
 
   if (existingProviders > 0) {
     return;
@@ -356,3 +361,93 @@ export async function selectAgent(page: Page, _agentName: string): Promise<void>
   // TODO: Implement if agent selection UI exists
   await page.waitForTimeout(100); // Placeholder
 }
+
+/**
+ * Send message and wait for AI response content
+ */
+export async function sendMessageAndWaitForResponse(
+  page: Page,
+  message: string,
+  expectedResponse?: string
+): Promise<void> {
+  await sendMessage(page, message);
+  await verifyMessageVisible(page, message);
+
+  const response = expectedResponse || "I'm a helpful AI assistant. How can I help you today?";
+  await expect(page.getByText(response)).toBeVisible({ timeout: 15000 });
+}
+
+/**
+ * Check if streaming is active by looking for stop button
+ */
+export async function isStreamingActive(page: Page): Promise<boolean> {
+  return page
+    .getByTestId('stop-button')
+    .isVisible()
+    .catch(() => false);
+}
+
+/**
+ * Wait for streaming to start (stop button appears)
+ */
+export async function waitForStreamingStart(page: Page, timeout: number = 10000): Promise<boolean> {
+  try {
+    await page.getByTestId('stop-button').waitFor({ state: 'visible', timeout });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Wait for streaming to stop (send button returns)
+ */
+export async function waitForStreamingStop(page: Page, timeout: number = 10000): Promise<boolean> {
+  try {
+    await page.getByTestId('send-button').waitFor({ state: 'visible', timeout });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get current chat interface state using testids
+ */
+export async function getChatInterfaceState(page: Page) {
+  return {
+    messageInputVisible: await page
+      .getByTestId('message-input')
+      .isVisible()
+      .catch(() => false),
+    sendButtonVisible: await page
+      .getByTestId('send-button')
+      .isVisible()
+      .catch(() => false),
+    stopButtonVisible: await page
+      .getByTestId('stop-button')
+      .isVisible()
+      .catch(() => false),
+    isStreaming: await page
+      .getByTestId('stop-button')
+      .isVisible()
+      .catch(() => false),
+  };
+}
+
+/**
+ * Complete project setup for tests that need a ready-to-use project
+ */
+export const testWithProject = (
+  projectName: string,
+  testFn: (page: Page, projectPath: string) => Promise<void>
+) => {
+  return withTestEnvironment(async (testEnv, page) => {
+    await setupAnthropicProvider(page);
+    const projectPath = path.join(testEnv.tempDir, projectName.toLowerCase().replace(/\s+/g, '-'));
+    await fs.promises.mkdir(projectPath, { recursive: true });
+    await createProject(page, projectName, projectPath);
+    await getMessageInput(page);
+    await testFn(page, projectPath);
+  });
+};

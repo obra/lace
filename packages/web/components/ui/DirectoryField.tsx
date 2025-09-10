@@ -232,6 +232,13 @@ export function DirectoryField({
     setIsDropdownOpen(true);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      // Close dropdown on Escape key
+      setIsDropdownOpen(false);
+    }
+  };
+
   const handleBlur = () => {
     setIsFocused(false);
   };
@@ -262,6 +269,7 @@ export function DirectoryField({
           onChange={handleInputChange}
           onFocus={handleFocus}
           onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
           placeholder={placeholder}
           required={required}
           disabled={disabled}

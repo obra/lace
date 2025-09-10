@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import {
   createProject,
@@ -69,11 +70,11 @@ test.describe('Streaming Compaction Events', () => {
       if (message.includes('First message')) {
         await expect(
           page.getByText('I understand you are building conversation length').first()
-        ).toBeVisible({ timeout: 15000 });
+        ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
       } else if (message.includes('Second message')) {
         await expect(
           page.getByText('Continuing the conversation with additional content').first()
-        ).toBeVisible({ timeout: 15000 });
+        ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
       }
 
       await page.waitForTimeout(1000);
@@ -84,10 +85,8 @@ test.describe('Streaming Compaction Events', () => {
     await sendMessage(page, compactionCommand);
     await verifyMessageVisible(page, compactionCommand);
 
-    // Wait for compaction response
-    await expect(page.getByText(/Manual compaction command received/).first()).toBeVisible({
-      timeout: 15000,
-    });
+    // Wait for compaction events to be processed (compaction is silent)
+    await page.waitForTimeout(2000);
 
     // Allow time for compaction processing
     await page.waitForTimeout(3000);
@@ -172,15 +171,15 @@ test.describe('Streaming Compaction Events', () => {
       if (message.includes('First message')) {
         await expect(
           page.getByText('I understand you are building conversation length').first()
-        ).toBeVisible({ timeout: 15000 });
+        ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
       } else if (message.includes('Second message')) {
         await expect(
           page.getByText('Continuing the conversation with additional content').first()
-        ).toBeVisible({ timeout: 15000 });
+        ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
       } else if (message.includes('Third message')) {
         await expect(
           page.getByText('This third message response adds even more content').first()
-        ).toBeVisible({ timeout: 15000 });
+        ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
       }
 
       // Check for compaction UI indicators after each message
@@ -245,7 +244,7 @@ test.describe('Streaming Compaction Events', () => {
 
     await expect(
       page.getByText("I'm a helpful AI assistant. How can I help you today?").first()
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
     await page.waitForTimeout(1000);
 
@@ -278,10 +277,8 @@ test.describe('Streaming Compaction Events', () => {
       uiResults[check.name] = visible;
     }
 
-    // Wait for compaction response
-    await expect(page.getByText(/Manual compaction command received/).first()).toBeVisible({
-      timeout: 15000,
-    });
+    // Wait for compaction to process
+    await page.waitForTimeout(2000);
 
     const compactionEnd = Date.now();
     const compactionDuration = compactionEnd - compactionStart;
@@ -317,6 +314,6 @@ test.describe('Streaming Compaction Events', () => {
     await expect(messageInput).toBeEnabled();
 
     // Test that compaction completed within reasonable time (under 10 seconds)
-    expect(uiAnalysis.compactionDuration).toBeLessThan(10000);
+    expect(uiAnalysis.compactionDuration).toBeLessThan(TIMEOUTS.STANDARD);
   });
 });

@@ -32,6 +32,47 @@ export function mockAnthropicForE2E(): void {
       const body = await request.text();
       const requestData = JSON.parse(body) as AnthropicRequest;
 
+      // Route helper agents to different responses based on model
+      if (requestData.model === 'claude-3-haiku-20240307') {
+        // Helper agent requests - return COMPLETELY different responses that won't appear in chat UI
+        const userMessages = requestData.messages?.filter((m) => m.role === 'user') || [];
+        const userMessage = userMessages[userMessages.length - 1]?.content || '';
+
+        console.warn('[MOCK] Helper agent request for message:', userMessage);
+
+        // Return task-specific helper responses that are completely different from main responses
+        let helperResponse = '✅ Internal summary completed';
+
+        if (typeof userMessage === 'string') {
+          if (userMessage.includes('Hello')) {
+            helperResponse = '📝 Context summary: User greeting processed';
+          } else if (userMessage.includes('test message')) {
+            helperResponse = '📊 Analysis: Test interaction logged';
+          } else if (userMessage.includes('conversation') || userMessage.includes('follow-up')) {
+            helperResponse = '🔗 Thread summary: Conversation flow tracked';
+          } else {
+            helperResponse = '⚙️ Background task: User input processed';
+          }
+        }
+
+        return new Response(
+          JSON.stringify({
+            id: 'msg_helper_response',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'text', text: helperResponse }],
+            model: 'claude-3-haiku-20240307',
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 3, output_tokens: 2 },
+          }),
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Main test agent requests - log the model being used
+      console.warn('[MOCK] Main agent request for model:', requestData.model);
+
+      // Main test agent requests - use detailed test responses
       // Get the LAST user message from conversation history (not the first)
       const userMessages = requestData.messages?.filter((m) => m.role === 'user') || [];
       const userMessage = userMessages[userMessages.length - 1]?.content || '';

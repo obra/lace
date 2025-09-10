@@ -1,5 +1,5 @@
 // ABOUTME: Reusable E2E test utilities for common operations
-// ABOUTME: Centralizes UI interactions and per-test server management
+// ABOUTME: Centralizes UI interactions, per-test server management, and timeout constants
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -8,6 +8,7 @@ import * as http from 'http';
 import { spawn, ChildProcess } from 'child_process';
 import { createServer } from 'net';
 import { fileURLToPath } from 'url';
+import type { Page } from '@playwright/test';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -88,9 +89,10 @@ async function startTestServer(
       LACE_DIR: tempDir,
       ANTHROPIC_API_KEY: 'test-anthropic-key-for-e2e',
       LACE_DB_PATH: path.join(tempDir, 'lace.db'),
-      NODE_ENV: 'development', // Use development mode for React Router v7 compatibility
+      NODE_ENV: 'test', // Use test mode - avoids Vite dev server issues
+      VITE_OPTIMIZE_DEPS_DISABLED: 'true', // Disable dependency optimization to prevent reloads
       E2E_TOOL_APPROVAL_MOCK: 'true',
-      LACE_LOG_LEVEL: 'debug',
+      LACE_LOG_LEVEL: 'error',
       LACE_LOG_STDERR: 'true',
     },
   });
@@ -135,9 +137,32 @@ export async function setupTestEnvironment(): Promise<TestEnvironment> {
   const anthropicCredentials = {
     apiKey: 'test-anthropic-key-for-e2e',
   };
+
+  // Create anthropic-helper credentials file for helper agents
+  const anthropicHelperCredentials = {
+    apiKey: 'test-anthropic-helper-key-for-e2e',
+  };
   await fs.promises.writeFile(
     path.join(credentialsDir, 'anthropic-default.json'),
     JSON.stringify(anthropicCredentials, null, 2)
+  );
+
+  await fs.promises.writeFile(
+    path.join(credentialsDir, 'anthropic-helper.json'),
+    JSON.stringify(anthropicHelperCredentials, null, 2)
+  );
+
+  // Create global config with separate models for helpers vs main tests
+  const globalConfig = {
+    defaultModels: {
+      fast: 'anthropic-helper:claude-3-haiku-20240307', // Helper agents use different model
+      smart: 'anthropic-default:claude-opus-4-1-20250805', // Main tests use this model
+    },
+  };
+
+  await fs.promises.writeFile(
+    path.join(tempDir, 'config.json'),
+    JSON.stringify(globalConfig, null, 2)
   );
 
   // Create provider-instances.json configuration
@@ -149,6 +174,12 @@ export async function setupTestEnvironment(): Promise<TestEnvironment> {
         displayName: 'Test Anthropic Provider',
         catalogProviderId: 'anthropic',
         isDefault: true,
+      },
+      'anthropic-helper': {
+        id: 'anthropic-helper',
+        displayName: 'Helper Anthropic Provider',
+        catalogProviderId: 'anthropic',
+        isDefault: false,
       },
     },
   };
@@ -215,6 +246,34 @@ export async function cleanupTestEnvironment(env: TestEnvironment) {
   ) {
     await fs.promises.rm(env.tempDir, { recursive: true, force: true });
   }
+}
+
+/**
+ * Standard timeout constants for E2E tests
+ * Use these instead of hardcoded values for consistency
+ */
+export const TIMEOUTS = {
+  QUICK: 5000, // Element visibility, form interactions
+  STANDARD: 10000, // AI responses, navigation
+  EXTENDED: 15000, // Complex operations, streaming
+} as const;
+
+/**
+ * Simple wrapper that eliminates boilerplate setup/teardown
+ * Use this instead of manual beforeEach/afterEach in every test file
+ */
+export function withTestEnvironment(
+  testFn: (testEnv: TestEnvironment, page: Page) => Promise<void>
+) {
+  return async ({ page }: { page: Page }) => {
+    const testEnv = await setupTestEnvironment();
+    try {
+      await page.goto(testEnv.serverUrl);
+      await testFn(testEnv, page);
+    } finally {
+      await cleanupTestEnvironment(testEnv);
+    }
+  };
 }
 
 // Project management utilities are now in ui-interactions.ts

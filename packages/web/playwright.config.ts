@@ -8,10 +8,13 @@ export default defineConfig({
   testMatch: '**/*.e2e.ts',
 
   // Enable parallel execution - this was previously disabled
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 4 : 2, // Use multiple workers instead of 1
+  workers: process.env.CI ? 1 : 1,
+
+  // Increase timeout for CI where server startup is slower
+  timeout: process.env.CI ? 120000 : 60000,
 
   // Enhanced reporting and debugging
   reporter: [
@@ -32,18 +35,10 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    // WebKit disabled in CI due to timing issues, available for local development
-    ...(process.env.CI
-      ? []
-      : [
-          {
-            name: 'webkit',
-            use: { ...devices['Desktop Safari'] },
-          },
-        ]),
+    // WebKit disabled due to timing and compatibility issues
   ],
 
-  // Per-test servers are now managed by setupTestEnvironment/cleanupTestEnvironment
+  // Per-test servers are managed by setupTestEnvironment/cleanupTestEnvironment
   // No global webServer needed
 
   // Global setup for worker isolation

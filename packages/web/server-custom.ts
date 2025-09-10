@@ -107,9 +107,20 @@ async function startLaceServer() {
   app.use(async (req, res, next) => {
     try {
       const source = await viteDevServer.ssrLoadModule('./server/app.ts');
-      return await (
-        source as { app: (req: unknown, res: unknown, next: unknown) => Promise<void> }
-      ).app(req, res, next);
+      if (
+        source &&
+        typeof source === 'object' &&
+        'app' in source &&
+        typeof source.app === 'function'
+      ) {
+        const appHandler = source.app as (
+          req: express.Request,
+          res: express.Response,
+          next: express.NextFunction
+        ) => Promise<void>;
+        return await appHandler(req, res, next);
+      }
+      throw new Error('Invalid SSR module structure');
     } catch (error) {
       if (typeof error === 'object' && error instanceof Error) {
         viteDevServer.ssrFixStacktrace(error);

@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import {
   createProject,
@@ -86,7 +87,7 @@ test.describe('Error Handling and Recovery', () => {
 
     // Check if interface remains responsive
     try {
-      await page.getByTestId('create-first-project-button').isVisible({ timeout: 3000 });
+      await page.getByTestId('create-first-project-button').isVisible({ timeout: TIMEOUTS.QUICK });
       networkErrorTest.interfaceResponsive = true;
       networkErrorTest.canNavigate = true;
     } catch (_error) {

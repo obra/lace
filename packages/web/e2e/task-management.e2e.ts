@@ -6,6 +6,7 @@ import {
   setupTestEnvironment,
   cleanupTestEnvironment,
   type TestEnvironment,
+  TIMEOUTS,
 } from './helpers/test-utils';
 import { createProject, setupAnthropicProvider, getMessageInput } from './helpers/ui-interactions';
 import * as fs from 'fs';
@@ -136,7 +137,7 @@ test.describe('Task Management CRUD Operations', () => {
     // If tasks exist, test persistence
     if (taskPersistenceTest.initialTaskCount > 0) {
       await page.reload();
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(TIMEOUTS.QUICK);
 
       taskPersistenceTest.reloadTaskCount = await page.locator('[data-testid="task-item"]').count();
       taskPersistenceTest.hasTaskPersistence =

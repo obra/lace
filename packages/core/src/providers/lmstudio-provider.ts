@@ -13,6 +13,7 @@ import {
 import { ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
+import { logProviderRequest, logProviderResponse } from '~/utils/provider-logging';
 
 // Interface for LMStudio model objects
 interface LMStudioModel {
@@ -422,13 +423,14 @@ export class LMStudioProvider extends AIProvider {
       ],
     };
 
-    logger.debug('LMStudio native tool calling request', {
-      provider: 'lmstudio',
+    // Log request with pretty formatting
+    logProviderRequest('lmstudio', {
       model: modelId,
-      messageCount: lmMessages.length,
-      toolCount: tools.length,
-      toolNames: tools.map((t) => t.name),
-    });
+      messages: lmMessages,
+      tools: rawTools,
+      predictionConfigStack,
+      chatData,
+    } as unknown as Record<string, unknown>);
 
     return new Promise((resolve, reject) => {
       let allContent = '';
@@ -549,13 +551,18 @@ export class LMStudioProvider extends AIProvider {
                 // Return immediately with tool calls (like other providers)
                 if (!resolved) {
                   resolved = true;
-                  resolve({
+                  const response = {
                     content: allContent.trim(),
                     toolCalls,
                     stopReason: 'tool_use',
                     usage: this._estimateUsage(allContent, lmMessages),
                     performance: this._calculatePerformance(chunkCount, allContent.length),
-                  });
+                  };
+
+                  // Log response with pretty formatting
+                  logProviderResponse('lmstudio', response);
+
+                  resolve(response);
                 }
                 return;
               }
@@ -571,7 +578,7 @@ export class LMStudioProvider extends AIProvider {
                 // Only resolve here if we haven't already resolved due to tool calls
                 if (!resolved) {
                   resolved = true;
-                  resolve({
+                  const response = {
                     content: allContent.trim(),
                     toolCalls,
                     stopReason: msg.stats?.stopReason || 'stop',
@@ -593,7 +600,12 @@ export class LMStudioProvider extends AIProvider {
                           timeToFirstToken: msg.stats.timeToFirstTokenSec,
                         }
                       : this._calculatePerformance(chunkCount, allContent.length),
-                  });
+                  };
+
+                  // Log response with pretty formatting
+                  logProviderResponse('lmstudio', response);
+
+                  resolve(response);
                 }
                 break;
               }
@@ -635,13 +647,8 @@ export class LMStudioProvider extends AIProvider {
         await this._ensureModelLoaded(model);
         modelLoaded = true; // Mark model as loaded to prevent retries after this point
 
-        logger.debug('Creating streaming LMStudio response with native tool calling', {
-          provider: 'lmstudio',
-          model,
-          messageCount: messages.length,
-          toolCount: tools.length,
-          toolNames: tools.map((t) => t.name),
-        });
+        // Streaming requests are handled by _createResponseWithNativeToolCalling
+        // which already includes payload logging
 
         // Use the same native tool calling method with streaming callback
         return this._createResponseWithNativeToolCalling(messages, tools, model, signal, () => {

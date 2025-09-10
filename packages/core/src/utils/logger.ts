@@ -40,6 +40,10 @@ class Logger {
     return LOG_LEVELS[level] <= LOG_LEVELS[this._level];
   }
 
+  shouldLog(level: LogLevel): boolean {
+    return this._shouldLog(level);
+  }
+
   private _write(level: LogLevel, message: string, data?: unknown) {
     if (!this._shouldLog(level)) {
       return;
