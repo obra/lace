@@ -21,65 +21,109 @@ export function EventStreamMonitor({ maxEvents = 1000 }: EventStreamMonitorProps
   const [hideTokenEvents, setHideTokenEvents] = useState(true); // Hide noisy token events by default
   const eventSourceRef = useRef<EventSource | null>(null);
   const eventsEndRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
+  const pauseRef = useRef(false);
+  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Update pause ref when isPaused changes (without triggering reconnection)
+  useEffect(() => {
+    pauseRef.current = isPaused;
+  }, [isPaused]);
 
   // Filter events for display
   const filteredEvents = hideTokenEvents
     ? events.filter((event) => event.type !== 'AGENT_TOKEN')
     : events;
 
-  // Scroll to bottom when new events arrive
+  // Scroll to bottom when new events arrive (only if not paused)
   useEffect(() => {
-    if (!isPaused) {
+    if (!pauseRef.current) {
       eventsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [events, isPaused]);
+  }, [events]);
 
-  // Connect to SSE stream
+  // Connect to SSE stream (stable connection, no recreation on pause)
   useEffect(() => {
+    mountedRef.current = true;
     const connectToEventStream = () => {
+      // Clear any existing reconnect timer
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
       }
+
+      if (!mountedRef.current) return; // Don't connect if unmounted
 
       setConnectionStatus('connecting');
       const eventSource = new EventSource('/api/events/stream');
       eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
-        setConnectionStatus('connected');
+        if (mountedRef.current) {
+          setConnectionStatus('connected');
+        }
       };
 
       eventSource.onmessage = (event) => {
-        if (isPaused) return;
+        // Check pause state via ref (no dependency on isPaused state)
+        if (pauseRef.current || !mountedRef.current) return;
 
         try {
           // Use SuperJSON parseTyped instead of JSON.parse
           const parsedEvent = parseTyped<LaceEvent>(event.data as string);
 
-          setEvents((prev) => {
-            const newEvents = [...prev, parsedEvent].slice(-maxEvents);
-            return newEvents;
-          });
+          if (mountedRef.current) {
+            setEvents((prev) => {
+              const newEvents = [...prev, parsedEvent].slice(-maxEvents);
+              return newEvents;
+            });
+          }
         } catch (error) {
           console.warn('Failed to parse SSE event with SuperJSON:', error, 'Raw data:', event.data);
         }
       };
 
       eventSource.onerror = () => {
+        if (!mountedRef.current) return;
+
         setConnectionStatus('disconnected');
+
+        // Clear any existing timer before setting new one
+        if (reconnectTimerRef.current) {
+          clearTimeout(reconnectTimerRef.current);
+        }
+
         // Auto-reconnect after 2 seconds
-        setTimeout(connectToEventStream, 2000);
+        reconnectTimerRef.current = setTimeout(() => {
+          if (mountedRef.current) {
+            connectToEventStream();
+          }
+        }, 2000);
       };
     };
 
     connectToEventStream();
 
     return () => {
+      mountedRef.current = false;
+
+      // Clear reconnect timer
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+
+      // Close connection
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
+        eventSourceRef.current = null;
       }
     };
-  }, [maxEvents, isPaused]);
+  }, [maxEvents]); // Removed isPaused from deps to prevent reconnection on pause
 
   const clearEvents = () => {
     setEvents([]);
