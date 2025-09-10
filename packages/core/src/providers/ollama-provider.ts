@@ -13,6 +13,7 @@ import {
 import { ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
+import { logProviderRequest, logProviderResponse } from '~/utils/provider-logging';
 
 interface OllamaProviderConfig extends ProviderConfig {
   host?: string;
@@ -134,14 +135,6 @@ export class OllamaProvider extends AIProvider {
           }))
         );
 
-        logger.debug('Sending request to Ollama', {
-          provider: 'ollama',
-          model,
-          messageCount: ollamaMessages.length,
-          toolCount: tools.length,
-          toolNames: tools.map((t) => t.name),
-        });
-
         // Prepare the request payload
         const requestPayload = {
           model,
@@ -162,6 +155,9 @@ export class OllamaProvider extends AIProvider {
               : undefined,
         };
 
+        // Log request with pretty formatting
+        logProviderRequest('ollama', requestPayload as unknown as Record<string, unknown>);
+
         // Make the request
         // Handle abort signal
         if (signal?.aborted) {
@@ -181,13 +177,8 @@ export class OllamaProvider extends AIProvider {
           });
         }
 
-        logger.debug('Received response from Ollama', {
-          provider: 'ollama',
-          model,
-          messageContent: response.message?.content,
-          hasToolCalls: !!response.message?.tool_calls,
-          toolCallCount: response.message?.tool_calls?.length || 0,
-        });
+        // Log response with pretty formatting
+        logProviderResponse('ollama', response);
 
         // Extract content and tool calls
         const content = response.message?.content || '';
@@ -274,14 +265,6 @@ export class OllamaProvider extends AIProvider {
           }))
         );
 
-        logger.debug('Sending streaming request to Ollama', {
-          provider: 'ollama',
-          model,
-          messageCount: ollamaMessages.length,
-          toolCount: tools.length,
-          toolNames: tools.map((t) => t.name),
-        });
-
         // Prepare the request payload for streaming
         const requestPayload = {
           model,
@@ -301,6 +284,11 @@ export class OllamaProvider extends AIProvider {
                 )
               : undefined,
         };
+
+        // Log streaming request with pretty formatting
+        logProviderRequest('ollama', requestPayload as unknown as Record<string, unknown>, {
+          streaming: true,
+        });
 
         // Handle abort signal
         if (signal?.aborted) {
@@ -382,13 +370,8 @@ export class OllamaProvider extends AIProvider {
             }));
           }
 
-          logger.debug('Received streaming response from Ollama', {
-            provider: 'ollama',
-            model,
-            contentLength: content.length,
-            toolCallCount: toolCalls.length,
-            toolCallNames: toolCalls.map((tc) => tc.name),
-          });
+          // Log streaming response with pretty formatting
+          logProviderResponse('ollama', { content, toolCalls, finalMessage }, { streaming: true });
 
           const result = {
             content,

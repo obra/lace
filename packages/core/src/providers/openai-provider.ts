@@ -27,6 +27,7 @@ import {
 import { ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
+import { logProviderRequest, logProviderResponse } from '~/utils/provider-logging';
 import { convertToOpenAIFormat } from '~/providers/format-converters';
 
 interface OpenAIProviderConfig extends ProviderConfig {
@@ -288,30 +289,15 @@ export class OpenAIProvider extends AIProvider {
       async () => {
         const requestPayload = this._createRequestPayload(messages, tools, model, false);
 
-        logger.debug('Sending request to OpenAI', {
-          provider: 'openai',
-          model: requestPayload.model,
-          messageCount: requestPayload.messages.length,
-          systemPromptLength: requestPayload.messages[0].content?.length,
-          toolCount: requestPayload.tools?.length,
-          toolNames: requestPayload.tools?.map((t) => t.function.name),
-        });
-
-        // Log full request payload for debugging
-        logger.debug('OpenAI request payload', {
-          provider: 'openai',
-          payload: JSON.stringify(requestPayload, null, 2),
-        });
+        // Log request with pretty formatting
+        logProviderRequest('openai', requestPayload as unknown as Record<string, unknown>);
 
         const response = (await this.getOpenAIClient().chat.completions.create(requestPayload, {
           signal,
         })) as OpenAI.Chat.ChatCompletion;
 
-        // Log full response for debugging
-        logger.debug('OpenAI response payload', {
-          provider: 'openai',
-          response: JSON.stringify(response, null, 2),
-        });
+        // Log response with pretty formatting
+        logProviderResponse('openai', response);
 
         const choice = response.choices[0];
         if (!choice.message) {
@@ -404,19 +390,9 @@ export class OpenAIProvider extends AIProvider {
       async () => {
         const requestPayload = this._createRequestPayload(messages, tools, model, true);
 
-        logger.debug('Sending streaming request to OpenAI', {
-          provider: 'openai',
-          model: requestPayload.model,
-          messageCount: requestPayload.messages.length,
-          systemPromptLength: requestPayload.messages[0].content?.length,
-          toolCount: requestPayload.tools?.length,
-          toolNames: requestPayload.tools?.map((t) => t.function.name),
-        });
-
-        // Log full request payload for debugging
-        logger.debug('OpenAI streaming request payload', {
-          provider: 'openai',
-          payload: JSON.stringify(requestPayload, null, 2),
+        // Log streaming request with pretty formatting
+        logProviderRequest('openai', requestPayload as unknown as Record<string, unknown>, {
+          streaming: true,
         });
 
         try {
