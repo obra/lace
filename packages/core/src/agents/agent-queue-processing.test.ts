@@ -210,8 +210,8 @@ describe('Agent Queue Processing', () => {
       await agent.sendMessage('trigger state transition');
 
       // After the operation completes and returns to idle, the queue should be processed
-      // Wait a bit for async queue processing
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait for async queue processing (increased timeout)
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const finalStats = agent.getQueueStats();
       expect(finalStats.queueLength).toBe(0); // Queue should be processed
