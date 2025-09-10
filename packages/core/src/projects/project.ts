@@ -437,6 +437,9 @@ export class Project {
       throw new Error(`MCP server '${serverId}' already exists in project`);
     }
 
+    // Save server configuration to project config
+    MCPConfigLoader.updateServerConfig(serverId, serverConfig, this.getWorkingDirectory());
+
     // Start async tool discovery (non-blocking)
     void ToolCatalog.discoverAndCacheTools(
       serverId,
