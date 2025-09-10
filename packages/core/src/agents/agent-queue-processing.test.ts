@@ -18,7 +18,7 @@ describe('Agent Queue Processing', () => {
   const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let mockProvider: TestProvider;
-  let mockToolExecutor: ToolExecutor;
+  let toolExecutor: ToolExecutor;
   let threadManager: ThreadManager;
   let testThreadId: string;
 
@@ -28,18 +28,15 @@ describe('Agent Queue Processing', () => {
       mockResponse: 'mock response',
     });
 
-    mockToolExecutor = {
-      registerAllAvailableTools: vi.fn(),
-      getRegisteredTools: vi.fn().mockReturnValue([]),
-      close: vi.fn().mockResolvedValue(undefined),
-    } as unknown as ToolExecutor;
+    // Use real ToolExecutor instead of mock
+    toolExecutor = new ToolExecutor();
 
     // Use real ThreadManager
     threadManager = new ThreadManager();
     testThreadId = threadManager.createThread();
 
     agent = new Agent({
-      toolExecutor: mockToolExecutor,
+      toolExecutor: toolExecutor,
       threadManager: threadManager,
       threadId: testThreadId,
       tools: [],
