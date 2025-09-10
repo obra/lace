@@ -8,10 +8,10 @@ export default defineConfig({
   testMatch: '**/*.e2e.ts',
 
   // Enable parallel execution - this was previously disabled
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 4 : 4, // Use multiple workers instead of 1
+  workers: process.env.CI ? 1 : 1,
 
   // Increase timeout for CI where server startup is slower
   timeout: process.env.CI ? 120000 : 60000,
