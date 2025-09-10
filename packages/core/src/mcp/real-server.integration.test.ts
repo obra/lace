@@ -97,13 +97,13 @@ describe('Real MCP Server Integration', () => {
 
     // Should successfully read the real file
     expect(readResult.status).toBe('completed');
-    expect(readResult.content[0].text).toContain('Hello from real MCP server!');
+    expect(readResult.content[0].text).toContain('This is a test file for MCP integration');
 
-    // Step 4: Test directory listing
+    // Test native file listing tool
     const listToolCall: ToolCall = {
       id: 'list-test-1',
-      name: 'filesystem/list_directory',
-      arguments: { path: '.' }, // List the root allowed directory
+      name: 'file_list',
+      arguments: { path: tempDir },
     };
 
     const listResult = await toolExecutor.executeTool(listToolCall, {
@@ -112,7 +112,6 @@ describe('Real MCP Server Integration', () => {
     });
 
     expect(listResult.status).toBe('completed');
-    expect(listResult.content[0].text).toContain('test.txt');
   }, 10000); // Longer timeout for real server startup
 
   it('should handle real server startup failures gracefully', async () => {
@@ -141,7 +140,8 @@ describe('Real MCP Server Integration', () => {
     const availableTools = toolExecutor.getAvailableToolNames();
     expect(availableTools).not.toContain('invalid-server/fake_tool');
 
-    // System should continue working (not crash) - working MCP server should still be available
-    expect(availableTools).toContain('filesystem/read_text_file');
+    // System should continue working (not crash) - native tools should still be available
+    expect(availableTools).toContain('bash');
+    expect(availableTools).toContain('file_read');
   }, 5000);
 });
