@@ -15,7 +15,6 @@ describe('MCP Types', () => {
       command: 'node',
       args: ['server.js'],
       env: { NODE_ENV: 'development' },
-      cwd: '/path/to/server',
       enabled: true,
       tools: {
         read_file: 'allow',

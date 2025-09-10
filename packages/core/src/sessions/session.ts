@@ -1155,10 +1155,15 @@ Use your task_add_note tool to record important notes as you work and your task_
       const startPromises = Object.entries(mcpServers)
         .filter(([_, config]) => config.enabled)
         .map(([serverId, config]) =>
-          this._mcpServerManager.startServer(serverId, config).catch((error) => {
-            // Continue with server disabled on failure (graceful degradation)
-            logger.warn(`MCP server ${serverId} failed to start, continuing disabled:`, error);
-          })
+          this._mcpServerManager
+            .startServer(serverId, {
+              ...config,
+              cwd: this.getWorkingDirectory(), // Always use session's working directory
+            })
+            .catch((error) => {
+              // Continue with server disabled on failure (graceful degradation)
+              logger.warn(`MCP server ${serverId} failed to start, continuing disabled:`, error);
+            })
         );
 
       await Promise.allSettled(startPromises);
@@ -1207,7 +1212,10 @@ Use your task_add_note tool to record important notes as you work and your task_
         case 'updated':
           await this._mcpServerManager.stopServer(serverId);
           if (serverConfig?.enabled) {
-            await this._mcpServerManager.startServer(serverId, serverConfig);
+            await this._mcpServerManager.startServer(serverId, {
+              ...serverConfig,
+              cwd: this.getWorkingDirectory(), // Always use session's working directory
+            });
             logger.info(`Restarted MCP server ${serverId} with new configuration`);
           }
           // Refresh tools in all ToolExecutors
@@ -1244,7 +1252,10 @@ Use your task_add_note tool to record important notes as you work and your task_
     if (!serverConfig) {
       throw new Error(`MCP server '${serverId}' not found in project configuration`);
     }
-    await this._mcpServerManager.startServer(serverId, serverConfig);
+    await this._mcpServerManager.startServer(serverId, {
+      ...serverConfig,
+      cwd: this.getWorkingDirectory(), // Always use session's working directory
+    });
     await this.refreshMCPToolsInExecutors();
   }
 
@@ -1289,7 +1300,6 @@ Use your task_add_note tool to record important notes as you work and your task_
   ): void {
     this._threadManager.addEvent({
       type: 'MCP_CONFIG_CHANGED',
-      threadId: this.getId(),
       data: { serverId, action, serverConfig },
       context: {
         sessionId: this.getId(),

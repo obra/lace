@@ -60,12 +60,14 @@ describe('MCPServerManager', () => {
       command: 'node',
       args: ['server.js'],
       env: { NODE_ENV: 'test' },
-      cwd: '/test/dir',
       enabled: true,
       tools: {},
     };
 
-    await manager.startServer('test', config);
+    // Pass cwd directly as part of the extended config (simulating what session does)
+    await manager.startServer('test', { ...config, cwd: '/test/dir' } as MCPServerConfig & {
+      cwd?: string;
+    });
 
     expect(StdioClientTransport).toHaveBeenCalledWith({
       command: 'node',

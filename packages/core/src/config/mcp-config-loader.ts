@@ -20,7 +20,6 @@ const MCPServerConfigSchema = z.object({
   command: z.string().min(1, 'Command is required'),
   args: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
-  cwd: z.string().optional(),
   enabled: z.boolean(),
   tools: z.record(z.string(), ToolPolicySchema),
   // Tool discovery cache fields

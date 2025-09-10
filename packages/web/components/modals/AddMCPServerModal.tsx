@@ -26,33 +26,8 @@ interface NewServerData {
   command: string;
   args: string;
   env: string;
-  cwd: string;
   enabled: boolean;
 }
-
-const commonServers = [
-  {
-    id: 'filesystem',
-    label: 'Filesystem Server',
-    command: 'npx',
-    args: '@modelcontextprotocol/server-filesystem',
-    description: 'Read and write files',
-  },
-  {
-    id: 'git',
-    label: 'Git Server',
-    command: 'npx',
-    args: '@modelcontextprotocol/server-git',
-    description: 'Git operations',
-  },
-  {
-    id: 'sqlite',
-    label: 'SQLite Server',
-    command: 'npx',
-    args: '@modelcontextprotocol/server-sqlite',
-    description: 'Database operations',
-  },
-];
 
 export function AddMCPServerModal({
   isOpen,
@@ -67,12 +42,10 @@ export function AddMCPServerModal({
     command: '',
     args: '',
     env: '',
-    cwd: '',
     enabled: true,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [selectedPreset, setSelectedPreset] = useState<string>('');
   const idInputRef = useRef<HTMLInputElement>(null);
 
   // Focus the ID input when modal opens
@@ -93,11 +66,9 @@ export function AddMCPServerModal({
         command: '',
         args: '',
         env: '',
-        cwd: '',
         enabled: true,
       });
       setErrors({});
-      setSelectedPreset('');
     } else if (initialData && isEditMode) {
       // Populate form with existing data for editing
       const { config } = initialData;
@@ -110,7 +81,6 @@ export function AddMCPServerModal({
               .map(([k, v]) => `${k}=${v}`)
               .join('\n')
           : '',
-        cwd: config.cwd || '',
         enabled: config.enabled,
       });
     }
@@ -121,19 +91,6 @@ export function AddMCPServerModal({
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: '' }));
-    }
-  };
-
-  const handlePresetSelect = (presetId: string) => {
-    const preset = commonServers.find((s) => s.id === presetId);
-    if (preset) {
-      setServerData((prev) => ({
-        ...prev,
-        id: preset.id,
-        command: preset.command,
-        args: preset.args,
-      }));
-      setSelectedPreset(presetId);
     }
   };
 
@@ -177,7 +134,6 @@ export function AddMCPServerModal({
       command: serverData.command.trim(),
       args,
       env,
-      cwd: serverData.cwd.trim() || undefined,
       enabled: serverData.enabled,
       tools: {}, // Start with empty tools, discovery will populate
     };
@@ -194,32 +150,6 @@ export function AddMCPServerModal({
       className="max-w-2xl z-[60]"
     >
       <div className="space-y-6" onClick={(e) => e.stopPropagation()}>
-        {/* Common Servers */}
-        <div>
-          <label className="text-sm font-medium mb-3 block">Quick Setup</label>
-          <div className="grid grid-cols-1 gap-3">
-            {commonServers.map((server) => (
-              <button
-                key={server.id}
-                type="button"
-                className={`p-4 text-left rounded-lg border transition-colors ${
-                  selectedPreset === server.id
-                    ? 'border-primary bg-primary/5'
-                    : 'border-base-300 hover:border-base-400'
-                }`}
-                onClick={() => handlePresetSelect(server.id)}
-              >
-                <div className="font-medium">{server.label}</div>
-                <div className="text-sm text-base-content/70 mt-1">{server.description}</div>
-                <code className="text-xs bg-base-200 px-2 py-1 rounded mt-2 inline-block">
-                  {server.command} {server.args}
-                </code>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Custom Configuration */}
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium mb-2 block">Server ID</label>
@@ -277,20 +207,6 @@ export function AddMCPServerModal({
             />
             <div className="text-xs text-base-content/60 mt-1">
               One per line in KEY=value format
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium mb-2 block">Working Directory</label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              placeholder="/path/to/working/directory"
-              value={serverData.cwd}
-              onChange={(e) => handleInputChange('cwd', e.target.value)}
-            />
-            <div className="text-xs text-base-content/60 mt-1">
-              Optional: Directory to run the server from
             </div>
           </div>
 

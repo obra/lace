@@ -18,7 +18,7 @@ export class MCPServerManager extends EventEmitter {
   /**
    * Start a server if it's not already running
    */
-  async startServer(serverId: string, config: MCPServerConfig): Promise<void> {
+  async startServer(serverId: string, config: MCPServerConfig & { cwd?: string }): Promise<void> {
     const existing = this.servers.get(serverId);
     if (existing && (existing.status === 'running' || existing.status === 'starting')) {
       return; // Already running or starting

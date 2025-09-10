@@ -15,7 +15,6 @@ const UpdateServerSchema = z.object({
   command: z.string().min(1).optional(),
   args: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
-  cwd: z.string().optional(),
   enabled: z.boolean().optional(),
   tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
 });
@@ -24,7 +23,6 @@ const CreateServerSchema = z.object({
   command: z.string().min(1, 'Command is required'),
   args: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
-  cwd: z.string().optional(),
   enabled: z.boolean().default(true),
   tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).default({}),
 });

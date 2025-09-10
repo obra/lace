@@ -92,7 +92,6 @@ export {
   faStream,
   faCircle,
   faPause,
-  faPlay,
   faFilter,
 } from '@fortawesome/free-solid-svg-icons';
 

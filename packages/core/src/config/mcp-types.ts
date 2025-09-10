@@ -16,7 +16,6 @@ export interface MCPServerConfig {
   command: string; // Executable name
   args?: string[]; // Command arguments
   env?: Record<string, string>; // Environment variables
-  cwd?: string; // Working directory
   enabled: boolean;
   tools: Record<string, ToolPolicy>; // Tool name -> approval policy
 

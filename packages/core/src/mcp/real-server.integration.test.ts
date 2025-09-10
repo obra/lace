@@ -9,7 +9,6 @@ import { mkdtempSync } from 'fs';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import type { ToolCall } from '~/tools/types';
 
 describe('Real MCP Server Integration', () => {
   void useTempLaceDir();
