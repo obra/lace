@@ -54,29 +54,11 @@ export function AgentsSection({
 
   const getAgentTasks = (agentId: ThreadId) => {
     if (!taskContext?.taskManager?.tasks) {
-      console.log(`[AgentsSection] No tasks available for agent ${agentId}`, {
-        hasTaskContext: !!taskContext,
-        hasTaskManager: !!taskContext?.taskManager,
-        hasTasks: !!taskContext?.taskManager?.tasks,
-      });
       return { inProgress: null, other: [] };
     }
 
     const allTasks = taskContext.taskManager.tasks;
     const agentTasks = allTasks.filter((task) => task.assignedTo === agentId);
-
-    console.log(`[AgentsSection] Task filtering for agent ${agentId}`, {
-      agentId,
-      totalTasks: allTasks.length,
-      tasksWithAssignedTo: allTasks.filter((t) => t.assignedTo).length,
-      agentTasksFound: agentTasks.length,
-      allTaskAssignees: allTasks.map((t) => ({ id: t.id, assignedTo: t.assignedTo })),
-      matchingTasks: agentTasks.map((t) => ({
-        id: t.id,
-        title: t.title,
-        assignedTo: t.assignedTo,
-      })),
-    });
 
     const inProgress = agentTasks.find((task) => task.status === 'in_progress') || null;
     const other = agentTasks.filter((task) => task.status !== 'in_progress');
