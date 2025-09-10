@@ -183,6 +183,9 @@ describe('Agent Tool Abort Functionality', () => {
     // Wait for the message processing to complete/abort
     await messagePromise;
 
+    // Give events time to process
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
     // Check that tool was marked as cancelled
     expect(toolCompletedCount).toBe(1);
     expect(toolResults[0].status).toBe('aborted');
@@ -243,6 +246,9 @@ describe('Agent Tool Abort Functionality', () => {
     expect(aborted).toBe(true);
 
     await messagePromise;
+
+    // Give events time to process
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // All tools should be cancelled
     expect(toolResults.length).toBe(3);
@@ -363,6 +369,9 @@ describe('Agent Tool Abort Functionality', () => {
 
     await messagePromise;
 
+    // Give events time to process
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
     // Check results
     expect(toolResults.size).toBe(2);
 
@@ -430,6 +439,9 @@ describe('Agent Tool Abort Functionality', () => {
     await new Promise((resolve) => setTimeout(resolve, 200));
     agent.abort();
     await firstMessagePromise;
+
+    // Give events time to process
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     expect(firstResult).not.toBeNull();
     expect(firstResult!.status).toBe('aborted');

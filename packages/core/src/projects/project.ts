@@ -438,7 +438,13 @@ export class Project {
     }
 
     // Start async tool discovery (non-blocking)
-    await ToolCatalog.discoverAndCacheTools(serverId, serverConfig, this.getWorkingDirectory());
+    void ToolCatalog.discoverAndCacheTools(
+      serverId,
+      serverConfig,
+      this.getWorkingDirectory()
+    ).catch((error) => {
+      logger.warn(`Tool discovery failed for MCP server ${serverId}:`, error);
+    });
 
     // Notify sessions immediately
     this.notifySessionsMCPChange(serverId, 'created', serverConfig);

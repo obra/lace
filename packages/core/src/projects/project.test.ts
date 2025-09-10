@@ -666,7 +666,7 @@ describe('Project', () => {
     it('should not block on tool discovery', async () => {
       const { ToolCatalog } = await import('~/tools/tool-catalog');
 
-      let resolveDiscovery: () => void;
+      let resolveDiscovery: (() => void) | undefined;
       const discoveryPromise = new Promise<void>((resolve) => {
         resolveDiscovery = resolve;
       });
@@ -688,7 +688,9 @@ describe('Project', () => {
       await addServerPromise;
 
       // Now complete the discovery
-      resolveDiscovery!();
+      if (resolveDiscovery) {
+        resolveDiscovery();
+      }
       await discoveryPromise;
     });
 
