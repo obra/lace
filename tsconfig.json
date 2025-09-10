@@ -15,6 +15,6 @@
       "~/*": ["./*"]
     }
   },
-  "include": ["packages/core/src/**/*", "src/**/*"],
-  "exclude": ["node_modules", "dist", "knip.config.ts", "**/*.d.ts", "production-build.test.ts"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "packages", "knip.config.ts", "**/*.d.ts", "production-build.test.ts"]
 }
