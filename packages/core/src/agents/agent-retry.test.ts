@@ -179,22 +179,20 @@ describe('Agent Retry Functionality', () => {
   describe('Retry Event Forwarding', () => {
     let agent: Agent;
     let mockProvider: MockRetryProvider;
-    let mockToolExecutor: ToolExecutor;
+    let toolExecutor: ToolExecutor;
     let mockThreadManager: ThreadManager;
 
     beforeEach(async () => {
       mockProvider = new MockRetryProvider();
 
-      mockToolExecutor = {
-        executeTool: vi.fn(),
-        getApprovalDecision: vi.fn(),
-      } as unknown as ToolExecutor;
+      // Use real ToolExecutor instead of mock
+      toolExecutor = new ToolExecutor();
 
       mockThreadManager = createMockThreadManager();
       const testThreadId = 'lace_20250723_abc123';
 
       agent = new Agent({
-        toolExecutor: mockToolExecutor,
+        toolExecutor: toolExecutor,
         threadManager: mockThreadManager,
         threadId: testThreadId,
         tools: [],
