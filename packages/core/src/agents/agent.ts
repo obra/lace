@@ -538,11 +538,19 @@ export class Agent extends EventEmitter {
 
   abort(): boolean {
     let aborted = false;
+    const originalState = this._state;
 
     // Abort LLM streaming/response generation
-    if (this._abortController && this._currentTurnMetrics) {
-      this._abortController.abort();
+    // Handle the case where we have turn metrics but no abort controller yet (race condition)
+    if (this._currentTurnMetrics) {
+      // Clear progress timer regardless of abort controller state
       this._clearProgressTimer();
+
+      // If we have an abort controller, signal abort
+      if (this._abortController) {
+        this._abortController.abort();
+        this._abortController = null;
+      }
 
       // Emit abort event with current metrics
       this.emit('turn_aborted', {
@@ -551,6 +559,11 @@ export class Agent extends EventEmitter {
       });
 
       this._currentTurnMetrics = null;
+      aborted = true;
+    } else if (this._abortController) {
+      // Edge case: abort controller exists without turn metrics
+      this._abortController.abort();
+      this._clearProgressTimer();
       this._abortController = null;
       aborted = true;
     }
@@ -566,6 +579,12 @@ export class Agent extends EventEmitter {
       this._activeToolCalls.clear();
       this._toolAbortController = null;
       // Don't reset _pendingToolCount here - let the tools complete normally
+      aborted = true;
+    }
+
+    // If we were in any active state (not idle), consider the abort successful
+    // This handles cases where the operation completes between the abort call and this check
+    if (!aborted && originalState !== 'idle') {
       aborted = true;
     }
 
@@ -659,6 +678,14 @@ export class Agent extends EventEmitter {
 
   // Private implementation methods
   private async _processConversation(): Promise<void> {
+    // Check if we were aborted before starting conversation processing
+    if (this._abortedSinceLastTurn) {
+      logger.debug('AGENT: Conversation processing skipped - agent was aborted', {
+        threadId: this._threadId,
+      });
+      return;
+    }
+
     this._abortController = new AbortController();
 
     try {
