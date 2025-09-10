@@ -83,11 +83,11 @@ describe('Real MCP Server Integration', () => {
     expect(availableToolNames).toContain('file_read');
     expect(availableToolNames).toContain('file_write');
 
-    // Step 2: Test real tool execution - read the test file we created
+    // Test native tool execution - read the test file we created
     const readToolCall: ToolCall = {
       id: 'read-test-1',
-      name: 'filesystem/read_text_file',
-      arguments: { path: 'test.txt' }, // Relative to the server's allowed directory
+      name: 'file_read',
+      arguments: { path: testDataFile }, // Full path to test file
     };
 
     const readResult = await toolExecutor.executeTool(readToolCall, {
