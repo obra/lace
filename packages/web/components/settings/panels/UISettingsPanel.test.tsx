@@ -10,14 +10,14 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { expect, describe, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { UISettingsPanel } from './UISettingsPanel';
-import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { SettingsProvider } from '@/components/providers/SettingsProvider';
 
 describe('UISettingsPanel', () => {
   it('renders theme selector', () => {
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <UISettingsPanel />
-      </ThemeProvider>
+      </SettingsProvider>
     );
     expect(screen.getByText('UI Settings')).toBeInTheDocument();
     expect(screen.getByText('Theme')).toBeInTheDocument();
@@ -28,9 +28,9 @@ describe('UISettingsPanel', () => {
 
   it('renders with current theme selected', () => {
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <UISettingsPanel currentTheme="light" />
-      </ThemeProvider>
+      </SettingsProvider>
     );
     expect(screen.getByText('UI Settings')).toBeInTheDocument();
     // Check that light appears in the current theme indicator and as button
@@ -44,9 +44,9 @@ describe('UISettingsPanel', () => {
   it('calls onThemeChange when theme selected', () => {
     const mockOnThemeChange = vi.fn();
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <UISettingsPanel onThemeChange={mockOnThemeChange} />
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     // Click on the light theme button (not the header text)
@@ -59,9 +59,9 @@ describe('UISettingsPanel', () => {
 
   it('displays theme selector properly', () => {
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <UISettingsPanel />
-      </ThemeProvider>
+      </SettingsProvider>
     );
     // ThemeSelector handles its own labeling and description
     expect(screen.getByText('Theme')).toBeInTheDocument();
@@ -70,9 +70,9 @@ describe('UISettingsPanel', () => {
 
   it('renders all available themes from ThemeSelector', () => {
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <UISettingsPanel />
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     // Check for some of the theme names from ThemeSelector (as buttons)
@@ -81,9 +81,9 @@ describe('UISettingsPanel', () => {
 
   it('integrates properly with SettingsPanel structure', () => {
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <UISettingsPanel />
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     // Should have the panel title as heading
@@ -92,9 +92,9 @@ describe('UISettingsPanel', () => {
 
   it('uses SettingField for consistent layout', () => {
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <UISettingsPanel />
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     // The Theme label should be present from ThemeSelector

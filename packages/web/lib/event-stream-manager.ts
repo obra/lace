@@ -136,7 +136,6 @@ export class EventStreamManager {
       const e = event as TaskCreatedEvent;
       this.broadcast({
         type: 'TASK_CREATED',
-        threadId: 'task-manager',
         data: { taskId: e.task.id, ...e },
         context: { projectId, sessionId, taskId: e.task.id },
         transient: true,
@@ -147,7 +146,6 @@ export class EventStreamManager {
       const e = event as TaskUpdatedEvent;
       this.broadcast({
         type: 'TASK_UPDATED',
-        threadId: 'task-manager',
         data: { taskId: e.task?.id || '', ...e },
         context: { projectId, sessionId, taskId: e.task?.id },
         transient: true,
@@ -158,7 +156,6 @@ export class EventStreamManager {
       const e = event as TaskDeletedEvent;
       this.broadcast({
         type: 'TASK_DELETED',
-        threadId: 'task-manager',
         data: { ...e },
         context: { projectId, sessionId, taskId: e.taskId },
         transient: true,
@@ -169,7 +166,6 @@ export class EventStreamManager {
       const e = event as TaskNoteAddedEvent;
       this.broadcast({
         type: 'TASK_NOTE_ADDED',
-        threadId: 'task-manager',
         data: { taskId: e.task?.id || '', ...e },
         context: { projectId, sessionId, taskId: e.task?.id },
         transient: true,
@@ -180,7 +176,6 @@ export class EventStreamManager {
       const e = event as AgentSpawnedEvent;
       this.broadcast({
         type: 'AGENT_SPAWNED',
-        threadId: e.agentThreadId,
         data: {
           type: e.type,
           taskId: e.taskId,
@@ -190,7 +185,7 @@ export class EventStreamManager {
           context: e.context,
           timestamp: e.timestamp,
         },
-        context: { projectId, sessionId, taskId: e.taskId },
+        context: { projectId, sessionId, taskId: e.taskId, threadId: e.agentThreadId },
         transient: true,
       });
     });
@@ -237,7 +232,6 @@ export class EventStreamManager {
 
       this.broadcast({
         type: 'AGENT_ERROR',
-        threadId: agentThreadId,
         timestamp: new Date(),
         data: {
           errorType: context.errorType as ErrorType,
@@ -261,7 +255,7 @@ export class EventStreamManager {
         context: {
           projectId,
           sessionId,
-          agentId: agentThreadId,
+          threadId: agentThreadId,
         },
       });
     });
@@ -319,6 +313,18 @@ export class EventStreamManager {
 
     this.connections.set(connectionId, connection);
 
+    // Log new connection
+    logger.info('[EVENT_STREAM] New connection established', {
+      connectionId,
+      totalConnections: this.connections.size,
+      subscription: {
+        projects: subscription.projects?.length || 0,
+        sessions: subscription.sessions?.length || 0,
+        threads: subscription.threads?.length || 0,
+        global: subscription.global,
+      },
+    });
+
     // Start keepalive if this is the first connection
     if (this.connections.size === 1) {
       this.startKeepAlive();
@@ -328,10 +334,12 @@ export class EventStreamManager {
     this.sendToConnection(connection, {
       id: this.generateEventId(),
       timestamp: new Date(),
-      threadId: 'system',
       type: 'LOCAL_SYSTEM_MESSAGE',
       data: 'Ready!',
       transient: true,
+      context: {
+        systemMessage: true,
+      },
     });
 
     return connectionId;
@@ -341,6 +349,15 @@ export class EventStreamManager {
   removeConnection(connectionId: string): void {
     const connection = this.connections.get(connectionId);
     if (connection) {
+      const connectionDuration = Date.now() - connection.connectedAt.getTime();
+
+      logger.info('[EVENT_STREAM] Removing connection', {
+        connectionId,
+        durationMs: connectionDuration,
+        remainingConnections: this.connections.size - 1,
+        lastEventId: connection.lastEventId,
+      });
+
       try {
         // Check if controller is still open before trying to close
         if (connection.controller.desiredSize !== null) {
@@ -353,6 +370,8 @@ export class EventStreamManager {
         }
       }
       this.connections.delete(connectionId);
+    } else {
+      logger.debug('[EVENT_STREAM] Attempted to remove non-existent connection', { connectionId });
     }
   }
 
@@ -365,10 +384,22 @@ export class EventStreamManager {
       timestamp: event.timestamp || new Date(),
     };
 
-    // Debug logging for event broadcasting
-    if (process.env.NODE_ENV === 'development') {
-      // Development debug info
-    }
+    // Comprehensive trace logging for event broadcasting
+    logger.debug('[EVENT_STREAM] Broadcasting event', {
+      eventId: fullEvent.id,
+      type: fullEvent.type,
+      contextThreadId: fullEvent.context?.threadId,
+      dataSize:
+        typeof fullEvent.data === 'string'
+          ? fullEvent.data.length
+          : JSON.stringify(fullEvent.data || {}).length,
+      dataPreview: this.truncateEventData(fullEvent.data),
+      contextProjectId: fullEvent.context?.projectId,
+      contextSessionId: fullEvent.context?.sessionId,
+      contextTaskId: fullEvent.context?.taskId,
+      connectionCount: this.connections.size,
+      timestamp: fullEvent.timestamp,
+    });
 
     // Optional: Add debug logging for error events
     if (fullEvent.type === 'AGENT_ERROR') {
@@ -386,14 +417,14 @@ export class EventStreamManager {
       ) {
         const errorData = data as AgentErrorEventData;
         logger.debug('[EVENT_STREAM] Broadcasting agent error event', {
-          threadId: fullEvent.threadId,
+          contextThreadId: fullEvent.context?.threadId,
           errorType: errorData.errorType,
           phase: errorData.context.phase,
           isRetryable: errorData.isRetryable,
         });
       } else {
         logger.debug('[EVENT_STREAM] Broadcasting agent error event with invalid data shape', {
-          threadId: fullEvent.threadId,
+          contextThreadId: fullEvent.context?.threadId,
           rawData: data,
         });
       }
@@ -422,9 +453,10 @@ export class EventStreamManager {
   private shouldSendToConnection(connection: ClientConnection, event: LaceEvent): boolean {
     const { subscription } = connection;
 
-    // Thread filtering
+    // Thread filtering - use context.threadId instead of top-level threadId
     if (subscription.threads && subscription.threads.length > 0) {
-      if (!subscription.threads.includes(event.threadId)) {
+      const eventThreadId = event.context?.threadId;
+      if (!eventThreadId || !subscription.threads.includes(eventThreadId)) {
         return false;
       }
     }
@@ -458,10 +490,20 @@ export class EventStreamManager {
     const eventData = `id: ${event.id}\ndata: ${stringify(event)}\n\n`;
     const chunk = this.encoder.encode(eventData);
 
-    // Debug logging for individual sends
-    if (process.env.NODE_ENV === 'development') {
-      // Development debug info
-    }
+    // Trace logging for individual sends
+    logger.debug('[EVENT_STREAM] Sending event to connection', {
+      connectionId: connection.id,
+      eventId: event.id,
+      eventType: event.type,
+      payloadSize: chunk.length,
+      connectedAt: connection.connectedAt,
+      subscription: {
+        projects: connection.subscription.projects?.length || 0,
+        sessions: connection.subscription.sessions?.length || 0,
+        threads: connection.subscription.threads?.length || 0,
+        global: connection.subscription.global,
+      },
+    });
 
     try {
       connection.controller.enqueue(chunk);
@@ -478,6 +520,34 @@ export class EventStreamManager {
   // Generate unique event IDs
   private generateEventId(): string {
     return `${Date.now()}-${++this.eventIdCounter}`;
+  }
+
+  // Helper to truncate event data for logging
+  private truncateEventData(data: unknown): string {
+    if (data === undefined || data === null) {
+      return 'null';
+    }
+
+    const maxLength = 200;
+    let dataStr: string;
+
+    if (typeof data === 'string') {
+      dataStr = data;
+    } else if (typeof data === 'object') {
+      try {
+        dataStr = JSON.stringify(data);
+      } catch (_error) {
+        dataStr = '[Circular or non-serializable object]';
+      }
+    } else {
+      dataStr = String(data);
+    }
+
+    if (dataStr.length <= maxLength) {
+      return dataStr;
+    }
+
+    return dataStr.substring(0, maxLength) + '...[truncated]';
   }
 
   // Get connection stats for debugging

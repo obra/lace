@@ -257,7 +257,6 @@ export async function action({ request, params }: Route.ActionArgs) {
         const eventStreamManager = EventStreamManager.getInstance();
         eventStreamManager.broadcast({
           type: 'AGENT_SUMMARY_UPDATED',
-          threadId: agentId,
           timestamp: new Date(),
           data: {
             summary,
@@ -268,7 +267,7 @@ export async function action({ request, params }: Route.ActionArgs) {
           context: {
             projectId: session.getProjectId(),
             sessionId: sessionId,
-            agentId: agentId,
+            threadId: agentId,
           },
         });
 
@@ -309,7 +308,6 @@ export async function action({ request, params }: Route.ActionArgs) {
         const eventStreamManager = EventStreamManager.getInstance();
         eventStreamManager.broadcast({
           type: 'AGENT_ERROR',
-          threadId: agentId,
           timestamp: new Date(),
           data: {
             errorType: errorClassification.errorType,
@@ -328,7 +326,7 @@ export async function action({ request, params }: Route.ActionArgs) {
           context: {
             projectId: session.getProjectId(),
             sessionId: sessionId,
-            agentId: agentId,
+            threadId: agentId,
           },
         });
       }

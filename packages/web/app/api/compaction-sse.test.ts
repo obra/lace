@@ -52,7 +52,6 @@ describe('Compaction SSE Events', () => {
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'COMPACTION_START',
-        threadId: undefined,
         transient: true,
         data: expect.objectContaining({
           auto: true,
@@ -82,7 +81,6 @@ describe('Compaction SSE Events', () => {
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'COMPACTION_COMPLETE',
-        threadId: undefined,
         transient: true,
         data: expect.objectContaining({
           success: true,
@@ -111,7 +109,6 @@ describe('Compaction SSE Events', () => {
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'COMPACTION_START',
-        threadId: undefined,
         transient: true,
         data: expect.objectContaining({
           auto: false,
@@ -133,7 +130,6 @@ describe('Compaction SSE Events', () => {
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'COMPACTION_COMPLETE',
-        threadId: undefined,
         transient: true,
         data: expect.objectContaining({
           success: true,
@@ -162,7 +158,6 @@ describe('Compaction SSE Events', () => {
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'COMPACTION_START',
-        threadId: undefined,
         transient: true,
         data: expect.objectContaining({
           auto: true,
@@ -185,7 +180,6 @@ describe('Compaction SSE Events', () => {
     expect(broadcastSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'COMPACTION_START',
-        threadId: undefined,
         transient: true,
         data: expect.objectContaining({
           auto: false,

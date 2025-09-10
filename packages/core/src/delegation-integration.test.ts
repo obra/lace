@@ -165,7 +165,7 @@ describe('Delegation Integration Tests', () => {
     threadManager.createThread(delegate1);
     threadManager.addEvent({
       type: 'AGENT_MESSAGE',
-      threadId: delegate1,
+      context: { threadId: delegate1 },
       data: { content: 'test' },
     });
 
@@ -177,7 +177,7 @@ describe('Delegation Integration Tests', () => {
     threadManager.createThread(delegate2);
     threadManager.addEvent({
       type: 'AGENT_MESSAGE',
-      threadId: delegate2,
+      context: { threadId: delegate2 },
       data: { content: 'test' },
     });
 
@@ -200,17 +200,17 @@ describe('Delegation Integration Tests', () => {
     // Add events to each thread
     threadManager.addEvent({
       type: 'USER_MESSAGE',
-      threadId: mainThreadId,
+      context: { threadId: mainThreadId },
       data: 'Main thread message',
     });
     threadManager.addEvent({
       type: 'AGENT_MESSAGE',
-      threadId: delegate1,
+      context: { threadId: delegate1 },
       data: { content: 'Delegate 1 message' },
     });
     threadManager.addEvent({
       type: 'AGENT_MESSAGE',
-      threadId: delegate2,
+      context: { threadId: delegate2 },
       data: { content: 'Delegate 2 message' },
     });
 
@@ -250,7 +250,7 @@ describe('Delegation Integration Tests', () => {
     threadManager.createThread(delegate1);
     threadManager.addEvent({
       type: 'AGENT_MESSAGE',
-      threadId: delegate1,
+      context: { threadId: delegate1 },
       data: { content: 'test1' },
     });
 
@@ -259,7 +259,7 @@ describe('Delegation Integration Tests', () => {
     threadManager.createThread(delegate2);
     threadManager.addEvent({
       type: 'AGENT_MESSAGE',
-      threadId: delegate2,
+      context: { threadId: delegate2 },
       data: { content: 'test2' },
     });
 

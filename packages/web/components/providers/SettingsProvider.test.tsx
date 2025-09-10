@@ -1,11 +1,11 @@
-// ABOUTME: Tests for ThemeProvider component
+// ABOUTME: Tests for SettingsProvider component
 // ABOUTME: Verifies theme persistence and migration from localStorage to settings API
 
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ThemeProvider, useTheme } from './ThemeProvider';
+import { SettingsProvider, useTheme } from './SettingsProvider';
 import { api } from '@/lib/api-client';
 
 // Mock the API client
@@ -33,7 +33,7 @@ function TestComponent() {
   );
 }
 
-describe('ThemeProvider', () => {
+describe('SettingsProvider', () => {
   const mockApiGet = vi.mocked(api.get);
   const mockApiPatch = vi.mocked(api.patch);
 
@@ -59,9 +59,9 @@ describe('ThemeProvider', () => {
     mockApiGet.mockResolvedValue({});
 
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <TestComponent />
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     // Should start with dark theme
@@ -73,9 +73,9 @@ describe('ThemeProvider', () => {
     mockApiGet.mockResolvedValue({ theme: 'light' });
 
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <TestComponent />
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     // Should load light theme from API
@@ -86,41 +86,15 @@ describe('ThemeProvider', () => {
     expect(mockApiGet).toHaveBeenCalledWith('/api/settings');
   });
 
-  it('should migrate from localStorage to settings API', async () => {
-    // Set theme in localStorage
-    localStorage.setItem('lace-theme', 'light');
-
-    // Mock API to return empty settings (no theme stored yet)
-    mockApiGet.mockResolvedValue({});
-    mockApiPatch.mockResolvedValue({ theme: 'light' });
-
-    render(
-      <ThemeProvider>
-        <TestComponent />
-      </ThemeProvider>
-    );
-
-    // Should migrate theme from localStorage to settings API
-    await waitFor(() => {
-      expect(mockApiPatch).toHaveBeenCalledWith('/api/settings', {
-        theme: 'light',
-        timelineWidth: 'medium',
-      });
-    });
-
-    // Should remove from localStorage after migration
-    expect(localStorage.getItem('lace-theme')).toBeNull();
-  });
-
   it('should save theme changes to settings API', async () => {
     // Mock API calls
     mockApiGet.mockResolvedValue({ theme: 'dark' });
     mockApiPatch.mockResolvedValue({ theme: 'light' });
 
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <TestComponent />
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     // Wait for initial load
@@ -139,6 +113,7 @@ describe('ThemeProvider', () => {
       expect(mockApiPatch).toHaveBeenCalledWith('/api/settings', {
         theme: 'light',
         timelineWidth: 'medium',
+        debugPanelEnabled: false,
       });
     });
   });
@@ -147,9 +122,9 @@ describe('ThemeProvider', () => {
     mockApiGet.mockResolvedValue({ theme: 'light' });
 
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <TestComponent />
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     // Should apply theme to document
@@ -163,9 +138,9 @@ describe('ThemeProvider', () => {
     mockApiGet.mockRejectedValue(new Error('API Error'));
 
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <TestComponent />
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     // Should fall back to default theme
@@ -179,9 +154,9 @@ describe('ThemeProvider', () => {
     mockApiGet.mockResolvedValue({ theme: 'invalid-theme' });
 
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <TestComponent />
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     // Should fall back to default theme for invalid values

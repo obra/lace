@@ -77,13 +77,13 @@ describe('ThreadManager Delegate Thread Creation', () => {
     // Add an event to the delegate thread
     const event = threadManager.addEvent({
       type: 'USER_MESSAGE',
-      threadId: delegateThreadId,
       data: 'Hello delegate',
+      context: { threadId: delegateThreadId },
     });
 
     // Verify event was added
     expect(event).not.toBeNull();
-    expect(event?.threadId).toBe(delegateThreadId);
+    expect(event?.context?.threadId).toBe(delegateThreadId);
     expect(event?.type).toBe('USER_MESSAGE');
     expect(event?.data).toBe('Hello delegate');
 
@@ -135,8 +135,8 @@ describe('ThreadManager Delegate Thread Creation', () => {
     expect(() => {
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId: nonExistentThreadId,
         data: 'Hello',
+        context: { threadId: nonExistentThreadId },
       });
     }).toThrow(`Thread ${nonExistentThreadId} not found`);
   });

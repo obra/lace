@@ -68,14 +68,13 @@ export class SessionService {
         );
         sseManager.broadcast({
           type: 'AGENT_MESSAGE',
-          threadId,
           timestamp: new Date(),
           data: { content, tokenUsage },
           context: {
             sessionId,
             projectId,
             taskId: undefined,
-            agentId: undefined,
+            threadId,
           },
         });
       }
@@ -86,7 +85,6 @@ export class SessionService {
       // Broadcast token to UI for real-time display
       sseManager.broadcast({
         type: 'AGENT_TOKEN',
-        threadId,
         timestamp: new Date(),
         data: { token },
         transient: true,
@@ -94,7 +92,7 @@ export class SessionService {
           sessionId,
           projectId, // Use actual projectId from session instead of undefined
           taskId: undefined,
-          agentId: undefined,
+          threadId,
         },
       });
     });
@@ -106,7 +104,6 @@ export class SessionService {
       // Broadcast COMPACTION_START event
       sseManager.broadcast({
         type: 'COMPACTION_START' as const,
-        threadId,
         timestamp: new Date(),
         data: {
           auto,
@@ -116,7 +113,7 @@ export class SessionService {
           sessionId,
           projectId,
           taskId: undefined,
-          agentId: undefined,
+          threadId,
         },
       });
     });
@@ -130,7 +127,6 @@ export class SessionService {
       // Broadcast COMPACTION_COMPLETE event
       sseManager.broadcast({
         type: 'COMPACTION_COMPLETE' as const,
-        threadId,
         timestamp: new Date(),
         data: {
           success,
@@ -140,7 +136,7 @@ export class SessionService {
           sessionId,
           projectId,
           taskId: undefined,
-          agentId: undefined,
+          threadId,
         },
       });
     });
@@ -158,14 +154,13 @@ export class SessionService {
       }) => {
         sseManager.broadcast({
           type: 'TOOL_CALL',
-          threadId,
           timestamp: new Date(),
           data: { id: callId, name: toolName, arguments: args },
           context: {
             sessionId,
             projectId,
             taskId: undefined,
-            agentId: undefined,
+            threadId,
           },
         });
       }
@@ -176,14 +171,13 @@ export class SessionService {
       ({ result }: { toolName: string; result: unknown; callId: string }) => {
         sseManager.broadcast({
           type: 'TOOL_RESULT',
-          threadId,
           timestamp: new Date(),
           data: result as ToolResult, // Cast to ToolResult for type safety
           context: {
             sessionId,
             projectId,
             taskId: undefined,
-            agentId: undefined,
+            threadId,
           },
         });
       }
@@ -194,7 +188,6 @@ export class SessionService {
       // Broadcast agent state change to UI via SSE
       sseManager.broadcast({
         type: 'AGENT_STATE_CHANGE',
-        threadId,
         timestamp: new Date(),
         data: {
           agentId: threadId,
@@ -206,7 +199,7 @@ export class SessionService {
           sessionId,
           projectId,
           taskId: undefined,
-          agentId: undefined,
+          threadId,
         },
       });
     });
@@ -247,7 +240,6 @@ export class SessionService {
             // The UI will use this to look up the corresponding TOOL_CALL event
             sseManager.broadcast({
               type: 'TOOL_APPROVAL_REQUEST',
-              threadId: asThreadId(eventThreadId),
               timestamp: new Date(event.timestamp || new Date()),
               data: {
                 toolCallId: toolCallData.toolCallId,
@@ -256,7 +248,7 @@ export class SessionService {
                 sessionId,
                 projectId,
                 taskId: undefined,
-                agentId: undefined,
+                threadId: asThreadId(eventThreadId),
               },
             });
           }
@@ -266,7 +258,6 @@ export class SessionService {
 
           sseManager.broadcast({
             type: 'TOOL_APPROVAL_RESPONSE',
-            threadId: asThreadId(eventThreadId),
             timestamp: new Date(event.timestamp || new Date()),
             data: {
               toolCallId: responseData.toolCallId,
@@ -276,21 +267,20 @@ export class SessionService {
               sessionId,
               projectId,
               taskId: undefined,
-              agentId: undefined,
+              threadId: asThreadId(eventThreadId),
             },
           });
         } else if (event.type === 'USER_MESSAGE') {
           // Broadcast user messages to UI (agent messages handled via agent_response_complete)
           sseManager.broadcast({
             type: 'USER_MESSAGE',
-            threadId: asThreadId(eventThreadId),
             timestamp: new Date(event.timestamp || new Date()),
             data: event.data,
             context: {
               sessionId,
               projectId,
               taskId: undefined,
-              agentId: undefined,
+              threadId: asThreadId(eventThreadId),
             },
           });
         }

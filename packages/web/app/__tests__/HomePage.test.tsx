@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { HomePage } from '@/app/HomePage';
-import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { SettingsProvider } from '@/components/providers/SettingsProvider';
 
 // Mock the providers
 vi.mock('@/components/providers/ProjectProvider', () => ({
@@ -97,9 +97,9 @@ describe('HomePage', () => {
     });
 
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <HomePage />
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     expect(screen.getByTestId('loading-view')).toBeInTheDocument();
@@ -133,9 +133,9 @@ describe('HomePage', () => {
     });
 
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <HomePage />
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     await waitFor(() => {
@@ -173,9 +173,9 @@ describe('HomePage', () => {
     });
 
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <HomePage />
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     await waitFor(() => {
@@ -226,9 +226,9 @@ describe('HomePage', () => {
     });
 
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <HomePageWithMock />
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     await waitFor(() => {

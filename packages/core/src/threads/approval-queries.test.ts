@@ -34,7 +34,7 @@ describe('Approval Database Queries', () => {
       // Create TOOL_CALL event
       const toolCallEvent: LaceEvent = {
         id: 'event_1',
-        threadId,
+        context: { threadId },
         type: 'TOOL_CALL',
         timestamp: new Date('2025-01-01T10:00:00Z'),
         data: { id: 'call_123', name: 'bash', arguments: { command: 'ls' } },
@@ -44,7 +44,7 @@ describe('Approval Database Queries', () => {
       // Create TOOL_APPROVAL_REQUEST event
       const requestEvent: LaceEvent = {
         id: 'event_2',
-        threadId,
+        context: { threadId },
         type: 'TOOL_APPROVAL_REQUEST',
         timestamp: new Date('2025-01-01T10:01:00Z'),
         data: { toolCallId: 'call_123' },
@@ -62,7 +62,7 @@ describe('Approval Database Queries', () => {
       // Create TOOL_CALL → TOOL_APPROVAL_REQUEST → TOOL_APPROVAL_RESPONSE
       db.saveEvent({
         id: 'event_1',
-        threadId,
+        context: { threadId },
         type: 'TOOL_CALL',
         timestamp: new Date('2025-01-01T10:00:00Z'),
         data: { id: 'call_123', name: 'bash', arguments: { command: 'ls' } },
@@ -70,7 +70,7 @@ describe('Approval Database Queries', () => {
 
       db.saveEvent({
         id: 'event_2',
-        threadId,
+        context: { threadId },
         type: 'TOOL_APPROVAL_REQUEST',
         timestamp: new Date('2025-01-01T10:01:00Z'),
         data: { toolCallId: 'call_123' },
@@ -78,7 +78,7 @@ describe('Approval Database Queries', () => {
 
       db.saveEvent({
         id: 'event_3',
-        threadId,
+        context: { threadId },
         type: 'TOOL_APPROVAL_RESPONSE',
         timestamp: new Date('2025-01-01T10:02:00Z'),
         data: { toolCallId: 'call_123', decision: ApprovalDecision.ALLOW_ONCE },
@@ -94,7 +94,7 @@ describe('Approval Database Queries', () => {
       ['call_1', 'call_2'].forEach((callId, index) => {
         db.saveEvent({
           id: `tool_event_${index + 1}`,
-          threadId,
+          context: { threadId },
           type: 'TOOL_CALL',
           timestamp: new Date(`2025-01-01T10:0${index}:00Z`),
           data: { id: callId, name: 'bash', arguments: { command: 'ls' } },
@@ -102,8 +102,8 @@ describe('Approval Database Queries', () => {
 
         db.saveEvent({
           id: `request_event_${index + 1}`,
-          threadId,
           type: 'TOOL_APPROVAL_REQUEST',
+          context: { threadId },
           timestamp: new Date(`2025-01-01T10:0${index + 1}:00Z`),
           data: { toolCallId: callId },
         });
@@ -121,7 +121,7 @@ describe('Approval Database Queries', () => {
       // Create TOOL_APPROVAL_RESPONSE event
       db.saveEvent({
         id: 'event_1',
-        threadId,
+        context: { threadId },
         type: 'TOOL_APPROVAL_RESPONSE',
         timestamp: new Date(),
         data: { toolCallId: 'call_123', decision: ApprovalDecision.ALLOW_SESSION },

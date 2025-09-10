@@ -11,7 +11,7 @@ import { vi, beforeEach, afterEach, expect, describe, it } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { SettingsContainer } from './SettingsContainer';
 import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
-import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { SettingsProvider } from '@/components/providers/SettingsProvider';
 import { stringify } from '@/lib/serialization';
 import { api } from '@/lib/api-client';
 
@@ -47,11 +47,11 @@ describe('SettingsContainer', () => {
 
     await act(async () => {
       component = render(
-        <ThemeProvider>
+        <SettingsProvider>
           <ProviderInstanceProvider>
             <SettingsContainer>{children}</SettingsContainer>
           </ProviderInstanceProvider>
-        </ThemeProvider>
+        </SettingsProvider>
       );
     });
 
@@ -175,7 +175,7 @@ describe('SettingsContainer', () => {
     mockApiGet.mockResolvedValue({ theme: 'light' });
 
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <SettingsContainer>
           {({ onOpenSettings }) => (
             <button onClick={onOpenSettings} data-testid="settings-trigger">
@@ -183,7 +183,7 @@ describe('SettingsContainer', () => {
             </button>
           )}
         </SettingsContainer>
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     await waitFor(() => {
@@ -200,7 +200,7 @@ describe('SettingsContainer', () => {
     mockApiGet.mockResolvedValue({}); // No theme in settings
 
     render(
-      <ThemeProvider>
+      <SettingsProvider>
         <SettingsContainer>
           {({ onOpenSettings }) => (
             <button onClick={onOpenSettings} data-testid="settings-trigger">
@@ -208,7 +208,7 @@ describe('SettingsContainer', () => {
             </button>
           )}
         </SettingsContainer>
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     await waitFor(() => {
@@ -254,6 +254,7 @@ describe('SettingsContainer', () => {
       expect(vi.mocked(api.patch)).toHaveBeenCalledWith('/api/settings', {
         theme: 'light',
         timelineWidth: 'medium',
+        debugPanelEnabled: false,
       });
     });
   });
@@ -357,7 +358,7 @@ describe('SettingsContainer', () => {
 
   it('provides render prop pattern for flexible integration', () => {
     const TestComponent = () => (
-      <ThemeProvider>
+      <SettingsProvider>
         <SettingsContainer>
           {({ onOpenSettings }) => (
             <div>
@@ -366,7 +367,7 @@ describe('SettingsContainer', () => {
             </div>
           )}
         </SettingsContainer>
-      </ThemeProvider>
+      </SettingsProvider>
     );
 
     render(<TestComponent />);

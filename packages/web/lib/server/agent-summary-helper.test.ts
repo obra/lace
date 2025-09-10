@@ -181,30 +181,30 @@ describe('agent-summary-helper', () => {
         {
           id: '1',
           type: 'USER_MESSAGE',
-          threadId: 'test',
           timestamp: new Date(),
           data: 'User message',
+          context: { threadId: 'test' },
         },
         {
           id: '2',
           type: 'AGENT_MESSAGE',
-          threadId: 'test',
           timestamp: new Date(),
           data: { content: 'First agent response' },
+          context: { threadId: 'test' },
         },
         {
           id: '3',
           type: 'USER_MESSAGE',
-          threadId: 'test',
           timestamp: new Date(),
           data: 'Another user message',
+          context: { threadId: 'test' },
         },
         {
           id: '4',
           type: 'AGENT_MESSAGE',
-          threadId: 'test',
           timestamp: new Date(),
           data: { content: 'Latest agent response' },
+          context: { threadId: 'test' },
         },
       ];
 
@@ -217,16 +217,16 @@ describe('agent-summary-helper', () => {
         {
           id: '1',
           type: 'USER_MESSAGE',
-          threadId: 'test',
           timestamp: new Date(),
           data: 'User message',
+          context: { threadId: 'test' },
         },
         {
           id: '2',
           type: 'TOOL_CALL',
-          threadId: 'test',
           timestamp: new Date(),
           data: { id: 'test-call', name: 'test', arguments: {} },
+          context: { threadId: 'test' },
         },
       ];
 
@@ -244,9 +244,9 @@ describe('agent-summary-helper', () => {
         {
           id: '1',
           type: 'AGENT_MESSAGE',
-          threadId: 'test',
           timestamp: new Date(),
           data: { content: 'Message from object format' },
+          context: { threadId: 'test' },
         },
       ];
 

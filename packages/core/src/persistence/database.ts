@@ -525,7 +525,7 @@ export class DatabasePersistence {
 
     // Guard against attempting to persist transient events
     if (isTransientEventType(event.type)) {
-      throw new TransientEventError(event.type, event.id, event.threadId);
+      throw new TransientEventError(event.type, event.id, event.context?.threadId);
     }
 
     try {
@@ -536,7 +536,7 @@ export class DatabasePersistence {
 
       stmt.run(
         event.id,
-        event.threadId,
+        event.context?.threadId,
         event.type,
         event.timestamp!.toISOString(),
         JSON.stringify(event.data)
@@ -546,7 +546,7 @@ export class DatabasePersistence {
       const updateThreadStmt = this.db.prepare(`
         UPDATE threads SET updated_at = ? WHERE id = ?
       `);
-      updateThreadStmt.run(new Date().toISOString(), event.threadId);
+      updateThreadStmt.run(new Date().toISOString(), event.context?.threadId);
 
       return true; // Event was successfully saved
     } catch (error: unknown) {

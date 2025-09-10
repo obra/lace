@@ -50,7 +50,7 @@ export function useSessionEvents(
 
   // Generate a composite key for event deduplication
   const getEventKey = useCallback((event: LaceEvent): string => {
-    return `${event.type}:${event.timestamp}:${event.threadId}:${JSON.stringify(event.data)}`;
+    return `${event.type}:${event.timestamp}:${event.context?.threadId}:${JSON.stringify(event.data)}`;
   }, []);
 
   // Add thread event to timeline
@@ -158,7 +158,7 @@ export function useSessionEvents(
       }
 
       // Show events from the selected agent's thread
-      return event.threadId === selectedAgent;
+      return event.context?.threadId === selectedAgent;
     });
   }, [events, selectedAgent]);
 

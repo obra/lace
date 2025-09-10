@@ -5,9 +5,10 @@ import { Outlet, Scripts, Links, Meta } from 'react-router';
 import '@/app/globals.css';
 import '@/app/fonts';
 import { ErrorBoundary } from '@/components/old/ErrorBoundary';
-import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { SettingsProvider } from '@/components/providers/SettingsProvider';
 import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
 import { ConsoleForwardScript } from '@/lib/console-forward/script';
+import { DebugPanel } from '@/components/debug/DebugPanel';
 
 export default function Root() {
   return (
@@ -22,11 +23,13 @@ export default function Root() {
       <body className="antialiased">
         <ConsoleForwardScript />
         <ErrorBoundary>
-          <ThemeProvider>
+          <SettingsProvider>
             <ProviderInstanceProvider>
-              <Outlet />
+              <DebugPanel>
+                <Outlet />
+              </DebugPanel>
             </ProviderInstanceProvider>
-          </ThemeProvider>
+          </SettingsProvider>
         </ErrorBoundary>
         <Scripts />
       </body>

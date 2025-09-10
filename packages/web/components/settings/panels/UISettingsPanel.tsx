@@ -8,7 +8,11 @@ import { ThemeSelector } from '@/components/ui/ThemeSelector';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { SettingField } from '@/components/settings/SettingField';
 import { Alert } from '@/components/ui/Alert';
-import { useTheme, TIMELINE_WIDTHS } from '@/components/providers/ThemeProvider';
+import {
+  useTheme,
+  useDebuggingSettings,
+  TIMELINE_WIDTHS,
+} from '@/components/providers/SettingsProvider';
 
 interface UISettingsPanelProps {
   currentTheme?: string;
@@ -17,6 +21,8 @@ interface UISettingsPanelProps {
 
 export function UISettingsPanel({ currentTheme, onThemeChange }: UISettingsPanelProps) {
   const { theme, setTimelineWidth } = useTheme();
+  const { debugPanelEnabled, setDebugPanelEnabled } = useDebuggingSettings();
+
   return (
     <SettingsPanel title="UI Settings">
       <Alert
@@ -48,6 +54,21 @@ export function UISettingsPanel({ currentTheme, onThemeChange }: UISettingsPanel
             </button>
           ))}
         </div>
+      </SettingField>
+
+      <SettingField
+        label="Debugging"
+        description="Enable debugging panel for monitoring SSE events and system diagnostics"
+      >
+        <label className="label cursor-pointer justify-start gap-3">
+          <input
+            type="checkbox"
+            className="toggle toggle-primary"
+            checked={debugPanelEnabled}
+            onChange={(e) => setDebugPanelEnabled(e.target.checked)}
+          />
+          <span className="label-text">Show debugging panel</span>
+        </label>
       </SettingField>
     </SettingsPanel>
   );

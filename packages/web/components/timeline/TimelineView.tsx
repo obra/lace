@@ -7,7 +7,7 @@ import React, { useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { LaceEvent, AgentInfo, ThreadId } from '@/types/core';
 import type { CompactionState } from '@/components/providers/EventStreamProvider';
-import { asThreadId } from '@/types/core';
+import { asThreadId, isThreadId } from '@/types/core';
 import { TimelineMessageWithDetails } from './TimelineMessageWithDetails';
 import { TypingIndicator } from './TypingIndicator';
 import { CompactionIndicator } from './CompactionIndicator';
@@ -82,21 +82,21 @@ export function TimelineView({
               const shouldGroupWithPrevious =
                 prevEvent &&
                 prevEvent.type === event.type &&
-                prevEvent.threadId === event.threadId &&
+                prevEvent.context?.threadId === event.context?.threadId &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(event.type) &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(prevEvent.type);
 
               const shouldGroupWithNext =
                 nextEvent &&
                 nextEvent.type === event.type &&
-                nextEvent.threadId === event.threadId &&
+                nextEvent.context?.threadId === event.context?.threadId &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(event.type) &&
                 ['USER_MESSAGE', 'AGENT_MESSAGE', 'AGENT_STREAMING'].includes(nextEvent.type);
 
               // Generate unique key for React
               const eventKey =
                 event.id ||
-                `${instanceId.current}-${event.threadId}-${event.type}-${
+                `${instanceId.current}-${event.context?.threadId}-${event.type}-${
                   event.timestamp instanceof Date ? event.timestamp.getTime() : event.timestamp
                 }-${index}-${JSON.stringify(event.data).slice(0, 50)}`;
 
@@ -130,8 +130,10 @@ export function TimelineView({
           <AnimatePresence>
             {isTyping &&
               currentAgent &&
+              isThreadId(currentAgent) &&
               !processedEvents.some(
-                (e) => e.type === 'AGENT_STREAMING' && e.threadId === asThreadId(currentAgent)
+                (e) =>
+                  e.type === 'AGENT_STREAMING' && e.context?.threadId === asThreadId(currentAgent)
               ) && (
                 <motion.div
                   key="typing"

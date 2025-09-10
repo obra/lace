@@ -102,7 +102,6 @@ describe('SessionService TaskManager Event Forwarding', () => {
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'TASK_CREATED',
-          threadId: 'task-manager',
           transient: true,
           context: expect.objectContaining({
             projectId: testProject.getId(),
@@ -206,7 +205,6 @@ describe('SessionService TaskManager Event Forwarding', () => {
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'TASK_UPDATED',
-          threadId: 'task-manager',
           transient: true,
           context: expect.objectContaining({
             projectId: testProject.getId(),
@@ -259,7 +257,6 @@ describe('SessionService TaskManager Event Forwarding', () => {
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'TASK_DELETED',
-          threadId: 'task-manager',
           transient: true,
           context: {
             projectId: testProject.getId(),
@@ -317,7 +314,6 @@ describe('SessionService TaskManager Event Forwarding', () => {
       const noteAddedEvent = noteAddedCalls[0][0];
       expect(noteAddedEvent).toMatchObject({
         type: 'TASK_NOTE_ADDED',
-        threadId: 'task-manager',
         transient: true,
         context: {
           projectId: testProject.getId(),
@@ -389,8 +385,7 @@ describe('SessionService TaskManager Event Forwarding', () => {
         id: 'test-event',
         timestamp: new Date(),
         type: 'TASK_CREATED',
-        threadId: 'task-manager',
-        context: { sessionId: 'test-session', taskId: 'test-task' },
+        context: { threadId: 'task-manager', sessionId: 'test-session', taskId: 'test-task' },
         data: {
           type: 'task:created',
           taskId: 'test-task',
@@ -486,7 +481,6 @@ describe('SessionService TaskManager Event Forwarding', () => {
       expect(broadcastSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'TASK_CREATED',
-          threadId: 'task-manager',
           transient: true,
           context: expect.objectContaining({
             projectId: testProject.getId(),

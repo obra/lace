@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useState, useMemo, useCallback, ReactNode } from 'react';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { useTaskHandlers } from '@/hooks/useTaskHandlers';
+import { useEventStream } from '@/hooks/useEventStream';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import { TaskCreationModal } from '@/components/modals/TaskCreationModal';
 import { TaskDisplayModal } from '@/components/modals/TaskDisplayModal';
@@ -68,6 +69,17 @@ export function TaskProvider({ children, projectId, sessionId }: TaskProviderPro
 
   // Task manager - only create when we have project and session
   const taskManager = useTaskManager(projectId || '', sessionId || '');
+
+  // Subscribe to task events via SSE (shares EventStreamFirehose singleton)
+  useEventStream({
+    projectId: projectId || undefined,
+    sessionId: sessionId || undefined,
+    // No threadIds - we want task events (which have no threadId)
+    onTaskCreated: taskManager?.handleTaskCreated,
+    onTaskUpdated: taskManager?.handleTaskUpdated,
+    onTaskDeleted: taskManager?.handleTaskDeleted,
+    onTaskNoteAdded: taskManager?.handleTaskNoteAdded,
+  });
 
   // Task handlers
   const {

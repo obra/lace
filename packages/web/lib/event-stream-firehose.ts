@@ -181,9 +181,28 @@ class EventStreamFirehose {
       return true;
     }
 
-    // Check thread ID filter
-    if (filter.threadIds?.length && !filter.threadIds.includes(event.threadId)) {
-      return false;
+    // Check thread ID filter - use context.threadId instead of top-level threadId
+    // Task events require sessionId matching when threadIds filter is present (security)
+    if (filter.threadIds?.length) {
+      const eventThreadId = event.context?.threadId;
+      const isTaskEvent = event.type?.includes('TASK');
+
+      if (isTaskEvent) {
+        // Task events must match sessionId when threadIds filter exists (prevent cross-session leaks)
+        const eventSessionId = event.context?.sessionId;
+        if (
+          !filter.sessionIds?.length ||
+          !eventSessionId ||
+          !filter.sessionIds.includes(eventSessionId)
+        ) {
+          return false; // Block task events that don't match session filter
+        }
+      } else {
+        // Non-task events must match threadId filter
+        if (!eventThreadId || !filter.threadIds.includes(eventThreadId)) {
+          return false;
+        }
+      }
     }
 
     // Check session ID filter

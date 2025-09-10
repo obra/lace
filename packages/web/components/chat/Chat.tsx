@@ -14,7 +14,7 @@ import {
 } from '@/components/providers/EventStreamProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useScrollContext } from '@/components/providers/ScrollProvider';
-import { useTheme } from '@/components/providers/ThemeProvider';
+import { useTheme } from '@/components/providers/SettingsProvider';
 import type { ThreadId, AgentInfo, LaceEvent } from '@/types/core';
 
 export const Chat = memo(function Chat(): React.JSX.Element {

@@ -28,9 +28,9 @@ describe('Event Types', () => {
   it('should create valid LaceEvent', () => {
     const event: LaceEvent = {
       type: 'USER_MESSAGE',
-      threadId: asThreadId('lace_20250731_test01'),
       timestamp: new Date(),
       data: 'Hello', // USER_MESSAGE data is a string
+      context: { threadId: asThreadId('lace_20250731_test01') },
     };
 
     expect(event.type).toBe('USER_MESSAGE');

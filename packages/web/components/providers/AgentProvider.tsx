@@ -13,6 +13,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import { useAgentManagement } from '@/hooks/useAgentManagement';
+import { useEventStream } from '@/hooks/useEventStream';
 import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import type { CreateAgentRequest } from '@/types/api';
@@ -75,6 +76,33 @@ export function AgentProvider({
     loadAgentConfiguration,
     updateAgent,
   } = useAgentManagement(sessionId);
+
+  // Subscribe to agent lifecycle events to refresh agent list in real-time
+  const debouncedReloadRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEventStream({
+    projectId: undefined, // Don't filter by project
+    sessionId: sessionId || undefined,
+    // No threadIds - we want session-level agent events
+    onAgentSpawned: useCallback(() => {
+      // Debounce rapid spawn events to coalesce into single refresh
+      if (debouncedReloadRef.current) {
+        clearTimeout(debouncedReloadRef.current);
+      }
+      debouncedReloadRef.current = setTimeout(() => {
+        void reloadSessionDetails();
+      }, 300);
+    }, [reloadSessionDetails]),
+  });
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debouncedReloadRef.current) {
+        clearTimeout(debouncedReloadRef.current);
+      }
+    };
+  }, []);
 
   // Use agent from URL params, not hash router
   const selectedAgent = selectedAgentId ? asThreadId(selectedAgentId) : null;

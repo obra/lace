@@ -140,12 +140,12 @@ describe('Agent Message Endpoint with Summary Generation', () => {
     // Verify AGENT_SUMMARY_UPDATED event was broadcast
     const summaryEvent = capturedEvents.find((event) => event.type === 'AGENT_SUMMARY_UPDATED');
     expect(summaryEvent).toBeDefined();
-    expect(summaryEvent!.threadId).toBe(agentId);
+    expect(summaryEvent!.context?.threadId).toBe(agentId);
     expect(summaryEvent!.transient).toBe(true);
     expect(summaryEvent!.context).toEqual({
       projectId,
       sessionId,
-      agentId,
+      threadId: agentId,
     });
 
     // Verify event data structure - check that we got a real summary

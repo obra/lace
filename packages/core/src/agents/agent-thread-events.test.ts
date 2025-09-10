@@ -71,7 +71,7 @@ describe('Agent Thread Events', () => {
         event: expect.objectContaining({
           type: 'USER_MESSAGE',
           data: 'Test message',
-          threadId: expect.any(String) as string,
+          context: { threadId: expect.any(String) as string },
         }) as LaceEvent,
         threadId: expect.any(String) as string,
       });
@@ -100,12 +100,12 @@ describe('Agent Thread Events', () => {
       // Check USER_MESSAGE event
       expect(userMessageCalls[0][0].event.type).toBe('USER_MESSAGE');
       expect(userMessageCalls[0][0].event.data).toBe('Test message');
-      expect(typeof userMessageCalls[0][0].threadId).toBe('string');
+      expect(typeof userMessageCalls[0][0].event.context?.threadId).toBe('string');
 
       // Check AGENT_MESSAGE event
       expect(agentMessageCalls[0][0].event.type).toBe('AGENT_MESSAGE');
       expect((agentMessageCalls[0][0].event.data as { content: string }).content).toBeDefined();
-      expect(typeof agentMessageCalls[0][0].threadId).toBe('string');
+      expect(typeof agentMessageCalls[0][0].event.context?.threadId).toBe('string');
     });
 
     it('should emit thread_event_added with consistent threadId', async () => {
@@ -127,7 +127,7 @@ describe('Agent Thread Events', () => {
       const secondCall: { event: LaceEvent; threadId: string } = relevantCalls[1][0];
 
       expect(firstCall.threadId).toBe(secondCall.threadId);
-      expect(firstCall.event.threadId).toBe(secondCall.event.threadId);
+      expect(firstCall.event.context?.threadId).toBe(secondCall.event.context?.threadId);
     });
   });
 
@@ -139,17 +139,17 @@ describe('Agent Thread Events', () => {
 
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'First message',
       });
       threadManager.addEvent({
         type: 'AGENT_MESSAGE',
-        threadId,
+        context: { threadId },
         data: { content: 'First response' },
       });
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'Second message',
       });
 
@@ -192,21 +192,21 @@ describe('Agent Thread Events', () => {
       const event1 = expectEventAdded(
         threadManager.addEvent({
           type: 'USER_MESSAGE',
-          threadId,
+          context: { threadId },
           data: 'Message 1',
         })
       );
       const event2 = expectEventAdded(
         threadManager.addEvent({
           type: 'AGENT_MESSAGE',
-          threadId,
+          context: { threadId },
           data: { content: 'Response 1' },
         })
       );
       const event3 = expectEventAdded(
         threadManager.addEvent({
           type: 'USER_MESSAGE',
-          threadId,
+          context: { threadId },
           data: 'Message 2',
         })
       );
@@ -263,7 +263,7 @@ describe('Agent Thread Events', () => {
       threadManager.clearEvents(threadId);
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'Test message',
       });
 
@@ -282,7 +282,7 @@ describe('Agent Thread Events', () => {
       threadManager.clearEvents(threadId);
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId,
+        context: { threadId },
         data: 'Specific thread message',
       });
 
@@ -322,7 +322,7 @@ describe('Agent Thread Events', () => {
       threadManager.clearEvents(existingThreadId);
       threadManager.addEvent({
         type: 'USER_MESSAGE',
-        threadId: existingThreadId,
+        context: { threadId: existingThreadId },
         data: 'Existing message',
       });
 

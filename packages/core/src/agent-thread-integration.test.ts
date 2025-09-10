@@ -60,12 +60,16 @@ describe('Agent Single Event Source Integration', () => {
     // Use Agent methods that trigger _addEventAndEmit internally
     await agent.sendMessage('test message');
 
-    // Verify Agent events are emitted
-    expect(agentLaceEventAdded).toHaveBeenCalledWith({
+    // Verify Agent events are emitted - check that USER_MESSAGE event was emitted
+    const userMessageCall = agentLaceEventAdded.mock.calls.find(
+      (call) => call[0].event.type === 'USER_MESSAGE' && call[0].event.data === 'test message'
+    );
+    expect(userMessageCall).toBeDefined();
+    expect(userMessageCall[0]).toEqual({
       event: expect.objectContaining({
         type: 'USER_MESSAGE',
         data: 'test message',
-      }) as object,
+      }),
       threadId: 'integration-test-thread',
     });
   });
@@ -90,12 +94,12 @@ describe('Agent Single Event Source Integration', () => {
     threadManager.createThread('api-test-thread');
     threadManager.addEvent({
       type: 'USER_MESSAGE',
-      threadId: 'api-test-thread',
+      context: { threadId: 'api-test-thread' },
       data: 'test message 1',
     });
     threadManager.addEvent({
       type: 'AGENT_MESSAGE',
-      threadId: 'api-test-thread',
+      context: { threadId: 'api-test-thread' },
       data: { content: 'test response 1' },
     });
 

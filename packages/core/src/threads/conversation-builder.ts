@@ -78,7 +78,7 @@ function deduplicateToolResults(events: LaceEvent[]): LaceEvent[] {
         // ToolResult objects without IDs are considered invalid and filtered out
         logger.warn('CONVERSATION_BUILDER: TOOL_RESULT missing id', {
           eventId: event.id,
-          threadId: event.threadId,
+          threadId: event.context?.threadId,
         });
         continue; // Skip results without IDs
       }
@@ -98,7 +98,7 @@ function deduplicateToolResults(events: LaceEvent[]): LaceEvent[] {
             keptStatus: status,
             replacedStatus: existingResult.status || 'completed',
             eventId: event.id,
-            threadId: event.threadId,
+            threadId: event.context?.threadId,
           });
         }
       } else if (existing) {
@@ -108,7 +108,7 @@ function deduplicateToolResults(events: LaceEvent[]): LaceEvent[] {
           skippedStatus: status,
           keptStatus: existingResult.status || 'completed',
           eventId: event.id,
-          threadId: event.threadId,
+          threadId: event.context?.threadId,
         });
       }
     }

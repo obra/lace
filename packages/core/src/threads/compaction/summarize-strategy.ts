@@ -164,9 +164,9 @@ Provide ONLY the summary, no preamble or explanation.`;
   ): LaceEvent {
     return {
       id: this.generateEventId(),
-      threadId: context.threadId,
       type: 'COMPACTION',
       timestamp: new Date(),
+      context: { threadId: context.threadId },
       data: {
         strategyId: this.id,
         originalEventCount,

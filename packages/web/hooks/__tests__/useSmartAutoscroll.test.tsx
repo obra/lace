@@ -117,9 +117,9 @@ describe('useTimelineAutoscroll', () => {
     const mockEvents: LaceEvent[] = [
       {
         type: 'USER_MESSAGE',
-        threadId: 'test-thread',
         data: 'Hello',
         timestamp: new Date(),
+        context: { threadId: 'test-thread' },
       },
     ];
 
@@ -143,9 +143,9 @@ describe('useTimelineAutoscroll', () => {
       ...mockEvents,
       {
         type: 'AGENT_STREAMING',
-        threadId: 'test-thread',
         data: { content: 'Streaming...' },
         timestamp: new Date(),
+        context: { threadId: 'test-thread' },
       },
     ];
     act(() => {
