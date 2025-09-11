@@ -3,7 +3,7 @@
 
 'use client';
 
-import type { ChangeEvent } from 'react';
+import React, { type ChangeEvent } from 'react';
 import type { ProviderInfo } from '@/types/api';
 
 interface ModelSelectorProps {
