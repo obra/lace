@@ -98,8 +98,7 @@ interface ClientConnection {
   };
   lastEventId?: string;
   connectedAt: Date;
-  lastKeepaliveAt: Date | null; // Track when we last sent keepalive
-  keepaliveCount: number; // Track unacknowledged keepalives
+  lastSendAt: number; // unix ms of last successful enqueue
 }
 
 // Use global to persist across HMR in development
@@ -311,8 +310,7 @@ export class EventStreamManager {
       controller,
       subscription,
       connectedAt: new Date(),
-      lastKeepaliveAt: null,
-      keepaliveCount: 0,
+      lastSendAt: Date.now(),
     };
 
     this.connections.set(connectionId, connection);
@@ -487,12 +485,7 @@ export class EventStreamManager {
     }
 
     // Event type filtering removed - LaceEvent handles all types
-
-    // Global filtering - include all if subscription.global is true
-    if (subscription.global === true) {
-      return true;
-    }
-
+    // Currently all connections receive all events (global subscription)
     return true;
   }
 
@@ -519,6 +512,7 @@ export class EventStreamManager {
     try {
       connection.controller.enqueue(chunk);
       connection.lastEventId = event.id;
+      connection.lastSendAt = Date.now();
     } catch (error) {
       // Any error during enqueue indicates a dead connection
       logger.debug(`[EVENT_STREAM] Failed to send event to connection ${connection.id}`, {
@@ -526,7 +520,17 @@ export class EventStreamManager {
         error: error instanceof Error ? error.message : String(error),
         connectionAge: Date.now() - connection.connectedAt.getTime(),
       });
-      throw new Error('Controller is closed');
+
+      class ControllerClosedError extends Error {
+        public readonly cause?: unknown;
+
+        constructor(message: string, cause?: unknown) {
+          super(message);
+          this.name = 'ControllerClosedError';
+          this.cause = cause;
+        }
+      }
+      throw new ControllerClosedError('Controller is closed', error);
     }
   }
 
@@ -617,6 +621,9 @@ export class EventStreamManager {
     this.keepAliveInterval = setInterval(() => {
       this.sendKeepAlive();
     }, this.KEEPALIVE_INTERVAL);
+
+    // Allow process to exit naturally if this is the only handle
+    this.keepAliveInterval.unref?.();
   }
 
   // Stop keepalive timer
@@ -642,36 +649,34 @@ export class EventStreamManager {
           continue;
         }
 
-        const now = new Date();
+        const now = Date.now();
 
-        // Check if connection is stale (keepalives not being consumed)
-        if (connection.lastKeepaliveAt) {
-          const keepaliveDuration = now.getTime() - connection.lastKeepaliveAt.getTime();
-          const MAX_KEEPALIVE_AGE = 90000; // 90 seconds - 3 keepalive cycles
+        // Check if connection hasn't had successful sends recently
+        const timeSinceLastSend = now - connection.lastSendAt;
+        const MAX_STALE_TIME = 90000; // 90 seconds without successful sends
 
-          if (keepaliveDuration > MAX_KEEPALIVE_AGE && connection.keepaliveCount > 2) {
-            logger.info(
-              `[EVENT_STREAM] Connection ${connectionId} stale - keepalives not being consumed`,
-              {
-                keepaliveDuration,
-                keepaliveCount: connection.keepaliveCount,
-                lastKeepaliveAt: connection.lastKeepaliveAt.toISOString(),
-              }
-            );
-            deadConnections.push(connectionId);
-            continue;
-          }
+        if (timeSinceLastSend > MAX_STALE_TIME) {
+          logger.info(`[EVENT_STREAM] Connection ${connectionId} stale - no successful sends`, {
+            timeSinceLastSend,
+            lastSendAt: new Date(connection.lastSendAt).toISOString(),
+          });
+          deadConnections.push(connectionId);
+          continue;
+        }
+
+        // Check for backpressure before sending
+        if (
+          typeof connection.controller.desiredSize === 'number' &&
+          connection.controller.desiredSize <= 0
+        ) {
+          logger.debug(
+            `[EVENT_STREAM] Connection ${connectionId} has backpressure (desiredSize: ${connection.controller.desiredSize})`
+          );
         }
 
         // Force a write to detect dead connections
         connection.controller.enqueue(keepAliveBytes);
-        connection.lastKeepaliveAt = now;
-        connection.keepaliveCount++;
-
-        // Reset keepalive count periodically if connection seems healthy
-        if (connection.keepaliveCount > 10 && connection.controller.desiredSize !== null) {
-          connection.keepaliveCount = Math.max(1, connection.keepaliveCount - 1);
-        }
+        connection.lastSendAt = now;
 
         // Check if the write caused immediate failure
         if (connection.controller.desiredSize === null) {
