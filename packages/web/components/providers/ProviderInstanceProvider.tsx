@@ -3,15 +3,7 @@
 
 'use client';
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-} from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { api } from '@/lib/api-client';
 import type { ProviderInfo, ModelInfo } from '@/types/api';
 
@@ -121,9 +113,6 @@ interface ProviderInstanceProviderProps {
 }
 
 export function ProviderInstanceProvider({ children }: ProviderInstanceProviderProps) {
-  // Track mounted state to prevent state updates after unmount
-  const mountedRef = useRef(true);
-
   // Instance Management State
   const [instances, setInstances] = useState<ProviderInstance[]>([]);
   const [instancesLoading, setInstancesLoading] = useState(true);
@@ -146,46 +135,36 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
   // Load instances from API
   const loadInstances = useCallback(async () => {
     try {
-      if (!mountedRef.current) return;
       setInstancesLoading(true);
       setInstancesError(null);
 
       const data = await api.get<{ instances: ProviderInstance[] }>('/api/provider/instances');
 
-      if (!mountedRef.current) return;
       setInstances(data.instances || []);
     } catch (err) {
-      if (!mountedRef.current) return;
       const errorMessage = err instanceof Error ? err.message : 'Failed to load instances';
       setInstancesError(errorMessage);
       console.error('Error loading instances:', errorMessage);
     } finally {
-      if (mountedRef.current) {
-        setInstancesLoading(false);
-      }
+      setInstancesLoading(false);
     }
   }, []);
 
   // Load catalog providers from API
   const loadCatalog = useCallback(async () => {
     try {
-      if (!mountedRef.current) return;
       setCatalogLoading(true);
       setCatalogError(null);
 
       const data = await api.get<{ providers: CatalogProvider[] }>('/api/provider/catalog');
 
-      if (!mountedRef.current) return;
       setCatalogProviders(data.providers || []);
     } catch (err) {
-      if (!mountedRef.current) return;
       const errorMessage = err instanceof Error ? err.message : 'Failed to load catalog';
       setCatalogError(errorMessage);
       console.error('Error loading catalog:', errorMessage);
     } finally {
-      if (mountedRef.current) {
-        setCatalogLoading(false);
-      }
+      setCatalogLoading(false);
     }
   }, []);
 
@@ -419,13 +398,6 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
     void loadInstances();
     void loadCatalog();
   }, [loadInstances, loadCatalog]);
-
-  // Cleanup: mark as unmounted to prevent state updates
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
 
   // Context value
   const contextValue = useMemo<ProviderInstanceContextValue>(
