@@ -113,7 +113,7 @@ describe('api.persona.catalog', () => {
 
 ---
 
-## Task 2: Add + Button to AgentsSection Header
+## ✅ Task 2: Add + Button to AgentsSection Header (COMPLETED)
 
 **Objective**: Add a + button to AGENTS section header matching the existing Tasks section pattern
 
@@ -208,7 +208,7 @@ describe('AgentsSection', () => {
 
 ---
 
-## Task 3: Create Searchable Persona Dropdown Component
+## ✅ Task 3: Create Searchable Persona Dropdown Component (COMPLETED)
 
 **Objective**: Build a reusable dropdown component for persona selection with search/autocomplete
 
@@ -403,7 +403,7 @@ describe('PersonaSelector', () => {
 
 ---
 
-## Task 4: Create Condensed Chat Input Component
+## ✅ Task 4: Create Condensed Chat Input Component (COMPLETED)
 
 **Objective**: Create a condensed version of the chat input suitable for modal usage
 
@@ -465,7 +465,7 @@ export function CondensedChatInput({
 
 ---
 
-## Task 5: Create Agent Creation Modal Component
+## ✅ Task 5: Create Agent Creation Modal Component (COMPLETED)
 
 **Objective**: Build the main modal component that orchestrates persona selection, model selection, and chat input
 
@@ -742,7 +742,7 @@ describe('AgentCreateChatModal', () => {
 
 ---
 
-## Task 6: Integrate Modal with Parent Components
+## ✅ Task 6: Integrate Modal with Parent Components (COMPLETED)
 
 **Objective**: Wire the modal into the sidebar and connect it to actual agent creation logic
 
@@ -837,7 +837,7 @@ it('should create agent when modal submitted', async () => {
 
 ---
 
-## Task 7: Handle Initial Message Sending
+## ✅ Task 7: Handle Initial Message Sending (COMPLETED)
 
 **Objective**: When user provides initial message, send it to newly created agent
 

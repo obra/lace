@@ -25,7 +25,6 @@ import { useProviderInstances } from '@/components/providers/ProviderInstancePro
 import { useURLState } from '@/hooks/useURLState';
 import { useEventStreamContext } from '@/components/providers/EventStreamProvider';
 import { api } from '@/lib/api-client';
-import useSWR from 'swr';
 import type { PersonaCatalogResponse } from '@/app/routes/api.persona.catalog';
 
 interface AgentPageContentProps {
@@ -58,10 +57,27 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   const [showCreateAgentModal, setShowCreateAgentModal] = useState(false);
 
   // Fetch personas for the modal
-  const { data: personaData } = useSWR('/api/persona/catalog', (url: string) =>
-    api.get<PersonaCatalogResponse>(url)
-  );
-  const personas = personaData?.personas || [];
+  const [personas, setPersonas] = useState<PersonaCatalogResponse['personas']>([]);
+  const [personasLoading, setPersonasLoading] = useState(false);
+  const [personasError, setPersonasError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadPersonas = async () => {
+      setPersonasLoading(true);
+      setPersonasError(null);
+      try {
+        const data = await api.get<PersonaCatalogResponse>('/api/persona/catalog');
+        setPersonas(data.personas);
+      } catch (error) {
+        setPersonasError(error instanceof Error ? error.message : 'Failed to load personas');
+        setPersonas([]); // Graceful degradation
+      } finally {
+        setPersonasLoading(false);
+      }
+    };
+
+    void loadPersonas();
+  }, []);
 
   // Event handlers
   const handleAgentSelect = useCallback(
@@ -223,6 +239,8 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
         defaultPersonaName="default"
         defaultProviderInstanceId={providers.find((p) => p.configured)?.instanceId}
         defaultModelId={providers.find((p) => p.configured)?.models[0]?.id}
+        personasLoading={personasLoading}
+        personasError={personasError}
       />
     </motion.div>
   );

@@ -34,6 +34,8 @@ interface AgentCreateChatModalProps {
 
   // Loading state
   creating?: boolean;
+  personasLoading?: boolean;
+  personasError?: string | null;
 }
 
 export function AgentCreateChatModal({
@@ -46,6 +48,8 @@ export function AgentCreateChatModal({
   defaultProviderInstanceId,
   defaultModelId,
   creating = false,
+  personasLoading = false,
+  personasError = null,
 }: AgentCreateChatModalProps) {
   const [selectedPersona, setSelectedPersona] = useState(defaultPersonaName || '');
   const [selectedProviderInstanceId, setSelectedProviderInstanceId] = useState(
@@ -53,6 +57,7 @@ export function AgentCreateChatModal({
   );
   const [selectedModelId, setSelectedModelId] = useState(defaultModelId || '');
   const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Reset to defaults when modal opens
   useEffect(() => {
@@ -61,14 +66,16 @@ export function AgentCreateChatModal({
       setSelectedProviderInstanceId(defaultProviderInstanceId || '');
       setSelectedModelId(defaultModelId || '');
       setMessage('');
+      setIsSubmitting(false);
     }
   }, [isOpen, defaultPersonaName, defaultProviderInstanceId, defaultModelId]);
 
   const canCreate = selectedPersona && selectedProviderInstanceId && selectedModelId;
 
   const handleSend = async () => {
-    if (!canCreate) return;
+    if (!canCreate || isSubmitting || creating) return;
 
+    setIsSubmitting(true);
     try {
       await onCreateAgent({
         personaName: selectedPersona,
@@ -80,6 +87,8 @@ export function AgentCreateChatModal({
     } catch (error) {
       console.error('Failed to create agent:', error);
       // Error handling - keep modal open so user can retry
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -101,11 +110,15 @@ export function AgentCreateChatModal({
           <label className="block text-sm font-medium text-base-content/80 mb-2">
             Who are you messaging?
           </label>
+          {personasError && (
+            <div className="mb-2 text-sm text-error">Failed to load personas: {personasError}</div>
+          )}
           <PersonaSelector
             personas={personas}
             selectedPersona={selectedPersona}
             onChange={setSelectedPersona}
-            placeholder="Select persona..."
+            placeholder={personasLoading ? 'Loading personas...' : 'Select persona...'}
+            disabled={personasLoading}
             className="w-full"
           />
         </div>
@@ -117,7 +130,7 @@ export function AgentCreateChatModal({
             onChange={setMessage}
             onSend={handleSend}
             placeholder="Type a message (optional)..."
-            disabled={creating}
+            disabled={creating || isSubmitting}
             className="w-full"
           />
         </div>
@@ -143,11 +156,11 @@ export function AgentCreateChatModal({
           <button
             type="button"
             onClick={handleSend}
-            disabled={!canCreate || creating}
+            disabled={!canCreate || creating || isSubmitting}
             className="btn btn-primary flex items-center gap-2"
             data-testid="create-agent-send-button"
           >
-            {creating ? (
+            {creating || isSubmitting ? (
               <>
                 <div className="loading loading-spinner loading-sm"></div>
                 Creating...
