@@ -40,3 +40,5 @@ export { ApprovalPendingError, ApprovalDecision } from '~/tools/types';
 export { ensureLaceDir } from '~/config/lace-dir';
 export { UserSettingsManager } from '~/config/user-settings';
 export { MCPConfigLoader } from '~/config/mcp-config-loader';
+export { personaRegistry } from '~/config/persona-registry';
+export type { PersonaInfo } from '~/config/persona-registry';

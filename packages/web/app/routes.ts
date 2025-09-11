@@ -69,6 +69,9 @@ export default [
   // Provider management routes
   route('api/provider/catalog', 'routes/api.provider.catalog.ts'),
   route('api/provider/instances', 'routes/api.provider.instances.ts'),
+
+  // Persona management routes
+  route('api/persona/catalog', 'routes/api.persona.catalog.ts'),
   route('api/provider/instances/:instanceId', 'routes/api.provider.instances.$instanceId.ts'),
   route(
     'api/provider/instances/:instanceId/test',
