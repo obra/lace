@@ -1,7 +1,7 @@
-// ABOUTME: Reusable component for selecting provider instances and models
-// ABOUTME: Used in project and session configuration dialogs
+// ABOUTME: Unified model selector with provider grouping using optgroups
+// ABOUTME: Replaces separate provider/model dropdowns with single grouped selector
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import type { ProviderInfo } from '@/types/api';
 
 interface ModelSelectionFormProps {
@@ -21,85 +21,59 @@ export function ModelSelectionForm({
   onModelChange,
   className = '',
 }: ModelSelectionFormProps) {
-  // Get available providers (only those that are configured with instance IDs)
-  const availableProviders = useMemo(() => {
-    return providers.filter((p): p is ProviderInfo & { instanceId: string } =>
-      Boolean(p.configured && p.instanceId)
-    );
-  }, [providers]);
+  // Filter to only configured providers
+  const configuredProviders = providers.filter(
+    (provider) => provider.configured && provider.instanceId
+  );
 
-  // Get available models for selected provider
-  const availableModels = useMemo(() => {
-    const provider = providers.find((p) => p.instanceId === providerInstanceId);
-    return provider?.models || [];
-  }, [providers, providerInstanceId]);
+  // Current selection value
+  const currentValue = providerInstanceId && modelId ? `${providerInstanceId}:${modelId}` : '';
 
-  const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newInstanceId = e.target.value;
-    onProviderChange(newInstanceId);
+  const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = event.target.value;
+    if (!value) return;
 
-    // Auto-select first model when provider changes
-    const provider = providers.find((p) => p.instanceId === newInstanceId);
-    const providerModels = provider?.models || [];
-    if (providerModels.length > 0 && providerModels[0]) {
-      onModelChange(providerModels[0].id);
+    const [newProviderInstanceId, newModelId] = value.split(':');
+    if (newProviderInstanceId && newModelId) {
+      onProviderChange(newProviderInstanceId);
+      onModelChange(newModelId);
     }
   };
 
-  return (
-    <div className={`grid md:grid-cols-2 gap-4 ${className}`}>
-      <div>
-        <label className="label">
-          <span className="label-text font-medium">Provider Instance</span>
-        </label>
-        <select
-          value={providerInstanceId || ''}
-          onChange={handleProviderChange}
-          className="select select-bordered w-full"
-          required
-        >
-          {availableProviders.length === 0 ? (
-            <option value="">No providers configured</option>
-          ) : (
-            <>
-              {!providerInstanceId && <option value="">Select a provider</option>}
-              {availableProviders.map((provider) => (
-                <option key={provider.instanceId} value={provider.instanceId}>
-                  {provider.displayName}
-                </option>
-              ))}
-            </>
-          )}
-        </select>
-      </div>
+  const hasModels = configuredProviders.some((provider) => provider.models.length > 0);
 
-      <div>
-        <label className="label">
-          <span className="label-text font-medium">Model</span>
-        </label>
-        <select
-          value={modelId || ''}
-          onChange={(e) => onModelChange(e.target.value)}
-          className="select select-bordered w-full"
-          required
-          disabled={!providerInstanceId}
-        >
-          {!providerInstanceId ? (
-            <option value="">Select a provider first</option>
-          ) : availableModels.length === 0 ? (
-            <option value="">No models available</option>
-          ) : (
-            <>
-              {!modelId && <option value="">Select a model</option>}
-              {availableModels.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.displayName}
-                </option>
-              ))}
-            </>
-          )}
-        </select>
-      </div>
+  return (
+    <div className={className}>
+      <label className="label">
+        <span className="label-text font-medium">Provider / Model</span>
+      </label>
+      <select
+        value={currentValue}
+        onChange={handleChange}
+        className="select select-bordered w-full"
+        required
+        disabled={!hasModels}
+      >
+        <option value="" disabled>
+          {!hasModels ? 'No models available' : 'Select provider and model...'}
+        </option>
+
+        {configuredProviders.map(
+          (provider) =>
+            provider.models.length > 0 && (
+              <optgroup key={provider.instanceId} label={provider.displayName}>
+                {provider.models.map((model) => (
+                  <option
+                    key={`${provider.instanceId}:${model.id}`}
+                    value={`${provider.instanceId}:${model.id}`}
+                  >
+                    {model.displayName}
+                  </option>
+                ))}
+              </optgroup>
+            )
+        )}
+      </select>
     </div>
   );
 }

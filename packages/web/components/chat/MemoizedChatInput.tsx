@@ -7,6 +7,9 @@ import React, { useState, useCallback, memo, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { CompactTokenUsage } from '@/components/ui/CompactTokenUsage';
+import { ModelSelector } from '@/components/ui/ModelSelector';
+import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import type { ThreadId } from '@/types/core';
 
 export const MemoizedChatInput = memo(function MemoizedChatInput({
@@ -115,6 +118,26 @@ const CustomChatInput = memo(
       focus: () => chatInputRef.current?.focus(),
     }));
 
+    const { currentAgent, updateAgent } = useAgentContext();
+    const { availableProviders } = useProviderInstances();
+
+    const handleModelChange = useCallback(
+      async (providerInstanceId: string, modelId: string) => {
+        if (currentAgent) {
+          try {
+            await updateAgent(currentAgent.threadId, {
+              name: currentAgent.name,
+              providerInstanceId,
+              modelId,
+            });
+          } catch (error) {
+            console.error('Failed to update agent model:', error);
+          }
+        }
+      },
+      [currentAgent, updateAgent]
+    );
+
     return (
       <div className="space-y-2">
         {/* Chat Input */}
@@ -132,29 +155,45 @@ const CustomChatInput = memo(
 
         {/* Bottom Status Area */}
         <div className="flex justify-between items-center text-xs text-base-content/40 min-h-[16px]">
-          {/* Left side - Status messages */}
-          <div className="flex-1" aria-live="polite" aria-atomic="true">
-            {speechError ? (
-              <div className="flex items-center gap-2 text-error">
-                <div className="w-2 h-2 bg-error rounded-full"></div>
-                <span>Speech error</span>
-              </div>
-            ) : isListening ? (
-              <div className="flex items-center gap-2 text-success">
-                <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
-                <span>Listening...</span>
-              </div>
-            ) : isStreaming ? (
-              <div className="flex items-center gap-2 text-warning">
-                <div className="w-2 h-2 bg-warning rounded-full animate-pulse"></div>
-                <span>Agent is responding...</span>
-              </div>
-            ) : disabled ? (
-              <div className="flex items-center gap-2 text-success">
-                <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
-                <span>Tool running...</span>
-              </div>
-            ) : null}
+          {/* Left side - Status messages + Model Selector */}
+          <div className="flex items-center gap-4 flex-1" aria-live="polite" aria-atomic="true">
+            {/* Status messages */}
+            <div className="flex items-center gap-2">
+              {speechError ? (
+                <>
+                  <div className="w-2 h-2 bg-error rounded-full"></div>
+                  <span>Speech error</span>
+                </>
+              ) : isListening ? (
+                <>
+                  <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
+                  <span>Listening...</span>
+                </>
+              ) : isStreaming ? (
+                <>
+                  <div className="w-2 h-2 bg-warning rounded-full animate-pulse"></div>
+                  <span>Agent is responding...</span>
+                </>
+              ) : disabled ? (
+                <>
+                  <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
+                  <span>Tool running...</span>
+                </>
+              ) : null}
+            </div>
+
+            {/* Model Selector */}
+            {currentAgent && (
+              <ModelSelector
+                providers={availableProviders}
+                selectedProviderInstanceId={currentAgent.providerInstanceId}
+                selectedModelId={currentAgent.modelId}
+                onChange={handleModelChange}
+                disabled={isStreaming}
+                className="select select-ghost select-xs"
+                placeholder="Select model..."
+              />
+            )}
           </div>
 
           {/* Right side - Token usage */}

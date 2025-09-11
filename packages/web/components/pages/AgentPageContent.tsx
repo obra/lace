@@ -13,7 +13,6 @@ import { Chat } from '@/components/chat/Chat';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
-import { AgentEditModal } from '@/components/config/AgentEditModal';
 import { SessionEditModal } from '@/components/config/SessionEditModal';
 
 import { useUIContext } from '@/components/providers/UIProvider';
@@ -51,16 +50,6 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   // Agent summary state
   const [agentSummary, setAgentSummary] = useState<string | null>(null);
 
-  // Modal states
-  const [showEditAgent, setShowEditAgent] = useState(false);
-  const [editingAgent, setEditingAgent] = useState<{
-    threadId: string;
-    name: string;
-    providerInstanceId: string;
-    modelId: string;
-    persona: string;
-  } | null>(null);
-
   const [showSessionEditModal, setShowSessionEditModal] = useState(false);
 
   // Event handlers
@@ -75,45 +64,6 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
     // Navigate to root to show project selection
     navigateToRoot();
   }, [navigateToRoot]);
-
-  const handleConfigureAgent = useCallback(
-    async (agentIdToEdit: string) => {
-      try {
-        const agentDetails = await loadAgentConfiguration(agentIdToEdit);
-        setEditingAgent({
-          threadId: agentIdToEdit,
-          name: agentDetails.name,
-          providerInstanceId: agentDetails.providerInstanceId,
-          modelId: agentDetails.modelId,
-          persona: agentDetails.persona,
-        });
-        setShowEditAgent(true);
-      } catch (error) {
-        console.error('Failed to load agent for editing:', error);
-      }
-    },
-    [loadAgentConfiguration]
-  );
-
-  const handleEditAgentSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!editingAgent || !editingAgent.name.trim()) return;
-
-      try {
-        await updateAgent(editingAgent.threadId, {
-          name: editingAgent.name.trim(),
-          providerInstanceId: editingAgent.providerInstanceId,
-          modelId: editingAgent.modelId,
-        });
-        setShowEditAgent(false);
-        setEditingAgent(null);
-      } catch (error) {
-        console.error('Failed to update agent:', error);
-      }
-    },
-    [editingAgent, updateAgent]
-  );
 
   const handleConfigureSession = useCallback(() => {
     setShowSessionEditModal(true);
@@ -173,7 +123,6 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
                 onCloseMobileNav={toggleSidebar as () => void}
                 onSwitchProject={handleSwitchProject}
                 onAgentSelect={handleAgentSelect}
-                onConfigureAgent={handleConfigureAgent}
                 onConfigureSession={handleConfigureSession}
               />
             </Sidebar>
@@ -195,7 +144,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
               </motion.button>
               <div className="flex flex-col gap-1">
                 <h1 className="font-semibold text-base-content truncate">
-                  {currentAgent ? `${currentAgent.name} - ${currentAgent.modelId}` : 'Agent'}
+                  {currentAgent ? currentAgent.name : 'Agent'}
                 </h1>
                 {agentSummary && (
                   <p className="text-sm text-base-content/70 truncate">{agentSummary}</p>
@@ -215,20 +164,6 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
       {pendingApprovals && pendingApprovals.length > 0 && (
         <ToolApprovalModal approvals={pendingApprovals} onDecision={handleApprovalDecision} />
       )}
-
-      {/* Agent Edit Modal */}
-      <AgentEditModal
-        isOpen={showEditAgent}
-        editingAgent={editingAgent}
-        providers={providers}
-        loading={false}
-        onClose={() => {
-          setShowEditAgent(false);
-          setEditingAgent(null);
-        }}
-        onSubmit={handleEditAgentSubmit}
-        onAgentChange={setEditingAgent}
-      />
 
       {/* Session Edit Modal */}
       {currentProject && (

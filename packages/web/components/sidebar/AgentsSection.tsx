@@ -5,7 +5,7 @@
 
 import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRobot, faCog, faSquare, faChevronRight, faChevronDown } from '@/lib/fontawesome';
+import { faRobot, faSquare, faChevronRight, faChevronDown } from '@/lib/fontawesome';
 import { SidebarItem } from '@/components/layout/Sidebar';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useOptionalTaskContext } from '@/components/providers/TaskProvider';
@@ -16,14 +16,12 @@ interface AgentsSectionProps {
   isMobile?: boolean;
   onCloseMobileNav?: () => void;
   onAgentSelect: (agentId: ThreadId) => void;
-  onConfigureAgent?: (agentId: ThreadId) => void;
 }
 
 export function AgentsSection({
   isMobile = false,
   onCloseMobileNav,
   onAgentSelect,
-  onConfigureAgent,
 }: AgentsSectionProps) {
   // Get context data
   const { sessionDetails, selectedAgent } = useAgentContext();
@@ -119,16 +117,6 @@ export function AgentsSection({
                     )}
                   </div>
                 </SidebarItem>
-                {onConfigureAgent && selectedAgent === agent.threadId && (
-                  <button
-                    onClick={() => onConfigureAgent?.(agent.threadId)}
-                    className="p-1 hover:bg-base-200/60 rounded transition-colors flex-shrink-0"
-                    title="Configure agent"
-                    data-testid={`configure-agent-${agent.threadId}-button`}
-                  >
-                    <FontAwesomeIcon icon={faCog} className="w-3 h-3 text-base-content/40" />
-                  </button>
-                )}
               </div>
 
               {/* In-progress task - show directly */}

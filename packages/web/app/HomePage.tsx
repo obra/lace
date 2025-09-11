@@ -64,7 +64,6 @@ export function HomePage() {
                 onCloseMobileNav={toggleSidebar as () => void}
                 onSwitchProject={handleSwitchProject}
                 onAgentSelect={() => {}} // No agent navigation on home page
-                onConfigureAgent={() => {}} // No agent configuration on home page
                 onConfigureSession={() => {}} // No session configuration on home page
               />
             </Sidebar>
