@@ -104,7 +104,7 @@ describe('ProviderInstanceProvider Regression Tests', () => {
     expect(mockApi.get).toHaveBeenCalledWith('/api/provider/instances');
   });
 
-  it('should handle mounted ref correctly and not block data loading', async () => {
+  it('should fail when mounted ref blocks state updates (demonstrates the bug)', async () => {
     // This test specifically targets the mounted ref issue
     function ProblematicProvider({ children }: { children: React.ReactNode }) {
       const mountedRef = useRef(true);
