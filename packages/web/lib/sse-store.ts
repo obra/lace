@@ -277,7 +277,7 @@ const sseStore = create<SSEState & SSEActions>()(
 );
 
 // HMR support to prevent store reset during development
-if (import.meta.hot) {
+if (import.meta.hot && import.meta.hot.data) {
   const hotData = import.meta.hot.data as Record<string, unknown>;
   const savedState = hotData.sseStore as (SSEState & SSEActions) | undefined;
   if (savedState) {
