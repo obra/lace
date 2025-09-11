@@ -48,6 +48,8 @@ export type { MCPServerConfig, DiscoveredTool, MCPConfig } from '~/config/mcp-ty
 
 export type { CompactionData } from '~/threads/compaction/types';
 
+export type { PersonaInfo } from '~/config/persona-registry';
+
 // Re-export utility functions
 export {
   asThreadId,
