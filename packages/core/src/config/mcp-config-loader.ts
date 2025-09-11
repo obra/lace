@@ -71,7 +71,7 @@ export class MCPConfigLoader {
           enabled: false,
           tools: {},
         };
-        console.warn(`Disabled invalid MCP server ${serverId}:`, error);
+        logger.warn(`Disabled invalid MCP server ${serverId}:`, { serverId, error });
       }
     }
 

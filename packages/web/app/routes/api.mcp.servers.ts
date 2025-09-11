@@ -4,6 +4,7 @@
 import { MCPConfigLoader, ToolCatalog } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
+import { logger } from '~/utils/logger';
 import { z } from 'zod';
 import type { MCPServerConfig } from '@/types/core';
 
@@ -35,7 +36,7 @@ export async function loader({
 
     return createSuperjsonResponse({ servers });
   } catch (error) {
-    console.error('Failed to load global MCP configuration:', error);
+    logger.error('Failed to load global MCP configuration:', { error });
     return createErrorResponse('Failed to load global MCP configuration', 500);
   }
 }
