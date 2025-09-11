@@ -80,12 +80,10 @@ vi.mock('@/components/sidebar/AgentsSection', () => ({
   AgentsSection: ({
     isMobile,
     onAgentSelect,
-    onConfigureAgent,
     onCloseMobileNav,
   }: {
     isMobile: boolean;
     onAgentSelect: (agentId: string) => void;
-    onConfigureAgent?: (agentId: string) => void;
     onCloseMobileNav?: () => void;
   }) => (
     <div data-testid="agents-section">
@@ -93,11 +91,6 @@ vi.mock('@/components/sidebar/AgentsSection', () => ({
       <button onClick={() => onAgentSelect('test-agent')} data-testid="select-agent">
         Select Agent
       </button>
-      {onConfigureAgent && (
-        <button onClick={() => onConfigureAgent('test-agent')} data-testid="configure-agent">
-          Configure Agent
-        </button>
-      )}
       {onCloseMobileNav && (
         <button onClick={onCloseMobileNav} data-testid="close-mobile-nav-agents">
           Close
@@ -162,7 +155,6 @@ describe('SidebarContent', () => {
     onSwitchProject: vi.fn(),
     onAgentSelect: vi.fn(),
     onClearAgent: vi.fn(),
-    onConfigureAgent: vi.fn(),
     onConfigureSession: vi.fn(),
     onCloseMobileNav: vi.fn(),
   };
@@ -305,14 +297,6 @@ describe('SidebarContent', () => {
       screen.getByTestId('select-agent').click();
 
       expect(mockHandlers.onAgentSelect).toHaveBeenCalledWith('test-agent');
-    });
-
-    it('calls onConfigureAgent when AgentsSection triggers it', () => {
-      render(<SidebarContent {...defaultProps} />);
-
-      screen.getByTestId('configure-agent').click();
-
-      expect(mockHandlers.onConfigureAgent).toHaveBeenCalledWith('test-agent');
     });
 
     it('calls onCloseMobileNav from all sections in mobile mode', () => {
