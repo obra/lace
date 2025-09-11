@@ -51,7 +51,7 @@ When `LACE_SQL_PROFILING=true`:
 ### Testing
 ```bash
 npm test            # Run tests in watch mode
-npm run test:run    # Run tests once
+npm run test    # Run tests once
 npm run test:unit   # Unit tests only
 npm run test:integration # Integration tests
 npm run test:coverage # Run tests with coverage report
@@ -153,23 +153,14 @@ Events include: USER_MESSAGE, AGENT_MESSAGE, TOOL_CALL, TOOL_RESULT, THINKING, S
 - **TypeScript 5.6+** with strict mode
 - **Node.js** with ES modules
 - **SQLite** (better-sqlite3) for persistence
-- **React 19 + NextJS 15 ** for web interface
+- **React 19 + React Router 7 ** for web interface
 - **Vitest and Playwright** for testing
 - **ESLint + Prettier** for code quality
-
-## Styling and CSS
-
-**⚠️ CRITICAL: DaisyUI Plugin in globals.css**
-- The line `@plugin "daisyui";` in `packages/web/app/globals.css` is **ESSENTIAL** and must **NEVER** be removed
-- Removing this line will break the entire app's CSS styling system
-- DaisyUI components and utilities depend on this plugin declaration
-- This is in addition to the DaisyUI plugin in `tailwind.config.js` - both are required
 
 **CSS Architecture:**
 - **Tailwind CSS** for utility-first styling
 - **DaisyUI** for component library and themes  
 - **CSS Variables** for dynamic theming and font management
-- **Google Fonts** loaded via Next.js font optimization + CSS imports
 
 ## UI Component System Philosophy
 
@@ -360,9 +351,9 @@ ThreadProcessor caches processed events for performance.
 
 ## Configuration
 
-- **Environment**: ANTHROPIC_KEY, OPENAI_API_KEY, LACE_DIR
+- **Environment**: LACE_DIR
 - **User Instructions**: `~/.lace/instructions.md`
-- **System Prompts**: Template-based generation in `src/config/prompts/`
+- **System Prompts**: Template-based generation in `packages/core/config/agent-personas/`
 - **Database**: SQLite storage in LACE_DIR with graceful degradation
 
 ## Security & Safety
@@ -374,15 +365,13 @@ ThreadProcessor caches processed events for performance.
 - Configurable approval policies
 
 
-## Debugging and Development
-
-Because the UI is a full terminal application, it's hard for you to debug it interactively. Sometimes, it's better to refactor components into smaller, more easily testable pieces. Sometimes, it's better to ask your human partner to test something for you. 
 
 ### Server-Side Debugging
-You MUST NEVER use console.log for server-side debugging. Instead, use the logger system and inspect the logs after runs.
+
+You MUST NEVER use console.log for server-side debugging. Instead, use the `logger` system and inspect the logs after runs.
 
 ### Web Development Debugging  
-For the Next.js web interface (`packages/web`), browser console messages are automatically forwarded to your development server terminal. This means you CAN use `console.log`, `console.error`, etc. in React components and client-side code - they will appear in your server logs with colored `[BROWSER]` prefixes and proper object serialization (including circular references and dates).
+For the React Router web interface (`packages/web`), browser console messages are automatically forwarded to your development server terminal. This means you CAN use `console.log`, `console.error`, etc. in React components and client-side code - they will appear in your server logs with colored `[BROWSER]` prefixes and proper object serialization (including circular references and dates).
 
 The console forwarding system:
 - Only runs in development mode  
