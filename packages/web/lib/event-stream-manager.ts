@@ -98,6 +98,7 @@ interface ClientConnection {
   };
   lastEventId?: string;
   connectedAt: Date;
+  lastSendAt: number; // unix ms of last successful enqueue
 }
 
 // Use global to persist across HMR in development
@@ -309,6 +310,7 @@ export class EventStreamManager {
       controller,
       subscription,
       connectedAt: new Date(),
+      lastSendAt: Date.now(),
     };
 
     this.connections.set(connectionId, connection);
@@ -331,16 +333,23 @@ export class EventStreamManager {
     }
 
     // Send connection confirmation as LaceEvent
-    this.sendToConnection(connection, {
-      id: this.generateEventId(),
-      timestamp: new Date(),
-      type: 'LOCAL_SYSTEM_MESSAGE',
-      data: 'Ready!',
-      transient: true,
-      context: {
-        systemMessage: true,
-      },
-    });
+    try {
+      this.sendToConnection(connection, {
+        id: this.generateEventId(),
+        timestamp: new Date(),
+        type: 'LOCAL_SYSTEM_MESSAGE',
+        data: 'Ready!',
+        transient: true,
+        context: {
+          systemMessage: true,
+        },
+      });
+    } catch (error) {
+      // Connection failed immediately - remove it
+      logger.debug(`[EVENT_STREAM] Connection ${connectionId} failed on initial send`, error);
+      this.removeConnection(connectionId);
+      throw error;
+    }
 
     return connectionId;
   }
@@ -476,12 +485,7 @@ export class EventStreamManager {
     }
 
     // Event type filtering removed - LaceEvent handles all types
-
-    // Global filtering - include all if subscription.global is true
-    if (subscription.global === true) {
-      return true;
-    }
-
+    // Currently all connections receive all events (global subscription)
     return true;
   }
 
@@ -508,12 +512,25 @@ export class EventStreamManager {
     try {
       connection.controller.enqueue(chunk);
       connection.lastEventId = event.id;
+      connection.lastSendAt = Date.now();
     } catch (error) {
-      // Controller may have been closed between broadcast and send
-      if (hasErrorCode(error) && error.code === 'ERR_INVALID_STATE') {
-        throw new Error('Controller is closed');
+      // Any error during enqueue indicates a dead connection
+      logger.debug(`[EVENT_STREAM] Failed to send event to connection ${connection.id}`, {
+        eventId: event.id,
+        error: error instanceof Error ? error.message : String(error),
+        connectionAge: Date.now() - connection.connectedAt.getTime(),
+      });
+
+      class ControllerClosedError extends Error {
+        public readonly cause?: unknown;
+
+        constructor(message: string, cause?: unknown) {
+          super(message);
+          this.name = 'ControllerClosedError';
+          this.cause = cause;
+        }
       }
-      throw error;
+      throw new ControllerClosedError('Controller is closed', error);
     }
   }
 
@@ -600,10 +617,13 @@ export class EventStreamManager {
       clearInterval(this.keepAliveInterval);
     }
 
-    // Send keepalive every 30 seconds
+    // Send keepalive every 30 seconds to detect dead connections
     this.keepAliveInterval = setInterval(() => {
       this.sendKeepAlive();
     }, this.KEEPALIVE_INTERVAL);
+
+    // Allow process to exit naturally if this is the only handle
+    this.keepAliveInterval.unref?.();
   }
 
   // Stop keepalive timer
@@ -622,21 +642,65 @@ export class EventStreamManager {
 
     for (const [connectionId, connection] of this.connections) {
       try {
-        // Check if controller is still open before trying to send
-        if (connection.controller.desiredSize !== null) {
-          connection.controller.enqueue(keepAliveBytes);
-        } else {
+        // Check controller state first
+        if (connection.controller.desiredSize === null) {
+          logger.debug(`[EVENT_STREAM] Controller desiredSize is null for ${connectionId}`);
+          deadConnections.push(connectionId);
+          continue;
+        }
+
+        const now = Date.now();
+
+        // Check if connection hasn't had successful sends recently
+        const timeSinceLastSend = now - connection.lastSendAt;
+        const MAX_STALE_TIME = 90000; // 90 seconds without successful sends
+
+        if (timeSinceLastSend > MAX_STALE_TIME) {
+          logger.info(`[EVENT_STREAM] Connection ${connectionId} stale - no successful sends`, {
+            timeSinceLastSend,
+            lastSendAt: new Date(connection.lastSendAt).toISOString(),
+          });
+          deadConnections.push(connectionId);
+          continue;
+        }
+
+        // Check for backpressure before sending
+        if (
+          typeof connection.controller.desiredSize === 'number' &&
+          connection.controller.desiredSize <= 0
+        ) {
+          logger.debug(
+            `[EVENT_STREAM] Connection ${connectionId} has backpressure (desiredSize: ${connection.controller.desiredSize})`
+          );
+        }
+
+        // Force a write to detect dead connections
+        connection.controller.enqueue(keepAliveBytes);
+        connection.lastSendAt = now;
+
+        // Check if the write caused immediate failure
+        if (connection.controller.desiredSize === null) {
+          logger.debug(`[EVENT_STREAM] Controller became null after enqueue for ${connectionId}`);
           deadConnections.push(connectionId);
         }
-      } catch (_error) {
-        // Connection is dead
+      } catch (error) {
+        // Connection is dead - any write error means we should clean up
+        logger.debug(`[EVENT_STREAM] Keepalive failed for connection ${connectionId}`, {
+          error: error instanceof Error ? error.message : String(error),
+          desiredSize: connection.controller.desiredSize,
+        });
         deadConnections.push(connectionId);
       }
     }
 
-    // Clean up dead connections
-    for (const connectionId of deadConnections) {
-      this.removeConnection(connectionId);
+    // Clean up dead connections immediately
+    if (deadConnections.length > 0) {
+      logger.info(
+        `[EVENT_STREAM] Cleaning up ${deadConnections.length} dead connections from keepalive`
+      );
+      for (const connectionId of deadConnections) {
+        this.removeConnection(connectionId);
+      }
     }
 
     // Stop keepalive if no connections

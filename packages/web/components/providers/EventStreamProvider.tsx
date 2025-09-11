@@ -26,7 +26,6 @@ import type { PendingApproval } from '@/types/api';
 interface EventStreamConnection {
   connection: StreamConnection;
   lastEvent?: LaceEvent;
-  sendCount: number;
   close: () => void;
   reconnect: () => void;
 }
@@ -234,7 +233,6 @@ export function EventStreamProvider({
       eventStream: {
         connection: eventStreamResult.connection,
         lastEvent: eventStreamResult.lastEvent,
-        sendCount: eventStreamResult.sendCount,
         close: eventStreamResult.close,
         reconnect: eventStreamResult.reconnect,
       },
@@ -260,7 +258,6 @@ export function EventStreamProvider({
     [
       eventStreamResult.connection,
       eventStreamResult.lastEvent,
-      eventStreamResult.sendCount,
       eventStreamResult.close,
       eventStreamResult.reconnect,
       events,
@@ -287,22 +284,7 @@ export function useEventStreamContext(): EventStreamContextType {
   return context;
 }
 
-// Convenience hooks for specific functionality
-export function useEventStreamConnection() {
-  const context = useContext(EventStreamContext);
-
-  if (!context) {
-    throw new Error('useEventStreamConnection must be used within EventStreamProvider');
-  }
-
-  return {
-    connection: context.eventStream.connection,
-    lastEvent: context.eventStream.lastEvent,
-    sendCount: context.eventStream.sendCount,
-    close: context.eventStream.close,
-    reconnect: context.eventStream.reconnect,
-  };
-}
+// Note: useEventStreamConnection removed - no production components use it
 
 export function useSessionEvents() {
   const context = useContext(EventStreamContext);
