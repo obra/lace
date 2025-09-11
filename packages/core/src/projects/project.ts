@@ -13,8 +13,9 @@ import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { getProcessTempDir } from '~/config/lace-dir';
 import { MCPConfigLoader } from '~/config/mcp-config-loader';
 import type { MCPServerConfig } from '~/config/mcp-types';
-import type { ToolExecutor } from '~/tools/executor';
+import { ToolExecutor } from '~/tools/executor';
 import { ToolCatalog } from '~/tools/tool-catalog';
+import { MCPServerManager } from '~/mcp/server-manager';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 
@@ -399,8 +400,7 @@ export class Project {
   /**
    * Create ToolExecutor with project MCP servers for configuration APIs
    */
-  async createToolExecutor(): Promise<ToolExecutor> {
-    const { ToolExecutor } = await import('~/tools/executor');
+  createToolExecutor(): ToolExecutor {
     const toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
 
@@ -408,7 +408,6 @@ export class Project {
     // without actually starting the servers (that happens in sessions)
     const mcpServers = this.getMCPServers();
     if (Object.keys(mcpServers).length > 0) {
-      const { MCPServerManager } = await import('~/mcp/server-manager');
       const mcpManager = new MCPServerManager();
       toolExecutor.registerMCPTools(mcpManager);
 

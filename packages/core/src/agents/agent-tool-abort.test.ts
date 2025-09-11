@@ -183,8 +183,10 @@ describe('Agent Tool Abort Functionality', () => {
     // Wait for the message processing to complete/abort
     await messagePromise;
 
-    // Give events time to process
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Wait until the single tool completion event is observed (max ~1s)
+    for (let i = 0; i < 50 && toolCompletedCount < 1; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
 
     // Check that tool was marked as cancelled
     expect(toolCompletedCount).toBe(1);
@@ -247,8 +249,10 @@ describe('Agent Tool Abort Functionality', () => {
 
     await messagePromise;
 
-    // Give events time to process
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Wait until all three tool completions arrive (max ~1s)
+    for (let i = 0; i < 50 && toolResults.length < 3; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
 
     // All tools should be cancelled
     expect(toolResults.length).toBe(3);
@@ -369,8 +373,10 @@ describe('Agent Tool Abort Functionality', () => {
 
     await messagePromise;
 
-    // Give events time to process
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Wait until both results are observed (max ~1s)
+    for (let i = 0; i < 50 && toolResults.size < 2; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
 
     // Check results
     expect(toolResults.size).toBe(2);
@@ -440,8 +446,10 @@ describe('Agent Tool Abort Functionality', () => {
     agent.abort();
     await firstMessagePromise;
 
-    // Give events time to process
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Wait for the first result to be set (max ~1s)
+    for (let i = 0; i < 50 && !firstResult; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
 
     expect(firstResult).not.toBeNull();
     expect(firstResult!.status).toBe('aborted');

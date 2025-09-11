@@ -643,7 +643,7 @@ describe('Project', () => {
     }
     it('should start async discovery when adding MCP server', async () => {
       const { ToolCatalog } = await import('~/tools/tool-catalog');
-      const discoverSpy = vi.spyOn(ToolCatalog, 'discoverAndCacheTools').mockResolvedValue();
+      const discoverSpy = vi.spyOn(ToolCatalog, 'discoverAndCacheTools').mockResolvedValue(void 0);
 
       // Use temp directory that exists
       const tempDir = getProcessTempDir();
