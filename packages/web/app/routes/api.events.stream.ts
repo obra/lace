@@ -13,10 +13,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     const manager = EventStreamManager.getInstance();
 
     // Create SSE stream
+    let connectionId: string;
+
     const stream = new ReadableStream<Uint8Array>({
       start(controller: ReadableStreamDefaultController<Uint8Array>) {
         // Add connection to manager with empty subscription (all events)
-        const connectionId = manager.addConnection(controller, subscription);
+        connectionId = manager.addConnection(controller, subscription);
 
         // Handle connection cleanup
         request.signal?.addEventListener('abort', () => {
@@ -26,8 +28,11 @@ export async function loader({ request }: Route.LoaderArgs) {
         return connectionId;
       },
 
-      cancel() {
-        // Connection cleanup is handled by abort listener
+      cancel(_reason) {
+        // Clean up connection when stream is cancelled (client disconnects)
+        if (connectionId) {
+          manager.removeConnection(connectionId);
+        }
       },
     });
 

@@ -98,6 +98,8 @@ interface ClientConnection {
   };
   lastEventId?: string;
   connectedAt: Date;
+  lastKeepaliveAt: Date | null; // Track when we last sent keepalive
+  keepaliveCount: number; // Track unacknowledged keepalives
 }
 
 // Use global to persist across HMR in development
@@ -111,8 +113,7 @@ export class EventStreamManager {
   private readonly MAX_CONNECTIONS = 100; // Global limit
   private eventIdCounter = 0;
   private keepAliveInterval: NodeJS.Timeout | null = null;
-  private readonly KEEPALIVE_INTERVAL = process.env.NODE_ENV === 'development' ? 5000 : 15000; // 5s dev, 15s prod
-  private readonly MAX_CONNECTION_AGE = 10 * 60 * 1000; // 10 minutes maximum connection age
+  private readonly KEEPALIVE_INTERVAL = 30000; // 30 seconds
 
   private constructor() {
     this.startKeepAlive();
@@ -310,6 +311,8 @@ export class EventStreamManager {
       controller,
       subscription,
       connectedAt: new Date(),
+      lastKeepaliveAt: null,
+      keepaliveCount: 0,
     };
 
     this.connections.set(connectionId, connection);
@@ -332,16 +335,23 @@ export class EventStreamManager {
     }
 
     // Send connection confirmation as LaceEvent
-    this.sendToConnection(connection, {
-      id: this.generateEventId(),
-      timestamp: new Date(),
-      type: 'LOCAL_SYSTEM_MESSAGE',
-      data: 'Ready!',
-      transient: true,
-      context: {
-        systemMessage: true,
-      },
-    });
+    try {
+      this.sendToConnection(connection, {
+        id: this.generateEventId(),
+        timestamp: new Date(),
+        type: 'LOCAL_SYSTEM_MESSAGE',
+        data: 'Ready!',
+        transient: true,
+        context: {
+          systemMessage: true,
+        },
+      });
+    } catch (error) {
+      // Connection failed immediately - remove it
+      logger.debug(`[EVENT_STREAM] Connection ${connectionId} failed on initial send`, error);
+      this.removeConnection(connectionId);
+      throw error;
+    }
 
     return connectionId;
   }
@@ -603,7 +613,7 @@ export class EventStreamManager {
       clearInterval(this.keepAliveInterval);
     }
 
-    // Send keepalive more frequently in development for faster dead connection detection
+    // Send keepalive every 30 seconds to detect dead connections
     this.keepAliveInterval = setInterval(() => {
       this.sendKeepAlive();
     }, this.KEEPALIVE_INTERVAL);
@@ -625,20 +635,6 @@ export class EventStreamManager {
 
     for (const [connectionId, connection] of this.connections) {
       try {
-        // Check connection age first - force disconnect old connections
-        const connectionAge = Date.now() - connection.connectedAt.getTime();
-        if (connectionAge > this.MAX_CONNECTION_AGE) {
-          logger.info(
-            `[EVENT_STREAM] Connection ${connectionId} exceeded max age (${connectionAge}ms)`,
-            {
-              connectionAge,
-              maxAge: this.MAX_CONNECTION_AGE,
-            }
-          );
-          deadConnections.push(connectionId);
-          continue;
-        }
-
         // Check controller state first
         if (connection.controller.desiredSize === null) {
           logger.debug(`[EVENT_STREAM] Controller desiredSize is null for ${connectionId}`);
@@ -646,10 +642,38 @@ export class EventStreamManager {
           continue;
         }
 
+        const now = new Date();
+
+        // Check if connection is stale (keepalives not being consumed)
+        if (connection.lastKeepaliveAt) {
+          const keepaliveDuration = now.getTime() - connection.lastKeepaliveAt.getTime();
+          const MAX_KEEPALIVE_AGE = 90000; // 90 seconds - 3 keepalive cycles
+
+          if (keepaliveDuration > MAX_KEEPALIVE_AGE && connection.keepaliveCount > 2) {
+            logger.info(
+              `[EVENT_STREAM] Connection ${connectionId} stale - keepalives not being consumed`,
+              {
+                keepaliveDuration,
+                keepaliveCount: connection.keepaliveCount,
+                lastKeepaliveAt: connection.lastKeepaliveAt.toISOString(),
+              }
+            );
+            deadConnections.push(connectionId);
+            continue;
+          }
+        }
+
         // Force a write to detect dead connections
         connection.controller.enqueue(keepAliveBytes);
+        connection.lastKeepaliveAt = now;
+        connection.keepaliveCount++;
 
-        // Check if the write caused any state changes
+        // Reset keepalive count periodically if connection seems healthy
+        if (connection.keepaliveCount > 10 && connection.controller.desiredSize !== null) {
+          connection.keepaliveCount = Math.max(1, connection.keepaliveCount - 1);
+        }
+
+        // Check if the write caused immediate failure
         if (connection.controller.desiredSize === null) {
           logger.debug(`[EVENT_STREAM] Controller became null after enqueue for ${connectionId}`);
           deadConnections.push(connectionId);
