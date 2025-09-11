@@ -7,6 +7,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCircle, faTrash, faPause, faPlay, faFilter } from '@/lib/fontawesome';
 import { parseTyped } from '@/lib/serialization';
+import { useEventStream } from '@/hooks/useEventStream';
+import { useSSEStore } from '@/lib/sse-store';
 import type { LaceEvent } from '@/types/core';
 interface EventStreamMonitorProps {
   maxEvents?: number;
@@ -14,16 +16,19 @@ interface EventStreamMonitorProps {
 
 export function EventStreamMonitor({ maxEvents = 1000 }: EventStreamMonitorProps) {
   const [events, setEvents] = useState<LaceEvent[]>([]);
-  const [connectionStatus, setConnectionStatus] = useState<
-    'connecting' | 'connected' | 'disconnected'
-  >('disconnected');
   const [isPaused, setIsPaused] = useState(false);
   const [hideTokenEvents, setHideTokenEvents] = useState(true); // Hide noisy token events by default
-  const eventSourceRef = useRef<EventSource | null>(null);
   const eventsEndRef = useRef<HTMLDivElement>(null);
-  const mountedRef = useRef(true);
   const pauseRef = useRef(false);
-  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get connection status from shared Zustand store
+  const connectionStatus = useSSEStore((state) =>
+    state.connectionStatus === 'connected'
+      ? 'connected'
+      : state.connectionStatus === 'connecting'
+        ? 'connecting'
+        : 'disconnected'
+  );
 
   // Update pause ref when isPaused changes (without triggering reconnection)
   useEffect(() => {
@@ -42,88 +47,18 @@ export function EventStreamMonitor({ maxEvents = 1000 }: EventStreamMonitorProps
     }
   }, [events]);
 
-  // Connect to SSE stream (stable connection, no recreation on pause)
-  useEffect(() => {
-    mountedRef.current = true;
-    const connectToEventStream = () => {
-      // Clear any existing reconnect timer
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
+  // Use shared EventStream instead of direct EventSource
+  useEventStream({
+    onSessionEvent: (event) => {
+      // Check pause state via ref (no dependency on isPaused state)
+      if (pauseRef.current) return;
 
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-
-      if (!mountedRef.current) return; // Don't connect if unmounted
-
-      setConnectionStatus('connecting');
-      const eventSource = new EventSource('/api/events/stream');
-      eventSourceRef.current = eventSource;
-
-      eventSource.onopen = () => {
-        if (mountedRef.current) {
-          setConnectionStatus('connected');
-        }
-      };
-
-      eventSource.onmessage = (event) => {
-        // Check pause state via ref (no dependency on isPaused state)
-        if (pauseRef.current || !mountedRef.current) return;
-
-        try {
-          // Use SuperJSON parseTyped instead of JSON.parse
-          const parsedEvent = parseTyped<LaceEvent>(event.data as string);
-
-          if (mountedRef.current) {
-            setEvents((prev) => {
-              const newEvents = [...prev, parsedEvent].slice(-maxEvents);
-              return newEvents;
-            });
-          }
-        } catch (error) {
-          console.warn('Failed to parse SSE event with SuperJSON:', error, 'Raw data:', event.data);
-        }
-      };
-
-      eventSource.onerror = () => {
-        if (!mountedRef.current) return;
-
-        setConnectionStatus('disconnected');
-
-        // Clear any existing timer before setting new one
-        if (reconnectTimerRef.current) {
-          clearTimeout(reconnectTimerRef.current);
-        }
-
-        // Auto-reconnect after 2 seconds
-        reconnectTimerRef.current = setTimeout(() => {
-          if (mountedRef.current) {
-            connectToEventStream();
-          }
-        }, 2000);
-      };
-    };
-
-    connectToEventStream();
-
-    return () => {
-      mountedRef.current = false;
-
-      // Clear reconnect timer
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
-
-      // Close connection
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-    };
-  }, [maxEvents]); // Removed isPaused from deps to prevent reconnection on pause
+      setEvents((prev) => {
+        const newEvents = [...prev, event].slice(-maxEvents);
+        return newEvents;
+      });
+    },
+  });
 
   const clearEvents = () => {
     setEvents([]);

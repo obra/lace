@@ -509,11 +509,13 @@ export class EventStreamManager {
       connection.controller.enqueue(chunk);
       connection.lastEventId = event.id;
     } catch (error) {
-      // Controller may have been closed between broadcast and send
-      if (hasErrorCode(error) && error.code === 'ERR_INVALID_STATE') {
-        throw new Error('Controller is closed');
-      }
-      throw error;
+      // Any error during enqueue indicates a dead connection
+      logger.debug(`[EVENT_STREAM] Failed to send event to connection ${connection.id}`, {
+        eventId: event.id,
+        error: error instanceof Error ? error.message : String(error),
+        connectionAge: Date.now() - connection.connectedAt.getTime(),
+      });
+      throw new Error('Controller is closed');
     }
   }
 
@@ -622,21 +624,39 @@ export class EventStreamManager {
 
     for (const [connectionId, connection] of this.connections) {
       try {
-        // Check if controller is still open before trying to send
-        if (connection.controller.desiredSize !== null) {
-          connection.controller.enqueue(keepAliveBytes);
-        } else {
+        // Check controller state first
+        if (connection.controller.desiredSize === null) {
+          logger.debug(`[EVENT_STREAM] Controller desiredSize is null for ${connectionId}`);
+          deadConnections.push(connectionId);
+          continue;
+        }
+
+        // Force a write to detect dead connections
+        connection.controller.enqueue(keepAliveBytes);
+
+        // Check if the write caused any state changes
+        if (connection.controller.desiredSize === null) {
+          logger.debug(`[EVENT_STREAM] Controller became null after enqueue for ${connectionId}`);
           deadConnections.push(connectionId);
         }
-      } catch (_error) {
-        // Connection is dead
+      } catch (error) {
+        // Connection is dead - any write error means we should clean up
+        logger.debug(`[EVENT_STREAM] Keepalive failed for connection ${connectionId}`, {
+          error: error instanceof Error ? error.message : String(error),
+          desiredSize: connection.controller.desiredSize,
+        });
         deadConnections.push(connectionId);
       }
     }
 
-    // Clean up dead connections
-    for (const connectionId of deadConnections) {
-      this.removeConnection(connectionId);
+    // Clean up dead connections immediately
+    if (deadConnections.length > 0) {
+      logger.info(
+        `[EVENT_STREAM] Cleaning up ${deadConnections.length} dead connections from keepalive`
+      );
+      for (const connectionId of deadConnections) {
+        this.removeConnection(connectionId);
+      }
     }
 
     // Stop keepalive if no connections

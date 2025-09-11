@@ -2,7 +2,7 @@
 // ABOUTME: Maintains same API as original but uses shared EventSource connection
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { EventStreamFirehose } from '@/lib/event-stream-firehose';
+import { useSSEStore } from '@/lib/sse-store';
 import type { LaceEvent, Task, AgentErrorData } from '@/types/core';
 import type { PendingApproval } from '@/types/api';
 
@@ -180,10 +180,10 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
 
   // Subscribe/unsubscribe effect - only runs when filter changes
   useEffect(() => {
-    const firehose = EventStreamFirehose.getInstance();
+    const store = useSSEStore.getState();
 
     // Pass current options directly to avoid stale closure - handlers are resolved at call-time
-    subscriptionIdRef.current = firehose.subscribe(filter, (event) => {
+    subscriptionIdRef.current = store.subscribe(filter, (event) => {
       // Get fresh handlers at the moment the event arrives
       const currentOptions = optionsRef.current;
 
@@ -291,39 +291,39 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
 
     return () => {
       if (subscriptionIdRef.current) {
-        firehose.unsubscribe(subscriptionIdRef.current);
+        store.unsubscribe(subscriptionIdRef.current);
         subscriptionIdRef.current = null;
       }
     };
   }, [filter]); // Only depend on filter
 
-  // Get current stats from firehose (handle case where getInstance might not be mocked properly)
-  const stats = useMemo(() => {
-    try {
-      return EventStreamFirehose.getInstance().getStats();
-    } catch (_error) {
-      // Fallback for test environments where mock might not be set up
-      return {
-        isConnected: true, // Assume connected for compatibility
-        subscriptionCount: 1,
-        eventsReceived: 0,
-        connectionUrl: null,
-        connectedAt: null,
-      };
-    }
-  }, []);
+  // Get current stats from Zustand store - connection status only
+  const connectionStatus = useSSEStore((state) => state.connectionStatus);
+  const eventSource = useSSEStore((state) => state.eventSource);
+  const connectedAt = useSSEStore((state) => state.lastConnectedAt);
 
-  // Backward-compatible close function (no-op for firehose)
+  const stats = useMemo(
+    () => ({
+      isConnected: connectionStatus === 'connected',
+      subscriptionCount: 1, // Simplified for compatibility
+      eventsReceived: 0, // Components track their own events
+      connectionUrl: eventSource?.url || null,
+      connectedAt,
+    }),
+    [connectionStatus, eventSource, connectedAt]
+  );
+
+  // Backward-compatible close function
   const close = useCallback(() => {
     if (subscriptionIdRef.current) {
-      EventStreamFirehose.getInstance().unsubscribe(subscriptionIdRef.current);
+      useSSEStore.getState().unsubscribe(subscriptionIdRef.current);
       subscriptionIdRef.current = null;
     }
   }, []);
 
-  // Backward-compatible reconnect function (no-op for firehose)
+  // Backward-compatible reconnect function
   const reconnect = useCallback(() => {
-    // Firehose handles reconnection automatically
+    useSSEStore.getState().reconnect();
   }, []);
 
   return {
