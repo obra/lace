@@ -144,7 +144,6 @@ export interface UseEventStreamResult {
     lastEventId?: string;
   };
   lastEvent?: LaceEvent;
-  sendCount: number;
   close: () => void;
   reconnect: () => void;
 }
@@ -297,20 +296,17 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
     };
   }, [filter]); // Only depend on filter
 
-  // Get current stats from Zustand store - connection status only
-  const connectionStatus = useSSEStore((state) => state.connectionStatus);
-  const eventSource = useSSEStore((state) => state.eventSource);
-  const connectedAt = useSSEStore((state) => state.lastConnectedAt);
+  // Get real connection stats from store
+  const connectionStats = useSSEStore.getState().getConnectionStats();
 
   const stats = useMemo(
     () => ({
-      isConnected: connectionStatus === 'connected',
-      subscriptionCount: 1, // Simplified for compatibility
-      eventsReceived: 0, // Components track their own events
-      connectionUrl: eventSource?.url || null,
-      connectedAt,
+      isConnected: connectionStats.isConnected,
+      subscriptionCount: connectionStats.subscriptionCount,
+      connectionUrl: connectionStats.connectionUrl,
+      connectedAt: connectionStats.connectedAt,
     }),
-    [connectionStatus, eventSource, connectedAt]
+    [connectionStats]
   );
 
   // Backward-compatible close function
@@ -334,7 +330,6 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
       lastEventId: lastEvent?.id,
     },
     lastEvent,
-    sendCount: stats.eventsReceived,
     close,
     reconnect,
   };

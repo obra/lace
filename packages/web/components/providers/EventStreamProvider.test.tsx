@@ -5,12 +5,7 @@ import React from 'react';
 import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { stringify } from '@/lib/serialization';
-import {
-  EventStreamProvider,
-  useEventStreamConnection,
-  useSessionEvents,
-  useAgentAPI,
-} from './EventStreamProvider';
+import { EventStreamProvider, useSessionEvents, useAgentAPI } from './EventStreamProvider';
 import { ToolApprovalProvider } from './ToolApprovalProvider';
 import { AgentProvider } from './AgentProvider';
 import type { ReactNode } from 'react';
@@ -108,7 +103,6 @@ describe('EventStreamProvider', () => {
         maxReconnectAttempts: 5,
       } as StreamConnection,
       lastEvent: undefined,
-      sendCount: 0,
       close: vi.fn(),
       reconnect: vi.fn(),
     };
@@ -142,21 +136,6 @@ describe('EventStreamProvider', () => {
     mockUseSessionAPI.mockReturnValue(mockSessionAPIReturn);
     mockUseAgentAPI.mockReturnValue(mockAgentAPIReturn);
     mockUseAgentManagement.mockReturnValue(mockAgentManagementReturn);
-  });
-
-  it('provides event stream context to children', async () => {
-    const { result } = renderHook(() => useEventStreamConnection(), { wrapper });
-
-    await act(async () => {
-      // Wait for any async effects to complete
-    });
-
-    expect(result.current).toBeDefined();
-    expect(result.current.connection).toBeDefined();
-    expect(result.current.lastEvent).toBeUndefined(); // lastEvent is optional and undefined by default
-    expect(result.current.sendCount).toBeDefined();
-    expect(result.current.close).toBeDefined();
-    expect(result.current.reconnect).toBeDefined();
   });
 
   it('provides session events context to children', async () => {
@@ -218,31 +197,6 @@ describe('EventStreamProvider', () => {
 
   // Note: Tool approval functionality has been moved to ToolApprovalProvider
 
-  it('exposes event stream connection state', async () => {
-    mockUseEventStream.mockReturnValue({
-      connection: {
-        connected: true,
-        lastEventId: 'conn-1',
-        reconnectAttempts: 0,
-        maxReconnectAttempts: 5,
-      },
-      lastEvent: undefined,
-      sendCount: 5,
-      close: vi.fn(),
-      reconnect: vi.fn(),
-    });
-
-    const { result } = renderHook(() => useEventStreamConnection(), { wrapper });
-
-    await act(async () => {
-      // Wait for any async effects to complete
-    });
-
-    expect(result.current.connection.connected).toBe(true);
-    expect(result.current.connection.lastEventId).toBe('conn-1');
-    expect(result.current.sendCount).toBe(5);
-  });
-
   it('exposes agent API methods', async () => {
     const mockSendMessage = vi.fn();
     const mockStopAgent = vi.fn();
@@ -266,7 +220,7 @@ describe('EventStreamProvider', () => {
   });
 
   it('passes correct parameters to underlying hooks', async () => {
-    renderHook(() => useEventStreamConnection(), { wrapper });
+    renderHook(() => useSessionEvents(), { wrapper });
 
     await act(async () => {
       // Wait for any async effects to complete
@@ -299,8 +253,8 @@ describe('EventStreamProvider', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     expect(() => {
-      renderHook(() => useEventStreamConnection());
-    }).toThrow('useEventStreamConnection must be used within EventStreamProvider');
+      renderHook(() => useSessionEvents());
+    }).toThrow('useSessionEvents must be used within EventStreamProvider');
 
     expect(() => {
       renderHook(() => useSessionEvents());
@@ -319,7 +273,7 @@ describe('EventStreamProvider', () => {
   });
 
   it('calls underlying hooks with correct parameters', async () => {
-    renderHook(() => useEventStreamConnection(), { wrapper });
+    renderHook(() => useSessionEvents(), { wrapper });
 
     await act(async () => {
       // Wait for any async effects to complete
@@ -363,7 +317,7 @@ describe('EventStreamProvider', () => {
       </AgentProvider>
     );
 
-    renderHook(() => useEventStreamConnection(), { wrapper: wrapperWithoutAgent });
+    renderHook(() => useSessionEvents(), { wrapper: wrapperWithoutAgent });
 
     await act(async () => {
       // Wait for any async effects to complete

@@ -178,7 +178,6 @@ describe('Chat', () => {
           maxReconnectAttempts: 5,
         },
         lastEvent: undefined,
-        sendCount: 0,
         reconnect: vi.fn(),
         close: vi.fn(),
       },

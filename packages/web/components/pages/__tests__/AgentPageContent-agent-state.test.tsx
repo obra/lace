@@ -54,7 +54,6 @@ vi.mock('@/components/providers/EventStreamProvider', () => ({
     eventStream: {
       connection: { connected: false },
       lastEvent: undefined,
-      sendCount: 0,
       close: vi.fn(),
       reconnect: vi.fn(),
     },

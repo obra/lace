@@ -4,12 +4,7 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
-import {
-  EventStreamProvider,
-  useEventStreamConnection,
-  useSessionEvents,
-  useAgentAPI,
-} from './EventStreamProvider';
+import { EventStreamProvider, useSessionEvents, useAgentAPI } from './EventStreamProvider';
 import { ToolApprovalProvider } from './ToolApprovalProvider';
 import { AgentProvider } from './AgentProvider';
 import { SettingsProvider } from '@/components/providers/SettingsProvider';
@@ -40,14 +35,11 @@ import type { StreamConnection } from '@/types/stream-events';
 
 // Test component that consumes event stream state without receiving it through props
 function TestEventStreamConsumer() {
-  const { connection } = useEventStreamConnection();
   const { events, loadingHistory } = useSessionEvents();
   const { sendMessage, stopAgent } = useAgentAPI();
 
   return (
     <div>
-      <div data-testid="is-connected">{connection.connected.toString()}</div>
-      <div data-testid="connection-id">{connection.lastEventId || 'none'}</div>
       <div data-testid="events-count">{events.length}</div>
       <div data-testid="loading-history">{loadingHistory.toString()}</div>
       <button
@@ -68,8 +60,8 @@ function TestEventStreamConsumer() {
 
 // Test component that should fail without provider
 function TestComponentWithoutProvider() {
-  const { connection } = useEventStreamConnection();
-  return <div data-testid="connected">{connection.connected}</div>;
+  const { events } = useSessionEvents();
+  return <div data-testid="events-count">{events.length}</div>;
 }
 
 describe('EventStreamProvider Integration', () => {
@@ -95,7 +87,6 @@ describe('EventStreamProvider Integration', () => {
         maxReconnectAttempts: 5,
       } as StreamConnection,
       lastEvent: undefined,
-      sendCount: 0,
       close: vi.fn(),
       reconnect: vi.fn(),
     });
@@ -170,7 +161,6 @@ describe('EventStreamProvider Integration', () => {
         maxReconnectAttempts: 5,
       } as StreamConnection,
       lastEvent: undefined,
-      sendCount: 0,
       close: vi.fn(),
       reconnect: vi.fn(),
     });
@@ -207,8 +197,6 @@ describe('EventStreamProvider Integration', () => {
     });
 
     // Verify state is accessible without prop drilling
-    expect(screen.getByTestId('is-connected')).toHaveTextContent('true');
-    expect(screen.getByTestId('connection-id')).toHaveTextContent('conn-123');
     expect(screen.getByTestId('events-count')).toHaveTextContent('2');
     expect(screen.getByTestId('loading-history')).toHaveTextContent('true');
   });
@@ -259,7 +247,7 @@ describe('EventStreamProvider Integration', () => {
           <TestComponentWithoutProvider />
         </SettingsProvider>
       );
-    }).toThrow('useEventStreamConnection must be used within EventStreamProvider');
+    }).toThrow('useSessionEvents must be used within EventStreamProvider');
 
     consoleSpy.mockRestore();
   });
@@ -297,7 +285,6 @@ describe('EventStreamProvider Integration', () => {
         maxReconnectAttempts: 5,
       } as StreamConnection,
       lastEvent: undefined,
-      sendCount: 0,
       close: vi.fn(),
       reconnect: vi.fn(),
     });
@@ -353,7 +340,6 @@ describe('EventStreamProvider Integration', () => {
       return {
         connection: { connected: true, reconnectAttempts: 0, maxReconnectAttempts: 5 },
         lastEvent: undefined,
-        sendCount: 0,
         close: vi.fn(),
         reconnect: vi.fn(),
       };

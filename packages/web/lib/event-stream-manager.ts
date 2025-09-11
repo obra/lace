@@ -111,7 +111,8 @@ export class EventStreamManager {
   private readonly MAX_CONNECTIONS = 100; // Global limit
   private eventIdCounter = 0;
   private keepAliveInterval: NodeJS.Timeout | null = null;
-  private readonly KEEPALIVE_INTERVAL = 30000; // 30 seconds
+  private readonly KEEPALIVE_INTERVAL = process.env.NODE_ENV === 'development' ? 5000 : 15000; // 5s dev, 15s prod
+  private readonly MAX_CONNECTION_AGE = 10 * 60 * 1000; // 10 minutes maximum connection age
 
   private constructor() {
     this.startKeepAlive();
@@ -602,7 +603,7 @@ export class EventStreamManager {
       clearInterval(this.keepAliveInterval);
     }
 
-    // Send keepalive every 30 seconds
+    // Send keepalive more frequently in development for faster dead connection detection
     this.keepAliveInterval = setInterval(() => {
       this.sendKeepAlive();
     }, this.KEEPALIVE_INTERVAL);
@@ -624,6 +625,20 @@ export class EventStreamManager {
 
     for (const [connectionId, connection] of this.connections) {
       try {
+        // Check connection age first - force disconnect old connections
+        const connectionAge = Date.now() - connection.connectedAt.getTime();
+        if (connectionAge > this.MAX_CONNECTION_AGE) {
+          logger.info(
+            `[EVENT_STREAM] Connection ${connectionId} exceeded max age (${connectionAge}ms)`,
+            {
+              connectionAge,
+              maxAge: this.MAX_CONNECTION_AGE,
+            }
+          );
+          deadConnections.push(connectionId);
+          continue;
+        }
+
         // Check controller state first
         if (connection.controller.desiredSize === null) {
           logger.debug(`[EVENT_STREAM] Controller desiredSize is null for ${connectionId}`);
