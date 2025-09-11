@@ -5,7 +5,7 @@
 
 import React, { memo } from 'react';
 import { Modal } from '@/components/ui/Modal';
-import { ModelSelectionForm } from './ModelSelectionForm';
+import { ModelSelector } from '@/components/ui/ModelSelector';
 import type { ProviderInfo } from '@/types/api';
 import type { SessionInfo } from '@/types/core';
 
@@ -64,14 +64,22 @@ export const AgentCreateModal = memo(function AgentCreateModal({
         </div>
 
         {/* Provider Instance Selection */}
-        <ModelSelectionForm
-          providers={providers}
-          providerInstanceId={selectedInstanceId}
-          modelId={selectedModelId}
-          onProviderChange={onProviderChange}
-          onModelChange={onModelChange}
-          className="mb-4"
-        />
+        <div className="mb-4">
+          <label className="label">
+            <span className="label-text font-medium">Provider / Model</span>
+          </label>
+          <ModelSelector
+            providers={providers}
+            selectedProviderInstanceId={selectedInstanceId}
+            selectedModelId={selectedModelId}
+            onChange={(providerInstanceId, modelId) => {
+              onProviderChange(providerInstanceId);
+              onModelChange(modelId);
+            }}
+            className="select select-bordered w-full"
+            placeholder="Select provider and model..."
+          />
+        </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t border-base-300">
           <button type="button" onClick={onClose} className="btn btn-ghost">

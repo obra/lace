@@ -8,7 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrash, faUser, faCog, faTools } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { ToolPolicyList } from '@/components/config/ToolPolicyList';
-import { ModelSelectionForm } from './ModelSelectionForm';
+import { ModelSelector } from '@/components/ui/ModelSelector';
 import type { ProviderInfo, SessionConfiguration } from '@/types/api';
 import { isToolPolicyData, type ToolPolicyInfo } from '@/lib/type-guards';
 import type { ProjectInfo, SessionInfo } from '@/types/core';
@@ -176,15 +176,22 @@ export const SessionEditModal = memo(function SessionEditModal({
               </div>
 
               {/* Provider and Model Selection */}
-              <ModelSelectionForm
-                providers={availableProviders}
-                providerInstanceId={sessionConfig.providerInstanceId}
-                modelId={sessionConfig.modelId}
-                onProviderChange={(instanceId) => {
-                  updateProviderInstanceId(instanceId);
-                }}
-                onModelChange={(modelId) => updateModelId(modelId)}
-              />
+              <div>
+                <label className="label">
+                  <span className="label-text font-medium">Provider / Model</span>
+                </label>
+                <ModelSelector
+                  providers={availableProviders}
+                  selectedProviderInstanceId={sessionConfig.providerInstanceId}
+                  selectedModelId={sessionConfig.modelId}
+                  onChange={(providerInstanceId, modelId) => {
+                    updateProviderInstanceId(providerInstanceId);
+                    updateModelId(modelId);
+                  }}
+                  className="select select-bordered w-full"
+                  placeholder="Select provider and model..."
+                />
+              </div>
             </div>
 
             <input

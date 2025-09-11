@@ -7,7 +7,7 @@ import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrash, faExclamationTriangle } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
-import { ModelSelectionForm } from './ModelSelectionForm';
+import { ModelSelector } from '@/components/ui/ModelSelector';
 import { Alert } from '@/components/ui/Alert';
 import type { ProviderInfo, SessionConfiguration } from '@/types/api';
 import type { ProjectInfo } from '@/types/core';
@@ -166,15 +166,21 @@ export const SessionCreateModal = memo(function SessionCreateModal({
           </div>
 
           {/* Provider and Model Selection */}
-          <ModelSelectionForm
-            providers={providers}
-            providerInstanceId={sessionConfig.providerInstanceId}
-            modelId={sessionConfig.modelId}
-            onProviderChange={(instanceId) =>
-              onSessionConfigChange({ ...sessionConfig, providerInstanceId: instanceId })
-            }
-            onModelChange={(modelId) => onSessionConfigChange({ ...sessionConfig, modelId })}
-          />
+          <div>
+            <label className="label">
+              <span className="label-text font-medium">Provider / Model</span>
+            </label>
+            <ModelSelector
+              providers={providers}
+              selectedProviderInstanceId={sessionConfig.providerInstanceId}
+              selectedModelId={sessionConfig.modelId}
+              onChange={(providerInstanceId, modelId) => {
+                onSessionConfigChange({ ...sessionConfig, providerInstanceId, modelId });
+              }}
+              className="select select-bordered w-full"
+              placeholder="Select provider and model..."
+            />
+          </div>
 
           {/* Working Directory */}
           <div>
