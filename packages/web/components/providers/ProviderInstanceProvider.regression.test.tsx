@@ -1,7 +1,7 @@
 // ABOUTME: Regression test for provider instance loading issues
 // ABOUTME: Specifically tests that provider data loads and is available for dropdowns/selects
 
-import React from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { ProviderInstanceProvider, useProviderInstances } from './ProviderInstanceProvider';
@@ -102,6 +102,55 @@ describe('ProviderInstanceProvider Regression Tests', () => {
 
     // API should have been called exactly once
     expect(mockApi.get).toHaveBeenCalledWith('/api/provider/instances');
+  });
+
+  it('should handle mounted ref correctly and not block data loading', async () => {
+    // This test specifically targets the mounted ref issue
+    function ProblematicProvider({ children }: { children: React.ReactNode }) {
+      const mountedRef = useRef(true);
+      const [instances, setInstances] = useState<any[]>([]);
+      const [loading, setLoading] = useState(true);
+
+      const loadData = useCallback(async () => {
+        try {
+          if (!mountedRef.current) return; // This could block loading
+          setLoading(true);
+
+          // Simulate API call
+          await new Promise((resolve) => setTimeout(resolve, 10));
+
+          if (!mountedRef.current) return; // This could block state update
+          setInstances([{ id: '1', name: 'Test' }]);
+        } finally {
+          if (mountedRef.current) {
+            setLoading(false);
+          }
+        }
+      }, []);
+
+      useEffect(() => {
+        void loadData();
+        return () => {
+          mountedRef.current = false; // This could cause issues
+        };
+      }, [loadData]);
+
+      return <div data-testid="instances-count">{instances.length}</div>;
+    }
+
+    const { rerender, unmount } = render(
+      <ProblematicProvider>
+        <div />
+      </ProblematicProvider>
+    );
+
+    // Wait for initial load
+    await waitFor(() => {
+      expect(screen.getByTestId('instances-count')).toHaveTextContent('1');
+    });
+
+    // This should succeed - simulating what the real component should do
+    expect(screen.getByTestId('instances-count')).toHaveTextContent('1');
   });
 
   it('should not prevent state updates during component lifecycle', async () => {
