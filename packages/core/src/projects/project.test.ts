@@ -649,7 +649,7 @@ describe('Project', () => {
       const tempDir = getProcessTempDir();
       const project = Project.create('Test Project', tempDir);
 
-      await project.addMCPServer('filesystem', {
+      project.addMCPServer('filesystem', {
         command: 'npx',
         args: ['@modelcontextprotocol/server-filesystem'],
         enabled: true,
@@ -678,20 +678,31 @@ describe('Project', () => {
       const project = Project.create('Test Project', tempDir);
 
       // addMCPServer should resolve before discovery completes
-      const addServerPromise = project.addMCPServer('slow-server', {
+      project.addMCPServer('slow-server', {
         command: 'slow-command',
         enabled: true,
         tools: {},
       });
 
-      // Verify addMCPServer resolves without waiting for discovery
-      await addServerPromise;
+      // Since addMCPServer is now sync, no need to await
+
+      // Assert that the server was added to config immediately (non-blocking behavior)
+      const servers = project.getMCPServers();
+      expect(servers['slow-server']).toBeDefined();
+      expect(servers['slow-server'].command).toBe('slow-command');
 
       // Now complete the discovery
       if (resolveDiscovery) {
         resolveDiscovery();
       }
       await discoveryPromise;
+
+      // Assert discovery spy was called (proves discovery was initiated)
+      expect(vi.mocked(ToolCatalog.discoverAndCacheTools)).toHaveBeenCalledWith(
+        'slow-server',
+        expect.objectContaining({ command: 'slow-command' }),
+        project.getWorkingDirectory()
+      );
     });
 
     it('should throw error for duplicate server IDs', async () => {
@@ -718,7 +729,7 @@ describe('Project', () => {
       const project = Project.create('Test Project', tempDir);
 
       // Add first server
-      await project.addMCPServer('duplicate-server', {
+      project.addMCPServer('duplicate-server', {
         command: 'test-command',
         enabled: true,
         tools: {},
@@ -729,13 +740,13 @@ describe('Project', () => {
       expect(serversAfterFirst['duplicate-server']).toBeDefined();
 
       // Try to add same server ID again - this should throw
-      await expect(
+      expect(() =>
         project.addMCPServer('duplicate-server', {
           command: 'another-command',
           enabled: true,
           tools: {},
         })
-      ).rejects.toThrow("MCP server 'duplicate-server' already exists in project");
+      ).toThrow("MCP server 'duplicate-server' already exists in project");
 
       // Cleanup
       discoverSpy.mockRestore();

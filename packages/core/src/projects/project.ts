@@ -429,7 +429,7 @@ export class Project {
   /**
    * Add new MCP server to project configuration
    */
-  async addMCPServer(serverId: string, serverConfig: MCPServerConfig): Promise<void> {
+  addMCPServer(serverId: string, serverConfig: MCPServerConfig): void {
     // Check for duplicates
     const existingServers = this.getMCPServers();
     if (existingServers[serverId]) {

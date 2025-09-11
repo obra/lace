@@ -80,7 +80,7 @@ describe('MCP Integration E2E', () => {
     project = Project.create(projectName, tempDir, 'Integration test project');
 
     // Add MCP server to project
-    await project.addMCPServer('test-server', {
+    project.addMCPServer('test-server', {
       command: 'node',
       args: ['test-server.js'],
       enabled: true,
