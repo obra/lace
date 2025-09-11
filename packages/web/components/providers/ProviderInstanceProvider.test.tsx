@@ -4,7 +4,10 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { ProviderInstanceProvider, useProviderInstances } from './ProviderInstanceProvider';
+import {
+  ProviderInstanceProvider,
+  useProviderInstances,
+} from '@/components/providers/ProviderInstanceProvider';
 
 // Mock the API client
 vi.mock('@/lib/api-client', () => ({
@@ -16,7 +19,8 @@ vi.mock('@/lib/api-client', () => ({
   },
 }));
 
-const mockApi = vi.mocked((await import('@/lib/api-client')).api);
+import { api as apiClient } from '@/lib/api-client';
+const mockApi = vi.mocked(apiClient);
 
 // Test component that uses the provider context
 function TestConsumer() {

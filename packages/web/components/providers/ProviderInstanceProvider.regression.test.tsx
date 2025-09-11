@@ -12,7 +12,8 @@ vi.mock('@/lib/api-client', () => ({
   },
 }));
 
-const mockApi = vi.mocked((await import('@/lib/api-client')).api);
+import { api as apiClient } from '@/lib/api-client';
+const mockApi = vi.mocked(apiClient);
 
 describe('ProviderInstanceProvider Mounted Ref Regression', () => {
   beforeEach(() => {
@@ -65,8 +66,10 @@ describe('ProviderInstanceProvider Mounted Ref Regression', () => {
 
     render(<BrokenProvider />);
 
-    // Wait for async operations
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Deterministic wait
+    vi.useFakeTimers();
+    await vi.runAllTimersAsync();
+    vi.useRealTimers();
 
     // With the bug: instances remain empty and loading stays true
     expect(screen.getByTestId('instances-count')).toHaveTextContent('0'); // BUG: no data loaded
