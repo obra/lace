@@ -11,6 +11,7 @@ import { fileEditRenderer } from './file-edit';
 import { fileListRenderer } from './file-list';
 import { searchRenderer } from './search';
 import { urlFetchRenderer } from './url-fetch';
+import { mcpRenderer } from './mcp';
 
 // Registry of tool renderers - add new tools here
 const toolRenderers: Record<string, ToolRenderer> = {
@@ -45,9 +46,15 @@ const toolRenderers: Record<string, ToolRenderer> = {
 
 /**
  * Get the renderer for a specific tool type
- * Returns empty object if no custom renderer exists (uses all fallbacks)
+ * Returns MCP renderer for MCP tools (containing '/'), otherwise specific tool renderer
  */
 export function getToolRenderer(toolName: string): ToolRenderer {
+  // Check if this is an MCP tool (format: serverId/toolName)
+  if (toolName.includes('/')) {
+    return mcpRenderer;
+  }
+
+  // Use specific renderer for native tools
   return toolRenderers[toolName.toLowerCase()] || {};
 }
 

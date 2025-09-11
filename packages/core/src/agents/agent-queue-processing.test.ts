@@ -18,7 +18,7 @@ describe('Agent Queue Processing', () => {
   const _tempLaceDir = setupCoreTest();
   let agent: Agent;
   let mockProvider: TestProvider;
-  let mockToolExecutor: ToolExecutor;
+  let toolExecutor: ToolExecutor;
   let threadManager: ThreadManager;
   let testThreadId: string;
 
@@ -28,18 +28,15 @@ describe('Agent Queue Processing', () => {
       mockResponse: 'mock response',
     });
 
-    mockToolExecutor = {
-      registerAllAvailableTools: vi.fn(),
-      getRegisteredTools: vi.fn().mockReturnValue([]),
-      close: vi.fn().mockResolvedValue(undefined),
-    } as unknown as ToolExecutor;
+    // Use real ToolExecutor instead of mock
+    toolExecutor = new ToolExecutor();
 
     // Use real ThreadManager
     threadManager = new ThreadManager();
     testThreadId = threadManager.createThread();
 
     agent = new Agent({
-      toolExecutor: mockToolExecutor,
+      toolExecutor: toolExecutor,
       threadManager: threadManager,
       threadId: testThreadId,
       tools: [],
@@ -210,8 +207,8 @@ describe('Agent Queue Processing', () => {
       await agent.sendMessage('trigger state transition');
 
       // After the operation completes and returns to idle, the queue should be processed
-      // Wait a bit for async queue processing
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait for async queue processing (increased timeout)
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const finalStats = agent.getQueueStats();
       expect(finalStats.queueLength).toBe(0); // Queue should be processed

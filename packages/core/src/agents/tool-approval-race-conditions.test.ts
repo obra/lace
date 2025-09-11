@@ -9,7 +9,7 @@ import { TestProvider } from '~/test-utils/test-provider';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { BashTool } from '~/tools/implementations/bash';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import {

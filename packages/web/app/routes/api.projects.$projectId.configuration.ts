@@ -1,10 +1,12 @@
 // ABOUTME: REST API endpoints for project configuration - GET, PUT for configuration management
 // ABOUTME: Handles project configuration retrieval and updates with validation and error handling
 
-import { Project, ProviderRegistry } from '@/lib/server/lace-imports';
+import { Project, ProviderRegistry, ToolCatalog } from '@/lib/server/lace-imports';
+import { ToolPolicyResolver } from '@/lib/tool-policy-resolver';
+import type { ToolPolicy } from '@/types/core';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
-import { toolCacheService } from '@/lib/server/tool-cache-service';
+// Using ToolCatalog instead of toolCacheService for better performance
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.configuration';
 
@@ -13,7 +15,7 @@ const ConfigurationSchema = z.object({
   modelId: z.string().min(1).optional(),
   maxTokens: z.number().positive().optional(),
   tools: z.array(z.string()).optional(),
-  toolPolicies: z.record(z.enum(['allow', 'require-approval', 'deny'])).optional(),
+  toolPolicies: z.record(z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
   workingDirectory: z.string().optional(),
   environmentVariables: z.record(z.string()).optional(),
 });
@@ -28,13 +30,26 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     const configuration = project.getConfiguration();
 
-    // Get user-configurable tools from cached registry
-    const userConfigurableTools = toolCacheService.getUserConfigurableTools();
+    // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
+    const availableTools = ToolCatalog.getAvailableTools(project);
+
+    // Resolve tool policy hierarchy for progressive restriction
+    // TODO: Get global policies for full hierarchy
+    const toolPolicyHierarchy = {
+      global: undefined, // TODO: Load actual global policies
+      project: configuration.toolPolicies as Record<string, ToolPolicy> | undefined,
+    };
+
+    const resolvedTools = ToolPolicyResolver.resolveProjectToolPolicies(
+      availableTools,
+      toolPolicyHierarchy
+    );
 
     return createSuperjsonResponse({
       configuration: {
         ...configuration,
-        availableTools: userConfigurableTools,
+        availableTools,
+        tools: resolvedTools,
       },
     });
   } catch (error: unknown) {
@@ -83,17 +98,23 @@ export async function action({ request, params }: Route.ActionArgs) {
       }
     }
 
+    // Validate progressive restriction if toolPolicies are being updated
+    if (validatedData.toolPolicies) {
+      // TODO: Add global policy validation when global configuration is available
+      // For now, project level has no restrictions (can set any policy)
+    }
+
     project.updateConfiguration(validatedData);
 
     const configuration = project.getConfiguration();
 
-    // Get user-configurable tools from cached registry (same as GET)
-    const userConfigurableTools = toolCacheService.getUserConfigurableTools();
+    // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
+    const availableTools = ToolCatalog.getAvailableTools(project);
 
     return createSuperjsonResponse({
       configuration: {
         ...configuration,
-        availableTools: userConfigurableTools,
+        availableTools,
       },
     });
   } catch (error: unknown) {

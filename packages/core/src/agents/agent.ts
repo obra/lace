@@ -7,7 +7,7 @@ import { AIProvider, ProviderMessage } from '~/providers/base-provider';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
-import { ApprovalDecision, ToolPolicy } from '~/tools/approval-types';
+import { ApprovalDecision, ToolPolicy } from '~/tools/types';
 import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
 import {
   LaceEvent,
@@ -450,7 +450,9 @@ export class Agent extends EventEmitter {
 
       const promptConfig = await loadPromptConfig({
         persona: this._persona,
-        tools: this._tools.map((tool) => ({ name: tool.name, description: tool.description })),
+        tools: this._toolExecutor
+          .getAllTools()
+          .map((tool) => ({ name: tool.name, description: tool.description })),
         session: session,
         project: project,
       });
@@ -607,7 +609,7 @@ export class Agent extends EventEmitter {
   }
 
   getAvailableTools(): Tool[] {
-    return [...this._tools]; // Return copy to prevent mutation
+    return [...this._toolExecutor.getAllTools()]; // Return copy to prevent mutation
   }
 
   get providerInstance(): AIProvider | null {
@@ -695,8 +697,8 @@ export class Agent extends EventEmitter {
       logger.debug('AGENT: Requesting response from provider', {
         threadId: this._threadId,
         conversationLength: conversation.length,
-        availableToolCount: this._tools.length,
-        availableToolNames: this._tools.map((t) => t.name),
+        availableToolCount: this._toolExecutor.getAllTools().length,
+        availableToolNames: this._toolExecutor.getAllTools().map((t) => t.name),
       });
 
       // Check if we're approaching token limit (simple threshold check)
@@ -735,7 +737,11 @@ export class Agent extends EventEmitter {
       // Try provider-specific token counting first, fall back to estimation
       let promptTokens: number;
       const providerCount = this.providerInstance
-        ? await this.providerInstance.countTokens(conversation, this._tools, modelId)
+        ? await this.providerInstance.countTokens(
+            conversation,
+            this._toolExecutor.getAllTools(),
+            modelId
+          )
         : null;
       if (providerCount !== null) {
         promptTokens = providerCount;
@@ -771,7 +777,7 @@ export class Agent extends EventEmitter {
       try {
         response = await this._createResponse(
           conversation,
-          this._tools,
+          this._toolExecutor.getAllTools(),
           this._abortController?.signal
         );
 
@@ -1691,11 +1697,22 @@ export class Agent extends EventEmitter {
 
       // Process queue when returning to idle
       if (newState === 'idle' && !this._isProcessingQueue) {
+        logger.debug('AGENT: Triggering queue processing on idle state', {
+          threadId: this._threadId,
+          queueLength: this._messageQueue.length,
+        });
         this.processQueuedMessages().catch((error) => {
           logger.error('AGENT: Failed to process queue on state change', {
             threadId: this._threadId,
             error: error instanceof Error ? error.message : String(error),
           });
+        });
+      } else {
+        logger.debug('AGENT: Not triggering queue processing', {
+          threadId: this._threadId,
+          newState,
+          isProcessingQueue: this._isProcessingQueue,
+          queueLength: this._messageQueue.length,
         });
       }
     }

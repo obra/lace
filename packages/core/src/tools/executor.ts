@@ -9,7 +9,7 @@ import {
   createToolResult,
 } from '~/tools/types';
 import { Tool } from '~/tools/tool';
-import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
+import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/types';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
@@ -30,6 +30,11 @@ import {
 } from '~/tools/implementations/task-manager/index';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url-fetch';
+import { MCPServerManager } from '~/mcp/server-manager';
+import type { MCPServerConnection } from '~/config/mcp-types';
+import { MCPToolAdapter } from '~/mcp/tool-adapter';
+import { logger } from '~/utils/logger';
+import type { Session } from '~/sessions/session';
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
@@ -66,7 +71,149 @@ export class ToolExecutor {
   }
 
   getAllTools(): Tool[] {
-    return Array.from(this.tools.values());
+    const nativeTools = this.getNativeTools();
+    const mcpTools = this.getMCPTools();
+    return [...nativeTools, ...mcpTools];
+  }
+
+  /**
+   * Ensure MCP tool discovery is complete before proceeding (called before LLM calls)
+   */
+  async ensureMCPToolsReady(timeoutMs: number = 5000): Promise<void> {
+    if (this.mcpDiscoveryPromise) {
+      try {
+        await Promise.race([
+          this.mcpDiscoveryPromise,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('MCP tool discovery timeout')), timeoutMs)
+          ),
+        ]);
+      } catch (error) {
+        logger.warn(`MCP tool discovery timed out after ${timeoutMs}ms:`, error);
+        // Continue with whatever tools we have
+      }
+    }
+  }
+
+  private getNativeTools(): Tool[] {
+    // Return all registered native tools (non-MCP)
+    return Array.from(this.tools.values()).filter((tool) => !tool.name.includes('/'));
+  }
+
+  private getMCPTools(): Tool[] {
+    // Return already registered MCP tools
+    // (Tool discovery happens lazily when tools are actually needed)
+    return Array.from(this.tools.values()).filter((tool) => tool.name.includes('/'));
+  }
+
+  /**
+   * Register MCP tools from a server manager (called by Session)
+   */
+  registerMCPTools(mcpManager: MCPServerManager): void {
+    // Store reference and start discovery in background (non-blocking)
+    this.mcpServerManager = mcpManager;
+    this.mcpDiscoveryPromise = this.discoverAllMCPTools();
+  }
+
+  /**
+   * Set session reference for callbacks (called during agent creation)
+   */
+  setSession(session: Session): void {
+    this.session = session;
+  }
+
+  private session?: Session;
+
+  private mcpServerManager?: MCPServerManager;
+  private mcpDiscoveryPromise?: Promise<void>;
+
+  private async discoverAllMCPTools(): Promise<void> {
+    if (!this.mcpServerManager) return;
+
+    try {
+      // Clear existing MCP tools
+      const mcpToolNames = Array.from(this.tools.keys()).filter((name) => name.includes('/'));
+      mcpToolNames.forEach((name) => this.tools.delete(name));
+
+      // Discover tools from all running servers
+      const runningServers = this.mcpServerManager
+        .getAllServers()
+        .filter((server) => server.status === 'running');
+
+      const discoveryPromises = runningServers.map((server) =>
+        this.discoverAndRegisterServerTools(server)
+      );
+
+      await Promise.all(discoveryPromises);
+    } catch (error) {
+      logger.warn('Failed to discover MCP tools:', error);
+    }
+  }
+
+  /**
+   * Register MCP tools and wait for discovery to complete (for testing)
+   */
+  async registerMCPToolsAndWait(mcpManager: MCPServerManager): Promise<void> {
+    // Clear existing MCP tools
+    const mcpToolNames = Array.from(this.tools.keys()).filter((name) => name.includes('/'));
+    mcpToolNames.forEach((name) => this.tools.delete(name));
+
+    // Register tools from all running servers and wait for completion
+    const runningServers = mcpManager
+      .getAllServers()
+      .filter((server) => server.status === 'running');
+
+    const discoveryPromises = runningServers.map((server) =>
+      this.discoverAndRegisterServerTools(server)
+    );
+
+    await Promise.all(discoveryPromises);
+  }
+
+  /**
+   * Discover and register tools from a server (async, non-blocking)
+   */
+  private async discoverAndRegisterServerTools(server: MCPServerConnection): Promise<void> {
+    try {
+      const serverTools = await this.discoverMCPServerTools(server);
+
+      // Filter tools based on approval policy - don't register disabled tools
+      const enabledTools = serverTools.filter((tool) => {
+        const [_serverId, toolId] = tool.name.split('/', 2);
+        const approvalLevel = server.config.tools[toolId] || 'ask';
+        return approvalLevel !== 'disable';
+      });
+
+      enabledTools.forEach((tool) => {
+        this.tools.set(tool.name, tool);
+      });
+
+      logger.debug(
+        `Registered ${enabledTools.length}/${serverTools.length} tools from MCP server ${server.id} (filtered out disabled tools)`
+      );
+    } catch (error) {
+      logger.warn(`Failed to discover and register tools from server ${server.id}:`, error);
+    }
+  }
+
+  private async discoverMCPServerTools(server: MCPServerConnection): Promise<Tool[]> {
+    try {
+      if (!server.client) return [];
+
+      // Use MCP SDK's listTools() to get available tools
+      const result = await server.client.listTools();
+
+      // Create MCPToolAdapter instances for each tool
+      const tools = result.tools.map(
+        (mcpTool) => new MCPToolAdapter(mcpTool, server.id, server.client!)
+      );
+
+      logger.debug(`Discovered ${tools.length} tools from MCP server ${server.id}`);
+      return tools;
+    } catch (error) {
+      logger.warn(`Failed to discover tools from server ${server.id}:`, error);
+      return [];
+    }
   }
 
   getApprovalCallback(): ApprovalCallback | undefined {
@@ -131,7 +278,26 @@ export class ToolExecutor {
       throw new Error(`Tool '${call.name}' not found`);
     }
 
-    // 2. SECURITY: Fail-safe - require agent context for policy enforcement
+    // 2. Check if tool is marked as safe internal (bypasses all approval)
+    if (tool.annotations?.safeInternal === true) {
+      return 'granted';
+    }
+
+    // 3. Check if this is an MCP tool with allow approval (bypasses agent requirement)
+    if (call.name.includes('/') && context?.agent) {
+      // MCP tools have serverId/toolName format
+      try {
+        const approvalLevel = await this.getMCPApprovalLevel(call.name, context);
+        if (approvalLevel === 'allow') {
+          return 'granted';
+        }
+      } catch (error) {
+        // Log but continue with normal flow
+        logger.warn('Failed to check MCP approval level:', error);
+      }
+    }
+
+    // 4. SECURITY: Fail-safe - require agent context for policy enforcement
     if (!context?.agent) {
       return createToolResult(
         'denied',
@@ -145,12 +311,7 @@ export class ToolExecutor {
       );
     }
 
-    // 3. Check if tool is marked as safe internal (bypasses all approval)
-    if (tool.annotations?.safeInternal === true) {
-      return 'granted';
-    }
-
-    // 4. Check tool policy with agent context
+    // 5. Check tool policy with agent context
     const session = await context.agent.getFullSession();
     if (!session) {
       return createToolResult(
@@ -184,7 +345,7 @@ export class ToolExecutor {
       case 'allow':
         return 'granted'; // Skip approval system
 
-      case 'require-approval':
+      case 'ask':
         // Fall through to approval system
         break;
     }
@@ -197,9 +358,14 @@ export class ToolExecutor {
     try {
       const decision = await this.approvalCallback.requestApproval(call);
 
-      if (decision === ApprovalDecision.ALLOW_ONCE || decision === ApprovalDecision.ALLOW_SESSION) {
+      if (
+        decision === ApprovalDecision.ALLOW_ONCE ||
+        decision === ApprovalDecision.ALLOW_SESSION ||
+        decision === ApprovalDecision.ALLOW_PROJECT ||
+        decision === ApprovalDecision.ALLOW_ALWAYS
+      ) {
         return 'granted';
-      } else if (decision === ApprovalDecision.DENY) {
+      } else if (decision === ApprovalDecision.DENY || decision === ApprovalDecision.DISABLE) {
         return createToolResult(
           'denied',
           [{ type: 'text', text: 'Tool execution denied by approval policy' }],
@@ -322,5 +488,48 @@ export class ToolExecutor {
         call.id
       );
     }
+  }
+
+  /**
+   * Get MCP tool approval level from session context
+   */
+  private async getMCPApprovalLevel(toolName: string, context?: ToolContext): Promise<string> {
+    if (!toolName.includes('/') || !context?.agent) {
+      return 'ask'; // Safe default
+    }
+
+    try {
+      // Get session from agent context
+      const session = await context.agent.getFullSession();
+      if (!session) {
+        return 'ask';
+      }
+
+      const [serverId, toolId] = toolName.split('/', 2);
+      const serverStatus = session.getMCPServerStatus(serverId);
+
+      logger.debug(
+        `MCP approval lookup: ${toolName} → server: ${serverId}, tool: ${toolId}, status: ${serverStatus?.status}`
+      );
+
+      if (serverStatus?.status === 'running') {
+        const approvalLevel = serverStatus.config.tools[toolId] || 'ask';
+        logger.debug(`MCP approval result: ${toolName} → ${approvalLevel}`);
+        return approvalLevel;
+      }
+
+      logger.debug(`MCP approval fallback: ${toolName} → ask (server not running)`);
+      return 'ask';
+    } catch (error) {
+      logger.warn(`Failed to get MCP approval level for ${toolName}:`, error);
+      return 'ask';
+    }
+  }
+
+  /**
+   * Cleanup resources on shutdown (MCP servers are managed by Session)
+   */
+  async shutdown(): Promise<void> {
+    // No cleanup needed - Session manages MCP server lifecycle
   }
 }

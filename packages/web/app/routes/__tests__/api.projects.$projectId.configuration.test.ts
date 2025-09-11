@@ -24,24 +24,6 @@ interface ErrorResponse {
   details?: unknown;
 }
 
-// Mock project instance
-const mockProject = {
-  getId: vi.fn().mockReturnValue('test-project'),
-  getConfiguration: vi.fn().mockReturnValue({
-    provider: 'anthropic',
-    model: 'claude-3-sonnet',
-    maxTokens: 4000,
-    tools: ['file-read', 'file-write'],
-    toolPolicies: {
-      'file-read': 'allow',
-      'file-write': 'require-approval',
-    },
-    workingDirectory: '/test/path',
-    environmentVariables: { NODE_ENV: 'test' },
-  }),
-  updateConfiguration: vi.fn(),
-};
-
 const mockToolExecutor = {
   registerAllAvailableTools: vi.fn(),
   getAllTools: vi.fn(() => [
@@ -52,15 +34,36 @@ const mockToolExecutor = {
   ]),
 };
 
+// Mock project instance
+const mockProject = {
+  getId: vi.fn().mockReturnValue('test-project'),
+  getConfiguration: vi.fn().mockReturnValue({
+    provider: 'anthropic',
+    model: 'claude-3-sonnet',
+    maxTokens: 4000,
+    tools: ['file-read', 'file-write'],
+    toolPolicies: {
+      'file-read': 'allow',
+      'file-write': 'ask',
+    },
+    workingDirectory: '/test/path',
+    environmentVariables: { NODE_ENV: 'test' },
+  }),
+  updateConfiguration: vi.fn(),
+  createToolExecutor: vi.fn().mockResolvedValue(mockToolExecutor),
+};
+
 vi.mock('@/lib/server/lace-imports', () => ({
   Project: {
     getById: vi.fn(),
   },
-  ToolExecutor: vi.fn(() => mockToolExecutor),
   ProviderRegistry: {
     getInstance: vi.fn(() => ({
       getConfiguredInstances: vi.fn(() => []),
     })),
+  },
+  ToolCatalog: {
+    getAvailableTools: vi.fn(() => ['file_read', 'file_write', 'bash']),
   },
 }));
 
@@ -79,19 +82,22 @@ describe('Project Configuration API', () => {
       const data = await parseResponse<ConfigurationResponse>(response);
 
       expect(response.status).toBe(200);
-      expect(data.configuration).toEqual({
+      expect(data.configuration).toMatchObject({
         provider: 'anthropic',
         model: 'claude-3-sonnet',
         maxTokens: 4000,
-        tools: ['file-read', 'file-write'],
         toolPolicies: {
           'file-read': 'allow',
-          'file-write': 'require-approval',
+          'file-write': 'ask',
         },
         workingDirectory: '/test/path',
         environmentVariables: { NODE_ENV: 'test' },
-        availableTools: ['file-read', 'file-write', 'bash'], // Added by API route
+        availableTools: ['file_read', 'file_write', 'bash'], // From ToolCatalog
       });
+
+      // Verify new tools structure exists
+      expect(data.configuration.tools).toBeDefined();
+      expect(typeof data.configuration.tools).toBe('object');
     });
 
     it('should return 404 when project not found', async () => {
@@ -133,7 +139,7 @@ describe('Project Configuration API', () => {
         tools: ['file-read', 'file-write', 'bash'],
         toolPolicies: {
           'file-read': 'allow',
-          'file-write': 'require-approval',
+          'file-write': 'ask',
           bash: 'deny',
         },
       };

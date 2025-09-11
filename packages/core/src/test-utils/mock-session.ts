@@ -4,9 +4,10 @@
 import { ToolContext } from '~/tools/types';
 import { Session } from '~/sessions/session';
 import type { Agent } from '~/agents/agent';
+import type { ToolPolicy } from '~/tools/types';
 
 interface MockSession {
-  getToolPolicy: (toolName: string) => 'allow' | 'require-approval' | 'deny';
+  getToolPolicy: (toolName: string) => ToolPolicy;
   getEffectiveConfiguration: () => Record<string, unknown>;
   getId: () => string;
   getProjectId: () => string | undefined;
@@ -21,7 +22,7 @@ interface MockSession {
  */
 function createMockSession(
   overrides: {
-    getToolPolicy?: (toolName: string) => 'allow' | 'require-approval' | 'deny';
+    getToolPolicy?: (toolName: string) => ToolPolicy;
     getEffectiveConfiguration?: () => Record<string, unknown>;
     getId?: () => string;
     getProjectId?: () => string | undefined;
@@ -30,7 +31,7 @@ function createMockSession(
   } = {}
 ): MockSession {
   return {
-    getToolPolicy: overrides.getToolPolicy || (() => 'require-approval'),
+    getToolPolicy: overrides.getToolPolicy || (() => 'ask'),
     getEffectiveConfiguration: overrides.getEffectiveConfiguration || (() => ({})),
     getId: overrides.getId || (() => 'lace_20250101_sess01'),
     getProjectId: overrides.getProjectId || (() => 'mock-project-id'),

@@ -229,7 +229,7 @@ WHERE type = 'TOOL_CALL';
 // ABOUTME: Event-based approval callback that uses ThreadManager for persistence
 // ABOUTME: Replaces Promise-based approval system with durable event storage
 
-import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalCallback, ApprovalDecision } from '~/tools/types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { Agent } from '~/agents/agent';
 import { ToolCall } from '~/tools/types';

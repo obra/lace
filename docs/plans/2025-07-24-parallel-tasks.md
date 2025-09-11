@@ -424,7 +424,7 @@ export class ApprovalPendingError extends Error {
 
 **Files to modify:**
 - `src/tools/event-approval-callback.ts` - Update requestApproval method
-- `src/tools/approval-types.ts` - Add ApprovalPendingError export
+- `src/tools/types.ts` - Add ApprovalPendingError export
 - `src/tools/event-approval-callback.test.ts` - Update tests for new behavior
 
 ### Phase 3: Update Tool Executor for Pending Approvals
@@ -561,7 +561,7 @@ import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 import { BashTool } from '~/tools/implementations/bash';
 import { setupTestPersistence, teardownTestPersistence } from '~/test-utils/persistence-helper';
 
@@ -933,7 +933,7 @@ Tests verify Agent state and event creation."
 ### Tool System Files  
 - `src/tools/executor.ts` - ToolExecutor that handles approvals
 - `src/tools/event-approval-callback.ts` - Event-based approval system
-- `src/tools/approval-types.ts` - Approval interfaces and types
+- `src/tools/types.ts` - Approval interfaces and types
 - `src/tools/types.ts` - Tool result types and utilities
 
 ### Thread Management Files

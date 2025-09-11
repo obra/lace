@@ -39,7 +39,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       });
     }
 
-    const { threadId, toolCallId } = paramsResult.data;
+    const { threadId, toolCallId: encodedToolCallId } = paramsResult.data;
+
+    // Decode the URL-encoded tool call ID
+    const toolCallId = decodeURIComponent(encodedToolCallId);
 
     // Parse and validate request body
     let requestBody: unknown;

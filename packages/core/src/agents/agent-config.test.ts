@@ -14,7 +14,7 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
-import { ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalDecision } from '~/tools/types';
 
 describe('Agent Configuration', () => {
   const _tempLaceDir = setupCoreTest();
@@ -77,7 +77,7 @@ describe('Agent Configuration', () => {
         systemPrompt: 'You are a senior code reviewer.',
         tools: ['file-read', 'bash'],
         toolPolicies: {
-          bash: 'require-approval',
+          bash: 'ask',
         },
       };
 
@@ -89,7 +89,7 @@ describe('Agent Configuration', () => {
       expect(validated.conversationHistory).toBe(50);
       expect(validated.systemPrompt).toBe('You are a senior code reviewer.');
       expect(validated.tools).toEqual(['file-read', 'bash']);
-      expect(validated.toolPolicies).toEqual({ bash: 'require-approval' });
+      expect(validated.toolPolicies).toEqual({ bash: 'ask' });
     });
 
     it('should reject invalid agent configuration', () => {
@@ -135,7 +135,7 @@ describe('Agent Configuration', () => {
         systemPrompt: 'You are a helpful assistant.',
         toolPolicies: {
           'file-read': 'allow',
-          bash: 'require-approval',
+          bash: 'ask',
         },
       });
 

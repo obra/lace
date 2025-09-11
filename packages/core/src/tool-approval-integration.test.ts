@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
 import { createGlobalPolicyCallback } from '~/tools/policy-wrapper';
-import { ApprovalCallback, ApprovalDecision } from '~/tools/approval-types';
+import { ApprovalCallback, ApprovalDecision } from '~/tools/types';
 // Note: CLIOptions type removed with CLI refactor, defining minimal type here for approval tests
 type CLIOptions = {
   approveAll?: boolean;
@@ -110,9 +110,9 @@ describe('Tool Approval System Integration', () => {
         tools: ['bash', 'file_read', 'file_write'], // Enable tools for testing
         toolPolicies: {
           // All tools require approval by default
-          bash: 'require-approval',
-          file_read: 'require-approval',
-          file_write: 'require-approval',
+          bash: 'ask',
+          file_read: 'ask',
+          file_write: 'ask',
         },
       }
     );

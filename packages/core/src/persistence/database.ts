@@ -186,6 +186,12 @@ function createLaceEventFromDb(
     case 'AGENT_ERROR':
       throw new Error('AGENT_ERROR events are transient and should not be persisted');
 
+    // MCP events are transient
+    case 'MCP_CONFIG_CHANGED':
+      throw new Error('MCP_CONFIG_CHANGED events are transient and should not be persisted');
+    case 'MCP_SERVER_STATUS_CHANGED':
+      throw new Error('MCP_SERVER_STATUS_CHANGED events are transient and should not be persisted');
+
     default: {
       const _exhaustive: never = type;
       throw new Error(`Unknown event type: ${String(_exhaustive)}`);

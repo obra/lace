@@ -1,37 +1,43 @@
-// ABOUTME: Multi-stage toggle component for tool access policies
-// ABOUTME: Provides a visual range selector style UI instead of dropdowns for better UX
+// ABOUTME: Multi-stage toggle component for tool access policies with explicit allowed values
+// ABOUTME: Clean implementation using allowedValues array from backend with legacy fallback
 
 'use client';
 
 import React, { memo } from 'react';
-
-export type ToolPolicy = 'allow' | 'require-approval' | 'deny';
+import type { ToolPolicy } from '~/tools/types';
 
 interface ToolPolicyToggleProps {
   value: ToolPolicy;
   onChange: (policy: ToolPolicy) => void;
   disabled?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  allowedValues?: ToolPolicy[]; // Explicit array from backend
 }
 
 const POLICY_CONFIG = {
   allow: {
     label: 'Allow',
-    description: 'Execute automatically',
+    description: 'Auto-approve without prompting',
     selectedStyle: 'bg-green-950 text-base-content ring-base-300',
     hoverStyle: 'hover:bg-green-950/30',
   },
-  'require-approval': {
+  ask: {
     label: 'Ask',
-    description: 'Require user approval',
+    description: 'Prompt user each time',
     selectedStyle: 'bg-yellow-950 text-base-content ring-base-300',
     hoverStyle: 'hover:bg-yellow-950/30',
   },
   deny: {
-    label: 'Block',
-    description: 'Never allow',
+    label: 'Deny',
+    description: 'Block execution',
     selectedStyle: 'bg-red-950 text-base-content ring-base-300',
     hoverStyle: 'hover:bg-red-950/30',
+  },
+  disable: {
+    label: 'Disable',
+    description: 'Tool not available',
+    selectedStyle: 'bg-base-600 text-base-content ring-base-300',
+    hoverStyle: 'hover:bg-base-600/30',
   },
 } as const;
 
@@ -55,29 +61,40 @@ export const ToolPolicyToggle = memo(function ToolPolicyToggle({
   onChange,
   disabled = false,
   size = 'sm',
+  allowedValues,
 }: ToolPolicyToggleProps) {
   const sizeConfig = SIZE_CONFIG[size];
+  const policiesToShow = allowedValues || ['allow', 'ask', 'deny', 'disable'];
 
   return (
     <div className={`inline-flex rounded-md bg-base-200 p-0.5 ${sizeConfig.container}`}>
-      {(Object.keys(POLICY_CONFIG) as ToolPolicy[]).map((policy) => {
+      {policiesToShow.map((policy) => {
         const config = POLICY_CONFIG[policy];
         const isSelected = value === policy;
+
+        // All policies shown are allowed (filtered at map level)
+        const isOptionDisabled = false;
 
         return (
           <button
             key={policy}
             type="button"
-            onClick={() => onChange(policy)}
-            disabled={disabled}
-            title={config.description}
+            onClick={() => !isOptionDisabled && onChange(policy)}
+            disabled={disabled || isOptionDisabled}
+            title={
+              isOptionDisabled
+                ? 'Not available - restricted by policy hierarchy'
+                : config.description
+            }
             className={`
               ${sizeConfig.button}
               relative font-medium transition-all duration-200 ease-out rounded-sm
               ${
                 isSelected
                   ? `${config.selectedStyle} shadow-sm ring-1`
-                  : `text-base-content/70 hover:text-base-content ${config.hoverStyle}`
+                  : isOptionDisabled
+                    ? 'text-base-content/30 bg-base-200 cursor-not-allowed'
+                    : `text-base-content/70 hover:text-base-content ${config.hoverStyle}`
               }
               ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
               focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-1 focus:ring-offset-base-200

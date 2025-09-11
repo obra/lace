@@ -86,6 +86,23 @@ export default [
     'routes/api.threads.$threadId.approvals.$toolCallId.ts'
   ),
 
+  // MCP management routes
+  route('api/mcp/servers', 'routes/api.mcp.servers.ts'),
+  route('api/mcp/servers/:serverId', 'routes/api.mcp.servers.$serverId.ts'),
+  route('api/projects/:projectId/mcp/servers', 'routes/api.projects.$projectId.mcp.servers.ts'),
+  route(
+    'api/projects/:projectId/mcp/servers/:serverId',
+    'routes/api.projects.$projectId.mcp.servers.$serverId.ts'
+  ),
+  route(
+    'api/projects/:projectId/sessions/:sessionId/mcp/servers',
+    'routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.ts'
+  ),
+  route(
+    'api/projects/:projectId/sessions/:sessionId/mcp/servers/:serverId/control',
+    'routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.$serverId.control.ts'
+  ),
+
   // Filesystem and debug routes
   route('api/filesystem/list', 'routes/api.filesystem.list.ts'),
   route('api/debug/console', 'routes/api.debug.console.ts'),

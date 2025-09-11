@@ -15,6 +15,9 @@ import {
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 import { existsSync } from 'fs';
+import { mkdtempSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import { getProcessTempDir } from '~/config/lace-dir';
 
 describe('Project', () => {
@@ -631,6 +634,122 @@ describe('Project', () => {
       project.refreshFromDatabase();
       expect(project.getName()).toBe('Updated Name');
       expect(project.getInfo()?.description).toBe('Updated description');
+    });
+  });
+
+  describe('MCP Server Management', () => {
+    function makeUniqueTempProjectDir(): string {
+      return mkdtempSync(join(tmpdir(), 'lace-project-test-'));
+    }
+    it('should start async discovery when adding MCP server', async () => {
+      const { ToolCatalog } = await import('~/tools/tool-catalog');
+      const discoverSpy = vi.spyOn(ToolCatalog, 'discoverAndCacheTools').mockResolvedValue(void 0);
+
+      // Use temp directory that exists
+      const tempDir = getProcessTempDir();
+      const project = Project.create('Test Project', tempDir);
+
+      project.addMCPServer('filesystem', {
+        command: 'npx',
+        args: ['@modelcontextprotocol/server-filesystem'],
+        enabled: true,
+        tools: {},
+      });
+
+      expect(discoverSpy).toHaveBeenCalledWith(
+        'filesystem',
+        expect.objectContaining({ command: 'npx' }),
+        project.getWorkingDirectory()
+      );
+    });
+
+    it('should not block on tool discovery', async () => {
+      const { ToolCatalog } = await import('~/tools/tool-catalog');
+
+      let resolveDiscovery: (() => void) | undefined;
+      const discoveryPromise = new Promise<void>((resolve) => {
+        resolveDiscovery = resolve;
+      });
+
+      // Mock discovery with deferred promise
+      vi.spyOn(ToolCatalog, 'discoverAndCacheTools').mockReturnValue(discoveryPromise);
+
+      const tempDir = makeUniqueTempProjectDir();
+      const project = Project.create('Test Project', tempDir);
+
+      // addMCPServer should resolve before discovery completes
+      project.addMCPServer('slow-server', {
+        command: 'slow-command',
+        enabled: true,
+        tools: {},
+      });
+
+      // Since addMCPServer is now sync, no need to await
+
+      // Assert that the server was added to config immediately (non-blocking behavior)
+      const servers = project.getMCPServers();
+      expect(servers['slow-server']).toBeDefined();
+      expect(servers['slow-server'].command).toBe('slow-command');
+
+      // Now complete the discovery
+      if (resolveDiscovery) {
+        resolveDiscovery();
+      }
+      await discoveryPromise;
+
+      // Assert discovery spy was called (proves discovery was initiated)
+      expect(vi.mocked(ToolCatalog.discoverAndCacheTools)).toHaveBeenCalledWith(
+        'slow-server',
+        expect.objectContaining({ command: 'slow-command' }),
+        project.getWorkingDirectory()
+      );
+    });
+
+    it('should throw error for duplicate server IDs', async () => {
+      // This test verifies that the duplicate check works correctly
+      // We'll mock ToolCatalog to avoid server startup but allow testing the duplicate logic
+      const { ToolCatalog } = await import('~/tools/tool-catalog');
+
+      // Mock with spy to track calls and avoid actual discovery
+      const discoverSpy = vi
+        .spyOn(ToolCatalog, 'discoverAndCacheTools')
+        .mockImplementation(async (serverId, config, projectDir) => {
+          // Simulate the immediate config save that the real method does
+          const { MCPConfigLoader } = await import('~/config/mcp-config-loader');
+          const pendingConfig = {
+            ...config,
+            discoveryStatus: 'discovering' as const,
+            lastDiscovery: new Date().toISOString(),
+          };
+          MCPConfigLoader.updateServerConfig(serverId, pendingConfig, projectDir);
+          // Don't run the background discovery
+        });
+
+      const tempDir = getProcessTempDir();
+      const project = Project.create('Test Project', tempDir);
+
+      // Add first server
+      project.addMCPServer('duplicate-server', {
+        command: 'test-command',
+        enabled: true,
+        tools: {},
+      });
+
+      // Verify the first server was actually added
+      const serversAfterFirst = project.getMCPServers();
+      expect(serversAfterFirst['duplicate-server']).toBeDefined();
+
+      // Try to add same server ID again - this should throw
+      expect(() =>
+        project.addMCPServer('duplicate-server', {
+          command: 'another-command',
+          enabled: true,
+          tools: {},
+        })
+      ).toThrow("MCP server 'duplicate-server' already exists in project");
+
+      // Cleanup
+      discoverSpy.mockRestore();
     });
   });
 });

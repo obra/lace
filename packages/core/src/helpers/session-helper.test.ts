@@ -73,9 +73,7 @@ describe('SessionHelper', () => {
 
     // Mock session
     mockSession = {
-      getToolPolicy: vi.fn().mockReturnValue('require-approval') as MockedFunction<
-        Session['getToolPolicy']
-      >,
+      getToolPolicy: vi.fn().mockReturnValue('ask') as MockedFunction<Session['getToolPolicy']>,
       getWorkingDirectory: vi.fn().mockReturnValue('/session/dir') as MockedFunction<
         Session['getWorkingDirectory']
       >,

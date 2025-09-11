@@ -98,7 +98,9 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
       if (!agentId) return;
 
       try {
-        await api.post(`/api/threads/${agentId}/approvals/${toolCallId}`, { decision });
+        await api.post(`/api/threads/${agentId}/approvals/${encodeURIComponent(toolCallId)}`, {
+          decision,
+        });
 
         // Remove the approval from pending list after successful submission
         handleApprovalResponse(toolCallId);

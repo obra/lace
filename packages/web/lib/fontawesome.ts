@@ -40,7 +40,10 @@ export {
   faTable,
   faMinus,
   faPlug,
+  faPlay,
   faStop,
+  faServer,
+  faTools,
   faEye,
   faColumns,
   faList,
@@ -89,7 +92,6 @@ export {
   faStream,
   faCircle,
   faPause,
-  faPlay,
   faFilter,
 } from '@fortawesome/free-solid-svg-icons';
 

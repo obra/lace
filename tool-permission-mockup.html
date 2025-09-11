@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool Permission Model UX Mockup</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .permission-locked { opacity: 0.6; pointer-events: none; }
+        .permission-inherited { border: 2px dashed #94a3b8; background: #f1f5f9; }
+        .permission-override { border: 2px solid #3b82f6; background: #eff6ff; }
+    </style>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto space-y-8">
+        
+        <!-- Global Level -->
+        <div class="bg-white rounded-lg p-6 shadow-lg">
+            <h2 class="text-2xl font-bold mb-4 text-blue-600">🌍 Global Tool Policies</h2>
+            <p class="text-gray-600 mb-6">Base security policy - what's the maximum permission level you're comfortable with?</p>
+            
+            <div class="space-y-4">
+                <div class="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                        <span class="font-mono text-sm">bash</span>
+                        <div class="text-xs text-gray-500">Execute shell commands</div>
+                    </div>
+                    <div class="flex bg-gray-200 rounded p-1">
+                        <button class="px-3 py-1 text-xs bg-green-600 text-white rounded shadow">Always</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Ask</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Deny</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Disable</button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                        <span class="font-mono text-sm">file_write</span>
+                        <div class="text-xs text-gray-500">Create and modify files</div>
+                    </div>
+                    <div class="flex bg-gray-200 rounded p-1">
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Always</button>
+                        <button class="px-3 py-1 text-xs bg-yellow-600 text-white rounded shadow">Ask</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Deny</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Disable</button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                        <span class="font-mono text-sm">url_fetch</span>
+                        <div class="text-xs text-gray-500">Fetch content from URLs</div>
+                    </div>
+                    <div class="flex bg-gray-200 rounded p-1">
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Always</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Ask</button>
+                        <button class="px-3 py-1 text-xs bg-red-600 text-white rounded shadow">Deny</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Disable</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Level -->
+        <div class="bg-white rounded-lg p-6 shadow-lg">
+            <h2 class="text-2xl font-bold mb-4 text-green-600">📁 Project Tool Policies</h2>
+            <p class="text-gray-600 mb-6">Override global policies for this project (can only be more restrictive)</p>
+            
+            <div class="space-y-4">
+                <!-- Inherited from global: allow-always, showing project override options -->
+                <div class="flex items-center justify-between p-4 permission-inherited rounded-lg">
+                    <div>
+                        <span class="font-mono text-sm">bash</span>
+                        <div class="text-xs text-blue-500">↑ Inherited: Always allow globally</div>
+                    </div>
+                    <div class="flex bg-gray-200 rounded p-1">
+                        <button class="px-3 py-1 text-xs bg-green-600 text-white rounded shadow">Project</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Ask</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Deny</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Disable</button>
+                    </div>
+                </div>
+
+                <!-- Inherited from global: require-approval, overridden to deny -->
+                <div class="flex items-center justify-between p-4 permission-override rounded-lg">
+                    <div>
+                        <span class="font-mono text-sm">file_write</span>
+                        <div class="text-xs text-blue-500">↑ Inherited: Ask globally</div>
+                        <div class="text-xs text-green-600">→ Overridden: Deny in project</div>
+                    </div>
+                    <div class="flex bg-gray-200 rounded p-1">
+                        <button class="px-3 py-1 text-xs text-gray-400 cursor-not-allowed" disabled>Project</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Ask</button>
+                        <button class="px-3 py-1 text-xs bg-red-600 text-white rounded shadow">Deny</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Disable</button>
+                    </div>
+                </div>
+
+                <!-- Locked - global is deny -->
+                <div class="flex items-center justify-between p-4 permission-locked rounded-lg border-red-300">
+                    <div>
+                        <span class="font-mono text-sm">url_fetch</span>
+                        <div class="text-xs text-red-500">🔒 Locked: Denied globally</div>
+                    </div>
+                    <div class="flex bg-gray-200 rounded p-1 opacity-50">
+                        <button class="px-3 py-1 text-xs text-gray-400 cursor-not-allowed" disabled>Project</button>
+                        <button class="px-3 py-1 text-xs text-gray-400 cursor-not-allowed" disabled>Ask</button>
+                        <button class="px-3 py-1 text-xs bg-red-400 text-white rounded">Deny</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Disable</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Session Level -->
+        <div class="bg-white rounded-lg p-6 shadow-lg">
+            <h2 class="text-2xl font-bold mb-4 text-purple-600">💬 Session Tool Policies</h2>
+            <p class="text-gray-600 mb-6">Override project policies for this conversation (can only be more restrictive)</p>
+            
+            <div class="space-y-4">
+                <!-- Inherited from project: allow-project -->
+                <div class="flex items-center justify-between p-4 permission-inherited rounded-lg">
+                    <div>
+                        <span class="font-mono text-sm">bash</span>
+                        <div class="text-xs text-green-500">↑ Inherited: Always allow in project</div>
+                    </div>
+                    <div class="flex bg-gray-200 rounded p-1">
+                        <button class="px-3 py-1 text-xs bg-purple-600 text-white rounded shadow">Session</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Ask</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Deny</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Disable</button>
+                    </div>
+                </div>
+
+                <!-- Locked - project is deny -->
+                <div class="flex items-center justify-between p-4 permission-locked rounded-lg border-red-300">
+                    <div>
+                        <span class="font-mono text-sm">file_write</span>
+                        <div class="text-xs text-red-500">🔒 Locked: Denied in project</div>
+                    </div>
+                    <div class="flex bg-gray-200 rounded p-1 opacity-50">
+                        <button class="px-3 py-1 text-xs text-gray-400 cursor-not-allowed" disabled>Session</button>
+                        <button class="px-3 py-1 text-xs text-gray-400 cursor-not-allowed" disabled>Ask</button>
+                        <button class="px-3 py-1 text-xs bg-red-400 text-white rounded">Deny</button>
+                        <button class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Disable</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Permission Legend -->
+        <div class="bg-gray-50 rounded-lg p-6">
+            <h3 class="text-lg font-bold mb-4">Permission Levels</h3>
+            <div class="grid md:grid-cols-2 gap-4 text-sm">
+                <div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-4 h-4 bg-green-600 rounded"></div>
+                        <strong>Always/Project/Session:</strong> Auto-approve without prompting
+                    </div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-4 h-4 bg-yellow-600 rounded"></div>
+                        <strong>Ask:</strong> Prompt user each time (with runtime options: once, session, project)
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-4 h-4 bg-red-600 rounded"></div>
+                        <strong>Deny:</strong> Block execution
+                    </div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-4 h-4 bg-gray-600 rounded"></div>
+                        <strong>Disable:</strong> Tool not available
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Flow Example -->
+        <div class="bg-blue-50 rounded-lg p-6">
+            <h3 class="text-lg font-bold mb-4 text-blue-800">Example User Flow</h3>
+            <div class="space-y-3 text-sm">
+                <div><strong>1. Global Setup:</strong> "I trust bash completely" → Set <code>bash: allow-always</code></div>
+                <div><strong>2. Sensitive Project:</strong> "This project needs extra care" → Override to <code>bash: require-approval</code></div>
+                <div><strong>3. Debug Session:</strong> "I want to see every command" → Keep <code>bash: require-approval</code></div>
+                <div><strong>4. Runtime:</strong> When bash tool is called → User sees prompt with options:
+                    <ul class="ml-4 mt-2 space-y-1">
+                        <li>• "Allow once" - approve this single use</li>
+                        <li>• "Allow for session" - auto-approve for this conversation</li>
+                        <li>• "Allow for project" - auto-approve for this project</li>
+                        <li>• "Deny" - block this request</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>

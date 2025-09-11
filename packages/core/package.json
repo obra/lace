@@ -23,6 +23,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.54.0",
     "@lmstudio/sdk": "^1.2.1",
+    "@modelcontextprotocol/sdk": "^1.17.5",
     "@typescript-eslint/utils": "^8.39.1",
     "better-sqlite3": "^11.10.0",
     "mustache": "^4.2.0",
@@ -93,10 +94,6 @@
     "./tools/event-approval-callback": {
       "types": "./dist/tools/event-approval-callback.d.ts",
       "import": "./dist/tools/event-approval-callback.js"
-    },
-    "./tools/approval-types": {
-      "types": "./dist/tools/approval-types.d.ts",
-      "import": "./dist/tools/approval-types.js"
     },
     "./tools/types": {
       "types": "./dist/tools/types.d.ts",
@@ -185,6 +182,10 @@
     "./tools/implementations/bash": {
       "types": "./dist/tools/implementations/bash.d.ts",
       "import": "./dist/tools/implementations/bash.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "import": "./dist/mcp/index.js"
     }
   }
 }

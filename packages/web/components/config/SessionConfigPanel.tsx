@@ -19,7 +19,7 @@ import type {
   CreateAgentRequest,
   SessionConfiguration,
 } from '@/types/api';
-import type { SessionInfo, ProjectInfo } from '@/types/core';
+import type { SessionInfo, ProjectInfo, ToolPolicy } from '@/types/core';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
@@ -122,10 +122,7 @@ export function SessionConfigPanel(): React.JSX.Element {
         >;
       }
       if (projectConfig.toolPolicies) {
-        defaultConfig.toolPolicies = projectConfig.toolPolicies as Record<
-          string,
-          'allow' | 'require-approval' | 'deny'
-        >;
+        defaultConfig.toolPolicies = projectConfig.toolPolicies as Record<string, ToolPolicy>;
       }
     }
     setSessionConfig(defaultConfig);

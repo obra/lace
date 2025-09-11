@@ -2,7 +2,7 @@
 // ABOUTME: Tests actual approval flow behavior through Agent conversations
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
+import { ApprovalDecision, ApprovalPendingError } from '~/tools/types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { expectEventAdded } from '~/test-utils/event-helpers';
 import { Agent } from '~/agents/agent';
@@ -100,7 +100,7 @@ describe('EventApprovalCallback Integration Tests', () => {
         modelId: 'claude-3-5-haiku-20241022',
         tools: ['bash'], // Enable bash tool
         toolPolicies: {
-          bash: 'require-approval',
+          bash: 'ask',
         },
       }
     );

@@ -2,7 +2,9 @@
 // ABOUTME: Handles session configuration retrieval and updates with validation and inheritance
 
 import { getSessionService } from '@/lib/server/session-service';
-import { toolCacheService } from '@/lib/server/tool-cache-service';
+import { ToolCatalog, Project } from '@/lib/server/lace-imports';
+import { ToolPolicyResolver } from '@/lib/tool-policy-resolver';
+import type { ToolPolicy } from '@/types/core';
 import { ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
@@ -20,7 +22,7 @@ const ConfigurationSchema = z.object({
   modelId: z.string().optional(),
   maxTokens: z.number().positive().optional(),
   tools: z.array(z.string()).optional(),
-  toolPolicies: z.record(z.enum(['allow', 'require-approval', 'deny'])).optional(),
+  toolPolicies: z.record(z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
   workingDirectory: z.string().optional(),
   environmentVariables: z.record(z.string()).optional(),
 });
@@ -43,13 +45,40 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     const configuration = session.getEffectiveConfiguration();
 
-    // Get user-configurable tools from cached registry
-    const userConfigurableTools = toolCacheService.getUserConfigurableTools();
+    // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
+    const projectId = session.getProjectId();
+    if (!projectId) {
+      return createErrorResponse('Session has no associated project', 500, {
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+    }
+    const project = Project.getById(projectId);
+    if (!project) {
+      return createErrorResponse('Associated project not found', 500, {
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+    }
+    const availableTools = ToolCatalog.getAvailableTools(project);
+
+    // Get project policies for hierarchy resolution
+    const projectConfig = project.getConfiguration();
+
+    // Resolve tool policy hierarchy for progressive restriction
+    const toolPolicyHierarchy = {
+      project: projectConfig.toolPolicies as Record<string, ToolPolicy> | undefined,
+      session: configuration.toolPolicies,
+    };
+
+    const resolvedTools = ToolPolicyResolver.resolveSessionToolPolicies(
+      availableTools,
+      toolPolicyHierarchy
+    );
 
     return createSuperjsonResponse({
       configuration: {
         ...configuration,
-        availableTools: userConfigurableTools,
+        availableTools,
+        tools: resolvedTools,
       },
     });
   } catch (error: unknown) {
@@ -87,17 +116,63 @@ export async function action({ request, params }: Route.ActionArgs) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
+    // Validate progressive restriction if toolPolicies are being updated
+    if (validatedData.toolPolicies) {
+      const projectId = session.getProjectId();
+      if (projectId) {
+        const project = Project.getById(projectId);
+        if (project) {
+          const projectConfig = project.getConfiguration();
+
+          // Check each tool policy change against project restrictions
+          for (const [tool, newPolicy] of Object.entries(validatedData.toolPolicies) as [
+            string,
+            ToolPolicy,
+          ][]) {
+            const projectPolicies = projectConfig.toolPolicies as
+              | Record<string, ToolPolicy>
+              | undefined;
+            if (projectPolicies) {
+              const projectPolicy = projectPolicies[tool];
+              if (
+                projectPolicy &&
+                !ToolPolicyResolver.isValidPolicyChange(tool, newPolicy, projectPolicy)
+              ) {
+                return createErrorResponse(
+                  `Tool '${tool}' cannot be set to '${newPolicy}' - more permissive than project policy '${projectPolicy}'`,
+                  400,
+                  { code: 'POLICY_VIOLATION' }
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+
     // Update session configuration directly
     session.updateConfiguration(validatedData);
     const configuration = session.getEffectiveConfiguration();
 
-    // Get user-configurable tools from cached registry (same as GET)
-    const userConfigurableTools = toolCacheService.getUserConfigurableTools();
+    // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
+    const projectId = session.getProjectId();
+    if (!projectId) {
+      return createErrorResponse('Session has no associated project', 500, {
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+    }
+    const project = Project.getById(projectId);
+    if (!project) {
+      return createErrorResponse('Associated project not found', 500, {
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+    }
+    const availableTools = ToolCatalog.getAvailableTools(project);
 
     return createSuperjsonResponse({
       configuration: {
         ...configuration,
-        availableTools: userConfigurableTools,
+        availableTools,
       },
     });
   } catch (error: unknown) {

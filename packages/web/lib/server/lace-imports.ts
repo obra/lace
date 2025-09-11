@@ -7,6 +7,7 @@ export { ProviderRegistry } from '~/providers/registry';
 export { ProviderCatalogManager } from '~/providers/catalog/manager';
 export { ProviderInstanceManager } from '~/providers/instance/manager';
 export { ToolExecutor } from '~/tools/executor';
+export { ToolCatalog } from '~/tools/tool-catalog';
 export { EventApprovalCallback } from '~/tools/event-approval-callback';
 export { Session } from '~/sessions/session';
 export { Project } from '~/projects/project';
@@ -33,8 +34,9 @@ export {
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
 export { TestProvider } from '~/test-utils/test-provider';
-export { ApprovalPendingError, ApprovalDecision } from '~/tools/approval-types';
+export { ApprovalPendingError, ApprovalDecision } from '~/tools/types';
 
 // Database and configuration
 export { ensureLaceDir } from '~/config/lace-dir';
 export { UserSettingsManager } from '~/config/user-settings';
+export { MCPConfigLoader } from '~/config/mcp-config-loader';

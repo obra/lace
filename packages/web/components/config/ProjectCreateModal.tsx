@@ -9,7 +9,7 @@ import { faPlus } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { AccentButton } from '@/components/ui/AccentButton';
 import { DirectoryField } from '@/components/ui';
-import type { ToolPolicy } from '@/components/ui/ToolPolicyToggle';
+import type { ToolPolicy } from '@/types/core';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import { DIRECTORY_BROWSER, WIZARD_PROGRESS } from '@/lib/constants/ui';
 

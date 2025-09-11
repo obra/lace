@@ -8,7 +8,7 @@ import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/b
 import { ToolCall, ToolResult, ToolContext } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
-import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/approval-types';
+import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/types';
 import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
@@ -216,16 +216,17 @@ describe('Enhanced Agent', () => {
       expect(agent.providerName).toBe('mock');
       expect(agent.getThreadId()).toBeDefined();
       expect(agent.getCurrentState()).toBe('idle');
-      expect(agent.getAvailableTools()).toEqual([]);
+      expect(agent.getAvailableTools().length).toBe(15); // Should have all native tools
     });
 
     it('should return copy of tools to prevent mutation', () => {
-      const tools = [new MockTool({ status: 'completed', content: [] })];
-      agent = createAgent({ tools });
+      agent = createAgent();
 
       const returnedTools = agent.getAvailableTools();
-      expect(returnedTools).toEqual(tools);
-      expect(returnedTools).not.toBe(tools); // Different array reference
+      const returnedTools2 = agent.getAvailableTools();
+
+      expect(returnedTools.length).toBe(15); // Should have all native tools
+      expect(returnedTools).not.toBe(returnedTools2); // Different array reference (copy)
     });
 
     it('should start in idle state and not running', () => {

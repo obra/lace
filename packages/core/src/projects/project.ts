@@ -6,10 +6,16 @@ import { basename } from 'path';
 import { getPersistence, ProjectData, SessionData } from '~/persistence/database';
 import { logger } from '~/utils/logger';
 import { Session } from '~/sessions/session';
+import type { ThreadId } from '~/threads/types';
 import { ThreadManager } from '~/threads/thread-manager';
 import type { SessionConfiguration } from '~/sessions/session-config';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { getProcessTempDir } from '~/config/lace-dir';
+import { MCPConfigLoader } from '~/config/mcp-config-loader';
+import type { MCPServerConfig } from '~/config/mcp-types';
+import { ToolExecutor } from '~/tools/executor';
+import { ToolCatalog } from '~/tools/tool-catalog';
+import { MCPServerManager } from '~/mcp/server-manager';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 
@@ -72,7 +78,7 @@ export class Project {
 
     // Auto-create a default session with project configuration
     try {
-      Session.create({
+      void Session.create({
         name: 'Main Session',
         description: 'Default session for project',
         projectId: projectData.id,
@@ -373,6 +379,113 @@ export class Project {
     const projectTempPath = join(processTempDir, `project-${projectId}`);
     mkdirSync(projectTempPath, { recursive: true });
     return projectTempPath;
+  }
+
+  /**
+   * Get MCP servers configured for this project
+   */
+  getMCPServers(): Record<string, MCPServerConfig> {
+    const config = MCPConfigLoader.loadConfig(this.getWorkingDirectory());
+    return config.servers;
+  }
+
+  /**
+   * Get specific MCP server configuration for this project
+   */
+  getMCPServer(serverId: string): MCPServerConfig | null {
+    const servers = this.getMCPServers();
+    return servers[serverId] || null;
+  }
+
+  /**
+   * Create ToolExecutor with project MCP servers for configuration APIs
+   */
+  createToolExecutor(): ToolExecutor {
+    const toolExecutor = new ToolExecutor();
+    toolExecutor.registerAllAvailableTools();
+
+    // For configuration APIs, we just show what MCP tools would be available
+    // without actually starting the servers (that happens in sessions)
+    const mcpServers = this.getMCPServers();
+    if (Object.keys(mcpServers).length > 0) {
+      const mcpManager = new MCPServerManager();
+      toolExecutor.registerMCPTools(mcpManager);
+
+      // Add placeholder tools based on server configuration
+      for (const [serverId, serverConfig] of Object.entries(mcpServers)) {
+        if (serverConfig.enabled && serverConfig.tools) {
+          for (const toolName of Object.keys(serverConfig.tools)) {
+            // Create placeholder MCP tools for configuration display
+            const _mcpToolName = `${serverId}/${toolName}`;
+            // The tool adapter will handle this properly when servers actually run
+          }
+        }
+      }
+    }
+
+    return toolExecutor;
+  }
+
+  /**
+   * Add new MCP server to project configuration
+   */
+  addMCPServer(serverId: string, serverConfig: MCPServerConfig): void {
+    // Check for duplicates
+    const existingServers = this.getMCPServers();
+    if (existingServers[serverId]) {
+      throw new Error(`MCP server '${serverId}' already exists in project`);
+    }
+
+    // Save server configuration to project config
+    MCPConfigLoader.updateServerConfig(serverId, serverConfig, this.getWorkingDirectory());
+
+    // Start async tool discovery (non-blocking)
+    void ToolCatalog.discoverAndCacheTools(
+      serverId,
+      serverConfig,
+      this.getWorkingDirectory()
+    ).catch((error) => {
+      logger.warn(`Tool discovery failed for MCP server ${serverId}:`, error);
+    });
+
+    // Notify sessions immediately
+    this.notifySessionsMCPChange(serverId, 'created', serverConfig);
+  }
+
+  /**
+   * Update existing MCP server configuration
+   */
+  updateMCPServer(serverId: string, serverConfig: MCPServerConfig): void {
+    MCPConfigLoader.updateServerConfig(serverId, serverConfig, this.getWorkingDirectory());
+    this.notifySessionsMCPChange(serverId, 'updated', serverConfig);
+  }
+
+  /**
+   * Remove MCP server from project configuration
+   */
+  deleteMCPServer(serverId: string): void {
+    MCPConfigLoader.deleteServerConfig(serverId, this.getWorkingDirectory());
+    this.notifySessionsMCPChange(serverId, 'deleted');
+  }
+
+  private notifySessionsMCPChange(
+    serverId: string,
+    action: 'created' | 'updated' | 'deleted',
+    serverConfig?: MCPServerConfig
+  ): void {
+    // Get session data and look up actual Session instances
+    const sessionDataList = this.getSessions();
+
+    sessionDataList.forEach((sessionData) => {
+      const session = Session.getByIdSync(sessionData.id as ThreadId);
+      if (session) {
+        session.announceMCPConfigChange(serverId, action, serverConfig);
+      } else {
+        logger.warn(
+          `Session ${sessionData.id} not found in registry for MCP config change notification`
+        );
+      }
+    });
   }
 
   private static generateNameFromDirectory(workingDirectory: string): string {
