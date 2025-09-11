@@ -9,6 +9,7 @@ import { faCheckCircle, faExclamationTriangle, faInfoCircle } from '@/lib/fontaw
 import { DismissButton } from '@/components/ui/DismissButton';
 
 export type AlertVariant = 'success' | 'warning' | 'error' | 'info';
+export type AlertLayout = 'vertical' | 'horizontal';
 
 export interface AlertProps {
   variant: AlertVariant;
@@ -18,6 +19,7 @@ export interface AlertProps {
   className?: string;
   showIcon?: boolean;
   onDismiss?: () => void;
+  layout?: AlertLayout;
 }
 
 const alertConfig = {
@@ -47,12 +49,15 @@ export function Alert({
   className = '',
   showIcon = true,
   onDismiss,
+  layout = 'vertical',
 }: AlertProps) {
   const config = alertConfig[variant];
 
+  const layoutClass = layout === 'horizontal' ? 'alert-vertical sm:alert-horizontal' : '';
+
   return (
     <div
-      className={`alert ${config.alertClass} ${className}`}
+      className={`alert ${config.alertClass} ${layoutClass} ${className}`}
       role={variant === 'error' || variant === 'warning' ? 'alert' : 'status'}
       aria-live={variant === 'error' || variant === 'warning' ? 'assertive' : 'polite'}
     >

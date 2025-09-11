@@ -30,19 +30,27 @@ export function ModelSelector({
     (provider) => provider.configured && provider.instanceId
   );
 
-  // Current selection value
+  // Current selection value using URL-encoded delimiter for safety
   const currentValue =
     selectedProviderInstanceId && selectedModelId
-      ? `${selectedProviderInstanceId}:${selectedModelId}`
+      ? `${encodeURIComponent(selectedProviderInstanceId)}|${encodeURIComponent(selectedModelId)}`
       : '';
 
   const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const value = event.target.value;
     if (!value) return;
 
-    const [providerInstanceId, modelId] = value.split(':');
-    if (providerInstanceId && modelId) {
-      onChange(providerInstanceId, modelId);
+    const parts = value.split('|');
+    if (parts.length === 2) {
+      try {
+        const providerInstanceId = decodeURIComponent(parts[0]);
+        const modelId = decodeURIComponent(parts[1]);
+        if (providerInstanceId && modelId) {
+          onChange(providerInstanceId, modelId);
+        }
+      } catch (error) {
+        console.error('Failed to decode model selector value:', error);
+      }
     }
   };
 
@@ -66,7 +74,7 @@ export function ModelSelector({
               {provider.models.map((model) => (
                 <option
                   key={`${provider.instanceId}:${model.id}`}
-                  value={`${provider.instanceId}:${model.id}`}
+                  value={`${encodeURIComponent(provider.instanceId!)}|${encodeURIComponent(model.id)}`}
                 >
                   {model.displayName}
                 </option>

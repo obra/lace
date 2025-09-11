@@ -408,6 +408,12 @@ export default function PlaygroundPage() {
                 description="This demo uses native OS-level speech recognition."
               />
             </AtomItem>
+            <AtomItem n={59.1} tip="Atom #59.1: Alert Error Horizontal">
+              <Alert variant="error" title="Failed to update model" layout="horizontal" />
+            </AtomItem>
+            <AtomItem n={59.2} tip="Atom #59.2: Alert Warning Horizontal">
+              <Alert variant="warning" title="Model change in progress" layout="horizontal" />
+            </AtomItem>
             <AtomItem n={60} tip="Atom #60: DismissButton Small">
               <DismissButton onClick={() => {}} size="sm" ariaLabel="Close small" />
             </AtomItem>

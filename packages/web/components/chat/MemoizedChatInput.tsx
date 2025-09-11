@@ -8,6 +8,7 @@ import { motion } from 'motion/react';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { CompactTokenUsage } from '@/components/ui/CompactTokenUsage';
 import { ModelSelector } from '@/components/ui/ModelSelector';
+import { Alert } from '@/components/ui/Alert';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import type { ThreadId } from '@/types/core';
@@ -111,6 +112,7 @@ const CustomChatInput = memo(
   ) {
     const [isListening, setIsListening] = useState(false);
     const [speechError, setSpeechError] = useState<string | null>(null);
+    const [modelError, setModelError] = useState<string | null>(null);
     const chatInputRef = useRef<{ focus: () => void } | null>(null);
 
     // Expose focus method via ref
@@ -125,12 +127,15 @@ const CustomChatInput = memo(
       async (providerInstanceId: string, modelId: string) => {
         if (currentAgent) {
           try {
+            setModelError(null); // Clear any previous error
             await updateAgent(currentAgent.threadId, {
               name: currentAgent.name,
               providerInstanceId,
               modelId,
             });
           } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to update model';
+            setModelError(errorMessage);
             console.error('Failed to update agent model:', error);
           }
         }
@@ -184,15 +189,25 @@ const CustomChatInput = memo(
 
             {/* Model Selector */}
             {currentAgent && (
-              <ModelSelector
-                providers={availableProviders}
-                selectedProviderInstanceId={currentAgent.providerInstanceId}
-                selectedModelId={currentAgent.modelId}
-                onChange={handleModelChange}
-                disabled={isStreaming}
-                className="select select-ghost select-xs"
-                placeholder="Select model..."
-              />
+              <div className="flex flex-col gap-1">
+                <ModelSelector
+                  providers={availableProviders}
+                  selectedProviderInstanceId={currentAgent.providerInstanceId}
+                  selectedModelId={currentAgent.modelId}
+                  onChange={handleModelChange}
+                  disabled={isStreaming}
+                  className="select select-ghost select-xs"
+                  placeholder="Select model..."
+                />
+                {modelError && (
+                  <Alert
+                    variant="error"
+                    title={modelError}
+                    layout="horizontal"
+                    className="text-xs py-1 px-2"
+                  />
+                )}
+              </div>
             )}
           </div>
 
