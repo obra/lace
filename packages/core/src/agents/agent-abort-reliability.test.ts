@@ -86,7 +86,6 @@ describe('Agent Abort Reliability', () => {
   it('should handle rapid abort attempts reliably', async () => {
     const totalAttempts = 20;
     let successfulAborts = 0;
-    let failedAborts = 0;
 
     for (let i = 0; i < totalAttempts; i++) {
       try {
@@ -135,13 +134,11 @@ describe('Agent Abort Reliability', () => {
         if (abortResult && agent.getCurrentState() === 'idle') {
           successfulAborts++;
         } else {
-          failedAborts++;
           console.log(
             `Attempt ${i + 1}: Abort returned ${abortResult}, state: ${agent.getCurrentState()}`
           );
         }
       } catch (error) {
-        failedAborts++;
         console.log(`Attempt ${i + 1} threw error:`, error);
       }
     }
@@ -227,7 +224,7 @@ describe('Agent Abort Reliability', () => {
         const success = abortResult && finalState === 'idle';
 
         abortResults.push(success);
-      } catch (error) {
+      } catch (_error) {
         // State timeout - try abort anyway (for any other active state)
         const abortResult = agent.abort();
         await messagePromise;
