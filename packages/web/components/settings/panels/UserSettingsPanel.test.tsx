@@ -65,14 +65,19 @@ describe('UserSettingsPanel', () => {
 
     render(<UserSettingsPanel />);
 
-    // Wait for initial load
+    // Wait for initial load and inputs to be enabled
     await waitFor(() => {
       expect(mockApiGet).toHaveBeenCalledWith('/api/settings');
     });
 
-    // Fill in the form
+    // Wait for inputs to be enabled (not disabled)
     const nameInput = screen.getByLabelText('Display Name');
     const emailInput = screen.getByLabelText('Email');
+
+    await waitFor(() => {
+      expect(nameInput).not.toBeDisabled();
+      expect(emailInput).not.toBeDisabled();
+    });
 
     await userEvent.clear(nameInput);
     await userEvent.type(nameInput, 'Jane Smith');
