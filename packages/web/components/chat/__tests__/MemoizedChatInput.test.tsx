@@ -73,8 +73,10 @@ vi.mock('motion/react', () => ({
   },
 }));
 
-// Mock AgentProvider context
-const mockAgentContext = {
+// Mock AgentProvider context with proper typing
+import type { useAgentContext } from '@/components/providers/AgentProvider';
+
+const mockAgentContext: Pick<ReturnType<typeof useAgentContext>, 'currentAgent' | 'updateAgent'> = {
   currentAgent: {
     threadId: 'test-agent-789' as ThreadId,
     name: 'Test Agent',

@@ -3,7 +3,7 @@
 
 'use client';
 
-import React from 'react';
+import type { ChangeEvent } from 'react';
 import type { ProviderInfo } from '@/types/api';
 
 interface ModelSelectorProps {
@@ -36,7 +36,7 @@ export function ModelSelector({
       ? `${encodeURIComponent(selectedProviderInstanceId)}|${encodeURIComponent(selectedModelId)}`
       : '';
 
-  const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const value = event.target.value;
     if (!value) return;
 
