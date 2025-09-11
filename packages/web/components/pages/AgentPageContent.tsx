@@ -14,6 +14,7 @@ import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
 import { SessionEditModal } from '@/components/config/SessionEditModal';
+import { AgentCreateChatModal } from '@/components/modals/AgentCreateChatModal';
 
 import { useUIContext } from '@/components/providers/UIProvider';
 import { asThreadId, isAgentSummaryUpdatedData } from '@/types/core';
@@ -23,6 +24,9 @@ import { useToolApprovalContext } from '@/components/providers/ToolApprovalProvi
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import { useURLState } from '@/hooks/useURLState';
 import { useEventStreamContext } from '@/components/providers/EventStreamProvider';
+import { api } from '@/lib/api-client';
+import useSWR from 'swr';
+import type { PersonaCatalogResponse } from '@/app/routes/api.persona.catalog';
 
 interface AgentPageContentProps {
   projectId: string;
@@ -51,6 +55,13 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   const [agentSummary, setAgentSummary] = useState<string | null>(null);
 
   const [showSessionEditModal, setShowSessionEditModal] = useState(false);
+  const [showCreateAgentModal, setShowCreateAgentModal] = useState(false);
+
+  // Fetch personas for the modal
+  const { data: personaData } = useSWR('/api/persona/catalog', (url: string) =>
+    api.get<PersonaCatalogResponse>(url)
+  );
+  const personas = personaData?.personas || [];
 
   // Event handlers
   const handleAgentSelect = useCallback(
@@ -68,6 +79,31 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   const handleConfigureSession = useCallback(() => {
     setShowSessionEditModal(true);
   }, []);
+
+  const handleCreateAgent = useCallback(() => {
+    setShowCreateAgentModal(true);
+  }, []);
+
+  const handleAgentCreated = useCallback(
+    async (config: {
+      personaName: string;
+      providerInstanceId: string;
+      modelId: string;
+      initialMessage?: string;
+    }) => {
+      await api.post(`/api/sessions/${sessionId}/agents`, {
+        name: `${config.personaName} Agent`,
+        providerInstanceId: config.providerInstanceId,
+        modelId: config.modelId,
+        persona: config.personaName,
+        initialMessage: config.initialMessage,
+      });
+
+      // Reload session details to show new agent
+      await reloadSessionDetails();
+    },
+    [sessionId, reloadSessionDetails]
+  );
 
   // Listen for agent summary updates from existing event stream
   const { agentEvents } = useEventStreamContext();
@@ -124,6 +160,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
                 onSwitchProject={handleSwitchProject}
                 onAgentSelect={handleAgentSelect}
                 onConfigureSession={handleConfigureSession}
+                onCreateAgent={handleCreateAgent}
               />
             </Sidebar>
           )}
@@ -175,6 +212,18 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
           onSuccess={reloadSessionDetails}
         />
       )}
+
+      {/* Agent Create Modal */}
+      <AgentCreateChatModal
+        isOpen={showCreateAgentModal}
+        onClose={() => setShowCreateAgentModal(false)}
+        onCreateAgent={handleAgentCreated}
+        personas={personas}
+        providers={providers}
+        defaultPersonaName="default"
+        defaultProviderInstanceId={providers.find((p) => p.configured)?.instanceId}
+        defaultModelId={providers.find((p) => p.configured)?.models[0]?.id}
+      />
     </motion.div>
   );
 }

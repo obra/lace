@@ -23,6 +23,7 @@ interface SidebarContentProps {
   onSwitchProject: () => void;
   onAgentSelect: (threadId: ThreadId) => void;
   onConfigureSession?: () => void;
+  onCreateAgent?: () => void;
 }
 
 export const SidebarContent = memo(function SidebarContent({
@@ -31,6 +32,7 @@ export const SidebarContent = memo(function SidebarContent({
   onSwitchProject,
   onAgentSelect,
   onConfigureSession,
+  onCreateAgent,
 }: SidebarContentProps) {
   // Get state from providers
   const { selectedProject } = useProjectContext();
@@ -69,6 +71,7 @@ export const SidebarContent = memo(function SidebarContent({
             isMobile={isMobile}
             onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
             onAgentSelect={onAgentSelect}
+            onCreateAgent={onCreateAgent}
           />
         )}
 
