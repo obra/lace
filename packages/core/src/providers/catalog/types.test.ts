@@ -168,6 +168,67 @@ describe('ProviderInstanceSchema', () => {
     const result = ProviderInstanceSchema.safeParse(invalidInstance);
     expect(result.success).toBe(false);
   });
+
+  it('should accept modelConfig with filters', () => {
+    const config = {
+      displayName: 'Test',
+      catalogProviderId: 'openrouter',
+      modelConfig: {
+        enableNewModels: true,
+        disabledModels: ['model-1'],
+        disabledProviders: ['provider-1'],
+        filters: {
+          requiredParameters: ['tools'],
+          maxPromptCostPerMillion: 5.0,
+          maxCompletionCostPerMillion: 10.0,
+          minContextLength: 32000,
+        },
+      },
+    };
+    const result = ProviderInstanceSchema.safeParse(config);
+    expect(result.success).toBe(true);
+  });
+
+  it('should work without modelConfig (backward compat)', () => {
+    const config = {
+      displayName: 'Test',
+      catalogProviderId: 'anthropic',
+    };
+    const result = ProviderInstanceSchema.safeParse(config);
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept partial modelConfig', () => {
+    const config = {
+      displayName: 'Test',
+      catalogProviderId: 'openrouter',
+      modelConfig: {
+        disabledModels: ['model-1'],
+        // Other fields should use defaults
+      },
+    };
+    const result = ProviderInstanceSchema.safeParse(config);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.modelConfig?.enableNewModels).toBe(true); // default
+      expect(result.data.modelConfig?.disabledProviders).toEqual([]); // default
+    }
+  });
+
+  it('should accept empty filters object', () => {
+    const config = {
+      displayName: 'Test',
+      catalogProviderId: 'openrouter',
+      modelConfig: {
+        enableNewModels: false,
+        disabledModels: [],
+        disabledProviders: [],
+        filters: {},
+      },
+    };
+    const result = ProviderInstanceSchema.safeParse(config);
+    expect(result.success).toBe(true);
+  });
 });
 
 describe('ProviderInstancesConfigSchema', () => {
