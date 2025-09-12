@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars } from '@/lib/fontawesome';
@@ -14,7 +14,7 @@ import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
 import { SettingsContainer } from '@/components/settings/SettingsContainer';
 import { SessionEditModal } from '@/components/config/SessionEditModal';
-import { AgentCreateChatModal } from '@/components/modals/AgentCreateChatModal';
+import { AgentCreateChatPopup } from '@/components/modals/AgentCreateChatPopup';
 
 import { useUIContext } from '@/components/providers/UIProvider';
 import { asThreadId, isAgentSummaryUpdatedData } from '@/types/core';
@@ -54,7 +54,8 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   const [agentSummary, setAgentSummary] = useState<string | null>(null);
 
   const [showSessionEditModal, setShowSessionEditModal] = useState(false);
-  const [showCreateAgentModal, setShowCreateAgentModal] = useState(false);
+  const [showCreateAgentPopup, setShowCreateAgentPopup] = useState(false);
+  const createAgentButtonRef = useRef<HTMLElement>(null);
 
   // Fetch personas for the modal
   const [personas, setPersonas] = useState<PersonaCatalogResponse['personas']>([]);
@@ -97,28 +98,46 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   }, []);
 
   const handleCreateAgent = useCallback(() => {
-    setShowCreateAgentModal(true);
+    setShowCreateAgentPopup(true);
   }, []);
 
   const handleAgentCreated = useCallback(
-    async (config: {
-      personaName: string;
-      providerInstanceId: string;
-      modelId: string;
-      initialMessage?: string;
-    }) => {
-      await api.post(`/api/sessions/${sessionId}/agents`, {
+    async (config: { personaName: string; initialMessage?: string }) => {
+      // Get current agent's provider/model
+      const currentAgent = selectedSessionDetails?.agents?.find((a) => a.threadId === agentId);
+      const currentProviderInstanceId = currentAgent?.providerInstanceId;
+      const currentModelId = currentAgent?.modelId;
+
+      // Fallback to first configured provider if session doesn't have current settings
+      const fallbackProvider = providers.find((p) => p.configured);
+
+      const response = await api.post(`/api/sessions/${sessionId}/agents`, {
         name: `${config.personaName} Agent`,
-        providerInstanceId: config.providerInstanceId,
-        modelId: config.modelId,
         persona: config.personaName,
         initialMessage: config.initialMessage,
+        providerInstanceId:
+          currentProviderInstanceId || fallbackProvider?.instanceId || providers[0]?.instanceId,
+        modelId: currentModelId || fallbackProvider?.models[0]?.id || providers[0]?.models[0]?.id,
       });
 
-      // Reload session details to show new agent
+      // Navigate to the new agent
+      const newAgentThreadId = response.threadId;
+      navigateToAgent(projectId, asThreadId(sessionId), asThreadId(newAgentThreadId));
+
+      // Reload session details to show new agent in sidebar
       await reloadSessionDetails();
+
+      return newAgentThreadId;
     },
-    [sessionId, reloadSessionDetails]
+    [
+      sessionId,
+      reloadSessionDetails,
+      navigateToAgent,
+      projectId,
+      providers,
+      agentId,
+      selectedSessionDetails,
+    ]
   );
 
   // Listen for agent summary updates from existing event stream
@@ -177,6 +196,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
                 onAgentSelect={handleAgentSelect}
                 onConfigureSession={handleConfigureSession}
                 onCreateAgent={handleCreateAgent}
+                createAgentButtonRef={createAgentButtonRef}
               />
             </Sidebar>
           )}
@@ -229,16 +249,14 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
         />
       )}
 
-      {/* Agent Create Modal */}
-      <AgentCreateChatModal
-        isOpen={showCreateAgentModal}
-        onClose={() => setShowCreateAgentModal(false)}
+      {/* Agent Create Popup */}
+      <AgentCreateChatPopup
+        isOpen={showCreateAgentPopup}
+        onClose={() => setShowCreateAgentPopup(false)}
         onCreateAgent={handleAgentCreated}
         personas={personas}
-        providers={providers}
-        defaultPersonaName="default"
-        defaultProviderInstanceId={providers.find((p) => p.configured)?.instanceId}
-        defaultModelId={providers.find((p) => p.configured)?.models[0]?.id}
+        defaultPersonaName="lace"
+        anchorRef={createAgentButtonRef}
         personasLoading={personasLoading}
         personasError={personasError}
       />

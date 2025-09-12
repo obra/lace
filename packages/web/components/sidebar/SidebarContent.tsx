@@ -24,6 +24,7 @@ interface SidebarContentProps {
   onAgentSelect: (threadId: ThreadId) => void;
   onConfigureSession?: () => void;
   onCreateAgent?: () => void;
+  createAgentButtonRef?: React.RefObject<HTMLElement>;
 }
 
 export const SidebarContent = memo(function SidebarContent({
@@ -33,6 +34,7 @@ export const SidebarContent = memo(function SidebarContent({
   onAgentSelect,
   onConfigureSession,
   onCreateAgent,
+  createAgentButtonRef,
 }: SidebarContentProps) {
   // Get state from providers
   const { selectedProject } = useProjectContext();
@@ -72,6 +74,7 @@ export const SidebarContent = memo(function SidebarContent({
             onCloseMobileNav={isMobile ? onCloseMobileNav : undefined}
             onAgentSelect={onAgentSelect}
             onCreateAgent={onCreateAgent}
+            createAgentButtonRef={createAgentButtonRef}
           />
         )}
 
