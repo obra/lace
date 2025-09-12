@@ -10,6 +10,7 @@ import { createErrorResponse } from '@/lib/server/api-utils';
 import { setupAgentApprovals } from '@/lib/server/agent-utils';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import type { Agent } from '@/lib/server/lace-imports';
+import { logger } from '~/utils/logger';
 import type { Route } from './+types/api.sessions.$sessionId.agents';
 
 // Type guard for unknown error values
@@ -23,6 +24,9 @@ function isCreateAgentRequest(body: unknown): body is CreateAgentRequest {
     typeof body === 'object' &&
     body !== null &&
     (!('name' in body) || typeof (body as { name: unknown }).name === 'string') &&
+    (!('persona' in body) || typeof (body as { persona: unknown }).persona === 'string') &&
+    (!('initialMessage' in body) ||
+      typeof (body as { initialMessage: unknown }).initialMessage === 'string') &&
     'providerInstanceId' in body &&
     typeof (body as { providerInstanceId: unknown }).providerInstanceId === 'string' &&
     'modelId' in body &&
@@ -100,6 +104,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         name: body.name || '',
         providerInstanceId: body.providerInstanceId,
         modelId: body.modelId,
+        persona: body.persona,
       });
     } catch (error) {
       // Log full error for server debugging while keeping client response sanitized
@@ -131,6 +136,17 @@ export async function action({ request, params }: Route.ActionArgs) {
       createdAt: (metadata?.createdAt as Date) || undefined,
       tokenUsage,
     };
+
+    // Send initial message if provided
+    if (body.initialMessage?.trim()) {
+      void agent.sendMessage(body.initialMessage.trim()).catch((error: unknown) => {
+        logger.error('Initial message sending error', {
+          threadId: agent.threadId,
+          sessionId,
+          error: isError(error) ? error.message : String(error),
+        });
+      });
+    }
 
     // Test SSE broadcast
     const sseManager = EventStreamManager.getInstance();

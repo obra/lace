@@ -789,6 +789,7 @@ export class Session {
       configModelId: config.modelId,
       effectiveProviderInstanceId: targetProviderInstanceId,
       effectiveModelId: targetModelId,
+      persona: config.persona,
     });
 
     // Create configured tool executor for this agent

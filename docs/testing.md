@@ -198,7 +198,6 @@ const session = await sessionService.createSession(
 #### 1. Shared State Between Tests
 - Always use individual provider instances
 - Clear caches with `Session.clearProviderCache()`
-- Use `:memory:` database for isolation
 
 #### 2. Cleanup Order
 ```typescript
@@ -1322,7 +1321,6 @@ function startServer() {
     env: {
       ...process.env,
       LACE_DIR: tempLaceDir, // Set isolated LACE_DIR for the server
-      LACE_DB_PATH: ':memory:',
       // ... other test environment variables
     },
   });

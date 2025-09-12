@@ -5,8 +5,8 @@
 
 import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRobot, faSquare, faChevronRight, faChevronDown } from '@/lib/fontawesome';
-import { SidebarItem } from '@/components/layout/Sidebar';
+import { faRobot, faSquare, faChevronRight, faChevronDown, faPlus } from '@/lib/fontawesome';
+import { SidebarItem, SidebarSection } from '@/components/layout/Sidebar';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useOptionalTaskContext } from '@/components/providers/TaskProvider';
 import { getStatusBgColor } from '@/lib/task-status-ui';
@@ -16,12 +16,16 @@ interface AgentsSectionProps {
   isMobile?: boolean;
   onCloseMobileNav?: () => void;
   onAgentSelect: (agentId: ThreadId) => void;
+  onCreateAgent?: () => void;
+  createAgentButtonRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 export function AgentsSection({
   isMobile = false,
   onCloseMobileNav,
   onAgentSelect,
+  onCreateAgent,
+  createAgentButtonRef,
 }: AgentsSectionProps) {
   // Get context data
   const { sessionDetails, selectedAgent } = useAgentContext();
@@ -76,19 +80,27 @@ export function AgentsSection({
     });
   };
 
+  const addAgentButton = onCreateAgent ? (
+    <button
+      ref={createAgentButtonRef}
+      onClick={onCreateAgent}
+      className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 border border-transparent hover:border-base-300/30"
+      title="Add agent"
+      data-testid="add-agent-button"
+    >
+      <FontAwesomeIcon icon={faPlus} className="w-3 h-3 text-base-content/60" />
+    </button>
+  ) : undefined;
+
   return (
-    <div className="ml-4 mt-2">
-      {' '}
-      {/* Indent to show it's under the session */}
-      {/* Tiny label header */}
-      <div className="px-6 mb-1">
-        <div className="flex items-center gap-1 text-xs font-medium text-base-content/50 uppercase tracking-wide">
-          <FontAwesomeIcon icon={faRobot} className="w-3 h-3" />
-          <span>Agents</span>
-        </div>
-      </div>
-      {/* Agent List */}
-      <div className="px-6 space-y-0.5">
+    <SidebarSection
+      title="Agents"
+      icon={faRobot}
+      defaultCollapsed={false}
+      collapsible={true}
+      headerActions={addAgentButton}
+    >
+      <div className="space-y-0.5">
         {' '}
         {/* Tighter spacing */}
         {sessionDetails.agents.map((agent) => {
@@ -164,6 +176,6 @@ export function AgentsSection({
           );
         })}
       </div>
-    </div>
+    </SidebarSection>
   );
 }

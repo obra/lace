@@ -88,7 +88,7 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
     const relativeFromSrc = moduleDir.substring(prefixLength);
 
     // Special case for agent-personas which moved from src/config/ to config/
-    if (relativePath === 'config/agent-personas') {
+    if (relativePath === 'agent-personas') {
       return path.resolve(process.cwd(), 'packages/core/config/agent-personas');
     }
 
@@ -97,6 +97,13 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
   } else {
     // In development, use the standard module-relative resolution
     const currentDir = path.dirname(fileURLToPath(importMetaUrl));
+
+    // Special case for agent-personas which is at packages/core/config/agent-personas
+    // but called from packages/core/src/ modules
+    if (relativePath === 'agent-personas') {
+      return path.resolve(currentDir, '../../config/agent-personas');
+    }
+
     return path.resolve(currentDir, relativePath);
   }
 }

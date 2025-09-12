@@ -65,6 +65,8 @@ export interface CreateAgentRequest {
   name?: string;
   providerInstanceId: string; // REQUIRED - no fallback to old system
   modelId: string; // REQUIRED - no fallback to old system
+  persona?: string; // NEW - persona for agent system prompt
+  initialMessage?: string; // NEW - optional initial message to send after creation
 }
 
 // API response types
