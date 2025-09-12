@@ -3,6 +3,21 @@
 
 import { z } from 'zod';
 
+// Model configuration schema
+export const ModelConfigSchema = z.object({
+  enableNewModels: z.boolean().default(true),
+  disabledModels: z.array(z.string()).default([]),
+  disabledProviders: z.array(z.string()).default([]),
+  filters: z
+    .object({
+      requiredParameters: z.array(z.string()).optional(),
+      maxPromptCostPerMillion: z.number().positive().optional(),
+      maxCompletionCostPerMillion: z.number().positive().optional(),
+      minContextLength: z.number().int().positive().optional(),
+    })
+    .optional(),
+});
+
 // Catwalk catalog model schema
 export const CatalogModelSchema = z.object({
   id: z.string().min(1),
@@ -39,6 +54,7 @@ export const ProviderInstanceSchema = z.object({
   endpoint: z.string().url().optional(),
   timeout: z.number().int().positive().optional(),
   retryPolicy: z.string().optional(),
+  modelConfig: ModelConfigSchema.optional(),
 });
 
 // User instances configuration file
@@ -53,6 +69,7 @@ export const CredentialSchema = z.object({
   additionalAuth: z.record(z.unknown()).optional(),
 });
 
+export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type CatalogModel = z.infer<typeof CatalogModelSchema>;
 export type CatalogProvider = z.infer<typeof CatalogProviderSchema>;
 export type ProviderInstance = z.infer<typeof ProviderInstanceSchema>;
