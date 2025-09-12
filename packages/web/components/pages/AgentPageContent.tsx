@@ -55,7 +55,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
 
   const [showSessionEditModal, setShowSessionEditModal] = useState(false);
   const [showCreateAgentPopup, setShowCreateAgentPopup] = useState(false);
-  const createAgentButtonRef = useRef<HTMLElement>(null);
+  const createAgentButtonRef = useRef<HTMLButtonElement>(null);
 
   // Fetch personas for the modal
   const [personas, setPersonas] = useState<PersonaCatalogResponse['personas']>([]);
@@ -111,13 +111,26 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
       // Fallback to first configured provider if session doesn't have current settings
       const fallbackProvider = providers.find((p) => p.configured);
 
+      // Validate that we have providers and models before creating agent
+      if (providers.length === 0) {
+        throw new Error('No providers available for agent creation');
+      }
+
+      const targetProviderInstanceId =
+        currentProviderInstanceId || fallbackProvider?.instanceId || providers[0]?.instanceId;
+      const targetModelId =
+        currentModelId || fallbackProvider?.models[0]?.id || providers[0]?.models[0]?.id;
+
+      if (!targetProviderInstanceId || !targetModelId) {
+        throw new Error('Unable to determine provider and model for agent creation');
+      }
+
       const response = await api.post(`/api/sessions/${sessionId}/agents`, {
         name: `${config.personaName} Agent`,
         persona: config.personaName,
         initialMessage: config.initialMessage,
-        providerInstanceId:
-          currentProviderInstanceId || fallbackProvider?.instanceId || providers[0]?.instanceId,
-        modelId: currentModelId || fallbackProvider?.models[0]?.id || providers[0]?.models[0]?.id,
+        providerInstanceId: targetProviderInstanceId,
+        modelId: targetModelId,
       });
 
       // Navigate to the new agent

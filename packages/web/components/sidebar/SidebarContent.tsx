@@ -24,7 +24,7 @@ interface SidebarContentProps {
   onAgentSelect: (threadId: ThreadId) => void;
   onConfigureSession?: () => void;
   onCreateAgent?: () => void;
-  createAgentButtonRef?: React.RefObject<HTMLElement | null>;
+  createAgentButtonRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 export const SidebarContent = memo(function SidebarContent({

@@ -19,7 +19,6 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
-import { Project, Session } from '@/lib/server/lace-imports';
 
 // Mock external dependencies only (following testing docs)
 vi.mock('server-only', () => ({}));

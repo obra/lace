@@ -17,7 +17,7 @@ interface AgentsSectionProps {
   onCloseMobileNav?: () => void;
   onAgentSelect: (agentId: ThreadId) => void;
   onCreateAgent?: () => void;
-  createAgentButtonRef?: React.RefObject<HTMLElement | null>;
+  createAgentButtonRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 export function AgentsSection({
@@ -82,7 +82,7 @@ export function AgentsSection({
 
   const addAgentButton = onCreateAgent ? (
     <button
-      ref={createAgentButtonRef as React.RefObject<HTMLButtonElement>}
+      ref={createAgentButtonRef}
       onClick={onCreateAgent}
       className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 border border-transparent hover:border-base-300/30"
       title="Add agent"

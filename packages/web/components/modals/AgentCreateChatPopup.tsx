@@ -21,7 +21,7 @@ interface AgentCreateChatPopupProps {
   defaultPersonaName?: string;
 
   // Positioning
-  anchorRef: React.RefObject<HTMLElement | null>;
+  anchorRef: React.RefObject<HTMLButtonElement | null>;
 
   // Loading state
   creating?: boolean;
@@ -40,7 +40,7 @@ export function AgentCreateChatPopup({
   personasLoading = false,
   personasError = null,
 }: AgentCreateChatPopupProps) {
-  const [selectedPersona, setSelectedPersona] = useState('lace');
+  const [selectedPersona, setSelectedPersona] = useState(defaultPersonaName || 'lace');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -49,13 +49,13 @@ export function AgentCreateChatPopup({
   // Reset to defaults when popup opens
   useEffect(() => {
     if (isOpen) {
-      setSelectedPersona('lace'); // Always default to lace
+      setSelectedPersona(defaultPersonaName || 'lace'); // Honor defaultPersonaName prop
       setMessage('');
       setIsSubmitting(false);
       // Focus message input when opened
       setTimeout(() => messageInputRef.current?.focus(), 100);
     }
-  }, [isOpen]);
+  }, [isOpen, defaultPersonaName]);
 
   const canCreate = selectedPersona && !personasLoading;
 
