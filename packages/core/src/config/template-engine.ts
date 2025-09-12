@@ -102,8 +102,28 @@ export class TemplateEngine {
       if (fs.existsSync(fullPath)) {
         logger.debug('Loading template from file system', { templatePath, templateDir });
         return fs.readFileSync(fullPath, 'utf-8');
+      } else {
+        logger.error('Template file not found in directory', {
+          templatePath,
+          templateDir,
+          fullPath,
+          dirExists: fs.existsSync(templateDir),
+          dirContents: fs.existsSync(templateDir)
+            ? fs.readdirSync(templateDir)
+            : 'directory does not exist',
+        });
       }
     }
+
+    logger.error('Template file not found in any directory', {
+      templatePath,
+      searchedDirs: this.templateDirs,
+      allDirContents: this.templateDirs.map((dir) => ({
+        dir,
+        exists: fs.existsSync(dir),
+        contents: fs.existsSync(dir) ? fs.readdirSync(dir) : 'not found',
+      })),
+    });
 
     throw new Error(`Template file not found in embedded files or directories: ${templatePath}`);
   }
