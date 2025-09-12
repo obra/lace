@@ -22,7 +22,6 @@ export default {
     '@typescript-eslint/eslint-plugin',
     '@typescript-eslint/parser',
     '@eslint/eslintrc',
-    'eslint-config-next',
     'eslint-plugin-import',
     'eslint-plugin-no-relative-import-paths',
     // Build tooling - used in config files
@@ -43,10 +42,8 @@ export default {
       entry: [
         // Next.js app entrypoints (Knip auto-detects these)
         'app/**/page.tsx',
-        'app/**/layout.tsx',
-        'app/api/**/route.ts',
         // Server entrypoint
-        'server.ts',
+        'server-custom.ts',
         // Storybook (auto-detected, but keep explicit)
         'stories_parked/*.stories.{ts,tsx}',
         // E2E test files
@@ -56,27 +53,6 @@ export default {
         'components/ui/**/*.tsx!',
         'components/feedback/**/*.tsx!',
         'components/demo/**/*.tsx!',
-        // Unused component files - only warn in production mode
-        'components/chat/index.ts!',
-        'components/config/ProviderDropdown.tsx!',
-        'components/feedback/index.ts!',
-        'components/files/CarouselCodeChanges.tsx!',
-        'components/files/FileDiffViewer.demo.tsx!',
-        'components/files/FileDiffViewer.integration.tsx!',
-        'components/pages/AnimatedLaceApp.tsx!',
-        'components/pages/ChatInterface.tsx!',
-        'components/pages/LaceAppMobileSidebar.tsx!',
-        'components/pages/LaceAppSidebar.tsx!',
-        'components/providers/ConnectionTest.tsx!',
-        'components/providers/ModelSelectionForm.tsx!',
-        'components/timeline/AnimatedTimelineMessage.tsx!',
-        'components/timeline/AnimatedTimelineView.tsx!',
-        'components/timeline/AnimatedTypingIndicator.tsx!',
-        'components/timeline/IntegrationEntry.tsx!',
-        'components/timeline/UnknownEventEntry.tsx!',
-        'hooks/useProviderStatus.ts!',
-        'hooks/useVoiceRecognition.ts!',
-        'lib/display-utils.ts!',
       ],
       // Keep ESLint plugin disabled to avoid module resolution issues
       eslint: false,
