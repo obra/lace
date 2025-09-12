@@ -3,7 +3,6 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 import { getLaceDir } from '~/config/lace-dir';
 import { scanEmbeddedFiles, resolveResourcePath } from '~/utils/resource-resolver';
 import { logger } from '~/utils/logger';
