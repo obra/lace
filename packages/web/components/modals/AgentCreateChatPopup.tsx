@@ -21,7 +21,7 @@ interface AgentCreateChatPopupProps {
   defaultPersonaName?: string;
 
   // Positioning
-  anchorRef: React.RefObject<HTMLElement>;
+  anchorRef: React.RefObject<HTMLElement | null>;
 
   // Loading state
   creating?: boolean;

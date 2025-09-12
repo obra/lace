@@ -17,7 +17,7 @@ interface AgentsSectionProps {
   onCloseMobileNav?: () => void;
   onAgentSelect: (agentId: ThreadId) => void;
   onCreateAgent?: () => void;
-  createAgentButtonRef?: React.RefObject<HTMLElement>;
+  createAgentButtonRef?: React.RefObject<HTMLElement | null>;
 }
 
 export function AgentsSection({

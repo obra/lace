@@ -121,7 +121,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
       });
 
       // Navigate to the new agent
-      const newAgentThreadId = response.threadId;
+      const newAgentThreadId = (response as { threadId: string }).threadId;
       navigateToAgent(projectId, asThreadId(sessionId), asThreadId(newAgentThreadId));
 
       // Reload session details to show new agent in sidebar

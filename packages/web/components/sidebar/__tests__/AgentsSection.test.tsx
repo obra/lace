@@ -9,7 +9,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { AgentsSection } from '../AgentsSection';
+import { AgentsSection } from '@/components/sidebar/AgentsSection';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useOptionalTaskContext } from '@/components/providers/TaskProvider';
 

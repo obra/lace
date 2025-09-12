@@ -11,7 +11,6 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '@/lib/server/lace-imports';
-import { parseResponse } from '@/lib/serialization';
 import { createActionArgs } from '@/test-utils/route-test-helpers';
 
 // Mock server-only module
@@ -27,7 +26,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 // Import after mocks
 import { action as POST } from '@/app/routes/api.sessions.$sessionId.agents';
 import { getSessionService, SessionService } from '@/lib/server/session-service';
-import { Project, Session } from '@/lib/server/lace-imports';
+import { Project, Session, asThreadId } from '@/lib/server/lace-imports';
 
 describe('Agent Creation - Persona System Prompt Integration', () => {
   const _tempLaceDir = setupWebTest();
@@ -93,7 +92,7 @@ describe('Agent Creation - Persona System Prompt Integration', () => {
     expect(response.status).toBe(201);
 
     // Get the created agent and check its persona
-    const session = await sessionService.getSession(sessionId as any);
+    const session = await sessionService.getSession(asThreadId(sessionId));
     const agents = session!.getAgents();
     const createdAgent = agents.find((a) => a.name === 'Default Agent');
 
@@ -121,7 +120,7 @@ describe('Agent Creation - Persona System Prompt Integration', () => {
     expect(response.status).toBe(201);
 
     // Get the created agent and check its persona
-    const session = await sessionService.getSession(sessionId as any);
+    const session = await sessionService.getSession(asThreadId(sessionId));
     const agents = session!.getAgents();
     const createdAgent = agents.find((a) => a.name === 'Summary Agent');
 
@@ -163,7 +162,7 @@ describe('Agent Creation - Persona System Prompt Integration', () => {
     await POST(createActionArgs(summaryRequest, { sessionId }));
 
     // Get the created agents
-    const session = await sessionService.getSession(sessionId as any);
+    const session = await sessionService.getSession(asThreadId(sessionId));
     const agents = session!.getAgents();
     const defaultAgent = agents.find((a) => a.name === 'Default Agent');
     const summaryAgent = agents.find((a) => a.name === 'Summary Agent');
@@ -180,8 +179,13 @@ describe('Agent Creation - Persona System Prompt Integration', () => {
     await summaryAgent!.initialize();
 
     // Get their system prompts from the provider
-    const defaultSystemPrompt = (defaultAgent as any).providerInstance?.getSystemPrompt?.();
-    const summarySystemPrompt = (summaryAgent as any).providerInstance?.getSystemPrompt?.();
+    type AgentWithProvider = { providerInstance?: { getSystemPrompt(): string } };
+    const defaultSystemPrompt = (
+      defaultAgent as AgentWithProvider
+    ).providerInstance?.getSystemPrompt?.();
+    const summarySystemPrompt = (
+      summaryAgent as AgentWithProvider
+    ).providerInstance?.getSystemPrompt?.();
 
     expect(defaultSystemPrompt).toBeDefined();
     expect(summarySystemPrompt).toBeDefined();
@@ -210,7 +214,7 @@ describe('Agent Creation - Persona System Prompt Integration', () => {
     // Should succeed - agent creation should handle invalid personas gracefully
     expect(response.status).toBe(201);
 
-    const session = await sessionService.getSession(sessionId as any);
+    const session = await sessionService.getSession(asThreadId(sessionId));
     const agents = session!.getAgents();
     const createdAgent = agents.find((a) => a.name === 'Invalid Persona Agent');
 
