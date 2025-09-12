@@ -1726,6 +1726,12 @@ export class Agent extends EventEmitter {
           threadId: this._threadId,
           abortedSinceLastTurn: this._abortedSinceLastTurn,
         });
+      } else {
+        logger.debug('AGENT: Skipping auto-continuation (agent not running or thread missing)', {
+          threadId: this._threadId,
+          initialized: this._initialized,
+          hasThread: !!this._threadManager.getThread(this._threadId),
+        });
       }
     }
 
