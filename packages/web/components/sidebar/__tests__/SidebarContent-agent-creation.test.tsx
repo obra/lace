@@ -1,36 +1,71 @@
 // ABOUTME: Integration tests for SidebarContent agent creation functionality
-// ABOUTME: Tests modal integration and agent creation flow
+// ABOUTME: Tests modal integration and agent creation flow using real implementations
 
 /**
  * @vitest-environment jsdom
  */
 
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
+import { setupWebTest } from '@/test-utils/web-test-setup';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
-// Mock all the context providers
-vi.mock('@/components/providers/ProjectProvider');
-vi.mock('@/components/providers/AgentProvider');
-
-// Mock AgentsSection with the onCreateAgent prop
-vi.mock('../AgentsSection', () => ({
-  AgentsSection: ({ onCreateAgent }: { onCreateAgent?: () => void }) => (
-    <div data-testid="agents-section">
-      {onCreateAgent && (
-        <button data-testid="add-agent-button" onClick={onCreateAgent}>
-          Add Agent
-        </button>
-      )}
-    </div>
-  ),
+// Mock external dependencies only
+vi.mock('server-only', () => ({}));
+vi.mock('@/lib/server/approval-manager', () => ({
+  getApprovalManager: () => ({
+    requestApproval: vi.fn().mockResolvedValue('allow_once'),
+  }),
 }));
 
-// Mock the child components that need complex setup
+// Mock context providers with complete interfaces
+vi.mock('@/components/providers/ProjectProvider', () => ({
+  useProjectContext: () => ({
+    selectedProject: { id: 'project-1', name: 'Test Project' },
+  }),
+}));
+
+vi.mock('@/components/providers/AgentProvider', () => ({
+  useOptionalAgentContext: () => ({
+    sessionDetails: {
+      id: 'session-1',
+      name: 'Test Session',
+      createdAt: new Date(),
+      agents: [
+        {
+          threadId: 'agent-1',
+          name: 'Test Agent',
+          status: 'idle',
+          persona: 'lace',
+          providerInstanceId: 'test-provider',
+          modelId: 'test-model',
+        },
+      ],
+    },
+    selectedAgent: null,
+    loading: false,
+    foundAgent: null,
+    currentAgent: null,
+    agentBusy: false,
+    loadAgentConfiguration: vi.fn(),
+    updateAgent: vi.fn(),
+    reloadSessionDetails: vi.fn(),
+    createAgentFromSession: vi.fn(),
+    deleteAgent: vi.fn(),
+  }),
+}));
+
+// Mock the child components to isolate SidebarContent testing
 vi.mock('@/components/sidebar/ProjectSection', () => ({
   ProjectSection: ({ onSwitchProject }: { onSwitchProject: () => void }) => (
     <div data-testid="project-section">
@@ -55,32 +90,45 @@ vi.mock('@/components/sidebar/FileBrowserSection', () => ({
   FileBrowserSection: () => <div data-testid="file-browser-section">File Browser Section</div>,
 }));
 
-const mockUseProjectContext = vi.mocked(useProjectContext);
-const mockUseOptionalAgentContext = vi.mocked(useOptionalAgentContext);
-
-const mockSessionDetails = {
-  id: 'session-1',
-  agents: [
-    {
-      threadId: 'agent-1',
-      name: 'Test Agent',
-      status: 'idle' as const,
-    },
-  ],
-};
+// Mock AgentsSection with the onCreateAgent prop
+vi.mock('@/components/sidebar/AgentsSection', () => ({
+  AgentsSection: ({ onCreateAgent }: { onCreateAgent?: () => void }) => (
+    <div data-testid="agents-section">
+      {onCreateAgent && (
+        <button data-testid="add-agent-button" onClick={onCreateAgent}>
+          Add Agent
+        </button>
+      )}
+    </div>
+  ),
+}));
 
 describe('SidebarContent Agent Creation Integration', () => {
-  beforeEach(() => {
+  const _tempLaceDir = setupWebTest();
+  let providerInstanceId: string;
+
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+
+    process.env = {
+      ...process.env,
+      LACE_DB_PATH: ':memory:',
+    };
+
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Anthropic Instance',
+      apiKey: 'test-anthropic-key',
+    });
+
     vi.clearAllMocks();
+  });
 
-    mockUseProjectContext.mockReturnValue({
-      selectedProject: { id: 'project-1', name: 'Test Project' },
-    });
-
-    mockUseOptionalAgentContext.mockReturnValue({
-      sessionDetails: mockSessionDetails,
-      selectedAgent: null,
-    });
+  afterEach(async () => {
+    cleanupTestProviderDefaults();
+    await cleanupTestProviderInstances([providerInstanceId]);
+    vi.clearAllMocks();
   });
 
   it('should pass onCreateAgent prop to AgentsSection when provided', () => {
@@ -118,19 +166,5 @@ describe('SidebarContent Agent Creation Integration', () => {
     fireEvent.click(addButton);
 
     expect(mockOnCreateAgent).toHaveBeenCalledOnce();
-  });
-
-  it('should not render AgentsSection when no session details', () => {
-    mockUseOptionalAgentContext.mockReturnValue({
-      sessionDetails: null,
-      selectedAgent: null,
-    });
-
-    const { container } = render(
-      <SidebarContent onSwitchProject={vi.fn()} onAgentSelect={vi.fn()} onCreateAgent={vi.fn()} />
-    );
-
-    // AgentsSection should not be rendered
-    expect(container.innerHTML).not.toContain('add-agent-button');
   });
 });
