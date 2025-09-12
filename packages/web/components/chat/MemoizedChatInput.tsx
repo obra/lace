@@ -113,6 +113,7 @@ const CustomChatInput = memo(
     const [isListening, setIsListening] = useState(false);
     const [speechError, setSpeechError] = useState<string | null>(null);
     const [modelError, setModelError] = useState<string | null>(null);
+    const [stopRequested, setStopRequested] = useState(false);
     const chatInputRef = useRef<{ focus: () => void } | null>(null);
 
     // Expose focus method via ref
@@ -122,6 +123,31 @@ const CustomChatInput = memo(
 
     const { currentAgent, updateAgent } = useAgentContext();
     const { availableProviders } = useProviderInstances();
+
+    // Wrapper for onInterrupt to show "Stop requested" feedback
+    const handleInterrupt = useCallback(async () => {
+      if (onInterrupt) {
+        setStopRequested(true);
+        const result = await onInterrupt();
+
+        // Reset stop requested after a delay, or immediately if abort failed
+        setTimeout(
+          () => {
+            setStopRequested(false);
+          },
+          result === false ? 100 : 3000
+        ); // Quick reset on failure, longer on success
+
+        return result;
+      }
+    }, [onInterrupt]);
+
+    // Reset stopRequested when agent is no longer streaming
+    React.useEffect(() => {
+      if (!isStreaming && stopRequested) {
+        setStopRequested(false);
+      }
+    }, [isStreaming, stopRequested]);
 
     const handleModelChange = useCallback(
       async (providerInstanceId: string, modelId: string) => {
@@ -151,7 +177,7 @@ const CustomChatInput = memo(
           value={value}
           onChange={onChange}
           onSubmit={onSubmit}
-          onInterrupt={onInterrupt}
+          onInterrupt={handleInterrupt}
           disabled={disabled}
           sendDisabled={sendDisabled}
           isStreaming={isStreaming}
@@ -173,6 +199,11 @@ const CustomChatInput = memo(
                 <>
                   <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
                   <span>Listening...</span>
+                </>
+              ) : stopRequested ? (
+                <>
+                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                  <span>Stop requested</span>
                 </>
               ) : isStreaming ? (
                 <>
