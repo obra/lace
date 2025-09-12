@@ -13,6 +13,12 @@ import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import type { ThreadId } from '@/types/core';
 
+// Stop requested feedback timing constants
+const STOP_FEEDBACK_DURATION = {
+  SUCCESS: 3000, // Show "Stop requested" for 3 seconds on successful abort
+  FAILURE: 100, // Quick reset on abort failure
+} as const;
+
 export const MemoizedChatInput = memo(function MemoizedChatInput({
   onSubmit,
   onInterrupt,
@@ -113,7 +119,9 @@ const CustomChatInput = memo(
     const [isListening, setIsListening] = useState(false);
     const [speechError, setSpeechError] = useState<string | null>(null);
     const [modelError, setModelError] = useState<string | null>(null);
+    const [stopRequested, setStopRequested] = useState(false);
     const chatInputRef = useRef<{ focus: () => void } | null>(null);
+    const stopRequestedTimeoutRef = useRef<number | null>(null);
 
     // Expose focus method via ref
     React.useImperativeHandle(ref, () => ({
@@ -122,6 +130,54 @@ const CustomChatInput = memo(
 
     const { currentAgent, updateAgent } = useAgentContext();
     const { availableProviders } = useProviderInstances();
+
+    // Wrapper for onInterrupt to show "Stop requested" feedback
+    const handleInterrupt = useCallback(async () => {
+      if (!onInterrupt) return;
+
+      setStopRequested(true);
+
+      // Clear any existing timeout before setting a new one
+      if (stopRequestedTimeoutRef.current) {
+        clearTimeout(stopRequestedTimeoutRef.current);
+        stopRequestedTimeoutRef.current = null;
+      }
+
+      let result: boolean | void;
+      try {
+        result = await onInterrupt();
+      } catch (error) {
+        console.error('Failed to interrupt agent:', error);
+        result = false; // Treat errors as failed abort
+      } finally {
+        // Reset stop requested after a delay, regardless of success/failure
+        const delay =
+          result === false ? STOP_FEEDBACK_DURATION.FAILURE : STOP_FEEDBACK_DURATION.SUCCESS;
+        stopRequestedTimeoutRef.current = window.setTimeout(() => {
+          setStopRequested(false);
+          stopRequestedTimeoutRef.current = null;
+        }, delay);
+      }
+
+      return result;
+    }, [onInterrupt]);
+
+    // Reset stopRequested when agent is no longer streaming
+    React.useEffect(() => {
+      if (!isStreaming && stopRequested) {
+        setStopRequested(false);
+      }
+    }, [isStreaming, stopRequested]);
+
+    // Cleanup timeout on unmount
+    React.useEffect(() => {
+      return () => {
+        if (stopRequestedTimeoutRef.current) {
+          clearTimeout(stopRequestedTimeoutRef.current);
+          stopRequestedTimeoutRef.current = null;
+        }
+      };
+    }, []);
 
     const handleModelChange = useCallback(
       async (providerInstanceId: string, modelId: string) => {
@@ -151,7 +207,7 @@ const CustomChatInput = memo(
           value={value}
           onChange={onChange}
           onSubmit={onSubmit}
-          onInterrupt={onInterrupt}
+          onInterrupt={handleInterrupt}
           disabled={disabled}
           sendDisabled={sendDisabled}
           isStreaming={isStreaming}
@@ -173,6 +229,11 @@ const CustomChatInput = memo(
                 <>
                   <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
                   <span>Listening...</span>
+                </>
+              ) : stopRequested ? (
+                <>
+                  <div className="w-2 h-2 bg-warning rounded-full animate-pulse"></div>
+                  <span>Stop requested</span>
                 </>
               ) : isStreaming ? (
                 <>

@@ -541,10 +541,28 @@ export class Agent extends EventEmitter {
   abort(): boolean {
     let aborted = false;
     const originalState = this._state;
+    const abortStartTime = Date.now();
+
+    logger.debug('AGENT: Abort requested', {
+      threadId: this._threadId,
+      originalState,
+      hasTurnMetrics: !!this._currentTurnMetrics,
+      hasAbortController: !!this._abortController,
+      hasToolAbortController: !!this._toolAbortController,
+      activeToolCallsCount: this._activeToolCalls.size,
+      pendingToolCount: this._pendingToolCount,
+      abortedSinceLastTurn: this._abortedSinceLastTurn,
+    });
 
     // Abort LLM streaming/response generation
     // Handle the case where we have turn metrics but no abort controller yet (race condition)
     if (this._currentTurnMetrics) {
+      logger.debug('AGENT: Aborting turn with metrics', {
+        threadId: this._threadId,
+        turnId: this._currentTurnMetrics.turnId,
+        hasAbortController: !!this._abortController,
+      });
+
       // Clear progress timer regardless of abort controller state
       this._clearProgressTimer();
 
@@ -552,6 +570,12 @@ export class Agent extends EventEmitter {
       if (this._abortController) {
         this._abortController.abort();
         this._abortController = null;
+        logger.debug('AGENT: Signaled abort controller', { threadId: this._threadId });
+      } else {
+        logger.warn('AGENT: Turn metrics exist but no abort controller (race condition)', {
+          threadId: this._threadId,
+          turnId: this._currentTurnMetrics.turnId,
+        });
       }
 
       // Emit abort event with current metrics
@@ -564,6 +588,9 @@ export class Agent extends EventEmitter {
       aborted = true;
     } else if (this._abortController) {
       // Edge case: abort controller exists without turn metrics
+      logger.debug('AGENT: Aborting controller without turn metrics', {
+        threadId: this._threadId,
+      });
       this._abortController.abort();
       this._clearProgressTimer();
       this._abortController = null;
@@ -572,6 +599,12 @@ export class Agent extends EventEmitter {
 
     // Abort all active tool executions
     if (this._toolAbortController) {
+      logger.debug('AGENT: Aborting tool executions', {
+        threadId: this._threadId,
+        activeToolCallsCount: this._activeToolCalls.size,
+        pendingToolCount: this._pendingToolCount,
+      });
+
       this._toolAbortController.abort();
 
       // Tools will detect the abort signal and return their own cancellation results
@@ -587,6 +620,10 @@ export class Agent extends EventEmitter {
     // If we were in any active state (not idle), consider the abort successful
     // This handles cases where the operation completes between the abort call and this check
     if (!aborted && originalState !== 'idle') {
+      logger.debug('AGENT: Considering abort successful due to active state', {
+        threadId: this._threadId,
+        originalState,
+      });
       aborted = true;
     }
 
@@ -594,6 +631,16 @@ export class Agent extends EventEmitter {
       this._abortedSinceLastTurn = true;
       this._setState('idle');
     }
+
+    const abortDuration = Date.now() - abortStartTime;
+    logger.debug('AGENT: Abort completed', {
+      threadId: this._threadId,
+      aborted,
+      originalState,
+      finalState: this._state,
+      durationMs: abortDuration,
+      abortedSinceLastTurn: this._abortedSinceLastTurn,
+    });
 
     return aborted;
   }
@@ -1664,9 +1711,27 @@ export class Agent extends EventEmitter {
       // Emit conversation complete after successful tool batch completion
       this.emit('conversation_complete');
 
-      // Only continue conversation if agent is still running and thread exists
-      if (this._initialized && this._threadManager.getThread(this._threadId)) {
+      // Only continue conversation if agent is still running, thread exists, and not aborted
+      if (
+        this._initialized &&
+        this._threadManager.getThread(this._threadId) &&
+        !this._abortedSinceLastTurn
+      ) {
+        logger.debug('AGENT: Auto-continuing conversation after successful tool batch', {
+          threadId: this._threadId,
+        });
         void this._processConversation();
+      } else if (this._abortedSinceLastTurn) {
+        logger.debug('AGENT: Skipping auto-continuation due to abort request', {
+          threadId: this._threadId,
+          abortedSinceLastTurn: this._abortedSinceLastTurn,
+        });
+      } else {
+        logger.debug('AGENT: Skipping auto-continuation (agent not running or thread missing)', {
+          threadId: this._threadId,
+          initialized: this._initialized,
+          hasThread: !!this._threadManager.getThread(this._threadId),
+        });
       }
     }
 
