@@ -77,9 +77,7 @@ export function SessionConfigPanel(): React.JSX.Element {
     persona: string;
   } | null>(null);
 
-  // Session creation state
-  const [newSessionName, setNewSessionName] = useState('');
-  const [newSessionDescription, setNewSessionDescription] = useState('');
+  // Session creation state (simplified - only need provider config)
   const [sessionConfig, setSessionConfig] = useState<SessionConfiguration>(DEFAULT_CONFIG);
 
   // Agent creation state
@@ -101,8 +99,6 @@ export function SessionConfigPanel(): React.JSX.Element {
   }, [projectId, projectConfig]);
 
   const resetSessionForm = useCallback(() => {
-    setNewSessionName('');
-    setNewSessionDescription('');
     // Use project configuration as defaults if available
     const defaultConfig = { ...DEFAULT_CONFIG };
     if (projectConfig) {
@@ -139,17 +135,13 @@ export function SessionConfigPanel(): React.JSX.Element {
     setSelectedModelId(modelId);
   };
 
-  const handleCreateSession = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newSessionName.trim()) return;
-
+  const handleCreateSession = async (userInput: string) => {
     try {
-      // Extract providerInstanceId and modelId from sessionConfig
+      // Extract providerInstanceId and modelId from sessionConfig for simplified flow
       const { providerInstanceId, modelId, ...otherConfig } = sessionConfig;
 
-      await createSession({
-        name: newSessionName.trim(),
-        description: newSessionDescription.trim() || undefined,
+      const sessionData = await createSession({
+        initialMessage: userInput, // New simplified flow
         providerInstanceId: providerInstanceId || '',
         modelId: modelId || '',
         configuration: otherConfig,
@@ -157,6 +149,11 @@ export function SessionConfigPanel(): React.JSX.Element {
 
       resetSessionForm();
       setShowCreateSession(false);
+
+      // Navigate to the new session
+      if (sessionData && project) {
+        navigateToSession(project, asThreadId(sessionData.id));
+      }
     } catch (error) {
       // Error will be handled in the modal
       console.error('Failed to create session:', error);
@@ -306,19 +303,6 @@ export function SessionConfigPanel(): React.JSX.Element {
     setDeleteError(null);
   }, [isDeleting]);
 
-  // Session creation modal handlers
-  const handleSessionNameChange = useCallback((name: string) => {
-    setNewSessionName(name);
-  }, []);
-
-  const handleSessionDescriptionChange = useCallback((description: string) => {
-    setNewSessionDescription(description);
-  }, []);
-
-  const handleSessionConfigChange = useCallback((config: SessionConfiguration) => {
-    setSessionConfig(config);
-  }, []);
-
   const handleCloseCreateSession = useCallback(() => {
     setShowCreateSession(false);
   }, []);
@@ -362,16 +346,9 @@ export function SessionConfigPanel(): React.JSX.Element {
       <SessionCreateModal
         isOpen={showCreateSession}
         currentProject={currentProject}
-        providers={availableProviders}
-        sessionConfig={sessionConfig}
-        sessionName={newSessionName}
-        sessionDescription={newSessionDescription}
         loading={loading}
         onClose={handleCloseCreateSession}
         onSubmit={handleCreateSession}
-        onSessionNameChange={handleSessionNameChange}
-        onSessionDescriptionChange={handleSessionDescriptionChange}
-        onSessionConfigChange={handleSessionConfigChange}
       />
 
       <AgentCreateModal
