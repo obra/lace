@@ -121,12 +121,12 @@ export function ProviderModelGroup({
                     <div className="flex items-center gap-2 flex-1">
                       <span className="font-medium">{model.name}</span>
                       {model.cost_per_1m_in === 0 && (
-                        <span className="badge badge-xs badge-success">FREE</span>
+                        <span className="badge badge-xs badge-ghost text-success">FREE</span>
                       )}
                       {badges.length > 0 && (
                         <div className="flex gap-1">
                           {badges.map((badge) => (
-                            <span key={badge} className="badge badge-xs badge-primary">
+                            <span key={badge} className="badge badge-xs badge-ghost opacity-60">
                               {badge}
                             </span>
                           ))}
