@@ -104,7 +104,7 @@ export function ProviderInstanceCard({
         // Remove all models from this provider from disabled list
         const providerModels = Array.from(modelsByProvider.get(providerName) || []);
         updated.disabledModels = prev.disabledModels.filter(
-          (m) => !providerModels.some((pm: any) => pm.id === m)
+          (m) => !providerModels.some((pm: unknown) => (pm as { id: string }).id === m)
         );
       } else {
         // Add provider to disabled list
@@ -312,8 +312,11 @@ export function ProviderInstanceCard({
                     providerName={providerName}
                     models={models}
                     enabledModels={models
-                      .filter((m: any) => !modelConfig.disabledModels.includes(m.id))
-                      .map((m: any) => m.id)}
+                      .filter(
+                        (m: unknown) =>
+                          !modelConfig.disabledModels.includes((m as { id: string }).id)
+                      )
+                      .map((m: unknown) => (m as { id: string }).id)}
                     onToggleProvider={handleToggleProvider}
                     onToggleModel={handleToggleModel}
                   />
