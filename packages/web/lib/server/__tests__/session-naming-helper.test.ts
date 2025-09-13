@@ -115,8 +115,8 @@ describe('generateSessionName', () => {
     expect(MockedInfrastructureHelper).toHaveBeenCalledWith({
       model: 'fast',
       tools: [],
-      providerInstanceId: 'test-provider',
-      modelId: 'test-model',
+      fallbackProviderInstanceId: 'test-provider',
+      fallbackModelId: 'test-model',
     });
   });
 });

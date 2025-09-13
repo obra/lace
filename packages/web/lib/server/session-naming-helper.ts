@@ -8,24 +8,11 @@ export async function generateSessionName(
   userInput: string,
   fallbackModel?: { providerInstanceId: string; modelId: string }
 ): Promise<string> {
-  let model: 'fast' | 'smart' = 'fast';
-  let providerInstanceId: string | undefined;
-  let modelId: string | undefined;
-
-  // Try to use 'fast' model first, fall back to session model if global config missing
-  if (fallbackModel) {
-    providerInstanceId = fallbackModel.providerInstanceId;
-    modelId = fallbackModel.modelId;
-  }
-
   const helper = new InfrastructureHelper({
-    model,
+    model: 'fast', // Prefer 'fast' model tier
     tools: [],
-    ...(providerInstanceId &&
-      modelId && {
-        providerInstanceId,
-        modelId,
-      }),
+    fallbackProviderInstanceId: fallbackModel?.providerInstanceId,
+    fallbackModelId: fallbackModel?.modelId,
   });
 
   const result = await helper.execute(

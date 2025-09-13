@@ -161,17 +161,11 @@ async function spawnSessionNamingHelper(
     const session = Session.getByIdSync(asThreadId(sessionId));
     const sessionConfig = session?.getEffectiveConfiguration();
 
-    // Generate new session name using helper agent with fallback model
-    const generatedName = await generateSessionName(
-      projectName,
-      initialMessage,
-      sessionConfig
-        ? {
-            providerInstanceId: sessionConfig.providerInstanceId as string,
-            modelId: sessionConfig.modelId as string,
-          }
-        : fallbackModel
-    );
+    // Generate new session name using helper agent with session's model as fallback
+    const generatedName = await generateSessionName(projectName, initialMessage, {
+      providerInstanceId: fallbackModel.providerInstanceId,
+      modelId: fallbackModel.modelId,
+    });
 
     // Update session name using the generalized update method
     Session.updateSession(sessionId, {
