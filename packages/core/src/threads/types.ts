@@ -306,7 +306,7 @@ interface SystemNotificationData {
 }
 
 // Session event data
-interface SessionUpdatedData {
+export interface SessionUpdatedData {
   name: string;
 }
 
