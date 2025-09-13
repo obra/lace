@@ -1,13 +1,13 @@
 // ABOUTME: Dynamic provider for OpenRouter that fetches fresh model data
 // ABOUTME: Combines API client, caching, and filtering into a complete catalog provider
 
-import { OpenRouterClient } from './client';
-import { CatalogCacheManager } from './cache-manager';
-import { ModelFilterService } from './filter-service';
-import type { ModelConfig, CatalogProvider, CatalogModel } from '../catalog/types';
-import type { OpenRouterModel } from './types';
+import { OpenRouterClient } from '~/providers/openrouter/client';
+import { CatalogCacheManager } from '~/providers/openrouter/cache-manager';
+import { ModelFilterService } from '~/providers/openrouter/filter-service';
+import type { ModelConfig, CatalogProvider, CatalogModel } from '~/providers/catalog/types';
+import type { OpenRouterModel } from '~/providers/openrouter/types';
 import { getLaceDir } from '~/config/lace-dir';
-import { convertPricing } from './utils';
+import { convertPricing } from '~/providers/openrouter/utils';
 
 export class OpenRouterDynamicProvider {
   private client: OpenRouterClient;
@@ -77,7 +77,34 @@ export class OpenRouterDynamicProvider {
     };
   }
 
-  private transformToCatalogProvider(provider: any): CatalogProvider {
+  async refreshCatalog(apiKey: string): Promise<CatalogProvider> {
+    // Force refresh - bypass cache and always fetch fresh data
+    const response = await this.client.fetchModels(apiKey);
+    const catalog = {
+      _meta: {
+        fetchedAt: new Date().toISOString(),
+        version: '1.0',
+        modelCount: response.data.length,
+        source: 'https://openrouter.ai/api/v1/models',
+      },
+      provider: {
+        name: 'OpenRouter',
+        id: 'openrouter',
+        models: response.data,
+      },
+    };
+
+    // Save to cache
+    await this.cacheManager.save(this.instanceId, catalog);
+
+    return this.transformToCatalogProvider(catalog.provider);
+  }
+
+  private transformToCatalogProvider(provider: {
+    name: string;
+    id: string;
+    models: OpenRouterModel[];
+  }): CatalogProvider {
     return {
       name: provider.name,
       id: provider.id,

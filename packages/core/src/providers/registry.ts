@@ -399,4 +399,8 @@ export class ProviderRegistry {
     }
     return false;
   }
+
+  getInstanceManager(): ProviderInstanceManager {
+    return this.instanceManager;
+  }
 }

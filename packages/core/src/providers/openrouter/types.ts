@@ -24,7 +24,7 @@ export const OpenRouterModelSchema = z.object({
     .optional(),
   top_provider: z
     .object({
-      context_length: z.number().optional(),
+      context_length: z.number().nullable().optional(),
       max_completion_tokens: z.number().nullable().optional(),
       is_moderated: z.boolean().optional(),
     })

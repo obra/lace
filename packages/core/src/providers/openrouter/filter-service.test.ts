@@ -305,7 +305,7 @@ describe('ModelFilterService', () => {
       expect(grouped.size).toBe(50); // 50 different providers
 
       // Verify each group has expected number of models
-      grouped.forEach((groupModels, provider) => {
+      grouped.forEach((groupModels, _provider) => {
         expect(groupModels.length).toBe(10); // 500 models / 50 providers = 10 each
       });
     });
