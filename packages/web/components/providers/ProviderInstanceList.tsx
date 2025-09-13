@@ -175,7 +175,7 @@ export function ProviderInstanceList() {
                   key={instance.id}
                   instance={instanceWithTestResult}
                   provider={catalog}
-                  onTest={() => handleTest(instance.id)}
+                  onTest={(instanceId) => handleTest(instanceId)}
                   onDelete={(instanceId) => void handleDelete(instanceId)}
                   onEdit={() => void loadInstances()} // Refresh list after edit
                   onRefresh={handleRefresh}
