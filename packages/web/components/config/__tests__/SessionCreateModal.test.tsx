@@ -58,10 +58,12 @@ describe('SessionCreateModal', () => {
       expect(textarea.tagName).toBe('TEXTAREA');
     });
 
-    it('should have send button', () => {
+    it('should have "Let\'s go" button', () => {
       render(<SessionCreateModal {...defaultProps} />);
 
-      expect(screen.getByTestId('condensed-send-button')).toBeInTheDocument();
+      const button = screen.getByTestId('condensed-send-button');
+      expect(button).toBeInTheDocument();
+      expect(button).toHaveTextContent("Let's go");
     });
 
     it('should not have cancel button (modal close only)', () => {

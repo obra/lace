@@ -93,7 +93,9 @@ export const SessionCreateModal = memo(function SessionCreateModal({
             onSend={submit}
             placeholder="Describe what you'd like to work on..."
             disabled={isButtonLoading}
-            className="min-h-[8rem]" // Make it larger than default for session creation
+            minRows={3}
+            sendButtonText="Let's go"
+            allowEmptySubmit={false}
           />
         </div>
       </div>
