@@ -1,10 +1,13 @@
 // ABOUTME: Individual instance card with status, actions, and details
 // ABOUTME: Uses StatusDot, Badge, and card components from design system
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import StatusDot from '@/components/ui/StatusDot';
 import Badge from '@/components/ui/Badge';
 import { EditInstanceModal } from './EditInstanceModal';
+import { ModelFilterBar } from './ModelFilterBar';
+import { ProviderModelGroup } from './ProviderModelGroup';
+import type { CatalogProvider } from '@lace/core/providers/catalog/types';
 
 interface ProviderInstanceCardProps {
   instance: {
@@ -18,6 +21,7 @@ interface ProviderInstanceCardProps {
     modelCount?: number;
     lastTested?: string;
   };
+  provider?: CatalogProvider; // Optional provider catalog data for model management
   onTest: () => void;
   onDelete: () => void;
   onEdit?: () => void; // Optional callback after edit success
@@ -25,11 +29,24 @@ interface ProviderInstanceCardProps {
 
 export function ProviderInstanceCard({
   instance,
+  provider,
   onTest,
   onDelete,
   onEdit,
 }: ProviderInstanceCardProps) {
   const [showEditModal, setShowEditModal] = useState(false);
+
+  // Model management state for OpenRouter instances
+  const [modelConfig, setModelConfig] = useState({
+    enableNewModels: true,
+    disabledModels: [] as string[],
+    disabledProviders: [] as string[],
+    filters: {},
+  });
+
+  const [filteredModels, setFilteredModels] = useState(provider?.models ?? []);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const getStatusProps = (status?: string) => {
     switch (status) {
       case 'connected':
@@ -62,6 +79,54 @@ export function ProviderInstanceCard({
     setShowEditModal(false);
     onEdit?.(); // Call parent callback to refresh data
   };
+
+  // Group models by provider for OpenRouter instances
+  const modelsByProvider = useMemo(() => {
+    if (!provider || provider.id !== 'openrouter') return new Map();
+
+    const groups = new Map<string, typeof provider.models>();
+    filteredModels.forEach((model) => {
+      const providerName = model.id.split('/')[0] || 'unknown';
+      const group = groups.get(providerName) || [];
+      group.push(model);
+      groups.set(providerName, group);
+    });
+    return groups;
+  }, [filteredModels, provider]);
+
+  // Apply search and filters for OpenRouter instances
+  useEffect(() => {
+    if (!provider || provider.id !== 'openrouter') return;
+
+    let filtered = provider.models;
+
+    // Apply search
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (model) =>
+          model.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          model.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Apply config filters (basic implementation for now)
+    filtered = filtered.filter((model) => {
+      // Check disabled providers
+      const modelProvider = model.id.split('/')[0] || 'unknown';
+      if (modelConfig.disabledProviders.includes(modelProvider)) {
+        return false;
+      }
+
+      // Check disabled models
+      if (modelConfig.disabledModels.includes(model.id)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    setFilteredModels(filtered);
+  }, [provider, searchQuery, modelConfig]);
 
   return (
     <div className="card bg-base-100 shadow-sm border border-base-300">
@@ -138,6 +203,81 @@ export function ProviderInstanceCard({
             </button>
           </div>
         </div>
+
+        {/* Model Management Section for OpenRouter instances */}
+        {provider && instance.catalogProviderId === 'openrouter' && (
+          <div className="border-t border-base-300 mt-4 pt-4">
+            <div className="mb-3">
+              <h5 className="font-medium mb-2">Model Management</h5>
+
+              {/* Search Bar */}
+              <div className="mb-3">
+                <input
+                  type="text"
+                  placeholder="Search models..."
+                  className="input input-bordered w-full"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              {/* Filter Bar */}
+              <ModelFilterBar
+                filters={modelConfig.filters}
+                onChange={(filters) => {
+                  setModelConfig((prev) => ({ ...prev, filters }));
+                }}
+              />
+
+              {/* Refresh Status */}
+              <div className="flex justify-between items-center my-3">
+                <span className="text-sm opacity-70">
+                  {provider.models.length} models available
+                </span>
+                <button
+                  className="btn btn-circle btn-sm btn-primary"
+                  onClick={() => {
+                    /* TODO: handleRefresh */
+                  }}
+                  disabled={isRefreshing}
+                >
+                  {isRefreshing ? (
+                    <span className="loading loading-spinner loading-xs"></span>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              {/* Model Groups */}
+              <div className="space-y-2">
+                {Array.from(modelsByProvider.entries()).map(([providerName, models]) => (
+                  <ProviderModelGroup
+                    key={providerName}
+                    providerName={providerName}
+                    models={models}
+                    enabledModels={models
+                      .filter((m: any) => !modelConfig.disabledModels.includes(m.id))
+                      .map((m: any) => m.id)}
+                    onToggleProvider={(provider, enabled) => {
+                      // TODO: handleToggleProvider
+                    }}
+                    onToggleModel={(modelId, enabled) => {
+                      // TODO: handleToggleModel
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <EditInstanceModal
