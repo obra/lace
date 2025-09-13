@@ -94,6 +94,56 @@ export function ProviderInstanceCard({
     return groups;
   }, [filteredModels, provider]);
 
+  // Toggle handlers for model management
+  const handleToggleProvider = (providerName: string, enabled: boolean) => {
+    setModelConfig((prev) => {
+      const updated = { ...prev };
+      if (enabled) {
+        // Remove provider from disabled list
+        updated.disabledProviders = prev.disabledProviders.filter((p) => p !== providerName);
+        // Remove all models from this provider from disabled list
+        const providerModels = Array.from(modelsByProvider.get(providerName) || []);
+        updated.disabledModels = prev.disabledModels.filter(
+          (m) => !providerModels.some((pm: any) => pm.id === m)
+        );
+      } else {
+        // Add provider to disabled list
+        updated.disabledProviders = [...prev.disabledProviders, providerName];
+      }
+      return updated;
+    });
+  };
+
+  const handleToggleModel = (modelId: string, enabled: boolean) => {
+    setModelConfig((prev) => ({
+      ...prev,
+      disabledModels: enabled
+        ? prev.disabledModels.filter((m) => m !== modelId)
+        : [...prev.disabledModels, modelId],
+    }));
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const response = await fetch(`/api/provider/instances/${instance.id}/refresh`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const updated = await response.json();
+        // Signal parent to refresh data
+        onEdit?.();
+      } else {
+        console.error('Failed to refresh catalog');
+      }
+    } catch (error) {
+      console.error('Error refreshing catalog:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   // Apply search and filters for OpenRouter instances
   useEffect(() => {
     if (!provider || provider.id !== 'openrouter') return;
@@ -236,9 +286,7 @@ export function ProviderInstanceCard({
                 </span>
                 <button
                   className="btn btn-circle btn-sm btn-primary"
-                  onClick={() => {
-                    /* TODO: handleRefresh */
-                  }}
+                  onClick={handleRefresh}
                   disabled={isRefreshing}
                 >
                   {isRefreshing ? (
@@ -266,12 +314,8 @@ export function ProviderInstanceCard({
                     enabledModels={models
                       .filter((m: any) => !modelConfig.disabledModels.includes(m.id))
                       .map((m: any) => m.id)}
-                    onToggleProvider={(provider, enabled) => {
-                      // TODO: handleToggleProvider
-                    }}
-                    onToggleModel={(modelId, enabled) => {
-                      // TODO: handleToggleModel
-                    }}
+                    onToggleProvider={handleToggleProvider}
+                    onToggleModel={handleToggleModel}
                   />
                 ))}
               </div>
