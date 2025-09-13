@@ -8,7 +8,10 @@ import { parseProviderModel } from '~/providers/provider-utils';
 import { ToolExecutor } from '~/tools/executor';
 import { Tool } from '~/tools/tool';
 import { ToolCall, ToolResult, ToolContext, createErrorResult } from '~/tools/types';
-import { AIProvider } from '~/providers/base-provider';
+import type { AIProvider } from '~/providers/base-provider';
+
+const isToolResult = (v: unknown): v is ToolResult =>
+  typeof v === 'object' && v !== null && 'status' in (v as Record<string, unknown>);
 import { Agent } from '~/agents/agent';
 import { logger } from '~/utils/logger';
 
@@ -35,6 +38,7 @@ export class SessionHelper extends BaseHelper {
   private provider: AIProvider | null = null;
   private toolExecutor: ToolExecutor | null = null;
   private tools: Tool[] | null = null;
+  private cachedModelId: string | null = null;
 
   constructor(private options: SessionHelperOptions) {
     super();
@@ -119,9 +123,11 @@ export class SessionHelper extends BaseHelper {
   protected getModel(): string {
     try {
       // Try to get model from global config first
-      const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
-      const { modelId } = parseProviderModel(providerModel);
-      return modelId;
+      if (!this.cachedModelId) {
+        const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
+        this.cachedModelId = parseProviderModel(providerModel).modelId;
+      }
+      return this.cachedModelId;
     } catch (_globalConfigError) {
       // Fallback: Get model from parent agent
       const agentInfo = this.options.parentAgent.getInfo();
@@ -156,8 +162,9 @@ export class SessionHelper extends BaseHelper {
       }
 
       // Build context with parent agent (inherit session policies)
+      const composedSignal = this.options.abortSignal ?? signal ?? new AbortController().signal;
       const context: ToolContext = {
-        signal: this.options.abortSignal || signal || new AbortController().signal,
+        signal: composedSignal,
         agent: this.options.parentAgent, // Key difference - has agent context
         workingDirectory: session?.getWorkingDirectory(),
       };
@@ -172,7 +179,7 @@ export class SessionHelper extends BaseHelper {
         // Go through normal approval flow
         const permission = await toolExecutor.requestToolPermission(toolCall, context);
 
-        if (typeof permission === 'object' && 'status' in permission) {
+        if (isToolResult(permission)) {
           // Permission denied - return as result
           results.push(permission);
           continue;

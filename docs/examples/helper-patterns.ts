@@ -17,11 +17,11 @@ export class MemoryAnalyzer {
     recommendations: string[];
   }> {
     const helperId = `memory-analysis-${Date.now()}`;
-    
+
     const helper = this.registry.createInfrastructureHelper(helperId, {
       model: 'smart', // Complex analysis needs smart model
       tools: ['ripgrep-search', 'file-read', 'file-list'],
-      workingDirectory: conversationLogDir
+      workingDirectory: conversationLogDir,
     });
 
     try {
@@ -51,13 +51,13 @@ export class MemoryAnalyzer {
   private extractPatterns(content: string): string[] {
     // Extract patterns from LLM response
     const patternMatch = content.match(/patterns?[:\s]*(.*?)(?=\n\n|\n[0-9]|$)/is);
-    return patternMatch ? patternMatch[1].split('\n').filter(l => l.trim()) : [];
+    return patternMatch ? patternMatch[1].split('\n').filter((l) => l.trim()) : [];
   }
 
   private extractRecommendations(content: string): string[] {
-    // Extract recommendations from LLM response  
+    // Extract recommendations from LLM response
     const recMatch = content.match(/recommendations?[:\s]*(.*?)$/is);
-    return recMatch ? recMatch[1].split('\n').filter(l => l.trim()) : [];
+    return recMatch ? recMatch[1].split('\n').filter((l) => l.trim()) : [];
   }
 }
 
@@ -72,24 +72,23 @@ export class EnhancedAgent extends Agent {
   async handleMessageWithUrlSupport(userMessage: string): Promise<void> {
     // Check if message contains URLs that need summarization
     const urls = this.extractUrls(userMessage);
-    
+
     if (urls.length > 0) {
       // Use session helper for URL processing
       const urlHelper = HelperFactory.createSessionHelper({
         model: 'fast', // URL summarization is typically straightforward
-        parentAgent: this
+        parentAgent: this,
       });
 
       const summaries: string[] = [];
-      
+
       for (const url of urls) {
         try {
-          const result = await urlHelper.execute(
-            `Fetch and provide a concise summary of: ${url}`
-          );
+          const result = await urlHelper.execute(`Fetch and provide a concise summary of: ${url}`);
           summaries.push(`${url}: ${result.content}`);
         } catch (error) {
-          summaries.push(`${url}: Unable to fetch (${error})`);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          summaries.push(`${url}: Unable to fetch (${errorMessage})`);
         }
       }
 
@@ -105,31 +104,39 @@ export class EnhancedAgent extends Agent {
   /**
    * Analyze complex data using smart model
    */
-  async analyzeData(data: string, analysisType: 'financial' | 'technical' | 'general'): Promise<string> {
+  async analyzeData(
+    data: string,
+    analysisType: 'financial' | 'technical' | 'general'
+  ): Promise<string> {
     const helper = HelperFactory.createSessionHelper({
       model: 'smart', // Complex analysis needs smart model
-      parentAgent: this
+      parentAgent: this,
     });
 
     const analysisPrompt = this.buildAnalysisPrompt(data, analysisType);
     const result = await helper.execute(analysisPrompt);
-    
+
     return result.content;
   }
 
   private extractUrls(message: string): string[] {
-    const urlRegex = /https?:\/\/[^\s]+/g;
-    return message.match(urlRegex) || [];
+    const urlRegex = /https?:\/\/[^\s)<>\]]+/g;
+    const raw = message.match(urlRegex) || [];
+    const cleaned = raw.map((u) => u.replace(/[),.;!?]+$/, ''));
+    return Array.from(new Set(cleaned));
   }
 
-  private buildAnalysisPrompt(data: string, type: string): string {
-    const prompts = {
+  private buildAnalysisPrompt(
+    data: string,
+    analysisType: 'financial' | 'technical' | 'general'
+  ): string {
+    const prompts: Readonly<Record<'financial' | 'technical' | 'general', string>> = {
       financial: 'Analyze this financial data for trends, risks, and opportunities',
-      technical: 'Analyze this technical data for patterns, anomalies, and insights', 
-      general: 'Analyze this data and provide key insights and recommendations'
-    };
-    
-    return `${prompts[type]}:\n\n${data}`;
+      technical: 'Analyze this technical data for patterns, anomalies, and insights',
+      general: 'Analyze this data and provide key insights and recommendations',
+    } as const;
+
+    return `${prompts[analysisType]}:\n\n${data}`;
   }
 }
 
@@ -138,14 +145,17 @@ export class EnhancedAgent extends Agent {
  * Infrastructure helper for intelligent task creation and management
  */
 export class SmartTaskManager {
-  async createTasksFromUserRequest(userRequest: string, projectContext?: string): Promise<{
+  async createTasksFromUserRequest(
+    userRequest: string,
+    projectContext?: string
+  ): Promise<{
     tasks: Array<{ title: string; description: string; priority: 'high' | 'medium' | 'low' }>;
     summary: string;
   }> {
     const helper = new InfrastructureHelper({
       model: 'fast', // Task breakdown is straightforward
       tools: ['task-create', 'file-read'], // If we need to read project files
-      workingDirectory: projectContext
+      workingDirectory: projectContext,
     });
 
     const prompt = `
@@ -165,7 +175,7 @@ export class SmartTaskManager {
 
     return {
       tasks: this.parseTasksFromResponse(result.content),
-      summary: result.content
+      summary: result.content,
     };
   }
 
@@ -178,7 +188,7 @@ export class SmartTaskManager {
     const helper = new InfrastructureHelper({
       model: 'smart', // Progress analysis can be complex
       tools: ['file-list', 'file-read', 'ripgrep-search'],
-      workingDirectory: projectDir
+      workingDirectory: projectDir,
     });
 
     const result = await helper.execute(`
@@ -196,23 +206,30 @@ export class SmartTaskManager {
 
   private parseTasksFromResponse(response: string) {
     // Parse structured task response (simplified)
-    const tasks: Array<{ title: string; description: string; priority: 'high' | 'medium' | 'low' }> = [];
-    
+    const tasks: Array<{
+      title: string;
+      description: string;
+      priority: 'high' | 'medium' | 'low';
+    }> = [];
+
     // Would implement proper parsing of LLM response format
     // This is a simplified example
     const taskBlocks = response.split(/\d+\./);
-    
+
     for (const block of taskBlocks.slice(1)) {
       const lines = block.trim().split('\n');
       const title = lines[0]?.trim() || 'Untitled Task';
       const description = lines.slice(1).join('\n').trim() || title;
-      const priority: 'high' | 'medium' | 'low' = 
-        block.toLowerCase().includes('urgent') || block.toLowerCase().includes('critical') ? 'high' :
-        block.toLowerCase().includes('low') || block.toLowerCase().includes('minor') ? 'low' : 'medium';
-      
+      const priority: 'high' | 'medium' | 'low' =
+        block.toLowerCase().includes('urgent') || block.toLowerCase().includes('critical')
+          ? 'high'
+          : block.toLowerCase().includes('low') || block.toLowerCase().includes('minor')
+            ? 'low'
+            : 'medium';
+
       tasks.push({ title, description, priority });
     }
-    
+
     return tasks;
   }
 
@@ -222,7 +239,7 @@ export class SmartTaskManager {
       completedTasks: this.extractNumber(response, /completed?[:\s]*(\d+)/i) || 0,
       pendingTasks: this.extractNumber(response, /pending[:\s]*(\d+)/i) || 0,
       blockers: this.extractList(response, 'blockers?'),
-      recommendations: this.extractList(response, 'recommendations?')
+      recommendations: this.extractList(response, 'recommendations?'),
     };
   }
 
@@ -234,7 +251,12 @@ export class SmartTaskManager {
   private extractList(text: string, section: string): string[] {
     const regex = new RegExp(`${section}[:\\s]*(.*?)(?=\\n\\n|\\n[a-z]+:|$)`, 'is');
     const match = text.match(regex);
-    return match ? match[1].split('\n').map(l => l.trim()).filter(l => l) : [];
+    return match
+      ? match[1]
+          .split('\n')
+          .map((l) => l.trim())
+          .filter((l) => l)
+      : [];
   }
 }
 
@@ -243,7 +265,10 @@ export class SmartTaskManager {
  * Infrastructure helper for intelligent log analysis and error categorization
  */
 export class ErrorAnalysisSystem {
-  async analyzeErrorLogs(logDirectory: string, timeframe?: string): Promise<{
+  async analyzeErrorLogs(
+    logDirectory: string,
+    timeframe?: string
+  ): Promise<{
     errorCategories: Record<string, number>;
     criticalErrors: string[];
     recommendations: string[];
@@ -252,11 +277,11 @@ export class ErrorAnalysisSystem {
     const helper = new InfrastructureHelper({
       model: 'smart', // Error analysis requires sophisticated reasoning
       tools: ['file-list', 'file-read', 'ripgrep-search'],
-      workingDirectory: logDirectory
+      workingDirectory: logDirectory,
     });
 
     const timeConstraint = timeframe ? `from the last ${timeframe}` : 'recent';
-    
+
     const result = await helper.execute(`
       Analyze error logs ${timeConstraint} to identify:
       
@@ -272,15 +297,17 @@ export class ErrorAnalysisSystem {
       errorCategories: this.parseErrorCategories(result.content),
       criticalErrors: this.extractCriticalErrors(result.content),
       recommendations: this.extractList(result.content, 'recommendations?'),
-      trends: this.extractTrends(result.content)
+      trends: this.extractTrends(result.content),
     };
   }
 
   private parseErrorCategories(content: string): Record<string, number> {
     const categories: Record<string, number> = {};
-    
+
     // Parse error categories from LLM response
-    const categoryMatch = content.match(/categories?[:\s]*(.*?)(?=\n\n|critical|recommendations)/is);
+    const categoryMatch = content.match(
+      /categories?[:\s]*(.*?)(?=\n\n|critical|recommendations)/is
+    );
     if (categoryMatch) {
       const lines = categoryMatch[1].split('\n');
       for (const line of lines) {
@@ -290,13 +317,13 @@ export class ErrorAnalysisSystem {
         }
       }
     }
-    
+
     return categories;
   }
 
   private extractCriticalErrors(content: string): string[] {
     const criticalMatch = content.match(/critical[:\s]*(.*?)(?=\n\n|recommendations|trends)/is);
-    return criticalMatch ? criticalMatch[1].split('\n').filter(l => l.trim()) : [];
+    return criticalMatch ? criticalMatch[1].split('\n').filter((l) => l.trim()) : [];
   }
 
   private extractTrends(content: string): string {
@@ -307,7 +334,12 @@ export class ErrorAnalysisSystem {
   private extractList(text: string, section: string): string[] {
     const regex = new RegExp(`${section}[:\\s]*(.*?)(?=\\n\\n|\\n[a-z]+:|$)`, 'is');
     const match = text.match(regex);
-    return match ? match[1].split('\n').map(l => l.trim()).filter(l => l) : [];
+    return match
+      ? match[1]
+          .split('\n')
+          .map((l) => l.trim())
+          .filter((l) => l)
+      : [];
   }
 }
 
@@ -317,24 +349,33 @@ export class ErrorAnalysisSystem {
  */
 export class HelperManager {
   private registry = new HelperRegistry();
-  private activeOperations = new Map<string, Promise<any>>();
+  private activeOperations = new Map<
+    string,
+    { promise: Promise<unknown>; abort: AbortController }
+  >();
 
   /**
    * Start a long-running analysis operation
    */
-  async startAnalysis(id: string, type: 'memory' | 'error' | 'performance', context: string): Promise<string> {
+  async startAnalysis(
+    id: string,
+    type: 'memory' | 'error' | 'performance',
+    context: string
+  ): Promise<string> {
     if (this.activeOperations.has(id)) {
       throw new Error(`Analysis ${id} already in progress`);
     }
 
+    const controller = new AbortController();
     const helper = this.registry.createInfrastructureHelper(id, {
       model: 'smart',
       tools: ['file-list', 'file-read', 'ripgrep-search'],
-      workingDirectory: context
+      workingDirectory: context,
+      abortSignal: controller.signal,
     });
 
-    const operation = this.executeAnalysis(helper, type);
-    this.activeOperations.set(id, operation);
+    const operation = this.executeAnalysis(helper, type, controller.signal);
+    this.activeOperations.set(id, { promise: operation, abort: controller });
 
     try {
       const result = await operation;
@@ -356,22 +397,26 @@ export class HelperManager {
    * Cancel an operation
    */
   async cancelOperation(id: string): Promise<void> {
-    const operation = this.activeOperations.get(id);
-    if (operation) {
-      // In a real implementation, you'd pass abort signals to helpers
+    const entry = this.activeOperations.get(id);
+    if (entry) {
+      entry.abort.abort();
       this.activeOperations.delete(id);
       this.registry.removeHelper(id);
     }
   }
 
-  private async executeAnalysis(helper: InfrastructureHelper, type: string): Promise<string> {
-    const prompts = {
+  private async executeAnalysis(
+    helper: InfrastructureHelper,
+    type: 'memory' | 'error' | 'performance',
+    signal?: AbortSignal
+  ): Promise<string> {
+    const prompts: Readonly<Record<'memory' | 'error' | 'performance', string>> = {
       memory: 'Analyze conversation patterns for memory insights',
       error: 'Analyze error logs for critical issues and trends',
-      performance: 'Analyze performance metrics and identify bottlenecks'
-    };
+      performance: 'Analyze performance metrics and identify bottlenecks',
+    } as const;
 
-    const result = await helper.execute(prompts[type as keyof typeof prompts]);
+    const result = await helper.execute(prompts[type], signal);
     return result.content;
   }
 
@@ -380,8 +425,10 @@ export class HelperManager {
    */
   async cleanup(): Promise<void> {
     // Wait for active operations to complete
-    await Promise.allSettled(Array.from(this.activeOperations.values()));
-    
+    await Promise.allSettled(
+      Array.from(this.activeOperations.values()).map((entry) => entry.promise)
+    );
+
     // Clear registry
     this.registry.clearAll();
     this.activeOperations.clear();

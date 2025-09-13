@@ -18,13 +18,13 @@ import { InfrastructureHelper, SessionHelper, HelperFactory } from '@lace/core';
 
 // Infrastructure helper for system tasks
 const infraHelper = HelperFactory.createInfrastructureHelper({
-  model: 'smart',
+  model: 'smart', // 'fast' or 'smart'
   tools: ['file-read', 'ripgrep-search']
 });
 
 // Session helper within an agent
 const sessionHelper = HelperFactory.createSessionHelper({
-  model: 'fast',
+  model: 'fast', // 'fast' or 'smart'
   parentAgent: this
 });
 
@@ -188,7 +188,8 @@ registry.clearAll();
 
 ## Configuration
 
-Create `~/.lace/config.json`:
+Create `~/.lace/config.json` (see docs/examples/config.json for a full template).  
+Each model string is `<providerInstanceId>:<modelId>` (e.g. `anthropic-default:claude-3-5-sonnet-20241022`):
 
 ```json
 {
@@ -199,7 +200,8 @@ Create `~/.lace/config.json`:
 }
 ```
 
-The system will fail fast if this configuration is missing.
+If this configuration is missing, helper creation will throw with a clear error.  
+Ensure both `~/.lace/config.json` and `~/.lace/provider-instances.json` exist.
 
 ## Error Handling
 
@@ -216,8 +218,11 @@ if (result.content.includes('error')) {
 // Check individual tool results
 for (const toolResult of result.toolResults) {
   if (toolResult.status === 'failed') {
-    console.error(`Tool ${toolResult.toolCallId} failed:`, 
-                  toolResult.content[0].text);
+    const msg =
+      Array.isArray(toolResult.content)
+        ? toolResult.content.map((c: any) => (typeof c?.text === 'string' ? c.text : '')).join(' ').trim()
+        : String(toolResult.content ?? '');
+    console.error(`Tool ${toolResult.toolCallId} failed: ${msg}`);
   }
 }
 
@@ -233,7 +238,7 @@ if (result.tokenUsage) {
 - Use `fast` models for simple tasks (summarization, formatting)
 - Use `smart` models for complex analysis or reasoning tasks
 
-**Tool Whitelisting:**
+**Tool access:**
 - Infrastructure helpers require explicit tool whitelisting
 - Only include tools actually needed for the task
 - Session helpers inherit tools from parent agent

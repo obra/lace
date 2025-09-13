@@ -1,5 +1,6 @@
+// ABOUTME: Tests SessionHelper provider creation, inherited tools/workingDir, approval flow, and abort handling
+// ABOUTME: Validates working directory inheritance, tool approval workflow, and error handling
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { MockedFunction } from 'vitest';
 import { SessionHelper } from './session-helper';
 import type { Agent } from '~/agents/agent';
 import type { Session } from '~/sessions/session';
@@ -72,24 +73,20 @@ describe('SessionHelper', () => {
     toolExecutor.registerTool(testTool.name, testTool);
 
     // Mock session
-    mockSession = {
-      getToolPolicy: vi.fn().mockReturnValue('ask') as MockedFunction<Session['getToolPolicy']>,
-      getWorkingDirectory: vi.fn().mockReturnValue('/session/dir') as MockedFunction<
-        Session['getWorkingDirectory']
-      >,
-      getTools: vi.fn().mockReturnValue([testTool]) as MockedFunction<Session['getTools']>,
-    } as Partial<Session> as Session;
+    const sessionPartial: Partial<Session> = {
+      getToolPolicy: vi.fn().mockReturnValue('require-approval'),
+      getWorkingDirectory: vi.fn().mockReturnValue('/session/dir'),
+      getTools: vi.fn().mockReturnValue([testTool]),
+    };
+    mockSession = sessionPartial as Session;
 
     // Mock agent
-    mockAgent = {
-      getFullSession: vi.fn().mockResolvedValue(mockSession) as MockedFunction<
-        Agent['getFullSession']
-      >,
-      getAvailableTools: vi.fn().mockReturnValue([testTool]) as MockedFunction<
-        Agent['getAvailableTools']
-      >,
+    const agentPartial: Partial<Agent> = {
+      getFullSession: vi.fn().mockResolvedValue(mockSession),
+      getAvailableTools: vi.fn().mockReturnValue([testTool]),
       toolExecutor,
-    } as Partial<Agent> as Agent;
+    };
+    mockAgent = agentPartial as Agent;
 
     // Mock global config
     vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue('test-instance:test-model');

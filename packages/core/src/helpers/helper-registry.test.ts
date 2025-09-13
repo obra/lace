@@ -1,12 +1,18 @@
+// ABOUTME: Tests HelperRegistry creation, duplicate protection, tracking, filtering, and counts
+// ABOUTME: Validates helper lifecycle management and type-based filtering
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HelperRegistry } from './helper-registry';
 import { InfrastructureHelper } from './infrastructure-helper';
 import { SessionHelper } from './session-helper';
-import { Agent } from '~/agents/agent';
+import type { Agent } from '~/agents/agent';
 
 // Mock modules
-vi.mock('./infrastructure-helper');
-vi.mock('./session-helper');
+vi.mock('./infrastructure-helper', () => ({
+  InfrastructureHelper: vi.fn(),
+}));
+vi.mock('./session-helper', () => ({
+  SessionHelper: vi.fn(),
+}));
 
 describe('HelperRegistry', () => {
   let registry: HelperRegistry;
@@ -14,7 +20,8 @@ describe('HelperRegistry', () => {
 
   beforeEach(() => {
     registry = new HelperRegistry();
-    mockAgent = {} as Agent;
+    const agentPartial: Partial<Agent> = {};
+    mockAgent = agentPartial as Agent;
     vi.clearAllMocks();
   });
 
@@ -22,7 +29,7 @@ describe('HelperRegistry', () => {
     it('should create infrastructure helper and track it', () => {
       const options = {
         model: 'fast' as const,
-        tools: ['test_tool']
+        tools: ['test_tool'],
       };
 
       const helper = registry.createInfrastructureHelper('test-id', options);
@@ -35,7 +42,7 @@ describe('HelperRegistry', () => {
     it('should throw if id already exists', () => {
       const options = {
         model: 'fast' as const,
-        tools: ['test_tool']
+        tools: ['test_tool'],
       };
 
       registry.createInfrastructureHelper('test-id', options);
@@ -50,7 +57,7 @@ describe('HelperRegistry', () => {
     it('should create session helper and track it', () => {
       const options = {
         model: 'fast' as const,
-        parentAgent: mockAgent
+        parentAgent: mockAgent,
       };
 
       const helper = registry.createSessionHelper('session-1', options);
@@ -63,7 +70,7 @@ describe('HelperRegistry', () => {
     it('should throw if id already exists', () => {
       const options = {
         model: 'fast' as const,
-        parentAgent: mockAgent
+        parentAgent: mockAgent,
       };
 
       registry.createSessionHelper('session-1', options);
@@ -78,7 +85,7 @@ describe('HelperRegistry', () => {
     it('should remove helper when requested', () => {
       const helper = registry.createInfrastructureHelper('test-id', {
         model: 'fast',
-        tools: []
+        tools: [],
       });
 
       expect(registry.getHelper('test-id')).toBe(helper);
@@ -135,13 +142,13 @@ describe('HelperRegistry', () => {
 
   describe('helper type tracking', () => {
     it('should track helper types correctly', () => {
-      const _infraHelper = registry.createInfrastructureHelper('infra-1', { 
-        model: 'fast', 
-        tools: [] 
+      const _infraHelper = registry.createInfrastructureHelper('infra-1', {
+        model: 'fast',
+        tools: [],
       });
-      const _sessionHelper = registry.createSessionHelper('session-1', { 
-        model: 'smart', 
-        parentAgent: mockAgent 
+      const _sessionHelper = registry.createSessionHelper('session-1', {
+        model: 'smart',
+        parentAgent: mockAgent,
       });
 
       expect(registry.getHelperType('infra-1')).toBe('infrastructure');

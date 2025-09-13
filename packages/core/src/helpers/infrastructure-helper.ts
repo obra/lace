@@ -8,7 +8,7 @@ import { parseProviderModel } from '~/providers/provider-utils';
 import { ToolExecutor } from '~/tools/executor';
 import { Tool } from '~/tools/tool';
 import { ToolCall, ToolResult, ToolContext, createErrorResult } from '~/tools/types';
-import { AIProvider } from '~/providers/base-provider';
+import type { AIProvider } from '~/providers/base-provider';
 import { logger } from '~/utils/logger';
 
 export interface InfrastructureHelperOptions {
@@ -59,9 +59,9 @@ export class InfrastructureHelper extends BaseHelper {
       modelId,
     });
 
-    // Get provider instance
+    // Get provider instance with explicit model
     const instanceManager = new ProviderInstanceManager();
-    const instance = await instanceManager.getInstance(instanceId);
+    const instance = await instanceManager.getInstance(instanceId, modelId);
 
     if (!instance) {
       throw new Error(`Provider instance not found: ${instanceId}`);
@@ -86,6 +86,13 @@ export class InfrastructureHelper extends BaseHelper {
       available: this.availableTools.map((t) => t.name),
     });
 
+    const missing = this.options.tools.filter(
+      (name) => !this.availableTools.some((t) => t.name === name)
+    );
+    if (missing.length > 0) {
+      logger.warn('Some whitelisted tools are not registered', { missing });
+    }
+
     return this.availableTools;
   }
 
@@ -105,6 +112,7 @@ export class InfrastructureHelper extends BaseHelper {
     signal?: AbortSignal
   ): Promise<ToolResult[]> {
     const results: ToolResult[] = [];
+    const whitelist = new Set(this.options.tools);
 
     for (const toolCall of toolCalls) {
       // Check abort signal
@@ -114,7 +122,7 @@ export class InfrastructureHelper extends BaseHelper {
       }
 
       // Security check: only allow whitelisted tools
-      if (!this.options.tools.includes(toolCall.name)) {
+      if (!whitelist.has(toolCall.name)) {
         logger.warn('InfrastructureHelper blocked non-whitelisted tool', {
           toolName: toolCall.name,
           whitelist: this.options.tools,
@@ -125,8 +133,9 @@ export class InfrastructureHelper extends BaseHelper {
       }
 
       // Build context without agent (infrastructure mode)
+      const composedSignal = this.options.abortSignal ?? signal ?? new AbortController().signal;
       const context: ToolContext = {
-        signal: this.options.abortSignal || signal || new AbortController().signal,
+        signal: composedSignal,
         workingDirectory: this.options.workingDirectory,
         processEnv: this.options.processEnv,
         // NO agent property - this is infrastructure mode

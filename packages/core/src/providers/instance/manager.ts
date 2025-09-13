@@ -13,7 +13,7 @@ import {
   ProviderInstance,
 } from '~/providers/catalog/types';
 import { ProviderRegistry } from '~/providers/registry';
-import { AIProvider } from '~/providers/base-provider';
+import type { AIProvider } from '~/providers/base-provider';
 
 export class ProviderInstanceManager {
   private configPath: string;
@@ -201,10 +201,10 @@ export class ProviderInstanceManager {
   }
 
   /**
-   * Get a provider instance by ID, with default model from catalog
+   * Get a provider instance by ID, with optional model override
    * Used by helper agents for programmatic provider access
    */
-  async getInstance(instanceId: string): Promise<AIProvider | null> {
+  async getInstance(instanceId: string, modelId?: string): Promise<AIProvider | null> {
     const config = await this.loadInstances();
     const instance = config.instances[instanceId];
 
@@ -212,18 +212,29 @@ export class ProviderInstanceManager {
       return null;
     }
 
-    // Get the default model for this provider from catalog
-    let modelId: string;
-    if (instance.catalogProviderId === 'anthropic') {
-      modelId = 'claude-3-5-haiku-20241022'; // Default small model
-    } else if (instance.catalogProviderId === 'openai') {
-      modelId = 'gpt-4o'; // Default model
-    } else {
-      modelId = 'default-model';
-    }
+    // Use provided modelId, otherwise fall back to default mapping
+    const resolvedModelId = modelId || this.getDefaultModelForProvider(instance.catalogProviderId);
 
     // Create provider using registry
     const registry = ProviderRegistry.getInstance();
-    return await registry.createProviderFromInstanceAndModel(instanceId, modelId);
+    try {
+      return await registry.createProviderFromInstanceAndModel(instanceId, resolvedModelId);
+    } catch (err) {
+      console.warn(`Provider creation failed for ${instanceId}:${resolvedModelId}`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Get default model for a catalog provider
+   */
+  private getDefaultModelForProvider(catalogProviderId: string): string {
+    if (catalogProviderId === 'anthropic') {
+      return 'claude-3-5-haiku-20241022'; // Default small model
+    } else if (catalogProviderId === 'openai') {
+      return 'gpt-4o'; // Default model
+    } else {
+      return 'default-model';
+    }
   }
 }

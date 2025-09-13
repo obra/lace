@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+// ABOUTME: Tests BaseHelper multi-turn loop, tool execution, abort handling, and max-turn protection
+// ABOUTME: Validates provider resolution, conversation building, tool result processing, and execution limits
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BaseHelper } from './base-helper';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
-import { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import type { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { TestProvider } from '~/test-utils/test-provider';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { z } from 'zod';
@@ -43,7 +45,7 @@ class QueuedMockProvider extends TestProvider {
     if (this.responseIndex >= this.responseQueue.length) {
       throw new Error('No more mock responses available');
     }
-    
+
     const response = this.responseQueue[this.responseIndex];
     this.responseIndex++;
     return response;
@@ -80,7 +82,7 @@ class TestHelper extends BaseHelper {
     // Simple implementation for testing
     const results = [];
     for (const call of toolCalls) {
-      const tool = this.tools.find(t => t.name === call.name);
+      const tool = this.tools.find((t) => t.name === call.name);
       if (tool) {
         const result = await tool.execute(call.arguments);
         results.push(result);
@@ -99,12 +101,12 @@ describe('BaseHelper', () => {
   beforeEach(() => {
     provider = new QueuedMockProvider({
       modelId: 'test-model',
-      config: {}
+      config: {},
     });
     toolExecutor = new ToolExecutor();
     testTool = new TestTool();
     toolExecutor.registerTool(testTool.name, testTool);
-    
+
     helper = new TestHelper(provider, toolExecutor, [testTool]);
   });
 
@@ -112,7 +114,7 @@ describe('BaseHelper', () => {
     it('should handle simple prompt without tools', async () => {
       provider.addMockResponse({
         content: 'Hello! How can I help?',
-        toolCalls: []
+        toolCalls: [],
       });
 
       const result = await helper.execute('Say hello');
@@ -126,17 +128,19 @@ describe('BaseHelper', () => {
       // First response: LLM wants to use a tool
       provider.addMockResponse({
         content: 'I will use the test tool',
-        toolCalls: [{
-          id: 'call_1',
-          name: 'test_tool',
-          arguments: { input: 'test data' }
-        }]
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            arguments: { input: 'test data' },
+          },
+        ],
       });
 
       // Second response: LLM processes tool result
       provider.addMockResponse({
         content: 'The tool processed: test data',
-        toolCalls: []
+        toolCalls: [],
       });
 
       const result = await helper.execute('Use the test tool');
@@ -151,27 +155,31 @@ describe('BaseHelper', () => {
       // First response: LLM wants to use a tool
       provider.addMockResponse({
         content: 'Using first tool',
-        toolCalls: [{
-          id: 'call_1',
-          name: 'test_tool',
-          arguments: { input: 'first' }
-        }]
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            arguments: { input: 'first' },
+          },
+        ],
       });
 
       // Second response: LLM wants another tool
       provider.addMockResponse({
         content: 'Using second tool',
-        toolCalls: [{
-          id: 'call_2',
-          name: 'test_tool',
-          arguments: { input: 'second' }
-        }]
+        toolCalls: [
+          {
+            id: 'call_2',
+            name: 'test_tool',
+            arguments: { input: 'second' },
+          },
+        ],
       });
 
       // Final response: Done with tools
       provider.addMockResponse({
         content: 'Processed both: first and second',
-        toolCalls: []
+        toolCalls: [],
       });
 
       const result = await helper.execute('Use tools twice');
@@ -186,11 +194,13 @@ describe('BaseHelper', () => {
       for (let i = 0; i < 15; i++) {
         provider.addMockResponse({
           content: `Tool call ${i}`,
-          toolCalls: [{
-            id: `call_${i}`,
-            name: 'test_tool',
-            arguments: { input: `data_${i}` }
-          }]
+          toolCalls: [
+            {
+              id: `call_${i}`,
+              name: 'test_tool',
+              arguments: { input: `data_${i}` },
+            },
+          ],
         });
       }
 
@@ -200,23 +210,25 @@ describe('BaseHelper', () => {
     });
 
     it('should handle abort signal', async () => {
+      vi.useFakeTimers();
       const controller = new AbortController();
-      
+
       provider.addMockResponse({
         content: 'Starting',
-        toolCalls: [{
-          id: 'call_1',
-          name: 'test_tool',
-          arguments: { input: 'test' }
-        }]
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            arguments: { input: 'test' },
+          },
+        ],
       });
 
-      // Abort during execution
+      const promise = helper.execute('Test abort', controller.signal);
       setTimeout(() => controller.abort(), 10);
-
-      await expect(
-        helper.execute('Test abort', controller.signal)
-      ).rejects.toThrow();
+      vi.runAllTimers();
+      await expect(promise).rejects.toThrow();
+      vi.useRealTimers();
     });
   });
 });
