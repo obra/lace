@@ -82,8 +82,8 @@ export function ProviderInstanceCard({
     onEdit?.(); // Call parent callback to refresh data
   };
 
-  // Check if this provider should show model management (3+ models)
-  const showModelManagement = provider && provider.models.length >= 3;
+  // Check if this provider should show model management (1+ models)
+  const showModelManagement = provider && provider.models.length >= 1;
 
   // Group ALL models by provider (not just filtered ones)
   const modelsByProvider = useMemo(() => {
