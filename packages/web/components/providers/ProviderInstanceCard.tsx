@@ -144,6 +144,37 @@ export function ProviderInstanceCard({
     }
   };
 
+  const handleSaveConfig = async () => {
+    try {
+      const response = await fetch(`/api/instances/${instance.id}/config`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modelConfig }),
+      });
+
+      if (response.ok) {
+        // Configuration saved successfully
+        console.log('Configuration saved');
+      }
+    } catch (error) {
+      console.error('Error saving configuration:', error);
+    }
+  };
+
+  // Auto-save on config changes (debounced)
+  useEffect(() => {
+    // Skip if this is the initial render or no provider data
+    if (!provider || provider.id !== 'openrouter') return;
+
+    const timer = setTimeout(() => {
+      if (instance.id) {
+        void handleSaveConfig();
+      }
+    }, 1000); // 1 second debounce
+
+    return () => clearTimeout(timer);
+  }, [modelConfig, instance.id, provider]);
+
   // Apply search and filters for OpenRouter instances
   useEffect(() => {
     if (!provider || provider.id !== 'openrouter') return;
