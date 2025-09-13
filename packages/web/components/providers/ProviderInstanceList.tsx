@@ -9,6 +9,7 @@ import { AddInstanceModal } from './AddInstanceModal';
 import { Alert } from '@/components/ui/Alert';
 import { SuccessToast } from '@/components/ui/SuccessToast';
 import { ErrorToast } from '@/components/errors/ErrorToast';
+import { GlobalModelSearch, type GlobalModelFilters } from './GlobalModelSearch';
 import { useProviderInstances } from './ProviderInstanceProvider';
 import { api } from '@/lib/api-client';
 import type { CatalogProvider } from '@/lib/server/lace-imports';
@@ -35,6 +36,14 @@ export function ProviderInstanceList() {
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
+  // Global search/filter state
+  const [globalFilters, setGlobalFilters] = useState<GlobalModelFilters>({
+    searchQuery: '',
+    requiredParameters: [],
+    minContextLength: undefined,
+    maxPromptCostPerMillion: undefined,
+  });
+
   // Fetch catalog data on mount
   useEffect(() => {
     fetchCatalogs();
@@ -57,6 +66,73 @@ export function ProviderInstanceList() {
     instance,
     catalog: catalogs.find((c) => c.id === instance.catalogProviderId),
   }));
+
+  // Calculate total model counts for display
+  const { totalModels, totalResults } = React.useMemo(() => {
+    let total = 0;
+    let results = 0;
+
+    for (const { catalog } of instancesWithCatalog) {
+      if (!catalog?.models) continue;
+
+      total += catalog.models.length;
+
+      // Count models that match current filters
+      const filtered = catalog.models.filter((model) => {
+        // Apply search filter
+        if (globalFilters.searchQuery) {
+          const searchLower = globalFilters.searchQuery.toLowerCase();
+          const matchesSearch =
+            model.id.toLowerCase().includes(searchLower) ||
+            model.name.toLowerCase().includes(searchLower);
+          if (!matchesSearch) return false;
+        }
+
+        // Apply capability filters
+        if (globalFilters.requiredParameters.length > 0) {
+          const hasTools = model.supports_attachments !== undefined;
+          const hasVision = model.supports_attachments === true;
+          const hasReasoning = model.can_reason === true;
+
+          const capabilities: string[] = [];
+          if (hasTools) capabilities.push('tools');
+          if (hasVision) capabilities.push('vision');
+          if (hasReasoning) capabilities.push('reasoning');
+
+          const hasRequired = globalFilters.requiredParameters.every((param) =>
+            capabilities.includes(param)
+          );
+          if (!hasRequired) return false;
+        }
+
+        // Apply context filter
+        if (globalFilters.minContextLength !== undefined) {
+          if (model.context_window < globalFilters.minContextLength) {
+            return false;
+          }
+        }
+
+        // Apply price filter
+        if (globalFilters.maxPromptCostPerMillion !== undefined) {
+          if (globalFilters.maxPromptCostPerMillion === 0) {
+            if (model.cost_per_1m_in !== 0 || model.cost_per_1m_out !== 0) {
+              return false;
+            }
+          } else {
+            if (model.cost_per_1m_in > globalFilters.maxPromptCostPerMillion) {
+              return false;
+            }
+          }
+        }
+
+        return true;
+      });
+
+      results += filtered.length;
+    }
+
+    return { totalModels: total, totalResults: results };
+  }, [instancesWithCatalog, globalFilters]);
 
   const handleTest = (instanceId: string) => {
     void testInstance(instanceId);
@@ -166,15 +242,78 @@ export function ProviderInstanceList() {
               </button>
             </div>
 
+            {/* Global Model Search and Filter */}
+            {totalModels > 0 && (
+              <GlobalModelSearch
+                filters={globalFilters}
+                onChange={setGlobalFilters}
+                resultCount={totalResults}
+                totalCount={totalModels}
+              />
+            )}
+
             {instancesWithCatalog.map(({ instance, catalog }) => {
               const instanceWithTestResult = getInstanceWithTestResult(instance.id);
               if (!instanceWithTestResult) return null;
+
+              // Check if this provider has any matching models (for visibility)
+              const hasMatchingModels = catalog?.models
+                ? catalog.models.some((model) => {
+                    // Apply the same filter logic here to determine visibility
+                    if (globalFilters.searchQuery) {
+                      const searchLower = globalFilters.searchQuery.toLowerCase();
+                      const matchesSearch =
+                        model.id.toLowerCase().includes(searchLower) ||
+                        model.name.toLowerCase().includes(searchLower);
+                      if (!matchesSearch) return false;
+                    }
+
+                    if (globalFilters.requiredParameters.length > 0) {
+                      const hasTools = model.supports_attachments !== undefined;
+                      const hasVision = model.supports_attachments === true;
+                      const hasReasoning = model.can_reason === true;
+
+                      const capabilities: string[] = [];
+                      if (hasTools) capabilities.push('tools');
+                      if (hasVision) capabilities.push('vision');
+                      if (hasReasoning) capabilities.push('reasoning');
+
+                      const hasRequired = globalFilters.requiredParameters.every((param) =>
+                        capabilities.includes(param)
+                      );
+                      if (!hasRequired) return false;
+                    }
+
+                    if (globalFilters.minContextLength !== undefined) {
+                      if (model.context_window < globalFilters.minContextLength) {
+                        return false;
+                      }
+                    }
+
+                    if (globalFilters.maxPromptCostPerMillion !== undefined) {
+                      if (globalFilters.maxPromptCostPerMillion === 0) {
+                        if (model.cost_per_1m_in !== 0 || model.cost_per_1m_out !== 0) {
+                          return false;
+                        }
+                      } else {
+                        if (model.cost_per_1m_in > globalFilters.maxPromptCostPerMillion) {
+                          return false;
+                        }
+                      }
+                    }
+
+                    return true;
+                  })
+                : true;
+
+              // Keep all provider cards visible regardless of matching models
 
               return (
                 <ProviderInstanceCard
                   key={instance.id}
                   instance={instanceWithTestResult}
                   provider={catalog}
+                  globalFilters={globalFilters}
                   onTest={(instanceId) => handleTest(instanceId)}
                   onDelete={(instanceId) => void handleDelete(instanceId)}
                   onEdit={() => void loadInstances()} // Refresh list after edit

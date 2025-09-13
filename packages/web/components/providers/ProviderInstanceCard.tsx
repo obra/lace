@@ -5,12 +5,10 @@ import { useState, useEffect, useMemo } from 'react';
 import StatusDot from '@/components/ui/StatusDot';
 import Badge from '@/components/ui/Badge';
 import { EditInstanceModal } from './EditInstanceModal';
-import { SearchInput } from './SearchInput';
-import { CapabilityFilters } from './CapabilityFilters';
-import { FilterDropdowns } from './FilterDropdowns';
 import { ProviderModelGroup } from './ProviderModelGroup';
 import { api } from '@/lib/api-client';
 import type { CatalogProvider, CatalogModel, ModelConfig } from '@/lib/server/lace-imports';
+import type { GlobalModelFilters } from './GlobalModelSearch';
 
 interface ProviderInstanceCardProps {
   instance: {
@@ -25,6 +23,7 @@ interface ProviderInstanceCardProps {
     lastTested?: string;
   };
   provider?: CatalogProvider; // Optional provider catalog data for model management
+  globalFilters?: GlobalModelFilters; // Global search/filter state
   onTest: (instanceId: string) => void;
   onDelete: (instanceId: string) => void;
   onEdit?: () => void; // Optional callback after edit success
@@ -34,6 +33,7 @@ interface ProviderInstanceCardProps {
 export function ProviderInstanceCard({
   instance,
   provider,
+  globalFilters,
   onTest,
   onDelete,
   onEdit,
@@ -49,7 +49,6 @@ export function ProviderInstanceCard({
     filters: {},
   });
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const getStatusProps = (status?: string) => {
     switch (status) {
@@ -60,10 +59,9 @@ export function ProviderInstanceCard({
       case 'testing':
         return { status: 'info' as const, text: 'Testing...' };
       default:
-        return {
-          status: 'warning' as const,
-          text: instance.hasCredentials ? 'Untested' : 'No Credentials',
-        };
+        return instance.hasCredentials
+          ? null // Don't show status if credentials exist but untested
+          : { status: 'warning' as const, text: 'No Credentials' };
     }
   };
 
@@ -96,16 +94,16 @@ export function ProviderInstanceCard({
     return groups;
   }, [provider, showModelManagement]);
 
-  // Filter groups for display based on search and filters
+  // Filter groups for display based on global filters
   const filteredModelsByProvider = useMemo(() => {
-    if (!showModelManagement) return new Map();
+    if (!showModelManagement || !globalFilters) return modelsByProvider;
 
     const filtered = new Map();
     for (const [providerName, models] of modelsByProvider.entries()) {
       const filteredModels = models.filter((model: CatalogModel) => {
-        // Apply search filter
-        if (searchQuery) {
-          const searchLower = searchQuery.toLowerCase();
+        // Apply global search filter
+        if (globalFilters.searchQuery) {
+          const searchLower = globalFilters.searchQuery.toLowerCase();
           if (
             !model.id.toLowerCase().includes(searchLower) &&
             !model.name.toLowerCase().includes(searchLower)
@@ -114,8 +112,8 @@ export function ProviderInstanceCard({
           }
         }
 
-        // Apply capability filters
-        if (modelConfig.filters?.requiredParameters?.length) {
+        // Apply global capability filters
+        if (globalFilters.requiredParameters.length > 0) {
           const hasTools = model.supports_attachments !== undefined;
           const hasVision = model.supports_attachments === true;
           const hasReasoning = model.can_reason === true;
@@ -125,42 +123,29 @@ export function ProviderInstanceCard({
           if (hasVision) capabilities.push('vision');
           if (hasReasoning) capabilities.push('reasoning');
 
-          const hasRequired = modelConfig.filters.requiredParameters!.every((param: string) =>
+          const hasRequired = globalFilters.requiredParameters.every((param: string) =>
             capabilities.includes(param)
           );
           if (!hasRequired) return false;
         }
 
-        // Apply context filter
-        if (modelConfig.filters?.minContextLength) {
-          if (model.context_window < modelConfig.filters.minContextLength) {
+        // Apply global context filter
+        if (globalFilters.minContextLength !== undefined) {
+          if (model.context_window < globalFilters.minContextLength) {
             return false;
           }
         }
 
-        // Apply cost filters
-        if (modelConfig.filters?.maxPromptCostPerMillion !== undefined) {
-          if (modelConfig.filters.maxPromptCostPerMillion === 0) {
+        // Apply global price filter
+        if (globalFilters.maxPromptCostPerMillion !== undefined) {
+          if (globalFilters.maxPromptCostPerMillion === 0) {
             // Free only filter - both input and output must be free
             if (model.cost_per_1m_in !== 0 || model.cost_per_1m_out !== 0) {
               return false;
             }
           } else {
             // Max cost filter
-            if (model.cost_per_1m_in > modelConfig.filters.maxPromptCostPerMillion) {
-              return false;
-            }
-          }
-        }
-
-        if (modelConfig.filters?.maxCompletionCostPerMillion !== undefined) {
-          if (modelConfig.filters.maxCompletionCostPerMillion === 0) {
-            // Free only filter for completion
-            if (model.cost_per_1m_out !== 0) {
-              return false;
-            }
-          } else {
-            if (model.cost_per_1m_out > modelConfig.filters.maxCompletionCostPerMillion) {
+            if (model.cost_per_1m_in > globalFilters.maxPromptCostPerMillion) {
               return false;
             }
           }
@@ -174,7 +159,7 @@ export function ProviderInstanceCard({
       }
     }
     return filtered;
-  }, [modelsByProvider, searchQuery, modelConfig, showModelManagement]);
+  }, [modelsByProvider, globalFilters, showModelManagement]);
 
   // Toggle handlers for model management
   const handleToggleProvider = (providerName: string, enabled: boolean) => {
@@ -254,14 +239,14 @@ export function ProviderInstanceCard({
       <div className="card-body py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <StatusDot status={statusProps.status} size="md" />
+            {statusProps && <StatusDot status={statusProps.status} size="md" />}
             <div className="flex-1">
               <div className="flex items-center space-x-2 mb-1">
                 <h4 className="font-medium">{instance.displayName}</h4>
               </div>
               <div className="text-sm text-base-content/60 space-y-1">
                 <div className="flex items-center space-x-4">
-                  <span>{statusProps.text}</span>
+                  {statusProps && <span>{statusProps.text}</span>}
                   {instance.modelCount !== undefined && (
                     <span>{instance.modelCount} models available</span>
                   )}
@@ -297,36 +282,6 @@ export function ProviderInstanceCard({
         {/* Model Management Section for multi-model providers */}
         {showModelManagement && (
           <div className="border-t border-base-300 mt-4 pt-4">
-            {/* Search and Filters on Same Line */}
-            <div className="flex gap-2 mb-4 flex-wrap items-center">
-              <SearchInput value={searchQuery} onChange={setSearchQuery} />
-              <CapabilityFilters
-                selectedCapabilities={modelConfig.filters?.requiredParameters || []}
-                onChange={(capabilities) => {
-                  setModelConfig((prev) => ({
-                    ...prev,
-                    filters: { ...prev.filters, requiredParameters: capabilities },
-                  }));
-                }}
-              />
-              <FilterDropdowns
-                contextFilter={modelConfig.filters?.minContextLength}
-                priceFilter={modelConfig.filters?.maxPromptCostPerMillion}
-                onContextChange={(value) => {
-                  setModelConfig((prev) => ({
-                    ...prev,
-                    filters: { ...prev.filters, minContextLength: value },
-                  }));
-                }}
-                onPriceChange={(value) => {
-                  setModelConfig((prev) => ({
-                    ...prev,
-                    filters: { ...prev.filters, maxPromptCostPerMillion: value },
-                  }));
-                }}
-              />
-            </div>
-
             {/* Model Groups */}
             <div className="space-y-2">
               {Array.from(filteredModelsByProvider.entries()).map(([providerName, models]) => (
