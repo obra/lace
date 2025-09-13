@@ -37,7 +37,11 @@ export function CondensedChatInput({
   }, [value]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Don't interfere with IME composition
+    if (e.nativeEvent.isComposing) return;
+
+    // Only submit on Enter without modifier keys
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
       if (value.trim()) {
         onSend();

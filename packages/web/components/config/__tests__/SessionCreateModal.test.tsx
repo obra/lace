@@ -58,10 +58,10 @@ describe('SessionCreateModal', () => {
       expect(textarea.tagName).toBe('TEXTAREA');
     });
 
-    it('should have "Let\'s go" button', () => {
+    it('should have send button', () => {
       render(<SessionCreateModal {...defaultProps} />);
 
-      expect(screen.getByRole('button', { name: "Let's go" })).toBeInTheDocument();
+      expect(screen.getByTestId('condensed-send-button')).toBeInTheDocument();
     });
 
     it('should not have cancel button (modal close only)', () => {
@@ -105,7 +105,7 @@ describe('SessionCreateModal', () => {
       render(<SessionCreateModal {...defaultProps} onSubmit={mockOnSubmit} />);
 
       const textarea = screen.getByRole('textbox');
-      const submitButton = screen.getByRole('button', { name: "Let's go" });
+      const submitButton = screen.getByTestId('condensed-send-button');
 
       fireEvent.change(textarea, { target: { value: 'Fix the authentication bug' } });
       fireEvent.click(submitButton);
@@ -116,7 +116,7 @@ describe('SessionCreateModal', () => {
     it('should disable submit button when textarea is empty', () => {
       render(<SessionCreateModal {...defaultProps} />);
 
-      const submitButton = screen.getByRole('button', { name: "Let's go" });
+      const submitButton = screen.getByTestId('condensed-send-button');
       expect(submitButton).toBeDisabled();
     });
 
@@ -124,7 +124,7 @@ describe('SessionCreateModal', () => {
       render(<SessionCreateModal {...defaultProps} />);
 
       const textarea = screen.getByRole('textbox');
-      const submitButton = screen.getByRole('button', { name: "Let's go" });
+      const submitButton = screen.getByTestId('condensed-send-button');
 
       fireEvent.change(textarea, { target: { value: 'Add dark mode' } });
 
@@ -160,9 +160,8 @@ describe('SessionCreateModal', () => {
     it('should show loading state on submit button when loading', () => {
       render(<SessionCreateModal {...defaultProps} loading={true} />);
 
-      const submitButton = screen.getByRole('button', { name: /creating/i });
+      const submitButton = screen.getByTestId('condensed-send-button');
       expect(submitButton).toBeDisabled();
-      expect(screen.getByText(/creating/i)).toBeInTheDocument();
     });
 
     it('should disable textarea when loading', () => {

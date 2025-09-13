@@ -3,8 +3,9 @@
 
 'use client';
 
-import React, { memo, useState, useEffect, useRef } from 'react';
+import React, { memo, useState, useRef, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
+import { CondensedChatInput } from '@/components/ui/CondensedChatInput';
 import type { ProjectInfo } from '@/types/core';
 
 interface SessionCreateModalProps {
@@ -24,46 +25,49 @@ export const SessionCreateModal = memo(function SessionCreateModal({
 }: SessionCreateModalProps) {
   const [userInput, setUserInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const chatInputRef = useRef<{ focus: () => void } | null>(null);
+  const mountedRef = useRef(true);
 
-  // Auto-focus textarea when modal opens
+  // Track component mount state to prevent state updates after unmount
   useEffect(() => {
-    if (isOpen && textareaRef.current) {
-      textareaRef.current.focus();
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Auto-focus input when modal opens
+  useEffect(() => {
+    if (isOpen && chatInputRef.current) {
+      chatInputRef.current.focus();
     }
   }, [isOpen]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async () => {
     if (!userInput.trim() || loading || isSubmitting) return;
 
     setIsSubmitting(true);
     try {
       await onSubmit(userInput.trim());
     } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (userInput.trim()) {
-        void handleSubmit(e as unknown as React.FormEvent);
+      // Only update state if component is still mounted
+      if (mountedRef.current) {
+        setIsSubmitting(false);
       }
     }
   };
 
   const handleClose = () => {
-    setUserInput('');
-    setIsSubmitting(false);
+    if (mountedRef.current) {
+      setUserInput('');
+      setIsSubmitting(false);
+    }
     onClose();
   };
 
   if (!isOpen) return null;
 
   const isButtonLoading = loading || isSubmitting;
-  const isDisabled = !userInput.trim() || isButtonLoading;
 
   return (
     <Modal
@@ -73,43 +77,26 @@ export const SessionCreateModal = memo(function SessionCreateModal({
       size="lg"
       className="flex flex-col"
     >
-      <form onSubmit={handleSubmit} className="flex flex-col">
-        <div className="space-y-6">
-          {/* Working Directory as subtitle */}
-          <div className="text-base-content/70 text-sm">{currentProject.workingDirectory}</div>
+      <div className="space-y-6">
+        {/* Working Directory as subtitle */}
+        <div className="text-base-content/70 text-sm">{currentProject.workingDirectory}</div>
 
-          {/* Question */}
-          <div>
-            <label className="label">
-              <span className="label-text text-lg font-medium">What are we working on?</span>
-            </label>
-            <textarea
-              ref={textareaRef}
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="textarea textarea-bordered w-full h-32 text-base"
-              placeholder="Describe what you'd like to work on..."
-              disabled={isButtonLoading}
-              rows={4}
-            />
-          </div>
+        {/* Question */}
+        <div>
+          <label className="label">
+            <span className="label-text text-lg font-medium">What are we working on?</span>
+          </label>
+          <CondensedChatInput
+            ref={chatInputRef}
+            value={userInput}
+            onChange={setUserInput}
+            onSend={submit}
+            placeholder="Describe what you'd like to work on..."
+            disabled={isButtonLoading}
+            className="min-h-[8rem]" // Make it larger than default for session creation
+          />
         </div>
-
-        {/* Actions */}
-        <div className="flex justify-end pt-6">
-          <button type="submit" className="btn btn-primary" disabled={isDisabled}>
-            {isButtonLoading ? (
-              <>
-                <div className="loading loading-spinner loading-sm"></div>
-                Creating...
-              </>
-            ) : (
-              "Let's go"
-            )}
-          </button>
-        </div>
-      </form>
+      </div>
     </Modal>
   );
 });

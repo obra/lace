@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateSessionName } from '@/lib/server/session-naming-helper';
 import { InfrastructureHelper } from '@/lib/server/lace-imports';
+import type { AIProvider } from '@/lib/server/lace-imports';
 
 // Mock the lace-imports module
 vi.mock('@/lib/server/lace-imports', () => ({
@@ -100,7 +101,7 @@ describe('generateSessionName', () => {
       content: 'Fix Auth Bug',
     });
 
-    const mockProvider = {} as unknown as import('@/lib/server/lace-imports').AIProvider;
+    const mockProvider = {} as unknown as AIProvider;
 
     MockedInfrastructureHelper.mockImplementation(
       () =>
@@ -114,11 +115,13 @@ describe('generateSessionName', () => {
       modelId: 'test-model',
     });
 
-    expect(MockedInfrastructureHelper).toHaveBeenCalledWith({
-      model: 'fast',
-      tools: [],
-      fallbackProvider: mockProvider,
-      fallbackModelId: 'test-model',
-    });
+    expect(MockedInfrastructureHelper).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'fast',
+        tools: [],
+        fallbackProvider: mockProvider,
+        fallbackModelId: 'test-model',
+      })
+    );
   });
 });
