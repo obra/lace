@@ -41,7 +41,6 @@ export function EditInstanceModal({
   const [formData, setFormData] = useState({
     displayName: instance.displayName,
     endpoint: instance.endpoint || '',
-    timeout: 30,
     apiKey: '',
   });
 
@@ -58,7 +57,6 @@ export function EditInstanceModal({
     setFormData({
       displayName: instance.displayName,
       endpoint: instance.endpoint || '',
-      timeout: 30,
       apiKey: '',
     });
   }, [instance]);
@@ -73,7 +71,6 @@ export function EditInstanceModal({
       await updateInstance(instance.id, {
         displayName: formData.displayName,
         endpoint: formData.endpoint || undefined,
-        timeout: formData.timeout,
         apiKey: formData.apiKey || undefined,
       });
 
@@ -95,7 +92,6 @@ export function EditInstanceModal({
     setFormData({
       displayName: instance.displayName,
       endpoint: instance.endpoint || '',
-      timeout: 30,
       apiKey: '',
     });
     onClose();
@@ -168,45 +164,60 @@ export function EditInstanceModal({
           </div>
         </div>
 
-        <div>
-          <label className="label">
-            <span className="label-text">Timeout (seconds)</span>
-          </label>
-          <input
-            type="number"
-            className="input input-bordered w-full"
-            value={formData.timeout}
-            onChange={(e) =>
-              setFormData({ ...formData, timeout: parseInt(e.target.value, 10) || 30 })
-            }
-            placeholder="30"
-            min="1"
-            max="300"
-          />
-          <div className="label">
-            <span className="label-text-alt">API request timeout in seconds (1-300)</span>
-          </div>
-        </div>
-
-        <div className="flex justify-end space-x-3 pt-4">
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={handleClose}
-            disabled={submitting}
-          >
-            Cancel
-          </button>
-          <button type="submit" className="btn btn-primary vapor-button" disabled={submitting}>
-            {submitting ? (
-              <>
-                <span className="loading loading-spinner loading-sm"></span>
-                Saving...
-              </>
-            ) : (
-              'Save Changes'
+        <div className="flex justify-between pt-4">
+          {/* Left side: Destructive actions */}
+          <div className="flex space-x-2">
+            {onDelete && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm text-error hover:bg-error/10"
+                onClick={() => {
+                  if (confirm(`Are you sure you want to delete "${instance.displayName}"?`)) {
+                    onDelete(instance.id);
+                    onClose();
+                  }
+                }}
+                disabled={submitting}
+              >
+                Delete
+              </button>
             )}
-          </button>
+            {onRefresh && instance.catalogProviderId === 'openrouter' && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  onRefresh(instance.id);
+                }}
+                disabled={submitting}
+                title="Refresh catalog from OpenRouter API"
+              >
+                Sync Models
+              </button>
+            )}
+          </div>
+
+          {/* Right side: Main actions */}
+          <div className="flex space-x-3">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={handleClose}
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary vapor-button" disabled={submitting}>
+              {submitting ? (
+                <>
+                  <span className="loading loading-spinner loading-sm"></span>
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </button>
+          </div>
         </div>
       </form>
     </Modal>
