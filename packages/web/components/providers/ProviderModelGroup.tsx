@@ -88,7 +88,17 @@ export function ProviderModelGroup({
       </summary>
       {isExpanded && (
         <div className="collapse-content">
-          <div className="space-y-2 pt-2">
+          {/* Column Headers */}
+          <div className="flex items-center px-3 py-2 text-xs opacity-60 border-b border-base-300 mb-2">
+            <div className="flex-1 pl-8">Model</div>
+            <div className="flex gap-6 text-right">
+              <div className="min-w-16">Context</div>
+              <div className="min-w-20">Input $/1M</div>
+              <div className="min-w-20">Output $/1M</div>
+            </div>
+          </div>
+
+          <div className="space-y-1">
             {models.map((model) => {
               const isEnabled = enabledModels.includes(model.id);
               const badges = getCapabilityBadges(model);
@@ -106,19 +116,13 @@ export function ProviderModelGroup({
                     checked={isEnabled}
                     onChange={(e) => onToggleModel(model.id, e.target.checked)}
                   />
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="font-medium">{model.name}</span>
-                        {model.cost_per_1m_in === 0 && (
-                          <span className="badge badge-xs badge-success ml-2">FREE</span>
-                        )}
-                        <div className="text-xs opacity-70 mt-1">
-                          {formatContext(model.context_window)} context •
-                          {formatPrice(model.cost_per_1m_in)} input /
-                          {formatPrice(model.cost_per_1m_out)} output per 1M
-                        </div>
-                      </div>
+                  <div className="flex-1 flex items-center">
+                    {/* Model name and badges - left side */}
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="font-medium">{model.name}</span>
+                      {model.cost_per_1m_in === 0 && (
+                        <span className="badge badge-xs badge-success">FREE</span>
+                      )}
                       {badges.length > 0 && (
                         <div className="flex gap-1">
                           {badges.map((badge) => (
@@ -128,6 +132,19 @@ export function ProviderModelGroup({
                           ))}
                         </div>
                       )}
+                    </div>
+
+                    {/* Context and pricing - right side in columns */}
+                    <div className="flex gap-6 text-sm text-right">
+                      <div className="min-w-16">
+                        <span className="font-mono">{formatContext(model.context_window)}</span>
+                      </div>
+                      <div className="min-w-20">
+                        <span className="font-mono">{formatPrice(model.cost_per_1m_in)}</span>
+                      </div>
+                      <div className="min-w-20">
+                        <span className="font-mono">{formatPrice(model.cost_per_1m_out)}</span>
+                      </div>
                     </div>
                   </div>
                 </label>
