@@ -20,6 +20,8 @@ interface EditInstanceModalProps {
   };
   onClose: () => void;
   onSuccess: () => void;
+  onDelete?: (instanceId: string) => void;
+  onRefresh?: (instanceId: string) => void;
 }
 
 export function EditInstanceModal({
@@ -27,6 +29,8 @@ export function EditInstanceModal({
   instance,
   onClose,
   onSuccess,
+  onDelete,
+  onRefresh,
 }: EditInstanceModalProps) {
   const { updateInstance } = useProviderInstances();
   const isMountedRef = useRef(false);

@@ -266,20 +266,12 @@ export function ProviderInstanceCard({
             <div className="flex-1">
               <div className="flex items-center space-x-2 mb-1">
                 <h4 className="font-medium">{instance.displayName}</h4>
-                <Badge variant="outline" size="xs">
-                  {instance.catalogProviderId}
-                </Badge>
               </div>
               <div className="text-sm text-base-content/60 space-y-1">
                 <div className="flex items-center space-x-4">
                   <span>{statusProps.text}</span>
                   {instance.modelCount !== undefined && (
                     <span>{instance.modelCount} models available</span>
-                  )}
-                  {instance.hasCredentials && (
-                    <Badge variant="success" size="xs">
-                      Configured
-                    </Badge>
                   )}
                   {!instance.hasCredentials && (
                     <Badge variant="error" size="xs">
@@ -324,12 +316,6 @@ export function ProviderInstanceCard({
             <button className="btn btn-outline btn-sm" onClick={() => setShowEditModal(true)}>
               Edit
             </button>
-            <button
-              className="btn btn-ghost btn-sm text-error hover:bg-error/10"
-              onClick={handleDeleteClick}
-            >
-              Delete
-            </button>
           </div>
         </div>
 
@@ -337,8 +323,6 @@ export function ProviderInstanceCard({
         {showModelManagement && (
           <div className="border-t border-base-300 mt-4 pt-4">
             <div className="mb-3">
-              <h5 className="font-medium mb-2">Model Management</h5>
-
               {/* Search Bar */}
               <div className="mb-3">
                 <input
