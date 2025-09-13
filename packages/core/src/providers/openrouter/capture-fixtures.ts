@@ -5,14 +5,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 async function captureOpenRouterResponse() {
-  console.log('Fetching OpenRouter models (no API key needed)...');
+  console.warn('Fetching OpenRouter models (no API key needed)...');
 
   const response = await fetch('https://openrouter.ai/api/v1/models');
   if (!response.ok) {
     throw new Error(`Failed: ${response.status}`);
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as { data: unknown[] };
 
   // Save to fixtures
   const fixturesDir = './fixtures';
@@ -23,7 +23,7 @@ async function captureOpenRouterResponse() {
     JSON.stringify(data, null, 2)
   );
 
-  console.log(`Captured ${data.data.length} models`);
+  console.warn(`Captured ${data.data.length} models`);
 
   // Also save a smaller test fixture with just a few models
   const testFixture = {

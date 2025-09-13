@@ -1,7 +1,7 @@
 // ABOUTME: OpenRouter API client for fetching model catalogs
 // ABOUTME: Handles authentication, request formatting, and response validation
 
-import { OpenRouterResponse, OpenRouterResponseSchema } from './types';
+import { OpenRouterResponse, OpenRouterResponseSchema } from '~/providers/openrouter/types';
 
 export class OpenRouterClient {
   private baseUrl = 'https://openrouter.ai/api/v1';
@@ -18,7 +18,7 @@ export class OpenRouterClient {
       throw new Error(`OpenRouter API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as unknown;
     return OpenRouterResponseSchema.parse(data);
   }
 }

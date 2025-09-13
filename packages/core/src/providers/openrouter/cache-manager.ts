@@ -3,6 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import type { OpenRouterModel } from '~/providers/openrouter/types';
 
 export interface CachedCatalog {
   _meta: {
@@ -14,7 +15,7 @@ export interface CachedCatalog {
   provider: {
     name: string;
     id: string;
-    models: any[];
+    models: OpenRouterModel[];
   };
 }
 
@@ -36,8 +37,8 @@ export class CatalogCacheManager {
     try {
       const filePath = this.getCachePath(instanceId);
       const content = await fs.promises.readFile(filePath, 'utf-8');
-      return JSON.parse(content);
-    } catch (error) {
+      return JSON.parse(content) as CachedCatalog;
+    } catch (_error) {
       return null;
     }
   }

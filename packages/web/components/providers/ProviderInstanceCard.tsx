@@ -7,7 +7,8 @@ import Badge from '@/components/ui/Badge';
 import { EditInstanceModal } from './EditInstanceModal';
 import { ModelFilterBar } from './ModelFilterBar';
 import { ProviderModelGroup } from './ProviderModelGroup';
-import type { CatalogProvider } from '@lace/core/providers/catalog/types';
+import { api } from '@/lib/api-client';
+import type { CatalogProvider, CatalogModel, ModelConfig } from '@/lib/server/lace-imports';
 
 interface ProviderInstanceCardProps {
   instance: {
@@ -25,6 +26,7 @@ interface ProviderInstanceCardProps {
   onTest: () => void;
   onDelete: () => void;
   onEdit?: () => void; // Optional callback after edit success
+  onRefresh?: (instanceId: string) => void;
 }
 
 export function ProviderInstanceCard({
@@ -33,18 +35,18 @@ export function ProviderInstanceCard({
   onTest,
   onDelete,
   onEdit,
+  onRefresh,
 }: ProviderInstanceCardProps) {
   const [showEditModal, setShowEditModal] = useState(false);
 
-  // Model management state for OpenRouter instances
-  const [modelConfig, setModelConfig] = useState({
+  // Model management state for multi-model providers
+  const [modelConfig, setModelConfig] = useState<ModelConfig>({
     enableNewModels: true,
-    disabledModels: [] as string[],
-    disabledProviders: [] as string[],
+    disabledModels: [],
+    disabledProviders: [],
     filters: {},
   });
 
-  const [filteredModels, setFilteredModels] = useState(provider?.models ?? []);
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const getStatusProps = (status?: string) => {
@@ -80,35 +82,128 @@ export function ProviderInstanceCard({
     onEdit?.(); // Call parent callback to refresh data
   };
 
-  // Group models by provider for OpenRouter instances
+  // Check if this provider should show model management (3+ models)
+  const showModelManagement = provider && provider.models.length >= 3;
+
+  // Group ALL models by provider (not just filtered ones)
   const modelsByProvider = useMemo(() => {
-    if (!provider || provider.id !== 'openrouter') return new Map();
+    if (!showModelManagement) return new Map();
 
     const groups = new Map<string, typeof provider.models>();
-    filteredModels.forEach((model) => {
-      const providerName = model.id.split('/')[0] || 'unknown';
+    provider.models.forEach((model) => {
+      // For router providers like OpenRouter, extract from model ID
+      // For single providers like Anthropic, use the provider name
+      const providerName = model.id.includes('/')
+        ? model.id.split('/')[0]
+        : provider.name.toLowerCase();
+
       const group = groups.get(providerName) || [];
       group.push(model);
       groups.set(providerName, group);
     });
     return groups;
-  }, [filteredModels, provider]);
+  }, [provider, showModelManagement]);
+
+  // Filter groups for display based on search and filters
+  const filteredModelsByProvider = useMemo(() => {
+    if (!showModelManagement) return new Map();
+
+    const filtered = new Map();
+    for (const [providerName, models] of modelsByProvider.entries()) {
+      const filteredModels = models.filter((model: CatalogModel) => {
+        // Apply search filter
+        if (searchQuery) {
+          const searchLower = searchQuery.toLowerCase();
+          if (
+            !model.id.toLowerCase().includes(searchLower) &&
+            !model.name.toLowerCase().includes(searchLower)
+          ) {
+            return false;
+          }
+        }
+
+        // Apply capability filters
+        if (modelConfig.filters?.requiredParameters?.length) {
+          const hasTools = model.supports_attachments !== undefined;
+          const hasVision = model.supports_attachments === true;
+          const hasReasoning = model.can_reason === true;
+
+          const capabilities: string[] = [];
+          if (hasTools) capabilities.push('tools');
+          if (hasVision) capabilities.push('vision');
+          if (hasReasoning) capabilities.push('reasoning');
+
+          const hasRequired = modelConfig.filters.requiredParameters!.every((param: string) =>
+            capabilities.includes(param)
+          );
+          if (!hasRequired) return false;
+        }
+
+        // Apply context filter
+        if (modelConfig.filters?.minContextLength) {
+          if (model.context_window < modelConfig.filters.minContextLength) {
+            return false;
+          }
+        }
+
+        // Apply cost filters
+        if (modelConfig.filters?.maxPromptCostPerMillion !== undefined) {
+          if (modelConfig.filters.maxPromptCostPerMillion === 0) {
+            // Free only filter - both input and output must be free
+            if (model.cost_per_1m_in !== 0 || model.cost_per_1m_out !== 0) {
+              return false;
+            }
+          } else {
+            // Max cost filter
+            if (model.cost_per_1m_in > modelConfig.filters.maxPromptCostPerMillion) {
+              return false;
+            }
+          }
+        }
+
+        if (modelConfig.filters?.maxCompletionCostPerMillion !== undefined) {
+          if (modelConfig.filters.maxCompletionCostPerMillion === 0) {
+            // Free only filter for completion
+            if (model.cost_per_1m_out !== 0) {
+              return false;
+            }
+          } else {
+            if (model.cost_per_1m_out > modelConfig.filters.maxCompletionCostPerMillion) {
+              return false;
+            }
+          }
+        }
+
+        return true;
+      });
+
+      if (filteredModels.length > 0) {
+        filtered.set(providerName, filteredModels);
+      }
+    }
+    return filtered;
+  }, [modelsByProvider, searchQuery, modelConfig, showModelManagement]);
 
   // Toggle handlers for model management
   const handleToggleProvider = (providerName: string, enabled: boolean) => {
     setModelConfig((prev) => {
       const updated = { ...prev };
+      const providerModels = Array.from(modelsByProvider.get(providerName) || []);
+      const providerModelIds = providerModels.map((m: unknown) => (m as { id: string }).id);
+
       if (enabled) {
         // Remove provider from disabled list
         updated.disabledProviders = prev.disabledProviders.filter((p) => p !== providerName);
         // Remove all models from this provider from disabled list
-        const providerModels = Array.from(modelsByProvider.get(providerName) || []);
-        updated.disabledModels = prev.disabledModels.filter(
-          (m) => !providerModels.some((pm: unknown) => (pm as { id: string }).id === m)
-        );
+        updated.disabledModels = prev.disabledModels.filter((m) => !providerModelIds.includes(m));
       } else {
         // Add provider to disabled list
         updated.disabledProviders = [...prev.disabledProviders, providerName];
+        // Add all models from this provider to disabled list
+        const newDisabledModels = providerModelIds.filter(
+          (id) => !prev.disabledModels.includes(id)
+        );
+        updated.disabledModels = [...prev.disabledModels, ...newDisabledModels];
       }
       return updated;
     });
@@ -124,21 +219,15 @@ export function ProviderInstanceCard({
   };
 
   const handleRefresh = async () => {
+    if (!onRefresh) return;
+
     setIsRefreshing(true);
     try {
-      const response = await fetch(`/api/provider/instances/${instance.id}/refresh`, {
-        method: 'POST',
-      });
-
-      if (response.ok) {
-        const updated = await response.json();
-        // Signal parent to refresh data
-        onEdit?.();
-      } else {
-        console.error('Failed to refresh catalog');
-      }
+      await onRefresh(instance.id);
+      // Parent will handle toast notification
     } catch (error) {
       console.error('Error refreshing catalog:', error);
+      // Parent will handle error toast
     } finally {
       setIsRefreshing(false);
     }
@@ -146,25 +235,18 @@ export function ProviderInstanceCard({
 
   const handleSaveConfig = async () => {
     try {
-      const response = await fetch(`/api/instances/${instance.id}/config`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modelConfig }),
-      });
-
-      if (response.ok) {
-        // Configuration saved successfully
-        console.log('Configuration saved');
-      }
+      await api.providers.updateModelConfig(instance.id, modelConfig);
+      // Configuration saved successfully (no toast needed - auto-save)
     } catch (error) {
       console.error('Error saving configuration:', error);
+      // Could add error feedback here if needed
     }
   };
 
   // Auto-save on config changes (debounced)
   useEffect(() => {
-    // Skip if this is the initial render or no provider data
-    if (!provider || provider.id !== 'openrouter') return;
+    // Skip if this is the initial render or no model management needed
+    if (!showModelManagement) return;
 
     const timer = setTimeout(() => {
       if (instance.id) {
@@ -173,41 +255,7 @@ export function ProviderInstanceCard({
     }, 1000); // 1 second debounce
 
     return () => clearTimeout(timer);
-  }, [modelConfig, instance.id, provider]);
-
-  // Apply search and filters for OpenRouter instances
-  useEffect(() => {
-    if (!provider || provider.id !== 'openrouter') return;
-
-    let filtered = provider.models;
-
-    // Apply search
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (model) =>
-          model.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          model.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    // Apply config filters (basic implementation for now)
-    filtered = filtered.filter((model) => {
-      // Check disabled providers
-      const modelProvider = model.id.split('/')[0] || 'unknown';
-      if (modelConfig.disabledProviders.includes(modelProvider)) {
-        return false;
-      }
-
-      // Check disabled models
-      if (modelConfig.disabledModels.includes(model.id)) {
-        return false;
-      }
-
-      return true;
-    });
-
-    setFilteredModels(filtered);
-  }, [provider, searchQuery, modelConfig]);
+  }, [modelConfig, instance.id, showModelManagement]);
 
   return (
     <div className="card bg-base-100 shadow-sm border border-base-300">
@@ -285,8 +333,8 @@ export function ProviderInstanceCard({
           </div>
         </div>
 
-        {/* Model Management Section for OpenRouter instances */}
-        {provider && instance.catalogProviderId === 'openrouter' && (
+        {/* Model Management Section for multi-model providers */}
+        {showModelManagement && (
           <div className="border-t border-base-300 mt-4 pt-4">
             <div className="mb-3">
               <h5 className="font-medium mb-2">Model Management</h5>
@@ -304,40 +352,54 @@ export function ProviderInstanceCard({
 
               {/* Filter Bar */}
               <ModelFilterBar
-                filters={modelConfig.filters}
+                filters={{
+                  requiredParameters: modelConfig.filters?.requiredParameters,
+                  minContextLength: modelConfig.filters?.minContextLength,
+                  maxPromptCostPerMillion: modelConfig.filters?.maxPromptCostPerMillion,
+                  maxCompletionCostPerMillion: modelConfig.filters?.maxCompletionCostPerMillion,
+                }}
                 onChange={(filters) => {
                   setModelConfig((prev) => ({ ...prev, filters }));
                 }}
               />
 
-              {/* Refresh Status */}
+              {/* Status and Refresh */}
               <div className="flex justify-between items-center my-3">
                 <span className="text-sm opacity-70">
                   {provider.models.length} models available
                 </span>
-                <button
-                  className="btn btn-circle btn-sm btn-primary"
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                >
-                  {isRefreshing ? (
-                    <span className="loading loading-spinner loading-xs"></span>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                      />
-                    </svg>
-                  )}
-                </button>
+                {/* Show refresh button only for OpenRouter (dynamic catalogs) */}
+                {instance.catalogProviderId === 'openrouter' && (
+                  <button
+                    className="btn btn-circle btn-sm btn-primary"
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    title="Refresh catalog from OpenRouter API"
+                  >
+                    {isRefreshing ? (
+                      <span className="loading loading-spinner loading-xs"></span>
+                    ) : (
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                )}
               </div>
 
               {/* Model Groups */}
               <div className="space-y-2">
-                {Array.from(modelsByProvider.entries()).map(([providerName, models]) => (
+                {Array.from(filteredModelsByProvider.entries()).map(([providerName, models]) => (
                   <ProviderModelGroup
                     key={providerName}
                     providerName={providerName}

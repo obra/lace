@@ -6,6 +6,7 @@ interface ModelFilters {
   requiredParameters?: string[];
   minContextLength?: number;
   maxPromptCostPerMillion?: number;
+  maxCompletionCostPerMillion?: number;
 }
 
 interface ModelFilterBarProps {

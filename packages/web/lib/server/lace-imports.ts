@@ -17,9 +17,21 @@ export { SessionHelper } from '~/helpers/session-helper';
 // Tool types
 
 // Provider types
-export type { CatalogProvider, ProviderInstancesConfig } from '~/providers/catalog/types';
-export { ProviderInstanceSchema, CredentialSchema } from '~/providers/catalog/types';
+export type {
+  CatalogProvider,
+  CatalogModel,
+  ProviderInstancesConfig,
+  ModelConfig,
+} from '~/providers/catalog/types';
+export {
+  ProviderInstanceSchema,
+  CredentialSchema,
+  ModelConfigSchema,
+} from '~/providers/catalog/types';
 export type { ConfiguredInstance } from '~/providers/registry';
+
+// OpenRouter dynamic provider
+export { OpenRouterDynamicProvider } from '~/providers/openrouter/dynamic-provider';
 
 // Tool implementations
 export { FileReadTool } from '~/tools/implementations/file-read';

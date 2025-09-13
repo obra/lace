@@ -3,11 +3,15 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProviderInstanceCard } from './ProviderInstanceCard';
 import { AddInstanceModal } from './AddInstanceModal';
 import { Alert } from '@/components/ui/Alert';
+import { SuccessToast } from '@/components/ui/SuccessToast';
+import { ErrorToast } from '@/components/errors/ErrorToast';
 import { useProviderInstances } from './ProviderInstanceProvider';
+import { api } from '@/lib/api-client';
+import type { CatalogProvider } from '@/lib/server/lace-imports';
 
 export function ProviderInstanceList() {
   const {
@@ -23,6 +27,37 @@ export function ProviderInstanceList() {
     getInstanceWithTestResult,
   } = useProviderInstances();
 
+  // Catalog data for model management
+  const [catalogs, setCatalogs] = useState<CatalogProvider[]>([]);
+  const [catalogsLoading, setCatalogsLoading] = useState(false);
+
+  // Toast state
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+
+  // Fetch catalog data on mount
+  useEffect(() => {
+    fetchCatalogs();
+  }, []);
+
+  const fetchCatalogs = async () => {
+    setCatalogsLoading(true);
+    try {
+      const data = await api.providers.getCatalog();
+      setCatalogs((data.providers as CatalogProvider[]) || []);
+    } catch (error) {
+      console.error('Failed to fetch catalogs:', error);
+    } finally {
+      setCatalogsLoading(false);
+    }
+  };
+
+  // Match instances with their catalog data
+  const instancesWithCatalog = instances.map((instance) => ({
+    instance,
+    catalog: catalogs.find((c) => c.id === instance.catalogProviderId),
+  }));
+
   const handleTest = (instanceId: string) => {
     void testInstance(instanceId);
   };
@@ -33,6 +68,19 @@ export function ProviderInstanceList() {
     } catch (err) {
       // Error handling is already done in the provider
       console.error('Failed to delete instance:', err);
+    }
+  };
+
+  const handleRefresh = async (instanceId: string) => {
+    try {
+      const result = await api.providers.refreshCatalog(instanceId);
+      // Refresh the catalogs to get updated model data
+      await fetchCatalogs();
+      setSuccessToast(`Refreshed ${result.modelCount} models`);
+    } catch (error) {
+      console.error('Failed to refresh catalog:', error);
+      setErrorToast('Failed to refresh catalog');
+      throw error;
     }
   };
 
@@ -118,7 +166,7 @@ export function ProviderInstanceList() {
               </button>
             </div>
 
-            {instances.map((instance) => {
+            {instancesWithCatalog.map(({ instance, catalog }) => {
               const instanceWithTestResult = getInstanceWithTestResult(instance.id);
               if (!instanceWithTestResult) return null;
 
@@ -126,9 +174,11 @@ export function ProviderInstanceList() {
                 <ProviderInstanceCard
                   key={instance.id}
                   instance={instanceWithTestResult}
+                  provider={catalog}
                   onTest={() => handleTest(instance.id)}
                   onDelete={() => void handleDelete(instance.id)}
                   onEdit={() => void loadInstances()} // Refresh list after edit
+                  onRefresh={handleRefresh}
                 />
               );
             })}
@@ -141,6 +191,18 @@ export function ProviderInstanceList() {
         onClose={closeAddModal}
         onSuccess={() => void loadInstances()}
       />
+
+      {/* Toast Notifications */}
+      {successToast && (
+        <SuccessToast message={successToast} onDismiss={() => setSuccessToast(null)} />
+      )}
+      {errorToast && (
+        <ErrorToast
+          errorType="provider_failure"
+          message={errorToast}
+          onDismiss={() => setErrorToast(null)}
+        />
+      )}
     </>
   );
 }

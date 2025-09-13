@@ -74,6 +74,14 @@ export default [
     'api/provider/instances/:instanceId/test',
     'routes/api.provider.instances.$instanceId.test.ts'
   ),
+  route(
+    'api/provider/instances/:instanceId/refresh',
+    'routes/api.provider.instances.$instanceId.refresh.ts'
+  ),
+  route(
+    'api/provider/instances/:instanceId/config',
+    'routes/api.provider.instances.$instanceId.config.ts'
+  ),
 
   // Thread and approval routes
   route('api/threads/:threadId/message', 'routes/api.threads.$threadId.message.ts'),
