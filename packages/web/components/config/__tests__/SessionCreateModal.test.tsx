@@ -4,7 +4,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { SessionCreateModal } from '../SessionCreateModal';
+import { SessionCreateModal } from '@/components/config/SessionCreateModal';
 import type { ProjectInfo } from '@/types/core';
 
 // Mock project data

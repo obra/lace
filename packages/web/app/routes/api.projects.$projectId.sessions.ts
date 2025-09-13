@@ -6,7 +6,6 @@ import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { generateSessionName } from '@/lib/server/session-naming-helper';
 import { EventStreamManager } from '@/lib/event-stream-manager';
-import { asThreadId } from '@/types/core';
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.sessions';
 

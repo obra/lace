@@ -2,11 +2,11 @@
 // ABOUTME: Validates session name generation with proper constraints and helper integration
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generateSessionName } from '../session-naming-helper';
-import { InfrastructureHelper } from '../lace-imports';
+import { generateSessionName } from '@/lib/server/session-naming-helper';
+import { InfrastructureHelper } from '@/lib/server/lace-imports';
 
 // Mock the lace-imports module
-vi.mock('../lace-imports', () => ({
+vi.mock('@/lib/server/lace-imports', () => ({
   InfrastructureHelper: vi.fn(),
 }));
 
@@ -26,7 +26,7 @@ describe('generateSessionName', () => {
       () =>
         ({
           execute: mockExecute,
-        }) as any
+        }) as unknown as InstanceType<typeof InfrastructureHelper>
     );
 
     await generateSessionName('MyProject', 'I need to fix the authentication redirect bug');
@@ -46,7 +46,7 @@ describe('generateSessionName', () => {
       () =>
         ({
           execute: mockExecute,
-        }) as any
+        }) as unknown as InstanceType<typeof InfrastructureHelper>
     );
 
     await generateSessionName('MyProject', 'I need to fix the authentication redirect bug');
@@ -65,7 +65,7 @@ describe('generateSessionName', () => {
       () =>
         ({
           execute: mockExecute,
-        }) as any
+        }) as unknown as InstanceType<typeof InfrastructureHelper>
     );
 
     const result = await generateSessionName(
@@ -85,7 +85,7 @@ describe('generateSessionName', () => {
       () =>
         ({
           execute: mockExecute,
-        }) as any
+        }) as unknown as InstanceType<typeof InfrastructureHelper>
     );
 
     await generateSessionName('Frontend App', 'Add dark mode toggle to settings');
@@ -100,13 +100,13 @@ describe('generateSessionName', () => {
       content: 'Fix Auth Bug',
     });
 
-    const mockProvider = {} as any; // Mock AIProvider
+    const mockProvider = {} as unknown as import('@/lib/server/lace-imports').AIProvider;
 
     MockedInfrastructureHelper.mockImplementation(
       () =>
         ({
           execute: mockExecute,
-        }) as any
+        }) as unknown as InstanceType<typeof InfrastructureHelper>
     );
 
     await generateSessionName('MyProject', 'Fix auth bug', {
