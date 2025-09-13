@@ -41,6 +41,8 @@ export const EVENT_TYPES = [
   'PROJECT_DELETED',
   // System events (transient)
   'SYSTEM_NOTIFICATION',
+  // Session events (transient)
+  'SESSION_UPDATED',
   // Error events (transient)
   'AGENT_ERROR',
   // MCP events (transient)
@@ -74,6 +76,8 @@ export function isTransientEventType(type: LaceEventType): boolean {
     'PROJECT_DELETED',
     // System events
     'SYSTEM_NOTIFICATION',
+    // Session events
+    'SESSION_UPDATED',
     // Error events
     'AGENT_ERROR',
     // MCP events
@@ -301,6 +305,11 @@ interface SystemNotificationData {
   type: 'system:notification'; // For compatibility
 }
 
+// Session event data
+interface SessionUpdatedData {
+  name: string;
+}
+
 // MCP event data types
 interface MCPConfigChangedData {
   serverId: string;
@@ -469,6 +478,10 @@ export type LaceEvent =
   | (BaseLaceEvent & {
       type: 'SYSTEM_NOTIFICATION';
       data: SystemNotificationData;
+    })
+  | (BaseLaceEvent & {
+      type: 'SESSION_UPDATED';
+      data: SessionUpdatedData;
     })
   | (BaseLaceEvent & {
       type: 'AGENT_ERROR';

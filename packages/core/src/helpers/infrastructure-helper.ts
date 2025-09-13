@@ -18,6 +18,12 @@ export interface InfrastructureHelperOptions {
   /** Explicit whitelist of tool names that can be used */
   tools: string[];
 
+  /** Fallback provider instance when global model config unavailable */
+  fallbackProviderInstanceId?: string;
+
+  /** Fallback model when global model config unavailable */
+  fallbackModelId?: string;
+
   /** Optional working directory for file operations */
   workingDirectory?: string;
 
@@ -49,15 +55,38 @@ export class InfrastructureHelper extends BaseHelper {
       return this.provider;
     }
 
-    // Get model configuration from global config
-    const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
-    const { instanceId, modelId } = parseProviderModel(providerModel);
+    let instanceId: string;
+    let modelId: string;
 
-    logger.debug('InfrastructureHelper resolving provider', {
-      tier: this.options.model,
-      instanceId,
-      modelId,
-    });
+    try {
+      // Try to get model configuration from global config first
+      const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
+      const parsed = parseProviderModel(providerModel);
+      instanceId = parsed.instanceId;
+      modelId = parsed.modelId;
+
+      logger.debug('InfrastructureHelper using global model config', {
+        tier: this.options.model,
+        instanceId,
+        modelId,
+      });
+    } catch (error) {
+      // Fall back to explicit provider instance if global config unavailable
+      if (this.options.fallbackProviderInstanceId && this.options.fallbackModelId) {
+        instanceId = this.options.fallbackProviderInstanceId;
+        modelId = this.options.fallbackModelId;
+
+        logger.debug('InfrastructureHelper using fallback model config', {
+          tier: this.options.model,
+          instanceId,
+          modelId,
+          reason: 'global config unavailable',
+        });
+      } else {
+        // No fallback available, re-throw original error
+        throw error;
+      }
+    }
 
     // Get provider instance with explicit model
     const instanceManager = new ProviderInstanceManager();
@@ -101,10 +130,19 @@ export class InfrastructureHelper extends BaseHelper {
   }
 
   protected getModel(): string {
-    // Extract model ID from provider model string
-    const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
-    const { modelId } = parseProviderModel(providerModel);
-    return modelId;
+    try {
+      // Try to extract model ID from global config first
+      const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
+      const { modelId } = parseProviderModel(providerModel);
+      return modelId;
+    } catch (error) {
+      // Fall back to explicit model if global config unavailable
+      if (this.options.fallbackModelId) {
+        return this.options.fallbackModelId;
+      }
+      // No fallback available, re-throw original error
+      throw error;
+    }
   }
 
   protected async executeToolCalls(
