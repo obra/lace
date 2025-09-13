@@ -13,6 +13,7 @@ export { Session } from '~/sessions/session';
 export { Project } from '~/projects/project';
 export { ThreadManager } from '~/threads/thread-manager';
 export { SessionHelper } from '~/helpers/session-helper';
+export { InfrastructureHelper } from '~/helpers/infrastructure-helper';
 
 // Tool types
 

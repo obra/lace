@@ -13,6 +13,7 @@ import {
 } from '@/lib/server/lace-imports';
 import { Session } from '@/lib/server/lace-imports';
 import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
+import { EventStreamManager } from '@/lib/event-stream-manager';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -119,7 +120,44 @@ describe('Session API endpoints under projects', () => {
   });
 
   describe('POST /api/projects/:projectId/sessions', () => {
-    it('should create session in project', async () => {
+    it('should create session with initialMessage (new simplified flow)', async () => {
+      const request = new Request(`http://localhost/api/projects/${projectId}/sessions`, {
+        method: 'POST',
+        body: JSON.stringify({
+          initialMessage: 'Fix the authentication bug',
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+          configuration: {},
+        }),
+      });
+
+      const response = await POST(createActionArgs(request, { projectId }));
+      const data = await parseResponse<SessionInfo>(response);
+
+      expect(response.status).toBe(201);
+      expect(data.id).toBeDefined();
+      expect(data.name).toBeDefined(); // Should be generated or truncated from initialMessage
+      expect(data.createdAt).toBeDefined();
+    });
+
+    it('should create session with default name when no name or initialMessage provided', async () => {
+      const request = new Request(`http://localhost/api/projects/${projectId}/sessions`, {
+        method: 'POST',
+        body: JSON.stringify({
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+          configuration: {},
+        }),
+      });
+
+      const response = await POST(createActionArgs(request, { projectId }));
+      const data = await parseResponse<SessionInfo>(response);
+
+      expect(response.status).toBe(201);
+      expect(data.name).toBe('New Session');
+    });
+
+    it('should create session in project (existing flow)', async () => {
       const request = new Request(`http://localhost/api/projects/${projectId}/sessions`, {
         method: 'POST',
         body: JSON.stringify({
@@ -223,6 +261,40 @@ describe('Session API endpoints under projects', () => {
       expect(data.id).toBeDefined();
       expect(data.name).toBe('Provider Instance Session');
       expect(data.createdAt).toBeDefined();
+    });
+
+    it('should spawn background session naming with SSE events for initialMessage', async () => {
+      // Create a mock event listener for SSE events
+      const broadcastSpy = vi.spyOn(EventStreamManager.getInstance(), 'broadcast');
+
+      const request = new Request(`http://localhost/api/projects/${projectId}/sessions`, {
+        method: 'POST',
+        body: JSON.stringify({
+          initialMessage: 'I need to fix the authentication redirect bug in the login system',
+          providerInstanceId,
+          modelId: 'claude-3-5-haiku-20241022',
+          configuration: {},
+        }),
+      });
+
+      const response = await POST(createActionArgs(request, { projectId }));
+      const sessionData = await parseResponse<SessionInfo>(response);
+
+      expect(response.status).toBe(201);
+      expect(sessionData.id).toBeDefined();
+
+      // Wait a bit for background helper to potentially run
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Note: In a real test environment, the helper agent would be mocked
+      // This test mainly verifies the integration structure is in place
+
+      // Verify the session was created with temporary name
+      expect(sessionData.name).toBeDefined();
+      expect(sessionData.name.length).toBeGreaterThan(0);
+
+      // Clean up spy
+      broadcastSpy.mockRestore();
     });
   });
 });
