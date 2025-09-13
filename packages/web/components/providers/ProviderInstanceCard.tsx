@@ -1,7 +1,7 @@
 // ABOUTME: Individual instance card with status, actions, and details
 // ABOUTME: Uses StatusDot, Badge, and card components from design system
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import StatusDot from '@/components/ui/StatusDot';
 import Badge from '@/components/ui/Badge';
 import { EditInstanceModal } from './EditInstanceModal';
@@ -77,9 +77,9 @@ export function ProviderInstanceCard({
 
   // Group ALL models by provider (not just filtered ones)
   const modelsByProvider = useMemo(() => {
-    if (!showModelManagement) return new Map();
+    if (!showModelManagement) return new Map<string, CatalogModel[]>();
 
-    const groups = new Map<string, typeof provider.models>();
+    const groups = new Map<string, CatalogModel[]>();
     provider.models.forEach((model) => {
       // For router providers like OpenRouter, extract from model ID
       // For single providers like Anthropic, use the provider name
@@ -98,7 +98,7 @@ export function ProviderInstanceCard({
   const filteredModelsByProvider = useMemo(() => {
     if (!showModelManagement || !globalFilters) return modelsByProvider;
 
-    const filtered = new Map();
+    const filtered = new Map<string, CatalogModel[]>();
     for (const [providerName, models] of modelsByProvider.entries()) {
       const filteredModels = models.filter((model: CatalogModel) => {
         // Apply global search filter
@@ -165,8 +165,8 @@ export function ProviderInstanceCard({
   const handleToggleProvider = (providerName: string, enabled: boolean) => {
     setModelConfig((prev) => {
       const updated = { ...prev };
-      const providerModels = Array.from(modelsByProvider.get(providerName) || []);
-      const providerModelIds = providerModels.map((m: unknown) => (m as { id: string }).id);
+      const providerModels = modelsByProvider.get(providerName) || [];
+      const providerModelIds = providerModels.map((m) => m.id);
 
       if (enabled) {
         // Remove provider from disabled list
@@ -210,7 +210,7 @@ export function ProviderInstanceCard({
     }
   };
 
-  const handleSaveConfig = async () => {
+  const handleSaveConfig = useCallback(async () => {
     try {
       await api.providers.updateModelConfig(instance.id, modelConfig);
       // Configuration saved successfully (no toast needed - auto-save)
@@ -218,7 +218,7 @@ export function ProviderInstanceCard({
       console.error('Error saving configuration:', error);
       // Could add error feedback here if needed
     }
-  };
+  }, [instance.id, modelConfig]);
 
   // Auto-save on config changes (debounced)
   useEffect(() => {
@@ -232,7 +232,7 @@ export function ProviderInstanceCard({
     }, 1000); // 1 second debounce
 
     return () => clearTimeout(timer);
-  }, [modelConfig, instance.id, showModelManagement]);
+  }, [modelConfig, instance.id, showModelManagement, handleSaveConfig]);
 
   return (
     <div className="card bg-base-100 shadow-sm border border-base-300">
@@ -290,10 +290,8 @@ export function ProviderInstanceCard({
                   providerName={providerName}
                   models={models}
                   enabledModels={models
-                    .filter(
-                      (m: unknown) => !modelConfig.disabledModels.includes((m as { id: string }).id)
-                    )
-                    .map((m: unknown) => (m as { id: string }).id)}
+                    .filter((m) => !modelConfig.disabledModels.includes(m.id))
+                    .map((m) => m.id)}
                   onToggleProvider={handleToggleProvider}
                   onToggleModel={handleToggleModel}
                 />
