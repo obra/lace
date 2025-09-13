@@ -18,6 +18,7 @@ import { AIProvider } from '~/providers/base-provider';
 export class ProviderInstanceManager {
   private configPath: string;
   private credentialsDir: string;
+  private savePromise: Promise<void> | null = null;
 
   constructor() {
     const laceDir = getLaceDir();
@@ -66,6 +67,17 @@ export class ProviderInstanceManager {
   }
 
   async saveInstances(config: ProviderInstancesConfig): Promise<void> {
+    // Serialize access to prevent concurrent writes from corrupting JSON
+    if (this.savePromise) {
+      await this.savePromise;
+    }
+
+    this.savePromise = this.performSave(config);
+    await this.savePromise;
+    this.savePromise = null;
+  }
+
+  private async performSave(config: ProviderInstancesConfig): Promise<void> {
     await fs.promises.writeFile(this.configPath, JSON.stringify(config, null, 2));
   }
 
