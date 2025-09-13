@@ -5,7 +5,9 @@ import { useState, useEffect, useMemo } from 'react';
 import StatusDot from '@/components/ui/StatusDot';
 import Badge from '@/components/ui/Badge';
 import { EditInstanceModal } from './EditInstanceModal';
-import { ModelFilterBar } from './ModelFilterBar';
+import { SearchInput } from './SearchInput';
+import { CapabilityFilters } from './CapabilityFilters';
+import { FilterDropdowns } from './FilterDropdowns';
 import { ProviderModelGroup } from './ProviderModelGroup';
 import { api } from '@/lib/api-client';
 import type { CatalogProvider, CatalogModel, ModelConfig } from '@/lib/server/lace-imports';
@@ -24,7 +26,7 @@ interface ProviderInstanceCardProps {
   };
   provider?: CatalogProvider; // Optional provider catalog data for model management
   onTest: () => void;
-  onDelete: () => void;
+  onDelete: (instanceId: string) => void;
   onEdit?: () => void; // Optional callback after edit success
   onRefresh?: (instanceId: string) => void;
 }
@@ -66,16 +68,6 @@ export function ProviderInstanceCard({
   };
 
   const statusProps = getStatusProps(instance.status);
-
-  const handleDeleteClick = () => {
-    if (
-      confirm(
-        `Are you sure you want to delete "${instance.displayName}"? This will remove the instance and its credentials.`
-      )
-    ) {
-      onDelete();
-    }
-  };
 
   const handleEditSuccess = () => {
     setShowEditModal(false);
@@ -322,83 +314,52 @@ export function ProviderInstanceCard({
         {/* Model Management Section for multi-model providers */}
         {showModelManagement && (
           <div className="border-t border-base-300 mt-4 pt-4">
-            <div className="mb-3">
-              {/* Search Bar */}
-              <div className="mb-3">
-                <input
-                  type="text"
-                  placeholder="Search models..."
-                  className="input input-bordered w-full"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-
-              {/* Filter Bar */}
-              <ModelFilterBar
-                filters={{
-                  requiredParameters: modelConfig.filters?.requiredParameters,
-                  minContextLength: modelConfig.filters?.minContextLength,
-                  maxPromptCostPerMillion: modelConfig.filters?.maxPromptCostPerMillion,
-                  maxCompletionCostPerMillion: modelConfig.filters?.maxCompletionCostPerMillion,
-                }}
-                onChange={(filters) => {
-                  setModelConfig((prev) => ({ ...prev, filters }));
+            {/* Search and Filters on Same Line */}
+            <div className="flex gap-2 mb-4 flex-wrap items-center">
+              <SearchInput value={searchQuery} onChange={setSearchQuery} />
+              <CapabilityFilters
+                selectedCapabilities={modelConfig.filters?.requiredParameters || []}
+                onChange={(capabilities) => {
+                  setModelConfig((prev) => ({
+                    ...prev,
+                    filters: { ...prev.filters, requiredParameters: capabilities },
+                  }));
                 }}
               />
+              <FilterDropdowns
+                contextFilter={modelConfig.filters?.minContextLength}
+                priceFilter={modelConfig.filters?.maxPromptCostPerMillion}
+                onContextChange={(value) => {
+                  setModelConfig((prev) => ({
+                    ...prev,
+                    filters: { ...prev.filters, minContextLength: value },
+                  }));
+                }}
+                onPriceChange={(value) => {
+                  setModelConfig((prev) => ({
+                    ...prev,
+                    filters: { ...prev.filters, maxPromptCostPerMillion: value },
+                  }));
+                }}
+              />
+            </div>
 
-              {/* Status and Refresh */}
-              <div className="flex justify-between items-center my-3">
-                <span className="text-sm opacity-70">
-                  {provider.models.length} models available
-                </span>
-                {/* Show refresh button only for OpenRouter (dynamic catalogs) */}
-                {instance.catalogProviderId === 'openrouter' && (
-                  <button
-                    className="btn btn-circle btn-sm btn-primary"
-                    onClick={handleRefresh}
-                    disabled={isRefreshing}
-                    title="Refresh catalog from OpenRouter API"
-                  >
-                    {isRefreshing ? (
-                      <span className="loading loading-spinner loading-xs"></span>
-                    ) : (
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                )}
-              </div>
-
-              {/* Model Groups */}
-              <div className="space-y-2">
-                {Array.from(filteredModelsByProvider.entries()).map(([providerName, models]) => (
-                  <ProviderModelGroup
-                    key={providerName}
-                    providerName={providerName}
-                    models={models}
-                    enabledModels={models
-                      .filter(
-                        (m: unknown) =>
-                          !modelConfig.disabledModels.includes((m as { id: string }).id)
-                      )
-                      .map((m: unknown) => (m as { id: string }).id)}
-                    onToggleProvider={handleToggleProvider}
-                    onToggleModel={handleToggleModel}
-                  />
-                ))}
-              </div>
+            {/* Model Groups */}
+            <div className="space-y-2">
+              {Array.from(filteredModelsByProvider.entries()).map(([providerName, models]) => (
+                <ProviderModelGroup
+                  key={providerName}
+                  providerName={providerName}
+                  models={models}
+                  enabledModels={models
+                    .filter(
+                      (m: unknown) => !modelConfig.disabledModels.includes((m as { id: string }).id)
+                    )
+                    .map((m: unknown) => (m as { id: string }).id)}
+                  onToggleProvider={handleToggleProvider}
+                  onToggleModel={handleToggleModel}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -409,6 +370,8 @@ export function ProviderInstanceCard({
         instance={instance}
         onClose={() => setShowEditModal(false)}
         onSuccess={handleEditSuccess}
+        onDelete={onDelete}
+        onRefresh={onRefresh}
       />
     </div>
   );
