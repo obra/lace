@@ -4,7 +4,6 @@
 import { BaseHelper } from '~/helpers/base-helper';
 import { GlobalConfigManager } from '~/config/global-config';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
-import { ProviderRegistry } from '~/providers/registry';
 import { parseProviderModel } from '~/providers/provider-utils';
 import { ToolExecutor } from '~/tools/executor';
 import { Tool } from '~/tools/tool';

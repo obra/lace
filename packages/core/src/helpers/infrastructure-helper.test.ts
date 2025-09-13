@@ -356,29 +356,22 @@ describe('InfrastructureHelper', () => {
         throw new Error('Global config not found');
       });
 
-      // Mock instance manager to return provider for fallback
-      const mockInstanceManager: Partial<ProviderInstanceManager> = {
-        getInstance: vi.fn().mockResolvedValue(mockProvider),
-      };
-      vi.mocked(ProviderInstanceManager).mockImplementation(
-        () => mockInstanceManager as unknown as ProviderInstanceManager
-      );
+      // Create fallback provider directly
+      const fallbackProvider = new QueuedMockProvider({});
+      fallbackProvider.addMockResponse({
+        content: 'Fallback response',
+      });
 
       const helper = new InfrastructureHelper({
         model: 'fast',
         tools: [],
-        fallbackProviderInstanceId: 'fallback-provider',
+        fallbackProvider: fallbackProvider,
         fallbackModelId: 'fallback-model',
-      });
-
-      mockProvider.addMockResponse({
-        content: 'Fallback response',
       });
 
       const result = await helper.execute('Test with fallback');
 
       expect(result.content).toBe('Fallback response');
-      expect(mockInstanceManager.getInstance).toHaveBeenCalledWith('fallback-provider');
     });
 
     it('should fail when neither global config nor fallback available', async () => {
