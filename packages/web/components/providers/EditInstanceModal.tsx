@@ -22,6 +22,7 @@ interface EditInstanceModalProps {
   onSuccess: () => void;
   onDelete?: (instanceId: string) => void;
   onRefresh?: (instanceId: string) => void;
+  onTest?: (instanceId: string) => void;
 }
 
 export function EditInstanceModal({
@@ -31,6 +32,7 @@ export function EditInstanceModal({
   onSuccess,
   onDelete,
   onRefresh,
+  onTest,
 }: EditInstanceModalProps) {
   const { updateInstance } = useProviderInstances();
   const isMountedRef = useRef(false);
@@ -165,21 +167,23 @@ export function EditInstanceModal({
         </div>
 
         <div className="flex justify-between pt-4">
-          {/* Left side: Destructive actions */}
+          {/* Left side: Utility and destructive actions */}
           <div className="flex space-x-2">
-            {onDelete && (
+            {onTest && (
               <button
                 type="button"
-                className="btn btn-ghost btn-sm text-error hover:bg-error/10"
+                className="btn btn-ghost btn-sm"
                 onClick={() => {
-                  if (confirm(`Are you sure you want to delete "${instance.displayName}"?`)) {
-                    onDelete(instance.id);
-                    onClose();
-                  }
+                  onTest(instance.id);
                 }}
-                disabled={submitting}
+                disabled={submitting || !instance.hasCredentials}
+                title={
+                  !instance.hasCredentials
+                    ? 'Add credentials to test connection'
+                    : 'Test connection'
+                }
               >
-                Delete
+                Test Connection
               </button>
             )}
             {onRefresh && instance.catalogProviderId === 'openrouter' && (
@@ -193,6 +197,21 @@ export function EditInstanceModal({
                 title="Refresh catalog from OpenRouter API"
               >
                 Sync Models
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm text-error hover:bg-error/10"
+                onClick={() => {
+                  if (confirm(`Are you sure you want to delete "${instance.displayName}"?`)) {
+                    onDelete(instance.id);
+                    onClose();
+                  }
+                }}
+                disabled={submitting}
+              >
+                Delete
               </button>
             )}
           </div>

@@ -25,7 +25,7 @@ interface ProviderInstanceCardProps {
     lastTested?: string;
   };
   provider?: CatalogProvider; // Optional provider catalog data for model management
-  onTest: () => void;
+  onTest: (instanceId: string) => void;
   onDelete: (instanceId: string) => void;
   onEdit?: () => void; // Optional callback after edit success
   onRefresh?: (instanceId: string) => void;
@@ -288,23 +288,6 @@ export function ProviderInstanceCard({
           </div>
 
           <div className="flex items-center space-x-2">
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={onTest}
-              disabled={!instance.hasCredentials || instance.status === 'testing'}
-              title={
-                !instance.hasCredentials ? 'Add credentials to test connection' : 'Test connection'
-              }
-            >
-              {instance.status === 'testing' ? (
-                <>
-                  <span className="loading loading-spinner loading-sm"></span>
-                  Testing
-                </>
-              ) : (
-                'Test'
-              )}
-            </button>
             <button className="btn btn-outline btn-sm" onClick={() => setShowEditModal(true)}>
               Edit
             </button>
@@ -372,6 +355,7 @@ export function ProviderInstanceCard({
         onSuccess={handleEditSuccess}
         onDelete={onDelete}
         onRefresh={onRefresh}
+        onTest={onTest}
       />
     </div>
   );
