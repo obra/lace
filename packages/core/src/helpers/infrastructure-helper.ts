@@ -19,10 +19,10 @@ export interface InfrastructureHelperOptions {
   /** Explicit whitelist of tool names that can be used */
   tools: string[];
 
-  /** Fallback provider instance when global model config unavailable */
-  fallbackProviderInstanceId?: string;
+  /** Fallback provider when global model config unavailable */
+  fallbackProvider?: AIProvider;
 
-  /** Fallback model when global model config unavailable */
+  /** Fallback model ID when global model config unavailable */
   fallbackModelId?: string;
 
   /** Optional working directory for file operations */
@@ -72,17 +72,15 @@ export class InfrastructureHelper extends BaseHelper {
         modelId,
       });
     } catch (error) {
-      // Fall back to explicit provider instance if global config unavailable
-      if (this.options.fallbackProviderInstanceId && this.options.fallbackModelId) {
-        instanceId = this.options.fallbackProviderInstanceId;
-        modelId = this.options.fallbackModelId;
-
-        logger.debug('InfrastructureHelper using fallback model config', {
+      // Fall back to explicit provider if global config unavailable
+      if (this.options.fallbackProvider) {
+        logger.debug('InfrastructureHelper using fallback provider', {
           tier: this.options.model,
-          instanceId,
-          modelId,
           reason: 'global config unavailable',
         });
+
+        this.provider = this.options.fallbackProvider;
+        return this.provider;
       } else {
         // No fallback available, re-throw original error
         throw error;
@@ -94,6 +92,14 @@ export class InfrastructureHelper extends BaseHelper {
     const instance = await instanceManager.getInstance(instanceId, modelId);
 
     if (!instance) {
+      // Try fallback provider if instance lookup fails too
+      if (this.options.fallbackProvider) {
+        logger.debug('InfrastructureHelper using fallback provider after instance lookup failure', {
+          failedInstanceId: instanceId,
+        });
+        this.provider = this.options.fallbackProvider;
+        return this.provider;
+      }
       throw new Error(`Provider instance not found: ${instanceId}`);
     }
 
