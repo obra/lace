@@ -10,12 +10,13 @@ interface UseSessionManagementResult {
   loading: boolean;
   projectConfig: Record<string, unknown> | null;
   createSession: (sessionData: {
-    name: string;
+    name?: string;
+    initialMessage?: string;
     description?: string;
     providerInstanceId?: string;
     modelId?: string;
     configuration?: Record<string, unknown>;
-  }) => Promise<void>;
+  }) => Promise<SessionInfo | null>;
   loadProjectConfig: () => Promise<void>;
   reloadSessions: () => Promise<void>;
   loadSessionConfiguration: (sessionId: string) => Promise<Record<string, unknown>>;

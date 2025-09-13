@@ -100,6 +100,8 @@ describe('generateSessionName', () => {
       content: 'Fix Auth Bug',
     });
 
+    const mockProvider = {} as any; // Mock AIProvider
+
     MockedInfrastructureHelper.mockImplementation(
       () =>
         ({
@@ -108,14 +110,14 @@ describe('generateSessionName', () => {
     );
 
     await generateSessionName('MyProject', 'Fix auth bug', {
-      providerInstanceId: 'test-provider',
+      provider: mockProvider,
       modelId: 'test-model',
     });
 
     expect(MockedInfrastructureHelper).toHaveBeenCalledWith({
       model: 'fast',
       tools: [],
-      fallbackProviderInstanceId: 'test-provider',
+      fallbackProvider: mockProvider,
       fallbackModelId: 'test-model',
     });
   });

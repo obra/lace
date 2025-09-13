@@ -15,6 +15,9 @@ export { ThreadManager } from '~/threads/thread-manager';
 export { SessionHelper } from '~/helpers/session-helper';
 export { InfrastructureHelper } from '~/helpers/infrastructure-helper';
 
+// Provider types
+export type { AIProvider } from '~/providers/base-provider';
+
 // Tool types
 
 // Provider types

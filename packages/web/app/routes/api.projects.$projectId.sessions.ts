@@ -1,7 +1,7 @@
 // ABOUTME: Session API endpoints under projects hierarchy - GET sessions by project, POST new session
 // ABOUTME: Uses Project class methods for session management with proper project-session relationships
 
-import { Project, Session } from '@/lib/server/lace-imports';
+import { Project, Session, ProviderRegistry } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { generateSessionName } from '@/lib/server/session-naming-helper';
@@ -154,13 +154,16 @@ async function spawnSessionNamingHelper(
   fallbackModel: { providerInstanceId: string; modelId: string }
 ): Promise<void> {
   try {
-    // Get the session to access its model configuration
-    const session = Session.getByIdSync(asThreadId(sessionId));
-    const sessionConfig = session?.getEffectiveConfiguration();
+    // Create provider instance for fallback
+    const registry = ProviderRegistry.getInstance();
+    const fallbackProvider = await registry.createProviderFromInstanceAndModel(
+      fallbackModel.providerInstanceId,
+      fallbackModel.modelId
+    );
 
-    // Generate new session name using helper agent with session's model as fallback
+    // Generate new session name using helper agent with configured provider
     const generatedName = await generateSessionName(projectName, initialMessage, {
-      providerInstanceId: fallbackModel.providerInstanceId,
+      provider: fallbackProvider,
       modelId: fallbackModel.modelId,
     });
 

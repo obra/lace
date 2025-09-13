@@ -2,16 +2,17 @@
 // ABOUTME: Takes project name and user input, returns brief descriptive session name
 
 import { InfrastructureHelper } from './lace-imports';
+import type { AIProvider } from './lace-imports';
 
 export async function generateSessionName(
   projectName: string,
   userInput: string,
-  fallbackModel?: { providerInstanceId: string; modelId: string }
+  fallbackModel?: { provider: AIProvider; modelId: string }
 ): Promise<string> {
   const helper = new InfrastructureHelper({
-    model: 'fast', // Prefer 'fast' model tier
+    model: 'fast', // Prefer 'fast' model tier if available
     tools: [],
-    fallbackProviderInstanceId: fallbackModel?.providerInstanceId,
+    fallbackProvider: fallbackModel?.provider,
     fallbackModelId: fallbackModel?.modelId,
   });
 

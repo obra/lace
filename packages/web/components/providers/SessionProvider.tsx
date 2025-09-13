@@ -94,16 +94,13 @@ export function SessionProvider({
     loadSessionsForProject,
   } = useSessionManagement(projectId);
 
-  // Subscribe to SESSION_UPDATED events to refresh session data in real-time
+  // Subscribe to SESSION_UPDATED events to refresh session list in real-time
   useEventStream({
     projectId: projectId || undefined,
-    onSessionUpdated: useCallback(
-      (event: LaceEvent) => {
-        // Reload sessions to get the updated session name
-        void reloadSessions();
-      },
-      [reloadSessions]
-    ),
+    onSessionUpdated: useCallback(() => {
+      // Reload sessions to get the updated session name in the list
+      void reloadSessions();
+    }, [reloadSessions]),
   });
 
   // Use session from URL params, not hash router

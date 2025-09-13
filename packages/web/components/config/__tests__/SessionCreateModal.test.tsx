@@ -14,7 +14,8 @@ const mockProject: ProjectInfo = {
   description: 'A great project description',
   workingDirectory: '/Users/jesse/projects/awesome-project',
   createdAt: new Date('2023-01-01'),
-  updatedAt: new Date('2023-01-02'),
+  isArchived: false,
+  lastUsedAt: new Date('2023-01-02'),
 };
 
 describe('SessionCreateModal', () => {
