@@ -99,6 +99,9 @@ interface EventHandlers {
   onProjectUpdated?: (event: ProjectEvent) => void;
   onProjectDeleted?: (event: ProjectEvent) => void;
 
+  // Session events
+  onSessionUpdated?: (event: LaceEvent) => void;
+
   // Agent events
   onAgentEvent?: (event: AgentEvent) => void;
   onAgentSpawned?: (event: AgentEvent) => void;
@@ -280,6 +283,9 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
                 currentOptions.onError?.(new Error('Malformed agent error event'));
               }
             }
+            break;
+          case 'SESSION_UPDATED':
+            currentOptions.onSessionUpdated?.(event);
             break;
           // Add other event type cases as needed
         }

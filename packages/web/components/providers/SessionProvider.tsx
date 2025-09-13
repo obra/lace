@@ -13,7 +13,8 @@ import React, {
   type ReactNode,
 } from 'react';
 import { useSessionManagement } from '@/hooks/useSessionManagement';
-import type { SessionInfo, ThreadId } from '@/types/core';
+import { useEventStream } from '@/hooks/useEventStream';
+import type { SessionInfo, ThreadId, LaceEvent } from '@/types/core';
 
 // Types for session context
 export interface SessionContextType {
@@ -92,6 +93,18 @@ export function SessionProvider({
     deleteSession,
     loadSessionsForProject,
   } = useSessionManagement(projectId);
+
+  // Subscribe to SESSION_UPDATED events to refresh session data in real-time
+  useEventStream({
+    projectId: projectId || undefined,
+    onSessionUpdated: useCallback(
+      (event: LaceEvent) => {
+        // Reload sessions to get the updated session name
+        void reloadSessions();
+      },
+      [reloadSessions]
+    ),
+  });
 
   // Use session from URL params, not hash router
   const selectedSession = selectedSessionId || null;

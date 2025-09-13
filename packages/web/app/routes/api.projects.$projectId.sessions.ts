@@ -70,11 +70,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (validatedData.name) {
       sessionName = validatedData.name;
     } else if (validatedData.initialMessage) {
-      // Create temporary name from first 50 chars of initialMessage
-      sessionName = validatedData.initialMessage.slice(0, 50).trim();
-      if (sessionName.length < validatedData.initialMessage.length) {
-        sessionName += '...';
-      }
+      // Use full initialMessage as temporary name (will be replaced by AI)
+      sessionName = validatedData.initialMessage.trim();
     } else {
       sessionName = 'New Session';
     }
