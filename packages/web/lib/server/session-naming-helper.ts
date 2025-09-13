@@ -3,10 +3,29 @@
 
 import { InfrastructureHelper } from './lace-imports';
 
-export async function generateSessionName(projectName: string, userInput: string): Promise<string> {
+export async function generateSessionName(
+  projectName: string,
+  userInput: string,
+  fallbackModel?: { providerInstanceId: string; modelId: string }
+): Promise<string> {
+  let model: 'fast' | 'smart' = 'fast';
+  let providerInstanceId: string | undefined;
+  let modelId: string | undefined;
+
+  // Try to use 'fast' model first, fall back to session model if global config missing
+  if (fallbackModel) {
+    providerInstanceId = fallbackModel.providerInstanceId;
+    modelId = fallbackModel.modelId;
+  }
+
   const helper = new InfrastructureHelper({
-    model: 'fast',
+    model,
     tools: [],
+    ...(providerInstanceId &&
+      modelId && {
+        providerInstanceId,
+        modelId,
+      }),
   });
 
   const result = await helper.execute(

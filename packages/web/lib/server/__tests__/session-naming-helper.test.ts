@@ -94,4 +94,29 @@ describe('generateSessionName', () => {
       `Here's the project name: 'Frontend App'. Here's what the user wrote: 'Add dark mode toggle to settings'. Return a brief descriptive name for this session. No more than 5 words.`
     );
   });
+
+  it('should use fallback model when provided', async () => {
+    const mockExecute = vi.fn().mockResolvedValue({
+      content: 'Fix Auth Bug',
+    });
+
+    MockedInfrastructureHelper.mockImplementation(
+      () =>
+        ({
+          execute: mockExecute,
+        }) as any
+    );
+
+    await generateSessionName('MyProject', 'Fix auth bug', {
+      providerInstanceId: 'test-provider',
+      modelId: 'test-model',
+    });
+
+    expect(MockedInfrastructureHelper).toHaveBeenCalledWith({
+      model: 'fast',
+      tools: [],
+      providerInstanceId: 'test-provider',
+      modelId: 'test-model',
+    });
+  });
 });

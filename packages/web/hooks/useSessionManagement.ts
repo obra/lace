@@ -75,18 +75,23 @@ export function useSessionManagement(projectId: string | null): UseSessionManage
 
   const createSession = useCallback(
     async (sessionData: {
-      name: string;
+      name?: string;
+      initialMessage?: string;
       description?: string;
       providerInstanceId?: string;
       modelId?: string;
       configuration?: Record<string, unknown>;
-    }) => {
-      if (!projectId) return;
+    }): Promise<SessionInfo | null> => {
+      if (!projectId) return null;
 
       try {
-        await api.post(`/api/projects/${projectId}/sessions`, sessionData);
+        const newSession = await api.post<SessionInfo>(
+          `/api/projects/${projectId}/sessions`,
+          sessionData
+        );
         // Reload sessions to show the new one
         await loadSessions();
+        return newSession;
       } catch (error) {
         console.error('Failed to create session:', error);
         // Re-throw the error so the UI can handle it

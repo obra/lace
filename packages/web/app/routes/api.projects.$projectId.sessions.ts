@@ -6,6 +6,7 @@ import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { generateSessionName } from '@/lib/server/session-naming-helper';
 import { EventStreamManager } from '@/lib/event-stream-manager';
+import { asThreadId } from '@/types/core';
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.sessions';
 
@@ -105,7 +106,11 @@ export async function action({ request, params }: Route.ActionArgs) {
         session.getId(),
         projectId,
         project.getName(),
-        validatedData.initialMessage
+        validatedData.initialMessage,
+        {
+          providerInstanceId: validatedData.providerInstanceId,
+          modelId: validatedData.modelId,
+        }
       );
     }
 
@@ -148,11 +153,25 @@ async function spawnSessionNamingHelper(
   sessionId: string,
   projectId: string,
   projectName: string,
-  initialMessage: string
+  initialMessage: string,
+  fallbackModel: { providerInstanceId: string; modelId: string }
 ): Promise<void> {
   try {
-    // Generate new session name using helper agent
-    const generatedName = await generateSessionName(projectName, initialMessage);
+    // Get the session to access its model configuration
+    const session = Session.getByIdSync(asThreadId(sessionId));
+    const sessionConfig = session?.getEffectiveConfiguration();
+
+    // Generate new session name using helper agent with fallback model
+    const generatedName = await generateSessionName(
+      projectName,
+      initialMessage,
+      sessionConfig
+        ? {
+            providerInstanceId: sessionConfig.providerInstanceId as string,
+            modelId: sessionConfig.modelId as string,
+          }
+        : fallbackModel
+    );
 
     // Update session name using the generalized update method
     Session.updateSession(sessionId, {
