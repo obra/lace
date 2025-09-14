@@ -4,7 +4,6 @@
 export default {
   ignore: [
     'packages/web/eslint.config.js', // ESLint config causes issues when run from root
-    'packages/web/stories_parked/**/*', // Parked story files - not active in build
     // Design system - OK to have unused exports for future components
     'packages/web/lib/animations.ts',
     'packages/web/lib/heroicons.ts',
@@ -47,36 +46,9 @@ export default {
         'app/api/**/route.ts',
         // Server entrypoint
         'server.ts',
-        // Storybook (auto-detected, but keep explicit)
-        'stories_parked/*.stories.{ts,tsx}',
         // E2E test files
         'e2e/**/*.e2e.ts',
         'e2e/**/*.test.e2e.ts',
-        // Design system components - only analyzed in production mode
-        'components/ui/**/*.tsx!',
-        'components/feedback/**/*.tsx!',
-        'components/demo/**/*.tsx!',
-        // Unused component files - only warn in production mode
-        'components/chat/index.ts!',
-        'components/config/ProviderDropdown.tsx!',
-        'components/feedback/index.ts!',
-        'components/files/CarouselCodeChanges.tsx!',
-        'components/files/FileDiffViewer.demo.tsx!',
-        'components/files/FileDiffViewer.integration.tsx!',
-        'components/pages/AnimatedLaceApp.tsx!',
-        'components/pages/ChatInterface.tsx!',
-        'components/pages/LaceAppMobileSidebar.tsx!',
-        'components/pages/LaceAppSidebar.tsx!',
-        'components/providers/ConnectionTest.tsx!',
-        'components/providers/ModelSelectionForm.tsx!',
-        'components/timeline/AnimatedTimelineMessage.tsx!',
-        'components/timeline/AnimatedTimelineView.tsx!',
-        'components/timeline/AnimatedTypingIndicator.tsx!',
-        'components/timeline/IntegrationEntry.tsx!',
-        'components/timeline/UnknownEventEntry.tsx!',
-        'hooks/useProviderStatus.ts!',
-        'hooks/useVoiceRecognition.ts!',
-        'lib/display-utils.ts!',
       ],
       // Keep ESLint plugin disabled to avoid module resolution issues
       eslint: false,
