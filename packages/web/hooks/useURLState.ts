@@ -15,7 +15,11 @@ export interface URLState {
 
 export interface URLActions {
   navigateToProject: (projectId: string) => void;
-  navigateToSession: (projectId: string, sessionId: ThreadId) => void;
+  navigateToSession: (
+    projectId: string,
+    sessionId: ThreadId,
+    options?: { initialMessage?: string }
+  ) => void;
   navigateToAgent: (projectId: string, sessionId: ThreadId, agentId: ThreadId) => void;
   navigateToRoot: () => void;
 }
@@ -39,8 +43,10 @@ export function useURLState(): URLState & URLActions {
   );
 
   const navigateToSession = useCallback(
-    (projectId: string, sessionId: ThreadId) => {
-      navigate(`/project/${projectId}/session/${sessionId}`);
+    (projectId: string, sessionId: ThreadId, options?: { initialMessage?: string }) => {
+      navigate(`/project/${projectId}/session/${sessionId}`, {
+        state: options?.initialMessage ? { initialMessage: options.initialMessage } : undefined,
+      });
     },
     [navigate]
   );
