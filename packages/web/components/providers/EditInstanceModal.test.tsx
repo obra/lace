@@ -166,7 +166,6 @@ describe('EditInstanceModal', () => {
         body: JSON.stringify({
           displayName: 'Updated Instance Name',
           endpoint: 'https://custom.api.com',
-          timeout: 30,
         }),
       });
     });
@@ -222,7 +221,6 @@ describe('EditInstanceModal', () => {
         body: JSON.stringify({
           displayName: 'Test Instance',
           endpoint: 'https://api.openai.com/v1',
-          timeout: 30,
           credential: { apiKey: 'new-api-key' },
         }),
       });
