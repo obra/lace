@@ -64,17 +64,4 @@ export async function withSuppressedStdio<T>(operation: () => Promise<T>): Promi
   }
 }
 
-/**
- * Synchronous version of withSuppressedStdio for non-async operations.
- *
- * @param operation - Synchronous function to execute with suppressed output
- * @returns The result of the operation
- */
-export function withSuppressedStdioSync<T>(operation: () => T): T {
-  const original = suppressStdio();
-  try {
-    return operation();
-  } finally {
-    restoreStdio(original);
-  }
-}
+// Removed unused withSuppressedStdioSync function
