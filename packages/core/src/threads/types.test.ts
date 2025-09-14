@@ -2,11 +2,11 @@
 // ABOUTME: Validates that events can store token usage data correctly
 
 import { describe, it, expect } from 'vitest';
-import { 
-  isTransientEventType, 
+import {
+  isTransientEventType,
   EVENT_TYPES,
   type LaceEvent,
-  type LaceEventType
+  type LaceEventType,
 } from '~/threads/types';
 
 describe('LaceEvent token usage', () => {
@@ -93,6 +93,51 @@ describe('LaceEvent token usage', () => {
   });
 });
 
+// Factory function for creating SESSION_UPDATED test events
+function createSessionUpdatedEvent(overrides: Partial<LaceEvent> = {}): LaceEvent {
+  return {
+    id: 'evt_session_123',
+    timestamp: new Date('2023-01-01T10:00:00Z'),
+    type: 'SESSION_UPDATED',
+    data: {
+      name: 'Test Session Name',
+    },
+    context: {
+      sessionId: 'lace_20240101_abc123',
+      projectId: 'project-456',
+    },
+    ...overrides,
+  };
+}
+
+describe('Session Event Types', () => {
+  it('should include SESSION_UPDATED in EVENT_TYPES array', () => {
+    expect(EVENT_TYPES).toContain('SESSION_UPDATED');
+  });
+
+  it('should classify SESSION_UPDATED as transient event type', () => {
+    expect(isTransientEventType('SESSION_UPDATED')).toBe(true);
+  });
+
+  it('should validate SessionUpdatedData interface with valid session event', () => {
+    const validSessionEvent = createSessionUpdatedEvent({
+      data: {
+        name: 'Fix Auth Bug',
+      },
+    });
+
+    expect(validSessionEvent.type).toBe('SESSION_UPDATED');
+    expect(validSessionEvent.data.name).toBe('Fix Auth Bug');
+    expect(validSessionEvent.context?.sessionId).toBe('lace_20240101_abc123');
+    expect(validSessionEvent.context?.projectId).toBe('project-456');
+  });
+
+  it('should ensure SESSION_UPDATED is properly typed in LaceEventType union', () => {
+    const eventType: LaceEventType = 'SESSION_UPDATED';
+    expect(eventType).toBe('SESSION_UPDATED');
+  });
+});
+
 // Factory function for creating AGENT_ERROR test events
 function createAgentErrorEvent(overrides: Partial<LaceEvent> = {}): LaceEvent {
   return {
@@ -147,13 +192,13 @@ describe('Error Event Types', () => {
   it('should accept all valid error types', () => {
     const errorTypes = [
       'provider_failure',
-      'tool_execution', 
+      'tool_execution',
       'processing_error',
       'timeout',
-      'streaming_error'
+      'streaming_error',
     ] as const;
 
-    errorTypes.forEach(errorType => {
+    errorTypes.forEach((errorType) => {
       const errorEvent = createAgentErrorEvent({
         data: {
           errorType,
@@ -174,10 +219,10 @@ describe('Error Event Types', () => {
       'provider_response',
       'tool_execution',
       'conversation_processing',
-      'initialization'
+      'initialization',
     ] as const;
 
-    phases.forEach(phase => {
+    phases.forEach((phase) => {
       const errorEvent = createAgentErrorEvent({
         data: {
           errorType: 'processing_error',

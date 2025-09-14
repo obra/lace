@@ -182,6 +182,10 @@ function createLaceEventFromDb(
     case 'SYSTEM_NOTIFICATION':
       throw new Error('SYSTEM_NOTIFICATION events are transient and should not be persisted');
 
+    // Session events are transient
+    case 'SESSION_UPDATED':
+      throw new Error('SESSION_UPDATED events are transient and should not be persisted');
+
     // Error events are transient
     case 'AGENT_ERROR':
       throw new Error('AGENT_ERROR events are transient and should not be persisted');

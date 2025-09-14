@@ -13,7 +13,8 @@ import React, {
   type ReactNode,
 } from 'react';
 import { useSessionManagement } from '@/hooks/useSessionManagement';
-import type { SessionInfo, ThreadId } from '@/types/core';
+import { useEventStream } from '@/hooks/useEventStream';
+import type { SessionInfo, ThreadId, LaceEvent } from '@/types/core';
 
 // Types for session context
 export interface SessionContextType {
@@ -32,12 +33,13 @@ export interface SessionContextType {
 
   // Data operations (passed through from hook)
   createSession: (sessionData: {
-    name: string;
+    name?: string;
+    initialMessage?: string;
     description?: string;
     providerInstanceId?: string;
     modelId?: string;
     configuration?: Record<string, unknown>;
-  }) => Promise<void>;
+  }) => Promise<SessionInfo | null>;
   loadProjectConfig: () => Promise<void>;
   reloadSessions: () => Promise<void>;
   loadSessionConfiguration: (sessionId: string) => Promise<Record<string, unknown>>;
@@ -91,6 +93,15 @@ export function SessionProvider({
     deleteSession,
     loadSessionsForProject,
   } = useSessionManagement(projectId);
+
+  // Subscribe to SESSION_UPDATED events to refresh session list in real-time
+  useEventStream({
+    projectId: projectId || undefined,
+    onSessionUpdated: useCallback(() => {
+      // Reload sessions to get the updated session name in the list
+      void reloadSessions();
+    }, [reloadSessions]),
+  });
 
   // Use session from URL params, not hash router
   const selectedSession = selectedSessionId || null;

@@ -1,14 +1,17 @@
 // ABOUTME: Session API endpoints under projects hierarchy - GET sessions by project, POST new session
 // ABOUTME: Uses Project class methods for session management with proper project-session relationships
 
-import { Project, Session } from '@/lib/server/lace-imports';
+import { Project, Session, ProviderRegistry } from '@/lib/server/lace-imports';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
+import { generateSessionName } from '@/lib/server/session-naming-helper';
+import { EventStreamManager } from '@/lib/event-stream-manager';
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.sessions';
 
 const CreateSessionSchema = z.object({
-  name: z.string().min(1, 'Session name is required'),
+  name: z.string().min(1).optional(), // Optional for both flows
+  initialMessage: z.string().min(1).optional(), // Optional - new simplified flow
   description: z.string().optional(),
   providerInstanceId: z.string().min(1, 'Provider instance ID is required'),
   modelId: z.string().min(1, 'Model ID is required'),
@@ -61,15 +64,27 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     // Clear provider cache to ensure fresh credentials are loaded
 
+    // Determine session name - either provided or generated from initialMessage
+    let sessionName: string;
+    if (validatedData.name) {
+      sessionName = validatedData.name;
+    } else if (validatedData.initialMessage) {
+      // Use full initialMessage as temporary name (will be replaced by AI)
+      sessionName = validatedData.initialMessage.trim();
+    } else {
+      sessionName = 'New Session';
+    }
+
     // Create session using Session.create with project inheritance
     const session = Session.create({
-      name: validatedData.name,
+      name: sessionName,
       description: validatedData.description,
       projectId: projectId,
       configuration: {
         ...validatedData.configuration,
         providerInstanceId: validatedData.providerInstanceId,
         modelId: validatedData.modelId,
+        initialMessage: validatedData.initialMessage, // Store for pre-filling
       },
     });
 
@@ -77,9 +92,23 @@ export async function action({ request, params }: Route.ActionArgs) {
     const sessionInfo = session.getInfo();
     const sessionData = {
       id: session.getId(),
-      name: sessionInfo?.name || validatedData.name,
+      name: sessionInfo?.name || sessionName,
       createdAt: sessionInfo?.createdAt || new Date(),
     };
+
+    // If we have initialMessage, spawn background helper to generate better name
+    if (validatedData.initialMessage) {
+      void spawnSessionNamingHelper(
+        session.getId(),
+        projectId,
+        project.getName(),
+        validatedData.initialMessage,
+        {
+          providerInstanceId: validatedData.providerInstanceId,
+          modelId: validatedData.modelId,
+        }
+      );
+    }
 
     return createSuperjsonResponse(sessionData, { status: 201 });
   } catch (error: unknown) {
@@ -110,5 +139,53 @@ export async function action({ request, params }: Route.ActionArgs) {
       500,
       { code: 'INTERNAL_SERVER_ERROR' }
     );
+  }
+}
+
+/**
+ * Spawn background helper to generate session name and emit SESSION_UPDATED event
+ */
+async function spawnSessionNamingHelper(
+  sessionId: string,
+  projectId: string,
+  projectName: string,
+  initialMessage: string,
+  fallbackModel: { providerInstanceId: string; modelId: string }
+): Promise<void> {
+  try {
+    // Create provider instance for fallback
+    const registry = ProviderRegistry.getInstance();
+    const fallbackProvider = await registry.createProviderFromInstanceAndModel(
+      fallbackModel.providerInstanceId,
+      fallbackModel.modelId
+    );
+
+    // Generate new session name using helper agent with configured provider
+    const generatedName = await generateSessionName(projectName, initialMessage, {
+      provider: fallbackProvider,
+      modelId: fallbackModel.modelId,
+    });
+
+    // Update session name using the generalized update method
+    Session.updateSession(sessionId, {
+      name: generatedName,
+    });
+
+    // Emit SESSION_UPDATED event via SSE
+    const eventManager = EventStreamManager.getInstance();
+    eventManager.broadcast({
+      type: 'SESSION_UPDATED',
+      data: {
+        name: generatedName,
+      },
+      context: {
+        sessionId,
+        projectId,
+      },
+      transient: true,
+    });
+  } catch (error) {
+    // Log error but don't fail the session creation
+    console.error('Failed to generate session name:', error);
   }
 }

@@ -93,6 +93,10 @@ export function AgentProvider({
         void reloadSessionDetails();
       }, 300);
     }, [reloadSessionDetails]),
+    onSessionUpdated: useCallback(() => {
+      // Reload session details when session name changes
+      void reloadSessionDetails();
+    }, [reloadSessionDetails]),
   });
 
   // Cleanup debounce timer on unmount
