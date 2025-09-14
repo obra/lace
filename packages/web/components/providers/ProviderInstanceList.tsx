@@ -30,7 +30,6 @@ export function ProviderInstanceList() {
 
   // Catalog data for model management
   const [catalogs, setCatalogs] = useState<CatalogProvider[]>([]);
-  const [catalogsLoading, setCatalogsLoading] = useState(false);
 
   // Toast state
   const [successToast, setSuccessToast] = useState<string | null>(null);
@@ -50,14 +49,11 @@ export function ProviderInstanceList() {
   }, []);
 
   const fetchCatalogs = async () => {
-    setCatalogsLoading(true);
     try {
       const data = await api.providers.getCatalog();
       setCatalogs((data.providers as CatalogProvider[]) || []);
     } catch (error) {
       console.error('Failed to fetch catalogs:', error);
-    } finally {
-      setCatalogsLoading(false);
     }
   };
 
@@ -90,9 +86,16 @@ export function ProviderInstanceList() {
 
         // Apply capability filters
         if (globalFilters.requiredParameters.length > 0) {
-          const hasTools = model.supports_attachments !== undefined;
-          const hasVision = model.supports_attachments === true;
-          const hasReasoning = model.can_reason === true;
+          const modelParams =
+            (model as CatalogProvider['models'][0] & { supported_parameters?: string[] })
+              .supported_parameters ?? [];
+          const hasTools =
+            (modelParams as string[]).includes('tools') ||
+            (modelParams as string[]).includes('function_calling');
+          const hasVision =
+            model.supports_attachments === true || (modelParams as string[]).includes('vision');
+          const hasReasoning =
+            model.can_reason === true || (modelParams as string[]).includes('reasoning');
 
           const capabilities: string[] = [];
           if (hasTools) capabilities.push('tools');
