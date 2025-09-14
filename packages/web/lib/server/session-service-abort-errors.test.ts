@@ -61,7 +61,7 @@ describe('SessionService abort error filtering', () => {
     // Emit an AbortError
     const abortError = new Error('Operation was aborted');
     abortError.name = 'AbortError';
-    mockAgent.emit('error', { error: abortError });
+    mockAgent.emit('error', { error: abortError, context: {} });
 
     // Should log the error but not broadcast to UI
     expect(logger.error).toHaveBeenCalledWith(
@@ -78,7 +78,7 @@ describe('SessionService abort error filtering', () => {
 
     // Emit a generic abort error
     const genericAbortError = new Error('Request was aborted');
-    mockAgent.emit('error', { error: genericAbortError });
+    mockAgent.emit('error', { error: genericAbortError, context: {} });
 
     // Should log the error but not broadcast to UI
     expect(logger.error).toHaveBeenCalled();
@@ -92,7 +92,7 @@ describe('SessionService abort error filtering', () => {
 
     // Emit a simple "Aborted" error
     const abortedError = new Error('Aborted');
-    mockAgent.emit('error', { error: abortedError });
+    mockAgent.emit('error', { error: abortedError, context: {} });
 
     // Should log the error but not broadcast to UI
     expect(logger.error).toHaveBeenCalled();
