@@ -31,9 +31,4 @@ export function isToolPolicyData(tools: unknown): tools is Record<string, ToolPo
   );
 }
 
-/**
- * Type guard to check if tools field is a simple string array
- */
-export function isToolStringArray(tools: unknown): tools is string[] {
-  return Array.isArray(tools) && tools.every((item) => typeof item === 'string');
-}
+// Removed unused function: isToolStringArray
