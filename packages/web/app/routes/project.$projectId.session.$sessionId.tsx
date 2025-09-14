@@ -2,7 +2,7 @@
 // ABOUTME: Session page with auto-redirect logic and provider setup
 
 import { useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, useLocation } from 'react-router';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { AgentProvider, useAgentContext } from '@/components/providers/AgentProvider';
@@ -14,6 +14,7 @@ const noOpCallback = () => {};
 // Client component that handles auto-redirect to coordinator agent
 function SessionRedirect({ projectId, sessionId }: { projectId: string; sessionId: string }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { sessionDetails } = useAgentContext();
 
   useEffect(() => {
@@ -22,19 +23,20 @@ function SessionRedirect({ projectId, sessionId }: { projectId: string; sessionI
       const coordinatorAgent = sessionDetails.agents.find((agent) => agent.threadId === sessionId);
 
       if (coordinatorAgent) {
-        // Redirect to coordinator agent
+        // Redirect to coordinator agent, preserving navigation state
         navigate(`/project/${projectId}/session/${sessionId}/agent/${coordinatorAgent.threadId}`, {
           replace: true,
+          state: location.state, // Preserve navigation state for pre-filling
         });
       } else if (sessionDetails.agents.length === 1) {
-        // If only one agent, use it
+        // If only one agent, use it, preserving navigation state
         navigate(
           `/project/${projectId}/session/${sessionId}/agent/${sessionDetails.agents[0].threadId}`,
-          { replace: true }
+          { replace: true, state: location.state }
         );
       }
     }
-  }, [sessionDetails, projectId, sessionId, navigate]);
+  }, [sessionDetails, projectId, sessionId, navigate, location.state]);
 
   return (
     <div className="flex h-screen bg-base-200 text-base-content font-ui items-center justify-center">
