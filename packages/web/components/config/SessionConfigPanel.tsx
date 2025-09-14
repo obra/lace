@@ -146,9 +146,11 @@ export function SessionConfigPanel(): React.JSX.Element {
 
       resetSessionForm();
 
-      // Navigate to the new session
+      // Navigate to the new session with initial message for pre-filling
       if (sessionData && project) {
-        navigateToSession(project, asThreadId(sessionData.id));
+        navigateToSession(project, asThreadId(sessionData.id), {
+          initialMessage: userInput,
+        });
       }
     } catch (error) {
       // Error will be handled in the modal
