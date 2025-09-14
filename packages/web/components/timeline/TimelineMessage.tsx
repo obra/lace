@@ -196,7 +196,7 @@ export function TimelineMessage({
       if (!event.data.success) {
         return (
           <div className="flex justify-center">
-            <Alert variant="error" title="Compaction failed" />
+            <Alert variant="error" title="Compaction failed" style="soft" />
           </div>
         );
       }
