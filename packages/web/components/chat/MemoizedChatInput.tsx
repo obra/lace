@@ -27,6 +27,7 @@ export const MemoizedChatInput = memo(function MemoizedChatInput({
   isStreaming,
   placeholder,
   agentId,
+  initialValue,
 }: {
   onSubmit: (message: string) => Promise<boolean | void>;
   onInterrupt?: () => Promise<boolean | void>;
@@ -35,10 +36,18 @@ export const MemoizedChatInput = memo(function MemoizedChatInput({
   isStreaming?: boolean;
   placeholder: string;
   agentId?: ThreadId;
+  initialValue?: string;
 }) {
   const [message, setMessage] = useState('');
   const chatInputRef = useRef<{ focus: () => void } | null>(null);
   const refocusTimeoutRef = useRef<number | null>(null);
+
+  // Set initial value if provided (allow empty-string)
+  useEffect(() => {
+    if (initialValue !== undefined) {
+      setMessage(initialValue);
+    }
+  }, [initialValue]);
 
   const handleSubmit = useCallback(async () => {
     const success = await onSubmit(message);

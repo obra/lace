@@ -3,8 +3,10 @@
 
 'use client';
 
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import { TimelineView } from '@/components/timeline/TimelineView';
+import type { SessionNavigationState } from '@/types/navigation';
 import { MemoizedChatInput } from '@/components/chat/MemoizedChatInput';
 import { useTimelineAutoscroll } from '@/hooks/useSmartAutoscroll';
 import {
@@ -15,7 +17,7 @@ import {
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useScrollContext } from '@/components/providers/ScrollProvider';
 import { useTheme } from '@/components/providers/SettingsProvider';
-import type { ThreadId, AgentInfo, LaceEvent } from '@/types/core';
+import type { ThreadId } from '@/types/core';
 
 export const Chat = memo(function Chat(): React.JSX.Element {
   // Get data from providers
@@ -25,6 +27,31 @@ export const Chat = memo(function Chat(): React.JSX.Element {
   const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useAgentAPI();
   const { triggerAutoscroll } = useScrollContext();
   const { getTimelineMaxWidthClass } = useTheme();
+
+  // Handle navigation state for initial message pre-filling
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [initialMessage, setInitialMessage] = useState<string | null>(null);
+
+  // Read initial message from navigation state and clear it
+  useEffect(() => {
+    const navState = location.state as SessionNavigationState | null;
+    if (navState?.initialMessage) {
+      setInitialMessage(navState.initialMessage);
+      // Clear navigation state to prevent re-use on back/forward
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.state, location.pathname, navigate]);
+
+  // Clear initial message after it's been consumed by MemoizedChatInput
+  useEffect(() => {
+    if (initialMessage) {
+      const timeout = setTimeout(() => {
+        setInitialMessage(null);
+      }, 100); // Small delay to ensure MemoizedChatInput has processed it
+      return () => clearTimeout(timeout);
+    }
+  }, [initialMessage]);
 
   const agents = sessionDetails?.agents;
 
@@ -97,6 +124,7 @@ export const Chat = memo(function Chat(): React.JSX.Element {
             isStreaming={agentBusy}
             placeholder={`Message ${inputAgentName}...`}
             agentId={inputAgentId}
+            initialValue={initialMessage || undefined}
           />
         </div>
       </div>

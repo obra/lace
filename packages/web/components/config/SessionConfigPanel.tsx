@@ -3,29 +3,22 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faCog, faRobot, faFolder, faInfoCircle, faTrash, faEdit } from '@/lib/fontawesome';
+import { faTrash } from '@/lib/fontawesome';
 import { SessionHeader } from './SessionHeader';
 import { SessionsList } from './SessionsList';
-import { SessionCreateModal } from './SessionCreateModal';
 import { SessionEditModal } from './SessionEditModal';
 import { AgentCreateModal } from './AgentCreateModal';
 import { AgentEditModal } from './AgentEditModal';
 import { AnimatedModal } from '@/components/ui/AnimatedModal';
-import type {
-  ProviderInfo,
-  ModelInfo,
-  CreateAgentRequest,
-  SessionConfiguration,
-} from '@/types/api';
+import type { SessionConfiguration } from '@/types/api';
 import type { SessionInfo, ProjectInfo, ToolPolicy } from '@/types/core';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useURLState } from '@/hooks/useURLState';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
-import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import { asThreadId } from '@/types/core';
 
 const DEFAULT_CONFIG: SessionConfiguration = {
@@ -61,7 +54,6 @@ export function SessionConfigPanel(): React.JSX.Element {
   const { availableProviders, instancesLoading: providersLoading } = useProviderInstances();
 
   const loading = sessionLoading || agentLoading || providersLoading;
-  const [showCreateSession, setShowCreateSession] = useState(false);
   const [showCreateAgent, setShowCreateAgent] = useState(false);
   const [showEditConfig, setShowEditConfig] = useState(false);
   const [showEditAgent, setShowEditAgent] = useState(false);
@@ -88,7 +80,6 @@ export function SessionConfigPanel(): React.JSX.Element {
   // Reset form when project or project configuration changes
   const projectId = currentProject.id;
   useEffect(() => {
-    setShowCreateSession(false);
     setShowCreateAgent(false);
     setShowEditConfig(false);
     setShowEditAgent(false);
@@ -148,11 +139,12 @@ export function SessionConfigPanel(): React.JSX.Element {
       });
 
       resetSessionForm();
-      setShowCreateSession(false);
 
-      // Navigate to the new session
+      // Navigate to the new session with initial message for pre-filling
       if (sessionData && project) {
-        navigateToSession(project, asThreadId(sessionData.id));
+        navigateToSession(project, asThreadId(sessionData.id), {
+          initialMessage: userInput,
+        });
       }
     } catch (error) {
       // Error will be handled in the modal
@@ -214,11 +206,6 @@ export function SessionConfigPanel(): React.JSX.Element {
     },
     [project, navigateToSession]
   );
-
-  const handleCreateSessionClick = useCallback(() => {
-    resetSessionForm(); // Reset with project defaults
-    setShowCreateSession(true);
-  }, [resetSessionForm]);
 
   const handleAgentSelect = useCallback(
     (agentId: string) => {
@@ -303,10 +290,6 @@ export function SessionConfigPanel(): React.JSX.Element {
     setDeleteError(null);
   }, [isDeleting]);
 
-  const handleCloseCreateSession = useCallback(() => {
-    setShowCreateSession(false);
-  }, []);
-
   const handleCloseEditSession = useCallback(() => {
     setShowEditConfig(false);
   }, []);
@@ -327,7 +310,7 @@ export function SessionConfigPanel(): React.JSX.Element {
   }, []);
 
   return (
-    <div className="bg-base-100 rounded-lg border border-base-300 p-6">
+    <div className="bg-base-100 rounded-lg border border-base-300 p-6 overflow-y-auto">
       <SessionHeader project={currentProject} />
 
       <SessionsList
@@ -338,17 +321,9 @@ export function SessionConfigPanel(): React.JSX.Element {
         onEditSession={handleEditSessionClick}
         onDeleteSession={handleDeleteSessionClick}
         onCreateAgent={handleCreateAgentClick}
-        onCreateSession={handleCreateSessionClick}
+        onCreateSession={handleCreateSession}
         onEditAgent={handleEditAgentClick}
         onAgentSelect={handleAgentSelect}
-      />
-
-      <SessionCreateModal
-        isOpen={showCreateSession}
-        currentProject={currentProject}
-        loading={loading}
-        onClose={handleCloseCreateSession}
-        onSubmit={handleCreateSession}
       />
 
       <AgentCreateModal

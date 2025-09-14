@@ -2,7 +2,8 @@
 // ABOUTME: Session page with auto-redirect logic and provider setup
 
 import { useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, useLocation } from 'react-router';
+import type { SessionNavigationState } from '@/types/navigation';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { AgentProvider, useAgentContext } from '@/components/providers/AgentProvider';
@@ -14,6 +15,7 @@ const noOpCallback = () => {};
 // Client component that handles auto-redirect to coordinator agent
 function SessionRedirect({ projectId, sessionId }: { projectId: string; sessionId: string }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { sessionDetails } = useAgentContext();
 
   useEffect(() => {
@@ -21,20 +23,21 @@ function SessionRedirect({ projectId, sessionId }: { projectId: string; sessionI
       // Find coordinator agent (has same threadId as sessionId)
       const coordinatorAgent = sessionDetails.agents.find((agent) => agent.threadId === sessionId);
 
-      if (coordinatorAgent) {
-        // Redirect to coordinator agent
-        navigate(`/project/${projectId}/session/${sessionId}/agent/${coordinatorAgent.threadId}`, {
+      let targetAgent = coordinatorAgent;
+      if (!targetAgent) {
+        // Fallback to first agent to prevent spinner hang
+        targetAgent = sessionDetails.agents[0];
+      }
+
+      if (targetAgent) {
+        // Redirect to target agent, preserving navigation state
+        navigate(`/project/${projectId}/session/${sessionId}/agent/${targetAgent.threadId}`, {
           replace: true,
+          state: location.state as SessionNavigationState | null, // Preserve navigation state for pre-filling
         });
-      } else if (sessionDetails.agents.length === 1) {
-        // If only one agent, use it
-        navigate(
-          `/project/${projectId}/session/${sessionId}/agent/${sessionDetails.agents[0].threadId}`,
-          { replace: true }
-        );
       }
     }
-  }, [sessionDetails, projectId, sessionId, navigate]);
+  }, [sessionDetails, projectId, sessionId, navigate, location.state]);
 
   return (
     <div className="flex h-screen bg-base-200 text-base-content font-ui items-center justify-center">

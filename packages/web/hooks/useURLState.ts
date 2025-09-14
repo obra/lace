@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useParams, useNavigate, useLocation } from 'react-router';
+import { useParams, useNavigate } from 'react-router';
 import { useCallback } from 'react';
 import type { ThreadId } from '@/types/core';
 
@@ -15,7 +15,11 @@ export interface URLState {
 
 export interface URLActions {
   navigateToProject: (projectId: string) => void;
-  navigateToSession: (projectId: string, sessionId: ThreadId) => void;
+  navigateToSession: (
+    projectId: string,
+    sessionId: ThreadId,
+    options?: { initialMessage?: string }
+  ) => void;
   navigateToAgent: (projectId: string, sessionId: ThreadId, agentId: ThreadId) => void;
   navigateToRoot: () => void;
 }
@@ -23,7 +27,6 @@ export interface URLActions {
 export function useURLState(): URLState & URLActions {
   const navigate = useNavigate();
   const params = useParams();
-  const _location = useLocation();
 
   // Extract current state from URL params
   const project = (params?.projectId as string) || null;
@@ -39,8 +42,10 @@ export function useURLState(): URLState & URLActions {
   );
 
   const navigateToSession = useCallback(
-    (projectId: string, sessionId: ThreadId) => {
-      navigate(`/project/${projectId}/session/${sessionId}`);
+    (projectId: string, sessionId: ThreadId, options?: { initialMessage?: string }) => {
+      navigate(`/project/${projectId}/session/${sessionId}`, {
+        state: options?.initialMessage ? { initialMessage: options.initialMessage } : undefined,
+      });
     },
     [navigate]
   );

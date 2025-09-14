@@ -5,7 +5,9 @@
 
 import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRobot, faEdit, faPlus, faTrash, faEllipsisV } from '@/lib/fontawesome';
+import { faRobot, faEdit, faTrash, faEllipsisV } from '@/lib/fontawesome';
+import { CondensedChatInput } from '@/components/ui/CondensedChatInput';
+import { Alert } from '@/components/ui/Alert';
 import type { SessionInfo, AgentInfo } from '@/types/core';
 
 interface SessionsListProps {
@@ -16,7 +18,7 @@ interface SessionsListProps {
   onEditSession: (sessionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
   onCreateAgent: () => void;
-  onCreateSession: () => void;
+  onCreateSession: (userInput: string) => Promise<void>;
   onEditAgent: (agent: AgentInfo) => void;
   onAgentSelect: (agentId: string) => void;
 }
@@ -34,13 +36,70 @@ export const SessionsList = memo(function SessionsList({
   onAgentSelect,
 }: SessionsListProps) {
   const [showContextMenu, setShowContextMenu] = useState<string | null>(null);
+  const [newSessionInput, setNewSessionInput] = useState('');
+  const [creationError, setCreationError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   // Close context menu on backdrop click
   const handleBackdropClick = () => {
     setShowContextMenu(null);
   };
+
+  const handleCreateSession = async () => {
+    if (!newSessionInput.trim() || creating) return;
+
+    setCreating(true);
+    setCreationError(null); // Clear previous errors
+    try {
+      await onCreateSession(newSessionInput.trim());
+      setNewSessionInput(''); // Clear after successful creation
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create session';
+      setCreationError(errorMessage);
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <div className="space-y-3" onClick={handleBackdropClick}>
+      {/* Inline Session Creation Form */}
+      <div className="bg-base-200/50 rounded-lg p-4 border border-base-300/50">
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-base-content">New session</div>
+
+          {/* Error Alert */}
+          {creationError && (
+            <Alert
+              variant="error"
+              title="Session creation failed"
+              description={creationError}
+              onDismiss={() => setCreationError(null)}
+            />
+          )}
+
+          <div>
+            <label
+              htmlFor="new-session-input"
+              className="text-sm font-medium text-base-content block mb-2"
+            >
+              What are we working on?
+            </label>
+            <CondensedChatInput
+              id="new-session-input"
+              value={newSessionInput}
+              onChange={setNewSessionInput}
+              onSend={handleCreateSession}
+              placeholder="e.g., Fix authentication bug"
+              disabled={loading || creating}
+              minRows={2}
+              sendButtonText="Let's go"
+              allowEmptySubmit={false}
+            />
+          </div>
+        </div>
+      </div>
+
       <h3 className="text-lg font-medium text-base-content flex items-center gap-2">
         <FontAwesomeIcon icon={faRobot} className="w-4 h-4" />
         Sessions ({sessions.length})
@@ -182,16 +241,6 @@ export const SessionsList = memo(function SessionsList({
             ))}
         </div>
       )}
-
-      {/* New Session Button - moved to bottom */}
-      <button
-        onClick={onCreateSession}
-        className="btn btn-primary btn-sm w-full"
-        disabled={loading}
-      >
-        <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-        New Session
-      </button>
     </div>
   );
 });
