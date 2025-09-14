@@ -81,7 +81,22 @@ export class ProviderInstanceManager {
   }
 
   private async performSave(config: ProviderInstancesConfig): Promise<void> {
-    await fs.promises.writeFile(this.configPath, JSON.stringify(config, null, 2));
+    // Atomic write: write to temp file, then rename
+    const tempPath = `${this.configPath}.tmp`;
+    const data = JSON.stringify(config, null, 2);
+
+    try {
+      await fs.promises.writeFile(tempPath, data, { mode: 0o600 });
+      await fs.promises.rename(tempPath, this.configPath);
+    } catch (error) {
+      // Clean up temp file on failure
+      try {
+        await fs.promises.unlink(tempPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+      throw error;
+    }
   }
 
   loadCredential(instanceId: string): Credential | null {
