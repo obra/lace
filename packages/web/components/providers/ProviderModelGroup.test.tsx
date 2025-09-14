@@ -66,8 +66,8 @@ describe('ProviderModelGroup', () => {
     const summary = screen.getByText('OpenAI').closest('summary');
     fireEvent.click(summary!);
 
-    expect(screen.getByText(/8k context/)).toBeInTheDocument();
-    expect(screen.getByText(/4k context/)).toBeInTheDocument();
+    expect(screen.getByText('8k')).toBeInTheDocument();
+    expect(screen.getByText('4k')).toBeInTheDocument();
   });
 
   it('should format pricing correctly', () => {
@@ -77,18 +77,26 @@ describe('ProviderModelGroup', () => {
     const summary = screen.getByText('OpenAI').closest('summary');
     fireEvent.click(summary!);
 
-    expect(screen.getByText(/\$30\.00 input/)).toBeInTheDocument();
-    expect(screen.getByText(/\$60\.00 output/)).toBeInTheDocument();
-    expect(screen.getByText(/\$0\.50 input/)).toBeInTheDocument();
-    expect(screen.getByText(/\$1\.50 output/)).toBeInTheDocument();
+    expect(screen.getByText('$30.00')).toBeInTheDocument();
+    expect(screen.getByText('$60.00')).toBeInTheDocument();
+    expect(screen.getByText('$0.50')).toBeInTheDocument();
+    expect(screen.getByText('$1.50')).toBeInTheDocument();
   });
 
   it('should show FREE badge for free models', () => {
     const freeModels = [
       {
-        id: 'provider/free-model',
-        name: 'Free Model',
+        id: 'provider/free-model-1',
+        name: 'Free Model 1',
         context_window: 4096,
+        cost_per_1m_in: 0,
+        cost_per_1m_out: 0,
+        supports_attachments: false,
+      },
+      {
+        id: 'provider/free-model-2',
+        name: 'Free Model 2',
+        context_window: 8192,
         cost_per_1m_in: 0,
         cost_per_1m_out: 0,
         supports_attachments: false,
@@ -99,7 +107,7 @@ describe('ProviderModelGroup', () => {
       <ProviderModelGroup
         {...defaultProps}
         models={freeModels}
-        enabledModels={['provider/free-model']}
+        enabledModels={['provider/free-model-1', 'provider/free-model-2']}
       />
     );
 
@@ -107,7 +115,7 @@ describe('ProviderModelGroup', () => {
     const summary = screen.getByText('OpenAI').closest('summary');
     fireEvent.click(summary!);
 
-    expect(screen.getByText('FREE')).toBeInTheDocument();
+    expect(screen.getAllByText('FREE')).toHaveLength(2); // Both free models show FREE badge
   });
 
   it('should show capability badges', () => {
