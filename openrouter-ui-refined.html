@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenRouter Model Management - Refined Mockups</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.6.0/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <style>
+        .variant-container {
+            min-height: 100vh;
+            padding: 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .variant-2 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .variant-3 { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <div class="navbar bg-base-100 sticky top-0 z-50 shadow-lg">
+        <div class="flex-1">
+            <a class="btn btn-ghost text-xl">OpenRouter Refined UI</a>
+        </div>
+        <div class="flex-none">
+            <ul class="menu menu-horizontal px-1">
+                <li><a href="#variant1">Option A: Inline Filters</a></li>
+                <li><a href="#variant2">Option B: Compact Header</a></li>
+                <li><a href="#variant3">Option C: Filter Bar</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Variant 1: Inline Filters -->
+    <div id="variant1" class="variant-container">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl font-bold text-white mb-6">Option A: Inline Filters</h2>
+            
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="card-title">OpenRouter Main</h3>
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm opacity-70">Last sync: 2h ago</span>
+                            <button class="btn btn-circle btn-sm btn-primary">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search Bar -->
+                    <div class="mb-3">
+                        <input type="text" placeholder="Search models..." class="input input-bordered w-full" />
+                    </div>
+
+                    <!-- Filter Controls -->
+                    <div class="space-y-3 mb-4">
+                        <!-- Capabilities Row -->
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <span class="text-sm font-semibold">Capabilities:</span>
+                            <label class="label cursor-pointer gap-2">
+                                <input type="checkbox" class="checkbox checkbox-sm" checked />
+                                <span class="label-text">Tools</span>
+                            </label>
+                            <label class="label cursor-pointer gap-2">
+                                <input type="checkbox" class="checkbox checkbox-sm" />
+                                <span class="label-text">Vision</span>
+                            </label>
+                            <label class="label cursor-pointer gap-2">
+                                <input type="checkbox" class="checkbox checkbox-sm" />
+                                <span class="label-text">Reasoning</span>
+                            </label>
+                            <label class="label cursor-pointer gap-2">
+                                <input type="checkbox" class="checkbox checkbox-sm" />
+                                <span class="label-text">Structured Output</span>
+                            </label>
+                            <label class="label cursor-pointer gap-2">
+                                <input type="checkbox" class="checkbox checkbox-sm" />
+                                <span class="label-text">Function Calling</span>
+                            </label>
+                        </div>
+
+                        <!-- Context and Price Row -->
+                        <div class="flex items-center gap-6">
+                            <div class="flex items-center gap-3">
+                                <span class="text-sm font-semibold">Context:</span>
+                                <select class="select select-bordered select-sm">
+                                    <option>Any size</option>
+                                    <option>&gt; 32k</option>
+                                    <option>&gt; 100k</option>
+                                    <option>&gt; 500k</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-sm font-semibold">Max price:</span>
+                                <select class="select select-bordered select-sm">
+                                    <option>Any price</option>
+                                    <option>Free only</option>
+                                    <option>&lt; $1/M tokens</option>
+                                    <option>&lt; $5/M tokens</option>
+                                    <option>&lt; $10/M tokens</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grouped Models -->
+                    <div class="space-y-3">
+                        <!-- OpenAI Group -->
+                        <div class="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" checked />
+                            <div class="collapse-title">
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" class="checkbox checkbox-sm" checked onclick="event.stopPropagation()" />
+                                        <span class="font-semibold">OpenAI</span>
+                                    </div>
+                                    <span class="text-sm opacity-70">8/12 enabled</span>
+                                </div>
+                            </div>
+                            <div class="collapse-content">
+                                <div class="space-y-2 pt-2">
+                                    <label class="flex items-center justify-between p-3 hover:bg-base-300 rounded-lg cursor-pointer">
+                                        <div class="flex items-center gap-3">
+                                            <input type="checkbox" class="checkbox checkbox-sm" checked />
+                                            <div>
+                                                <div class="font-medium">GPT-4o</div>
+                                                <div class="text-xs opacity-70">128k context • $2.50/$10.00 per 1M</div>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-1">
+                                            <span class="badge badge-xs badge-primary">tools</span>
+                                            <span class="badge badge-xs badge-secondary">vision</span>
+                                        </div>
+                                    </label>
+                                    <label class="flex items-center justify-between p-3 hover:bg-base-300 rounded-lg cursor-pointer">
+                                        <div class="flex items-center gap-3">
+                                            <input type="checkbox" class="checkbox checkbox-sm" checked />
+                                            <div>
+                                                <div class="font-medium">GPT-4 Turbo</div>
+                                                <div class="text-xs opacity-70">128k context • $10.00/$30.00 per 1M</div>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-1">
+                                            <span class="badge badge-xs badge-primary">tools</span>
+                                            <span class="badge badge-xs badge-info">function-calling</span>
+                                        </div>
+                                    </label>
+                                    <label class="flex items-center justify-between p-3 hover:bg-base-300 rounded-lg cursor-pointer opacity-60">
+                                        <div class="flex items-center gap-3">
+                                            <input type="checkbox" class="checkbox checkbox-sm" />
+                                            <div>
+                                                <div class="font-medium">GPT-3.5 Turbo</div>
+                                                <div class="text-xs opacity-70">16k context • $0.50/$1.50 per 1M</div>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-1">
+                                            <span class="badge badge-xs badge-primary">tools</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Anthropic Group -->
+                        <div class="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" checked />
+                            <div class="collapse-title">
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" class="checkbox checkbox-sm" checked onclick="event.stopPropagation()" />
+                                        <span class="font-semibold">Anthropic</span>
+                                    </div>
+                                    <span class="text-sm opacity-70">6/8 enabled</span>
+                                </div>
+                            </div>
+                            <div class="collapse-content">
+                                <div class="space-y-2 pt-2">
+                                    <label class="flex items-center justify-between p-3 hover:bg-base-300 rounded-lg cursor-pointer">
+                                        <div class="flex items-center gap-3">
+                                            <input type="checkbox" class="checkbox checkbox-sm" checked />
+                                            <div>
+                                                <div class="font-medium">Claude 3.5 Sonnet</div>
+                                                <div class="text-xs opacity-70">200k context • $3.00/$15.00 per 1M</div>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-1">
+                                            <span class="badge badge-xs badge-primary">tools</span>
+                                            <span class="badge badge-xs badge-secondary">vision</span>
+                                        </div>
+                                    </label>
+                                    <label class="flex items-center justify-between p-3 hover:bg-base-300 rounded-lg cursor-pointer">
+                                        <div class="flex items-center gap-3">
+                                            <input type="checkbox" class="checkbox checkbox-sm" checked />
+                                            <div>
+                                                <div class="font-medium">Claude 3 Opus</div>
+                                                <div class="text-xs opacity-70">200k context • $15.00/$75.00 per 1M</div>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-1">
+                                            <span class="badge badge-xs badge-primary">tools</span>
+                                            <span class="badge badge-xs badge-secondary">vision</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Google Group (Disabled) -->
+                        <div class="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" />
+                            <div class="collapse-title">
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" class="checkbox checkbox-sm" onclick="event.stopPropagation()" />
+                                        <span class="font-semibold">Google</span>
+                                    </div>
+                                    <span class="text-sm opacity-70">0/6 enabled</span>
+                                </div>
+                            </div>
+                            <div class="collapse-content">
+                                <div class="space-y-2 pt-2">
+                                    <label class="flex items-center justify-between p-3 hover:bg-base-300 rounded-lg cursor-pointer opacity-60">
+                                        <div class="flex items-center gap-3">
+                                            <input type="checkbox" class="checkbox checkbox-sm" />
+                                            <div>
+                                                <div class="font-medium">Gemini 1.5 Pro</div>
+                                                <div class="text-xs opacity-70">1M context • $3.50/$10.50 per 1M</div>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-1">
+                                            <span class="badge badge-xs badge-secondary">vision</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Meta Group -->
+                        <div class="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" />
+                            <div class="collapse-title">
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" class="checkbox checkbox-sm" checked onclick="event.stopPropagation()" />
+                                        <span class="font-semibold">Meta</span>
+                                    </div>
+                                    <span class="text-sm opacity-70">3/4 enabled</span>
+                                </div>
+                            </div>
+                            <div class="collapse-content">
+                                <div class="space-y-2 pt-2">
+                                    <label class="flex items-center justify-between p-3 hover:bg-base-300 rounded-lg cursor-pointer">
+                                        <div class="flex items-center gap-3">
+                                            <input type="checkbox" class="checkbox checkbox-sm" checked />
+                                            <div>
+                                                <div class="flex items-center gap-2">
+                                                    <span class="font-medium">Llama 3.1 405B</span>
+                                                    <span class="badge badge-xs badge-success">FREE</span>
+                                                </div>
+                                                <div class="text-xs opacity-70">128k context • Free tier available</div>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-1">
+                                            <span class="badge badge-xs badge-primary">tools</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Summary Stats -->
+                    <div class="mt-4 p-3 bg-base-200 rounded-lg flex justify-between items-center">
+                        <span class="text-sm">Total: <strong>177/523</strong> models enabled across <strong>14/42</strong> providers</span>
+                        <button class="btn btn-sm btn-primary">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Variant 2: Compact Header -->
+    <div id="variant2" class="variant-container variant-2">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl font-bold text-white mb-6">Option B: Compact Header</h2>
+            
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <!-- Compact Header -->
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="card-title">OpenRouter Main</h3>
+                            <p class="text-sm opacity-70">177/523 models enabled • Last sync: 2h ago</p>
+                        </div>
+                        <button class="btn btn-primary btn-sm gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.3"/></svg>
+                            Refresh Catalog
+                        </button>
+                    </div>
+
+                    <!-- Search -->
+                    <input type="text" placeholder="Search models by name, provider, or capability..." class="input input-bordered w-full mb-3" />
+
+                    <!-- Filters in Card -->
+                    <div class="card bg-base-200 mb-4">
+                        <div class="card-body p-3">
+                            <div class="grid grid-cols-1 gap-3">
+                                <!-- Capabilities -->
+                                <div class="flex items-center gap-3 flex-wrap">
+                                    <span class="text-sm font-semibold min-w-fit">Require:</span>
+                                    <label class="cursor-pointer flex items-center gap-1">
+                                        <input type="checkbox" class="checkbox checkbox-xs" checked />
+                                        <span class="text-sm">Tools</span>
+                                    </label>
+                                    <label class="cursor-pointer flex items-center gap-1">
+                                        <input type="checkbox" class="checkbox checkbox-xs" />
+                                        <span class="text-sm">Vision</span>
+                                    </label>
+                                    <label class="cursor-pointer flex items-center gap-1">
+                                        <input type="checkbox" class="checkbox checkbox-xs" />
+                                        <span class="text-sm">Reasoning</span>
+                                    </label>
+                                    <label class="cursor-pointer flex items-center gap-1">
+                                        <input type="checkbox" class="checkbox checkbox-xs" />
+                                        <span class="text-sm">Structured</span>
+                                    </label>
+                                    <label class="cursor-pointer flex items-center gap-1">
+                                        <input type="checkbox" class="checkbox checkbox-xs" />
+                                        <span class="text-sm">Functions</span>
+                                    </label>
+                                </div>
+                                
+                                <!-- Context and Price -->
+                                <div class="flex gap-4">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm">Context:</span>
+                                        <select class="select select-xs select-bordered">
+                                            <option>Any</option>
+                                            <option>&gt; 32k</option>
+                                            <option>&gt; 100k</option>
+                                            <option>&gt; 500k</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm">Price:</span>
+                                        <select class="select select-xs select-bordered">
+                                            <option>Any</option>
+                                            <option>Free</option>
+                                            <option>&lt; $1/M</option>
+                                            <option>&lt; $5/M</option>
+                                            <option>&lt; $10/M</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Provider Groups -->
+                    <div class="space-y-2">
+                        <!-- OpenAI -->
+                        <div class="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" checked />
+                            <div class="collapse-title py-3">
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" class="checkbox checkbox-sm" checked onclick="event.stopPropagation()" />
+                                        <span class="font-semibold">OpenAI</span>
+                                        <span class="badge badge-xs badge-primary">Popular</span>
+                                    </div>
+                                    <span class="text-sm">8/12 enabled</span>
+                                </div>
+                            </div>
+                            <div class="collapse-content">
+                                <div class="space-y-1 pt-2">
+                                    <label class="flex items-center p-2 hover:bg-base-100 rounded cursor-pointer">
+                                        <input type="checkbox" class="checkbox checkbox-sm mr-3" checked />
+                                        <div class="flex-1">
+                                            <span class="font-medium">GPT-4o</span>
+                                            <span class="text-xs opacity-70 ml-2">128k • $2.50/$10.00</span>
+                                        </div>
+                                        <div class="text-xs opacity-70">tools, vision</div>
+                                    </label>
+                                    <label class="flex items-center p-2 hover:bg-base-100 rounded cursor-pointer">
+                                        <input type="checkbox" class="checkbox checkbox-sm mr-3" checked />
+                                        <div class="flex-1">
+                                            <span class="font-medium">GPT-4 Turbo</span>
+                                            <span class="text-xs opacity-70 ml-2">128k • $10/$30</span>
+                                        </div>
+                                        <div class="text-xs opacity-70">tools, functions</div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Anthropic -->
+                        <div class="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" />
+                            <div class="collapse-title py-3">
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" class="checkbox checkbox-sm" checked onclick="event.stopPropagation()" />
+                                        <span class="font-semibold">Anthropic</span>
+                                    </div>
+                                    <span class="text-sm">6/8 enabled</span>
+                                </div>
+                            </div>
+                            <div class="collapse-content">
+                                <!-- Models here -->
+                            </div>
+                        </div>
+
+                        <!-- Free Providers Section -->
+                        <div class="divider text-xs">Free Tier Available</div>
+                        
+                        <!-- Meta -->
+                        <div class="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" />
+                            <div class="collapse-title py-3">
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" class="checkbox checkbox-sm" checked onclick="event.stopPropagation()" />
+                                        <span class="font-semibold">Meta</span>
+                                        <span class="badge badge-xs badge-success">FREE</span>
+                                    </div>
+                                    <span class="text-sm">3/4 enabled</span>
+                                </div>
+                            </div>
+                            <div class="collapse-content">
+                                <!-- Models here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Variant 3: Filter Bar Style - Updated -->
+    <div id="variant3" class="variant-container variant-3">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl font-bold text-white mb-6">Option C: Filter Bar (Updated)</h2>
+            
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <!-- Simplified Header -->
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="card-title">OpenRouter Main</h3>
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm opacity-70">Last sync: 2h ago</span>
+                            <button class="btn btn-circle btn-primary btn-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search -->
+                    <input type="text" placeholder="Search models, providers, or capabilities..." class="input input-bordered w-full mb-3" />
+
+                    <!-- Filter Bar -->
+                    <div class="navbar bg-base-200 rounded-lg mb-4 p-2">
+                        <div class="navbar-start">
+                            <div class="flex items-center gap-2">
+                                <label class="flex items-center gap-1 px-2">
+                                    <input type="checkbox" class="checkbox checkbox-xs" checked />
+                                    <span class="text-xs">Tools</span>
+                                </label>
+                                <div class="divider divider-horizontal m-0"></div>
+                                <label class="flex items-center gap-1 px-2">
+                                    <input type="checkbox" class="checkbox checkbox-xs" />
+                                    <span class="text-xs">Vision</span>
+                                </label>
+                                <div class="divider divider-horizontal m-0"></div>
+                                <label class="flex items-center gap-1 px-2">
+                                    <input type="checkbox" class="checkbox checkbox-xs" />
+                                    <span class="text-xs">Reasoning</span>
+                                </label>
+                                <div class="divider divider-horizontal m-0"></div>
+                                <label class="flex items-center gap-1 px-2">
+                                    <input type="checkbox" class="checkbox checkbox-xs" />
+                                    <span class="text-xs">Structured</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="navbar-end gap-3">
+                            <select class="select select-xs select-bordered">
+                                <option>Any context</option>
+                                <option>&gt; 32k</option>
+                                <option>&gt; 100k</option>
+                                <option>&gt; 500k</option>
+                            </select>
+                            <select class="select select-xs select-bordered">
+                                <option>Any price</option>
+                                <option>Free only</option>
+                                <option>&lt; $1/M</option>
+                                <option>&lt; $5/M</option>
+                                <option>&lt; $10/M</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Provider List with Detailed Models -->
+                    <div class="space-y-2">
+                        <div class="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" checked />
+                            <div class="collapse-title py-3 min-h-0">
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" class="checkbox checkbox-sm" checked onclick="event.stopPropagation()" />
+                                        <span class="font-semibold">OpenAI</span>
+                                    </div>
+                                    <span class="text-sm">8/12 enabled</span>
+                                </div>
+                            </div>
+                            <div class="collapse-content">
+                                <div class="space-y-2 pt-2">
+                                    <label class="flex items-center p-3 bg-base-100 rounded cursor-pointer hover:bg-base-300 transition-colors">
+                                        <input type="checkbox" class="checkbox checkbox-sm mr-3" checked />
+                                        <div class="flex-1">
+                                            <div class="flex justify-between items-start">
+                                                <div>
+                                                    <span class="font-medium">GPT-4o</span>
+                                                    <div class="text-xs opacity-70 mt-1">128k context • $2.50 input / $10.00 output per 1M</div>
+                                                </div>
+                                                <div class="flex gap-1">
+                                                    <span class="badge badge-xs badge-primary">tools</span>
+                                                    <span class="badge badge-xs badge-secondary">vision</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </label>
+                                    <label class="flex items-center p-3 bg-base-100 rounded cursor-pointer hover:bg-base-300 transition-colors">
+                                        <input type="checkbox" class="checkbox checkbox-sm mr-3" checked />
+                                        <div class="flex-1">
+                                            <div class="flex justify-between items-start">
+                                                <div>
+                                                    <span class="font-medium">GPT-4 Turbo</span>
+                                                    <div class="text-xs opacity-70 mt-1">128k context • $10.00 input / $30.00 output per 1M</div>
+                                                </div>
+                                                <div class="flex gap-1">
+                                                    <span class="badge badge-xs badge-primary">tools</span>
+                                                    <span class="badge badge-xs badge-info">functions</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </label>
+                                    <label class="flex items-center p-3 bg-base-100 rounded cursor-pointer hover:bg-base-300 transition-colors opacity-60">
+                                        <input type="checkbox" class="checkbox checkbox-sm mr-3" />
+                                        <div class="flex-1">
+                                            <div class="flex justify-between items-start">
+                                                <div>
+                                                    <span class="font-medium">GPT-3.5 Turbo</span>
+                                                    <div class="text-xs opacity-70 mt-1">16k context • $0.50 input / $1.50 output per 1M</div>
+                                                </div>
+                                                <div class="flex gap-1">
+                                                    <span class="badge badge-xs badge-primary">tools</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" checked />
+                            <div class="collapse-title py-3 min-h-0">
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" class="checkbox checkbox-sm" checked onclick="event.stopPropagation()" />
+                                        <span class="font-semibold">Anthropic</span>
+                                    </div>
+                                    <span class="text-sm">6/8 enabled</span>
+                                </div>
+                            </div>
+                            <div class="collapse-content">
+                                <div class="space-y-2 pt-2">
+                                    <label class="flex items-center p-3 bg-base-100 rounded cursor-pointer hover:bg-base-300 transition-colors">
+                                        <input type="checkbox" class="checkbox checkbox-sm mr-3" checked />
+                                        <div class="flex-1">
+                                            <div class="flex justify-between items-start">
+                                                <div>
+                                                    <span class="font-medium">Claude 3.5 Sonnet</span>
+                                                    <div class="text-xs opacity-70 mt-1">200k context • $3.00 input / $15.00 output per 1M</div>
+                                                </div>
+                                                <div class="flex gap-1">
+                                                    <span class="badge badge-xs badge-primary">tools</span>
+                                                    <span class="badge badge-xs badge-secondary">vision</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </label>
+                                    <label class="flex items-center p-3 bg-base-100 rounded cursor-pointer hover:bg-base-300 transition-colors">
+                                        <input type="checkbox" class="checkbox checkbox-sm mr-3" checked />
+                                        <div class="flex-1">
+                                            <div class="flex justify-between items-start">
+                                                <div>
+                                                    <span class="font-medium">Claude 3 Opus</span>
+                                                    <div class="text-xs opacity-70 mt-1">200k context • $15.00 input / $75.00 output per 1M</div>
+                                                </div>
+                                                <div class="flex gap-1">
+                                                    <span class="badge badge-xs badge-primary">tools</span>
+                                                    <span class="badge badge-xs badge-secondary">vision</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" />
+                            <div class="collapse-title py-3 min-h-0">
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" class="checkbox checkbox-sm" onclick="event.stopPropagation()" />
+                                        <span class="font-semibold">Google</span>
+                                    </div>
+                                    <span class="text-sm">0/6 enabled</span>
+                                </div>
+                            </div>
+                            <div class="collapse-content">
+                                <div class="space-y-2 pt-2">
+                                    <label class="flex items-center p-3 bg-base-100 rounded cursor-pointer hover:bg-base-300 transition-colors opacity-60">
+                                        <input type="checkbox" class="checkbox checkbox-sm mr-3" />
+                                        <div class="flex-1">
+                                            <div class="flex justify-between items-start">
+                                                <div>
+                                                    <span class="font-medium">Gemini 1.5 Pro</span>
+                                                    <div class="text-xs opacity-70 mt-1">1M context • $3.50 input / $10.50 output per 1M</div>
+                                                </div>
+                                                <div class="flex gap-1">
+                                                    <span class="badge badge-xs badge-secondary">vision</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="collapse collapse-arrow bg-base-200">
+                            <input type="checkbox" />
+                            <div class="collapse-title py-3 min-h-0">
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" class="checkbox checkbox-sm" checked onclick="event.stopPropagation()" />
+                                        <span class="font-semibold">Meta</span>
+                                    </div>
+                                    <span class="text-sm">3/4 enabled</span>
+                                </div>
+                            </div>
+                            <div class="collapse-content">
+                                <div class="space-y-2 pt-2">
+                                    <label class="flex items-center p-3 bg-base-100 rounded cursor-pointer hover:bg-base-300 transition-colors">
+                                        <input type="checkbox" class="checkbox checkbox-sm mr-3" checked />
+                                        <div class="flex-1">
+                                            <div class="flex justify-between items-start">
+                                                <div>
+                                                    <span class="font-medium">Llama 3.1 405B</span>
+                                                    <span class="badge badge-xs badge-success ml-2">FREE</span>
+                                                    <div class="text-xs opacity-70 mt-1">128k context • Free tier available</div>
+                                                </div>
+                                                <div class="flex gap-1">
+                                                    <span class="badge badge-xs badge-primary">tools</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Bar -->
+                    <div class="flex justify-between items-center mt-4 pt-4 border-t">
+                        <button class="btn btn-sm btn-ghost">Cancel</button>
+                        <button class="btn btn-sm btn-primary">Save Configuration</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // Prevent checkbox clicks from toggling collapse
+        document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+        });
+    </script>
+</body>
+</html>

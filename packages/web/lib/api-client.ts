@@ -251,4 +251,20 @@ export const api = {
     }
     return makeRequest<T>(url, { ...options, method: 'DELETE' }, clientOptions);
   },
+
+  // Provider-specific methods
+  providers: {
+    refreshCatalog: (instanceId: string) =>
+      api.post<{ success: boolean; modelCount: number; lastUpdated: string }>(
+        `/api/provider/instances/${instanceId}/refresh`
+      ),
+
+    updateModelConfig: (instanceId: string, modelConfig: unknown) =>
+      api.patch<{ success: boolean; message: string }>(
+        `/api/provider/instances/${instanceId}/config`,
+        { modelConfig }
+      ),
+
+    getCatalog: () => api.get<{ providers: unknown[] }>('/api/provider/catalog'),
+  },
 } as const;

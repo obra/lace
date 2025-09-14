@@ -370,4 +370,49 @@ describe('ProviderRegistry', () => {
       );
     });
   });
+
+  describe('dynamic catalog support', () => {
+    it('should support dynamic catalog for openrouter', async () => {
+      // Set up OpenRouter instance with API key
+      const config: ProviderInstancesConfig = {
+        version: '1.0',
+        instances: {
+          'openrouter-test': {
+            displayName: 'OpenRouter Test',
+            catalogProviderId: 'openrouter',
+            modelConfig: {
+              enableNewModels: true,
+              disabledModels: [],
+              disabledProviders: ['google'],
+            },
+          },
+        },
+      };
+
+      const credential: Credential = {
+        apiKey: 'sk-or-test123',
+      };
+
+      fs.writeFileSync(
+        path.join(tempDir, 'provider-instances.json'),
+        JSON.stringify(config, null, 2)
+      );
+
+      const credentialsDir = path.join(tempDir, 'credentials');
+      fs.mkdirSync(credentialsDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(credentialsDir, 'openrouter-test.json'),
+        JSON.stringify(credential, null, 2)
+      );
+
+      const catalogProvider = await registry.getCatalogProvider('openrouter');
+      expect(catalogProvider).toBeDefined();
+      expect(catalogProvider?.id).toBe('openrouter');
+    });
+
+    it('should fall back to static catalog when no OpenRouter instances configured', async () => {
+      const catalogProvider = await registry.getCatalogProvider('openrouter');
+      expect(catalogProvider).toBeDefined(); // Should get static catalog
+    });
+  });
 });

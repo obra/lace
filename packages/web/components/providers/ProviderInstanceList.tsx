@@ -3,11 +3,16 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProviderInstanceCard } from './ProviderInstanceCard';
 import { AddInstanceModal } from './AddInstanceModal';
 import { Alert } from '@/components/ui/Alert';
+import { SuccessToast } from '@/components/ui/SuccessToast';
+import { ErrorToast } from '@/components/errors/ErrorToast';
+import { GlobalModelSearch, type GlobalModelFilters } from './GlobalModelSearch';
 import { useProviderInstances } from './ProviderInstanceProvider';
+import { api } from '@/lib/api-client';
+import type { CatalogProvider } from '@/lib/server/lace-imports';
 
 export function ProviderInstanceList() {
   const {
@@ -23,6 +28,115 @@ export function ProviderInstanceList() {
     getInstanceWithTestResult,
   } = useProviderInstances();
 
+  // Catalog data for model management
+  const [catalogs, setCatalogs] = useState<CatalogProvider[]>([]);
+
+  // Toast state
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+
+  // Global search/filter state
+  const [globalFilters, setGlobalFilters] = useState<GlobalModelFilters>({
+    searchQuery: '',
+    requiredParameters: [],
+    minContextLength: undefined,
+    maxPromptCostPerMillion: undefined,
+  });
+
+  // Fetch catalog data on mount
+  useEffect(() => {
+    fetchCatalogs();
+  }, []);
+
+  const fetchCatalogs = async () => {
+    try {
+      const data = await api.providers.getCatalog();
+      setCatalogs((data.providers as CatalogProvider[]) || []);
+    } catch (error) {
+      console.error('Failed to fetch catalogs:', error);
+    }
+  };
+
+  // Match instances with their catalog data
+  const instancesWithCatalog = instances.map((instance) => ({
+    instance,
+    catalog: catalogs.find((c) => c.id === instance.catalogProviderId),
+  }));
+
+  // Calculate total model counts for display
+  const { totalModels, totalResults } = React.useMemo(() => {
+    let total = 0;
+    let results = 0;
+
+    for (const { catalog } of instancesWithCatalog) {
+      if (!catalog?.models) continue;
+
+      total += catalog.models.length;
+
+      // Count models that match current filters
+      const filtered = catalog.models.filter((model) => {
+        // Apply search filter
+        if (globalFilters.searchQuery) {
+          const searchLower = globalFilters.searchQuery.toLowerCase();
+          const matchesSearch =
+            model.id.toLowerCase().includes(searchLower) ||
+            model.name.toLowerCase().includes(searchLower);
+          if (!matchesSearch) return false;
+        }
+
+        // Apply capability filters
+        if (globalFilters.requiredParameters.length > 0) {
+          const modelParams =
+            (model as CatalogProvider['models'][0] & { supported_parameters?: string[] })
+              .supported_parameters ?? [];
+          const hasTools =
+            (modelParams as string[]).includes('tools') ||
+            (modelParams as string[]).includes('function_calling');
+          const hasVision =
+            model.supports_attachments === true || (modelParams as string[]).includes('vision');
+          const hasReasoning =
+            model.can_reason === true || (modelParams as string[]).includes('reasoning');
+
+          const capabilities: string[] = [];
+          if (hasTools) capabilities.push('tools');
+          if (hasVision) capabilities.push('vision');
+          if (hasReasoning) capabilities.push('reasoning');
+
+          const hasRequired = globalFilters.requiredParameters.every((param) =>
+            capabilities.includes(param)
+          );
+          if (!hasRequired) return false;
+        }
+
+        // Apply context filter
+        if (globalFilters.minContextLength !== undefined) {
+          if (model.context_window < globalFilters.minContextLength) {
+            return false;
+          }
+        }
+
+        // Apply price filter
+        if (globalFilters.maxPromptCostPerMillion !== undefined) {
+          if (globalFilters.maxPromptCostPerMillion === 0) {
+            if (model.cost_per_1m_in !== 0 || model.cost_per_1m_out !== 0) {
+              return false;
+            }
+          } else {
+            if (model.cost_per_1m_in > globalFilters.maxPromptCostPerMillion) {
+              return false;
+            }
+          }
+        }
+
+        return true;
+      });
+
+      results += filtered.length;
+    }
+
+    return { totalModels: total, totalResults: results };
+  }, [instancesWithCatalog, globalFilters]);
+
   const handleTest = (instanceId: string) => {
     void testInstance(instanceId);
   };
@@ -33,6 +147,19 @@ export function ProviderInstanceList() {
     } catch (err) {
       // Error handling is already done in the provider
       console.error('Failed to delete instance:', err);
+    }
+  };
+
+  const handleRefresh = async (instanceId: string) => {
+    try {
+      const result = await api.providers.refreshCatalog(instanceId);
+      // Refresh the catalogs to get updated model data
+      await fetchCatalogs();
+      setSuccessToast(`Refreshed ${result.modelCount} models`);
+    } catch (error) {
+      console.error('Failed to refresh catalog:', error);
+      setErrorToast('Failed to refresh catalog');
+      throw error;
     }
   };
 
@@ -118,17 +245,82 @@ export function ProviderInstanceList() {
               </button>
             </div>
 
-            {instances.map((instance) => {
+            {/* Global Model Search and Filter */}
+            {totalModels > 0 && (
+              <GlobalModelSearch
+                filters={globalFilters}
+                onChange={setGlobalFilters}
+                resultCount={totalResults}
+                totalCount={totalModels}
+              />
+            )}
+
+            {instancesWithCatalog.map(({ instance, catalog }) => {
               const instanceWithTestResult = getInstanceWithTestResult(instance.id);
               if (!instanceWithTestResult) return null;
+
+              // Check if this provider has any matching models (for visibility)
+              const hasMatchingModels = catalog?.models
+                ? catalog.models.some((model) => {
+                    // Apply the same filter logic here to determine visibility
+                    if (globalFilters.searchQuery) {
+                      const searchLower = globalFilters.searchQuery.toLowerCase();
+                      const matchesSearch =
+                        model.id.toLowerCase().includes(searchLower) ||
+                        model.name.toLowerCase().includes(searchLower);
+                      if (!matchesSearch) return false;
+                    }
+
+                    if (globalFilters.requiredParameters.length > 0) {
+                      const hasTools = model.supports_attachments !== undefined;
+                      const hasVision = model.supports_attachments === true;
+                      const hasReasoning = model.can_reason === true;
+
+                      const capabilities: string[] = [];
+                      if (hasTools) capabilities.push('tools');
+                      if (hasVision) capabilities.push('vision');
+                      if (hasReasoning) capabilities.push('reasoning');
+
+                      const hasRequired = globalFilters.requiredParameters.every((param) =>
+                        capabilities.includes(param)
+                      );
+                      if (!hasRequired) return false;
+                    }
+
+                    if (globalFilters.minContextLength !== undefined) {
+                      if (model.context_window < globalFilters.minContextLength) {
+                        return false;
+                      }
+                    }
+
+                    if (globalFilters.maxPromptCostPerMillion !== undefined) {
+                      if (globalFilters.maxPromptCostPerMillion === 0) {
+                        if (model.cost_per_1m_in !== 0 || model.cost_per_1m_out !== 0) {
+                          return false;
+                        }
+                      } else {
+                        if (model.cost_per_1m_in > globalFilters.maxPromptCostPerMillion) {
+                          return false;
+                        }
+                      }
+                    }
+
+                    return true;
+                  })
+                : true;
+
+              // Keep all provider cards visible regardless of matching models
 
               return (
                 <ProviderInstanceCard
                   key={instance.id}
                   instance={instanceWithTestResult}
-                  onTest={() => handleTest(instance.id)}
-                  onDelete={() => void handleDelete(instance.id)}
+                  provider={catalog}
+                  globalFilters={globalFilters}
+                  onTest={(instanceId) => handleTest(instanceId)}
+                  onDelete={(instanceId) => void handleDelete(instanceId)}
                   onEdit={() => void loadInstances()} // Refresh list after edit
+                  onRefresh={handleRefresh}
                 />
               );
             })}
@@ -141,6 +333,18 @@ export function ProviderInstanceList() {
         onClose={closeAddModal}
         onSuccess={() => void loadInstances()}
       />
+
+      {/* Toast Notifications */}
+      {successToast && (
+        <SuccessToast message={successToast} onDismiss={() => setSuccessToast(null)} />
+      )}
+      {errorToast && (
+        <ErrorToast
+          errorType="provider_failure"
+          message={errorToast}
+          onDismiss={() => setErrorToast(null)}
+        />
+      )}
     </>
   );
 }

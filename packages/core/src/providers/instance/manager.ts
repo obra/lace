@@ -18,6 +18,7 @@ import type { AIProvider } from '~/providers/base-provider';
 export class ProviderInstanceManager {
   private configPath: string;
   private credentialsDir: string;
+  private savePromise: Promise<void> | null = null;
 
   constructor() {
     const laceDir = getLaceDir();
@@ -66,7 +67,36 @@ export class ProviderInstanceManager {
   }
 
   async saveInstances(config: ProviderInstancesConfig): Promise<void> {
-    await fs.promises.writeFile(this.configPath, JSON.stringify(config, null, 2));
+    // Serialize access to prevent concurrent writes from corrupting JSON
+    if (this.savePromise) {
+      await this.savePromise;
+    }
+
+    this.savePromise = this.performSave(config);
+    try {
+      await this.savePromise;
+    } finally {
+      this.savePromise = null;
+    }
+  }
+
+  private async performSave(config: ProviderInstancesConfig): Promise<void> {
+    // Atomic write: write to temp file, then rename
+    const tempPath = `${this.configPath}.tmp`;
+    const data = JSON.stringify(config, null, 2);
+
+    try {
+      await fs.promises.writeFile(tempPath, data, { mode: 0o600 });
+      await fs.promises.rename(tempPath, this.configPath);
+    } catch (error) {
+      // Clean up temp file on failure
+      try {
+        await fs.promises.unlink(tempPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+      throw error;
+    }
   }
 
   loadCredential(instanceId: string): Credential | null {

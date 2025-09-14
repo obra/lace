@@ -9,6 +9,7 @@ import { OllamaProvider } from '~/providers/ollama-provider';
 import { ProviderCatalogManager } from '~/providers/catalog/manager';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import type { CatalogProvider, CatalogModel } from '~/providers/catalog/types';
+import { OpenRouterDynamicProvider } from '~/providers/openrouter/dynamic-provider';
 import { logger } from '~/utils/logger';
 
 /**
@@ -93,6 +94,42 @@ export class ProviderRegistry {
   async getCatalogProviders(): Promise<CatalogProvider[]> {
     await this.ensureInitialized();
     return this.catalogManager.getAvailableProviders();
+  }
+
+  async getCatalogProvider(providerId: string): Promise<CatalogProvider | null> {
+    await this.ensureInitialized();
+
+    // Special handling for OpenRouter
+    if (providerId === 'openrouter') {
+      // Check if we have an instance with API key
+      const instances = await this.instanceManager.loadInstances();
+      const openRouterInstance = Object.entries(instances.instances).find(
+        ([_, inst]) => inst.catalogProviderId === 'openrouter'
+      );
+
+      if (openRouterInstance) {
+        const [instanceId, instance] = openRouterInstance;
+        const credential = this.instanceManager.loadCredential(instanceId);
+
+        if (credential?.apiKey) {
+          const provider = new OpenRouterDynamicProvider(instanceId);
+          const config = instance.modelConfig ?? {
+            enableNewModels: true,
+            disabledModels: [],
+            disabledProviders: [],
+          };
+
+          try {
+            return await provider.getCatalogWithConfig(credential.apiKey, config);
+          } catch (error) {
+            logger.warn('Failed to fetch dynamic catalog, using static', { error });
+          }
+        }
+      }
+    }
+
+    // Fall back to static catalog
+    return this.catalogManager.getProvider(providerId);
   }
 
   async getConfiguredInstances(): Promise<ConfiguredInstance[]> {
@@ -361,5 +398,9 @@ export class ProviderRegistry {
       proto = Object.getPrototypeOf(proto);
     }
     return false;
+  }
+
+  getInstanceManager(): ProviderInstanceManager {
+    return this.instanceManager;
   }
 }
