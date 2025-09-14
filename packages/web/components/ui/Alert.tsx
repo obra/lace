@@ -10,6 +10,7 @@ import { DismissButton } from '@/components/ui/DismissButton';
 
 export type AlertVariant = 'success' | 'warning' | 'error' | 'info';
 export type AlertLayout = 'vertical' | 'horizontal';
+export type AlertStyle = 'default' | 'soft' | 'outline' | 'dash';
 
 export interface AlertProps {
   variant: AlertVariant;
@@ -20,6 +21,7 @@ export interface AlertProps {
   showIcon?: boolean;
   onDismiss?: () => void;
   layout?: AlertLayout;
+  style?: AlertStyle;
 }
 
 const alertConfig = {
@@ -50,14 +52,16 @@ export function Alert({
   showIcon = true,
   onDismiss,
   layout = 'vertical',
+  style = 'default',
 }: AlertProps) {
   const config = alertConfig[variant];
 
   const layoutClass = layout === 'horizontal' ? 'alert-vertical sm:alert-horizontal' : '';
+  const styleClass = style !== 'default' ? `alert-${style}` : '';
 
   return (
     <div
-      className={`alert ${config.alertClass} ${layoutClass} ${className}`}
+      className={`alert ${config.alertClass} ${styleClass} ${layoutClass} ${className}`}
       role={variant === 'error' || variant === 'warning' ? 'alert' : 'status'}
       aria-live={variant === 'error' || variant === 'warning' ? 'assertive' : 'polite'}
     >

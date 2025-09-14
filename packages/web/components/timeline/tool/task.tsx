@@ -223,7 +223,7 @@ const taskAddRenderer: ToolRenderer = {
     }
 
     // Fallback: No task data found
-    return <Alert variant="warning" title="No task metadata found" className="mt-2" />;
+    return <Alert variant="warning" title="No task metadata found" className="mt-2" style="soft" />;
   },
 
   getIcon: () => faPlus,
@@ -651,7 +651,13 @@ const taskViewRenderer: ToolRenderer = {
     if (typeof parsed === 'object' && parsed !== null && 'error' in parsed) {
       const error = parsed as { error: string; code?: string };
       return (
-        <Alert variant="error" title="Task not found" description={error.error} className="mt-2">
+        <Alert
+          variant="error"
+          title="Task not found"
+          description={error.error}
+          className="mt-2"
+          style="soft"
+        >
           {error.code && <div className="text-xs opacity-60">Code: {error.code}</div>}
         </Alert>
       );
