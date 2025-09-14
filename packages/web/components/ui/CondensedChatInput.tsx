@@ -10,7 +10,7 @@ import { faPaperPlane } from '@/lib/fontawesome';
 interface CondensedChatInputProps {
   value: string;
   onChange: (value: string) => void;
-  onSend: () => void;
+  onSend: () => Promise<void> | void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -47,16 +47,19 @@ export const CondensedChatInput = React.forwardRef<{ focus: () => void }, Conden
       []
     );
 
+    const adjustHeight = (el: HTMLTextAreaElement) => {
+      el.style.height = 'auto';
+      const minHeight = minRows * 24;
+      const newHeight = Math.max(minHeight, Math.min(el.scrollHeight, 200));
+      el.style.height = newHeight + 'px';
+    };
+
     // Auto-resize textarea when value changes
     useEffect(() => {
       if (textareaRef.current) {
-        const textarea = textareaRef.current;
-        textarea.style.height = 'auto';
-        const minHeight = minRows * 24; // Approximate line height
-        const newHeight = Math.max(minHeight, Math.min(textarea.scrollHeight, 200)); // Allow more height
-        textarea.style.height = newHeight + 'px';
+        adjustHeight(textareaRef.current);
       }
-    }, [value, minRows]);
+    }, [value, minRows, adjustHeight]);
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       // Don't interfere with IME composition
@@ -66,7 +69,7 @@ export const CondensedChatInput = React.forwardRef<{ focus: () => void }, Conden
       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         if (allowEmptySubmit || value.trim()) {
-          onSend();
+          void onSend();
         }
       }
     };
@@ -77,7 +80,7 @@ export const CondensedChatInput = React.forwardRef<{ focus: () => void }, Conden
 
     const handleSendClick = () => {
       if (allowEmptySubmit || value.trim()) {
-        onSend();
+        void onSend();
       }
     };
 
@@ -94,20 +97,13 @@ export const CondensedChatInput = React.forwardRef<{ focus: () => void }, Conden
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={disabled}
-            className="flex-1 bg-transparent outline-none placeholder:text-base-content/60 text-base-content resize-none overflow-y-auto text-sm"
+            className="flex-1 bg-transparent outline-none placeholder:text-base-content/60 text-base-content resize-none overflow-y-auto text-sm leading-snug"
             style={{
               minHeight: `${minRows * 24}px`,
               maxHeight: '200px',
-              lineHeight: '1.4',
             }}
             rows={minRows}
-            onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-              const target = e.target as HTMLTextAreaElement;
-              target.style.height = 'auto';
-              const minHeight = minRows * 24;
-              const newHeight = Math.max(minHeight, Math.min(target.scrollHeight, 200));
-              target.style.height = newHeight + 'px';
-            }}
+            onInput={(e: React.FormEvent<HTMLTextAreaElement>) => adjustHeight(e.currentTarget)}
           />
 
           {/* Send Button */}
@@ -117,12 +113,20 @@ export const CondensedChatInput = React.forwardRef<{ focus: () => void }, Conden
               onClick={handleSendClick}
               disabled={isDisabled}
               data-testid="condensed-send-button"
+              aria-label={sendButtonText || 'Send message'}
               className={`${
                 sendButtonText
                   ? 'px-4 py-2 rounded-lg bg-primary text-primary-content hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2 font-medium'
                   : 'w-7 h-7 flex items-center justify-center rounded-full bg-primary text-primary-content hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200'
               }`}
-              title={sendButtonText || (value.trim() ? 'Send message' : 'Type a message to send')}
+              title={
+                sendButtonText ||
+                (allowEmptySubmit
+                  ? 'Send'
+                  : value.trim()
+                    ? 'Send message'
+                    : 'Type a message to send')
+              }
             >
               <FontAwesomeIcon icon={faPaperPlane} className="w-3 h-3" />
               {sendButtonText && <span>{sendButtonText}</span>}
