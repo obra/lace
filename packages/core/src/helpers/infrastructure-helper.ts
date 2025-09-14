@@ -41,11 +41,19 @@ export interface InfrastructureHelperOptions {
  */
 export class InfrastructureHelper extends BaseHelper {
   private provider: AIProvider | null = null;
+  // Cache the model selected via global config or fallback to keep provider/model in sync
+  private resolvedModelId: string | null = null;
   private toolExecutor: ToolExecutor;
   private availableTools: Tool[] = [];
 
   constructor(private options: InfrastructureHelperOptions) {
     super();
+
+    // Validate that fallbackProvider has a corresponding fallbackModelId
+    if (options.fallbackProvider && !options.fallbackModelId) {
+      throw new Error('fallbackModelId is required when fallbackProvider is specified');
+    }
+
     this.toolExecutor = new ToolExecutor();
     this.toolExecutor.registerAllAvailableTools();
   }
@@ -64,6 +72,7 @@ export class InfrastructureHelper extends BaseHelper {
       const parsed = parseProviderModel(providerModel);
       instanceId = parsed.instanceId;
       modelId = parsed.modelId;
+      this.resolvedModelId = modelId;
 
       logger.debug('InfrastructureHelper using global model config', {
         tier: this.options.model,
@@ -79,6 +88,7 @@ export class InfrastructureHelper extends BaseHelper {
         });
 
         this.provider = this.options.fallbackProvider;
+        this.resolvedModelId = this.options.fallbackModelId ?? null;
         return this.provider;
       } else {
         // No fallback available, re-throw original error
@@ -97,6 +107,7 @@ export class InfrastructureHelper extends BaseHelper {
           failedInstanceId: instanceId,
         });
         this.provider = this.options.fallbackProvider;
+        this.resolvedModelId = this.options.fallbackModelId ?? null;
         return this.provider;
       }
       throw new Error(`Provider instance not found: ${instanceId}`);
@@ -136,14 +147,21 @@ export class InfrastructureHelper extends BaseHelper {
   }
 
   protected getModel(): string {
+    // Use cached model if available to stay consistent with provider
+    if (this.resolvedModelId) {
+      return this.resolvedModelId;
+    }
+
     try {
       // Try to extract model ID from global config first
       const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
       const { modelId } = parseProviderModel(providerModel);
+      this.resolvedModelId = modelId;
       return modelId;
     } catch (error) {
       // Fall back to explicit model if global config unavailable
       if (this.options.fallbackModelId) {
+        this.resolvedModelId = this.options.fallbackModelId;
         return this.options.fallbackModelId;
       }
       // No fallback available, re-throw original error
