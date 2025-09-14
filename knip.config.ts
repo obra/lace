@@ -21,7 +21,6 @@ export default {
     '@typescript-eslint/eslint-plugin',
     '@typescript-eslint/parser',
     '@eslint/eslintrc',
-    'eslint-config-next',
     'eslint-plugin-import',
     'eslint-plugin-no-relative-import-paths',
     // Build tooling - used in config files
@@ -38,17 +37,21 @@ export default {
       project: ['src/**/*.ts'],
     },
     'packages/web': {
-      // Web workspace - Next.js with Storybook
+      // Web workspace - React Router v7
       entry: [
-        // Next.js app entrypoints (Knip auto-detects these)
-        'app/**/page.tsx',
-        'app/**/layout.tsx',
-        'app/api/**/route.ts',
+        // React Router v7 entry points
+        'app/entry.client.tsx',
+        'app/root.tsx',
+        'app/routes.ts',
         // Server entrypoint
-        'server.ts',
-        // E2E test files
+        'server-custom.ts',
+        'server-production.ts',
+        // E2E test files and setup
         'e2e/**/*.e2e.ts',
         'e2e/**/*.test.e2e.ts',
+        'e2e/global-setup.ts',
+        'e2e/global-teardown.ts',
+        'e2e-test-server.ts',
       ],
       // Keep ESLint plugin disabled to avoid module resolution issues
       eslint: false,
