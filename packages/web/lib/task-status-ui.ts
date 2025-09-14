@@ -40,14 +40,4 @@ export const getStatusBgColor = (status: TaskStatus) => {
   return getStatusConfig(status).bgColor;
 };
 
-export const getStatusColumnColor = (status: TaskStatus) => {
-  return getStatusConfig(status).columnColor;
-};
-
-export const getStatusEmoji = (status: TaskStatus) => {
-  return getStatusConfig(status).emoji;
-};
-
-export const getStatusLabel = (status: TaskStatus) => {
-  return getStatusConfig(status).label;
-};
+// Removed unused functions: getStatusColumnColor, getStatusEmoji, getStatusLabel
