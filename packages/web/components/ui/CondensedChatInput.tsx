@@ -8,6 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperPlane } from '@/lib/fontawesome';
 
 interface CondensedChatInputProps {
+  id?: string;
   value: string;
   onChange: (value: string) => void;
   onSend: () => Promise<void> | void;
@@ -22,6 +23,7 @@ interface CondensedChatInputProps {
 export const CondensedChatInput = React.forwardRef<{ focus: () => void }, CondensedChatInputProps>(
   function CondensedChatInput(
     {
+      id,
       value,
       onChange,
       onSend,
@@ -94,6 +96,7 @@ export const CondensedChatInput = React.forwardRef<{ focus: () => void }, Conden
         <div className="flex items-center w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 transition-all duration-200">
           {/* Textarea Input */}
           <textarea
+            id={id}
             ref={textareaRef}
             value={value}
             onChange={handleTextareaChange}

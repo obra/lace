@@ -8,6 +8,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import '@testing-library/jest-dom/vitest';
 import { Chat } from '@/components/chat/Chat';
 import { ScrollProvider } from '@/components/providers/ScrollProvider';
@@ -142,11 +143,13 @@ describe('Chat', () => {
   // Helper to render Chat with required providers
   const renderChat = () => {
     return render(
-      <SettingsProvider>
-        <ScrollProvider>
-          <Chat />
-        </ScrollProvider>
-      </SettingsProvider>
+      <MemoryRouter>
+        <SettingsProvider>
+          <ScrollProvider>
+            <Chat />
+          </ScrollProvider>
+        </SettingsProvider>
+      </MemoryRouter>
     );
   };
 

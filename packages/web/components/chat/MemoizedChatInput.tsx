@@ -42,9 +42,9 @@ export const MemoizedChatInput = memo(function MemoizedChatInput({
   const chatInputRef = useRef<{ focus: () => void } | null>(null);
   const refocusTimeoutRef = useRef<number | null>(null);
 
-  // Set initial value if provided
+  // Set initial value if provided (allow empty-string)
   useEffect(() => {
-    if (initialValue) {
+    if (initialValue !== undefined) {
       setMessage(initialValue);
     }
   }, [initialValue]);

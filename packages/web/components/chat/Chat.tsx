@@ -6,6 +6,11 @@
 import React, { memo, useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { TimelineView } from '@/components/timeline/TimelineView';
+
+// Type for navigation state with initial message
+interface SessionNavigationState {
+  initialMessage?: string;
+}
 import { MemoizedChatInput } from '@/components/chat/MemoizedChatInput';
 import { useTimelineAutoscroll } from '@/hooks/useSmartAutoscroll';
 import {
@@ -16,7 +21,7 @@ import {
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useScrollContext } from '@/components/providers/ScrollProvider';
 import { useTheme } from '@/components/providers/SettingsProvider';
-import type { ThreadId, AgentInfo, LaceEvent } from '@/types/core';
+import type { ThreadId } from '@/types/core';
 
 export const Chat = memo(function Chat(): React.JSX.Element {
   // Get data from providers
@@ -28,30 +33,19 @@ export const Chat = memo(function Chat(): React.JSX.Element {
   const { getTimelineMaxWidthClass } = useTheme();
 
   // Handle navigation state for initial message pre-filling
+  const location = useLocation();
+  const navigate = useNavigate();
   const [initialMessage, setInitialMessage] = useState<string | null>(null);
-
-  // Safely access router hooks (they may not be available in tests)
-  let location: ReturnType<typeof useLocation> | null = null;
-  let navigate: ReturnType<typeof useNavigate> | null = null;
-
-  try {
-    location = useLocation();
-    navigate = useNavigate();
-  } catch {
-    // Router context not available (e.g., in tests)
-  }
 
   // Read initial message from navigation state and clear it
   useEffect(() => {
-    if (!location || !navigate) return;
-
-    const navState = location.state as { initialMessage?: string } | null;
+    const navState = location.state as SessionNavigationState | null;
     if (navState?.initialMessage) {
       setInitialMessage(navState.initialMessage);
       // Clear navigation state to prevent re-use on back/forward
       navigate(location.pathname, { replace: true, state: null });
     }
-  }, [location?.state, location?.pathname, navigate]);
+  }, [location.state, location.pathname, navigate]);
 
   // Clear initial message after it's been consumed by MemoizedChatInput
   useEffect(() => {
