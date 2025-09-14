@@ -8,7 +8,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faCog, faRobot, faFolder, faInfoCircle, faTrash, faEdit } from '@/lib/fontawesome';
 import { SessionHeader } from './SessionHeader';
 import { SessionsList } from './SessionsList';
-import { SessionCreateModal } from './SessionCreateModal';
 import { SessionEditModal } from './SessionEditModal';
 import { AgentCreateModal } from './AgentCreateModal';
 import { AgentEditModal } from './AgentEditModal';
@@ -61,7 +60,6 @@ export function SessionConfigPanel(): React.JSX.Element {
   const { availableProviders, instancesLoading: providersLoading } = useProviderInstances();
 
   const loading = sessionLoading || agentLoading || providersLoading;
-  const [showCreateSession, setShowCreateSession] = useState(false);
   const [showCreateAgent, setShowCreateAgent] = useState(false);
   const [showEditConfig, setShowEditConfig] = useState(false);
   const [showEditAgent, setShowEditAgent] = useState(false);
@@ -88,7 +86,6 @@ export function SessionConfigPanel(): React.JSX.Element {
   // Reset form when project or project configuration changes
   const projectId = currentProject.id;
   useEffect(() => {
-    setShowCreateSession(false);
     setShowCreateAgent(false);
     setShowEditConfig(false);
     setShowEditAgent(false);
@@ -148,7 +145,6 @@ export function SessionConfigPanel(): React.JSX.Element {
       });
 
       resetSessionForm();
-      setShowCreateSession(false);
 
       // Navigate to the new session
       if (sessionData && project) {
@@ -214,11 +210,6 @@ export function SessionConfigPanel(): React.JSX.Element {
     },
     [project, navigateToSession]
   );
-
-  const handleCreateSessionClick = useCallback(() => {
-    resetSessionForm(); // Reset with project defaults
-    setShowCreateSession(true);
-  }, [resetSessionForm]);
 
   const handleAgentSelect = useCallback(
     (agentId: string) => {
@@ -303,10 +294,6 @@ export function SessionConfigPanel(): React.JSX.Element {
     setDeleteError(null);
   }, [isDeleting]);
 
-  const handleCloseCreateSession = useCallback(() => {
-    setShowCreateSession(false);
-  }, []);
-
   const handleCloseEditSession = useCallback(() => {
     setShowEditConfig(false);
   }, []);
@@ -327,28 +314,21 @@ export function SessionConfigPanel(): React.JSX.Element {
   }, []);
 
   return (
-    <div className="bg-base-100 rounded-lg border border-base-300 p-6">
+    <div className="bg-base-100 rounded-lg border border-base-300 p-6 h-full flex flex-col">
       <SessionHeader project={currentProject} />
 
       <SessionsList
         sessions={sessions}
         selectedSession={selectedSession}
+        currentProject={currentProject}
         loading={loading}
         onSessionSelect={handleSessionSelect}
         onEditSession={handleEditSessionClick}
         onDeleteSession={handleDeleteSessionClick}
         onCreateAgent={handleCreateAgentClick}
-        onCreateSession={handleCreateSessionClick}
+        onCreateSession={handleCreateSession}
         onEditAgent={handleEditAgentClick}
         onAgentSelect={handleAgentSelect}
-      />
-
-      <SessionCreateModal
-        isOpen={showCreateSession}
-        currentProject={currentProject}
-        loading={loading}
-        onClose={handleCloseCreateSession}
-        onSubmit={handleCreateSession}
       />
 
       <AgentCreateModal
