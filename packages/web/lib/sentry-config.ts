@@ -1,7 +1,7 @@
 // ABOUTME: Central Sentry configuration constants
 // ABOUTME: Single source of truth for Sentry DSN and shared settings
 
-export const SENTRY_DSN =
+const SENTRY_DSN =
   'https://886230dfd5ba5600e8cc8db8710f2448@o543459.ingest.us.sentry.io/4509844023279616';
 
 export const SENTRY_CONFIG = {
