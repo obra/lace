@@ -77,11 +77,7 @@ export interface MessageResponse {
   messageId: string;
 }
 
-// API response types for proper error handling
-interface ApiSuccessResponse<T> {
-  data?: T;
-  [key: string]: unknown;
-}
+// Removed unused interface: ApiSuccessResponse
 
 // Simple error response with optional code for better client-side error handling
 export interface ApiErrorResponse {
@@ -95,9 +91,7 @@ export function isApiError(response: unknown): response is ApiErrorResponse {
   return typeof response === 'object' && response !== null && 'error' in response;
 }
 
-export function isApiSuccess<T>(response: unknown): response is ApiSuccessResponse<T> {
-  return typeof response === 'object' && response !== null && !('error' in response);
-}
+// Removed unused function: isApiSuccess
 
 // Specific API response types - now using core types directly (no wrappers)
 
