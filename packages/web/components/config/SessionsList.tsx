@@ -58,11 +58,6 @@ export const SessionsList = memo(function SessionsList({
 
   return (
     <div className="space-y-3" onClick={handleBackdropClick}>
-      <h3 className="text-lg font-medium text-base-content flex items-center gap-2">
-        <FontAwesomeIcon icon={faRobot} className="w-4 h-4" />
-        Sessions ({sessions.length})
-      </h3>
-
       {/* Inline Session Creation Form */}
       <div className="bg-base-200/50 rounded-lg p-4 border border-base-300/50">
         <div className="space-y-3">
@@ -84,6 +79,11 @@ export const SessionsList = memo(function SessionsList({
           </div>
         </div>
       </div>
+
+      <h3 className="text-lg font-medium text-base-content flex items-center gap-2">
+        <FontAwesomeIcon icon={faRobot} className="w-4 h-4" />
+        Sessions ({sessions.length})
+      </h3>
 
       {sessions.length === 0 ? (
         <div className="text-center py-8 text-base-content/60">
