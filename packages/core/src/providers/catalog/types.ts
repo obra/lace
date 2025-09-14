@@ -11,8 +11,8 @@ export const ModelConfigSchema = z.object({
   filters: z
     .object({
       requiredParameters: z.array(z.string()).optional(),
-      maxPromptCostPerMillion: z.number().positive().optional(),
-      maxCompletionCostPerMillion: z.number().positive().optional(),
+      maxPromptCostPerMillion: z.number().nonnegative().optional(),
+      maxCompletionCostPerMillion: z.number().nonnegative().optional(),
       minContextLength: z.number().int().positive().optional(),
     })
     .optional(),
@@ -33,6 +33,7 @@ export const CatalogModelSchema = z.object({
   default_reasoning_effort: z.string().optional(),
   reasoning_effort: z.string().optional(),
   supports_attachments: z.boolean().optional(),
+  supported_parameters: z.array(z.string()).optional(),
 });
 
 // Catwalk catalog provider schema

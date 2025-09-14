@@ -73,8 +73,11 @@ export class ProviderInstanceManager {
     }
 
     this.savePromise = this.performSave(config);
-    await this.savePromise;
-    this.savePromise = null;
+    try {
+      await this.savePromise;
+    } finally {
+      this.savePromise = null;
+    }
   }
 
   private async performSave(config: ProviderInstancesConfig): Promise<void> {

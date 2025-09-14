@@ -126,6 +126,7 @@ export class OpenRouterDynamicProvider {
       default_max_tokens: Math.min(4096, Math.floor(model.context_length / 4)),
       supports_attachments: model.supported_parameters?.includes('vision') ?? false,
       can_reason: model.supported_parameters?.includes('reasoning') ?? false,
+      supported_parameters: model.supported_parameters ?? [],
     }));
   }
 

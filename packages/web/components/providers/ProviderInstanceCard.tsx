@@ -114,9 +114,13 @@ export function ProviderInstanceCard({
 
         // Apply global capability filters
         if (globalFilters.requiredParameters.length > 0) {
-          const hasTools = model.supports_attachments !== undefined;
-          const hasVision = model.supports_attachments === true;
-          const hasReasoning = model.can_reason === true;
+          const modelParams =
+            (model as CatalogModel & { supported_parameters?: string[] }).supported_parameters ??
+            [];
+          const hasTools =
+            modelParams.includes('tools') || modelParams.includes('function_calling');
+          const hasVision = model.supports_attachments === true || modelParams.includes('vision');
+          const hasReasoning = model.can_reason === true || modelParams.includes('reasoning');
 
           const capabilities: string[] = [];
           if (hasTools) capabilities.push('tools');
