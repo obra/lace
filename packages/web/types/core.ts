@@ -54,10 +54,6 @@ export type { PersonaInfo } from '~/config/persona-registry';
 export {
   asThreadId,
   isThreadId,
-  asNewAgentSpec,
-  isNewAgentSpec,
-  parseNewAgentSpec,
-  createNewAgentSpec,
   asAssigneeId,
   EVENT_TYPES,
   isTransientEventType,
