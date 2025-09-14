@@ -308,6 +308,43 @@ Generic `ProviderMessage[]` format converts to provider-specific APIs. Each prov
 - Resumable conversations with `--continue` flag
 - Delegate thread management for sub-conversations
 
+### Navigation State Pattern
+For passing ephemeral data between routes, use React Router's built-in navigation state:
+
+```typescript
+// Define shared types
+export interface SessionNavigationState {
+  initialMessage?: string;
+}
+
+// Pass state during navigation
+navigate(`/project/${projectId}/session/${sessionId}`, {
+  state: { initialMessage: userInput } as SessionNavigationState
+});
+
+// Read and consume state in target component
+const location = useLocation();
+const navState = location.state as SessionNavigationState | null;
+if (navState?.initialMessage) {
+  setInitialValue(navState.initialMessage);
+  // Clear state to prevent re-use on back/forward navigation
+  navigate(location.pathname, { replace: true, state: undefined });
+}
+
+// Preserve state through redirects
+navigate(targetUrl, { 
+  replace: true, 
+  state: location.state as SessionNavigationState | null 
+});
+```
+
+**Benefits:**
+- Ephemeral by design - automatically cleaned up
+- No database complexity for temporary data
+- Browser-native state management
+- One-time consumption prevents stale data
+- Works across route redirects when explicitly preserved
+
 
 ## Testing Strategy
 
