@@ -314,7 +314,7 @@ export function SessionConfigPanel(): React.JSX.Element {
   }, []);
 
   return (
-    <div className="bg-base-100 rounded-lg border border-base-300 p-6 h-full flex flex-col">
+    <div className="bg-base-100 rounded-lg border border-base-300 p-6 overflow-y-auto">
       <SessionHeader project={currentProject} />
 
       <SessionsList

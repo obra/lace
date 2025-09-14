@@ -57,17 +57,16 @@ export const SessionsList = memo(function SessionsList({
   };
 
   return (
-    <div className="space-y-3 h-full flex flex-col" onClick={handleBackdropClick}>
-      <h3 className="text-lg font-medium text-base-content flex items-center gap-2 flex-shrink-0">
+    <div className="space-y-3" onClick={handleBackdropClick}>
+      <h3 className="text-lg font-medium text-base-content flex items-center gap-2">
         <FontAwesomeIcon icon={faRobot} className="w-4 h-4" />
         Sessions ({sessions.length})
       </h3>
 
       {/* Inline Session Creation Form */}
-      <div className="bg-base-200/50 rounded-lg p-4 border border-base-300/50 flex-shrink-0">
+      <div className="bg-base-200/50 rounded-lg p-4 border border-base-300/50">
         <div className="space-y-3">
-          <div className="text-sm font-medium text-base-content">{currentProject.name}</div>
-          <div className="text-xs text-base-content/70">{currentProject.workingDirectory}</div>
+          <div className="text-sm font-medium text-base-content">New session</div>
           <div>
             <label className="text-sm font-medium text-base-content block mb-2">
               What are we working on?
@@ -93,7 +92,7 @@ export const SessionsList = memo(function SessionsList({
           <p className="text-sm">Create your first session to get started</p>
         </div>
       ) : (
-        <div className="space-y-3 flex-1 overflow-y-auto">
+        <div className="space-y-3">
           {[...sessions]
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
             .map((session) => (
