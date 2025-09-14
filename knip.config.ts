@@ -1,10 +1,9 @@
 // ABOUTME: Knip configuration for dead code analysis
-// ABOUTME: Configures Storybook and other dev tools as valid entrypoints
+// ABOUTME: Configures entry points and ignores for React Router v7 monorepo
 
 export default {
   ignore: [
     'packages/web/eslint.config.js', // ESLint config causes issues when run from root
-    'packages/web/stories_parked/**/*', // Parked story files - not active in build
     // Design system - OK to have unused exports for future components
     'packages/web/lib/animations.ts',
     'packages/web/lib/heroicons.ts',
@@ -13,9 +12,11 @@ export default {
     'packages/web/e2e/**/*',
     // Development/testing infrastructure - always ignore
     'packages/web/e2e-test-server.ts',
-    'packages/web/feedback/story-types.ts',
     'packages/web/ladle.config.mjs',
     'packages/web/scripts/start-test-server.js',
+    'packages/web/lib/server/data-dir-init.ts', // Server initialization
+    // Config files
+    'packages/web/eslint.config.js',
   ],
   ignoreDependencies: [
     // ESLint tooling - used in config files that knip has trouble analyzing
@@ -30,6 +31,24 @@ export default {
     'autoprefixer',
     // Type definitions that may not be directly imported
     '@types/dompurify',
+    // React Router build-time dependencies
+    '@react-router/express',
+    '@react-router/node',
+    '@react-router/serve',
+    // Vite plugins used in config
+    '@vitejs/plugin-react',
+    '@sentry/vite-plugin',
+    // Development utilities
+    'concurrently',
+    'tsx',
+    // Server middleware dependencies
+    'compression',
+    'express',
+    'morgan',
+    'isbot',
+    '@types/compression',
+    '@types/express',
+    '@types/morgan',
   ],
   workspaces: {
     '.': {
@@ -38,21 +57,18 @@ export default {
       project: ['src/**/*.ts'],
     },
     'packages/web': {
-      // Web workspace - Next.js with Storybook
+      // Web workspace - React Router v7 with plugin auto-detection
       entry: [
-        // Next.js app entrypoints (Knip auto-detects these)
-        'app/**/page.tsx',
-        // Server entrypoint
+        // Additional entry points not detected by React Router plugin
         'server-custom.ts',
-        // Storybook (auto-detected, but keep explicit)
-        'stories_parked/*.stories.{ts,tsx}',
-        // E2E test files
+        'server-production.ts',
+        'server/app.ts', // Dynamically imported by server-custom.ts
+        // E2E test files and setup
         'e2e/**/*.e2e.ts',
         'e2e/**/*.test.e2e.ts',
-        // Design system components - only analyzed in production mode
-        'components/ui/**/*.tsx!',
-        'components/feedback/**/*.tsx!',
-        'components/demo/**/*.tsx!',
+        'e2e/global-setup.ts',
+        'e2e/global-teardown.ts',
+        'e2e-test-server.ts',
       ],
       // Keep ESLint plugin disabled to avoid module resolution issues
       eslint: false,
