@@ -316,7 +316,6 @@ export function SessionConfigPanel(): React.JSX.Element {
       <SessionsList
         sessions={sessions}
         selectedSession={selectedSession}
-        currentProject={currentProject}
         loading={loading}
         onSessionSelect={handleSessionSelect}
         onEditSession={handleEditSessionClick}

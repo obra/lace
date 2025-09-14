@@ -6,11 +6,7 @@
 import React, { memo, useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { TimelineView } from '@/components/timeline/TimelineView';
-
-// Type for navigation state with initial message
-interface SessionNavigationState {
-  initialMessage?: string;
-}
+import type { SessionNavigationState } from '@/types/navigation';
 import { MemoizedChatInput } from '@/components/chat/MemoizedChatInput';
 import { useTimelineAutoscroll } from '@/hooks/useSmartAutoscroll';
 import {
