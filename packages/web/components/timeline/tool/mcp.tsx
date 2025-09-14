@@ -11,7 +11,7 @@ import type { ToolAggregatedEventData } from '@/types/web-events';
 /**
  * MCP Parameters display component for the body
  */
-export function MCPParametersDisplay({ args }: { args: unknown }) {
+function MCPParametersDisplay({ args }: { args: unknown }) {
   if (!args || typeof args !== 'object') {
     if (args === null || args === undefined) return null;
     return <div className="text-sm text-base-content/70">{String(args)}</div>;

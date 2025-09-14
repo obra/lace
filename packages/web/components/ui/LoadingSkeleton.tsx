@@ -198,18 +198,18 @@ export function LoadingSkeleton({
 }
 
 // Specialized skeleton components
-export function ChatMessageSkeleton() {
+function ChatMessageSkeleton() {
   return <LoadingSkeleton variant="avatar" />;
 }
 
-export function TimelineSkeleton() {
+function TimelineSkeleton() {
   return <LoadingSkeleton variant="timeline" />;
 }
 
-export function CarouselSkeleton() {
+function CarouselSkeleton() {
   return <LoadingSkeleton variant="carousel" />;
 }
 
-export function CardGridSkeleton({ count = 3 }: { count?: number }) {
+function CardGridSkeleton({ count = 3 }: { count?: number }) {
   return <LoadingSkeleton variant="card" count={count} />;
 }
