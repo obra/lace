@@ -3,28 +3,22 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faCog, faRobot, faFolder, faInfoCircle, faTrash, faEdit } from '@/lib/fontawesome';
+import { faTrash } from '@/lib/fontawesome';
 import { SessionHeader } from './SessionHeader';
 import { SessionsList } from './SessionsList';
 import { SessionEditModal } from './SessionEditModal';
 import { AgentCreateModal } from './AgentCreateModal';
 import { AgentEditModal } from './AgentEditModal';
 import { AnimatedModal } from '@/components/ui/AnimatedModal';
-import type {
-  ProviderInfo,
-  ModelInfo,
-  CreateAgentRequest,
-  SessionConfiguration,
-} from '@/types/api';
+import type { SessionConfiguration } from '@/types/api';
 import type { SessionInfo, ProjectInfo, ToolPolicy } from '@/types/core';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useURLState } from '@/hooks/useURLState';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
-import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import { asThreadId } from '@/types/core';
 
 const DEFAULT_CONFIG: SessionConfiguration = {

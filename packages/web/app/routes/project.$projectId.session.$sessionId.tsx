@@ -3,6 +3,11 @@
 
 import { useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
+
+// Type for navigation state passed between routes
+interface SessionNavigationState {
+  initialMessage?: string;
+}
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { AgentProvider, useAgentContext } from '@/components/providers/AgentProvider';
@@ -26,13 +31,13 @@ function SessionRedirect({ projectId, sessionId }: { projectId: string; sessionI
         // Redirect to coordinator agent, preserving navigation state
         navigate(`/project/${projectId}/session/${sessionId}/agent/${coordinatorAgent.threadId}`, {
           replace: true,
-          state: location.state, // Preserve navigation state for pre-filling
+          state: location.state as SessionNavigationState | null, // Preserve navigation state for pre-filling
         });
       } else if (sessionDetails.agents.length === 1) {
         // If only one agent, use it, preserving navigation state
         navigate(
           `/project/${projectId}/session/${sessionId}/agent/${sessionDetails.agents[0].threadId}`,
-          { replace: true, state: location.state }
+          { replace: true, state: location.state as SessionNavigationState | null }
         );
       }
     }

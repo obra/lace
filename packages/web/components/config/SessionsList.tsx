@@ -5,8 +5,9 @@
 
 import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRobot, faEdit, faPlus, faTrash, faEllipsisV } from '@/lib/fontawesome';
+import { faRobot, faEdit, faTrash, faEllipsisV } from '@/lib/fontawesome';
 import { CondensedChatInput } from '@/components/ui/CondensedChatInput';
+import { Alert } from '@/components/ui/Alert';
 import type { SessionInfo, AgentInfo, ProjectInfo } from '@/types/core';
 
 interface SessionsListProps {
@@ -38,6 +39,7 @@ export const SessionsList = memo(function SessionsList({
 }: SessionsListProps) {
   const [showContextMenu, setShowContextMenu] = useState<string | null>(null);
   const [newSessionInput, setNewSessionInput] = useState('');
+  const [creationError, setCreationError] = useState<string | null>(null);
 
   // Close context menu on backdrop click
   const handleBackdropClick = () => {
@@ -47,12 +49,13 @@ export const SessionsList = memo(function SessionsList({
   const handleCreateSession = async () => {
     if (!newSessionInput.trim()) return;
 
+    setCreationError(null); // Clear previous errors
     try {
       await onCreateSession(newSessionInput.trim());
       setNewSessionInput(''); // Clear after successful creation
     } catch (error) {
-      // Error handling will be done by parent component
-      console.error('Failed to create session:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create session';
+      setCreationError(errorMessage);
     }
   };
 
@@ -62,15 +65,30 @@ export const SessionsList = memo(function SessionsList({
       <div className="bg-base-200/50 rounded-lg p-4 border border-base-300/50">
         <div className="space-y-3">
           <div className="text-sm font-medium text-base-content">New session</div>
+
+          {/* Error Alert */}
+          {creationError && (
+            <Alert
+              variant="error"
+              title="Session creation failed"
+              description={creationError}
+              onDismiss={() => setCreationError(null)}
+            />
+          )}
+
           <div>
-            <label className="text-sm font-medium text-base-content block mb-2">
+            <label
+              htmlFor="new-session-input"
+              className="text-sm font-medium text-base-content block mb-2"
+            >
               What are we working on?
             </label>
             <CondensedChatInput
+              id="new-session-input"
               value={newSessionInput}
               onChange={setNewSessionInput}
               onSend={handleCreateSession}
-              placeholder=""
+              placeholder="e.g., Fix authentication bug"
               disabled={loading}
               minRows={2}
               sendButtonText="Let's go"
