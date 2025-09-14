@@ -8,12 +8,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRobot, faEdit, faTrash, faEllipsisV } from '@/lib/fontawesome';
 import { CondensedChatInput } from '@/components/ui/CondensedChatInput';
 import { Alert } from '@/components/ui/Alert';
-import type { SessionInfo, AgentInfo, ProjectInfo } from '@/types/core';
+import type { SessionInfo, AgentInfo } from '@/types/core';
 
 interface SessionsListProps {
   sessions: SessionInfo[];
   selectedSession: SessionInfo | null;
-  currentProject: ProjectInfo;
   loading: boolean;
   onSessionSelect: (sessionId: string) => void;
   onEditSession: (sessionId: string) => void;
@@ -27,7 +26,6 @@ interface SessionsListProps {
 export const SessionsList = memo(function SessionsList({
   sessions,
   selectedSession,
-  currentProject,
   loading,
   onSessionSelect,
   onEditSession,
@@ -40,6 +38,7 @@ export const SessionsList = memo(function SessionsList({
   const [showContextMenu, setShowContextMenu] = useState<string | null>(null);
   const [newSessionInput, setNewSessionInput] = useState('');
   const [creationError, setCreationError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   // Close context menu on backdrop click
   const handleBackdropClick = () => {
@@ -47,8 +46,9 @@ export const SessionsList = memo(function SessionsList({
   };
 
   const handleCreateSession = async () => {
-    if (!newSessionInput.trim()) return;
+    if (!newSessionInput.trim() || creating) return;
 
+    setCreating(true);
     setCreationError(null); // Clear previous errors
     try {
       await onCreateSession(newSessionInput.trim());
@@ -56,6 +56,8 @@ export const SessionsList = memo(function SessionsList({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create session';
       setCreationError(errorMessage);
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -89,7 +91,7 @@ export const SessionsList = memo(function SessionsList({
               onChange={setNewSessionInput}
               onSend={handleCreateSession}
               placeholder="e.g., Fix authentication bug"
-              disabled={loading}
+              disabled={loading || creating}
               minRows={2}
               sendButtonText="Let's go"
               allowEmptySubmit={false}

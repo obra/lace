@@ -3,11 +3,7 @@
 
 import { useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
-
-// Type for navigation state passed between routes
-interface SessionNavigationState {
-  initialMessage?: string;
-}
+import type { SessionNavigationState } from '@/types/navigation';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { AgentProvider, useAgentContext } from '@/components/providers/AgentProvider';
@@ -27,18 +23,18 @@ function SessionRedirect({ projectId, sessionId }: { projectId: string; sessionI
       // Find coordinator agent (has same threadId as sessionId)
       const coordinatorAgent = sessionDetails.agents.find((agent) => agent.threadId === sessionId);
 
-      if (coordinatorAgent) {
-        // Redirect to coordinator agent, preserving navigation state
-        navigate(`/project/${projectId}/session/${sessionId}/agent/${coordinatorAgent.threadId}`, {
+      let targetAgent = coordinatorAgent;
+      if (!targetAgent) {
+        // Fallback to first agent to prevent spinner hang
+        targetAgent = sessionDetails.agents[0];
+      }
+
+      if (targetAgent) {
+        // Redirect to target agent, preserving navigation state
+        navigate(`/project/${projectId}/session/${sessionId}/agent/${targetAgent.threadId}`, {
           replace: true,
           state: location.state as SessionNavigationState | null, // Preserve navigation state for pre-filling
         });
-      } else if (sessionDetails.agents.length === 1) {
-        // If only one agent, use it, preserving navigation state
-        navigate(
-          `/project/${projectId}/session/${sessionId}/agent/${sessionDetails.agents[0].threadId}`,
-          { replace: true, state: location.state as SessionNavigationState | null }
-        );
       }
     }
   }, [sessionDetails, projectId, sessionId, navigate, location.state]);
