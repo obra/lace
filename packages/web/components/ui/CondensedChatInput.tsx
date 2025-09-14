@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useRef, useEffect, useImperativeHandle } from 'react';
+import React, { useRef, useEffect, useImperativeHandle, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperPlane } from '@/lib/fontawesome';
 
@@ -47,12 +47,15 @@ export const CondensedChatInput = React.forwardRef<{ focus: () => void }, Conden
       []
     );
 
-    const adjustHeight = (el: HTMLTextAreaElement) => {
-      el.style.height = 'auto';
-      const minHeight = minRows * 24;
-      const newHeight = Math.max(minHeight, Math.min(el.scrollHeight, 200));
-      el.style.height = newHeight + 'px';
-    };
+    const adjustHeight = useCallback(
+      (el: HTMLTextAreaElement) => {
+        el.style.height = 'auto';
+        const minHeight = minRows * 24;
+        const newHeight = Math.max(minHeight, Math.min(el.scrollHeight, 200));
+        el.style.height = newHeight + 'px';
+      },
+      [minRows]
+    );
 
     // Auto-resize textarea when value changes
     useEffect(() => {

@@ -181,12 +181,6 @@ describe('SessionCreateModal', () => {
       expect(screen.queryByText('My Awesome Project')).not.toBeInTheDocument();
     });
 
-    it('should call onClose when modal backdrop is clicked', () => {
-      const mockOnClose = vi.fn();
-      render(<SessionCreateModal {...defaultProps} onClose={mockOnClose} />);
-
-      // This depends on the Modal component implementation
-      // May need to be adjusted based on actual Modal component behavior
-    });
+    it.todo('should call onClose when modal backdrop is clicked');
   });
 });
