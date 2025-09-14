@@ -42,7 +42,9 @@ function isAgentErrorData(obj: unknown): obj is AgentErrorData {
 export function AgentErrorEntry({ event }: AgentErrorEntryProps) {
   if (!isAgentErrorData(event.data)) {
     // Malformed AGENT_ERROR event - return safe fallback
-    return <Alert variant="error" title="Error" description="Malformed error event data" />;
+    return (
+      <Alert variant="error" title="Error" description="Malformed error event data" style="soft" />
+    );
   }
 
   const errorData = event.data;
@@ -61,7 +63,7 @@ export function AgentErrorEntry({ event }: AgentErrorEntryProps) {
   ].filter(Boolean) as string[];
 
   return (
-    <Alert variant="error" title={title}>
+    <Alert variant="error" title={title} style="soft">
       <div className="space-y-2">
         {lines.map((line, index) => (
           <p key={index}>{line}</p>

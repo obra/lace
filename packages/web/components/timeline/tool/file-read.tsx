@@ -96,7 +96,7 @@ export const fileReadRenderer: ToolRenderer = {
     if (isError) {
       const message =
         result.content?.map((block) => block.text || '').join('') || 'An error occurred';
-      return <Alert variant="error" title="File Read Failed" description={message} />;
+      return <Alert variant="error" title="File Read Failed" description={message} style="soft" />;
     }
 
     if (!result.content || result.content.length === 0) {

@@ -188,7 +188,7 @@ export const delegateRenderer: ToolRenderer = {
     if (typeof parsed === 'string') {
       const statusText = result.status !== 'completed' ? result.status.toUpperCase() : parsed;
       return result.status !== 'completed' ? (
-        <Alert variant="error" title="Delegation Failed" description={statusText} />
+        <Alert variant="error" title="Delegation Failed" description={statusText} style="soft" />
       ) : (
         <div className="text-base-content/80 bg-base-200 border border-base-300 font-mono text-sm whitespace-pre-wrap rounded-lg p-3">
           {parsed}
@@ -248,7 +248,12 @@ export const delegateRenderer: ToolRenderer = {
 
           {/* Error Result */}
           {isError && data.error && (
-            <Alert variant="error" title="Delegation Failed" description={data.error} />
+            <Alert
+              variant="error"
+              title="Delegation Failed"
+              description={data.error}
+              style="soft"
+            />
           )}
 
           {/* Timeout with Partial Result */}

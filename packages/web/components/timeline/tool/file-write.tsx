@@ -46,7 +46,7 @@ export const fileWriteRenderer: ToolRenderer = {
     const isError = fileWriteRenderer.isError!(result);
 
     if (isError) {
-      return <Alert variant="error" title="Write Failed" description={content} />;
+      return <Alert variant="error" title="Write Failed" description={content} style="soft" />;
     }
 
     // Extract file path and content from arguments

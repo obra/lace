@@ -203,7 +203,7 @@ export const fileEditRenderer: ToolRenderer = {
       }
 
       // Fallback for other errors
-      return <Alert variant="error" title="Edit Failed" description={content} />;
+      return <Alert variant="error" title="Edit Failed" description={content} style="soft" />;
     }
 
     // Check if we have the enhanced metadata from the tool
