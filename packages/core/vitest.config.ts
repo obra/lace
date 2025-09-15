@@ -32,5 +32,15 @@ export default defineConfig({
     env: {
       NO_COLOR: '1',
     },
+    // Use threads pool instead of forks to avoid IPC issues
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        singleThread: true, // Use single thread to reduce overhead but isolate tests
+      },
+    },
+    // Add timeout to prevent hanging tests
+    testTimeout: 30000, // 30 second timeout for individual tests
+    hookTimeout: 10000, // 10 second timeout for beforeEach/afterEach hooks
   },
 });

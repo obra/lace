@@ -4,12 +4,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskManager } from '~/tasks/task-manager';
 import { DatabasePersistence, getPersistence } from '~/persistence/database';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, type EnhancedTempLaceDirContext } from '~/test-utils/core-test-setup';
 import { Task, CreateTaskRequest, TaskContext } from '~/tasks/types';
 import { asThreadId } from '~/threads/types';
 
 describe('TaskManager', () => {
-  const _tempLaceDir = setupCoreTest();
+  const tempLaceDir = setupCoreTest();
   let persistence: DatabasePersistence;
   let manager: TaskManager;
   const sessionId = asThreadId('lace_20250714_abc123');
@@ -20,8 +20,19 @@ describe('TaskManager', () => {
   });
 
   afterEach(() => {
+    // Clean up EventEmitter instances
+    if (manager) {
+      manager.removeAllListeners();
+    }
+
     // Test cleanup handled by setupCoreTest
     vi.restoreAllMocks();
+
+    // Register cleanup for any remaining references
+    tempLaceDir.registerCleanup(() => {
+      manager = undefined as any;
+      persistence = undefined as any;
+    });
   });
 
   describe('createTask', () => {

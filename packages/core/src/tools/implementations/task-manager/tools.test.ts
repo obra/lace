@@ -13,7 +13,7 @@ import {
 import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import type { Task } from '~/tasks/types';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, type EnhancedTempLaceDirContext } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -68,7 +68,7 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Enhanced Task Manager Tools', () => {
-  const _tempLaceDir = setupCoreTest();
+  const tempLaceDir = setupCoreTest();
   let context: ToolContext;
   let session: Session;
   let project: Project;
@@ -150,11 +150,35 @@ describe('Enhanced Task Manager Tools', () => {
 
   afterEach(async () => {
     vi.clearAllMocks();
-    session?.destroy();
+
+    // Clean up session and all its EventEmitters
+    if (session) {
+      session.destroy(); // This already calls removeAllListeners() on all agents
+    }
+
+    // Clean up context AbortController if it exists
+    if (context?.signal && !context.signal.aborted) {
+      try {
+        // Manually trigger abort to clean up any pending operations
+        (context.signal as any).aborted = true;
+      } catch (error) {
+        // Ignore errors when cleaning up AbortController
+      }
+    }
+
+    // Clean up provider and instances
     cleanupTestProviderDefaults();
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
     }
+
+    // Register additional cleanup with the test framework
+    tempLaceDir.registerCleanup(() => {
+      // Force cleanup of any remaining references
+      context = undefined as any;
+      session = undefined as any;
+      project = undefined as any;
+    });
   });
 
   describe('Context Integration', () => {
@@ -227,7 +251,11 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should create task with new agent assignment', async () => {
-      const newAgentSpec = createNewAgentSpec('lace', providerInstanceId, 'claude-3-5-haiku-20241022');
+      const newAgentSpec = createNewAgentSpec(
+        'lace',
+        providerInstanceId,
+        'claude-3-5-haiku-20241022'
+      );
 
       const result = await taskCreateTool.execute(
         {
@@ -553,7 +581,11 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should assign to new agent spec', async () => {
-      const newAgentSpec = createNewAgentSpec('lace', providerInstanceId, 'claude-3-5-haiku-20241022');
+      const newAgentSpec = createNewAgentSpec(
+        'lace',
+        providerInstanceId,
+        'claude-3-5-haiku-20241022'
+      );
 
       const result = await taskUpdateTool.execute(
         {
