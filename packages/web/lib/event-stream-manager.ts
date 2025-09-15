@@ -10,7 +10,7 @@ import { logger } from '~/utils/logger';
 import { stringify } from '@/lib/serialization';
 
 // Interface for AGENT_ERROR event data
-export interface AgentErrorEventData {
+interface AgentErrorEventData {
   errorType: ErrorType;
   message: string;
   stack?: string;
