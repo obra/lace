@@ -7,7 +7,7 @@ import type { ThreadId } from '@/types/core';
 import { isInternalWorkflowEvent } from '@/types/core';
 import { api } from '@/lib/api-client';
 
-export interface UseAgentEventsReturn {
+interface UseAgentEventsReturn {
   events: LaceEvent[];
   loadingHistory: boolean;
   connected: boolean;
