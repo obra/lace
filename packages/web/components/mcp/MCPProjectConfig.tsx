@@ -5,11 +5,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faServer, faEdit, faTrash } from '@/lib/fontawesome';
+import { faPlus, faServer } from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
 import type { MCPServerConfig } from '@/types/core';
-import { ToolPolicySelector } from '@/components/ui/ToolPolicySelector';
-import type { ToolPolicy } from '@/types/core';
+import { MCPServerCard } from './MCPServerCard';
+import { AddMCPServerModal } from '@/components/modals/AddMCPServerModal';
 
 interface MCPProjectConfigProps {
   projectId: string;
@@ -30,6 +30,7 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
   const [globalServers, setGlobalServers] = useState<Record<string, MCPServerConfig>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingServerId, setEditingServerId] = useState<string | null>(null);
 
   // Load project and global MCP configuration
   useEffect(() => {
@@ -80,38 +81,31 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
         return updated;
       });
     } catch (error) {
-      // Error handling
+      console.error(`Delete project MCP server ${serverId} failed`, error);
     }
   };
 
-  const handleToolPolicyChange = async (serverId: string, toolName: string, policy: ToolPolicy) => {
+  const handleEditProjectServer = (serverId: string) => {
+    setEditingServerId(serverId);
+  };
+
+  const handleCloseEditModal = () => {
+    setEditingServerId(null);
+  };
+
+  const handleUpdateProjectServer = async (serverId: string, config: MCPServerConfig) => {
     try {
-      // Check if this is a project server or global override
-      const isProjectServer = serverId in projectServers;
-      const currentConfig = isProjectServer ? projectServers[serverId] : globalServers[serverId];
-
-      const updatedConfig = {
-        ...currentConfig,
-        tools: {
-          ...currentConfig.tools,
-          [toolName]: policy,
-        },
-      };
-
-      if (isProjectServer) {
-        await api.put(`/api/projects/${projectId}/mcp/servers/${serverId}`, updatedConfig);
-        setProjectServers((prev) => ({ ...prev, [serverId]: updatedConfig }));
-      } else {
-        // TODO: Handle global server policy override for project
-      }
+      await api.put(`/api/projects/${projectId}/mcp/servers/${serverId}`, config);
+      setProjectServers((prev) => ({ ...prev, [serverId]: config }));
+      setEditingServerId(null);
     } catch (error) {
-      // Error handling
+      console.error(`Update project MCP server ${serverId} failed`, error);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center p-4">
+      <div className="flex justify-center items-center p-4" data-testid="loading-state">
         <div className="loading loading-spinner loading-md"></div>
       </div>
     );
@@ -129,7 +123,7 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
   const hasProjectServers = Object.keys(projectServers).length > 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="mcp-project-config">
       {/* Add Server Button */}
       <div className="flex justify-end">
         <button
@@ -137,9 +131,9 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.warn('[MCP Debug] Add Project Server button clicked');
             onOpenAddModal?.();
           }}
+          data-testid="add-project-server-button"
         >
           <FontAwesomeIcon icon={faPlus} className="w-4 h-4 mr-2" />
           Add Project Server
@@ -148,40 +142,19 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
 
       {/* Global Servers (inherited) */}
       {hasGlobalServers && (
-        <div>
+        <div data-testid="global-servers-section">
           <h4 className="text-sm font-medium text-base-content/80 mb-2">
             Global Servers (inherited)
           </h4>
-          <div className="space-y-3">
+          <div className="space-y-3" data-testid="global-servers-list">
             {Object.entries(globalServers).map(([serverId, config]) => (
-              <div key={serverId} className="border-l-4 border-base-300 pl-3 py-2 bg-base-50">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{serverId}</span>
-                    <code className="bg-base-200 px-2 py-1 rounded text-xs">
-                      {config.command} {config.args?.join(' ')}
-                    </code>
-                  </div>
-                </div>
-
-                {/* Tool policies */}
-                <div className="ml-2 space-y-1">
-                  {config.discoveredTools?.map((tool) => {
-                    const currentPolicy = config.tools[tool.name] || 'ask';
-                    return (
-                      <div key={tool.name} className="flex items-center gap-2 text-xs">
-                        <ToolPolicySelector
-                          value={currentPolicy as ToolPolicy}
-                          onChange={(policy) => handleToolPolicyChange(serverId, tool.name, policy)}
-                          size="xs"
-                          context="project"
-                        />
-                        <span className="font-mono">{tool.name}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <MCPServerCard
+                key={serverId}
+                serverId={serverId}
+                config={config}
+                isGlobal={true}
+                showActions={false}
+              />
             ))}
           </div>
         </div>
@@ -189,57 +162,19 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
 
       {/* Project-Specific Servers */}
       {hasProjectServers && (
-        <div>
+        <div data-testid="project-servers-section">
           <h4 className="text-sm font-medium text-primary mb-2">Project-Specific Servers</h4>
-          <div className="space-y-3">
+          <div className="space-y-3" data-testid="project-servers-list">
             {Object.entries(projectServers).map(([serverId, config]) => (
-              <div key={serverId} className="border-l-4 border-primary pl-3 py-2">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{serverId}</span>
-                    <span className="badge badge-primary badge-xs">project only</span>
-                    <code className="bg-base-200 px-2 py-1 rounded text-xs">
-                      {config.command} {config.args?.join(' ')}
-                    </code>
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      className="btn btn-xs btn-outline"
-                      onClick={() => {
-                        /* TODO: Edit */
-                      }}
-                      title="Edit Server"
-                    >
-                      <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
-                    </button>
-                    <button
-                      className="btn btn-xs btn-outline btn-error"
-                      onClick={() => handleDeleteProjectServer(serverId)}
-                      title="Delete Server"
-                    >
-                      <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Tool policies */}
-                <div className="ml-2 space-y-1">
-                  {config.discoveredTools?.map((tool) => {
-                    const currentPolicy = config.tools[tool.name] || 'ask';
-                    return (
-                      <div key={tool.name} className="flex items-center gap-2 text-xs">
-                        <ToolPolicySelector
-                          value={currentPolicy as ToolPolicy}
-                          onChange={(policy) => handleToolPolicyChange(serverId, tool.name, policy)}
-                          size="xs"
-                          context="project"
-                        />
-                        <span className="font-mono">{tool.name}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <MCPServerCard
+                key={serverId}
+                serverId={serverId}
+                config={config}
+                isGlobal={false}
+                showActions={true}
+                onEdit={handleEditProjectServer}
+                onDelete={() => handleDeleteProjectServer(serverId)}
+              />
             ))}
           </div>
         </div>
@@ -247,17 +182,36 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
 
       {/* Empty State */}
       {!hasProjectServers && !hasGlobalServers && (
-        <div className="text-center text-base-content/60 py-6">
+        <div className="text-center text-base-content/60 py-6" data-testid="empty-state">
           <FontAwesomeIcon icon={faServer} className="w-8 h-8 mx-auto mb-3" />
           <div className="text-sm font-medium mb-1">No MCP servers configured</div>
           <div className="text-xs mb-3">
             Configure global servers or add project-specific servers
           </div>
-          <button className="btn btn-primary btn-sm" onClick={onOpenAddModal}>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={onOpenAddModal}
+            data-testid="empty-state-add-server"
+          >
             <FontAwesomeIcon icon={faPlus} className="w-4 h-4 mr-1" />
             Add Server
           </button>
         </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingServerId && (
+        <AddMCPServerModal
+          isOpen={!!editingServerId}
+          onClose={handleCloseEditModal}
+          onAddServer={handleUpdateProjectServer}
+          loading={false}
+          initialData={{
+            id: editingServerId,
+            config: projectServers[editingServerId],
+          }}
+          isEditMode={true}
+        />
       )}
     </div>
   );
