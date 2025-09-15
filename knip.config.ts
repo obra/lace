@@ -33,6 +33,24 @@ export default {
     'autoprefixer',
     // Type definitions that may not be directly imported
     '@types/dompurify',
+    // React Router build-time dependencies
+    '@react-router/express',
+    '@react-router/node',
+    '@react-router/serve',
+    // Vite plugins used in config
+    '@vitejs/plugin-react',
+    '@sentry/vite-plugin',
+    // Development utilities
+    'concurrently',
+    'tsx',
+    // Server middleware dependencies
+    'compression',
+    'express',
+    'morgan',
+    'isbot',
+    '@types/compression',
+    '@types/express',
+    '@types/morgan',
   ],
   workspaces: {
     '.': {
@@ -41,13 +59,9 @@ export default {
       project: ['src/**/*.ts'],
     },
     'packages/web': {
-      // Web workspace - React Router v7
+      // Web workspace - React Router v7 with plugin auto-detection
       entry: [
-        // React Router v7 entry points
-        'app/entry.client.tsx',
-        'app/root.tsx',
-        'app/routes.ts',
-        // Server entrypoints
+        // Additional entry points not detected by React Router plugin
         'server-custom.ts',
         'server-production.ts',
         'server/app.ts', // Dynamically imported by server-custom.ts
