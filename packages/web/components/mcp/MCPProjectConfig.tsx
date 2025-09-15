@@ -9,6 +9,7 @@ import { faPlus, faServer } from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
 import type { MCPServerConfig } from '@/types/core';
 import { MCPServerCard } from './MCPServerCard';
+import { AddMCPServerModal } from '@/components/modals/AddMCPServerModal';
 
 interface MCPProjectConfigProps {
   projectId: string;
@@ -29,6 +30,7 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
   const [globalServers, setGlobalServers] = useState<Record<string, MCPServerConfig>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingServerId, setEditingServerId] = useState<string | null>(null);
 
   // Load project and global MCP configuration
   useEffect(() => {
@@ -78,6 +80,24 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
         delete updated[serverId];
         return updated;
       });
+    } catch (error) {
+      // Error handling
+    }
+  };
+
+  const handleEditProjectServer = (serverId: string) => {
+    setEditingServerId(serverId);
+  };
+
+  const handleCloseEditModal = () => {
+    setEditingServerId(null);
+  };
+
+  const handleUpdateProjectServer = async (serverId: string, config: MCPServerConfig) => {
+    try {
+      await api.put(`/api/projects/${projectId}/mcp/servers/${serverId}`, config);
+      setProjectServers((prev) => ({ ...prev, [serverId]: config }));
+      setEditingServerId(null);
     } catch (error) {
       // Error handling
     }
@@ -152,9 +172,7 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
                 config={config}
                 isGlobal={false}
                 showActions={true}
-                onEdit={() => {
-                  /* TODO: Edit functionality */
-                }}
+                onEdit={handleEditProjectServer}
                 onDelete={() => handleDeleteProjectServer(serverId)}
               />
             ))}
@@ -175,6 +193,21 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
             Add Server
           </button>
         </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingServerId && (
+        <AddMCPServerModal
+          isOpen={!!editingServerId}
+          onClose={handleCloseEditModal}
+          onAddServer={handleUpdateProjectServer}
+          loading={false}
+          initialData={{
+            id: editingServerId,
+            config: projectServers[editingServerId],
+          }}
+          isEditMode={true}
+        />
       )}
     </div>
   );
