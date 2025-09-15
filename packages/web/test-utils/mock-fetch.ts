@@ -59,7 +59,7 @@ export function createMockErrorResponse(
 /**
  * Creates a fetch mock function that handles common API patterns
  */
-export function createFetchMock(routes: Record<string, unknown>) {
+function createFetchMock(routes: Record<string, unknown>) {
   return (url: string | URL) => {
     const urlString = typeof url === 'string' ? url : url.toString();
 
