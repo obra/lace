@@ -86,4 +86,4 @@ export function useSessionAPI() {
   };
 }
 
-export type UseSessionAPIReturn = ReturnType<typeof useSessionAPI>;
+type UseSessionAPIReturn = ReturnType<typeof useSessionAPI>;
