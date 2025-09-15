@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getSessionService } from '@/lib/server/session-service';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import type { Agent, Session } from '@/lib/server/lace-imports';
-import { createMockAgent } from '@/test-utils/mock-agent';
+import { createMockAgent, createMockSession } from '@/test-utils/mock-agent';
 
 describe('Compaction SSE Events', () => {
   let sseManager: EventStreamManager;
@@ -25,7 +25,7 @@ describe('Compaction SSE Events', () => {
     mockAgent = createMockAgent({
       threadId: undefined as unknown as string, // This test expects threadId to be undefined
       getFullSession: async () =>
-        ({
+        createMockSession({
           getId: () => 'lace_20250809_def456',
           getProjectId: () => 'proj_789abc',
         }) as Session,
