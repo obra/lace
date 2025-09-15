@@ -64,23 +64,11 @@ export function createMockAgent(
 }
 
 /**
- * Creates a mock Agent that returns undefined from getFullSession (for testing edge cases)
- */
-function createMockAgentWithoutSession(
-  overrides: Parameters<typeof createMockAgent>[0] = {}
-): ReturnType<typeof createMockAgent> {
-  return createMockAgent({
-    ...overrides,
-    getFullSession: vi.fn().mockResolvedValue(undefined),
-  });
-}
-
-/**
  * Creates a mock Session for use with mock agents
  * @param overrides - Optional overrides for specific Session methods
  * @returns A mock Session object
  */
-function createMockSession(
+export function createMockSession(
   overrides: {
     getId?: () => string;
     getProjectId?: () => string;

@@ -48,5 +48,3 @@ export function useAgentAPI() {
     stopAgent,
   };
 }
-
-type UseAgentAPIReturn = ReturnType<typeof useAgentAPI>;
