@@ -9,6 +9,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import { BrowserRouter } from 'react-router';
 import { HomePage } from '@/app/HomePage';
 import { SettingsProvider } from '@/components/providers/SettingsProvider';
 
@@ -97,9 +98,11 @@ describe('HomePage', () => {
     });
 
     render(
-      <SettingsProvider>
-        <HomePage />
-      </SettingsProvider>
+      <BrowserRouter>
+        <SettingsProvider>
+          <HomePage />
+        </SettingsProvider>
+      </BrowserRouter>
     );
 
     expect(screen.getByTestId('loading-view')).toBeInTheDocument();
@@ -133,9 +136,11 @@ describe('HomePage', () => {
     });
 
     render(
-      <SettingsProvider>
-        <HomePage />
-      </SettingsProvider>
+      <BrowserRouter>
+        <SettingsProvider>
+          <HomePage />
+        </SettingsProvider>
+      </BrowserRouter>
     );
 
     await waitFor(() => {
@@ -173,9 +178,11 @@ describe('HomePage', () => {
     });
 
     render(
-      <SettingsProvider>
-        <HomePage />
-      </SettingsProvider>
+      <BrowserRouter>
+        <SettingsProvider>
+          <HomePage />
+        </SettingsProvider>
+      </BrowserRouter>
     );
 
     await waitFor(() => {
@@ -226,9 +233,11 @@ describe('HomePage', () => {
     });
 
     render(
-      <SettingsProvider>
-        <HomePageWithMock />
-      </SettingsProvider>
+      <BrowserRouter>
+        <SettingsProvider>
+          <HomePageWithMock />
+        </SettingsProvider>
+      </BrowserRouter>
     );
 
     await waitFor(() => {

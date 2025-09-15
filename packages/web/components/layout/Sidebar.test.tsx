@@ -62,34 +62,32 @@ describe('Sidebar', () => {
     expect(mockOnToggle).toHaveBeenCalledTimes(1);
   });
 
-  // NEW TESTS FOR TASK 3 - These should fail initially
-  it('calls onSettingsClick when settings button clicked (collapsed)', () => {
-    const mockOnSettingsClick = vi.fn();
+  // Settings button now navigates to /settings instead of calling onClick
+  it('navigates to settings when settings button clicked (collapsed)', () => {
     render(
       <BrowserRouter>
-        <Sidebar {...defaultProps} open={false} onSettingsClick={mockOnSettingsClick} />
+        <Sidebar {...defaultProps} open={false} />
       </BrowserRouter>
     );
 
     // When collapsed, only desktop collapsed settings button is visible
     const settingsButton = screen.getByLabelText('Open settings');
-    fireEvent.click(settingsButton);
-    expect(mockOnSettingsClick).toHaveBeenCalledTimes(1);
+    expect(settingsButton).toHaveAttribute('href', '/settings');
   });
 
-  it('calls onSettingsClick when settings button clicked (expanded)', () => {
-    const mockOnSettingsClick = vi.fn();
+  it('navigates to settings when settings button clicked (expanded)', () => {
     render(
       <BrowserRouter>
-        <Sidebar {...defaultProps} open={true} onSettingsClick={mockOnSettingsClick} />
+        <Sidebar {...defaultProps} open={true} />
       </BrowserRouter>
     );
 
-    // When expanded, both mobile and desktop settings buttons exist, click the first one
+    // When expanded, both mobile and desktop settings buttons exist
     const settingsButtons = screen.getAllByLabelText('Open settings');
     expect(settingsButtons.length).toBeGreaterThan(0);
-    fireEvent.click(settingsButtons[0]);
-    expect(mockOnSettingsClick).toHaveBeenCalledTimes(1);
+    settingsButtons.forEach((button) => {
+      expect(button).toHaveAttribute('href', '/settings');
+    });
   });
 
   it('does not render theme selector in footer', () => {
