@@ -62,7 +62,6 @@ export function MCPPanel() {
       setServers((prev) => ({ ...prev, [serverId]: config }));
       setShowAddModal(false);
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Add MCP server failed', error);
     } finally {
       setAddingServer(false);
@@ -85,7 +84,6 @@ export function MCPPanel() {
       setServers((prev) => ({ ...prev, [serverId]: config }));
       setEditingServerId(null);
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Update MCP server failed', error);
     }
   };
@@ -100,7 +98,6 @@ export function MCPPanel() {
         return updated;
       });
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Delete MCP server failed', error);
     }
   };

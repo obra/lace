@@ -9,9 +9,9 @@ import type { MCPServerConfig } from '@/types/core';
 
 // Mock FontAwesome icons
 vi.mock('@fortawesome/react-fontawesome', () => ({
-  FontAwesomeIcon: ({ icon, className }: any) => (
-    <span data-testid="icon" data-icon={icon.iconName} className={className}>
-      [{icon.iconName}]
+  FontAwesomeIcon: (props: { icon: { iconName: string }; className?: string }) => (
+    <span data-testid="icon" data-icon={props.icon.iconName} className={props.className}>
+      [{props.icon.iconName}]
     </span>
   ),
 }));
@@ -27,7 +27,7 @@ describe('MCPServerCard', () => {
       { name: 'write_file', description: 'Write file contents' },
       { name: 'list_directory', description: 'List directory contents' },
     ],
-    discoveryStatus: 'completed' as const,
+    discoveryStatus: 'success' as const,
   };
 
   it('should render global server correctly', () => {

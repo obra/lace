@@ -81,7 +81,6 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
         return updated;
       });
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error(`Delete project MCP server ${serverId} failed`, error);
     }
   };
@@ -100,7 +99,6 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
       setProjectServers((prev) => ({ ...prev, [serverId]: config }));
       setEditingServerId(null);
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error(`Update project MCP server ${serverId} failed`, error);
     }
   };

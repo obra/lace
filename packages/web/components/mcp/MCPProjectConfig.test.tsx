@@ -23,7 +23,7 @@ const mockGlobalServers = [
       { name: 'write_file', description: 'Write file contents' },
       { name: 'list_directory', description: 'List directory contents' },
     ],
-    discoveryStatus: 'completed' as const,
+    discoveryStatus: 'success' as const,
   },
 ];
 
@@ -38,7 +38,7 @@ const mockProjectServers = [
       { name: 'echo', description: 'Echo command' },
       { name: 'test_tool', description: 'Test tool' },
     ],
-    discoveryStatus: 'completed' as const,
+    discoveryStatus: 'success' as const,
   },
 ];
 
@@ -54,7 +54,14 @@ vi.mock('@/lib/api-client', () => ({
 
 // Mock the modal component
 vi.mock('@/components/modals/AddMCPServerModal', () => ({
-  AddMCPServerModal: ({ isOpen, onAddServer, initialData, isEditMode, onClose }: any) => {
+  AddMCPServerModal: (props: {
+    isOpen: boolean;
+    onAddServer: (id: string, config: MCPServerConfig) => void;
+    initialData?: { id: string; config: MCPServerConfig };
+    isEditMode?: boolean;
+    onClose: () => void;
+  }) => {
+    const { isOpen, onAddServer, initialData, isEditMode, onClose } = props;
     if (!isOpen) return null;
     return (
       <div data-testid="edit-mcp-modal">
@@ -89,7 +96,7 @@ describe('MCPProjectConfig Integration Tests', () => {
     vi.clearAllMocks();
 
     // Setup default API responses
-    (api.get as any).mockImplementation((url: string) => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === '/api/mcp/servers') {
         return Promise.resolve({ servers: mockGlobalServers });
       }
@@ -102,8 +109,8 @@ describe('MCPProjectConfig Integration Tests', () => {
       return Promise.reject(new Error(`Unexpected API call: ${url}`));
     });
 
-    (api.put as any).mockResolvedValue({ success: true });
-    (api.delete as any).mockResolvedValue({ success: true });
+    vi.mocked(api.put).mockResolvedValue({ success: true });
+    vi.mocked(api.delete).mockResolvedValue({ success: true });
   });
 
   afterEach(() => {
@@ -237,7 +244,7 @@ describe('MCPProjectConfig Integration Tests', () => {
 
   it('should display empty state when no servers are configured', async () => {
     // Override API to return empty results
-    (api.get as any).mockImplementation((url: string) => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === '/api/mcp/servers') {
         return Promise.resolve({ servers: [] });
       }
@@ -267,7 +274,7 @@ describe('MCPProjectConfig Integration Tests', () => {
 
   it('should handle API errors gracefully', async () => {
     // Make API calls fail
-    (api.get as any).mockRejectedValue(new Error('Network error'));
+    vi.mocked(api.get).mockRejectedValue(new Error('Network error'));
 
     render(<MCPProjectConfig projectId={mockProjectId} />);
 
@@ -289,7 +296,7 @@ describe('MCPProjectConfig Integration Tests', () => {
       discoveryError: '-32000',
     };
 
-    (api.get as any).mockImplementation((url: string) => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === '/api/mcp/servers') {
         return Promise.resolve({ servers: [] });
       }

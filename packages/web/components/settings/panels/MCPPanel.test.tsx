@@ -21,7 +21,7 @@ const mockGlobalServers = [
       { name: 'write_file', description: 'Write file contents' },
       { name: 'list_directory', description: 'List directory contents' },
     ],
-    discoveryStatus: 'completed' as const,
+    discoveryStatus: 'success' as const,
   },
   {
     id: 'test-server',
@@ -47,7 +47,14 @@ vi.mock('@/lib/api-client', () => ({
 
 // Mock the modal component
 vi.mock('@/components/modals/AddMCPServerModal', () => ({
-  AddMCPServerModal: ({ isOpen, onAddServer, initialData, isEditMode, onClose }: any) => {
+  AddMCPServerModal: (props: {
+    isOpen: boolean;
+    onAddServer: (id: string, config: MCPServerConfig) => void;
+    initialData?: { id: string; config: MCPServerConfig };
+    isEditMode?: boolean;
+    onClose: () => void;
+  }) => {
+    const { isOpen, onAddServer, initialData, isEditMode, onClose } = props;
     if (!isOpen) return null;
     return (
       <div data-testid="mcp-modal">
@@ -95,10 +102,10 @@ describe('MCPPanel Integration Tests', () => {
     vi.clearAllMocks();
 
     // Setup default API responses
-    (api.get as any).mockResolvedValue({ servers: mockGlobalServers });
-    (api.put as any).mockResolvedValue({ success: true });
-    (api.delete as any).mockResolvedValue({ success: true });
-    (api.post as any).mockResolvedValue({ success: true });
+    vi.mocked(api.get).mockResolvedValue({ servers: mockGlobalServers });
+    vi.mocked(api.put).mockResolvedValue({ success: true });
+    vi.mocked(api.delete).mockResolvedValue({ success: true });
+    vi.mocked(api.post).mockResolvedValue({ success: true });
   });
 
   afterEach(() => {
@@ -276,7 +283,7 @@ describe('MCPPanel Integration Tests', () => {
 
   it('should display empty state when no servers are configured', async () => {
     // Override API to return empty results
-    (api.get as any).mockResolvedValue({ servers: [] });
+    vi.mocked(api.get).mockResolvedValue({ servers: [] });
 
     render(<MCPPanel />);
 
@@ -298,7 +305,7 @@ describe('MCPPanel Integration Tests', () => {
 
   it('should handle API errors gracefully', async () => {
     // Make API calls fail
-    (api.get as any).mockRejectedValue(new Error('Network error'));
+    vi.mocked(api.get).mockRejectedValue(new Error('Network error'));
 
     render(<MCPPanel />);
 
@@ -310,7 +317,7 @@ describe('MCPPanel Integration Tests', () => {
 
   it('should show loading state initially', () => {
     // Don't resolve the API call immediately
-    (api.get as any).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(api.get).mockImplementation(() => new Promise(() => {}));
 
     render(<MCPPanel />);
 
@@ -334,11 +341,11 @@ describe('MCPPanel Integration Tests', () => {
         enabled: true,
         tools: {},
         discoveredTools: [{ name: 'tool1', description: 'Tool 1' }],
-        discoveryStatus: 'completed' as const,
+        discoveryStatus: 'success' as const,
       },
     ];
 
-    (api.get as any).mockResolvedValue({ servers: serversWithDifferentStates });
+    vi.mocked(api.get).mockResolvedValue({ servers: serversWithDifferentStates });
 
     render(<MCPPanel />);
 
