@@ -3,6 +3,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { checkReleaseNotesStatus, markReleaseNotesAsSeen } from './release-notes-service';
+import { api } from '@/lib/api-client';
 
 // Mock the generated release notes metadata
 vi.mock('@/app/generated/release-notes-meta.json', () => ({
@@ -13,9 +14,12 @@ vi.mock('@/app/generated/release-notes-meta.json', () => ({
   },
 }));
 
-// Mock fetch for markReleaseNotesAsSeen
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+// Mock the api client
+vi.mock('@/lib/api-client', () => ({
+  api: {
+    patch: vi.fn(),
+  },
+}));
 
 describe('release-notes-service', () => {
   beforeEach(() => {
@@ -60,36 +64,27 @@ describe('release-notes-service', () => {
 
   describe('markReleaseNotesAsSeen', () => {
     it('should send PATCH request to update settings', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
+      const mockPatch = vi.mocked(api.patch);
+      mockPatch.mockResolvedValue({});
 
       await markReleaseNotesAsSeen('test-hash-123');
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/settings', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          lastSeenReleaseNotesHash: 'test-hash-123',
-        }),
+      expect(mockPatch).toHaveBeenCalledWith('/api/settings', {
+        lastSeenReleaseNotesHash: 'test-hash-123',
       });
     });
 
     it('should handle failed API requests gracefully', async () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      mockFetch.mockResolvedValue({
-        ok: false,
-        statusText: 'Internal Server Error',
-      });
+      const mockPatch = vi.mocked(api.patch);
+      const apiError = new Error('Internal Server Error');
+      mockPatch.mockRejectedValue(apiError);
 
       await expect(markReleaseNotesAsSeen('test-hash-123')).resolves.toBeUndefined();
 
       expect(consoleSpy).toHaveBeenCalledWith(
         'Failed to update release notes seen status:',
-        'Internal Server Error'
+        apiError
       );
 
       consoleSpy.mockRestore();
@@ -97,8 +92,9 @@ describe('release-notes-service', () => {
 
     it('should handle network errors gracefully', async () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const mockPatch = vi.mocked(api.patch);
       const networkError = new Error('Network error');
-      mockFetch.mockRejectedValue(networkError);
+      mockPatch.mockRejectedValue(networkError);
 
       await expect(markReleaseNotesAsSeen('test-hash-123')).resolves.toBeUndefined();
 
