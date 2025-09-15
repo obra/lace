@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComments } from '@/lib/fontawesome';
 import * as Sentry from '@sentry/react';
@@ -23,10 +23,12 @@ export function FeedbackSection({ isMobile = false, onCloseMobileNav }: Feedback
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
 
+  // Refs for focus management
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+
   // Load user email from settings when modal opens
   const loadUserEmail = useCallback(async () => {
-    if (userEmail) return; // Don't reload if already set
-
     try {
       setIsLoadingSettings(true);
       const settings = await api.get<Record<string, unknown>>('/api/settings');
@@ -38,7 +40,7 @@ export function FeedbackSection({ isMobile = false, onCloseMobileNav }: Feedback
     } finally {
       setIsLoadingSettings(false);
     }
-  }, [userEmail]);
+  }, []);
 
   // Handle escape key to close modal
   const handleKeyDown = useCallback(
@@ -50,17 +52,24 @@ export function FeedbackSection({ isMobile = false, onCloseMobileNav }: Feedback
     [showFeedbackModal]
   );
 
-  // Add/remove escape key listener
+  // Add/remove escape key listener and manage focus
   useEffect(() => {
     if (showFeedbackModal) {
       document.addEventListener('keydown', handleKeyDown);
-      void loadUserEmail(); // Load email when modal opens
+      // Only load email if not already set
+      if (!userEmail) {
+        void loadUserEmail();
+      }
+      // Focus textarea when modal opens
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 100);
     }
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [showFeedbackModal, handleKeyDown, loadUserEmail]);
+  }, [showFeedbackModal, handleKeyDown, loadUserEmail, userEmail]);
 
   const handleFeedbackSubmit = async () => {
     if (!feedbackText.trim()) return;
@@ -88,10 +97,10 @@ export function FeedbackSection({ isMobile = false, onCloseMobileNav }: Feedback
       // Clear form and show success alert
       setFeedbackText('');
       setShowSuccessAlert(true);
+      // Hide alert after 3 seconds but let user close modal manually
       setTimeout(() => {
         setShowSuccessAlert(false);
-        setShowFeedbackModal(false);
-      }, 2000);
+      }, 3000);
 
       // Close mobile nav if this is mobile
       if (isMobile && onCloseMobileNav) {
@@ -132,16 +141,24 @@ export function FeedbackSection({ isMobile = false, onCloseMobileNav }: Feedback
 
       {/* Feedback Modal */}
       <div className={`modal ${showFeedbackModal ? 'modal-open' : ''}`}>
-        <div className="modal-box max-w-md p-0 bg-base-100 shadow-2xl">
+        <div
+          ref={modalRef}
+          className="modal-box max-w-md p-0 bg-base-100 shadow-2xl"
+          role="dialog"
+          aria-labelledby="feedback-title"
+          aria-describedby="feedback-description"
+        >
           {/* Header */}
           <div className="bg-gradient-to-r from-primary/10 to-secondary/10 p-6 pb-4">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
                 <FontAwesomeIcon icon={faComments} className="w-4 h-4 text-primary" />
               </div>
-              <h3 className="text-xl font-bold text-base-content">Share Your Feedback</h3>
+              <h3 id="feedback-title" className="text-xl font-bold text-base-content">
+                Share Your Feedback
+              </h3>
             </div>
-            <p className="text-base-content/70 text-sm">
+            <p id="feedback-description" className="text-base-content/70 text-sm">
               Help us make Lace better with your thoughts, bug reports, or feature ideas.
             </p>
           </div>
@@ -154,40 +171,51 @@ export function FeedbackSection({ isMobile = false, onCloseMobileNav }: Feedback
                   What&apos;s on your mind?
                 </span>
                 <textarea
+                  ref={textareaRef}
                   className="textarea textarea-bordered w-full h-24 resize-none text-sm placeholder:text-base-content/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                   placeholder="Share your experience, report bugs, suggest features..."
                   value={feedbackText}
                   onChange={(e) => setFeedbackText(e.target.value)}
                   disabled={isSubmitting || isLoadingSettings}
                   data-sentry-mask
+                  aria-label="Feedback message"
                 />
               </label>
             </div>
 
             <div className="space-y-2">
               <label className="block">
-                <span className="text-sm font-medium text-base-content/90 mb-1 block">
+                <span className="text-sm font-medium text-base-content/90 mb-1 flex items-center gap-2">
                   Email <span className="text-base-content/50 font-normal">(optional)</span>
+                  {isLoadingSettings && (
+                    <span
+                      className="loading loading-spinner loading-xs"
+                      aria-label="Loading email"
+                    />
+                  )}
                 </span>
                 <input
                   type="email"
                   className="input input-bordered w-full text-sm placeholder:text-base-content/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                  placeholder={isLoadingSettings ? 'Loading...' : 'your.email@example.com'}
+                  placeholder="your.email@example.com"
                   value={userEmail}
                   onChange={(e) => setUserEmail(e.target.value)}
                   disabled={isSubmitting || isLoadingSettings}
+                  aria-label="Email address"
                 />
               </label>
             </div>
 
             {/* Success Alert */}
             {showSuccessAlert && (
-              <Alert
-                variant="success"
-                title="Thank you for your feedback!"
-                style="soft"
-                className="text-sm"
-              />
+              <div role="status" aria-live="polite">
+                <Alert
+                  variant="success"
+                  title="Thank you for your feedback!"
+                  style="soft"
+                  className="text-sm"
+                />
+              </div>
             )}
 
             {/* Action Buttons */}
