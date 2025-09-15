@@ -12,9 +12,13 @@ export default {
     'packages/web/e2e/**/*',
     // Development/testing infrastructure - always ignore
     'packages/web/e2e-test-server.ts',
+    'packages/web/e2e/**/*',
     'packages/web/feedback/story-types.ts',
     'packages/web/ladle.config.mjs',
     'packages/web/scripts/start-test-server.js',
+    'packages/web/lib/server/data-dir-init.ts', // Server initialization
+    // Config files
+    'packages/web/eslint.config.js',
   ],
   ignoreDependencies: [
     // ESLint tooling - used in config files that knip has trouble analyzing
