@@ -68,17 +68,21 @@ export class ProviderInstanceManager {
   }
 
   async saveInstances(config: ProviderInstancesConfig): Promise<void> {
-    // Serialize access to prevent concurrent writes from corrupting JSON
-    // Use static lock to coordinate across all manager instances
-    if (ProviderInstanceManager.savePromise) {
-      await ProviderInstanceManager.savePromise;
-    }
+    // Chain promises to ensure proper serialization of saves
+    // This prevents race conditions where multiple saves start simultaneously
+    const currentPromise = (ProviderInstanceManager.savePromise ?? Promise.resolve())
+      .then(() => this.performSave(config))
+      .catch(() => this.performSave(config)); // Retry even if previous save failed
 
-    ProviderInstanceManager.savePromise = this.performSave(config);
+    ProviderInstanceManager.savePromise = currentPromise;
+
     try {
-      await ProviderInstanceManager.savePromise;
+      await currentPromise;
     } finally {
-      ProviderInstanceManager.savePromise = null;
+      // Only clear if this is still the current promise
+      if (ProviderInstanceManager.savePromise === currentPromise) {
+        ProviderInstanceManager.savePromise = null;
+      }
     }
   }
 

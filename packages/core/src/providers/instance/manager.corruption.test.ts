@@ -159,6 +159,11 @@ describe('ProviderInstanceManager - Corruption Reproduction', () => {
   });
 
   it('should handle file system errors gracefully', async () => {
+    // Skip on Windows as directory permissions work differently
+    if (process.platform === 'win32') {
+      return;
+    }
+
     const config: ProviderInstancesConfig = {
       version: '1.0',
       instances: {
@@ -169,16 +174,18 @@ describe('ProviderInstanceManager - Corruption Reproduction', () => {
       },
     };
 
-    // Make the directory read-only to trigger an error
+    // Write initial content
     const configPath = path.join(tempDir, 'provider-instances.json');
     fs.writeFileSync(configPath, 'initial content');
-    fs.chmodSync(configPath, 0o444); // Read-only
+
+    // Make the directory read-only to prevent writes (POSIX behavior)
+    fs.chmodSync(tempDir, 0o555); // Read-only directory
 
     // This should throw but not corrupt
     await expect(manager.saveInstances(config)).rejects.toThrow();
 
     // Restore permissions and verify file is unchanged
-    fs.chmodSync(configPath, 0o644);
+    fs.chmodSync(tempDir, 0o755);
     const content = fs.readFileSync(configPath, 'utf-8');
     expect(content).toBe('initial content');
   });
