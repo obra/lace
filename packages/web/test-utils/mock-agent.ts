@@ -66,7 +66,7 @@ export function createMockAgent(
 /**
  * Creates a mock Agent that returns undefined from getFullSession (for testing edge cases)
  */
-export function createMockAgentWithoutSession(
+function createMockAgentWithoutSession(
   overrides: Parameters<typeof createMockAgent>[0] = {}
 ): ReturnType<typeof createMockAgent> {
   return createMockAgent({
@@ -80,7 +80,7 @@ export function createMockAgentWithoutSession(
  * @param overrides - Optional overrides for specific Session methods
  * @returns A mock Session object
  */
-export function createMockSession(
+function createMockSession(
   overrides: {
     getId?: () => string;
     getProjectId?: () => string;
