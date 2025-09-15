@@ -5,11 +5,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faServer, faEdit, faTrash } from '@/lib/fontawesome';
+import { faPlus, faServer } from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
 import type { MCPServerConfig } from '@/types/core';
-import { ToolPolicySelector } from '@/components/ui/ToolPolicySelector';
-import type { ToolPolicy } from '@/types/core';
+import { MCPServerCard } from './MCPServerCard';
 
 interface MCPProjectConfigProps {
   projectId: string;
@@ -84,31 +83,6 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
     }
   };
 
-  const handleToolPolicyChange = async (serverId: string, toolName: string, policy: ToolPolicy) => {
-    try {
-      // Check if this is a project server or global override
-      const isProjectServer = serverId in projectServers;
-      const currentConfig = isProjectServer ? projectServers[serverId] : globalServers[serverId];
-
-      const updatedConfig = {
-        ...currentConfig,
-        tools: {
-          ...currentConfig.tools,
-          [toolName]: policy,
-        },
-      };
-
-      if (isProjectServer) {
-        await api.put(`/api/projects/${projectId}/mcp/servers/${serverId}`, updatedConfig);
-        setProjectServers((prev) => ({ ...prev, [serverId]: updatedConfig }));
-      } else {
-        // TODO: Handle global server policy override for project
-      }
-    } catch (error) {
-      // Error handling
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center items-center p-4">
@@ -154,34 +128,13 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
           </h4>
           <div className="space-y-3">
             {Object.entries(globalServers).map(([serverId, config]) => (
-              <div key={serverId} className="border-l-4 border-base-300 pl-3 py-2 bg-base-50">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{serverId}</span>
-                    <code className="bg-base-200 px-2 py-1 rounded text-xs">
-                      {config.command} {config.args?.join(' ')}
-                    </code>
-                  </div>
-                </div>
-
-                {/* Tool policies */}
-                <div className="ml-2 space-y-1">
-                  {config.discoveredTools?.map((tool) => {
-                    const currentPolicy = config.tools[tool.name] || 'ask';
-                    return (
-                      <div key={tool.name} className="flex items-center gap-2 text-xs">
-                        <ToolPolicySelector
-                          value={currentPolicy as ToolPolicy}
-                          onChange={(policy) => handleToolPolicyChange(serverId, tool.name, policy)}
-                          size="xs"
-                          context="project"
-                        />
-                        <span className="font-mono">{tool.name}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <MCPServerCard
+                key={serverId}
+                serverId={serverId}
+                config={config}
+                isGlobal={true}
+                showActions={false}
+              />
             ))}
           </div>
         </div>
@@ -193,53 +146,17 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
           <h4 className="text-sm font-medium text-primary mb-2">Project-Specific Servers</h4>
           <div className="space-y-3">
             {Object.entries(projectServers).map(([serverId, config]) => (
-              <div key={serverId} className="border-l-4 border-primary pl-3 py-2">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{serverId}</span>
-                    <span className="badge badge-primary badge-xs">project only</span>
-                    <code className="bg-base-200 px-2 py-1 rounded text-xs">
-                      {config.command} {config.args?.join(' ')}
-                    </code>
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      className="btn btn-xs btn-outline"
-                      onClick={() => {
-                        /* TODO: Edit */
-                      }}
-                      title="Edit Server"
-                    >
-                      <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
-                    </button>
-                    <button
-                      className="btn btn-xs btn-outline btn-error"
-                      onClick={() => handleDeleteProjectServer(serverId)}
-                      title="Delete Server"
-                    >
-                      <FontAwesomeIcon icon={faTrash} className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Tool policies */}
-                <div className="ml-2 space-y-1">
-                  {config.discoveredTools?.map((tool) => {
-                    const currentPolicy = config.tools[tool.name] || 'ask';
-                    return (
-                      <div key={tool.name} className="flex items-center gap-2 text-xs">
-                        <ToolPolicySelector
-                          value={currentPolicy as ToolPolicy}
-                          onChange={(policy) => handleToolPolicyChange(serverId, tool.name, policy)}
-                          size="xs"
-                          context="project"
-                        />
-                        <span className="font-mono">{tool.name}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <MCPServerCard
+                key={serverId}
+                serverId={serverId}
+                config={config}
+                isGlobal={false}
+                showActions={true}
+                onEdit={() => {
+                  /* TODO: Edit functionality */
+                }}
+                onDelete={() => handleDeleteProjectServer(serverId)}
+              />
             ))}
           </div>
         </div>

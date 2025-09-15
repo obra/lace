@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AddMCPServerModal } from '@/components/modals/AddMCPServerModal';
+import { MCPServerCard } from '@/components/mcp/MCPServerCard';
 import { api } from '@/lib/api-client';
 import type { MCPServerConfig } from '@/types/core';
 
@@ -142,53 +143,15 @@ export function MCPPanel() {
       {/* Server List */}
       <div className="space-y-4">
         {Object.entries(servers).map(([serverId, config]) => (
-          <div
+          <MCPServerCard
             key={serverId}
-            className="border-l-4 border-base-300 pl-4 py-3 bg-base-50 rounded-lg"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-3">
-                <span className="w-2 h-2 bg-base-400 rounded-full"></span>
-                <span className="font-semibold">{serverId}</span>
-                <code className="bg-base-200 px-2 py-1 rounded text-xs">
-                  {config.command} {config.args?.join(' ')}
-                </code>
-                {config.discoveryStatus === 'discovering' && (
-                  <span className="loading loading-spinner loading-xs"></span>
-                )}
-              </div>
-              <div className="flex gap-1">
-                <button
-                  className="btn btn-xs btn-outline"
-                  onClick={() => handleEditServer(serverId)}
-                  title="Edit Server"
-                >
-                  Edit
-                </button>
-                <button
-                  className="btn btn-xs btn-outline btn-error"
-                  onClick={() => handleDeleteServer(serverId)}
-                  title="Delete Server"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-
-            {/* Discovery Status */}
-            {config.discoveryStatus === 'failed' && (
-              <div className="text-xs text-error mb-2 ml-5">
-                Discovery failed: {config.discoveryError}
-              </div>
-            )}
-
-            {/* Tool list summary */}
-            {config.discoveredTools && config.discoveredTools.length > 0 && (
-              <div className="ml-5 text-xs text-base-content/60">
-                Tools: {config.discoveredTools.map((tool) => tool.name).join(', ')}
-              </div>
-            )}
-          </div>
+            serverId={serverId}
+            config={config}
+            isGlobal={true}
+            showActions={true}
+            onEdit={handleEditServer}
+            onDelete={handleDeleteServer}
+          />
         ))}
 
         {Object.keys(servers).length === 0 && (
