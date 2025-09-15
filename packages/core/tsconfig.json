@@ -5,9 +5,9 @@
     "moduleResolution": "Bundler",
     "outDir": "./dist",
     "rootDir": "./src",
-    "baseUrl": "./src",
+    "baseUrl": ".",
     "paths": {
-      "~/*": ["./*"]
+      "~/*": ["src/*"]
     },
     "typeRoots": ["./node_modules/@types", "../../node_modules/@types"],
     "types": ["bun"],
