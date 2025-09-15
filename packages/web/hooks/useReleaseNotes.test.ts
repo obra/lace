@@ -2,7 +2,7 @@
 // ABOUTME: Tests hook behavior with different user settings scenarios using real implementation
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { useReleaseNotes } from './useReleaseNotes';
 
 // Mock fetch globally like other tests do

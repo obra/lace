@@ -2,11 +2,9 @@
 // ABOUTME: Sets up test environment for Next.js components and API routes
 
 import { defineConfig } from 'vitest/config';
-import { plugin as markdown, Mode } from 'vite-plugin-markdown';
 import path from 'path';
 
 export default defineConfig({
-  plugins: [markdown({ mode: [Mode.RAW] })],
   test: {
     environment: 'jsdom',
     globals: true,
