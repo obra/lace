@@ -3,7 +3,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { motion } from 'motion/react';
 import { UIProvider } from '@/components/providers/UIProvider';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
@@ -23,9 +23,13 @@ function SettingsPageInner({ children, activeTab }: SettingsPageLayoutProps) {
   const { sidebarOpen, toggleSidebar } = useUIContext();
   const navigate = useNavigate();
 
-  const handleSwitchProject = () => {
+  const handleSwitchProject = useCallback(() => {
     navigate('/');
-  };
+  }, [navigate]);
+
+  const handleAgentSelect = useCallback(() => {
+    // No-op for settings pages
+  }, []);
 
   return (
     <motion.div
@@ -39,9 +43,9 @@ function SettingsPageInner({ children, activeTab }: SettingsPageLayoutProps) {
         <Sidebar open={sidebarOpen} onToggle={toggleSidebar}>
           <SidebarContent
             isMobile={false}
-            onCloseMobileNav={() => toggleSidebar()}
+            onCloseMobileNav={toggleSidebar}
             onSwitchProject={handleSwitchProject}
-            onAgentSelect={() => {}}
+            onAgentSelect={handleAgentSelect}
           />
         </Sidebar>
       </div>

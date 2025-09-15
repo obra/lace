@@ -231,6 +231,20 @@ export function ProviderInstanceCard({
   // Track if this is the initial load to prevent saving on mount
   const [hasInitialized, setHasInitialized] = useState(false);
 
+  // Resync modelConfig when instance changes (e.g., after server fetch)
+  useEffect(() => {
+    setModelConfig(
+      instance.modelConfig || {
+        enableNewModels: true,
+        disabledModels: [],
+        disabledProviders: [],
+        filters: {},
+      }
+    );
+    // Reset init flag to prevent auto-saving freshly loaded server state
+    setHasInitialized(false);
+  }, [instance.id, instance.modelConfig]);
+
   // Auto-save on config changes (debounced)
   useEffect(() => {
     // Skip if this is the initial render or no model management needed
