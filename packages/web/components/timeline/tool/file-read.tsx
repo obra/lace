@@ -59,6 +59,11 @@ export const fileReadRenderer: ToolRenderer = {
   },
 
   isError: (result: ToolResult): boolean => {
+    // Handle preview results - they should not be treated as errors
+    const metadata = result.metadata as { isPreview?: boolean } | undefined;
+    if (metadata?.isPreview) {
+      return false;
+    }
     // Trust the tool's own error flag - it knows if it failed
     return result.status !== 'completed';
   },

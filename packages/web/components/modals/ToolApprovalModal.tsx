@@ -19,6 +19,11 @@ import {
   createPreviewResult,
   shouldShowPartialDiff,
 } from './tool-approval-preview';
+import { api } from '@/lib/api-client';
+import { encodePathSegments } from '@/lib/path-utils';
+import type { SessionFileContentResponse } from '@/types/session-files';
+import type { ToolResult } from '@/components/timeline/tool/types';
+import { useSessionContext } from '@/components/providers/SessionProvider';
 
 interface ToolApprovalModalProps {
   approvals: PendingApproval[];
@@ -28,6 +33,8 @@ interface ToolApprovalModalProps {
 export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
+  const [filePreviewCache, setFilePreviewCache] = useState<Map<string, ToolResult>>(new Map());
+  const { selectedSession } = useSessionContext();
   const currentApproval = approvals[currentIndex];
   const request = currentApproval?.requestData;
 
@@ -69,6 +76,77 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [onDecision, currentApproval, currentIndex, approvals.length]);
+
+  // Fetch file content for file_read previews
+  useEffect(() => {
+    const toolName = request?.toolName || currentApproval?.toolCall?.name;
+    if (toolName !== 'file_read' || !currentApproval || !selectedSession) return;
+
+    const args = request?.input || currentApproval.toolCall?.arguments;
+    const readArgs = args as { path?: string; startLine?: number; endLine?: number } | undefined;
+
+    if (!readArgs?.path) return;
+
+    const cacheKey = `${currentApproval.toolCallId}-${readArgs.path}-${readArgs.startLine}-${readArgs.endLine}`;
+
+    // Check if we already have this file content cached
+    if (filePreviewCache.has(cacheKey)) return;
+
+    // Fetch file content from the server using the API client
+    const fetchFileContent = async () => {
+      try {
+        const encodedPath = encodePathSegments(readArgs.path!);
+        const fileData = await api.get<SessionFileContentResponse>(
+          `/api/sessions/${selectedSession}/files/${encodedPath}`
+        );
+
+        let content = fileData.content || '';
+
+        // Apply line range if specified (same logic as the file_read tool)
+        if (readArgs.startLine || readArgs.endLine) {
+          const lines = content.split('\n');
+          const start = Math.max(0, (readArgs.startLine || 1) - 1);
+          const end =
+            readArgs.endLine !== undefined
+              ? Math.min(lines.length, readArgs.endLine)
+              : lines.length;
+          const resultLines = lines.slice(start, end);
+          content = resultLines.join('\n');
+        }
+
+        // Create a result with the actual file content (same format as successful file_read)
+        const previewResult: ToolResult = {
+          status: 'completed', // Use completed so it renders as success
+          content: [{ type: 'text', text: content }],
+          metadata: {
+            isPreview: true,
+            arguments: args,
+            totalLines: fileData.content?.split('\n').length,
+            linesReturned: content.split('\n').length,
+            fileSize: fileData.size ? `${Math.round(fileData.size / 1024)} KB` : undefined,
+          },
+        };
+
+        setFilePreviewCache((prev) => new Map(prev).set(cacheKey, previewResult));
+      } catch (error) {
+        // Create an error result for display
+        const errorResult: ToolResult = {
+          status: 'pending', // Keep as pending to show as preview
+          content: [
+            {
+              type: 'text',
+              text: `Cannot preview ${readArgs.path}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            },
+          ],
+          metadata: { isPreview: true, arguments: args },
+        };
+
+        setFilePreviewCache((prev) => new Map(prev).set(cacheKey, errorResult));
+      }
+    };
+
+    void fetchFileContent();
+  }, [currentApproval, request, selectedSession, filePreviewCache]);
 
   // Early return after hooks to satisfy React rules
   if (!currentApproval || !request) return null;
@@ -174,29 +252,73 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
                       })()}
 
                     {/* All Tools: Use existing renderer directly */}
-                    <div>
+                    <div className="max-w-full overflow-hidden">
                       {(() => {
                         const renderer = getToolRenderer(toolName);
-                        const mockResult = createPreviewResult(toolName, args);
+
+                        // For file_read tools, use cached file content if available
+                        let resultToRender: ToolResult;
+                        let cachedResult: ToolResult | undefined;
+
+                        if (toolName === 'file_read') {
+                          const readArgs = args as
+                            | { path?: string; startLine?: number; endLine?: number }
+                            | undefined;
+                          const cacheKey = `${currentApproval.toolCallId}-${readArgs?.path}-${readArgs?.startLine}-${readArgs?.endLine}`;
+                          cachedResult = filePreviewCache.get(cacheKey);
+                          resultToRender = cachedResult || createPreviewResult(toolName, args);
+                        } else {
+                          resultToRender = createPreviewResult(toolName, args);
+                        }
+
                         const aggregatedData = {
                           call: {
                             id: 'preview',
                             name: toolName,
                             arguments: (args as Record<string, unknown>) || {},
                           },
-                          result: mockResult,
+                          result: resultToRender,
                           toolName: toolName,
                           toolId: 'preview',
                           arguments: args,
                         };
 
-                        return (
-                          renderer.renderResult?.(mockResult, aggregatedData) || (
-                            <div className="p-3 text-sm text-base-content/60">
-                              Preview not available for this tool type
-                            </div>
-                          )
+                        const renderedContent = renderer.renderResult?.(
+                          resultToRender,
+                          aggregatedData
+                        ) || (
+                          <div className="p-3 text-sm text-base-content/60">
+                            Preview not available for this tool type
+                          </div>
                         );
+
+                        // For file_read tools, wrap in a container that prevents line wrapping
+                        if (toolName === 'file_read' && cachedResult?.status === 'completed') {
+                          return (
+                            <div
+                              className="max-h-[400px] overflow-auto"
+                              style={{
+                                // Override any text wrapping in child elements
+                                maxWidth: '100%',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  // Apply to all text content within
+                                  whiteSpace: 'pre',
+                                  overflowWrap: 'normal',
+                                  wordBreak: 'normal',
+                                  fontSize: 'inherit',
+                                }}
+                                className="[&_pre]:!whitespace-pre [&_code]:!whitespace-pre [&_*]:!overflow-wrap-normal [&_*]:!word-break-normal"
+                              >
+                                {renderedContent}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return renderedContent;
                       })()}
                     </div>
                   </div>
