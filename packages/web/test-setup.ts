@@ -12,16 +12,21 @@ beforeAll(() => {
   if (typeof process !== 'undefined' && process.title) {
     try {
       // Get the current test file from Vitest's internal state
-      const testFile =
-        globalThis.__vitest_worker__?.filepath ||
-        (globalThis.expect?.getState && globalThis.expect.getState().testPath) ||
+      const vitestWorker = globalThis.__vitest_worker__ as { filepath?: string } | undefined;
+      const expectState = globalThis.expect as
+        | { getState?: () => { testPath?: string } }
+        | undefined;
+
+      const testFile: string =
+        vitestWorker?.filepath ||
+        (expectState?.getState && expectState.getState().testPath) ||
         process.env.VITEST_TEST_NAME ||
         '';
 
-      if (testFile) {
+      if (testFile && typeof testFile === 'string') {
         // Get project root (where package.json is)
         const projectRoot = process.cwd();
-        let relativePath = testFile;
+        let relativePath: string = testFile;
 
         // Handle file:// URLs from import.meta.url
         if (testFile.startsWith('file://')) {
@@ -40,7 +45,7 @@ beforeAll(() => {
       } else {
         process.title = 'vitest:web:unknown';
       }
-    } catch (error) {
+    } catch (_error) {
       process.title = 'vitest:web:error';
     }
   }

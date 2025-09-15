@@ -13,7 +13,7 @@ import {
 import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import type { Task } from '~/tasks/types';
-import { setupCoreTest, type EnhancedTempLaceDirContext } from '~/test-utils/core-test-setup';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -161,7 +161,7 @@ describe('Enhanced Task Manager Tools', () => {
       try {
         // Manually trigger abort to clean up any pending operations
         (context.signal as any).aborted = true;
-      } catch (error) {
+      } catch (_error) {
         // Ignore errors when cleaning up AbortController
       }
     }

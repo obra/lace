@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskManager } from '~/tasks/task-manager';
 import { DatabasePersistence, getPersistence } from '~/persistence/database';
-import { setupCoreTest, type EnhancedTempLaceDirContext } from '~/test-utils/core-test-setup';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { Task, CreateTaskRequest, TaskContext } from '~/tasks/types';
 import { asThreadId } from '~/threads/types';
 
