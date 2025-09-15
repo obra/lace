@@ -306,5 +306,4 @@ if (import.meta.hot && import.meta.hot.data) {
 // Export the store
 export const useSSEStore = sseStore;
 
-// Export types for external usage
-export type { EventFilter, EventSubscription };
+// Types used internally only
