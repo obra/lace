@@ -115,7 +115,7 @@ export function resolveResourcePath(importMetaUrl: string, relativePath: string)
  * @param fallbackFsPath - Filesystem path to use in development mode
  * @returns Array of objects with file name and loading function
  */
-export interface EmbeddedFileInfo {
+interface EmbeddedFileInfo {
   name: string; // Just the filename without extension
   fullPath: string; // Full path for reference
   loadContent: () => Promise<string>;
