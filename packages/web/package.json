@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "NODE_ENV=development NODE_OPTIONS='--import ./instrument.server.mjs' tsx server-custom.ts",
     "dev:debug": "NODE_ENV=development LACE_LOG_LEVEL=debug LACE_LOG_STDERR=true NODE_OPTIONS='--import ./instrument.server.mjs' tsx server-custom.ts",
+    "prebuild": "tsx ../../scripts/generate-release-notes-meta.ts",
     "build": "react-router build",
     "build:standalone": "react-router build",
     "start": "NODE_ENV=production NODE_OPTIONS='--import ./instrument.server.mjs' tsx server-custom.ts",

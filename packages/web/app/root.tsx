@@ -7,6 +7,7 @@ import '@/app/fonts';
 import { ErrorBoundary } from '@/components/old/ErrorBoundary';
 import { SettingsProvider } from '@/components/providers/SettingsProvider';
 import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
+import { ReleaseNotesProvider } from '@/components/providers/ReleaseNotesProvider';
 import { ConsoleForwardScript } from '@/lib/console-forward/script';
 import { DebugPanel } from '@/components/debug/DebugPanel';
 
@@ -25,9 +26,11 @@ export default function Root() {
         <ErrorBoundary>
           <SettingsProvider>
             <ProviderInstanceProvider>
-              <DebugPanel>
-                <Outlet />
-              </DebugPanel>
+              <ReleaseNotesProvider>
+                <DebugPanel>
+                  <Outlet />
+                </DebugPanel>
+              </ReleaseNotesProvider>
             </ProviderInstanceProvider>
           </SettingsProvider>
         </ErrorBoundary>

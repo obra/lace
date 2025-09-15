@@ -93,6 +93,7 @@ export {
   faCircle,
   faPause,
   faFilter,
+  faNewspaper,
 } from '@fortawesome/free-solid-svg-icons';
 
 // Re-export faXmark as faXmark for consistency

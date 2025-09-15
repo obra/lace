@@ -19,6 +19,7 @@ export default [
   route('settings/mcp', 'routes/settings.mcp.tsx'),
   route('settings/ui', 'routes/settings.ui.tsx'),
   route('settings/user', 'routes/settings.user.tsx'),
+  route('settings/release-notes', 'routes/settings.release-notes.tsx'),
 
   route('project/:projectId', 'routes/project.$projectId.tsx'),
   route(

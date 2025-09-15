@@ -6,45 +6,18 @@
 import React from 'react';
 import { NavLink } from 'react-router';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlug, faUser, faCog, faServer } from '@/lib/fontawesome';
+import { SETTINGS_TAB_CONFIGS, type SettingsTab } from '@/lib/settings-config';
 
 interface SettingsNavigationProps {
-  activeTab: 'providers' | 'mcp' | 'ui' | 'user';
+  activeTab: SettingsTab;
 }
-
-const tabs = [
-  {
-    id: 'providers',
-    label: 'Providers',
-    icon: faPlug,
-    path: '/settings/providers',
-  },
-  {
-    id: 'mcp',
-    label: 'MCP Servers',
-    icon: faServer,
-    path: '/settings/mcp',
-  },
-  {
-    id: 'ui',
-    label: 'UI',
-    icon: faCog,
-    path: '/settings/ui',
-  },
-  {
-    id: 'user',
-    label: 'User',
-    icon: faUser,
-    path: '/settings/user',
-  },
-] as const;
 
 export function SettingsNavigation({ activeTab }: SettingsNavigationProps) {
   return (
     <div className="border-b border-base-300">
       <div className="max-w-4xl mx-auto px-6">
         <nav className="flex space-x-8" aria-label="Settings navigation">
-          {tabs.map((tab) => (
+          {SETTINGS_TAB_CONFIGS.map((tab) => (
             <NavLink
               key={tab.id}
               to={tab.path}
