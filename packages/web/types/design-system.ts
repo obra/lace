@@ -28,13 +28,13 @@ export interface CarouselItem {
   commit: string;
 }
 
-export interface Timeline {
+interface Timeline {
   id: number;
   name: string;
   agent: 'Claude' | 'GPT-4' | 'Gemini';
 }
 
-export interface RecentFile {
+interface RecentFile {
   name: string;
   path: string;
   lastModified?: Date;
