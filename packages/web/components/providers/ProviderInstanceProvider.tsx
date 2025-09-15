@@ -8,7 +8,7 @@ import { api } from '@/lib/api-client';
 import type { ProviderInfo, ModelInfo } from '@/types/api';
 
 // Provider Instance Types
-export interface ProviderInstance {
+interface ProviderInstance {
   id: string;
   displayName: string;
   catalogProviderId: string;
@@ -20,19 +20,19 @@ export interface ProviderInstance {
   lastTested?: string;
 }
 
-export interface ProviderInstanceWithTestResult extends Omit<ProviderInstance, 'status'> {
+interface ProviderInstanceWithTestResult extends Omit<ProviderInstance, 'status'> {
   status: 'connected' | 'error' | 'untested' | 'testing';
   lastTested?: string;
 }
 
-export interface TestResult {
+interface TestResult {
   status: 'connected' | 'error' | 'testing';
   lastTested?: string;
   message?: string;
 }
 
 // Catalog Types
-export interface CatalogModel {
+interface CatalogModel {
   id: string;
   name: string;
   cost_per_1m_in: number;
@@ -58,7 +58,7 @@ export interface CatalogProvider {
 }
 
 // Form Data Types
-export interface InstanceFormData {
+interface InstanceFormData {
   displayName: string;
   endpoint: string;
   timeout: number;
