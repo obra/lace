@@ -9,7 +9,7 @@ Lace uses a hierarchical event-driven architecture that enables real-time update
 1. **Single Unified Stream**: All events flow through one EventStreamManager instance to avoid connection pool exhaustion
 2. **Hierarchical Scoping**: Events are scoped from system → project → session → thread → task levels
 3. **Client-Side Filtering**: Frontend subscribes to specific scopes and filters events locally
-4. **Bridge Pattern**: SessionService acts as bridge between core EventEmitter events and web streaming
+4. **Session Registration**: Session instances register with EventStreamManager to forward events
 5. **Type Safety**: All events use discriminated unions with proper TypeScript typing
 
 ## Event Hierarchy & Scopes
@@ -70,11 +70,11 @@ interface StreamEvent {
 }
 ```
 
-### Current Bridge: SessionService
-- ✅ Forwards Agent events to EventStreamManager
-- ❌ Does NOT forward TaskManager events 
-- ❌ Manual wiring is incomplete and inconsistent
-- ❌ Uses wrong eventType ('session' for everything)
+### Current Implementation: EventStreamManager
+- ✅ Global singleton manages all SSE connections
+- ✅ Session instances register to forward TaskManager events
+- ✅ Automatic agent error handling registration
+- ✅ Uses correct LaceEvent format with context hierarchy
 
 ### Frontend Subscription Model
 ```typescript
@@ -121,29 +121,34 @@ interface EventSubscription {
    - Mixed timestamp formats (Date vs string)
    - No standard metadata patterns
 
-## Proposed Complete Architecture
+## Current Implementation Architecture
 
-### 1. Systematic Event Forwarding
+### 1. EventStreamManager Registration Pattern
 
-Replace manual wiring with systematic event forwarding:
+The current implementation uses systematic event forwarding via EventStreamManager:
 
 ```typescript
-class SessionService {
-  private setupEventForwarding(session: Session, sessionId: ThreadId): void {
-    // Forward TaskManager events
-    this.setupTaskManagerForwarding(session.getTaskManager(), sessionId);
-    
-    // Forward Agent events for all agents
-    session.getAgents().forEach(agentInfo => {
-      const agent = session.getAgent(agentInfo.threadId);
-      if (agent) {
-        this.setupAgentEventForwarding(agent, sessionId);
-      }
+// EventStreamManager.registerSession() method
+registerSession(session: Session): void {
+  const taskManager = session.getTaskManager();
+
+  // Automatic TaskManager event forwarding
+  taskManager.on('task:created', (event) => {
+    this.broadcast({
+      type: 'TASK_CREATED',
+      data: { taskId: event.task.id, ...event },
+      context: { projectId, sessionId, taskId: event.task.id },
+      transient: true,
     });
-    
-    // Forward Session lifecycle events
-    this.setupSessionEventForwarding(session, sessionId);
-  }
+  });
+
+  // Agent error handling registration
+  session.getAgents().forEach(agentInfo => {
+    const agent = session.getAgent(agentInfo.threadId);
+    if (agent) {
+      this.registerAgentErrorHandler(agent, agentInfo.threadId, projectId, sessionId);
+    }
+  });
 }
 ```
 
@@ -319,12 +324,13 @@ useSystemEvents();                            // Only system events
 
 ---
 
-## Current Status: DRAFT
+## Current Status: IMPLEMENTED
 
-This document identifies the complete event architecture and current gaps. Next steps:
-1. Review and validate this design
-2. Implement Phase 1 fixes (TaskManager forwarding)
-3. Plan systematic architecture improvements
-4. Update implementation to match this design
+This document describes the event architecture. The core implementation is complete:
 
-**Key Decision**: Maintain current bridge pattern (SessionService) but make it complete and systematic rather than redesigning from scratch.
+✅ **TaskManager forwarding** - Session instances register with EventStreamManager to forward all task events
+✅ **Global EventStreamManager** - Single singleton manages all SSE connections with firehose pattern
+✅ **LaceEvent format** - Standardized event structure with context hierarchy
+✅ **Agent error handling** - Automatic registration of error handlers for all agents
+
+The EventStreamManager pattern successfully replaced the need for a complex SessionService bridge.

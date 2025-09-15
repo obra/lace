@@ -17,7 +17,7 @@ This guide outlines the proper use of our DaisyUI-based design system. Following
 - **Examples**: Hero gradients, logo colors, marketing CTAs, brand illustrations
 
 ```tsx
-// ✅ CORRECT: Brand/design elements - consistent across themes
+// CORRECT: Brand/design elements - consistent across themes
 <div className="bg-gradient-to-br from-emerald-500 to-cyan-400">Hero Section</div>
 <button className="bg-gradient-to-r from-emerald-600 to-cyan-500">Download Lace</button>
 ```
@@ -29,7 +29,7 @@ This guide outlines the proper use of our DaisyUI-based design system. Following
 - **Examples**: Selection states, status indicators, form validation, navigation highlights
 
 ```tsx
-// ✅ CORRECT: UI/functional elements - theme-aware
+// CORRECT: UI/functional elements - theme-aware
 <div className={isActive ? "border-primary" : "border-base-300"}>Tab</div>
 <div className="bg-success text-success-content">Success Status</div>
 ```
@@ -46,12 +46,12 @@ Ask yourself:
 Colors have meaning. Use the right semantic color for the right purpose:
 
 ```tsx
-// ✅ CORRECT: Semantic color usage
+// CORRECT: Semantic color usage
 <button className="btn btn-primary">Primary Action</button>
 <div className="alert alert-error">Error message</div>
 <span className="text-success">Success indicator</span>
 
-// ❌ WRONG: Random color selection
+// WRONG: Random color selection
 <button className="bg-purple-500">Some action</button>
 <div className="bg-red-300">Some message</div>
 ```
@@ -61,7 +61,7 @@ Colors have meaning. Use the right semantic color for the right purpose:
 Use the same color for the same type of interaction across all components:
 
 ```tsx
-// ✅ CORRECT: All selection states use primary
+// CORRECT: All selection states use primary
 <button className={isSelected ? "border-primary bg-primary/10" : "border-base-300"}>
 <div className={isActive ? "border-primary text-primary" : "text-base-content/70"}>
 ```
@@ -94,11 +94,11 @@ Use the same color for the same type of interaction across all components:
 Always pair colors with their content variants for proper contrast:
 
 ```tsx
-// ✅ CORRECT: Proper contrast pairing
+// CORRECT: Proper contrast pairing
 <div className="bg-primary text-primary-content">
 <div className="bg-success text-success-content">
 
-// ❌ WRONG: Manual color combinations
+// WRONG: Manual color combinations
 <div className="bg-primary text-white">
 ```
 
@@ -112,12 +112,12 @@ Always pair colors with their content variants for proper contrast:
 Use custom agent properties for AI agent representation:
 
 ```tsx
-// ✅ CORRECT: Agent-specific colors
+// CORRECT: Agent-specific colors
 <div className="bg-[rgb(var(--agent-claude))] text-white">Claude Avatar</div>
 <div className="bg-[rgb(var(--agent-gpt4))] text-white">GPT-4 Avatar</div>
 <div className="bg-[rgb(var(--agent-gemini))] text-white">Gemini Avatar</div>
 
-// ❌ WRONG: Using UI colors for agents
+// WRONG: Using UI colors for agents
 <div className="bg-primary">Claude</div>
 ```
 
@@ -125,14 +125,14 @@ Use custom agent properties for AI agent representation:
 Use user CSS custom properties for user-related elements:
 
 ```tsx
-// ✅ CORRECT: User-related elements use user theme colors
+// CORRECT: User-related elements use user theme colors
 <div className="bg-[rgb(var(--user-primary))] text-white">User Avatar</div>
 <div className="bg-[rgb(var(--user-primary))]/20 text-[rgb(var(--user-primary))]">User Message</div>
 <button className="text-[rgb(var(--user-primary))] hover:bg-[rgb(var(--user-primary))]/10">User Action</button>
 
-// ❌ WRONG: Hardcoded colors for user elements  
+// WRONG: Hardcoded colors for user elements  
 <div className="bg-teal-600">User Avatar</div>
-// ❌ WRONG: Using UI colors for user elements
+// WRONG: Using UI colors for user elements
 <div className="bg-primary">User Avatar</div>
 ```
 
@@ -140,11 +140,11 @@ Use user CSS custom properties for user-related elements:
 Use semantic theme colors for all interface elements:
 
 ```tsx
-// ✅ CORRECT: UI elements use semantic colors
+// CORRECT: UI elements use semantic colors
 <div className={isSelected ? "border-primary" : "border-base-300"}>Selection</div>
 <div className="bg-success text-success-content">Status</div>
 
-// ❌ WRONG: Hardcoded colors for UI
+// WRONG: Hardcoded colors for UI
 <div className="bg-green-500">Status</div>
 ```
 
@@ -210,11 +210,11 @@ Available custom properties:
 Use Tailwind's consistent spacing scale:
 
 ```tsx
-// ✅ CORRECT: Consistent spacing
+// CORRECT: Consistent spacing
 <div className="p-4 mb-6 gap-3">
 <div className="px-6 py-4">
 
-// ❌ WRONG: Random spacing
+// WRONG: Random spacing
 <div className="p-[13px] mb-[23px]">
 ```
 
@@ -245,10 +245,10 @@ Use Tailwind's consistent spacing scale:
 Use semantic colors for gradients:
 
 ```tsx
-// ✅ CORRECT: Theme-aware gradients
+// CORRECT: Theme-aware gradients
 <div className="bg-gradient-to-r from-primary to-secondary">
 
-// ✅ CORRECT: Lace accent gradient
+// CORRECT: Lace accent gradient
 <div className="bg-gradient-to-br from-emerald-500 to-cyan-400">
 ```
 

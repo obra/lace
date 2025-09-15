@@ -1,8 +1,10 @@
 # Web Interface Design Document
 
+> **⚠️ Note**: This document contains outdated information. For current web interface architecture, see [CLAUDE.md](../../CLAUDE.md).
+
 ## Overview
 
-The Lace web interface provides a browser-based UI for interacting with AI agents. It's built on Next.js 15 with React 19, using Server-Sent Events (SSE) for real-time communication and a clean REST API for agent management.
+The Lace web interface provides a browser-based UI for interacting with AI agents. It's built on React Router v7 with React 18.3, using Server-Sent Events (SSE) for real-time communication and a clean REST API for agent management.
 
 ## Architecture Principles
 
@@ -30,117 +32,74 @@ The Lace web interface provides a browser-based UI for interacting with AI agent
 
 ### Technology Stack
 
-- **Frontend**: Next.js 15, React 19, TypeScript
+- **Frontend**: React Router v7, React 18.3, TypeScript
 - **Styling**: Tailwind CSS with DaisyUI component library
-- **Real-time**: Server-Sent Events (SSE)
+- **Real-time**: Server-Sent Events (SSE) via EventStreamManager
 - **Markdown**: react-markdown with remark-gfm and rehype-highlight
 - **Security**: DOMPurify for content sanitization
-- **Backend Integration**: Direct use of Lace Agent class
+- **Backend Integration**: @lace/core workspace package
 - **State Management**: Event sourcing with SSE updates
-- **Testing**: Vitest with React Testing Library
+- **Testing**: Vitest with React Testing Library and Playwright
 
 ## Project Structure
 
-```
-packages/web/
-├── app/                    # Next.js app directory
-│   ├── api/               # API routes
-│   │   ├── sessions/      # Session management
-│   │   ├── threads/       # Message handling
-│   │   ├── providers/     # Provider discovery
-│   │   └── approvals/     # Tool approvals
-│   ├── page.tsx           # Main UI page
-│   └── layout.tsx         # Root layout
-├── components/            # React components
-│   ├── timeline/          # Timeline event renderers
-│   │   ├── SystemPromptEntry.tsx
-│   │   ├── UserSystemPromptEntry.tsx
-│   │   ├── UnknownEventEntry.tsx
-│   │   └── TimelineMessage.tsx
-│   ├── ui/               # Reusable UI components
-│   │   └── MarkdownRenderer.tsx
-│   ├── AgentSpawner.tsx  # Dynamic agent creation
-│   ├── ConversationDisplay.tsx
-│   └── ToolApprovalModal.tsx
-├── hooks/                 # Custom React hooks
-│   ├── useSSEStream.ts   # SSE connection management
-│   ├── useSessionAPI.ts  # API client hooks
-│   └── useFoldableContent.ts # Content folding logic
-├── lib/                   # Utilities
-│   ├── server/           # Server-only code
-│   │   ├── session-service.ts
-│   │   ├── approval-manager.ts
-│   │   └── lace-imports.ts
-│   ├── sse-manager.ts    # SSE broadcasting
-│   └── timeline-converter.ts # Event → timeline mapping
-└── types/                 # TypeScript types
-    ├── api.ts            # API interfaces
-    ├── events.ts         # Event type mappings
-    └── web-events.ts     # Timeline entry types
-```
+> **📁 Current Structure**: See the actual file structure in `packages/web/` - this document's structure is outdated.
+
+Key directories in the actual implementation:
+- `app/routes/` - React Router v7 file-based routing
+- `components/` - React components organized by feature
+- `lib/` - Utilities including api-client.ts and event-stream-manager.ts
+- `hooks/` - Custom React hooks
+- `types/` - TypeScript type definitions
 
 ## API Design
 
-### Session Management
+> **🚨 Outdated**: The API structure described below is incorrect. The actual API uses a **Project → Session → Task/Agent hierarchy**.
 
-**GET /api/sessions**
-- List all active sessions
-- Returns: `{ sessions: Session[] }`
+**Current API Routes** (see `app/routes.ts` for complete list):
+- `/api/projects/:projectId/sessions/:sessionId/tasks` - Task CRUD operations
+- `/api/agents/:agentId/message` - Agent messaging
+- `/api/threads/:threadId/approvals` - Tool approvals
+- `/api/events/stream` - Global SSE event stream
+- `/api/mcp/servers` - MCP server management
 
-**POST /api/sessions**
-- Create new session
-- Body: `{ name?: string }`
-- Returns: `{ session: Session }`
-- Creates parent thread with default agent
-
-**GET /api/sessions/{sessionId}**
-- Get session details with agents
-- Returns: `{ session: Session }`
-
-### Agent Management
-
-**POST /api/sessions/{sessionId}/agents**
-- Spawn new agent within session
-- Body: `{ name: string, provider?: string, model?: string }`
-- Returns: `{ agent: Agent }`
-- Creates delegate agent with incremented thread ID
-
-**GET /api/sessions/{sessionId}/agents**
-- List agents in session
-- Returns: `{ agents: Agent[] }`
+**For accurate API documentation**, see the route implementations in `packages/web/app/routes/`.
 
 ### Messaging
 
-**POST /api/threads/{threadId}/message**
+**POST /api/agents/{agentId}/message**
 - Send message to specific agent
 - Body: `{ message: string }`
-- Returns: `{ status: 'accepted', threadId, messageId }`
-- Validates thread ID format
-- Emits USER_MESSAGE event via SSE
+- Returns: `{ success: boolean }`
+
+**POST /api/threads/{threadId}/message**
+- Send message to thread
+- Body: `{ message: string }`
 
 ### Event Streaming
 
-**GET /api/sessions/{sessionId}/events/stream**
-- SSE endpoint for real-time events
-- Sends all events for agents within the session
-- Event types include both persisted and UI-only events
-- Automatic reconnection support
+**GET /api/events/stream**
+- Global SSE endpoint for all real-time events
+- "Firehose" pattern - sends all events, client-side filtering
+- Managed by EventStreamManager singleton
+- LaceEvent format with context hierarchy
 
 ### Tool Approvals
 
-**POST /api/approvals/{requestId}**
-- Submit approval decision for tool execution
-- Body: `{ requestId: string, decision: ApprovalDecision, reason?: string }`
-- Returns: `{ success: boolean }`
-- Supports session-wide approval policies
+**GET /api/threads/{threadId}/approvals/pending**
+- Get pending approvals for thread
+
+**POST /api/threads/{threadId}/approvals/{toolCallId}**
+- Submit approval decision for specific tool call
+- Body: `{ decision: ApprovalDecision, reason?: string }`
 
 ### Provider Discovery
 
-**GET /api/providers**
-- List all providers with available models
-- Returns: `{ providers: ProviderWithModels[] }`
-- Includes configuration status
-- Dynamic model discovery for local providers
+**GET /api/provider/catalog**
+- List all provider catalogs with models
+
+**GET /api/provider/instances**
+- List configured provider instances
 
 ## Event System
 
@@ -206,7 +165,7 @@ class EventStreamManager {
 ```
 
 **Key Features**:
-- **Automatic session registration**: Called by SessionService to forward TaskManager events
+- **Automatic session registration**: Session instances register to forward TaskManager events
 - **Agent error handling**: Registers error listeners for all agents in registered sessions
 - **Connection limits**: 100 connections globally, automatic cleanup in development
 - **Keepalive**: 30-second heartbeat to maintain connections
@@ -474,39 +433,29 @@ export { EVENT_TYPES } from '../../../../dist/threads/types.js';
 
 ## Implementation Details
 
-### SessionService
+### Core Services
 
-Central service managing sessions and agents:
-- Wraps Agent class for web API usage
-- Handles agent lifecycle and event routing
-- Manages tool approval flow
-- Maintains session/agent metadata (in-memory)
-- Creates delegates via `session.spawnAgent()`
+**EventStreamManager** (`lib/event-stream-manager.ts`):
+- Global singleton managing all SSE connections
+- "Firehose" pattern - broadcasts all events, client-side filtering
+- Registers Session instances to forward TaskManager events
+- Handles agent error forwarding and connection lifecycle
 
-Key responsibilities:
-- Thread ID generation and management
-- Provider instantiation with credentials
-- Event handler setup for SSE broadcasting
-- Agent state tracking
+**API Client** (`lib/api-client.ts`):
+- Centralized HTTP client with structured error handling
+- Retry logic and timeout support
+- SuperJSON serialization for type safety
+- Used by all frontend components for API calls
 
-### SSEManager
+### Event Streaming Implementation
 
-Manages Server-Sent Event connections:
-- Session-scoped event broadcasting
-- Connection lifecycle management
-- Automatic reconnection handling
-- Event type registration
+The actual implementation uses EventStreamManager:
+- **Global singleton** - single instance handles all connections
+- **Firehose pattern** - all events sent to all connections, client filters
+- **Session registration** - Sessions register to forward TaskManager events
+- **LaceEvent format** - standardized event structure with context hierarchy
 
-Implementation:
-```typescript
-class SSEManager {
-  private sessionStreams = new Map<string, Set<ReadableStreamDefaultController>>();
-  
-  broadcast(sessionId: string, event: SessionEvent): void {
-    // Send to all connections for session
-  }
-}
-```
+See `packages/web/lib/event-stream-manager.ts` for implementation details.
 
 ### ApprovalManager
 
@@ -722,7 +671,7 @@ npm test -- --run     # Single run
 2. Add types to `types/api.ts`
 3. Write tests first
 4. Implement handler
-5. Update SessionService if needed
+5. Update route registration in routes.ts if needed
 
 **Adding UI Components:**
 1. Create component in `components/`
