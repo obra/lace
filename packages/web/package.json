@@ -8,11 +8,11 @@
     "bun": ">=1.2.21"
   },
   "scripts": {
-    "dev": "NODE_ENV=development tsx server-custom.ts",
-    "dev:debug": "NODE_ENV=development LACE_LOG_LEVEL=debug LACE_LOG_STDERR=true tsx server-custom.ts",
+    "dev": "NODE_ENV=development NODE_OPTIONS='--import ./instrument.server.mjs' tsx server-custom.ts",
+    "dev:debug": "NODE_ENV=development LACE_LOG_LEVEL=debug LACE_LOG_STDERR=true NODE_OPTIONS='--import ./instrument.server.mjs' tsx server-custom.ts",
     "build": "react-router build",
     "build:standalone": "react-router build",
-    "start": "NODE_ENV=production tsx server-custom.ts",
+    "start": "NODE_ENV=production NODE_OPTIONS='--import ./instrument.server.mjs' tsx server-custom.ts",
     "typegen": "react-router typegen",
     "pretypecheck": "npm run typegen",
     "typecheck": "tsc --noEmit",
@@ -51,6 +51,7 @@
     "@react-router/serve": "^7.8.2",
     "@sentry/node": "^10.5.0",
     "@sentry/react": "^10.5.0",
+    "@sentry/react-router": "^10.11.0",
     "@sentry/vite-plugin": "^4.1.1",
     "@types/bun": "^1.2.21",
     "@types/compression": "^1.8.1",

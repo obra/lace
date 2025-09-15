@@ -3,10 +3,9 @@
 
 import { logger } from '~/utils/logger';
 import type { Route } from './+types/api.tunnel';
-import { api } from '@/lib/api-client';
 
-const SENTRY_HOST = 'o543459.ingest.us.sentry.io';
-const SENTRY_PROJECT_ID = '4509844023279616';
+const SENTRY_HOST = 'o4508888512331776.ingest.us.sentry.io';
+const SENTRY_PROJECT_ID = '4510016051019776';
 
 export async function action({ request }: Route.ActionArgs) {
   switch (request.method) {
@@ -17,20 +16,17 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   try {
-    logger.info('🔄 Sentry tunnel request received');
+    logger.debug('🔄 Sentry tunnel request received');
 
     const envelope = await request.text();
     logger.debug('📦 Sentry envelope received', {
       size: envelope.length,
-      preview: envelope.substring(0, 200) + (envelope.length > 200 ? '...' : ''),
     });
 
     const pieces = envelope.split('\n');
     const header = JSON.parse(pieces[0]) as { dsn?: string; trace?: unknown; event_id?: string };
 
     logger.debug('📋 Sentry envelope header parsed', {
-      dsn: header.dsn,
-      trace: header.trace,
       event_id: header.event_id,
     });
 
@@ -54,28 +50,40 @@ export async function action({ request }: Route.ActionArgs) {
     logger.debug('🚀 Forwarding to Sentry', { url: sentryUrl });
 
     try {
-      // Use api client for the request - it will handle errors properly
-      // Note: Passing the envelope as the body, overriding content-type for Sentry format
-      await api.post<void>(sentryUrl, envelope, {
+      // Extract the public key from the DSN if present
+      let publicKey = '7d7d2eed251df30b06eb8c7cdc81f221';
+      if (header.dsn) {
+        const match = header.dsn.match(/https:\/\/([a-f0-9]{32})@/);
+        if (match) {
+          publicKey = match[1];
+        }
+      }
+      const timestamp = Math.floor(Date.now() / 1000);
+
+      // Use fetch directly instead of api client for raw envelope forwarding
+      const response = await fetch(sentryUrl, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/x-sentry-envelope',
+          'X-Sentry-Auth': `Sentry sentry_key=${publicKey}, sentry_version=7, sentry_timestamp=${timestamp}, sentry_client=sentry.javascript.react-router`,
         },
+        body: envelope,
       });
 
-      logger.info('✅ Sentry envelope forwarded successfully');
-      return new Response(null, { status: 200 });
-    } catch (error) {
-      // Api client throws structured errors - handle HttpError for status codes
-      if (error && typeof error === 'object' && 'status' in error && 'message' in error) {
-        const httpError = error as { status: number; message: string };
+      if (!response.ok) {
+        const text = await response.text();
         logger.warn('🔴 Sentry error response', {
-          status: httpError.status,
-          message: httpError.message,
+          status: response.status,
+          message: `HTTP ${response.status}: ${response.statusText}`,
+          body: text,
         });
-        return new Response(null, { status: httpError.status });
+        return new Response(text, { status: response.status });
       }
 
-      // Handle other error types (NetworkError, ParseError, etc.)
+      logger.debug('✅ Sentry envelope forwarded successfully');
+      return new Response(null, { status: 200 });
+    } catch (error) {
+      // Handle fetch errors
       logger.warn('🔴 Sentry forwarding failed', {
         error: error instanceof Error ? error.message : String(error),
       });
