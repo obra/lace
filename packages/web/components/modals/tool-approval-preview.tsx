@@ -79,11 +79,43 @@ export function createPartialDiff(toolName: string, args: unknown): FileDiff | n
 }
 
 /**
+ * Creates a file read preview that will be populated with actual file content
+ * The ToolApprovalModal will handle fetching the content asynchronously
+ */
+function createFileReadPreview(args: unknown): ToolResult {
+  const readArgs = args as { path?: string; startLine?: number; endLine?: number };
+
+  if (!readArgs.path) {
+    return {
+      status: 'pending',
+      content: [{ type: 'text', text: 'No file path specified' }],
+      metadata: { isPreview: true, arguments: args },
+    };
+  }
+
+  // Return a placeholder that the modal component will replace with actual content
+  return {
+    status: 'pending',
+    content: [{ type: 'text', text: `Loading preview of ${readArgs.path}...` }],
+    metadata: {
+      isPreview: true,
+      arguments: args,
+      needsFileContent: true, // Flag to indicate this needs actual file content
+    },
+  };
+}
+
+/**
  * Creates a mock ToolResult for approval preview based on tool arguments
  * This allows us to reuse existing tool renderers for approval display
  */
 export function createPreviewResult(toolName: string, args: unknown): ToolResult {
-  // Generate tool-specific preview text
+  // For file_read, we want to show the actual file content as preview
+  if (toolName.toLowerCase() === 'file_read') {
+    return createFileReadPreview(args);
+  }
+
+  // Generate tool-specific preview text for other tools
   let previewText: string;
 
   switch (toolName.toLowerCase()) {
