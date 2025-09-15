@@ -5,8 +5,6 @@
 export type {
   ThreadId,
   AssigneeId,
-  NewAgentSpec,
-  ParsedNewAgentSpec,
   LaceEventType,
   LaceEvent,
   AgentMessageData,
