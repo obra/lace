@@ -10,7 +10,6 @@
   "scripts": {
     "dev": "NODE_ENV=development NODE_OPTIONS='--import ./instrument.server.mjs' tsx server-custom.ts",
     "dev:debug": "NODE_ENV=development LACE_LOG_LEVEL=debug LACE_LOG_STDERR=true NODE_OPTIONS='--import ./instrument.server.mjs' tsx server-custom.ts",
-    "prebuild": "tsx ../../scripts/generate-release-notes-meta.ts",
     "build": "react-router build",
     "build:standalone": "react-router build",
     "start": "NODE_ENV=production NODE_OPTIONS='--import ./instrument.server.mjs' tsx server-custom.ts",
@@ -109,6 +108,7 @@
     "msw": "^2.7.0",
     "postcss": "^8.4.38",
     "typescript": "^5.6.0",
+    "vite-plugin-markdown": "^2.2.0",
     "vitest": "^3.2.4"
   },
   "trustedDependencies": [

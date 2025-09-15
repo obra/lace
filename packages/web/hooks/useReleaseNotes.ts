@@ -24,14 +24,16 @@ export function useReleaseNotes(userSettings?: Record<string, unknown>): UseRele
   useEffect(() => {
     // Don't check until we have actual user settings (not undefined)
     if (userSettings === undefined) {
+      setIsLoading(false);
       return;
     }
 
-    async function checkStatus() {
+    function checkStatus() {
       setIsLoading(true);
+
       try {
         const lastSeenHash = userSettings?.lastSeenReleaseNotesHash as string | undefined;
-        const status = await checkReleaseNotesStatus(lastSeenHash);
+        const status = checkReleaseNotesStatus(lastSeenHash);
 
         setShouldShowModal(status.shouldShow);
         setContent(status.content);

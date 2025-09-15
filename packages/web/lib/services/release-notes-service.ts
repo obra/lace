@@ -1,31 +1,10 @@
 // ABOUTME: Service for managing release notes display logic and user settings integration
 // ABOUTME: Handles checking if release notes should be shown and updating seen status
 
-import type { ReleaseNotesMeta } from '@/types/release-notes';
 import { api } from '@/lib/api-client';
 
-// Static import of generated release notes metadata
-// This file is generated at build time by scripts/generate-release-notes-meta.ts
-import releaseNotesMetaModule from '@/app/generated/release-notes-meta.json';
-
-function isReleaseNotesMeta(x: unknown): x is ReleaseNotesMeta {
-  return (
-    !!x &&
-    typeof (x as Record<string, unknown>).hash === 'string' &&
-    typeof (x as Record<string, unknown>).content === 'string' &&
-    typeof (x as Record<string, unknown>).generatedAt === 'string'
-  );
-}
-
-// Function to get release notes metadata
-export function loadReleaseNotesMeta(): ReleaseNotesMeta | null {
-  try {
-    const meta = releaseNotesMetaModule as unknown;
-    return isReleaseNotesMeta(meta) ? meta : null;
-  } catch {
-    return null;
-  }
-}
+// Static import of release notes content
+import { RELEASE_NOTES } from '@/app/release-notes';
 
 export interface ReleaseNotesStatus {
   shouldShow: boolean;
@@ -34,41 +13,39 @@ export interface ReleaseNotesStatus {
 }
 
 /**
+ * Calculate simple hash of release notes content for browser compatibility
+ */
+function getReleaseNotesHash(): string {
+  let hash = 0;
+  for (let i = 0; i < RELEASE_NOTES.length; i++) {
+    const char = RELEASE_NOTES.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36);
+}
+
+/**
  * Check if release notes should be shown to the user
  */
-export async function checkReleaseNotesStatus(lastSeenHash?: string): Promise<ReleaseNotesStatus> {
-  const meta = loadReleaseNotesMeta();
-
-  if (!meta) {
-    return {
-      shouldShow: false,
-      content: '',
-      currentHash: '',
-    };
-  }
-
-  const shouldShow = !lastSeenHash || lastSeenHash !== meta.hash;
+export function checkReleaseNotesStatus(lastSeenHash?: string): ReleaseNotesStatus {
+  const currentHash = getReleaseNotesHash();
+  const shouldShow = !lastSeenHash || lastSeenHash !== currentHash;
 
   return {
     shouldShow,
-    content: meta.content,
-    currentHash: meta.hash,
+    content: RELEASE_NOTES,
+    currentHash,
   };
 }
 
 /**
  * Get current release notes content and hash
  */
-export function getCurrentReleaseNotes(): { content: string; hash: string } | null {
-  const meta = loadReleaseNotesMeta();
-
-  if (!meta) {
-    return null;
-  }
-
+export function getCurrentReleaseNotes(): { content: string; hash: string } {
   return {
-    content: meta.content,
-    hash: meta.hash,
+    content: RELEASE_NOTES,
+    hash: getReleaseNotesHash(),
   };
 }
 
