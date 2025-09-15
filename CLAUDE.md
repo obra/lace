@@ -8,17 +8,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Lace is a sophisticated AI coding assistant built with TypeScript and Node.js. It uses event-sourcing architecture with immutable conversation sequences that enable resumable conversations across process restarts and support for multiple interface types (CLI, web, API).
+Lace is a sophisticated AI coding assistant built as a TypeScript monorepo. The core uses event-sourcing architecture with immutable conversation sequences that enable resumable conversations across process restarts. It supports multiple interface types including a React Router v7 web interface with project/session/task management.
 
 ## Development Commands
 
 ### Build and Run
 ```bash
-npm run build        # Compile TypeScript to dist/ + copy prompts
-npm start           # Build and run the interactive CLI
-npm run lint        # ESLint checking
-npm run lint:fix    # Auto-fix linting issues
-npm run format      # Format code with Prettier
+npm run build        # Build core and web packages
+npm run dev          # Start web dev server (packages/web)
+npm run lint         # ESLint checking across workspaces
+npm run lint:fix     # Auto-fix linting issues
+npm run format       # Format code with Prettier
 ```
 
 ### Debug Logging
@@ -78,14 +78,20 @@ We NEVER leave backward-compatibility or legacy code in place. This is a pre-rel
 - All code must pass TypeScript strict mode compilation
 
 ### Import Style
-- Use `~/*` path aliases for internal imports instead of relative paths
-- **Omit file extensions** - prefer `import { Agent } from '~/agents/agent'` over `import { Agent } from '~/agents/agent.js'`
-- **Never use inline imports** - always declare imports at the top of the file
-  - ❌ `const taskTool = tool as { getTaskManager?: () => import('~/tasks/task-manager').TaskManager }`
-  - ✅ `import type { TaskManager } from '~/tasks/task-manager'` (at top) then `getTaskManager?: () => TaskManager`
-- Example: `import { Agent } from '~/agents/agent'` instead of `import { Agent } from '../../agents/agent.js'`
-- This makes imports more readable and prevents breakage when moving files
-- The `~` prefix maps to the `src/` directory via TypeScript path mapping
+
+**Core Package (`packages/core`):**
+- Use `~/*` path aliases for internal imports: `import { Agent } from '~/agents/agent'`
+- **Omit file extensions** in source code
+- The `~` prefix maps to the `packages/core/src/` directory
+
+**Web Package (`packages/web`):**
+- Use `@/` path aliases for internal imports: `import { Button } from '@/components/ui/button'`
+- Import from core package using workspace reference: `import { Agent } from '@lace/core/agents/agent'`
+- React Router v7 file-based routing in `app/routes/`
+
+**Never use inline imports** - always declare at the top:
+  - <bad>`const taskTool = tool as { getTaskManager?: () => import('~/tasks/task-manager').TaskManager }`</bad>
+  - <good>`import type { TaskManager } from '~/tasks/task-manager'` (at top)</good>
 
 ## Core Architecture
 
@@ -110,36 +116,46 @@ TOOL_RESULT events → Agent continues or responds
 
 ### Key Components
 
-**Agent System (`src/agents/agent.ts`)**
+**Agent System (`packages/core/src/agents/agent.ts`)**
 - Event-driven conversation engine with state machine: `idle → thinking → streaming → tool_execution → idle`
 - Emits events for UI updates: `agent_thinking_start/complete`, `tool_call_start/complete`, `state_change`
 - Token budget management and streaming response handling
 - Abort functionality for long-running operations
 - Supports multiple concurrent agents (not a singleton)
 
-**Thread Management (`src/threads/`)**
+**Thread Management (`packages/core/src/threads/`)**
 - **ThreadManager**: High-level thread operations and event coordination
-- **ThreadPersistence**: SQLite-based persistence with graceful degradation to memory-only
-- **ThreadProcessor**: UI-optimized event processing with performance caching
+- SQLite-based persistence with graceful degradation to memory-only
 - Stateless design - can rebuild conversation from events at any time
 - `buildConversationFromEvents()` converts event sequences to provider-specific formats
 
-**Tool System (`src/tools/`)**
+**Tool System (`packages/core/src/tools/`)**
 - **ToolExecutor**: Central tool management with approval workflow integration
+- **MCP (Model Context Protocol)** integration for external tools
 - Categories: file operations, system operations, workflow tools
 - User approval system with configurable policies
 - Safe execution with error handling and thread-aware context passing
 - Model-agnostic interface supporting all AI providers
 
-**Provider System (`src/providers/`)**
-- Abstraction layer supporting multiple AI providers (Anthropic, OpenAI, LMStudio, Ollama)
-- Normalized interface with format conversion between generic and provider-specific APIs
+**Provider System (`packages/core/src/providers/`)**
+- Abstraction layer supporting multiple AI providers (Anthropic, OpenAI, LMStudio, Ollama, OpenRouter)
+- Provider catalogs with model discovery and capabilities
+- Instance management for provider configurations
 - Streaming support where available
 - Registry system with auto-discovery
 
-**Interface System (`src/interfaces/`)**
-- **TerminalInterface**: Rich Ink/React-based UI with real-time updates and tool approval modals
-- **ThreadProcessor**: Cached processing of persisted events + real-time streaming content processing
+**Project & Session System (`packages/core/src/projects/`, `packages/core/src/sessions/`)**
+- **Projects**: Top-level containers with environment variables and settings
+- **Sessions**: Conversation contexts within projects
+- **Tasks**: Work items with status tracking and agent assignment
+- **MCP integration**: External tool servers and capabilities per project/session
+
+**Web Interface (`packages/web/`)**
+- **React Router v7** with file-based routing (`app/routes/`)
+- **Global EventStreamManager** for real-time SSE updates
+- **API client** with centralized error handling and retry logic
+- **DaisyUI + Tailwind CSS** component system
+- **Project → Session → Agent/Task hierarchy** in UI
 
 
 ## Event Model
@@ -151,11 +167,13 @@ Events include: USER_MESSAGE, AGENT_MESSAGE, TOOL_CALL, TOOL_RESULT, THINKING, S
 ## Technology Stack
 
 - **TypeScript 5.6+** with strict mode
-- **Node.js** with ES modules
+- **Node.js 20.18+** with ES modules
 - **SQLite** (better-sqlite3) for persistence
-- **React 19 + React Router 7 ** for web interface
+- **React Router v7** for web interface (file-based routing)
+- **React 18.3** with modern patterns
 - **Vitest and Playwright** for testing
 - **ESLint + Prettier** for code quality
+- **Monorepo** with npm workspaces (`packages/core`, `packages/web`)
 
 **CSS Architecture:**
 - **Tailwind CSS** for utility-first styling
@@ -300,7 +318,9 @@ Generic `ProviderMessage[]` format converts to provider-specific APIs. Each prov
 
 ### Tool System
 - User approval system with policies (ALLOW_ONCE, ALLOW_SESSION, DENY)
-- 11 tools: file operations (read/write/edit/insert/list/find), system operations (bash/search/url-fetch), workflow tools (task-manager/delegate)
+- **Core tools**: file operations (read/write/edit), system operations (bash/url-fetch)
+- **MCP integration**: External tools via Model Context Protocol
+- **Session/Project management**: Tasks, delegation, project context
 - Safe execution with error handling and context passing
 
 ### Thread Management
@@ -308,42 +328,28 @@ Generic `ProviderMessage[]` format converts to provider-specific APIs. Each prov
 - Resumable conversations with `--continue` flag
 - Delegate thread management for sub-conversations
 
-### Navigation State Pattern
-For passing ephemeral data between routes, use React Router's built-in navigation state:
+### Web API Architecture
 
-```typescript
-// Define shared types
-export interface SessionNavigationState {
-  initialMessage?: string;
-}
+**Centralized API Client (`packages/web/lib/api-client.ts`)**:
+- Structured error handling with retry logic
+- Timeout support and abort signal handling
+- Automatic JSON parsing with SuperJSON serialization
+- Type-safe request/response interfaces
 
-// Pass state during navigation
-navigate(`/project/${projectId}/session/${sessionId}`, {
-  state: { initialMessage: userInput } as SessionNavigationState
-});
-
-// Read and consume state in target component
-const location = useLocation();
-const navState = location.state as SessionNavigationState | null;
-if (navState?.initialMessage) {
-  setInitialValue(navState.initialMessage);
-  // Clear state to prevent re-use on back/forward navigation
-  navigate(location.pathname, { replace: true, state: undefined });
-}
-
-// Preserve state through redirects
-navigate(targetUrl, { 
-  replace: true, 
-  state: location.state as SessionNavigationState | null 
-});
+**API Route Structure**:
+```
+/api/projects/:projectId/sessions/:sessionId/tasks     # Task CRUD
+/api/agents/:agentId/message                          # Agent messaging
+/api/threads/:threadId/approvals                      # Tool approvals
+/api/events/stream                                    # Global SSE stream
+/api/mcp/servers                                      # MCP server management
 ```
 
-**Benefits:**
-- Ephemeral by design - automatically cleaned up
-- No database complexity for temporary data
-- Browser-native state management
-- One-time consumption prevents stale data
-- Works across route redirects when explicitly preserved
+**Real-time Updates**:
+- **Global EventStreamManager** singleton
+- "Firehose" SSE pattern - single stream, client-side filtering
+- Automatic Session registration forwards TaskManager events
+- LaceEvent format with context hierarchy (project/session/thread/task)
 
 
 ## Testing Strategy
@@ -352,7 +358,10 @@ navigate(targetUrl, {
 - **Integration Tests**: Cross-component interactions
 - **E2E Tests**: Full conversation workflows
 - **Co-location**: Test files next to source files (e.g., `agent.ts` → `agent.test.ts`)
-- **Vitest**: Primary testing framework with JSDoc environment for React components
+- **Vitest**: Primary testing framework for both packages
+- **Playwright**: E2E testing for web interface
+- **MSW**: API mocking for frontend tests
+- **React Testing Library**: Component testing patterns
 
 ## Code Standards
 
@@ -388,9 +397,12 @@ ThreadProcessor caches processed events for performance.
 
 ## Configuration
 
-- **Environment**: LACE_DIR
-- **User Instructions**: `~/.lace/instructions.md`
-- **System Prompts**: Template-based generation in `packages/core/config/agent-personas/`
+- **Environment**: LACE_DIR for data storage
+- **User Settings**: Stored in database with config management
+- **Agent Personas**: Template-based generation in `packages/core/config/agent-personas/`
+- **MCP Servers**: Configuration for external tool integration
+- **Provider Settings**: API keys and model configurations
+- **Project Settings**: Environment variables and MCP server assignments
 - **Database**: SQLite storage in LACE_DIR with graceful degradation
 
 ## Security & Safety
@@ -437,26 +449,30 @@ The conversation builder (`buildConversationFromEvents`) is critical for debuggi
 
 ### TypeScript ESLint Rules
 - **@typescript-eslint/no-floating-promises**: Always await promises or explicitly use `void` operator
-  - ❌ `manager.deleteTask(taskId, context);`
-  - ✅ `await manager.deleteTask(taskId, context);`
-  - ✅ `void manager.deleteTask(taskId, context);`
+  - <bad>`manager.deleteTask(taskId, context);`</bad>
+  - <good>`await manager.deleteTask(taskId, context);`</good>
+  - <good>`void manager.deleteTask(taskId, context);`</good>
 
 - **@typescript-eslint/no-unsafe-assignment**: Never use `any` type without proper typing
-  - ❌ `const data = await response.json();`
-  - ✅ `const data = (await response.json()) as { error: string };`
+  - <bad>`const data = await response.json();`</bad>
+  - <good>`const data = (await response.json()) as { error: string };`</good>
 
 - **@typescript-eslint/no-unused-vars**: Remove unused imports and variables
-  - ❌ `import type { SessionService } from '@/lib/server/session-service';` (if not used)
-  - ✅ Only import what you actually use
+  - <bad>`import type { SessionService } from '@/lib/server/session-service';` (if not used)</bad>
+  - <good>Only import what you actually use</good>
 
 - **@typescript-eslint/no-explicit-any**: Avoid using `any` type
-  - ❌ `} as any;`
-  - ✅ `} as typeof TextEncoder;`
+  - <bad>`} as any;`</bad>
+  - <good>`} as typeof TextEncoder;`</good>
 
-### Next.js Specific Rules
+### React Router v7 Specific Rules
 - **no-relative-import-paths**: Use absolute imports with @ prefix
-  - ❌ `import { GET } from '../route';`
-  - ✅ `import { GET } from '@/app/api/tasks/stream/route';`
+  - <bad>`import { loader } from '../route';`</bad>
+  - <good>`import { loader } from '@/routes/api.projects.$projectId.tasks';`</good>
+- **File-based routing**: Routes must be defined in both `app/routes/` files AND `app/routes.ts`
+  - Route files use dot notation: `api.projects.$projectId.sessions.$sessionId.tasks.ts`
+  - Frontend routes: `project.$projectId.session.$sessionId.agent.$agentId.tsx`
+  - Must also register in `routes.ts`: `route('api/projects/:projectId/sessions/:sessionId/tasks', 'routes/api.projects.$projectId.sessions.$sessionId.tasks.ts')`
 
 
  **Prefer `unknown` to `any`**  
