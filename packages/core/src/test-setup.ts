@@ -1,7 +1,46 @@
 // ABOUTME: Global test setup configuration
 // ABOUTME: Provides aggressive cleanup to prevent vitest hanging issues
 
-import { afterAll, afterEach, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, vi } from 'vitest';
+
+// Set process title to include relative test file path for easier identification
+beforeAll(() => {
+  if (typeof process !== 'undefined' && process.title) {
+    try {
+      // Get the current test file from Vitest's internal state
+      const testFile =
+        globalThis.__vitest_worker__?.filepath ||
+        (globalThis.expect?.getState && globalThis.expect.getState().testPath) ||
+        process.env.VITEST_TEST_NAME ||
+        '';
+
+      if (testFile) {
+        // Get project root (where package.json is)
+        const projectRoot = process.cwd();
+        let relativePath = testFile;
+
+        // Handle file:// URLs from import.meta.url
+        if (testFile.startsWith('file://')) {
+          relativePath = testFile.replace('file://', '');
+        }
+
+        // Make path relative to project root
+        if (relativePath.startsWith(projectRoot)) {
+          relativePath = relativePath.substring(projectRoot.length + 1);
+        }
+
+        // Clean up monorepo paths - remove packages/core/ prefix
+        relativePath = relativePath.replace(/.*packages\/core\//, '');
+
+        process.title = `vitest:core:${relativePath}`;
+      } else {
+        process.title = 'vitest:core:unknown';
+      }
+    } catch (error) {
+      process.title = 'vitest:core:error';
+    }
+  }
+});
 
 // Global cleanup after each test file
 afterAll(() => {

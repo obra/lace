@@ -1,11 +1,50 @@
 // ABOUTME: Test setup for vitest
 // ABOUTME: Global test configuration and mocks for server-only modules
 
-import { vi, afterAll, afterEach } from 'vitest';
+import { vi, afterAll, afterEach, beforeAll } from 'vitest';
 import '@testing-library/jest-dom';
 
 // Import superjson to ensure it's available in test environment
 import 'superjson';
+
+// Set process title to include relative test file path for easier identification
+beforeAll(() => {
+  if (typeof process !== 'undefined' && process.title) {
+    try {
+      // Get the current test file from Vitest's internal state
+      const testFile =
+        globalThis.__vitest_worker__?.filepath ||
+        (globalThis.expect?.getState && globalThis.expect.getState().testPath) ||
+        process.env.VITEST_TEST_NAME ||
+        '';
+
+      if (testFile) {
+        // Get project root (where package.json is)
+        const projectRoot = process.cwd();
+        let relativePath = testFile;
+
+        // Handle file:// URLs from import.meta.url
+        if (testFile.startsWith('file://')) {
+          relativePath = testFile.replace('file://', '');
+        }
+
+        // Make path relative to project root
+        if (relativePath.startsWith(projectRoot)) {
+          relativePath = relativePath.substring(projectRoot.length + 1);
+        }
+
+        // Clean up monorepo paths - remove packages/web/ prefix
+        relativePath = relativePath.replace(/.*packages\/web\//, '');
+
+        process.title = `vitest:web:${relativePath}`;
+      } else {
+        process.title = 'vitest:web:unknown';
+      }
+    } catch (error) {
+      process.title = 'vitest:web:error';
+    }
+  }
+});
 
 // Mock EventSource for SSE testing
 class MockEventSource {
