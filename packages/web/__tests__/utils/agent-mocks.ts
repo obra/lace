@@ -26,7 +26,7 @@ export function createMockAgentInfo(overrides?: Partial<AgentInfo>): AgentInfo {
  * @param baseOverrides Base overrides applied to all agents
  * @returns Array of AgentInfo mock objects
  */
-export function createMockAgents(count: number, baseOverrides?: Partial<AgentInfo>): AgentInfo[] {
+function createMockAgents(count: number, baseOverrides?: Partial<AgentInfo>): AgentInfo[] {
   return Array.from({ length: count }, (_, index) =>
     createMockAgentInfo({
       threadId: `lace_20250904_test${String(index + 1).padStart(2, '0')}` as ThreadId,
@@ -39,7 +39,7 @@ export function createMockAgents(count: number, baseOverrides?: Partial<AgentInf
 /**
  * Common agent personas for testing
  */
-export const MOCK_PERSONAS = {
+const MOCK_PERSONAS = {
   lace: createMockAgentInfo({ persona: 'lace' }),
   codingAgent: createMockAgentInfo({
     persona: 'coding-agent',
