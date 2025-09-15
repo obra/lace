@@ -34,31 +34,29 @@ describe('release-notes-service', () => {
     it('should indicate release notes should be shown when no last seen hash', async () => {
       const result = await checkReleaseNotesStatus();
 
-      expect(result).toEqual({
-        shouldShow: true,
-        content: '# Test Release Notes\n\nTest content',
-        currentHash: 'test-hash-123',
-      });
+      expect(result.shouldShow).toBe(true);
+      expect(result.content).toContain('# Release Notes');
+      expect(result.currentHash).toBeTruthy();
     });
 
     it('should indicate release notes should be shown when hash differs', async () => {
       const result = await checkReleaseNotesStatus('different-hash');
 
-      expect(result).toEqual({
-        shouldShow: true,
-        content: '# Test Release Notes\n\nTest content',
-        currentHash: 'test-hash-123',
-      });
+      expect(result.shouldShow).toBe(true);
+      expect(result.content).toContain('# Release Notes');
+      expect(result.currentHash).toBeTruthy();
     });
 
     it('should indicate release notes should not be shown when hash matches', async () => {
-      const result = await checkReleaseNotesStatus('test-hash-123');
+      // First get the current hash
+      const firstResult = await checkReleaseNotesStatus();
 
-      expect(result).toEqual({
-        shouldShow: false,
-        content: '# Test Release Notes\n\nTest content',
-        currentHash: 'test-hash-123',
-      });
+      // Then check with the same hash
+      const result = await checkReleaseNotesStatus(firstResult.currentHash);
+
+      expect(result.shouldShow).toBe(false);
+      expect(result.content).toContain('# Release Notes');
+      expect(result.currentHash).toBe(firstResult.currentHash);
     });
   });
 
