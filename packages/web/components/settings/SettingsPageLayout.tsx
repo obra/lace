@@ -12,10 +12,11 @@ import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { useUIContext } from '@/components/providers/UIProvider';
 import { useNavigate } from 'react-router';
 import { SettingsLayout } from './SettingsLayout';
+import type { SettingsTab } from '@/lib/settings-config';
 
 interface SettingsPageLayoutProps {
   children: React.ReactNode;
-  activeTab: 'providers' | 'mcp' | 'ui' | 'user';
+  activeTab: SettingsTab;
 }
 
 // Inner component that has access to UIContext

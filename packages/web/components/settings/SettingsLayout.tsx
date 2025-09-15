@@ -8,10 +8,11 @@ import { useNavigate } from 'react-router';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes } from '@/lib/fontawesome';
 import { SettingsNavigation } from './SettingsNavigation';
+import type { SettingsTab } from '@/lib/settings-config';
 
 interface SettingsLayoutProps {
   children: React.ReactNode;
-  activeTab: 'providers' | 'mcp' | 'ui' | 'user';
+  activeTab: SettingsTab;
 }
 
 export function SettingsLayout({ children, activeTab }: SettingsLayoutProps) {
