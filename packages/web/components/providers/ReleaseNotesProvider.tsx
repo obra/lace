@@ -42,7 +42,7 @@ export function ReleaseNotesProvider({ children }: ReleaseNotesProviderProps) {
       } catch (error) {
         console.warn('Failed to load user settings for release notes:', error);
         if (!cancelled) {
-          setRawUserSettings({});
+          setRawUserSettings(null);
         }
       }
     };

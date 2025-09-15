@@ -8,10 +8,20 @@ import { api } from '@/lib/api-client';
 // This file is generated at build time by scripts/generate-release-notes-meta.ts
 import releaseNotesMetaModule from '@/app/generated/release-notes-meta.json';
 
+function isReleaseNotesMeta(x: unknown): x is ReleaseNotesMeta {
+  return (
+    !!x &&
+    typeof (x as Record<string, unknown>).hash === 'string' &&
+    typeof (x as Record<string, unknown>).content === 'string' &&
+    typeof (x as Record<string, unknown>).generatedAt === 'string'
+  );
+}
+
 // Function to get release notes metadata
 export function loadReleaseNotesMeta(): ReleaseNotesMeta | null {
   try {
-    return releaseNotesMetaModule as ReleaseNotesMeta;
+    const meta = releaseNotesMetaModule as unknown;
+    return isReleaseNotesMeta(meta) ? meta : null;
   } catch {
     return null;
   }

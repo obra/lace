@@ -1,4 +1,6 @@
-// FontAwesome configuration for React components
+// ABOUTME: Centralized FontAwesome icon exports and configuration for web UI
+// ABOUTME: Prevents auto CSS injection and exports all required icons in one place
+
 import { config } from '@fortawesome/fontawesome-svg-core';
 
 // Prevent FontAwesome from adding CSS since we'll import it manually
