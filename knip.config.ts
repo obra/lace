@@ -43,9 +43,10 @@ export default {
         'app/entry.client.tsx',
         'app/root.tsx',
         'app/routes.ts',
-        // Server entrypoint
+        // Server entrypoints
         'server-custom.ts',
         'server-production.ts',
+        'server/app.ts', // Dynamically imported by server-custom.ts
         // E2E test files and setup
         'e2e/**/*.e2e.ts',
         'e2e/**/*.test.e2e.ts',
