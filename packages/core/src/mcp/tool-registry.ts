@@ -9,7 +9,7 @@ import { logger } from '~/utils/logger';
 import type { MCPConfig } from '~/config/mcp-types';
 import type { ToolPolicy } from '~/tools/types';
 
-export interface ToolRegistryEvents {
+interface ToolRegistryEvents {
   'tools-updated': (serverId: string, tools: Tool[]) => void;
   'tool-discovery-error': (serverId: string, error: string) => void;
 }
