@@ -12,7 +12,6 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Chat } from '@/components/chat/Chat';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
-import { SettingsContainer } from '@/components/settings/SettingsContainer';
 import { SessionEditModal } from '@/components/config/SessionEditModal';
 import { AgentCreateChatPopup } from '@/components/modals/AgentCreateChatPopup';
 
@@ -195,25 +194,17 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
     >
       {/* Unified Sidebar */}
       <div data-testid="sidebar" className="flex-shrink-0 h-full">
-        <SettingsContainer>
-          {({ onOpenSettings }: { onOpenSettings: () => void }) => (
-            <Sidebar
-              open={sidebarOpen}
-              onToggle={toggleSidebar}
-              onSettingsClick={onOpenSettings as () => void}
-            >
-              <SidebarContent
-                isMobile={false} // Component now handles mobile/desktop internally
-                onCloseMobileNav={toggleSidebar as () => void}
-                onSwitchProject={handleSwitchProject}
-                onAgentSelect={handleAgentSelect}
-                onConfigureSession={handleConfigureSession}
-                onCreateAgent={handleCreateAgent}
-                createAgentButtonRef={createAgentButtonRef}
-              />
-            </Sidebar>
-          )}
-        </SettingsContainer>
+        <Sidebar open={sidebarOpen} onToggle={toggleSidebar}>
+          <SidebarContent
+            isMobile={false} // Component now handles mobile/desktop internally
+            onCloseMobileNav={toggleSidebar as () => void}
+            onSwitchProject={handleSwitchProject}
+            onAgentSelect={handleAgentSelect}
+            onConfigureSession={handleConfigureSession}
+            onCreateAgent={handleCreateAgent}
+            createAgentButtonRef={createAgentButtonRef}
+          />
+        </Sidebar>
       </div>
 
       {/* Main Content */}

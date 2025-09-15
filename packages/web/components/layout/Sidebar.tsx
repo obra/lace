@@ -103,15 +103,16 @@ export function Sidebar({ open, onToggle, onSettingsClick, children }: SidebarPr
 
                 {/* Mobile Footer */}
                 <div className="p-4 border-t border-base-300">
-                  <button
-                    onClick={onSettingsClick}
+                  <Link
+                    to="/settings"
+                    onClick={onToggle}
                     className="btn btn-ghost w-full justify-start"
                     aria-label="Open settings"
                     data-testid="settings-button-mobile"
                   >
                     <FontAwesomeIcon icon={faCog} className="w-4 h-4 mr-2" />
                     Settings
-                  </button>
+                  </Link>
                 </div>
               </motion.div>
             </>
@@ -156,14 +157,14 @@ function DesktopSidebar({
     return (
       <div className="bg-base-100 border-r border-base-300/50 flex flex-col items-center py-6 transition-all duration-300 w-16 relative shadow-sm h-full">
         <div className="flex flex-col gap-3">
-          <button
-            onClick={onSettingsClick}
-            className="p-3 hover:bg-base-200 rounded-xl transition-all duration-200 hover:scale-105 ring-hover"
+          <Link
+            to="/settings"
+            className="p-3 hover:bg-base-200 rounded-xl transition-all duration-200 hover:scale-105 ring-hover block"
             aria-label="Open settings"
             data-testid="settings-button"
           >
             <FontAwesomeIcon icon={faCog} className="w-5 h-5 text-base-content/60" />
-          </button>
+          </Link>
         </div>
 
         {/* Clickable border area for toggle */}
@@ -202,9 +203,9 @@ function DesktopSidebar({
                 <span className="text-xl font-ui font-medium">Lace</span>
               </Link>
             </div>
-            <button
-              onClick={onSettingsClick}
-              className="p-2.5 hover:bg-base-200/80 rounded-xl transition-all duration-200 hover:scale-105"
+            <Link
+              to="/settings"
+              className="p-2.5 hover:bg-base-200/80 rounded-xl transition-all duration-200 hover:scale-105 block"
               aria-label="Open settings"
               data-testid="settings-button"
             >
@@ -212,7 +213,7 @@ function DesktopSidebar({
                 icon={faCog}
                 className="w-4 h-4 text-base-content/50 hover:text-base-content/80 transition-colors"
               />
-            </button>
+            </Link>
           </div>
         </div>
 

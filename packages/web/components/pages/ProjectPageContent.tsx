@@ -11,7 +11,6 @@ import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
 import { useUIContext } from '@/components/providers/UIProvider';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
-import { SettingsContainer } from '@/components/settings/SettingsContainer';
 
 interface ProjectPageContentProps {
   projectId: string;
@@ -36,23 +35,15 @@ export function ProjectPageContent({ projectId }: ProjectPageContentProps) {
     >
       {/* Unified Sidebar */}
       <div data-testid="sidebar" className="flex-shrink-0 h-full">
-        <SettingsContainer>
-          {({ onOpenSettings }: { onOpenSettings: () => void }) => (
-            <Sidebar
-              open={sidebarOpen}
-              onToggle={toggleSidebar}
-              onSettingsClick={() => onOpenSettings()}
-            >
-              <SidebarContent
-                isMobile={false} // Component now handles mobile/desktop internally
-                onCloseMobileNav={() => toggleSidebar()}
-                onSwitchProject={handleSwitchProject}
-                onAgentSelect={() => {}} // No agent navigation on project page
-                onConfigureSession={() => {}} // No session configuration on project page
-              />
-            </Sidebar>
-          )}
-        </SettingsContainer>
+        <Sidebar open={sidebarOpen} onToggle={toggleSidebar}>
+          <SidebarContent
+            isMobile={false} // Component now handles mobile/desktop internally
+            onCloseMobileNav={() => toggleSidebar()}
+            onSwitchProject={handleSwitchProject}
+            onAgentSelect={() => {}} // No agent navigation on project page
+            onConfigureSession={() => {}} // No session configuration on project page
+          />
+        </Sidebar>
       </div>
 
       {/* Main Content */}

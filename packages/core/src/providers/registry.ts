@@ -8,7 +8,7 @@ import { LMStudioProvider } from '~/providers/lmstudio-provider';
 import { OllamaProvider } from '~/providers/ollama-provider';
 import { ProviderCatalogManager } from '~/providers/catalog/manager';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
-import type { CatalogProvider, CatalogModel } from '~/providers/catalog/types';
+import type { CatalogProvider, CatalogModel, ModelConfig } from '~/providers/catalog/types';
 import { OpenRouterDynamicProvider } from '~/providers/openrouter/dynamic-provider';
 import { logger } from '~/utils/logger';
 
@@ -37,6 +37,7 @@ export interface ConfiguredInstance {
   endpoint?: string;
   timeout?: number;
   retryPolicy?: string;
+  modelConfig?: ModelConfig;
   hasCredentials: boolean;
 }
 
@@ -150,6 +151,7 @@ export class ProviderRegistry {
         endpoint: instance.endpoint,
         timeout: instance.timeout,
         retryPolicy: instance.retryPolicy,
+        modelConfig: instance.modelConfig,
         hasCredentials,
       });
     }

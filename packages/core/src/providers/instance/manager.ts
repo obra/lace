@@ -18,7 +18,8 @@ import type { AIProvider } from '~/providers/base-provider';
 export class ProviderInstanceManager {
   private configPath: string;
   private credentialsDir: string;
-  private savePromise: Promise<void> | null = null;
+  // Static lock shared across all instances to prevent concurrent file corruption
+  private static savePromise: Promise<void> | null = null;
 
   constructor() {
     const laceDir = getLaceDir();
@@ -68,19 +69,24 @@ export class ProviderInstanceManager {
 
   async saveInstances(config: ProviderInstancesConfig): Promise<void> {
     // Serialize access to prevent concurrent writes from corrupting JSON
-    if (this.savePromise) {
-      await this.savePromise;
+    // Use static lock to coordinate across all manager instances
+    if (ProviderInstanceManager.savePromise) {
+      await ProviderInstanceManager.savePromise;
     }
 
-    this.savePromise = this.performSave(config);
+    ProviderInstanceManager.savePromise = this.performSave(config);
     try {
-      await this.savePromise;
+      await ProviderInstanceManager.savePromise;
     } finally {
-      this.savePromise = null;
+      ProviderInstanceManager.savePromise = null;
     }
   }
 
   private async performSave(config: ProviderInstancesConfig): Promise<void> {
+    // Ensure the directory exists
+    const dir = path.dirname(this.configPath);
+    await fs.promises.mkdir(dir, { recursive: true });
+
     // Atomic write: write to temp file, then rename
     const tempPath = `${this.configPath}.tmp`;
     const data = JSON.stringify(config, null, 2);

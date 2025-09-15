@@ -12,6 +12,14 @@ export default [
   route('speech-demo', 'routes/speech-demo.tsx'),
   route('sentry-test', 'routes/sentry-test.tsx'),
   route('file-viewer', 'routes/file-viewer.tsx'),
+
+  // Settings routes
+  route('settings', 'routes/settings.tsx'),
+  route('settings/providers', 'routes/settings.providers.tsx'),
+  route('settings/mcp', 'routes/settings.mcp.tsx'),
+  route('settings/ui', 'routes/settings.ui.tsx'),
+  route('settings/user', 'routes/settings.user.tsx'),
+
   route('project/:projectId', 'routes/project.$projectId.tsx'),
   route(
     'project/:projectId/session/:sessionId',
