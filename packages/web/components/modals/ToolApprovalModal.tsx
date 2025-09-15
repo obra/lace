@@ -30,10 +30,55 @@ interface ToolApprovalModalProps {
   onDecision: (toolCallId: string, decision: ApprovalDecision) => void;
 }
 
+// LRU Cache implementation for file previews
+class LRUCache<K, V> {
+  private cache = new Map<K, V>();
+  private maxSize: number;
+
+  constructor(maxSize: number) {
+    this.maxSize = maxSize;
+  }
+
+  get(key: K): V | undefined {
+    const value = this.cache.get(key);
+    if (value !== undefined) {
+      // Move to end (most recently used)
+      this.cache.delete(key);
+      this.cache.set(key, value);
+    }
+    return value;
+  }
+
+  set(key: K, value: V): void {
+    if (this.cache.has(key)) {
+      // Update existing key
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.maxSize) {
+      // Remove least recently used (first item)
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+    }
+    this.cache.set(key, value);
+  }
+
+  has(key: K): boolean {
+    return this.cache.has(key);
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+
+  size(): number {
+    return this.cache.size;
+  }
+}
+
 export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
-  const [filePreviewCache, setFilePreviewCache] = useState<Map<string, ToolResult>>(new Map());
+  const [, forceUpdate] = useState({});
+  const [filePreviewCache] = useState(() => new LRUCache<string, ToolResult>(20)); // Max 20 cached previews
   const { selectedSession } = useSessionContext();
   const currentApproval = approvals[currentIndex];
   const request = currentApproval?.requestData;
@@ -76,6 +121,13 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [onDecision, currentApproval, currentIndex, approvals.length]);
+
+  // Cleanup cache when component unmounts
+  useEffect(() => {
+    return () => {
+      filePreviewCache.clear();
+    };
+  }, [filePreviewCache]);
 
   // Fetch file content for file_read previews
   useEffect(() => {
@@ -127,7 +179,8 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
           },
         };
 
-        setFilePreviewCache((prev) => new Map(prev).set(cacheKey, previewResult));
+        filePreviewCache.set(cacheKey, previewResult);
+        forceUpdate({}); // Trigger re-render
       } catch (error) {
         // Create an error result for display
         const errorResult: ToolResult = {
@@ -141,12 +194,13 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
           metadata: { isPreview: true, arguments: args },
         };
 
-        setFilePreviewCache((prev) => new Map(prev).set(cacheKey, errorResult));
+        filePreviewCache.set(cacheKey, errorResult);
+        forceUpdate({}); // Trigger re-render
       }
     };
 
     void fetchFileContent();
-  }, [currentApproval, request, selectedSession, filePreviewCache]);
+  }, [currentApproval, request, selectedSession]);
 
   // Early return after hooks to satisfy React rules
   if (!currentApproval || !request) return null;
