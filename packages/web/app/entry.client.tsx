@@ -19,8 +19,9 @@ Sentry.init({
   sendDefaultPii: true,
 
   integrations: [
-    // User Feedback
+    // User Feedback - disabled in favor of custom feedback form
     Sentry.feedbackIntegration({
+      autoInject: false, // Prevents Sentry's native UI from showing
       colorScheme: 'system',
     }),
   ],

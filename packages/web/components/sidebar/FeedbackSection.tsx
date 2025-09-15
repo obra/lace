@@ -3,10 +3,12 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComments } from '@/lib/fontawesome';
 import * as Sentry from '@sentry/react';
+import { api } from '@/lib/api-client';
+import { Alert } from '@/components/ui/Alert';
 
 interface FeedbackSectionProps {
   isMobile?: boolean;
@@ -18,7 +20,56 @@ export function FeedbackSection({ isMobile = false, onCloseMobileNav }: Feedback
   const [feedbackText, setFeedbackText] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+
+  // Refs for focus management
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Load user email from settings when modal opens
+  const loadUserEmail = useCallback(async () => {
+    try {
+      setIsLoadingSettings(true);
+      const settings = await api.get<Record<string, unknown>>('/api/settings');
+      if (settings.email && typeof settings.email === 'string') {
+        setUserEmail(settings.email);
+      }
+    } catch (error) {
+      console.warn('Failed to load user email from settings:', error);
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  }, []);
+
+  // Handle escape key to close modal
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showFeedbackModal) {
+        setShowFeedbackModal(false);
+      }
+    },
+    [showFeedbackModal]
+  );
+
+  // Add/remove escape key listener and manage focus
+  useEffect(() => {
+    if (showFeedbackModal) {
+      document.addEventListener('keydown', handleKeyDown);
+      // Only load email if not already set
+      if (!userEmail) {
+        void loadUserEmail();
+      }
+      // Focus textarea when modal opens
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 100);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showFeedbackModal, handleKeyDown, loadUserEmail, userEmail]);
 
   const handleFeedbackSubmit = async () => {
     if (!feedbackText.trim()) return;
@@ -43,14 +94,12 @@ export function FeedbackSection({ isMobile = false, onCloseMobileNav }: Feedback
         }
       );
 
-      setShowFeedbackModal(false);
+      // Clear form and show success alert
       setFeedbackText('');
-      setUserEmail('');
-
-      // Show React-based success toast
-      setShowSuccessToast(true);
+      setShowSuccessAlert(true);
+      // Hide alert after 3 seconds but let user close modal manually
       setTimeout(() => {
-        setShowSuccessToast(false);
+        setShowSuccessAlert(false);
       }, 3000);
 
       // Close mobile nav if this is mobile
@@ -92,71 +141,102 @@ export function FeedbackSection({ isMobile = false, onCloseMobileNav }: Feedback
 
       {/* Feedback Modal */}
       <div className={`modal ${showFeedbackModal ? 'modal-open' : ''}`}>
-        <div className="modal-box max-w-lg p-0 bg-base-100 shadow-2xl">
+        <div
+          ref={modalRef}
+          className="modal-box max-w-md p-0 bg-base-100 shadow-2xl"
+          role="dialog"
+          aria-labelledby="feedback-title"
+          aria-describedby="feedback-description"
+        >
           {/* Header */}
-          <div className="bg-gradient-to-r from-primary/10 to-secondary/10 p-8 pb-6">
+          <div className="bg-gradient-to-r from-primary/10 to-secondary/10 p-6 pb-4">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
-                <FontAwesomeIcon icon={faComments} className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
+                <FontAwesomeIcon icon={faComments} className="w-4 h-4 text-primary" />
               </div>
-              <h3 className="text-2xl font-bold text-base-content">Share Your Feedback</h3>
+              <h3 id="feedback-title" className="text-xl font-bold text-base-content">
+                Share Your Feedback
+              </h3>
             </div>
-            <p className="text-base-content/70 text-lg">
+            <p id="feedback-description" className="text-base-content/70 text-sm">
               Help us make Lace better with your thoughts, bug reports, or feature ideas.
             </p>
           </div>
 
           {/* Form Content */}
-          <div className="p-8 pt-6 space-y-6">
-            <div className="space-y-3">
+          <div className="p-6 pt-4 space-y-4">
+            <div className="space-y-2">
               <label className="block">
-                <span className="text-sm font-semibold text-base-content/90 mb-2 block">
+                <span className="text-sm font-medium text-base-content/90 mb-1 block">
                   What&apos;s on your mind?
                 </span>
                 <textarea
-                  className="textarea textarea-bordered w-full h-32 resize-none text-base placeholder:text-base-content/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                  placeholder="Share your experience, report bugs, suggest features, or just let us know how we're doing..."
+                  ref={textareaRef}
+                  className="textarea textarea-bordered w-full h-24 resize-none text-sm placeholder:text-base-content/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  placeholder="Share your experience, report bugs, suggest features..."
                   value={feedbackText}
                   onChange={(e) => setFeedbackText(e.target.value)}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isLoadingSettings}
                   data-sentry-mask
+                  aria-label="Feedback message"
                 />
               </label>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               <label className="block">
-                <span className="text-sm font-semibold text-base-content/90 mb-2 block">
+                <span className="text-sm font-medium text-base-content/90 mb-1 flex items-center gap-2">
                   Email <span className="text-base-content/50 font-normal">(optional)</span>
+                  {isLoadingSettings && (
+                    <span
+                      className="loading loading-spinner loading-xs"
+                      aria-label="Loading email"
+                    />
+                  )}
                 </span>
                 <input
                   type="email"
-                  className="input input-bordered w-full text-base placeholder:text-base-content/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  className="input input-bordered w-full text-sm placeholder:text-base-content/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                   placeholder="your.email@example.com"
                   value={userEmail}
                   onChange={(e) => setUserEmail(e.target.value)}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isLoadingSettings}
+                  aria-label="Email address"
                 />
               </label>
             </div>
 
+            {/* Success Alert */}
+            {showSuccessAlert && (
+              <div role="status" aria-live="polite">
+                <Alert
+                  variant="success"
+                  title="Thank you for your feedback!"
+                  style="soft"
+                  className="text-sm"
+                />
+              </div>
+            )}
+
             {/* Action Buttons */}
-            <div className="flex gap-3 pt-4">
+            <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setShowFeedbackModal(false)}
-                className="btn btn-outline flex-1"
-                disabled={isSubmitting}
+                className="btn btn-outline btn-sm flex-1"
+                disabled={isSubmitting || isLoadingSettings || showSuccessAlert}
               >
                 Cancel
               </button>
               <button
                 onClick={handleFeedbackSubmit}
-                className="btn btn-primary flex-1"
-                disabled={!feedbackText.trim() || isSubmitting}
+                className="btn btn-primary btn-sm flex-1"
+                disabled={
+                  !feedbackText.trim() || isSubmitting || isLoadingSettings || showSuccessAlert
+                }
               >
                 {isSubmitting ? (
                   <>
-                    <span className="loading loading-spinner loading-sm"></span>
+                    <span className="loading loading-spinner loading-xs"></span>
                     Sending...
                   </>
                 ) : (
@@ -167,15 +247,6 @@ export function FeedbackSection({ isMobile = false, onCloseMobileNav }: Feedback
           </div>
         </div>
       </div>
-
-      {/* Success Toast */}
-      {showSuccessToast && (
-        <div className="toast toast-top toast-end">
-          <div className="alert alert-success">
-            <span>Thank you for your feedback!</span>
-          </div>
-        </div>
-      )}
     </>
   );
 }
