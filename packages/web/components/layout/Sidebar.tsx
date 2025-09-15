@@ -267,24 +267,15 @@ export function SidebarSection({
           }
           aria-expanded={collapsible ? !collapsed : undefined}
         >
+          {collapsible && (
+            <ChevronRightIcon
+              className={`w-4 h-4 transition-transform ${collapsed ? 'rotate-0' : 'rotate-90'}`}
+            />
+          )}
           {icon && <FontAwesomeIcon icon={icon} className="w-4 h-4" />}
           <span className="uppercase tracking-wider text-xs font-semibold">{title}</span>
         </button>
-        <div className="flex items-center gap-2">
-          {headerActions}
-          {collapsible && (
-            <button
-              onClick={() => setCollapsed(!collapsed)}
-              className="hover:text-base-content/80 transition-colors"
-              aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${title} section`}
-              aria-expanded={!collapsed}
-            >
-              <ChevronRightIcon
-                className={`w-4 h-4 transition-transform ${collapsed ? 'rotate-0' : 'rotate-90'}`}
-              />
-            </button>
-          )}
-        </div>
+        <div className="flex items-center gap-2">{headerActions}</div>
       </div>
 
       {!collapsed && <div className="space-y-2 ml-1">{children}</div>}

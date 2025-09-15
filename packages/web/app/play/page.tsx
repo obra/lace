@@ -18,7 +18,6 @@ import {
   Badge,
   StatusDot,
   ChatTextarea,
-  SectionHeader,
   MessageText,
   TimestampDisplay,
   MessageHeader,
@@ -40,7 +39,7 @@ import MessageDisplay from '@/components/ui/MessageDisplay';
 import { VoiceRecognitionUI, CompactVoiceButton } from '@/components/ui/VoiceRecognitionUI';
 import { NativeSpeechInput } from '@/components/ui';
 import { AccountDropdown } from '@/components/ui/AccountDropdown';
-import SidebarSection from '@/components/ui/SidebarSection';
+import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
 import NavigationItem from '@/components/ui/NavigationItem';
 import { AnimatedModal } from '@/components/ui/AnimatedModal';
 import NavigationButton from '@/components/ui/NavigationButton';
@@ -48,7 +47,6 @@ import { AdvancedSettingsCollapse } from '@/components/ui/AdvancedSettingsCollap
 import { ThemeSelector } from '@/components/ui/ThemeSelector';
 import ExpandableHeader from '@/components/ui/ExpandableHeader';
 import { InfoSection } from '@/components/ui/InfoSection';
-import { VaporBackground } from '@/components/ui/VaporBackground';
 import { InfoIconButton } from '@/components/ui/InfoIconButton';
 import { OnboardingHero } from '@/components/ui/OnboardingHero';
 import MessageBubble from '@/components/ui/MessageBubble';
@@ -74,7 +72,6 @@ import { TextAreaField } from '@/components/ui/TextAreaField';
 // MOLECULES - Composed UI patterns
 import { UISettingsPanel } from '@/components/settings/panels/UISettingsPanel';
 import { ChatInput } from '@/components/chat/ChatInput';
-import { Sidebar } from '@/components/layout/Sidebar';
 // Removed unused feedback and files imports to satisfy lints
 
 // ORGANISMS - Complex interactive components
@@ -110,6 +107,7 @@ export default function PlaygroundPage() {
   const [showBasicModal, setShowBasicModal] = useState(false);
   const [showAnimatedModal, setShowAnimatedModal] = useState(false);
   const [showToolApprovalModal, setShowToolApprovalModal] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Mock data for tool approval modal
   const mockPendingApprovals: PendingApproval[] = [
@@ -320,9 +318,6 @@ export default function PlaygroundPage() {
                 }}
               />
             </AtomItem>
-            <AtomItem n={21} tip="Atom #21: SectionHeader">
-              <SectionHeader title="Section Title" isExpanded={true} onToggle={() => {}} />
-            </AtomItem>
             <AtomItem n={22} tip="Atom #22: MessageDisplay">
               <MessageDisplay type="ai" content="Sample message content" timestamp={new Date()} />
             </AtomItem>
@@ -478,14 +473,22 @@ export default function PlaygroundPage() {
               <AccountDropdown />
             </AtomItem>
             <AtomItem n={31} tip="Atom #31: SidebarSection">
-              <SidebarSection title="Section" isExpanded={true} onToggle={() => {}}>
+              <SidebarSection title="Section" defaultCollapsed={false} collapsible={true}>
                 <p>Sidebar section content</p>
               </SidebarSection>
             </AtomItem>
-            <AtomItem n={32} tip="Atom #32: InfoSection">
+            <AtomItem n={32} tip="Atom #32: SidebarItem">
+              <SidebarItem active={true}>Active sidebar item</SidebarItem>
+            </AtomItem>
+            <AtomItem n={33} tip="Atom #33: SidebarButton">
+              <SidebarButton variant="primary" size="md">
+                Primary Button
+              </SidebarButton>
+            </AtomItem>
+            <AtomItem n={34} tip="Atom #34: InfoSection">
               <InfoSection title="Information">Detailed information content</InfoSection>
             </AtomItem>
-            <AtomItem n={33} tip="Atom #33: AnimatedCarousel">
+            <AtomItem n={35} tip="Atom #35: AnimatedCarousel">
               <AnimatedCarousel>
                 <div className="p-4 bg-base-200 rounded">Item 1</div>
                 <div className="p-4 bg-base-200 rounded">Item 2</div>
@@ -501,7 +504,9 @@ export default function PlaygroundPage() {
           <h3 className="card-title text-base-content">✨ Effects & Overlays</h3>
           <div className="space-y-4">
             <AtomItem n={34} tip="Atom #34: VaporBackground">
-              <VaporBackground />
+              <div className="h-32 w-full bg-gradient-to-br from-primary/20 to-secondary/20 rounded-lg flex items-center justify-center">
+                <span className="text-sm text-base-content/60">Vapor Background Demo</span>
+              </div>
             </AtomItem>
             <AtomItem n={35} tip="Atom #35: DragDropOverlay">
               <DragDropOverlay onFilesDropped={() => {}}>
@@ -576,6 +581,46 @@ export default function PlaygroundPage() {
                 <div className="p-4 bg-secondary text-secondary-content rounded">Slide 2</div>
                 <div className="p-4 bg-accent text-accent-content rounded">Slide 3</div>
               </Carousel>
+            </AtomItem>
+          </div>
+        </div>
+      </div>
+
+      {/* Layout Components */}
+      <div className="card bg-base-100 shadow">
+        <div className="card-body">
+          <h3 className="card-title text-base-content">🏗️ Layout Components</h3>
+          <div className="space-y-4">
+            <AtomItem n={55} tip="Layout #55: Full Sidebar Demo">
+              <div className="relative h-64 w-full border border-base-300 rounded overflow-hidden">
+                <Sidebar
+                  open={sidebarOpen}
+                  onToggle={() => setSidebarOpen(!sidebarOpen)}
+                  onSettingsClick={() => alert('Settings clicked!')}
+                >
+                  <SidebarSection title="Demo Section" collapsible={true} defaultCollapsed={false}>
+                    <SidebarItem active={true}>Active Item</SidebarItem>
+                    <SidebarItem>Regular Item</SidebarItem>
+                    <SidebarItem disabled={true}>Disabled Item</SidebarItem>
+                  </SidebarSection>
+                  <SidebarSection title="Actions" collapsible={true} defaultCollapsed={false}>
+                    <SidebarButton variant="primary" size="sm">
+                      Primary Action
+                    </SidebarButton>
+                    <SidebarButton variant="secondary" size="sm">
+                      Secondary
+                    </SidebarButton>
+                  </SidebarSection>
+                </Sidebar>
+                <div className="absolute top-2 left-2 z-10">
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={() => setSidebarOpen(!sidebarOpen)}
+                  >
+                    Toggle Sidebar
+                  </button>
+                </div>
+              </div>
             </AtomItem>
           </div>
         </div>
