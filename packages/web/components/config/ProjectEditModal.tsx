@@ -8,6 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrash, faServer, faUser, faCog, faTools } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { DirectoryField } from '@/components/ui';
+import { ModelSelector } from '@/components/ui/ModelSelector';
 import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import { MCPProjectConfig } from '@/components/mcp/MCPProjectConfig';
 import { AddMCPServerModal } from '@/components/modals/AddMCPServerModal';
@@ -81,11 +82,14 @@ export function ProjectEditModal({
     setEditConfig(initialConfig);
   }, [initialConfig]);
 
-  // Get available models for selected provider
-  const availableModels = React.useMemo(() => {
-    const provider = availableProviders.find((p) => p.instanceId === editConfig.providerInstanceId);
-    return provider?.models || [];
-  }, [availableProviders, editConfig.providerInstanceId]);
+  // Handle provider and model selection from ModelSelector
+  const handleModelSelectorChange = (providerInstanceId: string, modelId: string) => {
+    setEditConfig((prev) => ({
+      ...prev,
+      providerInstanceId,
+      modelId,
+    }));
+  };
 
   // Environment variable handlers
   const handleAddEnvironmentVariable = () => {
@@ -231,69 +235,18 @@ export function ProjectEditModal({
                 required
               />
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="label">
-                    <span className="label-text font-medium">Default Provider</span>
-                  </label>
-                  <select
-                    value={editConfig.providerInstanceId || ''}
-                    onChange={(e) => {
-                      const newInstanceId = e.target.value;
-                      const provider = availableProviders.find(
-                        (p) => p.instanceId === newInstanceId
-                      );
-                      const providerModels = provider?.models || [];
-                      setEditConfig((prev) => ({
-                        ...prev,
-                        providerInstanceId: newInstanceId,
-                        modelId: providerModels[0]?.id || prev.modelId,
-                      }));
-                    }}
-                    className="select select-bordered w-full"
-                  >
-                    {availableProviders.length === 0 ? (
-                      <option value="">No providers available</option>
-                    ) : (
-                      <>
-                        {!editConfig.providerInstanceId && (
-                          <option value="">Select a provider</option>
-                        )}
-                        {availableProviders.map((provider) => (
-                          <option key={provider.instanceId} value={provider.instanceId}>
-                            {provider.displayName}
-                          </option>
-                        ))}
-                      </>
-                    )}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="label">
-                    <span className="label-text font-medium">Default Model</span>
-                  </label>
-                  <select
-                    value={editConfig.modelId || ''}
-                    onChange={(e) =>
-                      setEditConfig((prev) => ({ ...prev, modelId: e.target.value }))
-                    }
-                    className="select select-bordered w-full"
-                  >
-                    {availableModels.length === 0 ? (
-                      <option value="">No models available</option>
-                    ) : (
-                      <>
-                        {!editConfig.modelId && <option value="">Select a model</option>}
-                        {availableModels.map((model) => (
-                          <option key={model.id} value={model.id}>
-                            {model.displayName}
-                          </option>
-                        ))}
-                      </>
-                    )}
-                  </select>
-                </div>
+              <div>
+                <label className="label">
+                  <span className="label-text font-medium">Default Model</span>
+                </label>
+                <ModelSelector
+                  providers={availableProviders}
+                  selectedProviderInstanceId={editConfig.providerInstanceId}
+                  selectedModelId={editConfig.modelId}
+                  onChange={handleModelSelectorChange}
+                  className="select select-bordered w-full"
+                  placeholder="Select provider and model..."
+                />
               </div>
             </div>
 
