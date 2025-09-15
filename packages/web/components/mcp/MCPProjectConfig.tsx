@@ -81,7 +81,8 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
         return updated;
       });
     } catch (error) {
-      // Error handling
+      // eslint-disable-next-line no-console
+      console.error(`Delete project MCP server ${serverId} failed`, error);
     }
   };
 
@@ -99,7 +100,8 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
       setProjectServers((prev) => ({ ...prev, [serverId]: config }));
       setEditingServerId(null);
     } catch (error) {
-      // Error handling
+      // eslint-disable-next-line no-console
+      console.error(`Update project MCP server ${serverId} failed`, error);
     }
   };
 
@@ -131,7 +133,6 @@ export function MCPProjectConfig({ projectId, onOpenAddModal }: MCPProjectConfig
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.warn('[MCP Debug] Add Project Server button clicked');
             onOpenAddModal?.();
           }}
           data-testid="add-project-server-button"

@@ -130,7 +130,7 @@ describe('MCPPanel Integration Tests', () => {
 
     // Check discovery failed message
     expect(screen.getByTestId('discovery-error-test-server')).toHaveTextContent(
-      'Discovery failed: MCP error --32000: Connection closed'
+      'Discovery failed: MCP error -32000'
     );
 
     // Check that edit and delete buttons are present

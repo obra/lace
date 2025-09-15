@@ -311,7 +311,7 @@ describe('MCPProjectConfig Integration Tests', () => {
 
     // Should show discovery failed message
     expect(screen.getByTestId('discovery-error-failed-server')).toHaveTextContent(
-      'Discovery failed: MCP error --32000: Connection closed'
+      'Discovery failed: MCP error -32000'
     );
   });
 

@@ -134,7 +134,7 @@ describe('MCPServerCard', () => {
 
     // Should show discovery failed message
     expect(screen.getByTestId('discovery-error-failed-server')).toHaveTextContent(
-      'Discovery failed: MCP error --32000: Connection closed'
+      'Discovery failed: MCP error -32000'
     );
 
     // Should not show tools section when discovery failed
@@ -206,7 +206,7 @@ describe('MCPServerCard', () => {
   });
 
   it('should apply custom className', () => {
-    const { container } = render(
+    render(
       <MCPServerCard
         serverId="custom-server"
         config={mockServerConfig}

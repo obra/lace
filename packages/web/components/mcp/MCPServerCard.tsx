@@ -51,7 +51,7 @@ export function MCPServerCard({
             className="bg-base-200 px-2 py-1 rounded text-xs"
             data-testid={`server-command-${serverId}`}
           >
-            {config.command} {config.args?.join(' ')}
+            {config.args?.length ? `${config.command} ${config.args.join(' ')}` : config.command}
           </code>
           {config.discoveryStatus === 'discovering' && (
             <span
@@ -89,7 +89,7 @@ export function MCPServerCard({
       {/* Discovery Status */}
       {config.discoveryStatus === 'failed' && (
         <div className="text-xs text-error mb-2 ml-5" data-testid={`discovery-error-${serverId}`}>
-          Discovery failed: MCP error -{config.discoveryError}: Connection closed
+          Discovery failed: MCP error {config.discoveryError}
         </div>
       )}
 

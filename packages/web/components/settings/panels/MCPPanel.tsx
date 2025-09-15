@@ -9,8 +9,6 @@ import { MCPServerCard } from '@/components/mcp/MCPServerCard';
 import { api } from '@/lib/api-client';
 import type { MCPServerConfig } from '@/types/core';
 
-type ServerStatus = 'running' | 'stopped' | 'failed' | 'discovering';
-
 interface GlobalMCPServersResponse {
   servers: Array<MCPServerConfig & { id: string }>;
 }
@@ -37,8 +35,8 @@ export function MCPPanel() {
         });
 
         setServers(serversRecord);
-      } catch (error) {
-        setError(error instanceof Error ? error.message : 'Failed to load MCP servers');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load MCP servers');
       } finally {
         setLoading(false);
       }
@@ -64,7 +62,8 @@ export function MCPPanel() {
       setServers((prev) => ({ ...prev, [serverId]: config }));
       setShowAddModal(false);
     } catch (error) {
-      // Error handling
+      // eslint-disable-next-line no-console
+      console.error('Add MCP server failed', error);
     } finally {
       setAddingServer(false);
     }
@@ -86,7 +85,8 @@ export function MCPPanel() {
       setServers((prev) => ({ ...prev, [serverId]: config }));
       setEditingServerId(null);
     } catch (error) {
-      // Error handling
+      // eslint-disable-next-line no-console
+      console.error('Update MCP server failed', error);
     }
   };
 
@@ -100,7 +100,8 @@ export function MCPPanel() {
         return updated;
       });
     } catch (error) {
-      // Error handling
+      // eslint-disable-next-line no-console
+      console.error('Delete MCP server failed', error);
     }
   };
 
