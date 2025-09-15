@@ -153,7 +153,7 @@ export function createMockUIContext(overrides?: Partial<UseUIStateResult>): UseU
 /**
  * Convenience function to create common test scenario mocks
  */
-export function createTestScenarios() {
+function createTestScenarios() {
   return {
     // Session with agents
     sessionWithAgents: createMockSessionContext({
