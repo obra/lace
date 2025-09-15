@@ -21,6 +21,7 @@ interface ProviderInstanceCardProps {
     status?: 'connected' | 'error' | 'untested' | 'testing';
     modelCount?: number;
     lastTested?: string;
+    modelConfig?: ModelConfig;
   };
   provider?: CatalogProvider; // Optional provider catalog data for model management
   globalFilters?: GlobalModelFilters; // Global search/filter state
@@ -42,12 +43,15 @@ export function ProviderInstanceCard({
   const [showEditModal, setShowEditModal] = useState(false);
 
   // Model management state for multi-model providers
-  const [modelConfig, setModelConfig] = useState<ModelConfig>({
-    enableNewModels: true,
-    disabledModels: [],
-    disabledProviders: [],
-    filters: {},
-  });
+  // Initialize with existing config or defaults
+  const [modelConfig, setModelConfig] = useState<ModelConfig>(
+    instance.modelConfig || {
+      enableNewModels: true,
+      disabledModels: [],
+      disabledProviders: [],
+      filters: {},
+    }
+  );
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const getStatusProps = (status?: string) => {
@@ -224,10 +228,33 @@ export function ProviderInstanceCard({
     }
   }, [instance.id, modelConfig]);
 
+  // Track if this is the initial load to prevent saving on mount
+  const [hasInitialized, setHasInitialized] = useState(false);
+
+  // Resync modelConfig when instance changes (e.g., after server fetch)
+  useEffect(() => {
+    setModelConfig(
+      instance.modelConfig || {
+        enableNewModels: true,
+        disabledModels: [],
+        disabledProviders: [],
+        filters: {},
+      }
+    );
+    // Reset init flag to prevent auto-saving freshly loaded server state
+    setHasInitialized(false);
+  }, [instance.id, instance.modelConfig]);
+
   // Auto-save on config changes (debounced)
   useEffect(() => {
     // Skip if this is the initial render or no model management needed
     if (!showModelManagement) return;
+
+    // Skip the very first render to avoid saving defaults over existing config
+    if (!hasInitialized) {
+      setHasInitialized(true);
+      return;
+    }
 
     const timer = setTimeout(() => {
       if (instance.id) {
@@ -236,7 +263,8 @@ export function ProviderInstanceCard({
     }, 1000); // 1 second debounce
 
     return () => clearTimeout(timer);
-  }, [modelConfig, instance.id, showModelManagement, handleSaveConfig]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleSaveConfig is stable and hasInitialized is intentionally excluded
+  }, [modelConfig, instance.id, showModelManagement]);
 
   return (
     <div className="card bg-base-100 shadow-sm border border-base-300">

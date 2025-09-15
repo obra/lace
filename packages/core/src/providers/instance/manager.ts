@@ -18,7 +18,8 @@ import type { AIProvider } from '~/providers/base-provider';
 export class ProviderInstanceManager {
   private configPath: string;
   private credentialsDir: string;
-  private savePromise: Promise<void> | null = null;
+  // Static lock shared across all instances to prevent concurrent file corruption
+  private static savePromise: Promise<void> | null = null;
 
   constructor() {
     const laceDir = getLaceDir();
@@ -67,20 +68,29 @@ export class ProviderInstanceManager {
   }
 
   async saveInstances(config: ProviderInstancesConfig): Promise<void> {
-    // Serialize access to prevent concurrent writes from corrupting JSON
-    if (this.savePromise) {
-      await this.savePromise;
-    }
+    // Chain promises to ensure proper serialization of saves
+    // This prevents race conditions where multiple saves start simultaneously
+    const currentPromise = (ProviderInstanceManager.savePromise ?? Promise.resolve())
+      .then(() => this.performSave(config))
+      .catch(() => this.performSave(config)); // Retry even if previous save failed
 
-    this.savePromise = this.performSave(config);
+    ProviderInstanceManager.savePromise = currentPromise;
+
     try {
-      await this.savePromise;
+      await currentPromise;
     } finally {
-      this.savePromise = null;
+      // Only clear if this is still the current promise
+      if (ProviderInstanceManager.savePromise === currentPromise) {
+        ProviderInstanceManager.savePromise = null;
+      }
     }
   }
 
   private async performSave(config: ProviderInstancesConfig): Promise<void> {
+    // Ensure the directory exists
+    const dir = path.dirname(this.configPath);
+    await fs.promises.mkdir(dir, { recursive: true });
+
     // Atomic write: write to temp file, then rename
     const tempPath = `${this.configPath}.tmp`;
     const data = JSON.stringify(config, null, 2);

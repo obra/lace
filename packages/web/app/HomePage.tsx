@@ -16,7 +16,6 @@ import { useOnboarding } from '@/hooks/useOnboarding';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
-import { SettingsContainer } from '@/components/settings/SettingsContainer';
 
 export function HomePage() {
   const { projects, loading: loadingProjects } = useProjectContext();
@@ -52,23 +51,15 @@ export function HomePage() {
     >
       {/* Unified Sidebar */}
       <div data-testid="sidebar" className="flex-shrink-0 h-full">
-        <SettingsContainer>
-          {({ onOpenSettings }: { onOpenSettings: () => void }) => (
-            <Sidebar
-              open={sidebarOpen}
-              onToggle={toggleSidebar}
-              onSettingsClick={onOpenSettings as () => void}
-            >
-              <SidebarContent
-                isMobile={false} // Component now handles mobile/desktop internally
-                onCloseMobileNav={toggleSidebar as () => void}
-                onSwitchProject={handleSwitchProject}
-                onAgentSelect={() => {}} // No agent navigation on home page
-                onConfigureSession={() => {}} // No session configuration on home page
-              />
-            </Sidebar>
-          )}
-        </SettingsContainer>
+        <Sidebar open={sidebarOpen} onToggle={toggleSidebar}>
+          <SidebarContent
+            isMobile={false} // Component now handles mobile/desktop internally
+            onCloseMobileNav={toggleSidebar as () => void}
+            onSwitchProject={handleSwitchProject}
+            onAgentSelect={() => {}} // No agent navigation on home page
+            onConfigureSession={() => {}} // No session configuration on home page
+          />
+        </Sidebar>
       </div>
 
       {/* Main Content */}
