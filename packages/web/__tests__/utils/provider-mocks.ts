@@ -6,8 +6,6 @@ import type { SessionContextType } from '@/components/providers/SessionProvider'
 import type { AgentContextType } from '@/components/providers/AgentProvider';
 import type { ProjectContextType } from '@/components/providers/ProjectProvider';
 import type { UseUIStateResult } from '@/hooks/useUIState';
-import type { ThreadId } from '@/types/core';
-import { createMockAgentInfo } from './agent-mocks';
 
 /**
  * Creates a mock SessionContextType with all required methods

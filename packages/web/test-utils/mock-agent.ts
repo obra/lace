@@ -1,7 +1,6 @@
 // ABOUTME: Shared mock Agent utilities for web tests
 // ABOUTME: Provides complete Agent mocks with getFullSession() method for SessionService tests
 
-import { vi } from 'vitest';
 import type { Session } from '@/lib/server/lace-imports';
 
 /**
