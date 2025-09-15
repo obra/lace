@@ -1,7 +1,7 @@
 // ABOUTME: API route for testing server-side Sentry error reporting
 // ABOUTME: Throws a test error when called to verify Sentry captures server errors
 
-import * as Sentry from '@sentry/node';
+import * as Sentry from '@sentry/react-router';
 
 export async function action({ request }: { request: Request }) {
   // Add method guard
