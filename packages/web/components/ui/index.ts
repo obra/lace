@@ -6,7 +6,6 @@ export { default as ChatTextarea } from './ChatTextarea';
 export { default as VoiceButton } from './VoiceButton';
 export { default as SendButton } from './SendButton';
 export { default as FileAttachButton } from './FileAttachButton';
-export { default as SectionHeader } from './SectionHeader';
 export { default as MessageText } from './MessageText';
 export { default as AgentBadge } from './AgentBadge';
 export { default as TimestampDisplay } from './TimestampDisplay';
