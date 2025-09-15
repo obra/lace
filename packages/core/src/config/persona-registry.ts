@@ -13,7 +13,7 @@ export interface PersonaInfo {
   path: string;
 }
 
-export class PersonaNotFoundError extends Error {
+class PersonaNotFoundError extends Error {
   public readonly personaName: string;
   public readonly availablePersonas: string[];
 

@@ -6,8 +6,6 @@ import type { SessionContextType } from '@/components/providers/SessionProvider'
 import type { AgentContextType } from '@/components/providers/AgentProvider';
 import type { ProjectContextType } from '@/components/providers/ProjectProvider';
 import type { UseUIStateResult } from '@/hooks/useUIState';
-import type { ThreadId } from '@/types/core';
-import { createMockAgentInfo } from './agent-mocks';
 
 /**
  * Creates a mock SessionContextType with all required methods
@@ -147,100 +145,5 @@ export function createMockUIContext(overrides?: Partial<UseUIStateResult>): UseU
 
     // Apply any overrides
     ...overrides,
-  };
-}
-
-/**
- * Convenience function to create common test scenario mocks
- */
-export function createTestScenarios() {
-  return {
-    // Session with agents
-    sessionWithAgents: createMockSessionContext({
-      sessions: [
-        {
-          id: 'lace_20250801_test01' as ThreadId,
-          name: 'Test Session',
-          createdAt: new Date(),
-          agents: [
-            createMockAgentInfo({
-              threadId: 'lace_20250801_test01.1' as ThreadId,
-              name: 'Test Agent',
-              providerInstanceId: 'test-provider',
-              modelId: 'test-model',
-              status: 'idle',
-            }),
-          ],
-        },
-      ],
-      selectedSession: 'lace_20250801_test01',
-      foundSession: {
-        id: 'lace_20250801_test01' as ThreadId,
-        name: 'Test Session',
-        createdAt: new Date(),
-        agents: [
-          createMockAgentInfo({
-            threadId: 'lace_20250801_test01.1' as ThreadId,
-            name: 'Test Agent',
-            providerInstanceId: 'test-provider',
-            modelId: 'test-model',
-            status: 'idle',
-          }),
-        ],
-      },
-    }),
-
-    // Agent with session details
-    agentWithSession: createMockAgentContext({
-      sessionDetails: {
-        id: 'lace_20250801_test01' as ThreadId,
-        name: 'Test Session',
-        createdAt: new Date(),
-        agents: [
-          createMockAgentInfo({
-            threadId: 'lace_20250801_test01.1' as ThreadId,
-            name: 'Test Agent',
-            providerInstanceId: 'test-provider',
-            modelId: 'test-model',
-            status: 'idle',
-          }),
-        ],
-      },
-      selectedAgent: 'lace_20250801_test01.1' as ThreadId,
-      currentAgent: createMockAgentInfo({
-        threadId: 'lace_20250801_test01.1' as ThreadId,
-        name: 'Test Agent',
-        providerInstanceId: 'test-provider',
-        modelId: 'test-model',
-        status: 'idle',
-      }),
-    }),
-
-    // Project with configuration
-    projectWithConfig: createMockProjectContext({
-      projects: [
-        {
-          id: 'project-1',
-          name: 'Test Project',
-          description: 'Test Description',
-          workingDirectory: '/test/path',
-          isArchived: false,
-          createdAt: new Date(),
-          lastUsedAt: new Date(),
-          sessionCount: 2,
-        },
-      ],
-      currentProject: {
-        id: 'project-1',
-        name: 'Test Project',
-        description: 'Test Description',
-        workingDirectory: '/test/path',
-        isArchived: false,
-        createdAt: new Date(),
-        lastUsedAt: new Date(),
-        sessionCount: 2,
-      },
-      selectedProject: 'project-1',
-    }),
   };
 }

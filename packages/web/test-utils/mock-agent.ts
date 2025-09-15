@@ -1,7 +1,6 @@
 // ABOUTME: Shared mock Agent utilities for web tests
 // ABOUTME: Provides complete Agent mocks with getFullSession() method for SessionService tests
 
-import { vi } from 'vitest';
 import type { Session } from '@/lib/server/lace-imports';
 
 /**
@@ -61,18 +60,6 @@ export function createMockAgent(
         } as Session);
 
   return mockAgent;
-}
-
-/**
- * Creates a mock Agent that returns undefined from getFullSession (for testing edge cases)
- */
-export function createMockAgentWithoutSession(
-  overrides: Parameters<typeof createMockAgent>[0] = {}
-): ReturnType<typeof createMockAgent> {
-  return createMockAgent({
-    ...overrides,
-    getFullSession: vi.fn().mockResolvedValue(undefined),
-  });
 }
 
 /**

@@ -108,4 +108,4 @@ class SQLProfiler {
   }
 }
 
-export { SQLProfiler, type QueryProfile };
+export { SQLProfiler };

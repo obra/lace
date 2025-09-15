@@ -27,16 +27,3 @@ export interface CarouselItem {
   files: string[];
   commit: string;
 }
-
-export interface Timeline {
-  id: number;
-  name: string;
-  agent: 'Claude' | 'GPT-4' | 'Gemini';
-}
-
-export interface RecentFile {
-  name: string;
-  path: string;
-  lastModified?: Date;
-  size?: number;
-}

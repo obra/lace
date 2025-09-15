@@ -11,7 +11,7 @@ export interface RetryConfig {
   jitter: boolean;
 }
 
-export const DEFAULT_RETRY_CONFIG: RetryConfig = {
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxAttempts: 3,
   baseDelay: 1000, // 1 second
   maxDelay: 10000, // 10 seconds

@@ -1,7 +1,7 @@
 // ABOUTME: Utility functions for provider operations
 // ABOUTME: Model string parsing and validation helpers
 
-export interface ParsedProviderModel {
+interface ParsedProviderModel {
   instanceId: string;
   modelId: string;
 }

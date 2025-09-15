@@ -85,5 +85,3 @@ export function useSessionAPI() {
     listAgents,
   };
 }
-
-export type UseSessionAPIReturn = ReturnType<typeof useSessionAPI>;

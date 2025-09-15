@@ -7,11 +7,6 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { logger } from '~/utils/logger';
 import type { MCPServerConfig, MCPServerConnection } from '~/config/mcp-types';
 
-export interface ServerManagerEvents {
-  'server-status-changed': (serverId: string, status: MCPServerConnection['status']) => void;
-  'server-error': (serverId: string, error: string) => void;
-}
-
 export class MCPServerManager extends EventEmitter {
   private servers = new Map<string, MCPServerConnection>();
 

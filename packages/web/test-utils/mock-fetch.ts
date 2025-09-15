@@ -55,21 +55,3 @@ export function createMockErrorResponse(
 ): Response {
   return createMockResponse({ error }, { ...options, ok: false, status: options.status || 400 });
 }
-
-/**
- * Creates a fetch mock function that handles common API patterns
- */
-export function createFetchMock(routes: Record<string, unknown>) {
-  return (url: string | URL) => {
-    const urlString = typeof url === 'string' ? url : url.toString();
-
-    for (const [pattern, data] of Object.entries(routes)) {
-      if (urlString.includes(pattern)) {
-        return Promise.resolve(createMockResponse(data));
-      }
-    }
-
-    // Default to unhandled/loading state
-    return new Promise<Response>(() => {});
-  };
-}
