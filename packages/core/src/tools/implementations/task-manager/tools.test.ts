@@ -68,7 +68,7 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Enhanced Task Manager Tools', () => {
-  const tempLaceDir = setupCoreTest();
+  const _tempLaceDir = setupCoreTest();
   let context: ToolContext;
   let session: Session;
   let project: Project;
@@ -172,13 +172,11 @@ describe('Enhanced Task Manager Tools', () => {
       await cleanupTestProviderInstances([providerInstanceId]);
     }
 
-    // Register additional cleanup with the test framework
-    tempLaceDir.registerCleanup(() => {
-      // Force cleanup of any remaining references
-      context = undefined as any;
-      session = undefined as any;
-      project = undefined as any;
-    });
+    // Clear references immediately instead of registering cleanup
+    // (avoids timing issues with global setupCoreTest registry)
+    context = undefined as unknown as ToolContext;
+    session = undefined as unknown as Session;
+    project = undefined as unknown as Project;
   });
 
   describe('Context Integration', () => {

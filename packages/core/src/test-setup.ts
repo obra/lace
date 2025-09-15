@@ -8,8 +8,11 @@ beforeAll(() => {
   if (typeof process !== 'undefined' && process.title) {
     try {
       // Get the current test file from Vitest's internal state
-      const vitestWorker = globalThis.__vitest_worker__ as { filepath?: string } | undefined;
-      const expectState = globalThis.expect as
+      // Use bracket notation to avoid TypeScript index signature errors
+      const vitestWorker = (globalThis as unknown as Record<string, unknown>)[
+        '__vitest_worker__'
+      ] as { filepath?: string } | undefined;
+      const expectState = (globalThis as unknown as Record<string, unknown>)['expect'] as
         | { getState?: () => { testPath?: string } }
         | undefined;
 

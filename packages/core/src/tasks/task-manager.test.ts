@@ -9,7 +9,7 @@ import { Task, CreateTaskRequest, TaskContext } from '~/tasks/types';
 import { asThreadId } from '~/threads/types';
 
 describe('TaskManager', () => {
-  const tempLaceDir = setupCoreTest();
+  const _tempLaceDir = setupCoreTest();
   let persistence: DatabasePersistence;
   let manager: TaskManager;
   const sessionId = asThreadId('lace_20250714_abc123');
@@ -28,11 +28,10 @@ describe('TaskManager', () => {
     // Test cleanup handled by setupCoreTest
     vi.restoreAllMocks();
 
-    // Register cleanup for any remaining references
-    tempLaceDir.registerCleanup(() => {
-      manager = undefined as any;
-      persistence = undefined as any;
-    });
+    // Clear references immediately instead of registering cleanup
+    // (avoids timing issues with global setupCoreTest registry)
+    manager = undefined as unknown as TaskManager;
+    persistence = undefined as unknown as DatabasePersistence;
   });
 
   describe('createTask', () => {
