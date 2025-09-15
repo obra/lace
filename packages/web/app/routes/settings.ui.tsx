@@ -1,7 +1,7 @@
 // ABOUTME: UI settings page route component
 // ABOUTME: Displays UI preferences and theme settings in full-page layout
 
-import { SettingsLayout } from '@/components/settings/SettingsLayout';
+import { SettingsPageLayout } from '@/components/settings/SettingsPageLayout';
 import { UISettingsPanel } from '@/components/settings/panels/UISettingsPanel';
 import { useTheme } from '@/components/providers/SettingsProvider';
 
@@ -15,8 +15,8 @@ export default function UISettingsPage() {
   };
 
   return (
-    <SettingsLayout activeTab="ui">
+    <SettingsPageLayout activeTab="ui">
       <UISettingsPanel currentTheme={theme.daisyui} onThemeChange={handleThemeChange} />
-    </SettingsLayout>
+    </SettingsPageLayout>
   );
 }
