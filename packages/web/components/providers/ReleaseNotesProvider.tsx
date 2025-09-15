@@ -31,17 +31,17 @@ export function ReleaseNotesProvider({ children }: ReleaseNotesProviderProps) {
 
   // Load raw user settings to get lastSeenReleaseNotesHash
   useEffect(() => {
-    let cancelled = false;
+    const abortController = new AbortController();
 
     const loadRawSettings = async () => {
       try {
         const settings = await api.get<Record<string, unknown>>('/api/settings');
-        if (!cancelled) {
+        if (!abortController.signal.aborted) {
           setRawUserSettings(settings);
         }
       } catch (error) {
         console.warn('Failed to load user settings for release notes:', error);
-        if (!cancelled) {
+        if (!abortController.signal.aborted) {
           setRawUserSettings(null);
         }
       }
@@ -50,7 +50,7 @@ export function ReleaseNotesProvider({ children }: ReleaseNotesProviderProps) {
     void loadRawSettings();
 
     return () => {
-      cancelled = true;
+      abortController.abort();
     };
   }, []);
 

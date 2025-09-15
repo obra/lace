@@ -5,15 +5,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { checkReleaseNotesStatus, markReleaseNotesAsSeen } from './release-notes-service';
 import { api } from '@/lib/api-client';
 
-// Mock the generated release notes metadata
-vi.mock('@/app/generated/release-notes-meta.json', () => ({
-  default: {
-    hash: 'test-hash-123',
-    content: '# Test Release Notes\n\nTest content',
-    generatedAt: '2024-01-01T00:00:00.000Z',
-  },
-}));
-
 // Mock the api client
 vi.mock('@/lib/api-client', () => ({
   api: {

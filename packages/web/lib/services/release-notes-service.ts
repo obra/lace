@@ -27,6 +27,9 @@ function getReleaseNotesHash(): string {
 
 /**
  * Check if release notes should be shown to the user
+ *
+ * @param lastSeenHash - Hash of the last release notes version the user has seen
+ * @returns Object indicating whether to show modal, content, and current hash
  */
 export function checkReleaseNotesStatus(lastSeenHash?: string): ReleaseNotesStatus {
   const currentHash = getReleaseNotesHash();
@@ -41,6 +44,8 @@ export function checkReleaseNotesStatus(lastSeenHash?: string): ReleaseNotesStat
 
 /**
  * Get current release notes content and hash
+ *
+ * @returns Object containing the release notes markdown content and its hash
  */
 export function getCurrentReleaseNotes(): { content: string; hash: string } {
   return {
@@ -51,6 +56,9 @@ export function getCurrentReleaseNotes(): { content: string; hash: string } {
 
 /**
  * Update user settings with the current release notes hash
+ *
+ * @param currentHash - Hash of the release notes version to mark as seen
+ * @returns Promise that resolves when settings are updated
  */
 export async function markReleaseNotesAsSeen(currentHash: string): Promise<void> {
   try {
