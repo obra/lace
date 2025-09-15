@@ -6,7 +6,7 @@ import StatusDot from '@/components/ui/StatusDot';
 import Badge from '@/components/ui/Badge';
 import { EditInstanceModal } from './EditInstanceModal';
 import { ProviderModelGroup } from './ProviderModelGroup';
-import { api } from '@/lib/api-client';
+import { providerService } from '@/lib/server/provider-service';
 import type { CatalogProvider, CatalogModel, ModelConfig } from '@/lib/server/lace-imports';
 import type { GlobalModelFilters } from './GlobalModelSearch';
 
@@ -220,7 +220,7 @@ export function ProviderInstanceCard({
 
   const handleSaveConfig = useCallback(async () => {
     try {
-      await api.providers.updateModelConfig(instance.id, modelConfig);
+      await providerService.updateModelConfig(instance.id, modelConfig);
       // Configuration saved successfully (no toast needed - auto-save)
     } catch (error) {
       console.error('Error saving configuration:', error);

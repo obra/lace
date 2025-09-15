@@ -14,12 +14,22 @@ import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanc
 import { SettingsProvider } from '@/components/providers/SettingsProvider';
 import { stringify } from '@/lib/serialization';
 import { api } from '@/lib/api-client';
+import { providerService } from '@/lib/server/provider-service';
 
 // Mock the API client
 vi.mock('@/lib/api-client', () => ({
   api: {
     get: vi.fn(),
     patch: vi.fn(),
+  },
+}));
+
+// Mock the provider service
+vi.mock('@/lib/server/provider-service', () => ({
+  providerService: {
+    getCatalog: vi.fn(),
+    refreshCatalog: vi.fn(),
+    updateModelConfig: vi.fn(),
   },
 }));
 
@@ -76,6 +86,14 @@ describe('SettingsContainer', () => {
     const mockApiPatch = vi.mocked(api.patch);
     mockApiGet.mockResolvedValue({}); // Default empty settings
     mockApiPatch.mockResolvedValue({});
+
+    // Mock provider service
+    const mockGetCatalog = vi.mocked(providerService.getCatalog);
+    const mockRefreshCatalog = vi.mocked(providerService.refreshCatalog);
+    const mockUpdateModelConfig = vi.mocked(providerService.updateModelConfig);
+    mockGetCatalog.mockResolvedValue({ providers: [] });
+    mockRefreshCatalog.mockResolvedValue({ success: true, modelCount: 0, lastUpdated: '' });
+    mockUpdateModelConfig.mockResolvedValue({ success: true, message: '' });
 
     // Mock fetch API responses with proper superjson serialized content
     mockFetch.mockImplementation((url: string) => {
@@ -356,7 +374,7 @@ describe('SettingsContainer', () => {
     expect(screen.getByText('User')).toBeInTheDocument();
   });
 
-  it('provides render prop pattern for flexible integration', () => {
+  it('provides render prop pattern for flexible integration', async () => {
     const TestComponent = () => (
       <SettingsProvider>
         <SettingsContainer>
@@ -370,7 +388,9 @@ describe('SettingsContainer', () => {
       </SettingsProvider>
     );
 
-    render(<TestComponent />);
+    await act(async () => {
+      render(<TestComponent />);
+    });
 
     expect(screen.getByText('Test Content')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument();

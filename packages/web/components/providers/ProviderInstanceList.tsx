@@ -11,7 +11,7 @@ import { SuccessToast } from '@/components/ui/SuccessToast';
 import { ErrorToast } from '@/components/errors/ErrorToast';
 import { GlobalModelSearch, type GlobalModelFilters } from './GlobalModelSearch';
 import { useProviderInstances } from './ProviderInstanceProvider';
-import { api } from '@/lib/api-client';
+import { providerService } from '@/lib/server/provider-service';
 import type { CatalogProvider } from '@/lib/server/lace-imports';
 
 export function ProviderInstanceList() {
@@ -50,7 +50,7 @@ export function ProviderInstanceList() {
 
   const fetchCatalogs = async () => {
     try {
-      const data = await api.providers.getCatalog();
+      const data = await providerService.getCatalog();
       setCatalogs((data.providers as CatalogProvider[]) || []);
     } catch (error) {
       console.error('Failed to fetch catalogs:', error);
@@ -152,7 +152,7 @@ export function ProviderInstanceList() {
 
   const handleRefresh = async (instanceId: string) => {
     try {
-      const result = await api.providers.refreshCatalog(instanceId);
+      const result = await providerService.refreshCatalog(instanceId);
       // Refresh the catalogs to get updated model data
       await fetchCatalogs();
       setSuccessToast(`Refreshed ${result.modelCount} models`);
