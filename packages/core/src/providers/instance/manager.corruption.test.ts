@@ -89,7 +89,7 @@ describe('ProviderInstanceManager - Corruption Reproduction', () => {
     const finalContent = fs.readFileSync(finalPath, 'utf-8');
 
     // Check for corruption patterns
-    expect(finalContent).not.toContain('elConfig');
+    expect(finalContent).not.toContain('}elConfig');
     expect(finalContent).not.toContain('}}}}'); // Multiple closing braces
     expect(finalContent).not.toMatch(/\}\s*\{/); // JSON objects concatenated
 
@@ -151,7 +151,7 @@ describe('ProviderInstanceManager - Corruption Reproduction', () => {
     const finalContent = fs.readFileSync(finalPath, 'utf-8');
 
     // Check for corruption
-    expect(finalContent).not.toContain('elConfig');
+    expect(finalContent).not.toContain('}elConfig');
     expect(() => JSON.parse(finalContent)).not.toThrow();
 
     const parsed = JSON.parse(finalContent);
@@ -230,8 +230,8 @@ describe('ProviderInstanceManager - Corruption Reproduction', () => {
     }
   });
 
-  it('reproduces the elConfig corruption pattern', async () => {
-    // This test tries to reproduce the exact corruption pattern seen
+  it('prevents the elConfig corruption pattern with concurrent saves', async () => {
+    // This test verifies that the corruption pattern is prevented
     const configWithModelConfig: ProviderInstancesConfig = {
       version: '1.0',
       instances: {
@@ -294,21 +294,19 @@ describe('ProviderInstanceManager - Corruption Reproduction', () => {
     const finalPath = path.join(tempDir, 'provider-instances.json');
     const finalContent = fs.readFileSync(finalPath, 'utf-8');
 
-    // Log the content if corruption is detected
-    if (
-      finalContent.includes('elConfig') ||
-      !finalContent.startsWith('{') ||
-      !finalContent.endsWith('}')
-    ) {
-      console.error('CORRUPTION DETECTED:');
-      console.error('File content:', finalContent);
-      console.error('File length:', finalContent.length);
-    }
+    // Verify no corruption occurred
+    expect(finalContent).not.toContain('}elConfig');
+    expect(finalContent).not.toContain('}}}}');
 
-    // Assertions
-    expect(finalContent).not.toContain('elConfig');
-    expect(finalContent[0]).toBe('{');
-    expect(finalContent[finalContent.length - 1]).toBe('\n');
-    expect(finalContent[finalContent.length - 2]).toBe('}');
+    // Verify it's valid JSON
+    let parsed: any;
+    expect(() => {
+      parsed = JSON.parse(finalContent);
+    }).not.toThrow();
+
+    // Verify structure is correct (should have one of the instances)
+    expect(parsed).toHaveProperty('version', '1.0');
+    expect(parsed).toHaveProperty('instances');
+    expect(Object.keys(parsed.instances).length).toBeGreaterThan(0);
   });
 });
