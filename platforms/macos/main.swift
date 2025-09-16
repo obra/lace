@@ -418,7 +418,7 @@ extension UserDefaults {
         static let updateChannel = "LaceUpdateChannel"
         static let autoUpdate = "LaceAutoUpdate"
         static let checkFrequency = "LaceUpdateCheckFrequency"
-        static let laceDir = "LaceLaceDir"
+        static let laceDir = "LaceDataDir"
     }
     
     var updateChannel: UpdateChannel {
@@ -451,15 +451,39 @@ extension UserDefaults {
             return string(forKey: Keys.laceDir)
         }
         set {
-            if let newValue = newValue, !newValue.isEmpty {
-                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                let expanded = NSString(string: trimmed).expandingTildeInPath
+            if let newValue = newValue?.trimmingCharacters(in: .whitespacesAndNewlines), !newValue.isEmpty {
+                let expanded = NSString(string: newValue).expandingTildeInPath
                 let standardized = URL(fileURLWithPath: expanded).standardizedFileURL.path
                 set(standardized, forKey: Keys.laceDir)
             } else {
                 removeObject(forKey: Keys.laceDir)
             }
         }
+    }
+
+    // Validation-aware setter for UI use
+    func setLaceDir(_ newValue: String?, withValidation: Bool = false) -> (success: Bool, error: String?) {
+        if withValidation, let value = newValue?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty {
+            let expanded = NSString(string: value).expandingTildeInPath
+            let standardized = URL(fileURLWithPath: expanded).standardizedFileURL.path
+
+            let fileManager = FileManager.default
+            var isDirectory: ObjCBool = false
+
+            // Check if path exists and is a directory
+            guard fileManager.fileExists(atPath: standardized, isDirectory: &isDirectory), isDirectory.boolValue else {
+                return (false, "Directory does not exist: \(standardized)")
+            }
+
+            // Check if directory is writable
+            guard fileManager.isWritableFile(atPath: standardized) else {
+                return (false, "Directory is not writable: \(standardized)")
+            }
+        }
+
+        // If validation passes or is disabled, use the regular setter
+        laceDir = newValue
+        return (true, nil)
     }
 }
 
@@ -711,7 +735,21 @@ class SettingsWindow: NSWindowController {
         let newPath = laceDirTextField.stringValue
         let oldPath = UserDefaults.standard.laceDir
 
-        UserDefaults.standard.laceDir = newPath.isEmpty ? nil : newPath
+        let result = UserDefaults.standard.setLaceDir(newPath.isEmpty ? nil : newPath, withValidation: true)
+
+        if !result.success {
+            // Validation failed - show error and revert field
+            if let error = result.error {
+                showValidationError(error)
+            }
+            // Revert text field to previous value
+            if let oldPath = oldPath {
+                laceDirTextField.stringValue = oldPath
+            } else {
+                laceDirTextField.stringValue = ""
+            }
+            return
+        }
 
         // Check if path actually changed
         if oldPath != UserDefaults.standard.laceDir {
@@ -740,12 +778,22 @@ class SettingsWindow: NSWindowController {
             panel.beginSheetModal(for: window) { response in
                 if response == .OK, let url = panel.url {
                     let oldPath = UserDefaults.standard.laceDir
-                    UserDefaults.standard.laceDir = url.path
-                    self.laceDirTextField.stringValue = url.path
 
-                    if oldPath != url.path {
-                        print("LACE_DIR changed via browse from '\(oldPath ?? "default")' to '\(url.path)'")
-                        self.promptForServerRestart()
+                    // Validate the selected directory
+                    let result = UserDefaults.standard.setLaceDir(url.path, withValidation: true)
+
+                    if result.success {
+                        self.laceDirTextField.stringValue = url.path
+
+                        if oldPath != UserDefaults.standard.laceDir {
+                            print("LACE_DIR changed via browse from '\(oldPath ?? "default")' to '\(url.path)'")
+                            self.promptForServerRestart()
+                        }
+                    } else {
+                        // Show validation error
+                        if let error = result.error {
+                            self.showValidationError(error)
+                        }
                     }
                 }
             }
@@ -789,6 +837,47 @@ class SettingsWindow: NSWindowController {
         if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
             print("Restarting server with new LACE_DIR setting...")
             appDelegate.restartServer()
+        }
+    }
+
+    private func validateDirectory(_ path: String) -> (isValid: Bool, error: String?) {
+        guard !path.isEmpty else {
+            return (false, "Path cannot be empty")
+        }
+
+        let url = URL(fileURLWithPath: path)
+        let fileManager = FileManager.default
+
+        // Check if path exists
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
+            return (false, "Directory does not exist: \(path)")
+        }
+
+        // Check if it's actually a directory
+        guard isDirectory.boolValue else {
+            return (false, "Path is not a directory: \(path)")
+        }
+
+        // Check if directory is writable
+        guard fileManager.isWritableFile(atPath: url.path) else {
+            return (false, "Directory is not writable: \(path)")
+        }
+
+        return (true, nil)
+    }
+
+    private func showValidationError(_ message: String) {
+        let alert = NSAlert()
+        alert.messageText = "Invalid Directory"
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "OK")
+
+        if let window = window {
+            alert.beginSheetModal(for: window) { _ in }
+        } else {
+            alert.runModal()
         }
     }
 
