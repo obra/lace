@@ -186,44 +186,6 @@ describe('Delegation Integration Tests', () => {
     expect(subDelegate1).toBe(`${mainThreadId}.1.1`);
   });
 
-  it('should query delegate threads correctly', () => {
-    const mainThreadId = threadManager.generateThreadId();
-    threadManager.createThread(mainThreadId);
-
-    // Create delegate threads
-    const delegate1 = threadManager.generateDelegateThreadId(mainThreadId);
-    const delegate2 = threadManager.generateDelegateThreadId(mainThreadId);
-
-    threadManager.createThread(delegate1);
-    threadManager.createThread(delegate2);
-
-    // Add events to each thread
-    threadManager.addEvent({
-      type: 'USER_MESSAGE',
-      context: { threadId: mainThreadId },
-      data: 'Main thread message',
-    });
-    threadManager.addEvent({
-      type: 'AGENT_MESSAGE',
-      context: { threadId: delegate1 },
-      data: { content: 'Delegate 1 message' },
-    });
-    threadManager.addEvent({
-      type: 'AGENT_MESSAGE',
-      context: { threadId: delegate2 },
-      data: { content: 'Delegate 2 message' },
-    });
-
-    // Test multi-thread querying
-    const allEvents = threadManager.getMainAndDelegateEvents(mainThreadId);
-    expect(allEvents).toHaveLength(3);
-
-    // Events should be sorted chronologically
-    expect(allEvents[0].data).toBe('Main thread message');
-    expect(allEvents[1].data).toEqual({ content: 'Delegate 1 message' });
-    expect(allEvents[2].data).toEqual({ content: 'Delegate 2 message' });
-  });
-
   it('should handle nested delegations', () => {
     const mainThread = 'lace_20250101_abc123';
     const delegate1 = threadManager.generateDelegateThreadId(mainThread);

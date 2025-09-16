@@ -120,7 +120,7 @@ describe('Agent ThreadManager Encapsulation', () => {
       expect(typeof agent.getLaceEvents).toBe('function');
       expect(typeof agent.replaySessionEvents).toBe('function');
 
-      // Note: Some ThreadManager methods like compact(), getMainAndDelegateEvents()
+      // Note: Some ThreadManager methods like compact()
       // may need to be added to Agent API if they're needed by external code
     });
   });
