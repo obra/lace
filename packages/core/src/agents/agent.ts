@@ -2371,10 +2371,6 @@ export class Agent extends EventEmitter {
     return this._threadManager.getLatestThreadId();
   }
 
-  getMainAndDelegateEvents(mainThreadId: string): LaceEvent[] {
-    return this._threadManager.getMainAndDelegateEvents(mainThreadId);
-  }
-
   private async _handleCompactCommand(): Promise<void> {
     this.emit('compaction_start', { auto: false });
     this._addEventAndEmit({

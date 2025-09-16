@@ -388,22 +388,6 @@ export class ThreadManager {
     return buildCompleteHistory(thread.events);
   }
 
-  getMainAndDelegateEvents(mainThreadId: string): LaceEvent[] {
-    const allEvents: LaceEvent[] = [];
-
-    // Get main thread events
-    allEvents.push(...this.getEvents(mainThreadId));
-
-    // Get delegate thread events
-    const delegateThreads = this.listThreadIdsForSession(mainThreadId);
-    for (const delegateThreadId of delegateThreads) {
-      const delegateEvents = this._persistence.loadEvents(delegateThreadId);
-      allEvents.push(...delegateEvents);
-    }
-
-    // Sort chronologically across all threads
-    return allEvents.sort((a, b) => a.timestamp!.getTime() - b.timestamp!.getTime());
-  }
 
   /**
    * Get thread IDs for all delegate threads belonging to a session.
