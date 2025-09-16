@@ -74,9 +74,12 @@ afterEach(() => {
 
   // Force cleanup of any remaining EventEmitter instances
   // This helps prevent hanging when tests don't clean up properly
-  try {
-    process.removeAllListeners();
-  } catch (_error) {
-    // Ignore errors from removeAllListeners - some listeners might be essential
+  // Skip this in worker processes to avoid interfering with Vitest IPC
+  if (!process.env.VITEST_WORKER_ID) {
+    try {
+      process.removeAllListeners();
+    } catch (_error) {
+      // Ignore errors from removeAllListeners - some listeners might be essential
+    }
   }
 });
