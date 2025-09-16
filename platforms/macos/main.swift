@@ -120,8 +120,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
 
         // Set up environment variables
         var environment = ProcessInfo.processInfo.environment
-        if let customLaceDir = UserDefaults.standard.laceDir {
+        if let customLaceDir = UserDefaults.standard.laceDir, !customLaceDir.isEmpty {
             environment["LACE_DIR"] = customLaceDir
+        } else {
+            environment.removeValue(forKey: "LACE_DIR")
         }
         serverProcess?.environment = environment
 
