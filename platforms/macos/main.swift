@@ -225,7 +225,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         NSWorkspace.shared.open(url)
     }
     
-    @objc internal func restartServer() {
+    @MainActor @objc internal func restartServer() {
         serverPort = nil
         shouldAutoOpen = false // Don't auto-open on restart
         updateMenu()
@@ -452,7 +452,10 @@ extension UserDefaults {
         }
         set {
             if let newValue = newValue, !newValue.isEmpty {
-                set(newValue, forKey: Keys.laceDir)
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                let expanded = NSString(string: trimmed).expandingTildeInPath
+                let standardized = URL(fileURLWithPath: expanded).standardizedFileURL.path
+                set(standardized, forKey: Keys.laceDir)
             } else {
                 removeObject(forKey: Keys.laceDir)
             }
@@ -705,16 +708,10 @@ class SettingsWindow: NSWindowController {
     }
 
     @objc private func laceDirChanged() {
-        let newPath = laceDirTextField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newPath = laceDirTextField.stringValue
         let oldPath = UserDefaults.standard.laceDir
 
-        if newPath.isEmpty {
-            UserDefaults.standard.laceDir = nil
-        } else {
-            // Expand tilde to home directory
-            let expandedPath = NSString(string: newPath).expandingTildeInPath
-            UserDefaults.standard.laceDir = expandedPath
-        }
+        UserDefaults.standard.laceDir = newPath.isEmpty ? nil : newPath
 
         // Check if path actually changed
         if oldPath != UserDefaults.standard.laceDir {
@@ -783,7 +780,7 @@ class SettingsWindow: NSWindowController {
         } else {
             let response = alert.runModal()
             if response == .alertFirstButtonReturn {
-                restartServer()
+                self.restartServer()
             }
         }
     }
