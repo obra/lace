@@ -63,15 +63,6 @@ afterAll(() => {
   if (global.gc) {
     global.gc();
   }
-
-  // Force exit after a delay if process hasn't exited naturally
-  // Only trigger this in CI or when explicitly enabled via environment variable
-  if (process.env.CI || process.env.LACE_FORCE_TEST_EXIT) {
-    setTimeout(() => {
-      console.warn('Tests completed but process hanging - forcing exit');
-      process.exit(0);
-    }, 3000).unref(); // unref so it doesn't keep process alive
-  }
 });
 
 // Cleanup after each individual test
