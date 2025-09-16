@@ -24,14 +24,6 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const isMountedRef = useRef(true);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
 
   // Load initial token usage from agent API
   const fetchTokenUsage = useCallback(async () => {
@@ -39,13 +31,6 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
-
-    // Add delay and mounted check to prevent rapid cancellation
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    if (!isMountedRef.current || controller.signal.aborted) {
-      return;
-    }
 
     try {
       setLoading(true);
@@ -55,7 +40,8 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
         signal: controller.signal,
       });
 
-      if (!isMountedRef.current) {
+      // If request was aborted, don't update state
+      if (controller.signal.aborted) {
         return;
       }
 
@@ -70,16 +56,10 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
         return;
       }
 
-      if (!isMountedRef.current) {
-        return;
-      }
-
       console.error('[useAgentTokenUsage] Error fetching token usage:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch token usage');
     } finally {
-      if (isMountedRef.current) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   }, [agentId]);
 
