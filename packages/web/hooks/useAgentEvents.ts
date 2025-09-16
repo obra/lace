@@ -25,16 +25,6 @@ export function useAgentEvents(
   // Use ref to track seen events for O(1) deduplication
   const seenEvents = useRef(new Set<string>());
 
-  // Track if component is still mounted to prevent state updates after unmount
-  const isMountedRef = useRef(true);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
   // Generate a composite key for event deduplication
   const getEventKey = useCallback((event: LaceEvent): string => {
     return `${event.type}:${event.timestamp}:${event.context?.threadId}:${JSON.stringify(event.data)}`;
@@ -90,18 +80,13 @@ export function useAgentEvents(
 
     // Immediately start loading without delay to reduce race conditions
     const loadHistory = async () => {
-      // Check if still mounted before making request
-      if (!isMountedRef.current || controller.signal.aborted) {
-        return;
-      }
-
       try {
         const data = await api.get<LaceEvent[]>(`/api/agents/${agentId}/history`, {
           signal: controller.signal,
         });
 
-        // Check if still mounted before updating state
-        if (!isMountedRef.current) {
+        // If request was aborted, don't update state
+        if (controller.signal.aborted) {
           return;
         }
 
@@ -126,15 +111,14 @@ export function useAgentEvents(
         });
 
         setEvents(sortedEvents);
-
-        if (isMountedRef.current) {
-          setLoadingHistory(false);
-        }
+        setLoadingHistory(false);
       } catch (error: unknown) {
-        if ((error as { name?: string }).name !== 'AbortError' && isMountedRef.current) {
+        // Only handle non-abort errors
+        if ((error as { name?: string }).name !== 'AbortError') {
           console.error('[AGENT_EVENTS] Failed to load history:', error);
           setLoadingHistory(false);
         }
+        // Note: AbortError is expected when component unmounts, so we don't log it
       }
     };
 
