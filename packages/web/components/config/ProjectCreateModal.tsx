@@ -9,6 +9,7 @@ import { faPlus } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { AccentButton } from '@/components/ui/AccentButton';
 import { DirectoryField } from '@/components/ui';
+import { ModelSelector } from '@/components/ui/ModelSelector';
 import type { ToolPolicy } from '@/types/core';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import { DIRECTORY_BROWSER, WIZARD_PROGRESS } from '@/lib/constants/ui';
@@ -65,14 +66,6 @@ export function ProjectCreateModal({
   // Providers from context are already available/configured, no need to filter
   const availableProviders = useMemo(() => providers || [], [providers]);
 
-  // Get available models for project creation
-  const availableCreateModels = useMemo(() => {
-    const provider = availableProviders.find(
-      (p) => p.instanceId === createConfig.providerInstanceId
-    );
-    return provider?.models || [];
-  }, [availableProviders, createConfig.providerInstanceId]);
-
   // Initialize with first available provider instance
   useEffect(() => {
     if (availableProviders.length > 0 && !createConfig.providerInstanceId) {
@@ -119,6 +112,15 @@ export function ProjectCreateModal({
         setCreateName(baseName);
       }
     }
+  };
+
+  // Handle model selector change
+  const handleModelChange = (providerInstanceId: string, modelId: string) => {
+    setCreateConfig((prev) => ({
+      ...prev,
+      providerInstanceId,
+      modelId,
+    }));
   };
 
   // Handle project creation
@@ -264,55 +266,18 @@ export function ProjectCreateModal({
                 ) : (
                   // Providers available - show selection dropdowns
                   <>
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="label">
-                          <span className="label-text font-medium">Provider</span>
-                        </label>
-                        <select
-                          className="select select-bordered w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                          value={createConfig.providerInstanceId || ''}
-                          onChange={(e) => {
-                            const newInstanceId = e.target.value;
-                            const provider = availableProviders.find(
-                              (p) => p.instanceId === newInstanceId
-                            );
-                            const providerModels = provider?.models || [];
-                            setCreateConfig((prev) => ({
-                              ...prev,
-                              providerInstanceId: newInstanceId,
-                              modelId: providerModels[0]?.id || prev.modelId,
-                            }));
-                          }}
-                        >
-                          {availableProviders.map((p) => (
-                            <option key={p.instanceId} value={p.instanceId}>
-                              {p.displayName}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="label">
-                          <span className="label-text font-medium">Model</span>
-                        </label>
-                        <select
-                          className="select select-bordered w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                          value={createConfig.modelId || ''}
-                          onChange={(e) =>
-                            setCreateConfig((prev) => ({
-                              ...prev,
-                              modelId: e.target.value,
-                            }))
-                          }
-                        >
-                          {availableCreateModels.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.displayName || m.id}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                    <div>
+                      <label className="label">
+                        <span className="label-text font-medium">AI Model</span>
+                      </label>
+                      <ModelSelector
+                        providers={availableProviders}
+                        selectedProviderInstanceId={createConfig.providerInstanceId}
+                        selectedModelId={createConfig.modelId}
+                        onChange={handleModelChange}
+                        className="select select-bordered w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                        placeholder="Select provider and model..."
+                      />
                     </div>
                     <div className="mt-3">
                       <button

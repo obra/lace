@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui';
 import { Modal } from '@/components/ui/Modal';
 import { Alert } from '@/components/ui/Alert';
@@ -35,7 +35,6 @@ export function EditInstanceModal({
   onTest,
 }: EditInstanceModalProps) {
   const { updateInstance } = useProviderInstances();
-  const isMountedRef = useRef(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,14 +44,6 @@ export function EditInstanceModal({
     endpoint: instance.endpoint || '',
     apiKey: '',
   });
-
-  // Track mount status for React 18 Strict Mode compatibility
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
 
   // Update form data when instance changes
   useEffect(() => {
@@ -79,13 +70,9 @@ export function EditInstanceModal({
       onSuccess();
       onClose();
     } catch (err) {
-      if (isMountedRef.current) {
-        setError(err instanceof Error ? err.message : 'Failed to update instance');
-      }
+      setError(err instanceof Error ? err.message : 'Failed to update instance');
     } finally {
-      if (isMountedRef.current) {
-        setSubmitting(false);
-      }
+      setSubmitting(false);
     }
   };
 

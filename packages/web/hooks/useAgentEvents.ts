@@ -25,16 +25,6 @@ export function useAgentEvents(
   // Use ref to track seen events for O(1) deduplication
   const seenEvents = useRef(new Set<string>());
 
-  // Track if component is still mounted to prevent state updates after unmount
-  const isMountedRef = useRef(true);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
   // Generate a composite key for event deduplication
   const getEventKey = useCallback((event: LaceEvent): string => {
     return `${event.type}:${event.timestamp}:${event.context?.threadId}:${JSON.stringify(event.data)}`;
@@ -88,59 +78,53 @@ export function useAgentEvents(
     setLoadingHistory(true);
     const controller = new AbortController();
 
-    // Add small delay to prevent rapid cancellation during page reload
-    const timeoutId = setTimeout(() => {
-      // Check if still mounted before making request
-      if (!isMountedRef.current || controller.signal.aborted) {
-        return;
-      }
-
-      void api
-        .get<LaceEvent[]>(`/api/agents/${agentId}/history`, { signal: controller.signal })
-        .then((data) => {
-          // Check if still mounted before updating state
-          if (!isMountedRef.current) {
-            return;
-          }
-
-          // Events are already properly typed LaceEvents from superjson
-          // Filter out internal workflow events (they're handled separately)
-          const timelineEvents = data.filter((event) => !isInternalWorkflowEvent(event.type));
-
-          // Merge history with existing streamed events using dedup guard
-          setEvents((prev) => {
-            const newUniqueEvents: LaceEvent[] = [];
-            for (const event of timelineEvents) {
-              const eventKey = getEventKey(event);
-              if (!seenEvents.current.has(eventKey)) {
-                newUniqueEvents.push(event);
-                seenEvents.current.add(eventKey);
-              }
-            }
-
-            // Merge and sort by timestamp for chronological order
-            const mergedEvents = [...prev, ...newUniqueEvents];
-            return mergedEvents.sort((a, b) => {
-              const aTime = new Date(a.timestamp ?? new Date()).getTime();
-              const bTime = new Date(b.timestamp ?? new Date()).getTime();
-              return aTime - bTime;
-            });
-          });
-
-          if (isMountedRef.current) {
-            setLoadingHistory(false);
-          }
-        })
-        .catch((error: unknown) => {
-          if ((error as { name?: string }).name !== 'AbortError' && isMountedRef.current) {
-            console.error('[AGENT_EVENTS] Failed to load history:', error);
-            setLoadingHistory(false);
-          }
+    // Immediately start loading without delay to reduce race conditions
+    const loadHistory = async () => {
+      try {
+        const data = await api.get<LaceEvent[]>(`/api/agents/${agentId}/history`, {
+          signal: controller.signal,
         });
-    }, 50); // 50ms delay to prevent rapid cancellation
+
+        // If request was aborted, don't update state
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        // Events are already properly typed LaceEvents from superjson
+        // Filter out internal workflow events (they're handled separately)
+        const timelineEvents = data.filter((event) => !isInternalWorkflowEvent(event.type));
+
+        // Clear seen events and rebuild from scratch to ensure consistency
+        seenEvents.current.clear();
+
+        // Add all historical events to seen set
+        for (const event of timelineEvents) {
+          const eventKey = getEventKey(event);
+          seenEvents.current.add(eventKey);
+        }
+
+        // Sort events by timestamp for chronological order
+        const sortedEvents = timelineEvents.sort((a, b) => {
+          const aTime = new Date(a.timestamp ?? new Date()).getTime();
+          const bTime = new Date(b.timestamp ?? new Date()).getTime();
+          return aTime - bTime;
+        });
+
+        setEvents(sortedEvents);
+        setLoadingHistory(false);
+      } catch (error: unknown) {
+        // Only handle non-abort errors
+        if ((error as { name?: string }).name !== 'AbortError') {
+          console.error('[AGENT_EVENTS] Failed to load history:', error);
+          setLoadingHistory(false);
+        }
+        // Note: AbortError is expected when component unmounts, so we don't log it
+      }
+    };
+
+    void loadHistory();
 
     return () => {
-      clearTimeout(timeoutId);
       controller.abort();
     };
   }, [agentId, getEventKey]);
