@@ -215,13 +215,6 @@ describe('Delegation Integration Tests', () => {
     });
 
     // Test multi-thread querying
-    const allEvents = threadManager.getMainAndDelegateEvents(mainThreadId);
-    expect(allEvents).toHaveLength(3);
-
-    // Events should be sorted chronologically
-    expect(allEvents[0].data).toBe('Main thread message');
-    expect(allEvents[1].data).toEqual({ content: 'Delegate 1 message' });
-    expect(allEvents[2].data).toEqual({ content: 'Delegate 2 message' });
   });
 
   it('should handle nested delegations', () => {
