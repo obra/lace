@@ -140,7 +140,7 @@ export function DirectoryField({
   // Get visible directories (limited by showMore state)
   const getVisibleDirectories = useCallback((): DirectoryEntry[] => {
     const filtered = getFilteredDirectories();
-    return showMore ? filtered.slice(0, 100) : filtered.slice(0, 10);
+    return showMore ? filtered : filtered.slice(0, 100);
   }, [getFilteredDirectories, showMore]);
 
   // Initialize with home directory on first load
@@ -323,17 +323,17 @@ export function DirectoryField({
                   </div>
                 )}
 
-                {/* Show filtered directory contents */}
-                {getFilteredDirectories().length > 0 && (
-                  <>
-                    <div
-                      className="overflow-y-auto"
-                      style={
-                        inline
-                          ? { height: `${minRows * DIRECTORY_BROWSER.ROW_HEIGHT_REM}rem` }
-                          : undefined
-                      }
-                    >
+                {/* Directory contents with fixed height in inline mode */}
+                <div
+                  className="overflow-y-auto"
+                  style={
+                    inline
+                      ? { height: `${minRows * DIRECTORY_BROWSER.ROW_HEIGHT_REM}rem` }
+                      : undefined
+                  }
+                >
+                  {getFilteredDirectories().length > 0 ? (
+                    <>
                       {getVisibleDirectories().map((dir) => (
                         <button
                           type="button"
@@ -349,19 +349,18 @@ export function DirectoryField({
                           </span>
                         </button>
                       ))}
-                      {getFilteredDirectories().length > 10 && !showMore && (
+                      {getFilteredDirectories().length > 100 && !showMore && (
                         <div className="border-t border-base-300 p-2">
                           <button
                             type="button"
                             onClick={() => setShowMore(true)}
                             className="w-full text-center text-sm text-primary hover:text-primary-focus py-1"
                           >
-                            Show {Math.min(90, getFilteredDirectories().length - 10)} more
-                            directories
+                            Show {getFilteredDirectories().length - 100} more directories
                           </button>
                         </div>
                       )}
-                      {showMore && getFilteredDirectories().length > 10 && (
+                      {showMore && getFilteredDirectories().length > 100 && (
                         <div className="border-t border-base-300 p-2">
                           <button
                             type="button"
@@ -372,17 +371,18 @@ export function DirectoryField({
                           </button>
                         </div>
                       )}
-                    </div>
-                  </>
-                )}
-
-                {getFilteredDirectories().length === 0 && !isLoading && !apiError && (
-                  <div className="p-4 text-sm text-base-content/60 text-center">
-                    {value && value.split('/').pop()
-                      ? `No directories found matching "${value.split('/').pop()}"`
-                      : 'No directories found'}
-                  </div>
-                )}
+                    </>
+                  ) : (
+                    !isLoading &&
+                    !apiError && (
+                      <div className="p-4 text-sm text-base-content/60 text-center">
+                        {value && value.split('/').pop()
+                          ? `No directories found matching "${value.split('/').pop()}"`
+                          : 'No directories found'}
+                      </div>
+                    )
+                  )}
+                </div>
               </>
             )}
           </div>
