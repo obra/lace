@@ -1,7 +1,7 @@
 // ABOUTME: Test suite for task-based agent spawning functionality
 // ABOUTME: Verifies that tasks assigned to "new:persona:provider/model" trigger agent creation
 
-import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockedFunction } from 'vitest';
 import { TaskManager, type AgentCreationCallback } from '~/tasks/task-manager';
 import { DatabasePersistence } from '~/persistence/database';
 import { asThreadId, asAssigneeId, createNewAgentSpec } from '~/threads/types';
@@ -32,6 +32,14 @@ describe('Agent Spawning', () => {
     });
 
     taskManager = new TaskManager(sessionId, mockPersistence, mockAgentCreator);
+  });
+
+  afterEach(() => {
+    // Clean up EventEmitter instances
+    if (taskManager) {
+      taskManager.removeAllListeners();
+    }
+    vi.clearAllMocks();
   });
 
   describe('Task Creation with Agent Spawning', () => {

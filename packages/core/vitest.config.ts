@@ -32,5 +32,10 @@ export default defineConfig({
     env: {
       NO_COLOR: '1',
     },
+    // Use default pool configuration - should be forks which supports process.chdir()
+    // Removing custom pool options to use Vitest defaults
+    // Add timeout to prevent hanging tests
+    testTimeout: 30000, // 30 second timeout for individual tests
+    hookTimeout: 10000, // 10 second timeout for beforeEach/afterEach hooks
   },
 });

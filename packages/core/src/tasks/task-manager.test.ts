@@ -20,8 +20,18 @@ describe('TaskManager', () => {
   });
 
   afterEach(() => {
+    // Clean up EventEmitter instances
+    if (manager) {
+      manager.removeAllListeners();
+    }
+
     // Test cleanup handled by setupCoreTest
     vi.restoreAllMocks();
+
+    // Clear references immediately instead of registering cleanup
+    // (avoids timing issues with global setupCoreTest registry)
+    manager = undefined as unknown as TaskManager;
+    persistence = undefined as unknown as DatabasePersistence;
   });
 
   describe('createTask', () => {

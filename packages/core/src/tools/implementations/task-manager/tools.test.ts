@@ -150,11 +150,33 @@ describe('Enhanced Task Manager Tools', () => {
 
   afterEach(async () => {
     vi.clearAllMocks();
-    session?.destroy();
+
+    // Clean up session and all its EventEmitters
+    if (session) {
+      session.destroy(); // This already calls removeAllListeners() on all agents
+    }
+
+    // Clean up context AbortController if it exists
+    if (context?.signal && !context.signal.aborted) {
+      try {
+        // Manually trigger abort to clean up any pending operations
+        (context.signal as any).aborted = true;
+      } catch (_error) {
+        // Ignore errors when cleaning up AbortController
+      }
+    }
+
+    // Clean up provider and instances
     cleanupTestProviderDefaults();
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
     }
+
+    // Clear references immediately instead of registering cleanup
+    // (avoids timing issues with global setupCoreTest registry)
+    context = undefined as unknown as ToolContext;
+    session = undefined as unknown as Session;
+    project = undefined as unknown as Project;
   });
 
   describe('Context Integration', () => {
@@ -227,7 +249,11 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should create task with new agent assignment', async () => {
-      const newAgentSpec = createNewAgentSpec('lace', providerInstanceId, 'claude-3-5-haiku-20241022');
+      const newAgentSpec = createNewAgentSpec(
+        'lace',
+        providerInstanceId,
+        'claude-3-5-haiku-20241022'
+      );
 
       const result = await taskCreateTool.execute(
         {
@@ -553,7 +579,11 @@ describe('Enhanced Task Manager Tools', () => {
     });
 
     it('should assign to new agent spec', async () => {
-      const newAgentSpec = createNewAgentSpec('lace', providerInstanceId, 'claude-3-5-haiku-20241022');
+      const newAgentSpec = createNewAgentSpec(
+        'lace',
+        providerInstanceId,
+        'claude-3-5-haiku-20241022'
+      );
 
       const result = await taskUpdateTool.execute(
         {
