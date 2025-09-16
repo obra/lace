@@ -117,7 +117,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         serverProcess = Process()
         serverProcess?.executableURL = URL(fileURLWithPath: serverPath)
         serverProcess?.arguments = ["--host", "127.0.0.1"] // Use default port (31337 or next available)
-        
+
+        // Set up environment variables
+        var environment = ProcessInfo.processInfo.environment
+        if let customLaceDir = UserDefaults.standard.laceDir, !customLaceDir.isEmpty {
+            environment["LACE_DIR"] = customLaceDir
+        } else {
+            environment.removeValue(forKey: "LACE_DIR")
+        }
+        serverProcess?.environment = environment
+
         // Set up pipes to capture output
         let outputPipe = Pipe()
         let errorPipe = Pipe()
@@ -216,7 +225,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         NSWorkspace.shared.open(url)
     }
     
-    @objc private func restartServer() {
+    @MainActor @objc internal func restartServer() {
         serverPort = nil
         shouldAutoOpen = false // Don't auto-open on restart
         updateMenu()
@@ -409,6 +418,7 @@ extension UserDefaults {
         static let updateChannel = "LaceUpdateChannel"
         static let autoUpdate = "LaceAutoUpdate"
         static let checkFrequency = "LaceUpdateCheckFrequency"
+        static let laceDir = "LaceDataDir"
     }
     
     var updateChannel: UpdateChannel {
@@ -434,6 +444,46 @@ extension UserDefaults {
         set {
             set(newValue.rawValue, forKey: Keys.checkFrequency)
         }
+    }
+
+    var laceDir: String? {
+        get {
+            return string(forKey: Keys.laceDir)
+        }
+        set {
+            if let newValue = newValue?.trimmingCharacters(in: .whitespacesAndNewlines), !newValue.isEmpty {
+                let expanded = NSString(string: newValue).expandingTildeInPath
+                let standardized = URL(fileURLWithPath: expanded).standardizedFileURL.path
+                set(standardized, forKey: Keys.laceDir)
+            } else {
+                removeObject(forKey: Keys.laceDir)
+            }
+        }
+    }
+
+    // Validation-aware setter for UI use
+    func setLaceDir(_ newValue: String?, withValidation: Bool = false) -> (success: Bool, error: String?) {
+        if withValidation, let value = newValue?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty {
+            let expanded = NSString(string: value).expandingTildeInPath
+            let standardized = URL(fileURLWithPath: expanded).standardizedFileURL.path
+
+            let fileManager = FileManager.default
+            var isDirectory: ObjCBool = false
+
+            // Check if path exists and is a directory
+            guard fileManager.fileExists(atPath: standardized, isDirectory: &isDirectory), isDirectory.boolValue else {
+                return (false, "Directory does not exist: \(standardized)")
+            }
+
+            // Check if directory is writable
+            guard fileManager.isWritableFile(atPath: standardized) else {
+                return (false, "Directory is not writable: \(standardized)")
+            }
+        }
+
+        // If validation passes or is disabled, use the regular setter
+        laceDir = newValue
+        return (true, nil)
     }
 }
 
@@ -480,9 +530,12 @@ class SettingsWindow: NSWindowController {
     private var frequencyPopup: NSPopUpButton!
     private var versionLabel: NSTextField!
     private var checkNowButton: NSButton!
+    private var laceDirTextField: NSTextField!
+    private var laceDirBrowseButton: NSButton!
+    private var laceDirResetButton: NSButton!
     
     init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 450, height: 380),
                              styleMask: [.titled, .closable],
                              backing: .buffered,
                              defer: false)
@@ -504,7 +557,7 @@ class SettingsWindow: NSWindowController {
         let contentView = NSView(frame: window.contentView!.bounds)
         window.contentView = contentView
         
-        var yPos: CGFloat = 250
+        var yPos: CGFloat = 340
         let margin: CGFloat = 20
         let labelWidth: CGFloat = 120
         let controlWidth: CGFloat = 200
@@ -551,7 +604,43 @@ class SettingsWindow: NSWindowController {
         frequencyPopup.action = #selector(frequencyChanged)
         contentView.addSubview(frequencyPopup)
         yPos -= 50
-        
+
+        // Data Directory Section
+        let dataDirSectionLabel = NSTextField(labelWithString: "Data Directory")
+        dataDirSectionLabel.font = NSFont.systemFont(ofSize: 14, weight: .medium)
+        dataDirSectionLabel.frame = NSRect(x: margin, y: yPos, width: 300, height: 22)
+        contentView.addSubview(dataDirSectionLabel)
+        yPos -= 30
+
+        // LACE_DIR setting
+        let laceDirLabel = NSTextField(labelWithString: "Data Directory:")
+        laceDirLabel.frame = NSRect(x: margin, y: yPos, width: labelWidth, height: 22)
+        contentView.addSubview(laceDirLabel)
+
+        laceDirTextField = NSTextField(frame: NSRect(x: margin + labelWidth, y: yPos - 2, width: controlWidth - 50, height: 22))
+        laceDirTextField.target = self
+        laceDirTextField.action = #selector(laceDirChanged)
+        contentView.addSubview(laceDirTextField)
+
+        laceDirBrowseButton = NSButton(title: "Browse...", target: self, action: #selector(browseLaceDir))
+        laceDirBrowseButton.frame = NSRect(x: margin + labelWidth + controlWidth - 45, y: yPos - 2, width: 70, height: 26)
+        laceDirBrowseButton.bezelStyle = .rounded
+        contentView.addSubview(laceDirBrowseButton)
+        yPos -= 35
+
+        // Reset to default button and help text
+        laceDirResetButton = NSButton(title: "Use Default (~/.lace)", target: self, action: #selector(resetLaceDir))
+        laceDirResetButton.frame = NSRect(x: margin + labelWidth, y: yPos, width: 140, height: 26)
+        laceDirResetButton.bezelStyle = .rounded
+        contentView.addSubview(laceDirResetButton)
+
+        let helpLabel = NSTextField(labelWithString: "Changes require server restart")
+        helpLabel.font = NSFont.systemFont(ofSize: 11)
+        helpLabel.textColor = NSColor.secondaryLabelColor
+        helpLabel.frame = NSRect(x: margin + labelWidth + 150, y: yPos + 5, width: 200, height: 16)
+        contentView.addSubview(helpLabel)
+        yPos -= 50
+
         // Current Version
         let versionTitleLabel = NSTextField(labelWithString: "Current Version:")
         versionTitleLabel.frame = NSRect(x: margin, y: yPos, width: labelWidth, height: 22)
@@ -595,6 +684,14 @@ class SettingsWindow: NSWindowController {
                 break
             }
         }
+
+        // Set LACE_DIR field
+        if let customLaceDir = defaults.laceDir {
+            laceDirTextField.stringValue = customLaceDir
+        } else {
+            laceDirTextField.placeholderString = "Default: ~/.lace"
+            laceDirTextField.stringValue = ""
+        }
     }
     
     @objc private func channelChanged() {
@@ -633,7 +730,157 @@ class SettingsWindow: NSWindowController {
             appDelegate.updater.checkForUpdates(nil)
         }
     }
-    
+
+    @objc private func laceDirChanged() {
+        let newPath = laceDirTextField.stringValue
+        let oldPath = UserDefaults.standard.laceDir
+
+        let result = UserDefaults.standard.setLaceDir(newPath.isEmpty ? nil : newPath, withValidation: true)
+
+        if !result.success {
+            // Validation failed - show error and revert field
+            if let error = result.error {
+                showValidationError(error)
+            }
+            // Revert text field to previous value
+            if let oldPath = oldPath {
+                laceDirTextField.stringValue = oldPath
+            } else {
+                laceDirTextField.stringValue = ""
+            }
+            return
+        }
+
+        // Check if path actually changed
+        if oldPath != UserDefaults.standard.laceDir {
+            print("LACE_DIR changed from '\(oldPath ?? "default")' to '\(UserDefaults.standard.laceDir ?? "default")'")
+            promptForServerRestart()
+        }
+    }
+
+    @objc private func browseLaceDir() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.title = "Choose Data Directory"
+        panel.prompt = "Select"
+
+        // Set initial directory to current value or home directory
+        if let currentPath = UserDefaults.standard.laceDir {
+            panel.directoryURL = URL(fileURLWithPath: currentPath)
+        } else {
+            panel.directoryURL = URL(fileURLWithPath: NSHomeDirectory())
+        }
+
+        if let window = window {
+            panel.beginSheetModal(for: window) { response in
+                if response == .OK, let url = panel.url {
+                    let oldPath = UserDefaults.standard.laceDir
+
+                    // Validate the selected directory
+                    let result = UserDefaults.standard.setLaceDir(url.path, withValidation: true)
+
+                    if result.success {
+                        self.laceDirTextField.stringValue = url.path
+
+                        if oldPath != UserDefaults.standard.laceDir {
+                            print("LACE_DIR changed via browse from '\(oldPath ?? "default")' to '\(url.path)'")
+                            self.promptForServerRestart()
+                        }
+                    } else {
+                        // Show validation error
+                        if let error = result.error {
+                            self.showValidationError(error)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @objc private func resetLaceDir() {
+        let oldPath = UserDefaults.standard.laceDir
+        UserDefaults.standard.laceDir = nil
+        laceDirTextField.stringValue = ""
+
+        if oldPath != nil {
+            print("LACE_DIR reset to default from '\(oldPath!)'")
+            promptForServerRestart()
+        }
+    }
+
+    private func promptForServerRestart() {
+        let alert = NSAlert()
+        alert.messageText = "Server Restart Required"
+        alert.informativeText = "The data directory setting has changed. Would you like to restart the server now to apply the changes?"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Restart Server")
+        alert.addButton(withTitle: "Later")
+
+        if let window = window {
+            alert.beginSheetModal(for: window) { response in
+                if response == .alertFirstButtonReturn {
+                    self.restartServer()
+                }
+            }
+        } else {
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                self.restartServer()
+            }
+        }
+    }
+
+    private func restartServer() {
+        if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
+            print("Restarting server with new LACE_DIR setting...")
+            appDelegate.restartServer()
+        }
+    }
+
+    private func validateDirectory(_ path: String) -> (isValid: Bool, error: String?) {
+        guard !path.isEmpty else {
+            return (false, "Path cannot be empty")
+        }
+
+        let url = URL(fileURLWithPath: path)
+        let fileManager = FileManager.default
+
+        // Check if path exists
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
+            return (false, "Directory does not exist: \(path)")
+        }
+
+        // Check if it's actually a directory
+        guard isDirectory.boolValue else {
+            return (false, "Path is not a directory: \(path)")
+        }
+
+        // Check if directory is writable
+        guard fileManager.isWritableFile(atPath: url.path) else {
+            return (false, "Directory is not writable: \(path)")
+        }
+
+        return (true, nil)
+    }
+
+    private func showValidationError(_ message: String) {
+        let alert = NSAlert()
+        alert.messageText = "Invalid Directory"
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "OK")
+
+        if let window = window {
+            alert.beginSheetModal(for: window) { _ in }
+        } else {
+            alert.runModal()
+        }
+    }
+
     private func getCurrentVersion() -> String {
         if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
            let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {

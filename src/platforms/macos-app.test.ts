@@ -252,7 +252,7 @@ describe('macOS App Integration Tests', () => {
       const swiftCode = readFileSync(join(MACOS_PLATFORM_DIR, 'main.swift'), 'utf-8');
 
       expect(swiftCode).toContain('@objc private func openBrowser');
-      expect(swiftCode).toContain('@objc private func restartServer');
+      expect(swiftCode).toContain('@objc internal func restartServer');
       expect(swiftCode).toContain('@objc private func toggleLaunchAtStartup');
       expect(swiftCode).toContain('@objc private func quit');
     });
