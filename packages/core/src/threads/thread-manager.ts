@@ -388,7 +388,6 @@ export class ThreadManager {
     return buildCompleteHistory(thread.events);
   }
 
-
   /**
    * Get thread IDs for all delegate threads belonging to a session.
    * Returns only the IDs, not full thread objects. Use getThreadsBySession()
