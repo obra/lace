@@ -112,11 +112,20 @@ function createLaceEventFromDb(
   threadId: string,
   type: LaceEventType,
   timestamp: Date,
-  data: unknown
+  data: unknown,
+  context?: { sessionId?: string; projectId?: string }
 ): LaceEvent {
   // Ensure timestamp is always a Date object (defensive programming)
   const safeTimestamp = timestamp instanceof Date ? timestamp : new Date(timestamp);
-  const baseEvent = { id, threadId, timestamp: safeTimestamp };
+  const baseEvent = {
+    id,
+    timestamp: safeTimestamp,
+    context: {
+      threadId,
+      sessionId: context?.sessionId,
+      projectId: context?.projectId,
+    },
+  };
 
   switch (type) {
     case 'USER_MESSAGE':
@@ -508,7 +517,10 @@ export class DatabasePersistence {
       | undefined;
     if (!threadRow) return null;
 
-    const events = this.loadEvents(actualThreadId);
+    const events = this.loadEvents(actualThreadId, {
+      sessionId: threadRow.session_id || undefined,
+      projectId: threadRow.project_id || undefined,
+    });
 
     let metadata: Thread['metadata'] = undefined;
     if (threadRow.metadata) {
@@ -583,12 +595,12 @@ export class DatabasePersistence {
     );
   }
 
-  loadEvents(threadId: string): LaceEvent[] {
+  loadEvents(threadId: string, context?: { sessionId?: string; projectId?: string }): LaceEvent[] {
     if (this._disabled || !this.db || this._closed) return [];
 
     const stmt = this.db.prepare(`
-      SELECT * FROM events 
-      WHERE thread_id = ? 
+      SELECT * FROM events
+      WHERE thread_id = ?
       ORDER BY timestamp ASC
     `);
 
@@ -609,7 +621,8 @@ export class DatabasePersistence {
           row.thread_id,
           row.type as LaceEventType,
           new Date(row.timestamp),
-          JSON.parse(row.data) as unknown
+          JSON.parse(row.data) as unknown,
+          context
         );
       } catch (error) {
         throw new Error(

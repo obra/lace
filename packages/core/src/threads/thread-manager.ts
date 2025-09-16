@@ -431,7 +431,10 @@ export class ThreadManager {
     // Load events for each thread
     return threadsWithoutEvents.map((thread) => ({
       ...thread,
-      events: this._persistence.loadEvents(thread.id),
+      events: this._persistence.loadEvents(thread.id, {
+        sessionId: thread.sessionId,
+        projectId: thread.projectId,
+      }),
     }));
   }
 

@@ -88,59 +88,59 @@ export function useAgentEvents(
     setLoadingHistory(true);
     const controller = new AbortController();
 
-    // Add small delay to prevent rapid cancellation during page reload
-    const timeoutId = setTimeout(() => {
+    // Immediately start loading without delay to reduce race conditions
+    const loadHistory = async () => {
       // Check if still mounted before making request
       if (!isMountedRef.current || controller.signal.aborted) {
         return;
       }
 
-      void api
-        .get<LaceEvent[]>(`/api/agents/${agentId}/history`, { signal: controller.signal })
-        .then((data) => {
-          // Check if still mounted before updating state
-          if (!isMountedRef.current) {
-            return;
-          }
-
-          // Events are already properly typed LaceEvents from superjson
-          // Filter out internal workflow events (they're handled separately)
-          const timelineEvents = data.filter((event) => !isInternalWorkflowEvent(event.type));
-
-          // Merge history with existing streamed events using dedup guard
-          setEvents((prev) => {
-            const newUniqueEvents: LaceEvent[] = [];
-            for (const event of timelineEvents) {
-              const eventKey = getEventKey(event);
-              if (!seenEvents.current.has(eventKey)) {
-                newUniqueEvents.push(event);
-                seenEvents.current.add(eventKey);
-              }
-            }
-
-            // Merge and sort by timestamp for chronological order
-            const mergedEvents = [...prev, ...newUniqueEvents];
-            return mergedEvents.sort((a, b) => {
-              const aTime = new Date(a.timestamp ?? new Date()).getTime();
-              const bTime = new Date(b.timestamp ?? new Date()).getTime();
-              return aTime - bTime;
-            });
-          });
-
-          if (isMountedRef.current) {
-            setLoadingHistory(false);
-          }
-        })
-        .catch((error: unknown) => {
-          if ((error as { name?: string }).name !== 'AbortError' && isMountedRef.current) {
-            console.error('[AGENT_EVENTS] Failed to load history:', error);
-            setLoadingHistory(false);
-          }
+      try {
+        const data = await api.get<LaceEvent[]>(`/api/agents/${agentId}/history`, {
+          signal: controller.signal,
         });
-    }, 50); // 50ms delay to prevent rapid cancellation
+
+        // Check if still mounted before updating state
+        if (!isMountedRef.current) {
+          return;
+        }
+
+        // Events are already properly typed LaceEvents from superjson
+        // Filter out internal workflow events (they're handled separately)
+        const timelineEvents = data.filter((event) => !isInternalWorkflowEvent(event.type));
+
+        // Clear seen events and rebuild from scratch to ensure consistency
+        seenEvents.current.clear();
+
+        // Add all historical events to seen set
+        for (const event of timelineEvents) {
+          const eventKey = getEventKey(event);
+          seenEvents.current.add(eventKey);
+        }
+
+        // Sort events by timestamp for chronological order
+        const sortedEvents = timelineEvents.sort((a, b) => {
+          const aTime = new Date(a.timestamp ?? new Date()).getTime();
+          const bTime = new Date(b.timestamp ?? new Date()).getTime();
+          return aTime - bTime;
+        });
+
+        setEvents(sortedEvents);
+
+        if (isMountedRef.current) {
+          setLoadingHistory(false);
+        }
+      } catch (error: unknown) {
+        if ((error as { name?: string }).name !== 'AbortError' && isMountedRef.current) {
+          console.error('[AGENT_EVENTS] Failed to load history:', error);
+          setLoadingHistory(false);
+        }
+      }
+    };
+
+    void loadHistory();
 
     return () => {
-      clearTimeout(timeoutId);
       controller.abort();
     };
   }, [agentId, getEventKey]);
