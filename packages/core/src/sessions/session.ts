@@ -6,6 +6,7 @@ import { ThreadId, asThreadId } from '~/threads/types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { ToolExecutor } from '~/tools/executor';
+import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { TaskManager, AgentCreationCallback } from '~/tasks/task-manager';
 import { Task } from '~/tasks/types';
 import { getPersistence, SessionData } from '~/persistence/database';
@@ -393,12 +394,12 @@ export class Session {
     // Create session instance
     const session = new Session(sessionId, sessionData, threadManager);
 
-    // Create fully configured tool executor
-    const toolExecutor = session.createConfiguredToolExecutor();
-
     // Create and initialize coordinator agent
     let coordinatorAgent: Agent;
     try {
+      // Each agent gets its own ToolExecutor (no sharing)
+      const toolExecutor = session.createConfiguredToolExecutor();
+
       coordinatorAgent = await session.createAgent({
         sessionData,
         toolExecutor,
@@ -481,6 +482,9 @@ export class Session {
           delegateMetadata: delegateThread.metadata,
         });
 
+        // Each agent gets its own ToolExecutor (no sharing)
+        const toolExecutor = session.createConfiguredToolExecutor();
+
         // Create and initialize delegate agent
         const delegateAgent = await session.createAgent({
           sessionData,
@@ -512,10 +516,6 @@ export class Session {
 
     // Set up agent creation callback for task-based agent spawning
     session.setupAgentCreationCallback();
-
-    // Register delegate tool (TaskManager accessed via context)
-    const delegateTool = new DelegateTool();
-    toolExecutor.registerTool('delegate', delegateTool);
 
     // Final verification before completing reconstruction
     const finalAgents = session.getAgents();
@@ -812,11 +812,12 @@ export class Session {
       },
     });
 
-    // Set up approval callback for spawned agent (inherit from coordinator)
+    // Set up approval callback for spawned agent (each agent gets its own callback)
     const coordinatorAgent = this.getCoordinatorAgent();
-    const coordinatorApprovalCallback = coordinatorAgent?.toolExecutor.getApprovalCallback();
-    if (coordinatorApprovalCallback) {
-      agent.toolExecutor.setApprovalCallback(coordinatorApprovalCallback);
+    if (coordinatorAgent?.toolExecutor.getApprovalCallback()) {
+      // Create a new EventApprovalCallback instance for this agent (fixes shared callback bug)
+      const approvalCallback = new EventApprovalCallback(agent);
+      agent.toolExecutor.setApprovalCallback(approvalCallback);
     }
 
     this._agents.set(agent.threadId, agent);
