@@ -7,7 +7,6 @@ import { asThreadId, ThreadId } from '@/types/core';
 import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
-import { setupAgentApprovals } from '@/lib/server/agent-utils';
 import { EventStreamManager } from '@/lib/event-stream-manager';
 import type { Agent } from '@/lib/server/lace-imports';
 import { logger } from '~/utils/logger';
@@ -117,8 +116,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       );
     }
 
-    // Setup agent approvals using utility
-    setupAgentApprovals(agent, sessionId);
+    // No approval callback setup needed - Agent owns approval flow
 
     // CRITICAL: Setup event handlers for real-time updates
     // Without this, newly spawned agents won't emit events to the UI until page refresh
