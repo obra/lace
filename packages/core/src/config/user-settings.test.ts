@@ -187,4 +187,61 @@ describe('UserSettingsManager', () => {
       expect(filePath).toBe(path.join(tempDir, 'user-settings.json'));
     });
   });
+
+  describe('getDefaultModel', () => {
+    it('should return fast model when configured', () => {
+      const settings = {
+        defaultModels: {
+          fast: 'anthropic-default:claude-3-haiku-20240307',
+          smart: 'anthropic-default:claude-3-opus-20240229',
+        },
+      };
+      fs.writeFileSync(UserSettingsManager.getFilePath(), JSON.stringify(settings));
+
+      const model = UserSettingsManager.getDefaultModel('fast');
+      expect(model).toBe('anthropic-default:claude-3-haiku-20240307');
+    });
+
+    it('should throw when defaultModels section is missing', () => {
+      const settings = { theme: 'dark' };
+      fs.writeFileSync(UserSettingsManager.getFilePath(), JSON.stringify(settings));
+
+      expect(() => UserSettingsManager.getDefaultModel('fast')).toThrow(
+        /Settings are missing 'defaultModels' section/
+      );
+    });
+
+    it('should throw when specific tier is not configured', () => {
+      const settings = {
+        defaultModels: {
+          smart: 'anthropic-default:claude-3-opus-20240229',
+        },
+      };
+      fs.writeFileSync(UserSettingsManager.getFilePath(), JSON.stringify(settings));
+
+      expect(() => UserSettingsManager.getDefaultModel('fast')).toThrow(
+        /No default model configured for 'fast'/
+      );
+    });
+  });
+
+  describe('updateDefaultModels', () => {
+    it('should update default models in existing settings', () => {
+      const settings = { theme: 'dark', existingKey: 'value' };
+      fs.writeFileSync(UserSettingsManager.getFilePath(), JSON.stringify(settings));
+
+      UserSettingsManager.updateDefaultModels({
+        fast: 'test-provider:test-model',
+      });
+
+      const updatedSettings = UserSettingsManager.load();
+      expect(updatedSettings).toEqual({
+        theme: 'dark',
+        existingKey: 'value',
+        defaultModels: {
+          fast: 'test-provider:test-model',
+        },
+      });
+    });
+  });
 });
