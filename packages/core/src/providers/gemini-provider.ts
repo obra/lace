@@ -102,9 +102,11 @@ export class GeminiProvider extends AIProvider {
       .filter((part) => 'functionCall' in part && part.functionCall)
       .map((part) => {
         if ('functionCall' in part && part.functionCall) {
+          const toolName = part.functionCall.name || '';
           return {
-            id: `gemini_${Date.now()}_${Math.random()}`, // Gemini doesn't provide IDs
-            name: part.functionCall.name || '',
+            // Encode tool name in the ID for later format conversion
+            id: `gemini_${toolName}_${Date.now()}_${Math.random().toString(36).substring(2)}`,
+            name: toolName,
             arguments: part.functionCall.args || {},
           };
         }

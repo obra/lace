@@ -227,12 +227,28 @@ export function convertToGeminiFormat(messages: ProviderMessage[]): Content[] {
       if (msg.role === 'user' && msg.toolResults) {
         // Add function responses
         msg.toolResults.forEach((result) => {
+          // Decode tool name and call ID from Gemini-encoded tool call ID
+          const toolCallId = result.id || '';
+          let toolName = 'unknown_function';
+          let correlationId = toolCallId;
+
+          // Extract tool name from encoded ID format: gemini_{toolName}_{timestamp}_{random}
+          if (toolCallId.startsWith('gemini_')) {
+            // Find the last two underscores (timestamp and random parts)
+            const lastUnderscoreIndex = toolCallId.lastIndexOf('_');
+            const secondLastUnderscoreIndex = toolCallId.lastIndexOf('_', lastUnderscoreIndex - 1);
+
+            if (secondLastUnderscoreIndex > 6) {
+              // "gemini_".length = 7, so index > 6 means there's a tool name
+              toolName = toolCallId.substring(7, secondLastUnderscoreIndex); // Extract between "gemini_" and second-last "_"
+              correlationId = toolCallId; // Use full ID for correlation
+            }
+          }
+
           parts.push({
             functionResponse: {
-              // Note: result.id contains the tool call ID, but Gemini expects function name
-              // This is a limitation of the current ToolResult interface which doesn't store tool names
-              // In practice, using the call ID should work since it's unique per function call
-              name: result.id || 'unknown_function',
+              name: toolName, // Function name for Gemini API
+              id: correlationId, // Tool call ID for correlation
               response: {
                 output: result.content.map((c) => c.text || '').join('\n'),
                 ...(result.status !== 'completed' ? { error: 'Tool execution failed' } : {}),
