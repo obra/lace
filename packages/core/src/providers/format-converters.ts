@@ -4,6 +4,7 @@
 import { ProviderMessage } from '~/providers/base-provider';
 import { ToolCall } from '~/tools/types';
 import Anthropic from '@anthropic-ai/sdk';
+import type { Content, Part } from '@google/genai';
 
 /**
  * Converts enhanced ProviderMessage format to Anthropic's content blocks format
@@ -195,4 +196,52 @@ export function convertToTextOnlyFormat(messages: ProviderMessage[]): ProviderMe
       };
     }
   });
+}
+
+/**
+ * Converts enhanced ProviderMessage format to Gemini Content/Part format
+ */
+export function convertToGeminiFormat(messages: ProviderMessage[]): Content[] {
+  return messages
+    .filter((msg) => msg.role !== 'system') // System handled separately in Gemini
+    .map((msg): Content => {
+      const parts: Part[] = [];
+
+      // Add text content if present
+      if (msg.content && msg.content.trim()) {
+        parts.push({ text: msg.content });
+      }
+
+      if (msg.role === 'assistant' && msg.toolCalls) {
+        // Add function calls
+        msg.toolCalls.forEach((toolCall) => {
+          parts.push({
+            functionCall: {
+              name: toolCall.name,
+              args: toolCall.arguments,
+            },
+          });
+        });
+      }
+
+      if (msg.role === 'user' && msg.toolResults) {
+        // Add function responses
+        msg.toolResults.forEach((result) => {
+          parts.push({
+            functionResponse: {
+              name: result.id || '',
+              response: {
+                output: result.content.map((c) => c.text || '').join('\n'),
+                ...(result.status !== 'completed' ? { error: 'Tool execution failed' } : {}),
+              },
+            },
+          });
+        });
+      }
+
+      return {
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts,
+      };
+    });
 }
