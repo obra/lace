@@ -2713,6 +2713,140 @@ export class Agent extends EventEmitter {
     return event;
   }
 
+  /**
+   * Check tool policy and determine if approval is required.
+   * Agent owns this logic instead of ToolExecutor.
+   */
+  private async _checkToolPermission(
+    toolCall: ToolCall
+  ): Promise<'granted' | 'approval_required' | 'denied'> {
+    const session = await this.getFullSession();
+    if (!session) return 'denied';
+
+    const policy = session.getToolPolicy(toolCall.name);
+
+    switch (policy) {
+      case 'allow':
+        return 'granted';
+      case 'deny':
+        return 'denied';
+      case 'ask':
+        return 'approval_required';
+      default:
+        return 'approval_required'; // Safe default
+    }
+  }
+
+  /**
+   * Handle the complete approval flow for a tool that requires approval.
+   * Agent orchestrates: create request → wait for decision → execute or deny.
+   */
+  private async _handleToolApprovalFlow(toolCall: ToolCall, context: ToolContext): Promise<void> {
+    // 1. Create approval request event (in correct thread!)
+    const eventContext = this._getEventContext();
+    this._addEventAndEmit({
+      type: 'TOOL_APPROVAL_REQUEST',
+      data: { toolCallId: toolCall.id },
+      context: {
+        threadId: this._threadId,
+        sessionId: eventContext.sessionId,
+      },
+    });
+
+    // 2. Wait for approval decision
+    const decision = await this._waitForApprovalDecision(toolCall.id);
+
+    // 3. Act on decision
+    if (this._isApprovalGranted(decision)) {
+      const result = await this._toolExecutor.execute(toolCall, context);
+
+      // Add result event and emit (following existing pattern)
+      this._activeToolCalls.delete(toolCall.id);
+      this._addEventAndEmit({
+        type: 'TOOL_RESULT',
+        data: result,
+        context: { threadId: this._threadId },
+      });
+      this.emit('tool_call_complete', {
+        toolName: toolCall.name,
+        result,
+        callId: toolCall.id,
+      });
+
+      // Update batch tracking
+      this._pendingToolCount--;
+      if (this._pendingToolCount === 0) {
+        this._handleBatchComplete();
+      }
+    } else {
+      const deniedResult = this._createDeniedResult(toolCall, decision);
+
+      // Add denied result event (following existing pattern)
+      this._activeToolCalls.delete(toolCall.id);
+      this._addEventAndEmit({
+        type: 'TOOL_RESULT',
+        data: deniedResult,
+        context: { threadId: this._threadId },
+      });
+      this.emit('tool_call_complete', {
+        toolName: toolCall.name,
+        result: deniedResult,
+        callId: toolCall.id,
+      });
+
+      // Update batch tracking
+      this._pendingToolCount--;
+      if (this._pendingToolCount === 0) {
+        this._handleBatchComplete();
+      }
+    }
+  }
+
+  /**
+   * Wait for approval decision using existing event system.
+   * Polls database for TOOL_APPROVAL_RESPONSE event.
+   */
+  private async _waitForApprovalDecision(toolCallId: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      // Set up timeout
+      const timeout = setTimeout(() => {
+        reject(new Error(`Approval timeout for tool call ${toolCallId}`));
+      }, 300000); // 5 minutes
+
+      // Poll for approval response event
+      const checkForResponse = () => {
+        const decision = this._threadManager.getApprovalDecision(toolCallId);
+        if (decision) {
+          clearTimeout(timeout);
+          resolve(decision);
+        } else {
+          // Check again in 100ms
+          setTimeout(checkForResponse, 100);
+        }
+      };
+
+      checkForResponse();
+    });
+  }
+
+  /**
+   * Check if approval decision grants execution permission.
+   */
+  private _isApprovalGranted(decision: string): boolean {
+    return decision === 'allow_once' || decision === 'allow_session';
+  }
+
+  /**
+   * Create denied tool result for rejected approvals.
+   */
+  private _createDeniedResult(toolCall: ToolCall, decision: string): ToolResult {
+    return {
+      id: toolCall.id,
+      content: [{ type: 'text', text: `Tool execution denied: ${decision}` }],
+      status: 'failed',
+    };
+  }
+
   private _getWorkingDirectory(): string | undefined {
     logger.debug('Agent._getWorkingDirectory() called', {
       threadId: this._threadId,
