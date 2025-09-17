@@ -1437,12 +1437,12 @@ export class Agent extends EventEmitter {
         agent: this,
       };
 
-      // First: Check permission
-      const permission = await this._toolExecutor.requestToolPermission(toolCall, toolContext);
+      // Agent owns permission checking (new callback-free flow)
+      const permission = await this._checkToolPermission(toolCall);
 
       if (permission === 'granted') {
-        // Permission already checked and granted - execute without checking again
-        const result = await this._toolExecutor.executeApprovedTool(toolCall, toolContext);
+        // Execute immediately without approval
+        const result = await this._toolExecutor.execute(toolCall, toolContext);
 
         // Only add events if thread still exists
         if (this._threadManager.getThread(this._threadId)) {
@@ -1470,13 +1470,13 @@ export class Agent extends EventEmitter {
             this._handleBatchComplete();
           }
         }
-      } else if (permission === 'pending') {
-        // Permission pending - approval request was created
-        // Don't decrement pending count yet - wait for approval response
+      } else if (permission === 'approval_required') {
+        // Start approval flow - don't decrement pending count yet
+        void this._handleToolApprovalFlow(toolCall, toolContext);
         return;
       } else {
-        // Permission was denied - we got a ToolResult back
-        const result = permission;
+        // Permission was denied - create denied result
+        const result = this._createDeniedResult(toolCall, 'denied by policy');
 
         // Only add events if thread still exists
         if (this._threadManager.getThread(this._threadId)) {
