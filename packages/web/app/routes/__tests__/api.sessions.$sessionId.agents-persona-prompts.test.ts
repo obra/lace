@@ -142,29 +142,29 @@ describe('Agent Creation API - Persona System Prompt Generation', () => {
 
     // Get the session and access the actual Agent instances
     const session = await sessionService.getSession(asThreadId(sessionId));
-    const agentInfos = session!.getAgents();
-    const defaultAgentInfo = agentInfos.find((a) => a.name === 'Default Agent');
-    const summaryAgentInfo = agentInfos.find((a) => a.name === 'Summary Agent');
+    const agents = session!.getAgents();
+    const defaultAgent = agents.find((a) => a.getInfo().name === 'Default Agent');
+    const summaryAgent = agents.find((a) => a.getInfo().name === 'Summary Agent');
 
-    expect(defaultAgentInfo).toBeDefined();
-    expect(summaryAgentInfo).toBeDefined();
-    expect(defaultAgentInfo!.persona).toBe('lace');
-    expect(summaryAgentInfo!.persona).toBe('session-summary');
+    expect(defaultAgent).toBeDefined();
+    expect(summaryAgent).toBeDefined();
+    expect(defaultAgent!.getInfo().persona).toBe('lace');
+    expect(summaryAgent!.getInfo().persona).toBe('session-summary');
 
     // Access the actual Agent instances from the session's internal agent map
     // This is the proper way to get Agent instances for testing system prompt generation
     const sessionInternal = session as unknown as {
       _agents: Map<string, { initialize(): Promise<void> }>;
     };
-    const defaultAgent = sessionInternal._agents.get(defaultAgentInfo!.threadId);
-    const summaryAgent = sessionInternal._agents.get(summaryAgentInfo!.threadId);
+    const defaultAgentInternal = sessionInternal._agents.get(defaultAgent!.threadId);
+    const summaryAgentInternal = sessionInternal._agents.get(summaryAgent!.threadId);
 
-    expect(defaultAgent).toBeDefined();
-    expect(summaryAgent).toBeDefined();
+    expect(defaultAgentInternal).toBeDefined();
+    expect(summaryAgentInternal).toBeDefined();
 
     // Initialize agents to trigger system prompt generation
-    await defaultAgent!.initialize();
-    await summaryAgent!.initialize();
+    await defaultAgentInternal!.initialize();
+    await summaryAgentInternal!.initialize();
 
     // Verify loadPromptConfig was called with the correct personas
     expect(mockLoadPromptConfig).toHaveBeenCalledTimes(2);

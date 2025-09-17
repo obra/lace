@@ -130,13 +130,14 @@ export class SessionHelper extends BaseHelper {
       return this.cachedModelId;
     } catch (_globalConfigError) {
       // Fallback: Get model from parent agent
-      const agentInfo = this.options.parentAgent.getInfo();
-      if (agentInfo?.modelId) {
+      const parentAgentModel = this.options.parentAgent.model;
+      if (parentAgentModel && parentAgentModel !== 'unknown-model') {
         logger.debug('SessionHelper using parent agent model as fallback', {
           agentId: this.options.parentAgent.threadId,
-          modelId: agentInfo.modelId,
+          modelId: parentAgentModel,
         });
-        return agentInfo.modelId;
+        this.cachedModelId = parentAgentModel;
+        return parentAgentModel;
       }
 
       // Last resort

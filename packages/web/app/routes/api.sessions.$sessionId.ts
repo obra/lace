@@ -52,7 +52,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       id: session.getId(),
       name: sessionInfo?.name ?? 'Unknown',
       createdAt: sessionInfo?.createdAt ?? new Date(),
-      agents: agents,
+      agents: agents.map((agent) => agent.getInfo()),
     };
 
     return createSuperjsonResponse(sessionData);
@@ -133,7 +133,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       description: (updatedSessionData as { description?: string }).description,
       status: (updatedSessionData as { status?: string }).status,
       createdAt: (updatedSessionData as { createdAt: Date }).createdAt,
-      agents: agents,
+      agents: agents.map((agent) => agent.getInfo()),
     };
 
     return createSuperjsonResponse(sessionData);
