@@ -98,9 +98,10 @@ describe('SessionService.spawnAgent Method', () => {
     const agents = session!.getAgents();
     const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
     expect(spawnedAgent).toBeDefined();
-    expect(spawnedAgent!.name).toBe('Service Agent');
-    expect(spawnedAgent!.providerInstanceId).toBeDefined();
-    expect(spawnedAgent!.status).toBe('idle');
+    const agentInfo = spawnedAgent!.getInfo();
+    expect(agentInfo.name).toBe('Service Agent');
+    expect(agentInfo.providerInstanceId).toBeDefined();
+    expect(agentInfo.status).toBe('idle');
 
     // Verify agent is retrievable via session
     const sessionForAgent = await sessionService.getSession(sessionId as ThreadId);

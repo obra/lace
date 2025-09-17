@@ -124,7 +124,7 @@ describe('Session', () => {
       });
 
       const agents = session.getAgents();
-      expect(agents[0]?.modelId).toBe('claude-3-5-sonnet-20241022');
+      expect(agents[0]?.getInfo().modelId).toBe('claude-3-5-sonnet-20241022');
     });
 
     it('should create session with openai provider instance', () => {
@@ -138,7 +138,7 @@ describe('Session', () => {
       });
 
       const agents = session.getAgents();
-      expect(agents[0]?.modelId).toBe('gpt-4o');
+      expect(agents[0]?.getInfo().modelId).toBe('gpt-4o');
     });
   });
 
@@ -264,7 +264,10 @@ describe('Session', () => {
 
       const agents = session.getAgents();
       expect(agents).toHaveLength(2); // Coordinator + 1 spawned agent
-      expect(agents[1]).toEqual(
+
+      // Should return actual Agent objects, test the DTO via getInfo()
+      const spawnedAgentInfo = agents[1].getInfo();
+      expect(spawnedAgentInfo).toEqual(
         expect.objectContaining({
           name: 'Test Agent',
           providerInstanceId: expect.any(String) as string,
@@ -291,7 +294,8 @@ describe('Session', () => {
       expect(agents).toHaveLength(2); // Coordinator + 1 spawned agent
 
       const spawnedAgent = agents[1];
-      expect(spawnedAgent).toEqual(
+      const spawnedAgentInfo = spawnedAgent.getInfo();
+      expect(spawnedAgentInfo).toEqual(
         expect.objectContaining({
           name: 'Claude Sonnet Agent',
           providerInstanceId: expect.any(String) as string,
@@ -318,7 +322,8 @@ describe('Session', () => {
       expect(agents).toHaveLength(2); // Coordinator + 1 spawned agent
 
       const spawnedAgent = agents[1];
-      expect(spawnedAgent).toEqual(
+      const spawnedAgentInfo = spawnedAgent.getInfo();
+      expect(spawnedAgentInfo).toEqual(
         expect.objectContaining({
           name: 'GPT Agent',
           providerInstanceId: expect.any(String) as string,
@@ -341,7 +346,8 @@ describe('Session', () => {
       expect(agents).toHaveLength(2); // Coordinator + 1 spawned agent
 
       const spawnedAgent = agents[1];
-      expect(spawnedAgent).toEqual(
+      const spawnedAgentInfo = spawnedAgent.getInfo();
+      expect(spawnedAgentInfo).toEqual(
         expect.objectContaining({
           name: 'Default Agent',
           providerInstanceId: expect.any(String) as string, // Should fall back to session provider
@@ -361,7 +367,10 @@ describe('Session', () => {
       const agents = session.getAgents();
 
       expect(agents).toHaveLength(1);
-      expect(agents[0]).toEqual(
+
+      // Should return actual Agent object, test DTO via getInfo()
+      const coordinatorInfo = agents[0].getInfo();
+      expect(coordinatorInfo).toEqual(
         expect.objectContaining({
           threadId: session.getId(),
           name: 'Lace', // Coordinator agent defaults to "Lace" when no session name provided
@@ -393,8 +402,9 @@ describe('Session', () => {
       // Verify spawned agent can be retrieved
       expect(session.getAgent(asThreadId(agent1.threadId))).toBeDefined();
 
-      // Verify spawned agent has expected properties
-      expect(spawnedAgents[0]).toEqual(
+      // Verify spawned agent has expected properties via getInfo()
+      const spawnedAgentInfo = spawnedAgents[0].getInfo();
+      expect(spawnedAgentInfo).toEqual(
         expect.objectContaining({
           name: expect.any(String) as string,
           providerInstanceId: expect.any(String) as string,
@@ -402,6 +412,35 @@ describe('Session', () => {
           status: expect.any(String) as string,
         })
       );
+    });
+
+    it('REFACTOR: should return Agent objects instead of AgentInfo DTOs', () => {
+      const session = Session.create({
+        name: 'Test Session',
+        projectId: testProject.getId(),
+      });
+      const spawnedAgent = session.spawnAgent({ name: 'Test Agent' });
+
+      const agents = session.getAgents();
+
+      // This test will FAIL until we refactor getAgents() to return Agent[]
+      // instead of AgentInfo[]. This is the boundary violation we want to fix.
+      expect(agents).toHaveLength(2); // coordinator + spawned
+
+      // Agents should be actual Agent instances, not DTOs
+      expect(agents[0]).toBeInstanceOf(session.getCoordinatorAgent()!.constructor);
+      expect(agents[1]).toBeInstanceOf(spawnedAgent.constructor);
+
+      // Should have Agent methods, not just DTO properties
+      expect(typeof agents[0].sendMessage).toBe('function');
+      expect(typeof agents[1].sendMessage).toBe('function');
+
+      // Should be the same objects returned by getAgent()
+      const coordinatorAgent = session.getCoordinatorAgent();
+      const retrievedSpawnedAgent = session.getAgent(asThreadId(spawnedAgent.threadId));
+
+      expect(agents[0]).toBe(coordinatorAgent);
+      expect(agents[1]).toBe(retrievedSpawnedAgent);
     });
   });
 

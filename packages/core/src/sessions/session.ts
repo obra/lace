@@ -735,7 +735,7 @@ export class Session {
   }
 
   getInfo(): SessionInfo | null {
-    const agents = this.getAgents();
+    const agents = this.getAgents(); // Returns Agent[] now
     const sessionData = this.getSessionData();
 
     return {
@@ -743,7 +743,7 @@ export class Session {
       name: sessionData?.name || 'Session ' + this._sessionId,
       description: sessionData?.description,
       createdAt: this.getCoordinatorAgent()?.getThreadCreatedAt() || new Date(),
-      agents,
+      agents: agents.map((agent) => agent.getInfo()), // Transform to AgentInfo[] at API boundary
     };
   }
 
@@ -840,19 +840,19 @@ export class Session {
     return agent;
   }
 
-  getAgents(): AgentInfo[] {
+  getAgents(): Agent[] {
     const agents = [];
 
     // Add the coordinator agent first (if it exists)
     const coordinator = this.getCoordinatorAgent();
     if (coordinator) {
-      agents.push(coordinator.getInfo());
+      agents.push(coordinator);
     }
 
     // Add all other agents
     Array.from(this._agents.entries()).forEach(([threadId, agent]) => {
       if (threadId !== this._sessionId) {
-        agents.push(agent.getInfo());
+        agents.push(agent);
       }
     });
 

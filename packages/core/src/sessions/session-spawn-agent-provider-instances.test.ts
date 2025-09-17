@@ -77,9 +77,10 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       // Agent should inherit session's provider instance configuration
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.providerInstanceId).toBe(providerInstanceId);
-      expect(spawnedAgent?.modelId).toBe('claude-3-5-haiku-20241022');
-      expect(spawnedAgent?.name).toBe('Default Agent');
+      const agentInfo = spawnedAgent?.getInfo();
+      expect(agentInfo?.providerInstanceId).toBe(providerInstanceId);
+      expect(agentInfo?.modelId).toBe('claude-3-5-haiku-20241022');
+      expect(agentInfo?.name).toBe('Default Agent');
     });
 
     it('should spawn agent with explicit provider instance parameters', () => {
@@ -96,8 +97,9 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       // Note: During transition, provider resolution falls back to 'anthropic'
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.modelId).toBe('gpt-4o'); // Model should be preserved
-      expect(spawnedAgent?.name).toBe('OpenAI Agent');
+      const agentInfo = spawnedAgent?.getInfo();
+      expect(agentInfo?.modelId).toBe('gpt-4o'); // Model should be preserved
+      expect(agentInfo?.name).toBe('OpenAI Agent');
     });
 
     it('should spawn agent with custom model on same provider instance', () => {
@@ -112,9 +114,10 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       // Agent should use same provider but different model
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.providerInstanceId).toBe(providerInstanceId);
-      expect(spawnedAgent?.modelId).toBe('claude-3-5-sonnet-20241022');
-      expect(spawnedAgent?.name).toBe('Sonnet Agent');
+      const agentInfo = spawnedAgent?.getInfo();
+      expect(agentInfo?.providerInstanceId).toBe(providerInstanceId);
+      expect(agentInfo?.modelId).toBe('claude-3-5-sonnet-20241022');
+      expect(agentInfo?.name).toBe('Sonnet Agent');
     });
   });
 
@@ -126,8 +129,9 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
 
       // Should inherit from session
-      expect(spawnedAgent?.providerInstanceId).toBe(providerInstanceId);
-      expect(spawnedAgent?.modelId).toBe('claude-3-5-haiku-20241022');
+      const agentInfo = spawnedAgent?.getInfo();
+      expect(agentInfo?.providerInstanceId).toBe(providerInstanceId);
+      expect(agentInfo?.modelId).toBe('claude-3-5-haiku-20241022');
     });
 
     it('should accept explicit provider instance parameters', () => {
@@ -142,8 +146,9 @@ describe('Session.spawnAgent() with Provider Instances', () => {
 
       // Should accept parameters and preserve model
       // Note: Provider resolution currently falls back during transition
-      expect(spawnedAgent?.modelId).toBe('gpt-4o-mini');
-      expect(spawnedAgent?.name).toBe('Override Agent');
+      const agentInfo = spawnedAgent?.getInfo();
+      expect(agentInfo?.modelId).toBe('gpt-4o-mini');
+      expect(agentInfo?.name).toBe('Override Agent');
     });
 
     it('should handle partial provider instance parameters during transition', () => {
@@ -170,7 +175,8 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       expect(agent).toBeDefined();
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.modelId).toBe('claude-3-5-sonnet-20241022');
+      const agentInfo = spawnedAgent?.getInfo();
+      expect(agentInfo?.modelId).toBe('claude-3-5-sonnet-20241022');
     });
   });
 
@@ -192,12 +198,14 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       expect(agents).toHaveLength(3); // Coordinator + 2 spawned agents
 
       const anthropicSpawned = agents.find((a) => a.threadId === anthropicAgent.threadId);
-      expect(anthropicSpawned?.modelId).toBe('claude-3-5-sonnet-20241022');
-      expect(anthropicSpawned?.name).toBe('Anthropic Agent');
+      const anthropicInfo = anthropicSpawned?.getInfo();
+      expect(anthropicInfo?.modelId).toBe('claude-3-5-sonnet-20241022');
+      expect(anthropicInfo?.name).toBe('Anthropic Agent');
 
       const openaiSpawned = agents.find((a) => a.threadId === openaiAgent.threadId);
-      expect(openaiSpawned?.modelId).toBe('gpt-4o');
-      expect(openaiSpawned?.name).toBe('OpenAI Agent');
+      const openaiInfo = openaiSpawned?.getInfo();
+      expect(openaiInfo?.modelId).toBe('gpt-4o');
+      expect(openaiInfo?.name).toBe('OpenAI Agent');
     });
 
     it('should spawn agents with mixed inheritance and explicit configuration', () => {
@@ -212,12 +220,14 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       expect(agents).toHaveLength(3); // Coordinator + 2 spawned agents
 
       const defaultSpawned = agents.find((a) => a.threadId === defaultAgent.threadId);
-      expect(defaultSpawned?.modelId).toBe('claude-3-5-haiku-20241022'); // Inherited from session
-      expect(defaultSpawned?.name).toBe('Default Agent');
+      const defaultInfo = defaultSpawned?.getInfo();
+      expect(defaultInfo?.modelId).toBe('claude-3-5-haiku-20241022'); // Inherited from session
+      expect(defaultInfo?.name).toBe('Default Agent');
 
       const explicitSpawned = agents.find((a) => a.threadId === explicitAgent.threadId);
-      expect(explicitSpawned?.modelId).toBe('gpt-4o-mini'); // Model should be preserved
-      expect(explicitSpawned?.name).toBe('Explicit Agent');
+      const explicitInfo = explicitSpawned?.getInfo();
+      expect(explicitInfo?.modelId).toBe('gpt-4o-mini'); // Model should be preserved
+      expect(explicitInfo?.name).toBe('Explicit Agent');
     });
   });
 
@@ -228,7 +238,8 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
       // Delegates should get thread-based names, not 'Lace'
-      expect(spawnedAgent?.name).toMatch(/^Agent-\d+$/);
+      const agentInfo = spawnedAgent?.getInfo();
+      expect(agentInfo?.name).toMatch(/^Agent-\d+$/);
     });
 
     it('should use thread-based default name for empty string', () => {
@@ -237,7 +248,8 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
       // Delegates should get thread-based names, not 'Lace'
-      expect(spawnedAgent?.name).toMatch(/^Agent-\d+$/);
+      const agentInfo = spawnedAgent?.getInfo();
+      expect(agentInfo?.name).toMatch(/^Agent-\d+$/);
     });
 
     it('should use thread-based default name for whitespace-only string', () => {
@@ -246,7 +258,8 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
       // Delegates should get thread-based names, not 'Lace'
-      expect(spawnedAgent?.name).toMatch(/^Agent-\d+$/);
+      const agentInfo = spawnedAgent?.getInfo();
+      expect(agentInfo?.name).toMatch(/^Agent-\d+$/);
     });
 
     it('should preserve custom agent names', () => {
@@ -254,7 +267,8 @@ describe('Session.spawnAgent() with Provider Instances', () => {
 
       const agents = testSession.getAgents();
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
-      expect(spawnedAgent?.name).toBe('Custom Agent Name');
+      const agentInfo = spawnedAgent?.getInfo();
+      expect(agentInfo?.name).toBe('Custom Agent Name');
     });
   });
 
@@ -282,9 +296,11 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
 
       // Verify models are preserved correctly
-      expect(coordinatorAgent?.modelId).toBe('gpt-4o');
-      expect(spawnedAgent?.modelId).toBe('claude-3-5-haiku-20241022');
-      expect(spawnedAgent?.name).toBe('Cross Provider Agent');
+      const coordinatorInfo = coordinatorAgent?.getInfo();
+      const spawnedInfo = spawnedAgent?.getInfo();
+      expect(coordinatorInfo?.modelId).toBe('gpt-4o');
+      expect(spawnedInfo?.modelId).toBe('claude-3-5-haiku-20241022');
+      expect(spawnedInfo?.name).toBe('Cross Provider Agent');
 
       openaiSession.destroy();
     });

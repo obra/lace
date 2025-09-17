@@ -428,7 +428,7 @@ describe('Agent Spawning API E2E Tests', () => {
       const agents = session!.getAgents();
       const createdAgent = agents.find((a) => a.threadId === agentThreadId);
       expect(createdAgent).toBeDefined();
-      expect(createdAgent!.name).toBe('integration-agent');
+      expect(createdAgent!.getInfo().name).toBe('integration-agent');
 
       // Verify via API as well
       const listRequest = new Request(`http://localhost/api/sessions/${sessionId}/agents`, {

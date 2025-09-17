@@ -56,9 +56,10 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Get agents from Session instance
+    // Get agents from Session instance and transform to DTOs for API response
     const agents = session.getAgents();
-    return createSuperjsonResponse(agents);
+    const agentInfos = agents.map((agent) => agent.getInfo());
+    return createSuperjsonResponse(agentInfos);
   } catch (_error: unknown) {
     return createErrorResponse('Internal server error', 500, { code: 'INTERNAL_SERVER_ERROR' });
   }
