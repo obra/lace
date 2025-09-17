@@ -6,7 +6,6 @@ import { ThreadId, asThreadId } from '~/threads/types';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { ToolExecutor } from '~/tools/executor';
-import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { TaskManager, AgentCreationCallback } from '~/tasks/task-manager';
 import { Task } from '~/tasks/types';
 import { getPersistence, SessionData } from '~/persistence/database';
@@ -812,13 +811,7 @@ export class Session {
       },
     });
 
-    // Set up approval callback for spawned agent (each agent gets its own callback)
-    const coordinatorAgent = this.getCoordinatorAgent();
-    if (coordinatorAgent?.toolExecutor.getApprovalCallback()) {
-      // Create a new EventApprovalCallback instance for this agent (fixes shared callback bug)
-      const approvalCallback = new EventApprovalCallback(agent);
-      agent.toolExecutor.setApprovalCallback(approvalCallback);
-    }
+    // No approval callback setup needed - Agent owns approval flow
 
     this._agents.set(agent.threadId, agent);
 
