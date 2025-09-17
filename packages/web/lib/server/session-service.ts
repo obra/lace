@@ -27,7 +27,10 @@ export class SessionService {
       for (const agentInfo of agents) {
         const agent = session.getAgent(agentInfo.threadId);
         if (agent) {
-          setupAgentApprovals(agent, sessionId);
+          // Only set up approval callback if agent doesn't already have one
+          if (!agent.toolExecutor.getApprovalCallback()) {
+            setupAgentApprovals(agent, sessionId);
+          }
           await this.setupAgentEventHandlers(agent);
         }
       }
