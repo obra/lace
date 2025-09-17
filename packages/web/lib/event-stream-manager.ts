@@ -495,19 +495,19 @@ export class EventStreamManager {
     const chunk = this.encoder.encode(eventData);
 
     // Trace logging for individual sends
-    logger.debug('[EVENT_STREAM] Sending event to connection', {
-      connectionId: connection.id,
-      eventId: event.id,
-      eventType: event.type,
-      payloadSize: chunk.length,
-      connectedAt: connection.connectedAt,
-      subscription: {
-        projects: connection.subscription.projects?.length || 0,
-        sessions: connection.subscription.sessions?.length || 0,
-        threads: connection.subscription.threads?.length || 0,
-        global: connection.subscription.global,
-      },
-    });
+    //logger.debug('[EVENT_STREAM] Sending event to connection', {
+    //  connectionId: connection.id,
+    //  eventId: event.id,
+    //  eventType: event.type,
+    //  payloadSize: chunk.length,
+    //  connectedAt: connection.connectedAt,
+    //  subscription: {
+    //    projects: connection.subscription.projects?.length || 0,
+    //    sessions: connection.subscription.sessions?.length || 0,
+    //    threads: connection.subscription.threads?.length || 0,
+    //    global: connection.subscription.global,
+    //  },
+    //});
 
     try {
       connection.controller.enqueue(chunk);
