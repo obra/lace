@@ -2,7 +2,7 @@
 // ABOUTME: Inherits tool policies and approval workflow from parent session
 
 import { BaseHelper } from '~/helpers/base-helper';
-import { GlobalConfigManager } from '~/config/global-config';
+import { UserSettingsManager } from '~/config/user-settings';
 import { ProviderRegistry } from '~/providers/registry';
 import { parseProviderModel } from '~/providers/provider-utils';
 import { ToolExecutor } from '~/tools/executor';
@@ -50,11 +50,11 @@ export class SessionHelper extends BaseHelper {
     }
 
     try {
-      // Try global config first
-      const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
+      // Try user settings first
+      const providerModel = UserSettingsManager.getDefaultModel(this.options.model);
       const { instanceId, modelId } = parseProviderModel(providerModel);
 
-      logger.debug('SessionHelper creating provider from global config', {
+      logger.debug('SessionHelper creating provider from user settings', {
         tier: this.options.model,
         instanceId,
         modelId,
@@ -67,17 +67,17 @@ export class SessionHelper extends BaseHelper {
         this.provider = instance;
         return instance;
       }
-    } catch (_globalConfigError) {
-      logger.debug('SessionHelper global config failed, falling back to parent provider', {
+    } catch (_settingsError) {
+      logger.debug('SessionHelper user settings failed, falling back to parent provider', {
         tier: this.options.model,
       });
     }
 
-    // Fallback: Use parent agent's provider when global config unavailable
+    // Fallback: Use parent agent's provider when user settings unavailable
     const parentProvider = await this.options.parentAgent.getProvider();
     if (!parentProvider) {
       throw new Error(
-        'No provider available: global config failed and parent agent has no provider'
+        'No provider available: user settings failed and parent agent has no provider'
       );
     }
 
@@ -124,7 +124,7 @@ export class SessionHelper extends BaseHelper {
     try {
       // Try to get model from global config first
       if (!this.cachedModelId) {
-        const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
+        const providerModel = UserSettingsManager.getDefaultModel(this.options.model);
         this.cachedModelId = parseProviderModel(providerModel).modelId;
       }
       return this.cachedModelId;

@@ -2,7 +2,7 @@
 // ABOUTME: Validates tool blocking, bypass approval, custom working directory, and graceful error handling
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { InfrastructureHelper } from './infrastructure-helper';
-import { GlobalConfigManager } from '~/config/global-config';
+import { UserSettingsManager } from '~/config/user-settings';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
@@ -11,7 +11,7 @@ import type { ProviderMessage, ProviderResponse } from '~/providers/base-provide
 import { z } from 'zod';
 
 // Mock modules
-vi.mock('~/config/global-config');
+vi.mock('~/config/user-settings');
 vi.mock('~/providers/instance/manager');
 
 // Create a mock provider that supports multiple queued responses
@@ -79,7 +79,7 @@ describe('InfrastructureHelper', () => {
     toolExecutor.registerTool(unapprovedTool.name, unapprovedTool);
 
     // Mock global config
-    vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue('test-instance:test-model');
+    vi.mocked(UserSettingsManager.getDefaultModel).mockReturnValue('test-instance:test-model');
 
     // Setup mock provider
     mockProvider = new QueuedMockProvider({});
@@ -253,7 +253,7 @@ describe('InfrastructureHelper', () => {
 
     it('should resolve fast vs smart models correctly', async () => {
       // Test fast model
-      vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValueOnce(
+      vi.mocked(UserSettingsManager.getDefaultModel).mockReturnValueOnce(
         'fast-instance:fast-model'
       );
 
@@ -264,10 +264,10 @@ describe('InfrastructureHelper', () => {
 
       const fastModel = fastHelper['getModel']();
       expect(fastModel).toBe('fast-model');
-      expect(GlobalConfigManager.getDefaultModel).toHaveBeenCalledWith('fast');
+      expect(UserSettingsManager.getDefaultModel).toHaveBeenCalledWith('fast');
 
       // Test smart model
-      vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValueOnce(
+      vi.mocked(UserSettingsManager.getDefaultModel).mockReturnValueOnce(
         'smart-instance:smart-model'
       );
 
@@ -278,7 +278,7 @@ describe('InfrastructureHelper', () => {
 
       const smartModel = smartHelper['getModel']();
       expect(smartModel).toBe('smart-model');
-      expect(GlobalConfigManager.getDefaultModel).toHaveBeenCalledWith('smart');
+      expect(UserSettingsManager.getDefaultModel).toHaveBeenCalledWith('smart');
     });
 
     it('should handle abort signal during execution', async () => {
@@ -352,7 +352,7 @@ describe('InfrastructureHelper', () => {
 
     it('should use fallback provider when global config unavailable', async () => {
       // Mock global config to throw error
-      vi.mocked(GlobalConfigManager.getDefaultModel).mockImplementation(() => {
+      vi.mocked(UserSettingsManager.getDefaultModel).mockImplementation(() => {
         throw new Error('Global config not found');
       });
 
@@ -376,7 +376,7 @@ describe('InfrastructureHelper', () => {
 
     it('should fail when neither global config nor fallback available', async () => {
       // Mock global config to throw error
-      vi.mocked(GlobalConfigManager.getDefaultModel).mockImplementation(() => {
+      vi.mocked(UserSettingsManager.getDefaultModel).mockImplementation(() => {
         throw new Error('Global config not found');
       });
 

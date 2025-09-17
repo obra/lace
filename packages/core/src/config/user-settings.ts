@@ -146,4 +146,49 @@ export class UserSettingsManager {
   static exists(): boolean {
     return fs.existsSync(this.getFilePath());
   }
+
+  /**
+   * Get the default model configuration for a given tier
+   * @param tier - Either 'fast' or 'smart'
+   * @returns The provider:model string for the requested tier
+   * @throws Error if tier is not configured
+   */
+  static getDefaultModel(tier: 'fast' | 'smart'): string {
+    const settings = this.load();
+    const defaultModels = settings.defaultModels as Record<string, unknown> | undefined;
+
+    if (!defaultModels) {
+      throw new Error(
+        `Settings are missing 'defaultModels' section. ` +
+          `Please configure default models in the settings.`
+      );
+    }
+
+    const model = defaultModels[tier];
+
+    if (!model || typeof model !== 'string') {
+      throw new Error(
+        `No default model configured for '${tier}'. ` +
+          `Please configure a '${tier}' model in the settings.`
+      );
+    }
+
+    return model;
+  }
+
+  /**
+   * Update the default models configuration
+   * @param models - Object with optional fast and smart model settings
+   */
+  static updateDefaultModels(models: { fast?: string; smart?: string }): void {
+    const settings = this.load();
+    const currentDefaultModels = (settings.defaultModels as Record<string, unknown>) || {};
+
+    settings.defaultModels = {
+      ...currentDefaultModels,
+      ...models,
+    };
+
+    this.save(settings);
+  }
 }

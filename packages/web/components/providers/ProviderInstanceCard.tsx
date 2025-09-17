@@ -222,11 +222,15 @@ export function ProviderInstanceCard({
     try {
       await providerService.updateModelConfig(instance.id, modelConfig);
       // Configuration saved successfully (no toast needed - auto-save)
+      // Trigger reload of instances to update availableProviders
+      if (onEdit) {
+        onEdit();
+      }
     } catch (error) {
       console.error('Error saving configuration:', error);
       // Could add error feedback here if needed
     }
-  }, [instance.id, modelConfig]);
+  }, [instance.id, modelConfig, onEdit]);
 
   // Track if this is the initial load to prevent saving on mount
   const [hasInitialized, setHasInitialized] = useState(false);
