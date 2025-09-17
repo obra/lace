@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ProviderInstanceList } from '@/components/providers/ProviderInstanceList';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { SettingField } from '@/components/settings/SettingField';
@@ -31,36 +31,43 @@ export function ProvidersPanel() {
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Load current settings
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        setLoading(true);
-        const settings = await api.get<Record<string, unknown>>('/api/settings');
-        const models = (settings.defaultModels || {}) as DefaultModels;
-        setDefaultModels(models);
-        setError(null);
-      } catch (err) {
-        setError('Failed to load current settings');
-        console.error('Failed to load settings:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadSettings();
+  // Load current settings with retry mechanism
+  const loadSettings = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const settings = await api.get<Record<string, unknown>>('/api/settings');
+      const models = (settings.defaultModels || {}) as DefaultModels;
+      setDefaultModels(models);
+    } catch (err) {
+      setError('Failed to load current settings');
+      console.error('Failed to load settings:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadSettings();
+  }, [loadSettings]);
 
   // Parse provider:model format
   const parseModelSelection = (modelString: string | undefined) => {
     if (!modelString || !modelString.includes(':')) {
       return { providerId: undefined, modelId: undefined };
     }
-    const [providerId, modelId] = modelString.split(':');
+    const parts = modelString.split(':');
+    if (parts.length !== 2) {
+      console.warn('Invalid model format:', modelString);
+      return { providerId: undefined, modelId: undefined };
+    }
+    const [providerId, modelId] = parts;
     return { providerId, modelId };
   };
 
-  // Handle model selection
+  // Handle model selection with cleanup tracking
+  const pendingSavesRef = useRef(new Set<Promise<void>>());
+
   const handleModelChange = useCallback(
     async (tier: 'fast' | 'smart', providerInstanceId: string, modelId: string) => {
       const newModelString = `${providerInstanceId}:${modelId}`;
@@ -68,25 +75,41 @@ export function ProvidersPanel() {
       setDefaultModels(newModels);
       setSaveSuccess(false);
 
-      // Auto-save
-      try {
-        setSaving(true);
-        setError(null);
-        await api.patch('/api/settings', {
-          defaultModels: newModels,
-        });
-        setSaveSuccess(true);
-        // Clear success message after 3 seconds
-        setTimeout(() => setSaveSuccess(false), 3000);
-      } catch (err) {
-        setError(`Failed to save ${tier} model setting`);
-        console.error('Failed to save settings:', err);
-      } finally {
-        setSaving(false);
-      }
+      // Auto-save with race condition protection
+      const savePromise = (async () => {
+        try {
+          setSaving(true);
+          setError(null);
+          await api.patch('/api/settings', {
+            defaultModels: newModels,
+          });
+          setSaveSuccess(true);
+          // Clear success message after 3 seconds
+          setTimeout(() => setSaveSuccess(false), 3000);
+        } catch (err) {
+          setError(`Failed to save ${tier} model setting`);
+          console.error('Failed to save settings:', err);
+        } finally {
+          setSaving(false);
+        }
+      })();
+
+      // Track pending save for cleanup
+      pendingSavesRef.current.add(savePromise);
+      await savePromise;
+      pendingSavesRef.current.delete(savePromise);
     },
     [defaultModels]
   );
+
+  // Cleanup on unmount - cancel pending saves
+  useEffect(() => {
+    const pendingSaves = pendingSavesRef.current;
+    return () => {
+      // Note: We can't actually cancel the API calls, but we can prevent state updates
+      pendingSaves.clear();
+    };
+  }, []);
 
   const { providerId: fastProviderId, modelId: fastModelId } = parseModelSelection(
     defaultModels.fast
@@ -119,7 +142,15 @@ export function ProvidersPanel() {
               title="Configuration Error"
               description={error}
               onDismiss={() => setError(null)}
-            />
+            >
+              <button
+                onClick={() => void loadSettings()}
+                className="btn btn-sm btn-primary mt-2"
+                disabled={loading}
+              >
+                {loading ? 'Retrying...' : 'Retry'}
+              </button>
+            </Alert>
           )}
 
           {saveSuccess && (

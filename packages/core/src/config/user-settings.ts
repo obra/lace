@@ -155,15 +155,16 @@ export class UserSettingsManager {
    */
   static getDefaultModel(tier: 'fast' | 'smart'): string {
     const settings = this.load();
-    const defaultModels = settings.defaultModels as Record<string, unknown> | undefined;
 
-    if (!defaultModels) {
+    // Type-safe access to defaultModels
+    if (!settings.defaultModels || typeof settings.defaultModels !== 'object') {
       throw new Error(
         `Settings are missing 'defaultModels' section. ` +
           `Please configure default models in the settings.`
       );
     }
 
+    const defaultModels = settings.defaultModels as Record<string, unknown>;
     const model = defaultModels[tier];
 
     if (!model || typeof model !== 'string') {
