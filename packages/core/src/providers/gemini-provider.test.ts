@@ -2,8 +2,8 @@
 // ABOUTME: Tests configuration, format conversion, responses, streaming, and error handling
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { GeminiProvider } from './gemini-provider';
-import { ProviderMessage } from './base-provider';
+import { GeminiProvider } from '~/providers/gemini-provider';
+import { ProviderMessage } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 
 // Mock the Google GenAI SDK
@@ -29,7 +29,7 @@ describe('GeminiProvider', () => {
 
   describe('Configuration', () => {
     it('should require API key for client creation', async () => {
-      const provider = new GeminiProvider({ apiKey: null });
+      const provider = new GeminiProvider({ apiKey: '' });
       await expect(provider.createResponse([], [], 'test')).rejects.toThrow();
     });
 

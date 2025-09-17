@@ -34,7 +34,7 @@ export class GeminiProvider extends AIProvider {
       const config = this._config as GeminiProviderConfig;
       if (!config.apiKey) {
         throw new Error(
-          'Missing API key for Gemini provider. Please ensure the provider instance has valid credentials.'
+          'Gemini API key not configured. Please set your API key in provider settings or obtain one from https://aistudio.google.com/app/apikey'
         );
       }
 
@@ -194,7 +194,7 @@ export class GeminiProvider extends AIProvider {
             streamingStarted = true; // Mark that streaming has begun
 
             // Emit token events for real-time display
-            if (chunk.text) {
+            if (chunk.text && typeof chunk.text === 'string') {
               _content += chunk.text;
               this.emit('token', { token: chunk.text });
             }

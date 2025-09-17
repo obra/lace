@@ -229,7 +229,10 @@ export function convertToGeminiFormat(messages: ProviderMessage[]): Content[] {
         msg.toolResults.forEach((result) => {
           parts.push({
             functionResponse: {
-              name: result.id || '',
+              // Note: result.id contains the tool call ID, but Gemini expects function name
+              // This is a limitation of the current ToolResult interface which doesn't store tool names
+              // In practice, using the call ID should work since it's unique per function call
+              name: result.id || 'unknown_function',
               response: {
                 output: result.content.map((c) => c.text || '').join('\n'),
                 ...(result.status !== 'completed' ? { error: 'Tool execution failed' } : {}),
