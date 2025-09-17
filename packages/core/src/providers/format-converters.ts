@@ -4,6 +4,7 @@
 import { ProviderMessage } from '~/providers/base-provider';
 import { ToolCall } from '~/tools/types';
 import Anthropic from '@anthropic-ai/sdk';
+import type { Content, Part } from '@google/genai';
 
 /**
  * Converts enhanced ProviderMessage format to Anthropic's content blocks format
@@ -195,4 +196,71 @@ export function convertToTextOnlyFormat(messages: ProviderMessage[]): ProviderMe
       };
     }
   });
+}
+
+/**
+ * Converts enhanced ProviderMessage format to Gemini Content/Part format
+ */
+export function convertToGeminiFormat(messages: ProviderMessage[]): Content[] {
+  return messages
+    .filter((msg) => msg.role !== 'system') // System handled separately in Gemini
+    .map((msg): Content => {
+      const parts: Part[] = [];
+
+      // Add text content if present
+      if (msg.content && msg.content.trim()) {
+        parts.push({ text: msg.content });
+      }
+
+      if (msg.role === 'assistant' && msg.toolCalls) {
+        // Add function calls
+        msg.toolCalls.forEach((toolCall) => {
+          parts.push({
+            functionCall: {
+              name: toolCall.name,
+              args: toolCall.arguments,
+            },
+          });
+        });
+      }
+
+      if (msg.role === 'user' && msg.toolResults) {
+        // Add function responses
+        msg.toolResults.forEach((result) => {
+          // Decode tool name and call ID from Gemini-encoded tool call ID
+          const toolCallId = result.id || '';
+          let toolName = 'unknown_function';
+          let correlationId = toolCallId;
+
+          // Extract tool name from encoded ID format: gemini_{toolName}_{timestamp}_{random}
+          if (toolCallId.startsWith('gemini_')) {
+            // Find the last two underscores (timestamp and random parts)
+            const lastUnderscoreIndex = toolCallId.lastIndexOf('_');
+            const secondLastUnderscoreIndex = toolCallId.lastIndexOf('_', lastUnderscoreIndex - 1);
+
+            if (secondLastUnderscoreIndex > 6) {
+              // "gemini_".length = 7, so index > 6 means there's a tool name
+              toolName = toolCallId.substring(7, secondLastUnderscoreIndex); // Extract between "gemini_" and second-last "_"
+              correlationId = toolCallId; // Use full ID for correlation
+            }
+          }
+
+          parts.push({
+            functionResponse: {
+              name: toolName, // Function name for Gemini API
+              id: correlationId, // Tool call ID for correlation
+              response: {
+                output: result.content.map((c) => c.text || '').join('\n'),
+                ...(result.status !== 'completed' ? { error: 'Tool execution failed' } : {}),
+              },
+            },
+          });
+        });
+      }
+
+      return {
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts,
+      };
+    });
 }

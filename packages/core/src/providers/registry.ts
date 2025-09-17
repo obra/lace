@@ -6,6 +6,7 @@ import { AnthropicProvider } from '~/providers/anthropic-provider';
 import { OpenAIProvider } from '~/providers/openai-provider';
 import { LMStudioProvider } from '~/providers/lmstudio-provider';
 import { OllamaProvider } from '~/providers/ollama-provider';
+import { GeminiProvider } from '~/providers/gemini-provider';
 import { ProviderCatalogManager } from '~/providers/catalog/manager';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import type { CatalogProvider, CatalogModel, ModelConfig } from '~/providers/catalog/types';
@@ -272,7 +273,7 @@ export class ProviderRegistry {
     models: ModelInfo[];
     configured: boolean;
   }> {
-    const providers = ['anthropic', 'openai', 'lmstudio', 'ollama'];
+    const providers = ['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama'];
     const results = [];
 
     for (const providerName of providers) {
@@ -323,6 +324,13 @@ export class ProviderRegistry {
             ...(catalogProvider ? { catalogProvider } : {}),
           });
         }
+        case 'gemini': {
+          // Metadata-only instance (no API calls); include catalog for models
+          return new GeminiProvider({
+            apiKey: null,
+            ...(catalogProvider ? { catalogProvider } : {}),
+          });
+        }
         case 'lmstudio': {
           return new LMStudioProvider({ baseURL: 'http://localhost:1234' });
         }
@@ -365,6 +373,15 @@ export class ProviderRegistry {
           hasApiKey: !!config.apiKey,
         });
         return new OpenAIProvider({
+          ...config,
+          apiKey: typeof config.apiKey === 'string' ? config.apiKey : null,
+        });
+      }
+      case 'gemini': {
+        logger.debug('Creating GeminiProvider', {
+          hasApiKey: !!config.apiKey,
+        });
+        return new GeminiProvider({
           ...config,
           apiKey: typeof config.apiKey === 'string' ? config.apiKey : null,
         });
