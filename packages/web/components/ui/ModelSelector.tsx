@@ -41,16 +41,27 @@ export function ModelSelector({
     if (!value) return;
 
     const parts = value.split('|');
-    if (parts.length === 2) {
-      try {
-        const providerInstanceId = decodeURIComponent(parts[0]);
-        const modelId = decodeURIComponent(parts[1]);
-        if (providerInstanceId && modelId) {
-          onChange(providerInstanceId, modelId);
-        }
-      } catch (error) {
-        console.error('Failed to decode model selector value:', error);
+    if (parts.length !== 2) {
+      console.error('Invalid model selector format:', value);
+      return;
+    }
+
+    try {
+      const [providerPart, modelPart] = parts;
+      const providerInstanceId = decodeURIComponent(providerPart);
+      const modelId = decodeURIComponent(modelPart);
+
+      if (!providerInstanceId || !modelId) {
+        console.error('Empty provider or model ID after decoding:', {
+          providerInstanceId,
+          modelId,
+        });
+        return;
       }
+
+      onChange(providerInstanceId, modelId);
+    } catch (error) {
+      console.error('Failed to decode model selector value:', error);
     }
   };
 

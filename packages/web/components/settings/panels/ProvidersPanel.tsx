@@ -40,7 +40,16 @@ export function ProvidersPanel() {
       const models = (settings.defaultModels || {}) as DefaultModels;
       setDefaultModels(models);
     } catch (err) {
-      setError('Failed to load current settings');
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (errorMessage.includes('fetch')) {
+        setError(
+          'Unable to connect to settings server. Please check your connection and try again.'
+        );
+      } else if (errorMessage.includes('401') || errorMessage.includes('403')) {
+        setError('Access denied. Please check your authentication and try again.');
+      } else {
+        setError(`Failed to load settings: ${errorMessage}`);
+      }
       console.error('Failed to load settings:', err);
     } finally {
       setLoading(false);
@@ -51,8 +60,8 @@ export function ProvidersPanel() {
     void loadSettings();
   }, [loadSettings]);
 
-  // Parse provider:model format
-  const parseModelSelection = (modelString: string | undefined) => {
+  // Parse provider:model format (memoized for performance)
+  const parseModelSelection = useCallback((modelString: string | undefined) => {
     if (!modelString || !modelString.includes(':')) {
       return { providerId: undefined, modelId: undefined };
     }
@@ -63,7 +72,7 @@ export function ProvidersPanel() {
     }
     const [providerId, modelId] = parts;
     return { providerId, modelId };
-  };
+  }, []);
 
   // Handle model selection with cleanup tracking
   const pendingSavesRef = useRef(new Set<Promise<void>>());
@@ -87,7 +96,16 @@ export function ProvidersPanel() {
           // Clear success message after 3 seconds
           setTimeout(() => setSaveSuccess(false), 3000);
         } catch (err) {
-          setError(`Failed to save ${tier} model setting`);
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          if (errorMessage.includes('fetch')) {
+            setError(`Unable to save ${tier} model. Please check your connection and try again.`);
+          } else if (errorMessage.includes('400')) {
+            setError(
+              `Invalid ${tier} model configuration. Please verify the selected model is valid.`
+            );
+          } else {
+            setError(`Failed to save ${tier} model: ${errorMessage}`);
+          }
           console.error('Failed to save settings:', err);
         } finally {
           setSaving(false);
@@ -96,8 +114,11 @@ export function ProvidersPanel() {
 
       // Track pending save for cleanup
       pendingSavesRef.current.add(savePromise);
-      await savePromise;
-      pendingSavesRef.current.delete(savePromise);
+      try {
+        await savePromise;
+      } finally {
+        pendingSavesRef.current.delete(savePromise);
+      }
     },
     [defaultModels]
   );
