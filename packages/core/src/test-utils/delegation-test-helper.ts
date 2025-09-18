@@ -236,6 +236,15 @@ export async function createDelegationTestSetup(options?: {
         bash: 'allow',
         file_read: 'allow',
         file_write: 'allow',
+        file_edit: 'allow',
+        file_list: 'allow',
+        // Task management tools needed by delegate agents
+        task_add: 'allow',
+        task_complete: 'allow',
+        task_update: 'allow',
+        task_add_note: 'allow',
+        task_view: 'allow',
+        task_list: 'allow',
       },
     },
   });
