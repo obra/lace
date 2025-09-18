@@ -5,6 +5,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createRemixStub } from '@remix-run/testing';
 import { loader } from '../api.sessions.$sessionId.approvals.pending';
 import { getSessionService } from '@/lib/server/session-service';
+import { parseResponse } from '@/lib/serialization';
+import { createLoaderArgs } from '@/test-utils/route-test-helpers';
 import type { Session } from '@lace/core/sessions/session';
 import type { Agent } from '@lace/core/agents/agent';
 import { asThreadId } from '@/types/core';
@@ -181,7 +183,7 @@ describe('/api/sessions/:sessionId/approvals/pending', () => {
   });
 
   it('should return 404 when session not found', async () => {
-    const sessionId = 'lace_20250916_notfound';
+    const sessionId = 'lace_20250916_nofind'; // Valid format but non-existent
 
     const mockSessionService = {
       getSession: vi.fn().mockResolvedValue(null),
@@ -189,15 +191,11 @@ describe('/api/sessions/:sessionId/approvals/pending', () => {
     mockGetSessionService.mockReturnValue(mockSessionService as any);
 
     const request = new Request(`http://localhost/api/sessions/${sessionId}/approvals/pending`);
-    const response = await loader({
-      request,
-      params: { sessionId },
-      context: {},
-    } as any);
+    const response = await loader(createLoaderArgs(request, { sessionId }));
+    const data = await parseResponse(response);
 
     expect(response.status).toBe(404);
-    const data = await response.json();
-    expect(data.error.code).toBe('RESOURCE_NOT_FOUND');
+    expect(data.code).toBe('RESOURCE_NOT_FOUND');
   });
 
   it('should handle errors from individual agents gracefully', async () => {
