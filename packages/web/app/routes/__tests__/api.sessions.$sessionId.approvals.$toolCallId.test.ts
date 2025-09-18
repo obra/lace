@@ -129,7 +129,7 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
   });
 
   it('should return 404 when session not found', async () => {
-    const sessionId = 'lace_20250916_notfound';
+    const sessionId = 'lace_20250916_nofind'; // Valid format but non-existent
     const toolCallId = 'tool-call-1';
 
     const mockSessionService = {
