@@ -1,7 +1,7 @@
 // ABOUTME: Simplified callback-free tool execution engine
 // ABOUTME: Handles tool registration and execution - Agent owns approval flow
 
-import { ToolResult, ToolContext, ToolCall, createErrorResult } from '~/tools/types';
+import { ToolResult, ToolContext, ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { mkdirSync } from 'fs';
@@ -261,41 +261,37 @@ export class ToolExecutor {
     if (!tool) {
       throw new Error(`Tool '${toolCall.name}' not found`);
     }
-    try {
-      // Create enhanced context with environment and temp directory
-      let toolContext: ToolContext = context || {};
+    // Create enhanced context with environment and temp directory
+    let toolContext: ToolContext = context || {};
 
-      // Merge project environment variables if agent is available
-      if (context?.agent) {
-        const session = await context.agent.getFullSession();
-        const projectId = session?.getProjectId();
+    // Merge project environment variables if agent is available
+    if (context?.agent) {
+      const session = await context.agent.getFullSession();
+      const projectId = session?.getProjectId();
 
-        // Create merged environment for subprocess execution
-        if (projectId) {
-          const projectEnv = this.envManager.getMergedEnvironment(projectId);
-          toolContext.processEnv = { ...process.env, ...projectEnv };
-        }
-
-        // Use the LLM-provided tool call ID and create temp directory
-        const toolTempDir = await this.createToolTempDirectory(toolCall.id, context);
-
-        // Enhanced context with temp directory information
-        toolContext = {
-          ...toolContext,
-          toolTempDir,
-        };
+      // Create merged environment for subprocess execution
+      if (projectId) {
+        const projectEnv = this.envManager.getMergedEnvironment(projectId);
+        toolContext.processEnv = { ...process.env, ...projectEnv };
       }
 
-      const result = await tool.execute(toolCall.arguments, toolContext);
+      // Use the LLM-provided tool call ID and create temp directory
+      const toolTempDir = await this.createToolTempDirectory(toolCall.id, context);
 
-      // Ensure the result has the call ID if it wasn't set by the tool
-      if (!result.id && toolCall.id) {
-        result.id = toolCall.id;
-      }
-      return result;
-    } catch (error) {
-      throw error;
+      // Enhanced context with temp directory information
+      toolContext = {
+        ...toolContext,
+        toolTempDir,
+      };
     }
+
+    const result = await tool.execute(toolCall.arguments, toolContext);
+
+    // Ensure the result has the call ID if it wasn't set by the tool
+    if (!result.id && toolCall.id) {
+      result.id = toolCall.id;
+    }
+    return result;
   }
 
   /**

@@ -1192,17 +1192,16 @@ Use your task_add_note tool to record important notes as you work and your task_
   private async refreshMCPToolsInExecutors(): Promise<void> {
     // Update MCP tools in all agents' ToolExecutors
     // Only register for fully initialized agents to avoid timing issues
-    const refreshPromises = [];
     for (const agent of this._agents.values()) {
       if (agent.isRunning) {
         // Only update initialized agents
         const toolExecutor = agent.toolExecutor;
         if (toolExecutor?.registerMCPTools) {
-          refreshPromises.push(toolExecutor.registerMCPTools(this._mcpServerManager));
+          // registerMCPTools is synchronous - just call it
+          toolExecutor.registerMCPTools(this._mcpServerManager);
         }
       }
     }
-    await Promise.all(refreshPromises);
   }
 
   /**
