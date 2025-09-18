@@ -32,7 +32,7 @@ describe('Task Agent Spawning with Personas', () => {
   });
 
   it('spawns agent with correct persona from NewAgentSpec', async () => {
-    const agentSpec = createNewAgentSpec('coding-agent', 'anthropic', 'claude-3-sonnet');
+    const agentSpec = createNewAgentSpec('coder', 'anthropic', 'claude-3-sonnet');
 
     const _taskId = await taskManager.createTask(
       {
@@ -45,7 +45,7 @@ describe('Task Agent Spawning with Personas', () => {
 
     // Verify agent creator was called with correct persona
     expect(mockAgentCreator).toHaveBeenCalledWith(
-      'coding-agent',
+      'coder',
       'anthropic',
       'claude-3-sonnet',
       expect.objectContaining({
@@ -55,8 +55,8 @@ describe('Task Agent Spawning with Personas', () => {
     );
   });
 
-  it('spawns agent with helper-agent persona', async () => {
-    const agentSpec = createNewAgentSpec('helper-agent', 'openai', 'gpt-4');
+  it('spawns agent with _helper-agent persona', async () => {
+    const agentSpec = createNewAgentSpec('_helper-agent', 'openai', 'gpt-4');
 
     await taskManager.createTask(
       {
@@ -67,9 +67,9 @@ describe('Task Agent Spawning with Personas', () => {
       context
     );
 
-    // Verify helper-agent persona was passed
+    // Verify _helper-agent persona was passed
     expect(mockAgentCreator).toHaveBeenCalledWith(
-      'helper-agent',
+      '_helper-agent',
       'openai',
       'gpt-4',
       expect.objectContaining({
@@ -124,8 +124,8 @@ describe('Task Agent Spawning with Personas', () => {
   it('handles different persona types correctly', async () => {
     const testCases = [
       { persona: 'lace', provider: 'anthropic', model: 'claude-3-sonnet' },
-      { persona: 'coding-agent', provider: 'openai', model: 'gpt-4' },
-      { persona: 'helper-agent', provider: 'ollama', model: 'llama2' },
+      { persona: 'coder', provider: 'openai', model: 'gpt-4' },
+      { persona: '_helper-agent', provider: 'ollama', model: 'llama2' },
       { persona: 'data-analyst', provider: 'anthropic', model: 'claude-3-haiku' },
     ];
 
@@ -151,7 +151,7 @@ describe('Task Agent Spawning with Personas', () => {
     const eventListener = vi.fn();
     taskManager.on('agent:spawned', eventListener);
 
-    const agentSpec = createNewAgentSpec('coding-agent', 'anthropic', 'claude-3-sonnet');
+    const agentSpec = createNewAgentSpec('coder', 'anthropic', 'claude-3-sonnet');
 
     await taskManager.createTask(
       {
