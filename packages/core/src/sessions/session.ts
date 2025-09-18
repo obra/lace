@@ -28,7 +28,7 @@ import { FileFindTool } from '~/tools/implementations/file-find';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url-fetch';
 import { logger } from '~/utils/logger';
-import type { ApprovalCallback, ToolPolicy } from '~/tools/types';
+import type { ToolPolicy } from '~/tools/types';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { getEnvVar } from '~/config/env-loader';
 import { MCPServerManager } from '~/mcp/server-manager';
@@ -75,7 +75,6 @@ export class Session {
     name?: string;
     description?: string;
     projectId: string;
-    approvalCallback?: ApprovalCallback;
     configuration?: Record<string, unknown>;
   }): Session {
     const name = options.name || Session.generateSessionName();
@@ -233,11 +232,7 @@ export class Session {
     // Set up agent creation callback for task-based agent spawning
     session.setupAgentCreationCallback();
 
-    // Set up coordinator agent with approval callback if provided
-    const coordinatorAgent = session.getCoordinatorAgent();
-    if (coordinatorAgent && options.approvalCallback) {
-      coordinatorAgent.toolExecutor.setApprovalCallback(options.approvalCallback);
-    }
+    // Agent owns approval flow - no callback setup needed
 
     // Register session in registry after creation is complete
     Session._sessionRegistry.set(asThreadId(sessionData.id), session);
