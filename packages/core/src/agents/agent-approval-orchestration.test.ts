@@ -23,7 +23,7 @@ describe('Agent Approval Orchestration', () => {
   let toolExecutor: ToolExecutor;
 
   beforeEach(() => {
-    const persistence = new DatabasePersistence(':memory:');
+    const _persistence = new DatabasePersistence(':memory:');
     threadManager = new ThreadManager();
     toolExecutor = new ToolExecutor();
 

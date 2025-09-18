@@ -4,7 +4,7 @@
 import { EventEmitter } from 'events';
 import { resolve } from 'path';
 import { AIProvider, ProviderMessage } from '~/providers/base-provider';
-import { ToolCall, ToolResult, ToolContext } from '~/tools/types';
+import { ToolCall, ToolResult } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ApprovalDecision, ToolPolicy } from '~/tools/types';
@@ -1476,8 +1476,8 @@ export class Agent extends EventEmitter {
           }
         }
       } else if (permission === 'approval_required') {
-        // Start approval flow - don't decrement pending count yet
-        void this._handleToolApprovalFlow(toolCall, toolContext);
+        // Request approval - don't decrement pending count yet
+        this._requestToolApproval(toolCall);
         return;
       } else {
         // Permission was denied - create denied result
@@ -2750,10 +2750,10 @@ export class Agent extends EventEmitter {
   }
 
   /**
-   * Handle the complete approval flow for a tool that requires approval.
-   * Agent orchestrates: create request → wait for decision → execute or deny.
+   * Request tool approval by creating TOOL_APPROVAL_REQUEST event.
+   * Agent waits for external approval response via _handleToolApprovalResponse().
    */
-  private async _handleToolApprovalFlow(toolCall: ToolCall, context: ToolContext): Promise<void> {
+  private _requestToolApproval(toolCall: ToolCall): void {
     // 1. Create approval request event (in correct thread!)
     const eventContext = this._getEventContext();
     this._addEventAndEmit({
