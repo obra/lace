@@ -17,7 +17,7 @@ const createMockAgent = (threadId: string, pendingApprovals: any[] = []) => {
   return {
     threadId,
     getPendingApprovals: vi.fn().mockReturnValue(pendingApprovals),
-    submitApprovalDecision: vi.fn().mockResolvedValue(undefined),
+    handleApprovalResponse: vi.fn().mockResolvedValue(undefined),
   } as unknown as Agent;
 };
 
@@ -60,7 +60,7 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
       `http://localhost/api/sessions/${sessionId}/approvals/${toolCallId}`,
       {
         method: 'POST',
-        body: JSON.stringify({ decision: 'approve' }),
+        body: JSON.stringify({ decision: 'allow_once' }),
         headers: { 'Content-Type': 'application/json' },
       }
     );
@@ -74,8 +74,8 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
     expect(response.status).toBe(200);
 
     // Should call submitApprovalDecision on the correct agent (agent2)
-    expect(agent2.submitApprovalDecision).toHaveBeenCalledWith('tool-call-1', 'approve');
-    expect(agent1.submitApprovalDecision).not.toHaveBeenCalled();
+    expect(agent2.handleApprovalResponse).toHaveBeenCalledWith('tool-call-1', 'allow_once');
+    expect(agent1.handleApprovalResponse).not.toHaveBeenCalled();
   });
 
   it('should return 404 when tool call not found in any agent', async () => {
@@ -96,7 +96,7 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
       `http://localhost/api/sessions/${sessionId}/approvals/${toolCallId}`,
       {
         method: 'POST',
-        body: JSON.stringify({ decision: 'approve' }),
+        body: JSON.stringify({ decision: 'allow_once' }),
         headers: { 'Content-Type': 'application/json' },
       }
     );
@@ -149,7 +149,7 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
       `http://localhost/api/sessions/${sessionId}/approvals/${toolCallId}`,
       {
         method: 'POST',
-        body: JSON.stringify({ decision: 'approve' }),
+        body: JSON.stringify({ decision: 'allow_once' }),
         headers: { 'Content-Type': 'application/json' },
       }
     );
@@ -215,7 +215,7 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
     expect(response.status).toBe(200);
 
     // Should find tool-call-2 in agent2 and submit decision
-    expect(agent2.submitApprovalDecision).toHaveBeenCalledWith('tool-call-2', 'deny');
-    expect(agent1.submitApprovalDecision).not.toHaveBeenCalled();
+    expect(agent2.handleApprovalResponse).toHaveBeenCalledWith('tool-call-2', 'deny');
+    expect(agent1.handleApprovalResponse).not.toHaveBeenCalled();
   });
 });

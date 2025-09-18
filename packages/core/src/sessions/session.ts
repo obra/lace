@@ -806,6 +806,21 @@ export class Session {
       },
     });
 
+    // Inherit tool policies from main session so delegate can execute tools
+    const mainSessionPolicies = this.getEffectiveConfiguration()?.toolPolicies || {};
+    if (Object.keys(mainSessionPolicies).length > 0) {
+      // Create delegate thread with inherited policies
+      const delegateThread = this._threadManager.getThread(targetThreadId);
+      if (delegateThread) {
+        // Update thread metadata with inherited tool policies
+        const updatedMetadata = {
+          ...delegateThread.metadata,
+          inheritedToolPolicies: mainSessionPolicies,
+        };
+        this._threadManager.updateThreadMetadata(targetThreadId, updatedMetadata);
+      }
+    }
+
     // No approval callback setup needed - Agent owns approval flow
 
     this._agents.set(agent.threadId, agent);

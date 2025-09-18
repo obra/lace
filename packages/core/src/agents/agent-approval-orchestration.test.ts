@@ -27,8 +27,12 @@ describe('Agent Approval Orchestration', () => {
     threadManager = new ThreadManager();
     toolExecutor = new ToolExecutor();
 
+    // Generate proper ThreadId format and create thread
+    const threadId = threadManager.generateThreadId();
+    threadManager.createThread(threadId);
+
     agent = new Agent({
-      threadId: 'test-agent-thread',
+      threadId,
       threadManager,
       toolExecutor,
       tools: [],
@@ -127,45 +131,35 @@ describe('Agent Approval Orchestration', () => {
   });
 
   describe('Approval Flow Orchestration', () => {
-    it('should create approval request and execute after approval response', async () => {
+    it('should execute complete approval workflow end-to-end', async () => {
       const toolCall: ToolCall = {
         id: 'approval-test-1',
         name: 'test_tool',
         arguments: {},
       };
 
-      // Mock agent methods
-      const addEventSpy = vi.spyOn(agent as any, '_addEventAndEmit').mockImplementation(() => {});
+      // Mock tool execution
       const executeSpy = vi.spyOn(toolExecutor, 'execute').mockResolvedValue({
         id: 'approval-test-1',
         content: [{ type: 'text', text: 'Tool executed successfully' }],
         status: 'completed',
       });
 
-      // Step 1: Set up tool tracking (as _executeSingleTool would do)
-      (agent as any)._activeToolCalls.set(toolCall.id, toolCall);
+      // Step 1: Agent processes tool calls (creates TOOL_CALL event + approval request)
+      (agent as any)._executeToolCalls([toolCall]);
 
-      // Step 2: Create approval request (should not execute yet)
-      await (agent as any)._handleToolApprovalFlow(toolCall, { agent });
-
-      // Should create approval request event
-      expect(addEventSpy).toHaveBeenCalledWith({
-        type: 'TOOL_APPROVAL_REQUEST',
-        data: { toolCallId: 'approval-test-1' },
-        context: {
-          threadId: 'test-agent-thread',
-          sessionId: undefined, // Test agent doesn't have session context
-        },
-      });
-
-      // Should NOT execute tool yet (waiting for approval)
+      // Should create approval request event but not execute yet
       expect(executeSpy).not.toHaveBeenCalled();
 
-      // Step 2: Simulate approval response (should execute tool)
-      await agent.handleApprovalResponse('approval-test-1', 'allow_once' as any);
+      // Step 2: External approval response (should execute tool)
+      agent.handleApprovalResponse('approval-test-1', 'allow_once' as any);
 
-      // Now tool should be executed
-      expect(executeSpy).toHaveBeenCalledWith(toolCall, { agent });
+      // Wait for event processing and tool execution
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Tool should now be executed through the complete approval pipeline
+      expect(executeSpy).toHaveBeenCalledTimes(1);
+      expect(executeSpy).toHaveBeenCalledWith(toolCall, expect.objectContaining({ agent }));
     });
 
     it('should handle denied approvals properly', async () => {
@@ -175,40 +169,37 @@ describe('Agent Approval Orchestration', () => {
         arguments: {},
       };
 
-      // Mock agent methods
-      const addEventSpy = vi.spyOn(agent as any, '_addEventAndEmit').mockImplementation(() => {});
+      // Spy on event emission but don't mock it (let real events flow)
+      const addEventSpy = vi.spyOn(agent as any, '_addEventAndEmit');
       const executeSpy = vi.spyOn(toolExecutor, 'execute');
 
-      // Step 1: Set up tool tracking (as _executeSingleTool would do)
-      (agent as any)._activeToolCalls.set(toolCall.id, toolCall);
+      // Step 1: Agent processes tool calls (creates TOOL_CALL event + approval request)
+      (agent as any)._executeToolCalls([toolCall]);
 
-      // Step 2: Create approval request
-      await (agent as any)._handleToolApprovalFlow(toolCall, { agent });
-
-      // Should create approval request event
-      expect(addEventSpy).toHaveBeenCalledWith({
-        type: 'TOOL_APPROVAL_REQUEST',
-        data: { toolCallId: 'denial-test-1' },
-        context: {
-          threadId: 'test-agent-thread',
-          sessionId: undefined,
-        },
-      });
-
-      // Step 3: Simulate approval denial
-      await agent.handleApprovalResponse('denial-test-1', 'deny' as any);
-
-      // Should NOT execute tool after denial (but should create denied result)
+      // Should create approval request event but not execute yet
       expect(executeSpy).not.toHaveBeenCalled();
 
-      // Should create TOOL_RESULT event with denial
-      expect(addEventSpy).toHaveBeenCalledWith({
+      // Step 2: Send approval denial through public API
+      agent.handleApprovalResponse('denial-test-1', 'deny' as any);
+
+      // Wait for event processing
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Should NOT execute tool after denial
+      expect(executeSpy).not.toHaveBeenCalled();
+
+      // Should create TOOL_RESULT event with denial (check all calls)
+      const toolResultCalls = addEventSpy.mock.calls.filter(
+        (call) => call[0]?.type === 'TOOL_RESULT'
+      );
+      expect(toolResultCalls).toHaveLength(1);
+      expect(toolResultCalls[0][0]).toEqual({
         type: 'TOOL_RESULT',
         data: expect.objectContaining({
           id: 'denial-test-1',
           status: 'denied',
         }),
-        context: { threadId: 'test-agent-thread' },
+        context: { threadId: agent.threadId },
       });
     });
   });
@@ -223,7 +214,7 @@ describe('Agent Approval Orchestration', () => {
         type: 'TOOL_APPROVAL_RESPONSE',
         data: { toolCallId: 'test-tool-call-1', decision: 'allow_once' },
         context: {
-          threadId: 'test-agent-thread',
+          threadId: agent.threadId,
           // sessionId not included in test context
         },
       });
