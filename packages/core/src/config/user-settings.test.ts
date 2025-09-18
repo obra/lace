@@ -207,7 +207,7 @@ describe('UserSettingsManager', () => {
       fs.writeFileSync(UserSettingsManager.getFilePath(), JSON.stringify(settings));
 
       expect(() => UserSettingsManager.getDefaultModel('fast')).toThrow(
-        /Settings are missing 'defaultModels' section/
+        /No default models configured/
       );
     });
 
@@ -220,7 +220,7 @@ describe('UserSettingsManager', () => {
       fs.writeFileSync(UserSettingsManager.getFilePath(), JSON.stringify(settings));
 
       expect(() => UserSettingsManager.getDefaultModel('fast')).toThrow(
-        /No default model configured for 'fast'/
+        /No default 'fast' model configured/
       );
     });
   });

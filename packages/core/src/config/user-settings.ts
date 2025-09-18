@@ -148,53 +148,12 @@ export class UserSettingsManager {
   }
 
   /**
-   * Migrate legacy global config to user settings if it exists
-   * @private
-   */
-  private static migrateLegacyGlobalConfig(): void {
-    const globalConfigPath = getLaceFilePath('config.json');
-
-    if (fs.existsSync(globalConfigPath)) {
-      try {
-        const globalConfigContent = fs.readFileSync(globalConfigPath, 'utf-8');
-        const globalConfig = JSON.parse(globalConfigContent) as unknown;
-
-        if (
-          typeof globalConfig === 'object' &&
-          globalConfig !== null &&
-          'defaultModels' in globalConfig
-        ) {
-          const { defaultModels } = globalConfig as { defaultModels: unknown };
-
-          // Migrate to user settings
-          const currentSettings = this.load();
-          if (!currentSettings.defaultModels) {
-            currentSettings.defaultModels = defaultModels;
-            this.save(currentSettings);
-            logger.info('Migrated default models from global config to user settings');
-          }
-        }
-
-        // Rename legacy file to indicate migration
-        const backupPath = `${globalConfigPath}.migrated`;
-        fs.renameSync(globalConfigPath, backupPath);
-        logger.info('Renamed legacy config.json to config.json.migrated');
-      } catch (error) {
-        logger.warn('Failed to migrate legacy global config', { error });
-      }
-    }
-  }
-
-  /**
    * Get the default model configuration for a given tier
    * @param tier - Either 'fast' or 'smart'
    * @returns The provider:model string for the requested tier
    * @throws Error if tier is not configured
    */
   static getDefaultModel(tier: 'fast' | 'smart'): string {
-    // Attempt migration before loading settings
-    this.migrateLegacyGlobalConfig();
-
     const settings = this.load();
 
     // Type-safe access to defaultModels
