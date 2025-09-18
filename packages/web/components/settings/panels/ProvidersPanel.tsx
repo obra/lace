@@ -35,7 +35,7 @@ export function ProvidersPanel() {
   const isMountedRef = useRef(false);
   const defaultModelsRef = useRef<DefaultModels>({});
   const saveToastTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const pendingSavesRef = useRef(new Set<Promise<void>>());
+  const saveAbortControllerRef = useRef<AbortController | null>(null);
 
   // Load current settings with retry mechanism
   const loadSettings = useCallback(async () => {
@@ -101,16 +101,31 @@ export function ProvidersPanel() {
         setSaveSuccess(false);
       }
 
-      // Auto-save with proper async state handling
-      const savePromise = (async () => {
-        try {
-          if (isMountedRef.current) {
-            setSaving(true);
-            setError(null);
-          }
-          await api.patch('/api/settings', { defaultModels: nextModels });
-          if (!isMountedRef.current) return;
+      // Cancel any pending save to prevent out-of-order updates
+      if (saveAbortControllerRef.current) {
+        saveAbortControllerRef.current.abort();
+      }
 
+      // Create new AbortController for this save
+      const abortController = new AbortController();
+      saveAbortControllerRef.current = abortController;
+
+      try {
+        if (isMountedRef.current) {
+          setSaving(true);
+          setError(null);
+        }
+
+        await api.patch(
+          '/api/settings',
+          { defaultModels: nextModels },
+          {
+            signal: abortController.signal,
+          }
+        );
+
+        // Only update UI if this request wasn't cancelled and component is still mounted
+        if (!abortController.signal.aborted && isMountedRef.current) {
           setSaveSuccess(true);
           // Clear previous timer and set new one
           if (saveToastTimerRef.current) {
@@ -119,35 +134,36 @@ export function ProvidersPanel() {
           saveToastTimerRef.current = setTimeout(() => {
             if (isMountedRef.current) setSaveSuccess(false);
           }, 3000);
-        } catch (err) {
-          if (!isMountedRef.current) return;
-
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          if (errorMessage.includes('fetch')) {
-            setError(`Unable to save ${tier} model. Please check your connection and try again.`);
-          } else if (errorMessage.includes('401') || errorMessage.includes('403')) {
-            setError('Access denied. Please check your authentication and try again.');
-          } else if (errorMessage.includes('400')) {
-            setError(
-              `Invalid ${tier} model configuration. Please verify the selected model is valid.`
-            );
-          } else {
-            setError(`Failed to save ${tier} model: ${errorMessage}`);
-          }
-          console.error('Failed to save settings:', err);
-        } finally {
-          if (isMountedRef.current) {
-            setSaving(false);
-          }
         }
-      })();
+      } catch (err) {
+        // Don't show error for aborted requests
+        if (err instanceof Error && err.name === 'AbortError') {
+          return;
+        }
 
-      // Track pending save for cleanup
-      pendingSavesRef.current.add(savePromise);
-      try {
-        await savePromise;
+        if (!isMountedRef.current) return;
+
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        if (errorMessage.includes('fetch')) {
+          setError(`Unable to save ${tier} model. Please check your connection and try again.`);
+        } else if (errorMessage.includes('401') || errorMessage.includes('403')) {
+          setError('Access denied. Please check your authentication and try again.');
+        } else if (errorMessage.includes('400')) {
+          setError(
+            `Invalid ${tier} model configuration. Please verify the selected model is valid.`
+          );
+        } else {
+          setError(`Failed to save ${tier} model: ${errorMessage}`);
+        }
+        console.error('Failed to save settings:', err);
       } finally {
-        pendingSavesRef.current.delete(savePromise);
+        // Clear the abort controller if this was the active one
+        if (saveAbortControllerRef.current === abortController) {
+          saveAbortControllerRef.current = null;
+        }
+        if (isMountedRef.current) {
+          setSaving(false);
+        }
       }
     },
     [] // No dependencies - use refs for latest values
@@ -156,10 +172,14 @@ export function ProvidersPanel() {
   // Mount/unmount lifecycle management
   useEffect(() => {
     isMountedRef.current = true;
-    const pendingSaves = pendingSavesRef.current;
     return () => {
       isMountedRef.current = false;
-      pendingSaves.clear();
+      // Cancel any pending save request
+      if (saveAbortControllerRef.current) {
+        saveAbortControllerRef.current.abort();
+        saveAbortControllerRef.current = null;
+      }
+      // Clear success message timer
       if (saveToastTimerRef.current) {
         clearTimeout(saveToastTimerRef.current);
         saveToastTimerRef.current = null;
