@@ -10,7 +10,7 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '@/lib/server/lace-imports';
-import { ApprovalPendingError, ApprovalDecision } from '@/lib/server/lace-imports';
+import { ApprovalDecision } from '@/lib/server/lace-imports';
 import { TestProvider } from '@/lib/server/lace-imports';
 
 describe('Callback-Free Agent Approval Flow', () => {
@@ -78,6 +78,16 @@ describe('Callback-Free Agent Approval Flow', () => {
   });
 
   afterEach(async () => {
+    // Stop agent to prevent further database operations
+    if (agent) {
+      agent.stop();
+    }
+
+    // Destroy session to cleanup all agents and resources
+    if (session) {
+      session.destroy();
+    }
+
     cleanupTestProviderDefaults();
     await cleanupTestProviderInstances([providerInstanceId]);
     vi.clearAllMocks();
