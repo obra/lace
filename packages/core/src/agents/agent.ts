@@ -1584,7 +1584,7 @@ export class Agent extends EventEmitter {
 
       // Execute through ToolExecutor's approved tool method
       // This bypasses permission checks (already approved) but ensures proper context setup
-      const result = await this._toolExecutor.executeApprovedTool(toolCall, toolContext);
+      const result = await this._toolExecutor.execute(toolCall, toolContext);
 
       // Only add events if thread still exists
       if (this._threadManager.getThread(this._threadId)) {
