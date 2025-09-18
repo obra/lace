@@ -37,7 +37,7 @@ export type { ConfiguredInstance } from '~/providers/registry';
 export { OpenRouterDynamicProvider } from '~/providers/openrouter/dynamic-provider';
 
 // Tool implementations
-export { FileReadTool } from '~/tools/implementations/file-read';
+export { FileReadTool } from '~/tools/implementations/file_read';
 
 // Test utilities
 export {
