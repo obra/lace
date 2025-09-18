@@ -284,20 +284,18 @@ describe('Session Approval API Integration (Real Components)', () => {
   });
 
   it('should return 404 for non-existent session', async () => {
-    const nonExistentSessionId = 'lace_20250916_notfound';
+    const nonExistentSessionId = 'lace_20250916_nofind'; // Valid format but non-existent
 
     const request = new Request(
       `http://localhost/api/sessions/${nonExistentSessionId}/approvals/pending`
     );
-    const response = await pendingApprovalsLoader({
-      request,
-      params: { sessionId: nonExistentSessionId },
-      context: {},
-    } as any);
+    const response = await pendingApprovalsLoader(
+      createLoaderArgs(request, { sessionId: nonExistentSessionId })
+    );
+    const data = await parseResponse(response);
 
     expect(response.status).toBe(404);
-    const data = await response.json();
-    expect(data.error.code).toBe('RESOURCE_NOT_FOUND');
+    expect(data.code).toBe('RESOURCE_NOT_FOUND');
   });
 
   it('should return 404 when tool call not found in any agent', async () => {
@@ -317,17 +315,15 @@ describe('Session Approval API Integration (Real Components)', () => {
       }
     );
 
-    const response = await approvalDecisionAction({
-      request,
-      params: {
+    const response = await approvalDecisionAction(
+      createActionArgs(request, {
         sessionId: session.getId(),
         toolCallId: 'non-existent-tool-call',
-      },
-      context: {},
-    } as any);
+      })
+    );
+    const data = await parseResponse(response);
 
     expect(response.status).toBe(404);
-    const data = await response.json();
-    expect(data.error.code).toBe('RESOURCE_NOT_FOUND');
+    expect(data.code).toBe('RESOURCE_NOT_FOUND');
   });
 });
