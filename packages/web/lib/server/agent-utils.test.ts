@@ -1,8 +1,7 @@
-// ABOUTME: Tests for event-based approval callback with real Agent and Session instances
-// ABOUTME: Validates that approval requests create events and session-wide approvals work correctly
+// ABOUTME: Tests for callback-free agent approval flow with real Agent and Session instances
+// ABOUTME: Validates that agent-owned approval system creates events correctly
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setupAgentApprovals } from '@/lib/server/agent-utils';
 import { Agent, ToolExecutor, Session, Project, ThreadManager } from '@/lib/server/lace-imports';
 import { asThreadId, type ThreadId } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
@@ -14,7 +13,7 @@ import {
 import { ApprovalPendingError, ApprovalDecision } from '@/lib/server/lace-imports';
 import { TestProvider } from '@/lib/server/lace-imports';
 
-describe('Event-Based Approval Callback', () => {
+describe('Callback-Free Agent Approval Flow', () => {
   const _tempLaceDir = setupWebTest();
   let agent: Agent;
   let session: Session;
@@ -75,8 +74,7 @@ describe('Event-Based Approval Callback', () => {
       configurable: true,
     });
 
-    // Set up approvals
-    setupAgentApprovals(agent, threadId);
+    // No callback setup needed - Agent owns approval flow in callback-free architecture
   });
 
   afterEach(async () => {
@@ -85,101 +83,140 @@ describe('Event-Based Approval Callback', () => {
     vi.clearAllMocks();
   });
 
-  it('should create TOOL_APPROVAL_REQUEST event when approval is requested', async () => {
-    const approvalCallback = agent.toolExecutor.getApprovalCallback();
-    expect(approvalCallback).toBeDefined();
+  it('should create TOOL_APPROVAL_REQUEST event through agent conversation flow', async () => {
+    // Set up mock provider to return tool calls requiring approval
+    const provider = new TestProvider();
+    vi.spyOn(provider, 'createResponse').mockResolvedValue({
+      content: 'I will run the bash command.',
+      toolCalls: [
+        {
+          id: 'call_123',
+          name: 'bash',
+          arguments: { command: 'ls' },
+        },
+      ],
+      stopReason: 'tool_use',
+    });
 
-    // Request approval for a tool that requires approval
-    const toolCall = {
-      id: 'call_123',
-      name: 'bash',
-      arguments: { command: 'ls' },
-    } as const satisfies {
-      id: string;
-      name: string;
-      arguments: unknown;
-    };
+    // Mock provider creation to use our test provider
+    const createProviderSpy = vi.fn().mockResolvedValue(provider);
+    Object.defineProperty(agent, '_createProviderInstance', {
+      value: createProviderSpy,
+      writable: true,
+      configurable: true,
+    });
 
-    try {
-      await approvalCallback!.requestApproval(toolCall);
-      throw new Error('Expected ApprovalPendingError to be thrown');
-    } catch (error: unknown) {
-      // Verify that ApprovalPendingError was thrown with correct toolCallId
-      expect(error).toBeInstanceOf(ApprovalPendingError);
-      const approvalError = error as ApprovalPendingError;
-      expect(approvalError.toolCallId).toBe('call_123');
-    }
+    // Trigger conversation flow - this should create approval request for bash tool
+    await agent.sendMessage('Run ls command');
 
-    // Verify TOOL_APPROVAL_REQUEST event was created
+    // Wait for approval request to be processed
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // Verify TOOL_APPROVAL_REQUEST event was created through agent-owned flow
     const events = threadManager.getEvents(threadId);
     const approvalRequestEvent = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
     expect(approvalRequestEvent).toBeDefined();
     expect(approvalRequestEvent?.data).toEqual({ toolCallId: 'call_123' });
   });
 
-  it('should return ALLOW_SESSION for tools with session-wide approval', async () => {
+  it('should execute tools immediately when session policy allows', async () => {
     // Set up session-wide approval for bash tool
     session.updateConfiguration({
       toolPolicies: { bash: 'allow' },
     });
 
-    const approvalCallback = agent.toolExecutor.getApprovalCallback();
-    expect(approvalCallback).toBeDefined();
+    // Set up mock provider to return allowed tool calls
+    const provider = new TestProvider();
+    vi.spyOn(provider, 'createResponse').mockResolvedValue({
+      content: 'I will run the pwd command.',
+      toolCalls: [
+        {
+          id: 'call_456',
+          name: 'bash',
+          arguments: { command: 'pwd' },
+        },
+      ],
+      stopReason: 'tool_use',
+    });
 
-    const toolCall = {
-      id: 'call_456',
-      name: 'bash',
-      arguments: { command: 'pwd' },
-    } as const satisfies {
-      id: string;
-      name: string;
-      arguments: unknown;
-    };
+    // Mock provider creation
+    const createProviderSpy = vi.fn().mockResolvedValue(provider);
+    Object.defineProperty(agent, '_createProviderInstance', {
+      value: createProviderSpy,
+      writable: true,
+      configurable: true,
+    });
 
-    const decision = await approvalCallback!.requestApproval(toolCall);
-    expect(decision).toBe(ApprovalDecision.ALLOW_SESSION);
+    // Trigger conversation flow with allowed tool
+    await agent.sendMessage('Run pwd command');
 
-    // Should not create approval request event since tool is pre-approved
+    // Wait for tool execution to complete
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
     const events = threadManager.getEvents(threadId);
+
+    // Should NOT create approval request event since tool is pre-approved
     const approvalRequestEvent = events.find(
       (e) => e.type === 'TOOL_APPROVAL_REQUEST' && e.data.toolCallId === 'call_456'
     );
     expect(approvalRequestEvent).toBeUndefined();
+
+    // Should create TOOL_RESULT event since tool executed immediately
+    const toolResultEvent = events.find(
+      (e) => e.type === 'TOOL_RESULT' && e.data.id === 'call_456'
+    );
+    expect(toolResultEvent).toBeDefined();
   });
 
-  it('should return existing approval if response already exists', async () => {
-    const approvalCallback = agent.toolExecutor.getApprovalCallback();
-    expect(approvalCallback).toBeDefined();
-
-    const toolCall = {
-      id: 'call_789',
-      name: 'read',
-      arguments: { file_path: '/test.txt' },
-    } as const satisfies {
-      id: string;
-      name: string;
-      arguments: unknown;
-    };
-
-    // First, create an approval request
-    try {
-      await approvalCallback!.requestApproval(toolCall);
-    } catch (error) {
-      expect(error).toBeInstanceOf(ApprovalPendingError);
-    }
-
-    // Now simulate an approval response
-    threadManager.addEvent({
-      type: 'TOOL_APPROVAL_RESPONSE',
-      data: {
-        toolCallId: 'call_789',
-        decision: ApprovalDecision.ALLOW_ONCE,
-      },
-      context: { threadId },
+  it('should handle approval response and execute tool', async () => {
+    // Set up provider to return tool calls requiring approval
+    const provider = new TestProvider();
+    vi.spyOn(provider, 'createResponse').mockResolvedValue({
+      content: 'I will read the file.',
+      toolCalls: [
+        {
+          id: 'call_789',
+          name: 'file_read',
+          arguments: { path: '/test.txt' },
+        },
+      ],
+      stopReason: 'tool_use',
     });
 
-    // Second request should return the existing approval
-    const decision = await approvalCallback!.requestApproval(toolCall);
-    expect(decision).toBe(ApprovalDecision.ALLOW_ONCE);
+    // Mock provider creation
+    const createProviderSpy = vi.fn().mockResolvedValue(provider);
+    Object.defineProperty(agent, '_createProviderInstance', {
+      value: createProviderSpy,
+      writable: true,
+      configurable: true,
+    });
+
+    // Trigger conversation flow - creates approval request
+    await agent.sendMessage('Read the test file');
+
+    // Wait for approval request
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // Verify approval request was created
+    const events = threadManager.getEvents(threadId);
+    const approvalRequestEvent = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+    expect(approvalRequestEvent).toBeDefined();
+    expect(approvalRequestEvent?.data.toolCallId).toBe('call_789');
+
+    // Simulate approval response through agent method
+    await agent.handleApprovalResponse('call_789', ApprovalDecision.ALLOW_ONCE);
+
+    // Wait for tool execution
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // Verify approval response and tool result events were created
+    const finalEvents = threadManager.getEvents(threadId);
+    const approvalResponseEvent = finalEvents.find((e) => e.type === 'TOOL_APPROVAL_RESPONSE');
+    expect(approvalResponseEvent).toBeDefined();
+    expect(approvalResponseEvent?.data.decision).toBe(ApprovalDecision.ALLOW_ONCE);
+
+    const toolResultEvent = finalEvents.find((e) => e.type === 'TOOL_RESULT');
+    expect(toolResultEvent).toBeDefined();
+    expect(toolResultEvent?.data.id).toBe('call_789');
   });
 });
