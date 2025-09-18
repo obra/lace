@@ -14,7 +14,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import type { ThreadId } from '@/types/core';
-import type { PendingApproval } from '@/types/api';
+import type { SessionPendingApproval } from '@/types/api';
 import { api } from '@/lib/api-client';
 import { AbortError } from '@/lib/api-errors';
 import type { ApprovalDecision } from '@/types/core';
@@ -22,15 +22,15 @@ import type { ApprovalDecision } from '@/types/core';
 // Types for tool approval context
 interface ToolApprovalContextType {
   // Approval data
-  pendingApprovals: PendingApproval[];
+  pendingApprovals: SessionPendingApproval[];
   loading: boolean;
 
   // Approval actions
-  handleApprovalRequest: (approval: PendingApproval) => void;
+  handleApprovalRequest: (approval: SessionPendingApproval) => void;
   handleApprovalResponse: (toolCallId: string) => void;
   handleApprovalDecision: (toolCallId: string, decision: ApprovalDecision) => Promise<void>;
   clearApprovalRequest: () => void;
-  refreshPendingApprovals: () => Promise<void>;
+  refreshSessionPendingApprovals: () => Promise<void>;
 }
 
 const ToolApprovalContext = createContext<ToolApprovalContextType | null>(null);
@@ -41,14 +41,14 @@ interface ToolApprovalProviderProps {
 }
 
 export function ToolApprovalProvider({ children, sessionId }: ToolApprovalProviderProps) {
-  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
+  const [pendingApprovals, setSessionPendingApprovals] = useState<SessionPendingApproval[]>([]);
   const [loading, setLoading] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Refresh pending approvals from API (session-wide)
-  const refreshPendingApprovals = useCallback(async () => {
+  const refreshSessionPendingApprovals = useCallback(async () => {
     if (!sessionId) {
-      setPendingApprovals([]);
+      setSessionPendingApprovals([]);
       return;
     }
 
@@ -59,7 +59,7 @@ export function ToolApprovalProvider({ children, sessionId }: ToolApprovalProvid
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
-      const data = await api.get<PendingApproval[]>(
+      const data = await api.get<SessionPendingApproval[]>(
         `/api/sessions/${sessionId}/approvals/pending`,
         {
           signal: controller.signal,
@@ -67,14 +67,14 @@ export function ToolApprovalProvider({ children, sessionId }: ToolApprovalProvid
       );
 
       if (Array.isArray(data)) {
-        setPendingApprovals(data);
+        setSessionPendingApprovals(data);
       } else {
-        setPendingApprovals([]);
+        setSessionPendingApprovals([]);
       }
     } catch (error) {
       if (error instanceof AbortError) return;
       console.error('[TOOL_APPROVAL] Failed to fetch pending approvals:', error);
-      setPendingApprovals([]);
+      setSessionPendingApprovals([]);
     } finally {
       setLoading(false);
     }
@@ -82,17 +82,17 @@ export function ToolApprovalProvider({ children, sessionId }: ToolApprovalProvid
 
   // Handle approval requests (triggered by event stream)
   const handleApprovalRequest = useCallback(
-    (_approval: PendingApproval) => {
+    (_approval: SessionPendingApproval) => {
       // When we get a new approval request, refresh the pending approvals
       // to get the most up-to-date data from the API with tool metadata
-      void refreshPendingApprovals();
+      void refreshSessionPendingApprovals();
     },
-    [refreshPendingApprovals]
+    [refreshSessionPendingApprovals]
   );
 
   // Handle approval responses (remove from pending list)
   const handleApprovalResponse = useCallback((toolCallId: string) => {
-    setPendingApprovals((prev) => prev.filter((p) => p.toolCallId !== toolCallId));
+    setSessionPendingApprovals((prev) => prev.filter((p) => p.toolCallId !== toolCallId));
   }, []);
 
   // Handle approval decision and submit to API (session-scoped)
@@ -116,18 +116,18 @@ export function ToolApprovalProvider({ children, sessionId }: ToolApprovalProvid
 
   // Clear all approval requests
   const clearApprovalRequest = useCallback(() => {
-    setPendingApprovals([]);
+    setSessionPendingApprovals([]);
   }, []);
 
   // Load pending approvals when session changes
   useEffect(() => {
     if (!sessionId) {
-      setPendingApprovals([]);
+      setSessionPendingApprovals([]);
       return;
     }
 
-    void refreshPendingApprovals();
-  }, [sessionId, refreshPendingApprovals]);
+    void refreshSessionPendingApprovals();
+  }, [sessionId, refreshSessionPendingApprovals]);
 
   const value: ToolApprovalContextType = useMemo(
     () => ({
@@ -140,7 +140,7 @@ export function ToolApprovalProvider({ children, sessionId }: ToolApprovalProvid
       handleApprovalResponse,
       handleApprovalDecision,
       clearApprovalRequest,
-      refreshPendingApprovals,
+      refreshSessionPendingApprovals,
     }),
     [
       pendingApprovals,
@@ -149,7 +149,7 @@ export function ToolApprovalProvider({ children, sessionId }: ToolApprovalProvid
       handleApprovalResponse,
       handleApprovalDecision,
       clearApprovalRequest,
-      refreshPendingApprovals,
+      refreshSessionPendingApprovals,
     ]
   );
 

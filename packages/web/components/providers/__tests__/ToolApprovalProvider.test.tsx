@@ -14,7 +14,7 @@ import {
   useToolApprovalContext,
 } from '@/components/providers/ToolApprovalProvider';
 import type { ThreadId } from '@/types/core';
-import type { PendingApproval } from '@/types/api';
+import type { PendingApproval, SessionPendingApproval } from '@/types/api';
 import type { ToolApprovalRequestData } from '@/types/web-events';
 
 // Mock the serialization utility
@@ -46,6 +46,14 @@ const createMockApproval = (overrides?: Partial<PendingApproval>): PendingApprov
     isReadOnly: false,
     riskLevel: 'safe',
   } as ToolApprovalRequestData,
+  ...overrides,
+});
+
+const createMockSessionApproval = (
+  overrides?: Partial<SessionPendingApproval>
+): SessionPendingApproval => ({
+  ...createMockApproval(overrides),
+  agentId: 'test-agent-id',
   ...overrides,
 });
 
@@ -82,7 +90,7 @@ function ContextConsumer() {
     handleApprovalRequest,
     handleApprovalResponse,
     clearApprovalRequest,
-    refreshPendingApprovals,
+    refreshSessionPendingApprovals,
   } = useToolApprovalContext();
 
   return (
@@ -99,7 +107,7 @@ function ContextConsumer() {
       ))}
 
       <button
-        onClick={() => handleApprovalRequest(createMockApproval())}
+        onClick={() => handleApprovalRequest(createMockSessionApproval())}
         data-testid="handle-approval-request"
       >
         Handle Approval Request
@@ -113,7 +121,7 @@ function ContextConsumer() {
       <button onClick={() => clearApprovalRequest()} data-testid="clear-approvals">
         Clear Approvals
       </button>
-      <button onClick={() => void refreshPendingApprovals()} data-testid="refresh-approvals">
+      <button onClick={() => void refreshSessionPendingApprovals()} data-testid="refresh-approvals">
         Refresh Approvals
       </button>
     </div>

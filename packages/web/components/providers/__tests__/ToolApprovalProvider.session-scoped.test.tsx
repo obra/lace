@@ -10,6 +10,8 @@ import {
 } from '@/components/providers/ToolApprovalProvider';
 import { api } from '@/lib/api-client';
 import type { ThreadId } from '@/types/core';
+import { ApprovalDecision } from '@/types/core';
+import type { SessionPendingApproval } from '@/types/api';
 
 // Mock the api client
 vi.mock('@/lib/api-client', () => ({
@@ -134,7 +136,7 @@ describe('ToolApprovalProvider (Session-Scoped)', () => {
       const { handleApprovalDecision } = useToolApprovalContext();
       return (
         <button
-          onClick={() => handleApprovalDecision('tool-call-1', 'approve')}
+          onClick={() => handleApprovalDecision('tool-call-1', ApprovalDecision.ALLOW_ONCE)}
           data-testid="approve-button"
         >
           Approve
@@ -159,7 +161,7 @@ describe('ToolApprovalProvider (Session-Scoped)', () => {
     await waitFor(() => {
       expect(mockApi.post).toHaveBeenCalledWith(
         `/api/sessions/${testSessionId}/approvals/tool-call-1`,
-        { decision: 'approve' }
+        { decision: ApprovalDecision.ALLOW_ONCE }
       );
     });
   });

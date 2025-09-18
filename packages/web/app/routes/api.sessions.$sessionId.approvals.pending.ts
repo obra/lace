@@ -8,6 +8,7 @@ import { ThreadIdSchema } from '@/lib/validation/schemas';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { logger } from '~/utils/logger';
+import type { SessionPendingApproval } from '@/types/api';
 import type { Route } from './+types/api.sessions.$sessionId.approvals.pending';
 
 // Validation schema
@@ -56,7 +57,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     }
 
     // Collect pending approvals from ALL agents
-    const allPendingApprovals = [];
+    const allPendingApprovals: SessionPendingApproval[] = [];
 
     for (const agentInfo of agentInfos) {
       logger.info(`[SESSION_APPROVAL] Getting actual Agent instance for ${agentInfo.threadId}`);
@@ -133,7 +134,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
           allPendingApprovals.push({
             toolCallId: approval.toolCallId,
-            toolCall: approval.toolCall,
+            toolCall: toolCall, // Use the typed toolCall instead of the unknown one
             requestedAt: approval.requestedAt,
             requestData,
             // Include agent context in the approval

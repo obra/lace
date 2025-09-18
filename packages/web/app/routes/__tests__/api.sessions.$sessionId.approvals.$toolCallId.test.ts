@@ -8,19 +8,32 @@ import { parseResponse } from '@/lib/serialization';
 import { createActionArgs } from '@/test-utils/route-test-helpers';
 import type { Session } from '@lace/core/sessions/session';
 import type { Agent } from '@lace/core/agents/agent';
+import type { PendingApproval, ApiErrorResponse } from '@/types/api';
+import type { SessionService } from '@/lib/server/session-service';
+import type { ToolApprovalRequestData } from '@/types/web-events';
 
 // Mock the session service
 vi.mock('@/lib/server/session-service');
 const mockGetSessionService = vi.mocked(getSessionService);
 
 // Mock session and agents
-const createMockAgent = (threadId: string, pendingApprovals: any[] = []) => {
+const createMockAgent = (threadId: string, pendingApprovals: PendingApproval[] = []) => {
   return {
     threadId,
     getPendingApprovals: vi.fn().mockReturnValue(pendingApprovals),
     handleApprovalResponse: vi.fn().mockResolvedValue(undefined),
   } as unknown as Agent;
 };
+
+const createMockRequestData = (): ToolApprovalRequestData => ({
+  requestId: 'request-1',
+  toolName: 'file_write',
+  input: {},
+  isReadOnly: false,
+  riskLevel: 'moderate',
+  toolDescription: 'Test tool',
+  toolAnnotations: {},
+});
 
 const createMockSession = (sessionId: string, agents: Agent[] = []) => {
   return {
@@ -47,6 +60,7 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
         toolCallId: 'tool-call-1',
         toolCall: { name: 'file_write', arguments: {} },
         requestedAt: new Date('2023-01-01T10:00:00Z'),
+        requestData: createMockRequestData(),
       },
     ]);
 
@@ -54,8 +68,11 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
 
     const mockSessionService = {
       getSession: vi.fn().mockResolvedValue(mockSession),
-    };
-    mockGetSessionService.mockReturnValue(mockSessionService as any);
+      setupAgentEventHandlers: vi.fn().mockResolvedValue(undefined),
+      updateSession: vi.fn().mockResolvedValue(undefined),
+      clearActiveSessions: vi.fn(),
+    } as SessionService;
+    mockGetSessionService.mockReturnValue(mockSessionService);
 
     const request = new Request(
       `http://localhost/api/sessions/${sessionId}/approvals/${toolCallId}`,
@@ -88,8 +105,11 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
 
     const mockSessionService = {
       getSession: vi.fn().mockResolvedValue(mockSession),
-    };
-    mockGetSessionService.mockReturnValue(mockSessionService as any);
+      setupAgentEventHandlers: vi.fn().mockResolvedValue(undefined),
+      updateSession: vi.fn().mockResolvedValue(undefined),
+      clearActiveSessions: vi.fn(),
+    } as SessionService;
+    mockGetSessionService.mockReturnValue(mockSessionService);
 
     const request = new Request(
       `http://localhost/api/sessions/${sessionId}/approvals/${toolCallId}`,
@@ -101,7 +121,7 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
     );
 
     const response = await action(createActionArgs(request, { sessionId, toolCallId }));
-    const data = await parseResponse(response);
+    const data = await parseResponse<ApiErrorResponse>(response);
 
     expect(response.status).toBe(404);
     expect(data.code).toBe('RESOURCE_NOT_FOUND');
@@ -121,7 +141,7 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
     );
 
     const response = await action(createActionArgs(request, { sessionId, toolCallId }));
-    const data = await parseResponse(response);
+    const data = await parseResponse<ApiErrorResponse>(response);
 
     expect(response.status).toBe(400);
     expect(data.code).toBe('VALIDATION_ERROR');
@@ -134,7 +154,7 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
     const mockSessionService = {
       getSession: vi.fn().mockResolvedValue(null),
     };
-    mockGetSessionService.mockReturnValue(mockSessionService as any);
+    mockGetSessionService.mockReturnValue(mockSessionService as SessionService);
 
     const request = new Request(
       `http://localhost/api/sessions/${sessionId}/approvals/${toolCallId}`,
@@ -146,7 +166,7 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
     );
 
     const response = await action(createActionArgs(request, { sessionId, toolCallId }));
-    const data = await parseResponse(response);
+    const data = await parseResponse<ApiErrorResponse>(response);
 
     expect(response.status).toBe(404);
     expect(data.code).toBe('RESOURCE_NOT_FOUND');
@@ -161,6 +181,7 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
         toolCallId: 'tool-call-1',
         toolCall: { name: 'file_read', arguments: {} },
         requestedAt: new Date('2023-01-01T10:00:00Z'),
+        requestData: createMockRequestData(),
       },
     ]);
 
@@ -169,11 +190,13 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
         toolCallId: 'tool-call-2',
         toolCall: { name: 'file_write', arguments: {} },
         requestedAt: new Date('2023-01-01T10:01:00Z'),
+        requestData: createMockRequestData(),
       },
       {
         toolCallId: 'tool-call-3',
         toolCall: { name: 'bash', arguments: {} },
         requestedAt: new Date('2023-01-01T10:02:00Z'),
+        requestData: createMockRequestData(),
       },
     ]);
 
@@ -181,8 +204,11 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
 
     const mockSessionService = {
       getSession: vi.fn().mockResolvedValue(mockSession),
-    };
-    mockGetSessionService.mockReturnValue(mockSessionService as any);
+      setupAgentEventHandlers: vi.fn().mockResolvedValue(undefined),
+      updateSession: vi.fn().mockResolvedValue(undefined),
+      clearActiveSessions: vi.fn(),
+    } as SessionService;
+    mockGetSessionService.mockReturnValue(mockSessionService);
 
     const request = new Request(
       `http://localhost/api/sessions/${sessionId}/approvals/${toolCallId}`,
@@ -194,7 +220,12 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
     );
 
     const response = await action(createActionArgs(request, { sessionId, toolCallId }));
-    const data = await parseResponse(response);
+    const data = await parseResponse<{
+      success: boolean;
+      agentId: string;
+      toolCallId: string;
+      decision: string;
+    }>(response);
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);

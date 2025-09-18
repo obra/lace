@@ -13,7 +13,7 @@ import { parseResponse } from '@/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 import { loader as pendingApprovalsLoader } from '@/app/routes/api.sessions.$sessionId.approvals.pending';
 import { action as approvalDecisionAction } from '@/app/routes/api.sessions.$sessionId.approvals.$toolCallId';
-import type { PendingApproval, ApiErrorResponse } from '@/types/api';
+import type { SessionPendingApproval } from '@/types/api';
 import type { ProviderResponse } from '@lace/core/providers/base-provider';
 
 // Mock server-only module
@@ -115,7 +115,10 @@ describe('Session Approval API Integration (Real Components)', () => {
     ]);
 
     // Mock main agent provider to use our mock
-    vi.spyOn(mainAgent as any, '_createProviderInstance').mockResolvedValue(mockProvider);
+    vi.spyOn(
+      mainAgent as { _createProviderInstance?: () => Promise<unknown> },
+      '_createProviderInstance'
+    ).mockResolvedValue(mockProvider);
 
     // Trigger main agent conversation - creates approval request
     await mainAgent.sendMessage('Run main command');
@@ -143,9 +146,10 @@ describe('Session Approval API Integration (Real Components)', () => {
     ]);
 
     // Mock delegate agent provider
-    vi.spyOn(delegateAgent as any, '_createProviderInstance').mockResolvedValue(
-      delegateMockProvider
-    );
+    vi.spyOn(
+      delegateAgent as { _createProviderInstance?: () => Promise<unknown> },
+      '_createProviderInstance'
+    ).mockResolvedValue(delegateMockProvider);
 
     // Trigger delegate agent conversation - creates second approval request
     await delegateAgent.sendMessage('Run delegate command');
@@ -169,27 +173,29 @@ describe('Session Approval API Integration (Real Components)', () => {
     const response = await pendingApprovalsLoader(
       createLoaderArgs(request, { sessionId: session.getId() })
     );
-    const approvals = await parseResponse<PendingApproval[]>(response);
+    const approvals = await parseResponse<SessionPendingApproval[]>(response);
 
     // Should aggregate approvals from both agents
     expect(approvals).toHaveLength(2);
 
-    const toolCallIds = approvals.map((a: any) => a.toolCallId);
+    const toolCallIds = approvals.map((a) => a.toolCallId);
     expect(toolCallIds).toContain('main-bash-call');
     expect(toolCallIds).toContain('delegate-bash-call');
 
-    const agentIds = approvals.map((a: any) => a.agentId);
+    const agentIds = approvals.map((a) => a.agentId);
     expect(agentIds).toContain(mainAgent.threadId);
     expect(agentIds).toContain(delegateAgent.threadId);
 
     // Verify approval metadata
-    const mainApproval = approvals.find((a: any) => a.toolCallId === 'main-bash-call');
-    expect(mainApproval.requestData.toolName).toBe('bash');
-    expect(mainApproval.agentId).toBe(mainAgent.threadId);
+    const mainApproval = approvals.find((a) => a.toolCallId === 'main-bash-call');
+    expect(mainApproval).toBeDefined();
+    expect(mainApproval!.requestData.toolName).toBe('bash');
+    expect(mainApproval!.agentId).toBe(mainAgent.threadId);
 
-    const delegateApproval = approvals.find((a: any) => a.toolCallId === 'delegate-bash-call');
-    expect(delegateApproval.requestData.toolName).toBe('bash');
-    expect(delegateApproval.agentId).toBe(delegateAgent.threadId);
+    const delegateApproval = approvals.find((a) => a.toolCallId === 'delegate-bash-call');
+    expect(delegateApproval).toBeDefined();
+    expect(delegateApproval!.requestData.toolName).toBe('bash');
+    expect(delegateApproval!.agentId).toBe(delegateAgent.threadId);
   });
 
   it('should route approval decisions to correct agent', async () => {
@@ -213,9 +219,10 @@ describe('Session Approval API Integration (Real Components)', () => {
     ]);
 
     // Mock delegate agent provider
-    vi.spyOn(delegateAgent as any, '_createProviderInstance').mockResolvedValue(
-      delegateMockProvider
-    );
+    vi.spyOn(
+      delegateAgent as { _createProviderInstance?: () => Promise<unknown> },
+      '_createProviderInstance'
+    ).mockResolvedValue(delegateMockProvider);
 
     // Trigger delegate conversation - creates real approval request
     await delegateAgent.sendMessage('Run routing test');
@@ -248,7 +255,7 @@ describe('Session Approval API Integration (Real Components)', () => {
         toolCallId: 'routing-test-call',
       })
     );
-    const result = await parseResponse(response);
+    const result = await parseResponse<{ success: boolean }>(response);
 
     // Verify success
     expect(result.success).toBe(true);
@@ -273,11 +280,11 @@ describe('Session Approval API Integration (Real Components)', () => {
       request,
       params: { sessionId: emptySession.getId() },
       context: {},
-    } as any);
+    } as Parameters<typeof pendingApprovalsLoader>[0]);
 
     expect(response.status).toBe(200);
-    const data = await response.json();
-    expect(data.json).toEqual([]);
+    const data = await parseResponse<SessionPendingApproval[]>(response);
+    expect(data).toEqual([]);
   });
 
   it('should return 404 for non-existent session', async () => {
@@ -289,7 +296,7 @@ describe('Session Approval API Integration (Real Components)', () => {
     const response = await pendingApprovalsLoader(
       createLoaderArgs(request, { sessionId: nonExistentSessionId })
     );
-    const data = await parseResponse(response);
+    const data = await parseResponse<{ code: string }>(response);
 
     expect(response.status).toBe(404);
     expect(data.code).toBe('RESOURCE_NOT_FOUND');
@@ -318,7 +325,7 @@ describe('Session Approval API Integration (Real Components)', () => {
         toolCallId: 'non-existent-tool-call',
       })
     );
-    const data = await parseResponse(response);
+    const data = await parseResponse<{ code: string }>(response);
 
     expect(response.status).toBe(404);
     expect(data.code).toBe('RESOURCE_NOT_FOUND');
