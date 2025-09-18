@@ -44,7 +44,10 @@ const createMockAgent = (threadId: string, pendingApprovals: any[] = []) => {
 
 const createMockSession = (sessionId: string, agents: Agent[] = []) => {
   return {
-    getAgents: vi.fn().mockReturnValue(agents),
+    getAgents: vi.fn().mockReturnValue(agents.map((agent) => ({ threadId: agent.threadId }))), // Return AgentInfo objects
+    getAgent: vi
+      .fn()
+      .mockImplementation((agentId: string) => agents.find((a) => a.threadId === agentId) || null), // Return actual Agent instances
   } as unknown as Session;
 };
 
