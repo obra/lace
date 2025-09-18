@@ -5,11 +5,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, AgentConfig, AgentState } from '~/agents/agent';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
-import { ToolCall, ToolResult, ToolContext } from '~/tools/types';
+import { ToolCall, ToolResult, ToolContext, ApprovalDecision } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
-import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/types';
-import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ThreadManager } from '~/threads/thread-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { expectEventAdded } from '~/test-utils/event-helpers';
@@ -126,16 +124,17 @@ describe('Enhanced Agent', () => {
       toolCalls: [],
     });
 
-    // Create approval callback that auto-approves for tests
-    const autoApprovalCallback: ApprovalCallback = {
-      requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
-    };
-
     toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
-    toolExecutor.setApprovalCallback(autoApprovalCallback);
     threadManager = new ThreadManager();
   });
+
+  // Helper function to mock agent approval flow for auto-approval in tests
+  function setupAutoApprovalAgent(agent: Agent) {
+    // Mock agent approval methods to auto-approve all tools
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
+    return agent;
+  }
 
   // Helper function to create a provider that returns tool calls only once
   function createOneTimeToolProvider(toolCalls: ToolCall[], content = 'I will use the tool.') {
@@ -200,6 +199,9 @@ describe('Enhanced Agent', () => {
 
     const agent = new Agent({ ...defaultConfig, ...config });
 
+    // Set up auto-approval for tests (replaces callback setup)
+    setupAutoApprovalAgent(agent);
+
     // Mock provider creation to return our mock provider
     vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProvider);
 
@@ -251,6 +253,9 @@ describe('Enhanced Agent', () => {
         tools: [],
         metadata, // NEW parameter
       });
+
+      // Set up auto-approval for tests (replaces callback setup)
+      setupAutoApprovalAgent(agent);
 
       // Mock provider access for test
       vi.spyOn(agent, 'getProvider').mockResolvedValue(mockProvider);
@@ -766,17 +771,11 @@ describe('Enhanced Agent', () => {
         'I will execute the tool.'
       );
 
-      // Create an approval callback that requires approval (doesn't auto-approve)
-      const pendingApprovalCallback: ApprovalCallback = {
-        requestApproval: () => {
-          throw new ApprovalPendingError('call_1');
-        },
-      };
-
-      // Override the toolExecutor's approval callback for this specific test
-      toolExecutor.setApprovalCallback(pendingApprovalCallback);
-
       agent = createAgent({ tools: [mockTool] });
+
+      // Mock agent to require approval for this test (replaces callback setup)
+      vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('approval_required');
+
       // Use the specific mock provider for this test
       vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
       await agent.start();
@@ -817,12 +816,6 @@ describe('Enhanced Agent', () => {
       const toolResult = toolResults[0].data;
       expect(toolResult.id).toBe('call_1');
       expect(toolResult.status).toBe('completed');
-
-      // Restore auto-approval callback for other tests
-      const autoApprovalCallback: ApprovalCallback = {
-        requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
-      };
-      toolExecutor.setApprovalCallback(autoApprovalCallback);
     });
 
     it('should create error result when tool is denied', async () => {
@@ -833,12 +826,12 @@ describe('Enhanced Agent', () => {
       );
 
       agent = createAgent({ tools: [mockTool] });
+
+      // Mock agent to deny tools for this test (replaces callback setup)
+      vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('denied');
+
       // Use the specific mock provider for this test
       vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
-
-      // Set up proper EventApprovalCallback for approval workflow
-      const approvalCallback = new EventApprovalCallback(agent);
-      toolExecutor.setApprovalCallback(approvalCallback);
 
       await agent.start();
 
@@ -886,10 +879,6 @@ describe('Enhanced Agent', () => {
       agent = createAgent({ tools: [mockTool] });
       // Use the specific mock provider for this test
       vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
-
-      // Set up proper EventApprovalCallback for approval workflow
-      const approvalCallback = new EventApprovalCallback(agent);
-      toolExecutor.setApprovalCallback(approvalCallback);
 
       await agent.start();
 
@@ -943,10 +932,6 @@ describe('Enhanced Agent', () => {
       // Use the specific mock provider for this test
       vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
 
-      // Set up proper EventApprovalCallback for approval workflow
-      const approvalCallback = new EventApprovalCallback(agent);
-      toolExecutor.setApprovalCallback(approvalCallback);
-
       await agent.start();
 
       const toolCompleteEvents: Array<{ toolName: string; result: ToolResult; callId: string }> =
@@ -989,10 +974,6 @@ describe('Enhanced Agent', () => {
 
     it('should attempt tool execution immediately instead of creating approval requests directly', async () => {
       // Reset to auto-approval callback for this test
-      const autoApprovalCallback: ApprovalCallback = {
-        requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
-      };
-      toolExecutor.setApprovalCallback(autoApprovalCallback);
 
       // Mock ToolExecutor.executeApprovedTool to track calls (since agent now uses this for granted permissions)
       const executeToolSpy = vi.spyOn(toolExecutor, 'executeApprovedTool');
@@ -1050,10 +1031,6 @@ describe('Enhanced Agent', () => {
 
       // Update the agent's provider mock to use the specific test provider
       vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProviderForTest);
-
-      // Set up proper EventApprovalCallback to create pending approvals
-      const approvalCallback = new EventApprovalCallback(agent);
-      toolExecutor.setApprovalCallback(approvalCallback);
 
       await agent.start();
 
@@ -1179,10 +1156,6 @@ describe('Enhanced Agent', () => {
       // Update the agent's provider mock to use the specific test provider
       vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
-      // Set up proper EventApprovalCallback for approval workflow
-      const approvalCallback = new EventApprovalCallback(agent);
-      toolExecutor.setApprovalCallback(approvalCallback);
-
       await agent.start();
 
       // Spy on tool execute to verify call patterns (important for double-decrement detection)
@@ -1248,10 +1221,6 @@ describe('Enhanced Agent', () => {
 
       // Update the agent's provider mock to use the specific test provider
       vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProviderForTest);
-
-      // Set up EventApprovalCallback for approval workflow
-      const approvalCallback = new EventApprovalCallback(agent);
-      toolExecutor.setApprovalCallback(approvalCallback);
 
       await agent.start();
       await agent.sendMessage('Run a command');
