@@ -7,7 +7,6 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { ApprovalDecision } from '~/tools/types';
 
 // Mock provider for testing command handling
 class MockProvider extends BaseMockProvider {
@@ -36,9 +35,7 @@ describe('Agent command handling', () => {
   beforeEach(() => {
     threadManager = new ThreadManager();
     toolExecutor = new ToolExecutor();
-    toolExecutor.setApprovalCallback({
-      requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
-    });
+    // Mock agent approval for tests - will be applied to agent after creation
 
     const provider = new MockProvider();
     const threadId = threadManager.generateThreadId();
@@ -58,6 +55,9 @@ describe('Agent command handling', () => {
 
     // Mock provider creation for test
     vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+
+    // Mock agent approval for tests
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
   });
 
   it('should handle /compact command', async () => {

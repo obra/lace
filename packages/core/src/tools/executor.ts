@@ -7,12 +7,12 @@ import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { BashTool } from '~/tools/implementations/bash';
-import { FileReadTool } from '~/tools/implementations/file-read';
-import { FileWriteTool } from '~/tools/implementations/file-write';
-import { FileEditTool } from '~/tools/implementations/file-edit';
-import { FileListTool } from '~/tools/implementations/file-list';
-import { RipgrepSearchTool } from '~/tools/implementations/ripgrep-search';
-import { FileFindTool } from '~/tools/implementations/file-find';
+import { FileReadTool } from '~/tools/implementations/file_read';
+import { FileWriteTool } from '~/tools/implementations/file_write';
+import { FileEditTool } from '~/tools/implementations/file_edit';
+import { FileListTool } from '~/tools/implementations/file_list';
+import { RipgrepSearchTool } from '~/tools/implementations/ripgrep_search';
+import { FileFindTool } from '~/tools/implementations/file_find';
 import {
   TaskCreateTool,
   TaskListTool,
@@ -22,7 +22,7 @@ import {
   TaskViewTool,
 } from '~/tools/implementations/task-manager/index';
 import { DelegateTool } from '~/tools/implementations/delegate';
-import { UrlFetchTool } from '~/tools/implementations/url-fetch';
+import { UrlFetchTool } from '~/tools/implementations/url_fetch';
 import { MCPServerManager } from '~/mcp/server-manager';
 import type { MCPServerConnection } from '~/config/mcp-types';
 import { MCPToolAdapter } from '~/mcp/tool-adapter';

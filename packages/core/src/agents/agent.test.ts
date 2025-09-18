@@ -117,6 +117,12 @@ describe('Enhanced Agent', () => {
     session = Session.create({
       name: 'Agent Test Session',
       projectId: project.getId(),
+      configuration: {
+        toolPolicies: {
+          mock_tool: 'allow', // Allow test tool to execute without approval
+          bash: 'allow', // Allow bash tool for bash tests
+        },
+      },
     });
 
     mockProvider = new MockProvider({
@@ -129,10 +135,14 @@ describe('Enhanced Agent', () => {
     threadManager = new ThreadManager();
   });
 
-  // Helper function to mock agent approval flow for auto-approval in tests
+  // Helper functions for different approval test scenarios
   function setupAutoApprovalAgent(agent: Agent) {
-    // Mock agent approval methods to auto-approve all tools
     vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
+    return agent;
+  }
+
+  function setupApprovalRequiredAgent(agent: Agent) {
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('approval_required');
     return agent;
   }
 
@@ -199,9 +209,6 @@ describe('Enhanced Agent', () => {
 
     const agent = new Agent({ ...defaultConfig, ...config });
 
-    // Set up auto-approval for tests (replaces callback setup)
-    setupAutoApprovalAgent(agent);
-
     // Mock provider creation to return our mock provider
     vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProvider);
 
@@ -253,9 +260,6 @@ describe('Enhanced Agent', () => {
         tools: [],
         metadata, // NEW parameter
       });
-
-      // Set up auto-approval for tests (replaces callback setup)
-      setupAutoApprovalAgent(agent);
 
       // Mock provider access for test
       vi.spyOn(agent, 'getProvider').mockResolvedValue(mockProvider);
@@ -481,6 +485,9 @@ describe('Enhanced Agent', () => {
     });
 
     it('should execute tools and emit events', async () => {
+      // This test needs tools to execute immediately
+      setupAutoApprovalAgent(agent);
+
       const events: Array<{
         type: string;
         data?:
@@ -773,8 +780,8 @@ describe('Enhanced Agent', () => {
 
       agent = createAgent({ tools: [mockTool] });
 
-      // Mock agent to require approval for this test (replaces callback setup)
-      vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('approval_required');
+      // This test specifically tests approval flow
+      setupApprovalRequiredAgent(agent);
 
       // Use the specific mock provider for this test
       vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
@@ -975,8 +982,8 @@ describe('Enhanced Agent', () => {
     it('should attempt tool execution immediately instead of creating approval requests directly', async () => {
       // Reset to auto-approval callback for this test
 
-      // Mock ToolExecutor.executeApprovedTool to track calls (since agent now uses this for granted permissions)
-      const executeToolSpy = vi.spyOn(toolExecutor, 'executeApprovedTool');
+      // Mock ToolExecutor.execute to track calls (since agent now uses this for granted permissions)
+      const executeToolSpy = vi.spyOn(toolExecutor, 'execute');
 
       const mockProviderForTest = createOneTimeToolProvider(
         [{ id: 'call_immediate', name: 'mock_tool', arguments: { action: 'test' } }],
@@ -996,7 +1003,7 @@ describe('Enhanced Agent', () => {
       // Add delay to allow async tool execution to complete
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // Verify ToolExecutor.executeApprovedTool was called immediately
+      // Verify ToolExecutor.execute was called immediately
       expect(executeToolSpy).toHaveBeenCalledTimes(1);
       expect(executeToolSpy).toHaveBeenCalledWith(
         {
@@ -1207,7 +1214,7 @@ describe('Enhanced Agent', () => {
 
     it('should provide temp directory when executing approved bash tool', async () => {
       // This test verifies that approved tools get proper temp directory setup
-      // Bug: _executeApprovedTool calls tool.execute() directly, bypassing temp dir setup
+      // Bug: _executeApprovedTool should use ToolExecutor for proper temp dir setup
 
       const bashTool = new BashTool();
       toolExecutor.registerTool('bash', bashTool);
@@ -1259,7 +1266,7 @@ describe('Enhanced Agent', () => {
 
       const result = toolResult!.data;
 
-      // This test verifies the fix: _executeApprovedTool now uses ToolExecutor
+      // This test verifies the fix: approved tools now use ToolExecutor.execute()
       // which properly sets up the temp directory for bash tool execution
 
       // The key fix verification: temp directory is now provided
@@ -2183,9 +2190,8 @@ describe('Enhanced Agent', () => {
 
       const toolExecutor = new ToolExecutor();
       toolExecutor.registerTool(mockTool.name, mockTool);
-      toolExecutor.setApprovalCallback({
-        requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
-      });
+      // Mock agent approval for tests
+      vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
 
       agent = createAgent({ tools: [mockTool], toolExecutor });
       await agent.start();

@@ -9,7 +9,6 @@ import { ProviderResponse } from '~/providers/base-provider';
 import { logger } from '~/utils/logger';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { ApprovalDecision } from '~/tools/types';
 import { EVENT_TYPES } from '~/threads/types';
 
 // Helper function to wait for agent to return to idle state
@@ -176,11 +175,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
     toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
 
-    // Set up auto-approval callback so tools actually execute
-    const autoApprovalCallback = {
-      requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
-    };
-    toolExecutor.setApprovalCallback(autoApprovalCallback);
+    // Mock agent approval for tests - will be applied to agent after creation
 
     threadId = `test_thread_${Date.now()}`;
     threadManager.createThread(threadId);
@@ -199,6 +194,9 @@ describe('Conversation State Management with Enhanced Agent', () => {
 
     // Mock provider creation for test
     vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+
+    // Mock agent approval for tests
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
 
     await agent.start();
   });

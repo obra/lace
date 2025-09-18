@@ -10,8 +10,6 @@ import { Tool } from '~/tools/tool';
 import { ToolCall, ToolResult, ToolContext, createErrorResult } from '~/tools/types';
 import type { AIProvider } from '~/providers/base-provider';
 
-const isToolResult = (v: unknown): v is ToolResult =>
-  typeof v === 'object' && v !== null && 'status' in (v as Record<string, unknown>);
 import { Agent } from '~/agents/agent';
 import { logger } from '~/utils/logger';
 
@@ -21,6 +19,9 @@ export interface SessionHelperOptions {
 
   /** Parent agent to inherit context and policies from */
   parentAgent: Agent;
+
+  /** Explicit whitelist of tool names this helper can use (fail-closed security) */
+  allowedTools?: string[];
 
   /** Optional abort signal for cancellation */
   abortSignal?: AbortSignal;
@@ -177,28 +178,49 @@ export class SessionHelper extends BaseHelper {
       });
 
       try {
-        // Go through normal approval flow
-        const permission = await toolExecutor.requestToolPermission(toolCall, context);
-
-        if (isToolResult(permission)) {
-          // Permission denied - return as result
-          results.push(permission);
-          continue;
+        // SECURITY: Check explicit tool whitelist first (fail-closed)
+        if (this.options.allowedTools) {
+          const whitelist = new Set(this.options.allowedTools);
+          if (!whitelist.has(toolCall.name)) {
+            results.push(
+              createErrorResult(`Tool '${toolCall.name}' not in helper whitelist`, toolCall.id)
+            );
+            continue;
+          }
         }
 
-        if (permission === 'pending') {
-          // This shouldn't happen in single-shot execution
-          logger.warn('SessionHelper got pending approval in single-shot mode', {
-            toolName: toolCall.name,
-          });
-          results.push(
-            createErrorResult('Tool approval pending in single-shot helper', toolCall.id)
-          );
-          continue;
+        // If no explicit whitelist, fall back to session policy checking
+        if (!this.options.allowedTools) {
+          const policy = session?.getToolPolicy(toolCall.name);
+          const config = session?.getEffectiveConfiguration();
+
+          // Deny if tool not in session allowlist
+          if (config?.tools && !config.tools.includes(toolCall.name)) {
+            results.push(
+              createErrorResult(
+                `Tool '${toolCall.name}' not available in session configuration`,
+                toolCall.id
+              )
+            );
+            continue;
+          }
+
+          // Deny if tool requires approval (helpers cannot handle approvals)
+          if (policy === 'ask' || policy === 'deny' || !policy) {
+            results.push(
+              createErrorResult(
+                `Tool '${toolCall.name}' requires approval - not available in helper context`,
+                toolCall.id
+              )
+            );
+            continue;
+          }
+
+          // Must be 'allow' policy to reach here
         }
 
-        // Permission granted - execute
-        const result = await toolExecutor.executeApprovedTool(toolCall, context);
+        // Execute the tool (either whitelisted or explicitly allowed)
+        const result = await toolExecutor.execute(toolCall, context);
         results.push(result);
       } catch (error) {
         logger.error('SessionHelper tool execution failed', {

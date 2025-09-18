@@ -8,8 +8,6 @@ import { ToolExecutor } from '~/tools/executor';
 import { TestProvider } from '~/test-utils/test-provider';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { expectEventAdded } from '~/test-utils/event-helpers';
-import { ApprovalDecision } from '~/tools/types';
-import { EventApprovalCallback } from '~/tools/event-approval-callback';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
@@ -164,8 +162,8 @@ describe('Tool Batch Completion Behavior', () => {
       providerInstanceId,
     });
 
-    const approvalCallback = new EventApprovalCallback(agent);
-    agent.toolExecutor.setApprovalCallback(approvalCallback);
+    // Mock agent approval for tests
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
   });
 
   afterEach(async () => {

@@ -1,11 +1,10 @@
 // ABOUTME: Integration tests for file edit tool with file protection
 // ABOUTME: Tests text replacement, validation, and file read protection mechanism
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { writeFile, rm, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { FileEditTool } from '~/tools/implementations/file-edit';
-import { ApprovalDecision } from '~/tools/types';
+import { FileEditTool } from '~/tools/implementations/file_edit';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
@@ -51,10 +50,10 @@ describe('FileEditTool Integration Tests', () => {
       projectId: project.getId(),
     });
 
-    // Set approval callback to allow all tools (needed for tests)
-    session.getAgent(session.getId())!.toolExecutor.setApprovalCallback({
-      requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
-    });
+    // Mock agent approval for tests
+    vi.spyOn(session.getAgent(session.getId())! as any, '_checkToolPermission').mockResolvedValue(
+      'granted'
+    );
 
     // Get the coordinator agent
     agent = session.getAgent(session.getId())!;

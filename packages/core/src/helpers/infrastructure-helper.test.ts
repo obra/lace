@@ -157,8 +157,8 @@ describe('InfrastructureHelper', () => {
       });
       helper['toolExecutor'] = toolExecutor;
 
-      // Spy on executeApprovedTool to verify it's called directly
-      const executeSpy = vi.spyOn(toolExecutor, 'executeApprovedTool');
+      // Spy on execute to verify it's called directly
+      const executeSpy = vi.spyOn(toolExecutor, 'execute');
 
       mockProvider.addMockResponse({
         content: 'Using tool',
@@ -178,7 +178,7 @@ describe('InfrastructureHelper', () => {
 
       await helper.execute('Test bypass approval');
 
-      // Should call executeApprovedTool directly (bypassing approval)
+      // Should call execute directly (bypassing approval)
       expect(executeSpy).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'test_tool' }),
         expect.any(Object)
@@ -193,7 +193,7 @@ describe('InfrastructureHelper', () => {
       });
       helper['toolExecutor'] = toolExecutor;
 
-      const executeSpy = vi.spyOn(toolExecutor, 'executeApprovedTool');
+      const executeSpy = vi.spyOn(toolExecutor, 'execute');
 
       mockProvider.addMockResponse({
         content: 'Using tool with custom directory',
@@ -322,10 +322,8 @@ describe('InfrastructureHelper', () => {
       });
       helper['toolExecutor'] = toolExecutor;
 
-      // Mock executeApprovedTool to throw error
-      vi.spyOn(toolExecutor, 'executeApprovedTool').mockRejectedValue(
-        new Error('Tool execution failed')
-      );
+      // Mock execute to throw error
+      vi.spyOn(toolExecutor, 'execute').mockRejectedValue(new Error('Tool execution failed'));
 
       mockProvider.addMockResponse({
         content: 'Using tool',

@@ -11,6 +11,7 @@ import type { ToolCall } from '~/tools/types';
 // Mock Session for policy checking
 const mockSession = {
   getToolPolicy: vi.fn(),
+  getEffectiveConfiguration: vi.fn().mockReturnValue({ tools: undefined }), // No tool restrictions by default
   getProjectId: vi.fn().mockReturnValue('test-project'),
   getEnvironmentVariables: vi.fn().mockReturnValue({}),
   createToolTempDirectory: vi.fn().mockReturnValue('/tmp/test-tool-dir'),
@@ -89,6 +90,39 @@ describe('Agent Approval Orchestration', () => {
       });
 
       expect(permission).toBe('approval_required');
+    });
+
+    it('should deny when session context is missing (fail-closed)', async () => {
+      // Mock getFullSession to return null (no session context)
+      vi.spyOn(agent, 'getFullSession').mockResolvedValue(null);
+
+      const permission = await (agent as any)._checkToolPermission({
+        name: 'any_tool',
+        id: 'test-call-5',
+        arguments: {},
+      });
+
+      expect(permission).toBe('denied');
+    });
+
+    it('should deny tools not in session configuration allowlist', async () => {
+      // Mock session with restricted tool configuration
+      const restrictedSession = {
+        getToolPolicy: vi.fn().mockReturnValue(undefined), // No specific policy
+        getEffectiveConfiguration: vi.fn().mockReturnValue({
+          tools: ['allowed_tool'], // Only one tool allowed
+        }),
+      };
+      vi.spyOn(agent, 'getFullSession').mockResolvedValue(restrictedSession as any);
+
+      const permission = await (agent as any)._checkToolPermission({
+        name: 'restricted_tool', // Not in allowlist
+        id: 'test-call-6',
+        arguments: {},
+      });
+
+      // Should be denied even if no explicit deny policy
+      expect(permission).toBe('denied');
     });
   });
 

@@ -1,98 +1,74 @@
-// ABOUTME: Test file for ToolExecutor policy enforcement functionality
-// ABOUTME: Tests tool policy enforcement with allow/ask/deny logic
+// ABOUTME: Test file for Agent policy enforcement functionality (ported from ToolExecutor)
+// ABOUTME: Tests Agent tool policy enforcement with allow/ask/deny logic
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { Agent } from '~/agents/agent';
 import { ToolExecutor } from '~/tools/executor';
-import { ToolContext } from '~/tools/types';
-import { ApprovalDecision } from '~/tools/types';
-import { asThreadId } from '~/threads/types';
-import { Session } from '~/sessions/session';
-import type { Agent } from '~/agents/agent';
-import { Project } from '~/projects/project';
-import { BashTool } from '~/tools/implementations/bash';
-import { FileReadTool } from '~/tools/implementations/file-read';
-import { FileWriteTool } from '~/tools/implementations/file-write';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { ThreadManager } from '~/threads/thread-manager';
+import { DatabasePersistence } from '~/persistence/database';
+import type { ToolCall } from '~/tools/types';
 
-describe('ToolExecutor policy enforcement', () => {
-  const _tempLaceDir = setupCoreTest();
-  let executor: ToolExecutor;
-  let _project: Project;
-  let context: ToolContext;
-  let mockSession: Session;
+describe('Agent policy enforcement', () => {
+  let agent: Agent;
+  let threadManager: ThreadManager;
+  let toolExecutor: ToolExecutor;
+  let mockSession: any;
 
   beforeEach(() => {
-    // Create a test project with tool policies
-    _project = Project.create('Test Project', '/project/path', 'A test project', {
-      provider: 'anthropic',
-      model: 'claude-3-sonnet',
-      tools: ['file-read', 'file-write', 'bash'],
-      toolPolicies: {
-        'file-read': 'allow',
-        'file-write': 'ask',
-        bash: 'deny',
+    const persistence = new DatabasePersistence(':memory:');
+    threadManager = new ThreadManager();
+    toolExecutor = new ToolExecutor();
+
+    // Create test agent
+    agent = new Agent({
+      threadId: 'test-agent-thread',
+      threadManager,
+      toolExecutor,
+      tools: [],
+      metadata: {
+        name: 'Test Agent',
+        modelId: 'test-model',
+        providerInstanceId: 'test-provider',
       },
     });
 
-    // Create executor and register tools
-    executor = new ToolExecutor();
-    executor.registerTool('bash', new BashTool());
-    executor.registerTool('file-read', new FileReadTool());
-    executor.registerTool('file-write', new FileWriteTool());
-
-    // Create mock session that implements getToolPolicy
+    // Mock session with different tool policies for testing
     mockSession = {
       getToolPolicy: vi.fn(),
       getEffectiveConfiguration: vi.fn().mockReturnValue({
-        tools: ['file-read', 'file-write', 'bash'],
-        toolPolicies: {
-          'file-read': 'allow',
-          'file-write': 'ask',
-          bash: 'deny',
-        },
+        tools: ['file_read', 'file_write', 'bash'], // Tools in allowlist
       }),
-    } as unknown as Session;
-
-    // Create a mock agent with the needed threadId
-    const mockAgent = {
-      threadId: asThreadId('lace_20250101_test03'),
-      getSession: () => mockSession,
-      getFullSession: vi.fn().mockResolvedValue(mockSession),
-    } as unknown as Agent;
-
-    context = {
-      signal: new AbortController().signal,
-      workingDirectory: '/project/path',
-      agent: mockAgent,
     };
-  });
 
-  afterEach(() => {
-    // Test cleanup handled by setupCoreTest
+    // Mock agent's session access
+    vi.spyOn(agent, 'getFullSession').mockResolvedValue(mockSession);
   });
 
   it('should allow tool when policy is allow', async () => {
-    vi.mocked(mockSession.getToolPolicy).mockReturnValue('allow');
+    mockSession.getToolPolicy.mockReturnValue('allow');
 
-    const toolCall = { id: 'test-id', name: 'file-read', arguments: { file_path: '/test.txt' } };
-    const result = await executor.executeTool(toolCall, context);
+    const toolCall: ToolCall = {
+      id: 'test-id',
+      name: 'file_read',
+      arguments: { path: '/test.txt' },
+    };
 
-    // Policy should allow the tool to execute (not be denied by policy)
-    expect(result.content[0].text).not.toContain('Tool execution denied by policy');
+    const permission = await (
+      agent as unknown as { _checkToolPermission: (toolCall: ToolCall) => Promise<string> }
+    )._checkToolPermission(toolCall);
+
+    expect(permission).toBe('granted');
   });
 
   it('should require approval when policy is ask', async () => {
     vi.mocked(mockSession.getToolPolicy).mockReturnValue('ask');
 
-    // Mock approval system to auto-approve
-    const mockApprovalCallback = {
-      requestApproval: vi.fn().mockResolvedValue(ApprovalDecision.ALLOW_ONCE),
-    };
-    executor.setApprovalCallback(mockApprovalCallback);
+    // Mock agent approval for policy tests
+    vi.spyOn(context.agent as any, '_checkToolPermission').mockResolvedValue('granted');
 
     const toolCall = {
       id: 'test-id',
-      name: 'file-write',
+      name: 'file_write',
       arguments: { path: '/test.txt', content: 'test' },
     };
     const result = await executor.executeTool(toolCall, context);
@@ -113,7 +89,7 @@ describe('ToolExecutor policy enforcement', () => {
 
   it('should deny tool when not in allowed tools list', async () => {
     vi.mocked(mockSession.getEffectiveConfiguration).mockReturnValue({
-      tools: ['file-read'], // bash not included
+      tools: ['file_read'], // bash not included
     });
 
     const toolCall = { id: 'test-id', name: 'bash', arguments: { command: 'ls' } };
@@ -134,7 +110,7 @@ describe('ToolExecutor policy enforcement', () => {
       agent: mockAgentWithoutSession,
     };
 
-    const toolCall = { id: 'test-id', name: 'file-read', arguments: { file_path: '/test.txt' } };
+    const toolCall = { id: 'test-id', name: 'file_read', arguments: { file_path: '/test.txt' } };
     const result = await executor.executeTool(toolCall, contextWithoutSession);
 
     expect(result.status).toBe('denied');
@@ -144,15 +120,12 @@ describe('ToolExecutor policy enforcement', () => {
   it('should deny approval when user rejects', async () => {
     vi.mocked(mockSession.getToolPolicy).mockReturnValue('ask');
 
-    // Mock approval system to reject
-    const mockApprovalCallback = {
-      requestApproval: vi.fn().mockResolvedValue(ApprovalDecision.DENY),
-    };
-    executor.setApprovalCallback(mockApprovalCallback);
+    // Mock agent approval for policy tests
+    vi.spyOn(context.agent as any, '_checkToolPermission').mockResolvedValue('denied');
 
     const toolCall = {
       id: 'test-id',
-      name: 'file-write',
+      name: 'file_write',
       arguments: { path: '/test.txt', content: 'test' },
     };
     const result = await executor.executeTool(toolCall, context);

@@ -1,7 +1,7 @@
 // ABOUTME: Integration tests for temp directory functionality across all layers
 // ABOUTME: Tests the complete flow from process temp to tool-call directories
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getProcessTempDir, clearProcessTempDirCache } from '~/config/lace-dir';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
@@ -12,7 +12,6 @@ import { existsSync } from 'fs';
 import { writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import type { ToolContext, ToolResult } from '~/tools/types';
-import { ApprovalDecision } from '~/tools/types';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
@@ -84,9 +83,7 @@ describe('Temp Directory Integration', () => {
     toolExecutor = new ToolExecutor();
     integrationTool = new IntegrationTestTool();
     toolExecutor.registerTool(integrationTool.name, integrationTool);
-    toolExecutor.setApprovalCallback({
-      requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
-    });
+    // Mock agent approval for tests - will be applied to agent from session
     clearProcessTempDirCache();
   });
 
@@ -97,6 +94,8 @@ describe('Temp Directory Integration', () => {
 
   it('should create proper directory hierarchy through ToolExecutor', async () => {
     const agent = session.getAgent(session.getId())!;
+    // Mock agent approval for tests
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
 
     const context: ToolContext = {
       signal: new AbortController().signal,
@@ -170,6 +169,8 @@ describe('Temp Directory Integration', () => {
 
   it('should maintain stability across ToolExecutor instances', async () => {
     const agent = session.getAgent(session.getId())!;
+    // Mock agent approval for tests
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
 
     const context: ToolContext = {
       signal: new AbortController().signal,
@@ -191,9 +192,7 @@ describe('Temp Directory Integration', () => {
     const newToolExecutor = new ToolExecutor();
     const newIntegrationTool = new IntegrationTestTool();
     newToolExecutor.registerTool(newIntegrationTool.name, newIntegrationTool);
-    newToolExecutor.setApprovalCallback({
-      requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
-    });
+    // Reusing existing agent with approval mocking
 
     await newToolExecutor.executeTool(
       {

@@ -1363,12 +1363,28 @@ export class Agent extends EventEmitter {
 
     const toolCall = toolCallEvent.data as ToolCall;
 
-    if (decision === ApprovalDecision.DENY) {
-      // Create error result for denied tool
+    if (decision === ApprovalDecision.ALLOW_SESSION) {
+      // Update session tool policy for session-wide approval
+      void this._updateSessionToolPolicy(toolCall.name, 'allow');
+
+      // Execute the approved tool
+      void this._executeApprovedTool(toolCall);
+      return; // Early return to avoid double decrementing
+    } else if (decision === ApprovalDecision.ALLOW_ONCE) {
+      // Execute the tool once
+      void this._executeApprovedTool(toolCall);
+      return; // Early return to avoid double decrementing
+    } else {
+      // SECURITY: Handle DENY and unknown decisions (fail-closed)
+      const errorMessage =
+        decision === ApprovalDecision.DENY
+          ? 'Tool execution denied by user'
+          : `Tool execution denied: unknown decision '${decision}'`;
+
       const errorResult: ToolResult = {
         id: toolCallId,
         status: 'denied',
-        content: [{ type: 'text', text: 'Tool execution denied by user' }],
+        content: [{ type: 'text', text: errorMessage }],
       };
       // Remove from active tools tracking (it was denied)
       this._activeToolCalls.delete(toolCallId);
@@ -1377,17 +1393,6 @@ export class Agent extends EventEmitter {
         data: errorResult,
         context: { threadId: this._threadId },
       });
-    } else if (decision === ApprovalDecision.ALLOW_SESSION) {
-      // Update session tool policy for session-wide approval
-      void this._updateSessionToolPolicy(toolCall.name, 'allow');
-
-      // Execute the approved tool
-      void this._executeApprovedTool(toolCall);
-      return; // Early return to avoid double decrementing
-    } else {
-      // allow_once - just execute the tool
-      void this._executeApprovedTool(toolCall);
-      return; // Early return to avoid double decrementing
     }
 
     // Handle denied tool completion
@@ -2723,6 +2728,13 @@ export class Agent extends EventEmitter {
     const session = await this.getFullSession();
     if (!session) return 'denied';
 
+    // SECURITY: Check tool allowlist first (fail-closed)
+    const config = session.getEffectiveConfiguration();
+    if (config.tools && !config.tools.includes(toolCall.name)) {
+      return 'denied'; // Tool not in allowlist
+    }
+
+    // Check specific tool policy
     const policy = session.getToolPolicy(toolCall.name);
 
     switch (policy) {

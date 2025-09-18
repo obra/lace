@@ -168,8 +168,8 @@ describe('MCP Integration E2E', () => {
       agent: coordinatorAgent,
     };
 
-    // Step 6: Execute tool through ToolExecutor (this tests the full approval flow)
-    const result = await toolExecutor.executeTool(toolCall, context);
+    // Step 6: Execute tool through ToolExecutor (this tests the new simplified flow)
+    const result = await toolExecutor.execute(toolCall, context);
 
     expect(result.status).toBe('completed');
     expect(result.content).toHaveLength(1);
@@ -265,7 +265,7 @@ describe('MCP Integration E2E', () => {
       arguments: { message: 'Testing approval levels' },
     };
 
-    const result = await toolExecutor.executeTool(toolCall, {
+    const result = await toolExecutor.execute(toolCall, {
       signal: new AbortController().signal,
       agent: agent,
     });

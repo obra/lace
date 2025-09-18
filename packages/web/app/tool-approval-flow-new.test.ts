@@ -85,7 +85,7 @@ describe('Event-Based Tool Approval Integration', () => {
 
     // Register file-read tool
     const fileReadTool = new FileReadTool();
-    agent.toolExecutor.registerTool('file-read', fileReadTool);
+    agent.toolExecutor.registerTool('file_read', fileReadTool);
   });
 
   afterEach(async () => {
@@ -101,7 +101,7 @@ describe('Event-Based Tool Approval Integration', () => {
     const testFilePath = join(tempDir, 'test-file.txt');
     const toolCall = {
       id: 'test-call-123',
-      name: 'file-read',
+      name: 'file_read',
       arguments: { path: testFilePath },
     };
 
@@ -124,7 +124,7 @@ describe('Event-Based Tool Approval Integration', () => {
     try {
       await approvalCallback.requestApproval({
         id: 'test-call-123',
-        name: 'file-read',
+        name: 'file_read',
         arguments: {
           file_path: testFilePath,
         },
@@ -148,7 +148,7 @@ describe('Event-Based Tool Approval Integration', () => {
     const testFilePath = join(tempDir, 'test-file.txt');
     const toolCall = {
       id: 'existing-call-456',
-      name: 'file-read',
+      name: 'file_read',
       arguments: { path: testFilePath },
     };
 
@@ -178,7 +178,7 @@ describe('Event-Based Tool Approval Integration', () => {
     // Request approval - should return existing decision immediately
     const decision = await approvalCallback.requestApproval({
       id: 'existing-call-456',
-      name: 'file-read',
+      name: 'file_read',
       arguments: {
         file_path: testFilePath,
       },
@@ -198,7 +198,7 @@ describe('Event-Based Tool Approval Integration', () => {
     // Create TOOL_CALL and TOOL_APPROVAL_REQUEST events
     const toolCall = {
       id: 'pending-call-789',
-      name: 'file-read',
+      name: 'file_read',
       arguments: { path: testFilePath },
     };
 
@@ -220,7 +220,7 @@ describe('Event-Based Tool Approval Integration', () => {
 
     expect(pendingApprovals).toHaveLength(1);
     expect(pendingApprovals[0].toolCallId).toBe('pending-call-789');
-    expect((pendingApprovals[0].toolCall as { name: string }).name).toBe('file-read');
+    expect((pendingApprovals[0].toolCall as { name: string }).name).toBe('file_read');
 
     // Add approval response
     agent.threadManager.addEvent({

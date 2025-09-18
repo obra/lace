@@ -18,15 +18,15 @@ import {
   TaskViewTool,
 } from '~/tools/implementations/task-manager';
 import { BashTool } from '~/tools/implementations/bash';
-import { FileReadTool } from '~/tools/implementations/file-read';
-import { FileWriteTool } from '~/tools/implementations/file-write';
+import { FileReadTool } from '~/tools/implementations/file_read';
+import { FileWriteTool } from '~/tools/implementations/file_write';
 import { Project } from '~/projects/project';
-import { FileEditTool } from '~/tools/implementations/file-edit';
-import { FileListTool } from '~/tools/implementations/file-list';
-import { RipgrepSearchTool } from '~/tools/implementations/ripgrep-search';
-import { FileFindTool } from '~/tools/implementations/file-find';
+import { FileEditTool } from '~/tools/implementations/file_edit';
+import { FileListTool } from '~/tools/implementations/file_list';
+import { RipgrepSearchTool } from '~/tools/implementations/ripgrep_search';
+import { FileFindTool } from '~/tools/implementations/file_find';
 import { DelegateTool } from '~/tools/implementations/delegate';
-import { UrlFetchTool } from '~/tools/implementations/url-fetch';
+import { UrlFetchTool } from '~/tools/implementations/url_fetch';
 import { logger } from '~/utils/logger';
 import type { ToolPolicy } from '~/tools/types';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
