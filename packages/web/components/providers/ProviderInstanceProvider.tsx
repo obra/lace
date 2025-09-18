@@ -18,6 +18,17 @@ interface ProviderInstance {
   status?: 'connected' | 'error' | 'untested';
   modelCount?: number;
   lastTested?: string;
+  modelConfig?: {
+    enableNewModels: boolean;
+    disabledModels: string[];
+    disabledProviders: string[];
+    filters?: {
+      requiredParameters?: string[];
+      maxPromptCostPerMillion?: number;
+      maxCompletionCostPerMillion?: number;
+      minContextLength?: number;
+    };
+  };
 }
 
 interface ProviderInstanceWithTestResult extends Omit<ProviderInstance, 'status'> {
@@ -369,16 +380,48 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
         };
       }
 
-      // Transform catalog models to ModelInfo format
-      const models: ModelInfo[] = catalogProvider.models.map((catalogModel) => ({
-        id: catalogModel.id,
-        displayName: catalogModel.name,
-        description: undefined, // Not available in catalog format
-        contextWindow: catalogModel.context_window,
-        maxOutputTokens: catalogModel.default_max_tokens,
-        capabilities: catalogModel.supports_attachments ? ['attachments'] : undefined,
-        isDefault: false, // Would need to check against catalog provider defaults
-      }));
+      // Transform catalog models to ModelInfo format, filtering out disabled models
+      const models: ModelInfo[] = catalogProvider.models
+        .filter((catalogModel) => {
+          // Filter out disabled models
+          if (instance.modelConfig?.disabledModels.includes(catalogModel.id)) {
+            return false;
+          }
+
+          // Apply cost filters if specified
+          const filters = instance.modelConfig?.filters;
+          if (filters) {
+            if (
+              filters.maxPromptCostPerMillion !== undefined &&
+              catalogModel.cost_per_1m_in > filters.maxPromptCostPerMillion
+            ) {
+              return false;
+            }
+            if (
+              filters.maxCompletionCostPerMillion !== undefined &&
+              catalogModel.cost_per_1m_out > filters.maxCompletionCostPerMillion
+            ) {
+              return false;
+            }
+            if (
+              filters.minContextLength !== undefined &&
+              catalogModel.context_window < filters.minContextLength
+            ) {
+              return false;
+            }
+          }
+
+          return true;
+        })
+        .map((catalogModel) => ({
+          id: catalogModel.id,
+          displayName: catalogModel.name,
+          description: undefined, // Not available in catalog format
+          contextWindow: catalogModel.context_window,
+          maxOutputTokens: catalogModel.default_max_tokens,
+          capabilities: catalogModel.supports_attachments ? ['attachments'] : undefined,
+          isDefault: false, // Would need to check against catalog provider defaults
+        }));
 
       return {
         id: catalogProvider.id,

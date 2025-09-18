@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SessionHelper } from './session-helper';
 import type { Agent } from '~/agents/agent';
 import type { Session } from '~/sessions/session';
-import { GlobalConfigManager } from '~/config/global-config';
+import { UserSettingsManager } from '~/config/user-settings';
 import { ProviderRegistry } from '~/providers/registry';
 import { TestProvider } from '~/test-utils/test-provider';
 import { Tool } from '~/tools/tool';
@@ -13,7 +13,7 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { z } from 'zod';
 
 // Mock modules
-vi.mock('~/config/global-config');
+vi.mock('~/config/user-settings');
 vi.mock('~/providers/registry');
 
 // Create a mock provider that supports multiple queued responses
@@ -88,8 +88,8 @@ describe('SessionHelper', () => {
     };
     mockAgent = agentPartial as Agent;
 
-    // Mock global config
-    vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue('test-instance:test-model');
+    // Mock user settings
+    vi.mocked(UserSettingsManager.getDefaultModel).mockReturnValue('test-instance:test-model');
 
     // Mock provider registry
     const mockRegistry: Partial<ProviderRegistry> = {
@@ -238,7 +238,7 @@ describe('SessionHelper', () => {
 
       const provider = await helper['getProvider']();
 
-      expect(GlobalConfigManager.getDefaultModel).toHaveBeenCalledWith('fast');
+      expect(UserSettingsManager.getDefaultModel).toHaveBeenCalledWith('fast');
       expect(ProviderRegistry.getInstance).toHaveBeenCalled();
       expect(provider).toBe(mockProvider);
     });
@@ -257,7 +257,7 @@ describe('SessionHelper', () => {
 
     it('should resolve fast vs smart models correctly', async () => {
       // Test fast model
-      vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValueOnce(
+      vi.mocked(UserSettingsManager.getDefaultModel).mockReturnValueOnce(
         'fast-instance:fast-model'
       );
 
@@ -268,10 +268,10 @@ describe('SessionHelper', () => {
 
       const fastModel = fastHelper['getModel']();
       expect(fastModel).toBe('fast-model');
-      expect(GlobalConfigManager.getDefaultModel).toHaveBeenCalledWith('fast');
+      expect(UserSettingsManager.getDefaultModel).toHaveBeenCalledWith('fast');
 
       // Test smart model
-      vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValueOnce(
+      vi.mocked(UserSettingsManager.getDefaultModel).mockReturnValueOnce(
         'smart-instance:smart-model'
       );
 
@@ -282,7 +282,7 @@ describe('SessionHelper', () => {
 
       const smartModel = smartHelper['getModel']();
       expect(smartModel).toBe('smart-model');
-      expect(GlobalConfigManager.getDefaultModel).toHaveBeenCalledWith('smart');
+      expect(UserSettingsManager.getDefaultModel).toHaveBeenCalledWith('smart');
     });
 
     it('should handle pending approval gracefully', async () => {

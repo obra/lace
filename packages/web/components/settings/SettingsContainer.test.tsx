@@ -288,8 +288,8 @@ describe('SettingsContainer', () => {
       fireEvent.click(screen.getByTestId('settings-trigger'));
     });
 
-    // Should show Providers panel by default
-    expect(screen.getByText('AI Provider Configuration')).toBeInTheDocument();
+    // Should show AI Models panel by default (check for Default Models section)
+    expect(screen.getByText('Default Models')).toBeInTheDocument();
   });
 
   it('handles keyboard navigation (Escape key)', async () => {
@@ -368,8 +368,8 @@ describe('SettingsContainer', () => {
       fireEvent.click(screen.getByTestId('settings-trigger'));
     });
 
-    // Should show tabs
-    expect(screen.getByText('Providers')).toBeInTheDocument();
+    // Should show tabs (check for tab specifically)
+    expect(screen.getByRole('tab', { name: /AI Models/ })).toBeInTheDocument();
     expect(screen.getByText('UI')).toBeInTheDocument();
     expect(screen.getByText('User')).toBeInTheDocument();
   });

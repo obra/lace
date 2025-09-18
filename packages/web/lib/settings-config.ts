@@ -1,7 +1,7 @@
 // ABOUTME: Centralized configuration for settings tabs and navigation
 // ABOUTME: Single source of truth for settings tab definitions, types, and metadata
 
-import { faPlug, faUser, faCog, faServer, faNewspaper } from '@/lib/fontawesome';
+import { faRobot, faUser, faCog, faServer, faNewspaper } from '@/lib/fontawesome';
 
 export const SETTINGS_TABS = {
   PROVIDERS: 'providers',
@@ -16,15 +16,15 @@ export type SettingsTab = (typeof SETTINGS_TABS)[keyof typeof SETTINGS_TABS];
 export interface SettingsTabConfig {
   id: SettingsTab;
   label: string;
-  icon: typeof faPlug; // FontAwesome icon type
+  icon: typeof faRobot; // FontAwesome icon type
   path: string;
 }
 
 export const SETTINGS_TAB_CONFIGS: readonly SettingsTabConfig[] = [
   {
     id: SETTINGS_TABS.PROVIDERS,
-    label: 'Providers',
-    icon: faPlug,
+    label: 'AI Models',
+    icon: faRobot,
     path: '/settings/providers',
   },
   {

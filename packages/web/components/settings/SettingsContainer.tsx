@@ -6,7 +6,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlug, faUser, faCog, faServer } from '@/lib/fontawesome';
+import { faRobot, faUser, faCog, faServer } from '@/lib/fontawesome';
 import { useTheme } from '@/components/providers/SettingsProvider';
 import { SettingsTabs } from './SettingsTabs';
 import { UISettingsPanel } from './panels/UISettingsPanel';
@@ -50,16 +50,16 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
 
   const userSettingsPanel = useMemo(() => <UserSettingsPanel />, []);
 
-  const providersPanel = useMemo(() => <ProvidersPanel />, []);
+  const aiModelsPanel = useMemo(() => <ProvidersPanel />, []);
 
   const mcpPanel = useMemo(() => <MCPPanel />, []);
 
   // Tab configuration with icons
   const tabConfig = [
     {
-      id: 'providers',
-      label: 'Providers',
-      icon: <FontAwesomeIcon icon={faPlug} className="w-4 h-4" />,
+      id: 'ai-models',
+      label: 'AI Models',
+      icon: <FontAwesomeIcon icon={faRobot} className="w-4 h-4" />,
     },
     {
       id: 'mcp',
@@ -82,9 +82,9 @@ export function SettingsContainer({ children }: SettingsContainerProps) {
         className="w-[80vw] h-[80vh] max-w-none max-h-none md:w-[90vw] md:h-[85vh] sm:w-[95vw] sm:h-[90vh] bg-base-100/60 backdrop-blur-md border border-base-300/60 shadow-xl"
       >
         <div className="h-[calc(80vh-8rem)] -m-4 flex flex-col rounded-xl overflow-hidden">
-          <SettingsTabs defaultTab="providers" tabs={tabConfig}>
-            <div data-tab="providers" className="flex-1 overflow-y-auto p-6">
-              {providersPanel}
+          <SettingsTabs defaultTab="ai-models" tabs={tabConfig}>
+            <div data-tab="ai-models" className="flex-1 overflow-y-auto p-6">
+              {aiModelsPanel}
             </div>
             <div data-tab="mcp" className="flex-1 overflow-y-auto p-6">
               {mcpPanel}

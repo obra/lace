@@ -1,7 +1,7 @@
 // ABOUTME: Individual instance card with status, actions, and details
 // ABOUTME: Uses StatusDot, Badge, and card components from design system
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import StatusDot from '@/components/ui/StatusDot';
 import Badge from '@/components/ui/Badge';
 import { EditInstanceModal } from './EditInstanceModal';
@@ -218,15 +218,37 @@ export function ProviderInstanceCard({
     }
   };
 
+  // Debounced reload to prevent excessive provider reloads
+  const debouncedReloadRef = useRef<NodeJS.Timeout | null>(null);
+
   const handleSaveConfig = useCallback(async () => {
     try {
       await providerService.updateModelConfig(instance.id, modelConfig);
       // Configuration saved successfully (no toast needed - auto-save)
+
+      // Debounce reload to prevent excessive updates during rapid changes
+      if (onEdit) {
+        if (debouncedReloadRef.current) {
+          clearTimeout(debouncedReloadRef.current);
+        }
+        debouncedReloadRef.current = setTimeout(() => {
+          onEdit();
+        }, 300); // 300ms debounce
+      }
     } catch (error) {
       console.error('Error saving configuration:', error);
       // Could add error feedback here if needed
     }
-  }, [instance.id, modelConfig]);
+  }, [instance.id, modelConfig, onEdit]);
+
+  // Cleanup debounced reload on unmount
+  useEffect(() => {
+    return () => {
+      if (debouncedReloadRef.current) {
+        clearTimeout(debouncedReloadRef.current);
+      }
+    };
+  }, []);
 
   // Track if this is the initial load to prevent saving on mount
   const [hasInitialized, setHasInitialized] = useState(false);

@@ -37,20 +37,31 @@ export function ModelSelector({
       : '';
 
   const handleChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    const value = event.target.value;
+    const value = event.currentTarget.value;
     if (!value) return;
 
     const parts = value.split('|');
-    if (parts.length === 2) {
-      try {
-        const providerInstanceId = decodeURIComponent(parts[0]);
-        const modelId = decodeURIComponent(parts[1]);
-        if (providerInstanceId && modelId) {
-          onChange(providerInstanceId, modelId);
-        }
-      } catch (error) {
-        console.error('Failed to decode model selector value:', error);
+    if (parts.length !== 2) {
+      console.warn('Invalid model selector format:', value);
+      return;
+    }
+
+    try {
+      const [providerPart, modelPart] = parts;
+      const providerInstanceId = decodeURIComponent(providerPart);
+      const modelId = decodeURIComponent(modelPart);
+
+      if (!providerInstanceId || !modelId) {
+        console.warn('Empty provider or model ID after decoding:', {
+          providerInstanceId,
+          modelId,
+        });
+        return;
       }
+
+      onChange(providerInstanceId, modelId);
+    } catch (error) {
+      console.error('Failed to decode model selector value:', error);
     }
   };
 

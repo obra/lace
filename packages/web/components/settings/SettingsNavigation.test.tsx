@@ -15,7 +15,7 @@ describe('SettingsNavigation', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Providers')).toBeInTheDocument();
+    expect(screen.getByText('AI Models')).toBeInTheDocument();
     expect(screen.getByText('MCP Servers')).toBeInTheDocument();
     expect(screen.getByText('UI')).toBeInTheDocument();
     expect(screen.getByText('User')).toBeInTheDocument();
@@ -28,12 +28,12 @@ describe('SettingsNavigation', () => {
       </MemoryRouter>
     );
 
-    const providersLink = screen.getByRole('link', { name: /providers/i });
+    const aiModelsLink = screen.getByRole('link', { name: /ai models/i });
     const mcpLink = screen.getByRole('link', { name: /mcp servers/i });
     const uiLink = screen.getByRole('link', { name: /ui/i });
     const userLink = screen.getByRole('link', { name: /user/i });
 
-    expect(providersLink).toHaveAttribute('href', '/settings/providers');
+    expect(aiModelsLink).toHaveAttribute('href', '/settings/providers');
     expect(mcpLink).toHaveAttribute('href', '/settings/mcp');
     expect(uiLink).toHaveAttribute('href', '/settings/ui');
     expect(userLink).toHaveAttribute('href', '/settings/user');

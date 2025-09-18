@@ -2,7 +2,7 @@
 // ABOUTME: Bypasses user approval with programmatic tool whitelist for trusted operations
 
 import { BaseHelper } from '~/helpers/base-helper';
-import { GlobalConfigManager } from '~/config/global-config';
+import { UserSettingsManager } from '~/config/user-settings';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { parseProviderModel } from '~/providers/provider-utils';
 import { ToolExecutor } from '~/tools/executor';
@@ -67,24 +67,24 @@ export class InfrastructureHelper extends BaseHelper {
     let modelId: string;
 
     try {
-      // Try to get model configuration from global config first
-      const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
+      // Try to get model configuration from user settings first
+      const providerModel = UserSettingsManager.getDefaultModel(this.options.model);
       const parsed = parseProviderModel(providerModel);
       instanceId = parsed.instanceId;
       modelId = parsed.modelId;
       this.resolvedModelId = modelId;
 
-      logger.debug('InfrastructureHelper using global model config', {
+      logger.debug('InfrastructureHelper using user settings model config', {
         tier: this.options.model,
         instanceId,
         modelId,
       });
     } catch (error) {
-      // Fall back to explicit provider if global config unavailable
+      // Fall back to explicit provider if user settings unavailable
       if (this.options.fallbackProvider) {
         logger.debug('InfrastructureHelper using fallback provider', {
           tier: this.options.model,
-          reason: 'global config unavailable',
+          reason: 'user settings unavailable',
         });
 
         this.provider = this.options.fallbackProvider;
@@ -153,13 +153,13 @@ export class InfrastructureHelper extends BaseHelper {
     }
 
     try {
-      // Try to extract model ID from global config first
-      const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
+      // Try to extract model ID from user settings first
+      const providerModel = UserSettingsManager.getDefaultModel(this.options.model);
       const { modelId } = parseProviderModel(providerModel);
       this.resolvedModelId = modelId;
       return modelId;
     } catch (error) {
-      // Fall back to explicit model if global config unavailable
+      // Fall back to explicit model if user settings unavailable
       if (this.options.fallbackModelId) {
         this.resolvedModelId = this.options.fallbackModelId;
         return this.options.fallbackModelId;

@@ -146,4 +146,48 @@ export class UserSettingsManager {
   static exists(): boolean {
     return fs.existsSync(this.getFilePath());
   }
+
+  /**
+   * Get the default model configuration for a given tier
+   * @param tier - Either 'fast' or 'smart'
+   * @returns The provider:model string for the requested tier
+   * @throws Error if tier is not configured
+   */
+  static getDefaultModel(tier: 'fast' | 'smart'): string {
+    const settings = this.load();
+
+    // Type-safe access to defaultModels
+    if (!settings.defaultModels || typeof settings.defaultModels !== 'object') {
+      throw new Error(
+        `No default models configured. Please configure default models in the AI Models settings tab.`
+      );
+    }
+
+    const defaultModels = settings.defaultModels as Record<string, unknown>;
+    const model = defaultModels[tier];
+
+    if (!model || typeof model !== 'string') {
+      throw new Error(
+        `No default '${tier}' model configured. Please select a ${tier} model in the AI Models settings tab.`
+      );
+    }
+
+    return model;
+  }
+
+  /**
+   * Update the default models configuration
+   * @param models - Object with optional fast and smart model settings
+   */
+  static updateDefaultModels(models: { fast?: string; smart?: string }): void {
+    const settings = this.load();
+    const currentDefaultModels = (settings.defaultModels as Record<string, unknown>) || {};
+
+    settings.defaultModels = {
+      ...currentDefaultModels,
+      ...models,
+    };
+
+    this.save(settings);
+  }
 }
