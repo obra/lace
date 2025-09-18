@@ -10,7 +10,7 @@ import { SettingField } from '@/components/settings/SettingField';
 import { ModelSelector } from '@/components/ui/ModelSelector';
 import { Alert } from '@/components/ui/Alert';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRocket, faBrain, faPlug, faInfoCircle } from '@/lib/fontawesome';
+import { faRocket, faBrain, faPlug } from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
@@ -31,15 +31,29 @@ export function ProvidersPanel() {
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Refs to prevent stale closure issues and setState after unmount
+  const isMountedRef = useRef(false);
+  const defaultModelsRef = useRef<DefaultModels>({});
+  const saveToastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingSavesRef = useRef(new Set<Promise<void>>());
+
   // Load current settings with retry mechanism
   const loadSettings = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
-      const settings = await api.get<Record<string, unknown>>('/api/settings');
-      const models = (settings.defaultModels || {}) as DefaultModels;
-      setDefaultModels(models);
+      if (isMountedRef.current) {
+        setLoading(true);
+        setError(null);
+      }
+      const settings = await api.get<{ defaultModels?: DefaultModels }>('/api/settings');
+      const models: DefaultModels = settings.defaultModels ?? {};
+
+      if (isMountedRef.current) {
+        setDefaultModels(models);
+        defaultModelsRef.current = models; // Keep ref in sync
+      }
     } catch (err) {
+      if (!isMountedRef.current) return;
+
       const errorMessage = err instanceof Error ? err.message : String(err);
       if (errorMessage.includes('fetch')) {
         setError(
@@ -52,7 +66,9 @@ export function ProvidersPanel() {
       }
       console.error('Failed to load settings:', err);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -62,43 +78,55 @@ export function ProvidersPanel() {
 
   // Parse provider:model format (memoized for performance)
   const parseModelSelection = useCallback((modelString: string | undefined) => {
-    if (!modelString || !modelString.includes(':')) {
-      return { providerId: undefined, modelId: undefined };
-    }
-    const parts = modelString.split(':');
-    if (parts.length !== 2) {
+    if (!modelString) return { providerId: undefined, modelId: undefined };
+    const idx = modelString.indexOf(':');
+    if (idx <= 0 || idx === modelString.length - 1) {
       console.warn('Invalid model format:', modelString);
       return { providerId: undefined, modelId: undefined };
     }
-    const [providerId, modelId] = parts;
+    const providerId = modelString.slice(0, idx);
+    const modelId = modelString.slice(idx + 1);
     return { providerId, modelId };
   }, []);
 
-  // Handle model selection with cleanup tracking
-  const pendingSavesRef = useRef(new Set<Promise<void>>());
-
+  // Handle model selection with ref-based state access
   const handleModelChange = useCallback(
     async (tier: 'fast' | 'smart', providerInstanceId: string, modelId: string) => {
       const newModelString = `${providerInstanceId}:${modelId}`;
-      const newModels = { ...defaultModels, [tier]: newModelString };
-      setDefaultModels(newModels);
-      setSaveSuccess(false);
+      const nextModels = { ...defaultModelsRef.current, [tier]: newModelString };
+      defaultModelsRef.current = nextModels;
 
-      // Auto-save with race condition protection
+      if (isMountedRef.current) {
+        setDefaultModels(nextModels);
+        setSaveSuccess(false);
+      }
+
+      // Auto-save with proper async state handling
       const savePromise = (async () => {
         try {
-          setSaving(true);
-          setError(null);
-          await api.patch('/api/settings', {
-            defaultModels: newModels,
-          });
+          if (isMountedRef.current) {
+            setSaving(true);
+            setError(null);
+          }
+          await api.patch('/api/settings', { defaultModels: nextModels });
+          if (!isMountedRef.current) return;
+
           setSaveSuccess(true);
-          // Clear success message after 3 seconds
-          setTimeout(() => setSaveSuccess(false), 3000);
+          // Clear previous timer and set new one
+          if (saveToastTimerRef.current) {
+            clearTimeout(saveToastTimerRef.current);
+          }
+          saveToastTimerRef.current = setTimeout(() => {
+            if (isMountedRef.current) setSaveSuccess(false);
+          }, 3000);
         } catch (err) {
+          if (!isMountedRef.current) return;
+
           const errorMessage = err instanceof Error ? err.message : String(err);
           if (errorMessage.includes('fetch')) {
             setError(`Unable to save ${tier} model. Please check your connection and try again.`);
+          } else if (errorMessage.includes('401') || errorMessage.includes('403')) {
+            setError('Access denied. Please check your authentication and try again.');
           } else if (errorMessage.includes('400')) {
             setError(
               `Invalid ${tier} model configuration. Please verify the selected model is valid.`
@@ -108,7 +136,9 @@ export function ProvidersPanel() {
           }
           console.error('Failed to save settings:', err);
         } finally {
-          setSaving(false);
+          if (isMountedRef.current) {
+            setSaving(false);
+          }
         }
       })();
 
@@ -120,15 +150,20 @@ export function ProvidersPanel() {
         pendingSavesRef.current.delete(savePromise);
       }
     },
-    [defaultModels]
+    [] // No dependencies - use refs for latest values
   );
 
-  // Cleanup on unmount - cancel pending saves
+  // Mount/unmount lifecycle management
   useEffect(() => {
+    isMountedRef.current = true;
     const pendingSaves = pendingSavesRef.current;
     return () => {
-      // Note: We can't actually cancel the API calls, but we can prevent state updates
+      isMountedRef.current = false;
       pendingSaves.clear();
+      if (saveToastTimerRef.current) {
+        clearTimeout(saveToastTimerRef.current);
+        saveToastTimerRef.current = null;
+      }
     };
   }, []);
 

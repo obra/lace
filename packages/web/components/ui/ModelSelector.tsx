@@ -37,12 +37,12 @@ export function ModelSelector({
       : '';
 
   const handleChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    const value = event.target.value;
+    const value = event.currentTarget.value;
     if (!value) return;
 
     const parts = value.split('|');
     if (parts.length !== 2) {
-      console.error('Invalid model selector format:', value);
+      console.warn('Invalid model selector format:', value);
       return;
     }
 
@@ -52,7 +52,7 @@ export function ModelSelector({
       const modelId = decodeURIComponent(modelPart);
 
       if (!providerInstanceId || !modelId) {
-        console.error('Empty provider or model ID after decoding:', {
+        console.warn('Empty provider or model ID after decoding:', {
           providerInstanceId,
           modelId,
         });
