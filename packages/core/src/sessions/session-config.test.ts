@@ -25,7 +25,7 @@ describe('Session configuration', () => {
         maxTokens: 4000,
         temperature: 0.7,
         systemPrompt: 'You are a helpful assistant.',
-        tools: ['file-read', 'bash'],
+        tools: ['file_read', 'bash'],
         toolPolicies: {
           bash: 'ask',
         },
@@ -59,7 +59,7 @@ describe('Session configuration', () => {
         modelId: 'claude-3-5-haiku-20241022',
         temperature: 0.1,
         capabilities: ['code-analysis', 'security-review'],
-        restrictions: ['no-file-write'],
+        restrictions: ['no-file_write'],
         memorySize: 1000,
       };
 
@@ -68,7 +68,7 @@ describe('Session configuration', () => {
       if (result.success) {
         expect(result.data.role).toBe('code-reviewer');
         expect(result.data.capabilities).toEqual(['code-analysis', 'security-review']);
-        expect(result.data.restrictions).toEqual(['no-file-write']);
+        expect(result.data.restrictions).toEqual(['no-file_write']);
       }
     });
 
@@ -116,7 +116,7 @@ describe('Session configuration', () => {
         modelId: 'claude-3-5-sonnet-20241022',
         maxTokens: 4000,
         toolPolicies: {
-          'file-read': 'allow',
+          file_read: 'allow',
           bash: 'ask',
         },
         environmentVariables: {
@@ -130,7 +130,7 @@ describe('Session configuration', () => {
         temperature: 0.8,
         toolPolicies: {
           bash: 'allow',
-          'file-write': 'ask',
+          file_write: 'ask',
         },
         environmentVariables: {
           OVERRIDE_VAR: 'override-value',
@@ -145,9 +145,9 @@ describe('Session configuration', () => {
       expect(merged.maxTokens).toBe(4000); // From base
       expect(merged.temperature).toBe(0.8); // Overridden
       expect(merged.toolPolicies).toEqual({
-        'file-read': 'allow',
+        file_read: 'allow',
         bash: 'allow', // Overridden
-        'file-write': 'ask', // Added
+        file_write: 'ask', // Added
       });
       expect(merged.environmentVariables).toEqual({
         BASE_VAR: 'base-value',
@@ -164,9 +164,9 @@ describe('Session configuration', () => {
         temperature: 0.2,
         maxTokens: 8000,
         systemPrompt: 'You are a senior software engineer conducting code reviews.',
-        tools: ['file-read', 'file-write', 'bash'],
+        tools: ['file_read', 'file_write', 'bash'],
         toolPolicies: {
-          'file-write': 'ask' as const,
+          file_write: 'ask' as const,
           bash: 'ask' as const,
         },
       };
@@ -182,7 +182,7 @@ describe('Session configuration', () => {
       expect(preset?.description).toBe('Configuration optimized for code review tasks');
       expect(preset?.configuration.modelId).toBe('claude-3-5-sonnet-20241022');
       expect(preset?.configuration.temperature).toBe(0.2);
-      expect(preset?.configuration.tools).toEqual(['file-read', 'file-write', 'bash']);
+      expect(preset?.configuration.tools).toEqual(['file_read', 'file_write', 'bash']);
     });
 
     it('should list all presets', () => {

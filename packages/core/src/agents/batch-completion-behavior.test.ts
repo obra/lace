@@ -10,7 +10,7 @@ import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { expectEventAdded } from '~/test-utils/event-helpers';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
-import { ToolResult, ToolContext } from '~/tools/types';
+import { ToolResult, ToolContext, ApprovalDecision } from '~/tools/types';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import {
@@ -162,8 +162,8 @@ describe('Tool Batch Completion Behavior', () => {
       providerInstanceId,
     });
 
-    // Mock agent approval for tests
-    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
+    // This test specifically tests approval denial workflow - tools should require approval
+    // Remove auto-grant mock so tools default to 'approval_required'
   });
 
   afterEach(async () => {

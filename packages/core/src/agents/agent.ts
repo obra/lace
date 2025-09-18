@@ -4,7 +4,7 @@
 import { EventEmitter } from 'events';
 import { resolve } from 'path';
 import { AIProvider, ProviderMessage } from '~/providers/base-provider';
-import { ToolCall, ToolResult } from '~/tools/types';
+import { ToolCall, ToolResult, ToolContext } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { ApprovalDecision, ToolPolicy } from '~/tools/types';
@@ -2765,87 +2765,10 @@ export class Agent extends EventEmitter {
       },
     });
 
-    // 2. Wait for approval decision
-    const decision = await this._waitForApprovalDecision(toolCall.id);
+    // Do NOT wait internally or execute - that happens via _handleToolApprovalResponse()
+    // when TOOL_APPROVAL_RESPONSE events arrive from UI/automation
 
-    // 3. Act on decision
-    if (this._isApprovalGranted(decision)) {
-      const result = await this._toolExecutor.execute(toolCall, context);
-
-      // Add result event and emit (following existing pattern)
-      this._activeToolCalls.delete(toolCall.id);
-      this._addEventAndEmit({
-        type: 'TOOL_RESULT',
-        data: result,
-        context: { threadId: this._threadId },
-      });
-      this.emit('tool_call_complete', {
-        toolName: toolCall.name,
-        result,
-        callId: toolCall.id,
-      });
-
-      // Update batch tracking
-      this._pendingToolCount--;
-      if (this._pendingToolCount === 0) {
-        this._handleBatchComplete();
-      }
-    } else {
-      const deniedResult = this._createDeniedResult(toolCall, decision);
-
-      // Add denied result event (following existing pattern)
-      this._activeToolCalls.delete(toolCall.id);
-      this._addEventAndEmit({
-        type: 'TOOL_RESULT',
-        data: deniedResult,
-        context: { threadId: this._threadId },
-      });
-      this.emit('tool_call_complete', {
-        toolName: toolCall.name,
-        result: deniedResult,
-        callId: toolCall.id,
-      });
-
-      // Update batch tracking
-      this._pendingToolCount--;
-      if (this._pendingToolCount === 0) {
-        this._handleBatchComplete();
-      }
-    }
-  }
-
-  /**
-   * Wait for approval decision using existing event system.
-   * Polls database for TOOL_APPROVAL_RESPONSE event.
-   */
-  private async _waitForApprovalDecision(toolCallId: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      // Set up timeout
-      const timeout = setTimeout(() => {
-        reject(new Error(`Approval timeout for tool call ${toolCallId}`));
-      }, 300000); // 5 minutes
-
-      // Poll for approval response event
-      const checkForResponse = () => {
-        const decision = this._threadManager.getApprovalDecision(toolCallId);
-        if (decision) {
-          clearTimeout(timeout);
-          resolve(decision);
-        } else {
-          // Check again in 100ms
-          setTimeout(checkForResponse, 100);
-        }
-      };
-
-      checkForResponse();
-    });
-  }
-
-  /**
-   * Check if approval decision grants execution permission.
-   */
-  private _isApprovalGranted(decision: string): boolean {
-    return decision === 'allow_once' || decision === 'allow_session';
+    // Approval request created, tool remains in pending state until external approval
   }
 
   /**

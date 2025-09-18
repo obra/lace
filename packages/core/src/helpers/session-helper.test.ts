@@ -75,6 +75,7 @@ describe('SessionHelper', () => {
     // Mock session
     const sessionPartial: Partial<Session> = {
       getToolPolicy: vi.fn().mockReturnValue('require-approval'),
+      getEffectiveConfiguration: vi.fn().mockReturnValue({ tools: undefined }), // No tool allowlist restrictions
       getWorkingDirectory: vi.fn().mockReturnValue('/session/dir'),
       getTools: vi.fn().mockReturnValue([testTool]),
     };

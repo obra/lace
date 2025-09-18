@@ -136,8 +136,16 @@ describe('Delegation Integration Tests', () => {
     session = Session.create({
       name: 'Delegation Integration Test Session',
       projectId: project.getId(),
-      approvalCallback: {
-        requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE), // Auto-approve all tool calls for testing
+      configuration: {
+        toolPolicies: {
+          // Auto-approve all tools for testing (replaces approvalCallback)
+          delegate: 'allow',
+          bash: 'allow',
+          file_read: 'allow',
+          file_write: 'allow',
+          task_add: 'allow',
+          task_complete: 'allow',
+        },
       },
     });
   });

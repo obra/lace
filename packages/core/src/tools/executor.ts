@@ -286,7 +286,7 @@ export class ToolExecutor {
         };
       }
 
-      const result = await tool.executeValidated(toolCall.arguments, toolContext);
+      const result = await tool.execute(toolCall.arguments, toolContext);
 
       // Ensure the result has the call ID if it wasn't set by the tool
       if (!result.id && toolCall.id) {

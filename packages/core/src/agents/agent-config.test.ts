@@ -71,11 +71,11 @@ describe('Agent Configuration', () => {
         modelId: 'claude-3-5-haiku-20241022',
         temperature: 0.1,
         capabilities: ['code-analysis', 'security-review'],
-        restrictions: ['no-file-write'],
+        restrictions: ['no-file_write'],
         memorySize: 1000,
         conversationHistory: 50,
         systemPrompt: 'You are a senior code reviewer.',
-        tools: ['file-read', 'bash'],
+        tools: ['file_read', 'bash'],
         toolPolicies: {
           bash: 'ask',
         },
@@ -84,11 +84,11 @@ describe('Agent Configuration', () => {
       const validated = ConfigurationValidator.validateAgentConfiguration(config);
       expect(validated.role).toBe('code-reviewer');
       expect(validated.capabilities).toEqual(['code-analysis', 'security-review']);
-      expect(validated.restrictions).toEqual(['no-file-write']);
+      expect(validated.restrictions).toEqual(['no-file_write']);
       expect(validated.memorySize).toBe(1000);
       expect(validated.conversationHistory).toBe(50);
       expect(validated.systemPrompt).toBe('You are a senior code reviewer.');
-      expect(validated.tools).toEqual(['file-read', 'bash']);
+      expect(validated.tools).toEqual(['file_read', 'bash']);
       expect(validated.toolPolicies).toEqual({ bash: 'ask' });
     });
 
@@ -111,7 +111,7 @@ describe('Agent Configuration', () => {
       testSession.updateConfiguration({
         temperature: 0.8,
         systemPrompt: 'You are a helpful assistant.',
-        tools: ['file-read', 'file-write'],
+        tools: ['file_read', 'file_write'],
       });
 
       // Spawn agent with specific configuration
@@ -125,7 +125,7 @@ describe('Agent Configuration', () => {
       const config = agent.getEffectiveConfiguration();
       expect(config.temperature).toBe(0.8);
       expect(config.systemPrompt).toBe('You are a helpful assistant.');
-      expect(config.tools).toEqual(['file-read', 'file-write']);
+      expect(config.tools).toEqual(['file_read', 'file_write']);
     });
 
     it('should override session configuration with agent-specific settings', () => {
@@ -134,7 +134,7 @@ describe('Agent Configuration', () => {
         temperature: 0.5,
         systemPrompt: 'You are a helpful assistant.',
         toolPolicies: {
-          'file-read': 'allow',
+          file_read: 'allow',
           bash: 'ask',
         },
       });
@@ -149,7 +149,7 @@ describe('Agent Configuration', () => {
         temperature: 0.2,
         systemPrompt: 'You are a senior code reviewer.',
         toolPolicies: {
-          'file-read': 'allow',
+          file_read: 'allow',
           bash: 'deny', // Override session policy
         },
       });
@@ -159,7 +159,7 @@ describe('Agent Configuration', () => {
       expect(config.temperature).toBe(0.2); // Agent override
       expect(config.systemPrompt).toBe('You are a senior code reviewer.'); // Agent override
       expect(config.toolPolicies).toEqual({
-        'file-read': 'allow',
+        file_read: 'allow',
         bash: 'deny', // Agent override
       });
     });
@@ -175,7 +175,7 @@ describe('Agent Configuration', () => {
       agent.updateConfiguration({
         role: 'code-reviewer',
         capabilities: ['code-analysis', 'security-review'],
-        restrictions: ['no-file-write'],
+        restrictions: ['no-file_write'],
         temperature: 0.1,
       });
 
@@ -183,7 +183,7 @@ describe('Agent Configuration', () => {
       const config = agent.getEffectiveConfiguration();
       expect(config.role).toBe('code-reviewer');
       expect(config.capabilities).toEqual(['code-analysis', 'security-review']);
-      expect(config.restrictions).toEqual(['no-file-write']);
+      expect(config.restrictions).toEqual(['no-file_write']);
       expect(config.temperature).toBe(0.1);
     });
 
@@ -195,22 +195,22 @@ describe('Agent Configuration', () => {
       // Configure agent with capabilities and restrictions
       agent.updateConfiguration({
         capabilities: ['security-analysis', 'vulnerability-scanning'],
-        restrictions: ['no-file-write', 'no-bash'],
+        restrictions: ['no-file_write', 'no-bash'],
         toolPolicies: {
-          'file-read': 'allow',
+          file_read: 'allow',
           bash: 'deny',
-          'file-write': 'deny',
+          file_write: 'deny',
         },
       });
 
       // Agent should have capabilities and restrictions
       const config = agent.getEffectiveConfiguration();
       expect(config.capabilities).toEqual(['security-analysis', 'vulnerability-scanning']);
-      expect(config.restrictions).toEqual(['no-file-write', 'no-bash']);
+      expect(config.restrictions).toEqual(['no-file_write', 'no-bash']);
       expect(config.toolPolicies).toEqual({
-        'file-read': 'allow',
+        file_read: 'allow',
         bash: 'deny',
-        'file-write': 'deny',
+        file_write: 'deny',
       });
     });
   });
@@ -243,7 +243,7 @@ describe('Agent Configuration', () => {
       testSession.updateConfiguration({
         temperature: 0.7,
         systemPrompt: 'You are a helpful assistant.',
-        tools: ['file-read', 'bash'],
+        tools: ['file_read', 'bash'],
       });
 
       const agent = testSession.spawnAgent({ name: 'Test Agent' });
@@ -258,7 +258,7 @@ describe('Agent Configuration', () => {
       const effective = agent.getEffectiveConfiguration();
       expect(effective.temperature).toBe(0.2); // Agent override
       expect(effective.systemPrompt).toBe('You are a helpful assistant.'); // From session
-      expect(effective.tools).toEqual(['file-read', 'bash']); // From session
+      expect(effective.tools).toEqual(['file_read', 'bash']); // From session
       expect(effective.role).toBe('specialist'); // Agent-specific
     });
 
@@ -336,20 +336,20 @@ describe('Agent Configuration', () => {
 
       // Configure agent restrictions
       agent.updateConfiguration({
-        restrictions: ['no-file-write', 'no-bash', 'read-only'],
+        restrictions: ['no-file_write', 'no-bash', 'read-only'],
         toolPolicies: {
-          'file-read': 'allow',
-          'file-write': 'deny',
+          file_read: 'allow',
+          file_write: 'deny',
           bash: 'deny',
         },
       });
 
       // Agent should have restrictions in configuration
       const config = agent.getEffectiveConfiguration();
-      expect(config.restrictions).toEqual(['no-file-write', 'no-bash', 'read-only']);
+      expect(config.restrictions).toEqual(['no-file_write', 'no-bash', 'read-only']);
       expect(config.toolPolicies).toEqual({
-        'file-read': 'allow',
-        'file-write': 'deny',
+        file_read: 'allow',
+        file_write: 'deny',
         bash: 'deny',
       });
     });

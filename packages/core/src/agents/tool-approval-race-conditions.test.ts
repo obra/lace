@@ -131,8 +131,8 @@ describe('Tool Approval Race Condition Integration Tests', () => {
     // Mock provider creation for test
     vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
-    // Mock agent approval for tests
-    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
+    // This test specifically tests approval race conditions - tools should require approval
+    // Remove the auto-grant mock so tools default to 'approval_required'
 
     await agent.start();
   });

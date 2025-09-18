@@ -119,8 +119,8 @@ describe('Enhanced Agent', () => {
       projectId: project.getId(),
       configuration: {
         toolPolicies: {
-          mock_tool: 'allow', // Allow test tool to execute without approval
-          bash: 'allow', // Allow bash tool for bash tests
+          // Default: tools require approval (secure by default)
+          // Individual tests will use setupAutoApprovalAgent() if they need auto-execution
         },
       },
     });
@@ -553,6 +553,9 @@ describe('Enhanced Agent', () => {
     });
 
     it('should add tool calls and results to thread', async () => {
+      // This test expects immediate tool execution
+      setupAutoApprovalAgent(agent);
+
       await agent.sendMessage('Use the tool');
 
       // Add small delay to allow async tool execution to complete
@@ -577,6 +580,9 @@ describe('Enhanced Agent', () => {
     });
 
     it('should handle tool execution errors gracefully', async () => {
+      // This test expects immediate tool execution
+      setupAutoApprovalAgent(agent);
+
       const failingTool = new MockTool({
         status: 'failed',
         content: [{ type: 'text', text: 'Tool failed' }],
@@ -602,6 +608,9 @@ describe('Enhanced Agent', () => {
     });
 
     it('should recurse for next response after tool execution', async () => {
+      // This test expects immediate tool execution and conversation continuation
+      setupAutoApprovalAgent(agent);
+
       // Set up provider to return different responses
       let callCount = 0;
       vi.spyOn(mockProvider, 'createResponse').mockImplementation((..._args) => {
@@ -869,7 +878,7 @@ describe('Enhanced Agent', () => {
       const toolResult = toolResults[0].data;
       expect(toolResult.id).toBe('call_1');
       expect(toolResult.status).not.toBe('completed');
-      expect(toolResult.content[0].text).toBe('Tool execution denied by user');
+      expect(toolResult.content[0].text).toBe('Tool execution denied: denied by policy');
     });
 
     it('should execute multiple tools independently as approvals arrive', async () => {
@@ -884,6 +893,8 @@ describe('Enhanced Agent', () => {
       );
 
       agent = createAgent({ tools: [mockTool] });
+      // This test specifically tests approval workflow - tools should require approval
+      setupApprovalRequiredAgent(agent);
       // Use the specific mock provider for this test
       vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
 
@@ -936,6 +947,8 @@ describe('Enhanced Agent', () => {
       );
 
       agent = createAgent({ tools: [mockTool] });
+      // This test specifically tests approval workflow - tools should require approval
+      setupApprovalRequiredAgent(agent);
       // Use the specific mock provider for this test
       vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(mockProviderForTest);
 
@@ -980,8 +993,6 @@ describe('Enhanced Agent', () => {
     });
 
     it('should attempt tool execution immediately instead of creating approval requests directly', async () => {
-      // Reset to auto-approval callback for this test
-
       // Mock ToolExecutor.execute to track calls (since agent now uses this for granted permissions)
       const executeToolSpy = vi.spyOn(toolExecutor, 'execute');
 
@@ -991,6 +1002,8 @@ describe('Enhanced Agent', () => {
       );
 
       agent = createAgent({ tools: [mockTool] });
+      // This test expects immediate tool execution (auto-approval)
+      setupAutoApprovalAgent(agent);
 
       // Update the agent's provider mock to use the specific test provider
       vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProviderForTest);
@@ -1076,7 +1089,7 @@ describe('Enhanced Agent', () => {
         isPending: false,
         content: [{ type: 'text' as const, text: 'Tool completed successfully' }],
       };
-      vi.spyOn(toolExecutor, 'executeTool').mockResolvedValue(completedResult);
+      vi.spyOn(toolExecutor, 'execute').mockResolvedValue(completedResult);
 
       // Use a provider that returns tool calls once, then regular response
       class MockProviderOnce extends MockProvider {
@@ -1103,6 +1116,8 @@ describe('Enhanced Agent', () => {
       });
 
       agent = createAgent({ tools: [mockTool] });
+      // This test expects immediate tool execution (non-pending)
+      setupAutoApprovalAgent(agent);
 
       // Update the agent's provider mock to use the specific test provider
       vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
@@ -1579,6 +1594,9 @@ describe('Enhanced Agent', () => {
     });
 
     it('should execute multiple tools in sequence', async () => {
+      // This test needs auto-approval for immediate execution
+      setupAutoApprovalAgent(agent);
+
       const toolStartEvents: Array<{
         toolName: string;
         arguments: Record<string, unknown>;
@@ -1606,6 +1624,9 @@ describe('Enhanced Agent', () => {
     });
 
     it('should add all tool calls and results to thread', async () => {
+      // This test needs auto-approval for immediate execution
+      setupAutoApprovalAgent(agent);
+
       await agent.sendMessage('Use multiple tools');
 
       // Add delay to allow multiple async tool executions to complete

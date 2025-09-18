@@ -102,7 +102,7 @@ describe('Temp Directory Integration', () => {
       agent,
     };
 
-    await toolExecutor.executeTool(
+    await toolExecutor.execute(
       {
         id: 'test-hierarchy',
         name: integrationTool.name,
@@ -140,7 +140,7 @@ describe('Temp Directory Integration', () => {
       agent,
     };
 
-    await toolExecutor.executeTool(
+    await toolExecutor.execute(
       {
         id: 'test-file-ops',
         name: integrationTool.name,
@@ -178,7 +178,7 @@ describe('Temp Directory Integration', () => {
     };
 
     // Execute with first ToolExecutor instance
-    await toolExecutor.executeTool(
+    await toolExecutor.execute(
       {
         id: 'test-stability-1',
         name: integrationTool.name,
@@ -194,7 +194,7 @@ describe('Temp Directory Integration', () => {
     newToolExecutor.registerTool(newIntegrationTool.name, newIntegrationTool);
     // Reusing existing agent with approval mocking
 
-    await newToolExecutor.executeTool(
+    await newToolExecutor.execute(
       {
         id: 'test-stability-2',
         name: newIntegrationTool.name,

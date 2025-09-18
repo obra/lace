@@ -59,7 +59,7 @@ describe('Session Configuration Integration', () => {
         maxTokens: 8000,
         temperature: 0.7,
         systemPrompt: 'You are a helpful assistant.',
-        tools: ['file-read', 'bash'],
+        tools: ['file_read', 'bash'],
         toolPolicies: {
           bash: 'ask',
         },
@@ -71,7 +71,7 @@ describe('Session Configuration Integration', () => {
       expect(validated.maxTokens).toBe(8000);
       expect(validated.temperature).toBe(0.7);
       expect(validated.systemPrompt).toBe('You are a helpful assistant.');
-      expect(validated.tools).toEqual(['file-read', 'bash']);
+      expect(validated.tools).toEqual(['file_read', 'bash']);
       expect(validated.toolPolicies).toEqual({ bash: 'ask' });
     });
 
@@ -143,7 +143,7 @@ describe('Session Configuration Integration', () => {
       // Set project tool policies
       testProject.updateConfiguration({
         toolPolicies: {
-          'file-read': 'allow',
+          file_read: 'allow',
           bash: 'ask',
         },
       });
@@ -161,16 +161,16 @@ describe('Session Configuration Integration', () => {
       session.updateConfiguration({
         toolPolicies: {
           bash: 'allow', // Override project policy
-          'file-write': 'ask', // Add new policy
+          file_write: 'ask', // Add new policy
         },
       });
 
       const effectiveConfig = session.getEffectiveConfiguration();
 
       expect(effectiveConfig.toolPolicies).toEqual({
-        'file-read': 'allow', // From project
+        file_read: 'allow', // From project
         bash: 'allow', // Overridden by session
-        'file-write': 'ask', // Added by session
+        file_write: 'ask', // Added by session
       });
 
       session.destroy();
@@ -187,9 +187,9 @@ describe('Session Configuration Integration', () => {
           temperature: 0.2,
           maxTokens: 8000,
           systemPrompt: 'You are a senior software engineer conducting code reviews.',
-          tools: ['file-read', 'file-write', 'bash'],
+          tools: ['file_read', 'file_write', 'bash'],
           toolPolicies: {
-            'file-write': 'ask',
+            file_write: 'ask',
             bash: 'ask',
           },
         },
@@ -221,9 +221,9 @@ describe('Session Configuration Integration', () => {
       expect(effectiveConfig.systemPrompt).toBe(
         'You are a senior software engineer conducting code reviews.'
       );
-      expect(effectiveConfig.tools).toEqual(['file-read', 'file-write', 'bash']);
+      expect(effectiveConfig.tools).toEqual(['file_read', 'file_write', 'bash']);
       expect(effectiveConfig.toolPolicies).toEqual({
-        'file-write': 'ask',
+        file_write: 'ask',
         bash: 'ask',
       });
 
@@ -245,15 +245,15 @@ describe('Session Configuration Integration', () => {
       // Set tool policies
       session.updateConfiguration({
         toolPolicies: {
-          'file-read': 'allow',
+          file_read: 'allow',
           bash: 'ask',
-          'file-write': 'deny',
+          file_write: 'deny',
         },
       });
 
-      expect(session.getToolPolicy('file-read')).toBe('allow');
+      expect(session.getToolPolicy('file_read')).toBe('allow');
       expect(session.getToolPolicy('bash')).toBe('ask');
-      expect(session.getToolPolicy('file-write')).toBe('deny');
+      expect(session.getToolPolicy('file_write')).toBe('deny');
       expect(session.getToolPolicy('unknown-tool')).toBe('ask'); // Default
 
       session.destroy();

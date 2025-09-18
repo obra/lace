@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, readFile, rm, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { FileEditTool } from '~/tools/implementations/file-edit';
+import { FileEditTool } from '~/tools/implementations/file_edit';
 
 describe('FileEditTool actual file modification', () => {
   let tool: FileEditTool;
@@ -14,7 +14,7 @@ describe('FileEditTool actual file modification', () => {
 
   beforeEach(async () => {
     tool = new FileEditTool();
-    testDir = join(tmpdir(), 'file-edit-actual-test-' + Date.now());
+    testDir = join(tmpdir(), 'file_edit-actual-test-' + Date.now());
     await mkdir(testDir, { recursive: true });
     testFile = join(testDir, 'test.txt');
   });

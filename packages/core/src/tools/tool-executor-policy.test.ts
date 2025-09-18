@@ -61,77 +61,93 @@ describe('Agent policy enforcement', () => {
   });
 
   it('should require approval when policy is ask', async () => {
-    vi.mocked(mockSession.getToolPolicy).mockReturnValue('ask');
+    mockSession.getToolPolicy.mockReturnValue('ask');
 
-    // Mock agent approval for policy tests
-    vi.spyOn(context.agent as any, '_checkToolPermission').mockResolvedValue('granted');
-
-    const toolCall = {
+    const toolCall: ToolCall = {
       id: 'test-id',
       name: 'file_write',
       arguments: { path: '/test.txt', content: 'test' },
     };
-    const result = await executor.executeTool(toolCall, context);
 
-    // The tool may fail due to filesystem issues, but policy should allow it to try
-    expect(result.content[0].text).not.toContain('Tool execution denied by policy');
+    const permission = await (
+      agent as unknown as { _checkToolPermission: (toolCall: ToolCall) => Promise<string> }
+    )._checkToolPermission(toolCall);
+
+    expect(permission).toBe('approval_required');
   });
 
   it('should deny tool when policy is deny', async () => {
-    vi.mocked(mockSession.getToolPolicy).mockReturnValue('deny');
+    mockSession.getToolPolicy.mockReturnValue('deny');
 
-    const toolCall = { id: 'test-id', name: 'bash', arguments: { command: 'ls' } };
-    const result = await executor.executeTool(toolCall, context);
+    const toolCall: ToolCall = {
+      id: 'test-id',
+      name: 'bash',
+      arguments: { command: 'ls' },
+    };
 
-    expect(result.status).toBe('denied');
-    expect(result.content[0].text).toContain('execution denied by policy');
+    const permission = await (
+      agent as unknown as { _checkToolPermission: (toolCall: ToolCall) => Promise<string> }
+    )._checkToolPermission(toolCall);
+
+    expect(permission).toBe('denied');
   });
 
   it('should deny tool when not in allowed tools list', async () => {
-    vi.mocked(mockSession.getEffectiveConfiguration).mockReturnValue({
+    mockSession.getEffectiveConfiguration.mockReturnValue({
       tools: ['file_read'], // bash not included
     });
+    mockSession.getToolPolicy.mockReturnValue('allow'); // Policy allows but not in allowlist
 
-    const toolCall = { id: 'test-id', name: 'bash', arguments: { command: 'ls' } };
-    const result = await executor.executeTool(toolCall, context);
+    const toolCall: ToolCall = {
+      id: 'test-id',
+      name: 'bash',
+      arguments: { command: 'ls' },
+    };
 
-    expect(result.status).toBe('denied');
-    expect(result.content[0].text).toContain('not allowed in current configuration');
+    const permission = await (
+      agent as unknown as { _checkToolPermission: (toolCall: ToolCall) => Promise<string> }
+    )._checkToolPermission(toolCall);
+
+    expect(permission).toBe('denied');
   });
 
   it('should require session context for security policy enforcement', async () => {
-    const mockAgentWithoutSession = {
-      threadId: asThreadId('lace_20250101_test03'),
-      getFullSession: vi.fn().mockResolvedValue(undefined), // No session available
-    } as unknown as Agent;
+    // Mock getFullSession to return null (no session available)
+    vi.spyOn(agent, 'getFullSession').mockResolvedValue(null);
 
-    const contextWithoutSession = {
-      signal: new AbortController().signal,
-      agent: mockAgentWithoutSession,
+    const toolCall: ToolCall = {
+      id: 'test-id',
+      name: 'file_read',
+      arguments: { path: '/test.txt' },
     };
 
-    const toolCall = { id: 'test-id', name: 'file_read', arguments: { file_path: '/test.txt' } };
-    const result = await executor.executeTool(toolCall, contextWithoutSession);
+    const permission = await (
+      agent as unknown as { _checkToolPermission: (toolCall: ToolCall) => Promise<string> }
+    )._checkToolPermission(toolCall);
 
-    expect(result.status).toBe('denied');
-    expect(result.content[0].text).toContain('Session not found for policy enforcement');
+    expect(permission).toBe('denied');
   });
 
-  it('should deny approval when user rejects', async () => {
-    vi.mocked(mockSession.getToolPolicy).mockReturnValue('ask');
+  it('should handle denied approvals correctly', async () => {
+    mockSession.getToolPolicy.mockReturnValue('ask');
 
-    // Mock agent approval for policy tests
-    vi.spyOn(context.agent as any, '_checkToolPermission').mockResolvedValue('denied');
-
-    const toolCall = {
+    const toolCall: ToolCall = {
       id: 'test-id',
       name: 'file_write',
       arguments: { path: '/test.txt', content: 'test' },
     };
-    const result = await executor.executeTool(toolCall, context);
 
-    expect(mockApprovalCallback.requestApproval).toHaveBeenCalled();
-    expect(result.status).toBe('denied');
-    expect(result.content[0].text).toContain('Tool execution denied by approval policy');
+    // First check should return approval_required
+    const permission = await (
+      agent as unknown as { _checkToolPermission: (toolCall: ToolCall) => Promise<string> }
+    )._checkToolPermission(toolCall);
+    expect(permission).toBe('approval_required');
+
+    // Test that denied approval creates proper result
+    const deniedResult = (
+      agent as unknown as { _createDeniedResult: (toolCall: ToolCall, decision: string) => any }
+    )._createDeniedResult(toolCall, 'deny');
+    expect(deniedResult.status).toBe('failed');
+    expect(deniedResult.content[0].text).toContain('Tool execution denied: deny');
   });
 });

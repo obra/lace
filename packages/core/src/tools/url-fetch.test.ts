@@ -2,7 +2,7 @@
 // ABOUTME: Validates URL fetching, content handling, and enhanced error reporting
 
 import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
-import { UrlFetchTool } from '~/tools/implementations/url-fetch';
+import { UrlFetchTool } from '~/tools/implementations/url_fetch';
 
 describe('UrlFetchTool with schema validation', () => {
   let tool: UrlFetchTool;

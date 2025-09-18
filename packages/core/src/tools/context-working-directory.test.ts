@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
-import { FileReadTool } from '~/tools/implementations/file-read';
+import { FileReadTool } from '~/tools/implementations/file_read';
 import { createMockToolContext } from '~/test-utils/mock-session';
 
 describe('ToolContext working directory', () => {
@@ -11,7 +11,7 @@ describe('ToolContext working directory', () => {
 
   beforeEach(() => {
     executor = new ToolExecutor();
-    executor.registerTool('file-read', new FileReadTool());
+    executor.registerTool('file_read', new FileReadTool());
   });
 
   it('should pass working directory in ToolContext', () => {

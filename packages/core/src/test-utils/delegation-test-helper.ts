@@ -227,10 +227,16 @@ export async function createDelegationTestSetup(options?: {
 
   // Create session WITHOUT provider configuration - it inherits from project
   const session = Session.create({
-    name: options?.sessionName || 'Delegation Test Session',
+    name: 'Delegation Test Session',
     projectId: project.getId(),
-    approvalCallback: {
-      requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE), // Auto-approve all tool calls for testing
+    configuration: {
+      toolPolicies: {
+        // Auto-approve all tools for testing (replaces approvalCallback)
+        delegate: 'allow',
+        bash: 'allow',
+        file_read: 'allow',
+        file_write: 'allow',
+      },
     },
   });
 

@@ -104,13 +104,13 @@
       "types": "./dist/tools/tool.d.ts",
       "import": "./dist/tools/tool.js"
     },
-    "./tools/implementations/file-read": {
-      "types": "./dist/tools/implementations/file-read.d.ts",
-      "import": "./dist/tools/implementations/file-read.js"
+    "./tools/implementations/file_read": {
+      "types": "./dist/tools/implementations/file_read.d.ts",
+      "import": "./dist/tools/implementations/file_read.js"
     },
-    "./tools/implementations/file-edit": {
-      "types": "./dist/tools/implementations/file-edit.d.ts",
-      "import": "./dist/tools/implementations/file-edit.js"
+    "./tools/implementations/file_edit": {
+      "types": "./dist/tools/implementations/file_edit.d.ts",
+      "import": "./dist/tools/implementations/file_edit.js"
     },
     "./sessions/session": {
       "types": "./dist/sessions/session.d.ts",
@@ -176,9 +176,9 @@
       "types": "./dist/threads/compaction/types.d.ts",
       "import": "./dist/threads/compaction/types.js"
     },
-    "./tools/implementations/url-fetch": {
-      "types": "./dist/tools/implementations/url-fetch.d.ts",
-      "import": "./dist/tools/implementations/url-fetch.js"
+    "./tools/implementations/url_fetch": {
+      "types": "./dist/tools/implementations/url_fetch.d.ts",
+      "import": "./dist/tools/implementations/url_fetch.js"
     },
     "./tools/implementations/bash": {
       "types": "./dist/tools/implementations/bash.d.ts",
