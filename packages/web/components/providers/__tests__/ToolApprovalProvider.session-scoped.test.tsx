@@ -4,7 +4,10 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
-import { ToolApprovalProvider, useToolApprovalContext } from '../ToolApprovalProvider';
+import {
+  ToolApprovalProvider,
+  useToolApprovalContext,
+} from '@/components/providers/ToolApprovalProvider';
 import { api } from '@/lib/api-client';
 import type { ThreadId } from '@/types/core';
 

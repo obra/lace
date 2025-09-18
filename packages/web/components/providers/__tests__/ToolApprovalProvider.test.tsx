@@ -187,7 +187,7 @@ describe('ToolApprovalProvider', () => {
   });
 
   describe('Pending Approvals Management', () => {
-    it('loads pending approvals on mount when agentId is provided', async () => {
+    it('loads pending approvals on mount when sessionId is provided', async () => {
       mockParseResponse.mockResolvedValue(mockApprovals);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
@@ -218,7 +218,7 @@ describe('ToolApprovalProvider', () => {
       });
     });
 
-    it('clears approvals when agentId is null', async () => {
+    it('clears approvals when sessionId is null', async () => {
       mockParseResponse.mockResolvedValue(mockApprovals);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,

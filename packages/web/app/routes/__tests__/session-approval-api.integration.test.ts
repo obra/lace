@@ -8,15 +8,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { Session, Project, TestProvider } from '@/lib/server/lace-imports';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
-import { asThreadId } from '@/types/core';
+import { createTestProviderInstance } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
-import { loader as pendingApprovalsLoader } from '../api.sessions.$sessionId.approvals.pending';
-import { action as approvalDecisionAction } from '../api.sessions.$sessionId.approvals.$toolCallId';
+import { loader as pendingApprovalsLoader } from '@/app/routes/api.sessions.$sessionId.approvals.pending';
+import { action as approvalDecisionAction } from '@/app/routes/api.sessions.$sessionId.approvals.$toolCallId';
+import type { PendingApproval, ApiErrorResponse } from '@/types/api';
 import type { ProviderResponse } from '@lace/core/providers/base-provider';
 
 // Mock server-only module
@@ -172,7 +169,7 @@ describe('Session Approval API Integration (Real Components)', () => {
     const response = await pendingApprovalsLoader(
       createLoaderArgs(request, { sessionId: session.getId() })
     );
-    const approvals = await parseResponse(response);
+    const approvals = await parseResponse<PendingApproval[]>(response);
 
     // Should aggregate approvals from both agents
     expect(approvals).toHaveLength(2);

@@ -2,13 +2,12 @@
 // ABOUTME: Routes approval decisions to the correct agent that created the tool call
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { action } from '../api.sessions.$sessionId.approvals.$toolCallId';
+import { action } from '@/app/routes/api.sessions.$sessionId.approvals.$toolCallId';
 import { getSessionService } from '@/lib/server/session-service';
 import { parseResponse } from '@/lib/serialization';
 import { createActionArgs } from '@/test-utils/route-test-helpers';
 import type { Session } from '@lace/core/sessions/session';
 import type { Agent } from '@lace/core/agents/agent';
-import { asThreadId } from '@/types/core';
 
 // Mock the session service
 vi.mock('@/lib/server/session-service');

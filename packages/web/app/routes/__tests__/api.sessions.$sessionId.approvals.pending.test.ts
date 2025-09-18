@@ -2,14 +2,12 @@
 // ABOUTME: Ensures all pending approvals from all agents in a session are collected and returned
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createRemixStub } from '@remix-run/testing';
-import { loader } from '../api.sessions.$sessionId.approvals.pending';
+import { loader } from '@/app/routes/api.sessions.$sessionId.approvals.pending';
 import { getSessionService } from '@/lib/server/session-service';
 import { parseResponse } from '@/lib/serialization';
 import { createLoaderArgs } from '@/test-utils/route-test-helpers';
 import type { Session } from '@lace/core/sessions/session';
 import type { Agent } from '@lace/core/agents/agent';
-import { asThreadId } from '@/types/core';
 
 // Mock the session service
 vi.mock('@/lib/server/session-service');

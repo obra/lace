@@ -8,6 +8,7 @@ import { ThreadIdSchema } from '@/lib/validation/schemas';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import { logger } from '~/utils/logger';
+import { ApprovalDecision } from '@/types/core';
 import type { Route } from './+types/api.sessions.$sessionId.approvals.$toolCallId';
 
 // Validation schemas
@@ -36,7 +37,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const { sessionId, toolCallId } = paramsResult.data;
 
     // Validate request body
-    const body = await request.json();
+    const body = (await request.json()) as unknown;
     const bodyResult = BodySchema.safeParse(body);
     if (!bodyResult.success) {
       return createErrorResponse('Invalid request body', 400, {
@@ -111,7 +112,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     // Submit approval decision to the correct agent using the same method as thread endpoint
     try {
-      await targetAgent.handleApprovalResponse(toolCallId, decision as any);
+      await targetAgent.handleApprovalResponse(toolCallId, decision as ApprovalDecision);
 
       logger.info(
         `[SESSION_APPROVAL] Submitted ${decision} decision for tool call ${toolCallId} to agent ${targetAgent.threadId}`

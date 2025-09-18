@@ -94,7 +94,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
           {
             approvals: rawPendingApprovals.map((a) => ({
               toolCallId: a.toolCallId,
-              toolName: (a.toolCall as any)?.name,
+              toolName: (a.toolCall as { name: string })?.name,
             })),
           }
         );
