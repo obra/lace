@@ -2734,6 +2734,12 @@ export class Agent extends EventEmitter {
       return 'denied'; // Tool not in allowlist
     }
 
+    // Check if tool is marked as safeInternal (auto-allowed)
+    const tool = this._toolExecutor.getTool(toolCall.name);
+    if (tool?.annotations?.safeInternal) {
+      return 'granted'; // Safe internal tools are always allowed
+    }
+
     // Check specific tool policy
     const policy = session.getToolPolicy(toolCall.name);
 
