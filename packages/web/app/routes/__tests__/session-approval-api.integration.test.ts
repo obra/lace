@@ -115,10 +115,11 @@ describe('Session Approval API Integration (Real Components)', () => {
     ]);
 
     // Mock main agent provider to use our mock
-    vi.spyOn(
-      mainAgent as { _createProviderInstance?: () => Promise<unknown> },
-      '_createProviderInstance'
-    ).mockResolvedValue(mockProvider);
+    Object.defineProperty(mainAgent, '_createProviderInstance', {
+      value: vi.fn().mockResolvedValue(mockProvider),
+      writable: true,
+      configurable: true,
+    });
 
     // Trigger main agent conversation - creates approval request
     await mainAgent.sendMessage('Run main command');
@@ -146,10 +147,11 @@ describe('Session Approval API Integration (Real Components)', () => {
     ]);
 
     // Mock delegate agent provider
-    vi.spyOn(
-      delegateAgent as { _createProviderInstance?: () => Promise<unknown> },
-      '_createProviderInstance'
-    ).mockResolvedValue(delegateMockProvider);
+    Object.defineProperty(delegateAgent, '_createProviderInstance', {
+      value: vi.fn().mockResolvedValue(delegateMockProvider),
+      writable: true,
+      configurable: true,
+    });
 
     // Trigger delegate agent conversation - creates second approval request
     await delegateAgent.sendMessage('Run delegate command');
@@ -219,10 +221,11 @@ describe('Session Approval API Integration (Real Components)', () => {
     ]);
 
     // Mock delegate agent provider
-    vi.spyOn(
-      delegateAgent as { _createProviderInstance?: () => Promise<unknown> },
-      '_createProviderInstance'
-    ).mockResolvedValue(delegateMockProvider);
+    Object.defineProperty(delegateAgent, '_createProviderInstance', {
+      value: vi.fn().mockResolvedValue(delegateMockProvider),
+      writable: true,
+      configurable: true,
+    });
 
     // Trigger delegate conversation - creates real approval request
     await delegateAgent.sendMessage('Run routing test');

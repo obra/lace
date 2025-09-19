@@ -12,6 +12,14 @@ import type { PendingApproval, ApiErrorResponse } from '@/types/api';
 import type { SessionService } from '@/lib/server/session-service';
 import type { ToolApprovalRequestData } from '@/types/web-events';
 
+// Define session service mock interface matching the real SessionService
+interface MockSessionService {
+  getSession: ReturnType<typeof vi.fn>;
+  setupAgentEventHandlers: ReturnType<typeof vi.fn>;
+  updateSession: ReturnType<typeof vi.fn>;
+  clearActiveSessions: ReturnType<typeof vi.fn>;
+}
+
 // Mock the session service
 vi.mock('@/lib/server/session-service');
 const mockGetSessionService = vi.mocked(getSessionService);
@@ -84,7 +92,12 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
     );
 
     const response = await action(createActionArgs(request, { sessionId, toolCallId }));
-    const data = await parseResponse(response);
+    const data = await parseResponse<{
+      success: boolean;
+      agentId: string;
+      toolCallId: string;
+      decision: string;
+    }>(response);
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
@@ -151,10 +164,13 @@ describe('/api/sessions/:sessionId/approvals/:toolCallId', () => {
     const sessionId = 'lace_20250916_nofind'; // Valid format but non-existent
     const toolCallId = 'tool-call-1';
 
-    const mockSessionService = {
+    const mockSessionService: MockSessionService = {
       getSession: vi.fn().mockResolvedValue(null),
+      setupAgentEventHandlers: vi.fn().mockResolvedValue(undefined),
+      updateSession: vi.fn().mockResolvedValue(undefined),
+      clearActiveSessions: vi.fn(),
     };
-    mockGetSessionService.mockReturnValue(mockSessionService as SessionService);
+    mockGetSessionService.mockReturnValue(mockSessionService);
 
     const request = new Request(
       `http://localhost/api/sessions/${sessionId}/approvals/${toolCallId}`,

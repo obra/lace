@@ -10,21 +10,12 @@ import type { Session } from '@lace/core/sessions/session';
 import type { Agent } from '@lace/core/agents/agent';
 import type { ApiErrorResponse } from '@/types/api';
 
-// Define loader args interface
-interface LoaderArgs {
-  request: Request;
-  params: {
-    sessionId: string;
-  };
-  context: unknown;
-}
-
-// Define session service mock interface
+// Define session service mock interface matching the real SessionService
 interface MockSessionService {
   getSession: ReturnType<typeof vi.fn>;
-  setupAgentEventHandlers?: ReturnType<typeof vi.fn>;
-  updateSession?: ReturnType<typeof vi.fn>;
-  clearActiveSessions?: ReturnType<typeof vi.fn>;
+  setupAgentEventHandlers: ReturnType<typeof vi.fn>;
+  updateSession: ReturnType<typeof vi.fn>;
+  clearActiveSessions: ReturnType<typeof vi.fn>;
 }
 
 // Mock the session service
@@ -78,17 +69,16 @@ describe('/api/sessions/:sessionId/approvals/pending', () => {
     const sessionId = 'lace_20250916_test01';
     const mockSession = createMockSession(sessionId, []);
 
-    const mockSessionService = {
+    const mockSessionService: MockSessionService = {
       getSession: vi.fn().mockResolvedValue(mockSession),
+      setupAgentEventHandlers: vi.fn().mockResolvedValue(undefined),
+      updateSession: vi.fn().mockResolvedValue(undefined),
+      clearActiveSessions: vi.fn(),
     };
-    mockGetSessionService.mockReturnValue(mockSessionService as unknown as MockSessionService);
+    mockGetSessionService.mockReturnValue(mockSessionService);
 
     const request = new Request(`http://localhost/api/sessions/${sessionId}/approvals/pending`);
-    const response = await loader({
-      request,
-      params: { sessionId },
-      context: {},
-    } as LoaderArgs);
+    const response = await loader(createLoaderArgs(request, { sessionId }));
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -122,17 +112,16 @@ describe('/api/sessions/:sessionId/approvals/pending', () => {
 
     const mockSession = createMockSession(sessionId, [agent1, agent2]);
 
-    const mockSessionService = {
+    const mockSessionService: MockSessionService = {
       getSession: vi.fn().mockResolvedValue(mockSession),
+      setupAgentEventHandlers: vi.fn().mockResolvedValue(undefined),
+      updateSession: vi.fn().mockResolvedValue(undefined),
+      clearActiveSessions: vi.fn(),
     };
-    mockGetSessionService.mockReturnValue(mockSessionService as unknown as MockSessionService);
+    mockGetSessionService.mockReturnValue(mockSessionService);
 
     const request = new Request(`http://localhost/api/sessions/${sessionId}/approvals/pending`);
-    const response = await loader({
-      request,
-      params: { sessionId },
-      context: {},
-    } as LoaderArgs);
+    const response = await loader(createLoaderArgs(request, { sessionId }));
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -176,17 +165,16 @@ describe('/api/sessions/:sessionId/approvals/pending', () => {
 
     const mockSession = createMockSession(sessionId, [agent1, agent2]);
 
-    const mockSessionService = {
+    const mockSessionService: MockSessionService = {
       getSession: vi.fn().mockResolvedValue(mockSession),
+      setupAgentEventHandlers: vi.fn().mockResolvedValue(undefined),
+      updateSession: vi.fn().mockResolvedValue(undefined),
+      clearActiveSessions: vi.fn(),
     };
-    mockGetSessionService.mockReturnValue(mockSessionService as unknown as MockSessionService);
+    mockGetSessionService.mockReturnValue(mockSessionService);
 
     const request = new Request(`http://localhost/api/sessions/${sessionId}/approvals/pending`);
-    const response = await loader({
-      request,
-      params: { sessionId },
-      context: {},
-    } as LoaderArgs);
+    const response = await loader(createLoaderArgs(request, { sessionId }));
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -201,10 +189,13 @@ describe('/api/sessions/:sessionId/approvals/pending', () => {
   it('should return 404 when session not found', async () => {
     const sessionId = 'lace_20250916_nofind'; // Valid format but non-existent
 
-    const mockSessionService = {
+    const mockSessionService: MockSessionService = {
       getSession: vi.fn().mockResolvedValue(null),
+      setupAgentEventHandlers: vi.fn().mockResolvedValue(undefined),
+      updateSession: vi.fn().mockResolvedValue(undefined),
+      clearActiveSessions: vi.fn(),
     };
-    mockGetSessionService.mockReturnValue(mockSessionService as unknown as MockSessionService);
+    mockGetSessionService.mockReturnValue(mockSessionService);
 
     const request = new Request(`http://localhost/api/sessions/${sessionId}/approvals/pending`);
     const response = await loader(createLoaderArgs(request, { sessionId }));
@@ -234,17 +225,16 @@ describe('/api/sessions/:sessionId/approvals/pending', () => {
 
     const mockSession = createMockSession(sessionId, [agent1, agent2]);
 
-    const mockSessionService = {
+    const mockSessionService: MockSessionService = {
       getSession: vi.fn().mockResolvedValue(mockSession),
+      setupAgentEventHandlers: vi.fn().mockResolvedValue(undefined),
+      updateSession: vi.fn().mockResolvedValue(undefined),
+      clearActiveSessions: vi.fn(),
     };
-    mockGetSessionService.mockReturnValue(mockSessionService as unknown as MockSessionService);
+    mockGetSessionService.mockReturnValue(mockSessionService);
 
     const request = new Request(`http://localhost/api/sessions/${sessionId}/approvals/pending`);
-    const response = await loader({
-      request,
-      params: { sessionId },
-      context: {},
-    } as LoaderArgs);
+    const response = await loader(createLoaderArgs(request, { sessionId }));
 
     expect(response.status).toBe(200);
     const data = await response.json();
