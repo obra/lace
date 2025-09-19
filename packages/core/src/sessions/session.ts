@@ -1178,9 +1178,8 @@ Use your task_add_note tool to record important notes as you work and your task_
       logger.info(`Initialized MCP servers for session ${this.getId()}`);
 
       // Fire-and-forget refresh of MCP tools in any existing executors
-      void this.refreshMCPToolsInExecutors().catch((error) => {
-        logger.debug(`Non-blocking MCP tools refresh failed during startup:`, error);
-      });
+      // Refresh MCP tools in existing executors (synchronous)
+      this.refreshMCPToolsInExecutors();
     } catch (error) {
       logger.warn(`Failed to initialize MCP servers for session ${this.getId()}:`, error);
     }
@@ -1189,7 +1188,7 @@ Use your task_add_note tool to record important notes as you work and your task_
   /**
    * Refresh MCP tools in all ToolExecutors for this session
    */
-  private async refreshMCPToolsInExecutors(): Promise<void> {
+  private refreshMCPToolsInExecutors(): void {
     // Update MCP tools in all agents' ToolExecutors
     // Only register for fully initialized agents to avoid timing issues
     for (const agent of this._agents.values()) {
@@ -1228,14 +1227,14 @@ Use your task_add_note tool to record important notes as you work and your task_
             logger.info(`Restarted MCP server ${serverId} with new configuration`);
           }
           // Refresh tools in all ToolExecutors
-          await this.refreshMCPToolsInExecutors();
+          this.refreshMCPToolsInExecutors();
           break;
 
         case 'deleted':
           await this._mcpServerManager.stopServer(serverId);
           logger.info(`Stopped and removed MCP server ${serverId}`);
           // Refresh tools in all ToolExecutors
-          await this.refreshMCPToolsInExecutors();
+          this.refreshMCPToolsInExecutors();
           break;
       }
     } catch (error) {
@@ -1265,12 +1264,12 @@ Use your task_add_note tool to record important notes as you work and your task_
       ...serverConfig,
       cwd: this.getWorkingDirectory(), // Always use session's working directory
     });
-    await this.refreshMCPToolsInExecutors();
+    this.refreshMCPToolsInExecutors();
   }
 
   async stopMCPServer(serverId: string): Promise<void> {
     await this._mcpServerManager.stopServer(serverId);
-    await this.refreshMCPToolsInExecutors();
+    this.refreshMCPToolsInExecutors();
   }
 
   async restartMCPServer(serverId: string): Promise<void> {

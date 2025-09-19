@@ -4,7 +4,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
 import { FileReadTool } from '~/tools/implementations/file_read';
-import { BashTool } from '~/tools/implementations/bash';
 import type { ToolCall, ToolContext } from '~/tools/types';
 
 describe('Simplified ToolExecutor', () => {

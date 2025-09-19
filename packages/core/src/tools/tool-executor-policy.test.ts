@@ -5,7 +5,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { ToolExecutor } from '~/tools/executor';
 import { ThreadManager } from '~/threads/thread-manager';
-import { DatabasePersistence } from '~/persistence/database';
 import type { ToolCall } from '~/tools/types';
 
 describe('Agent policy enforcement', () => {
@@ -15,7 +14,6 @@ describe('Agent policy enforcement', () => {
   let mockSession: any;
 
   beforeEach(() => {
-    const persistence = new DatabasePersistence(':memory:');
     threadManager = new ThreadManager();
     toolExecutor = new ToolExecutor();
 
