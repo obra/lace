@@ -48,6 +48,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     const { decision } = bodyResult.data;
 
+    logger.info(
+      `[SESSION_APPROVAL_DECISION] Processing ${decision} for tool call ${toolCallId} in session ${sessionId}`
+    );
+
     // Get session
     const sessionService = getSessionService();
     const session = await sessionService.getSession(asThreadId(sessionId));
@@ -55,54 +59,19 @@ export async function action({ request, params }: Route.ActionArgs) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Find which agent has this pending approval
-    const agentInfos = session.getAgents();
-    let targetAgent = null;
+    // Use the new efficient session-wide method to find which agent owns this approval
+    const pendingApprovals = session.getPendingApprovals();
 
     logger.info(
-      `[SESSION_APPROVAL] Looking for tool call ${toolCallId} in ${agentInfos.length} agents`
+      `[SESSION_APPROVAL_DECISION] Session has ${pendingApprovals.length} pending approvals`
     );
 
-    for (const agentInfo of agentInfos) {
-      // Get actual Agent instance
-      const agent = session.getAgent(asThreadId(agentInfo.threadId));
-      if (!agent) {
-        logger.warn(`[SESSION_APPROVAL] Agent instance not found for ${agentInfo.threadId}`);
-        continue;
-      }
+    const approval = pendingApprovals.find((a) => a.toolCallId === toolCallId);
 
-      logger.info(
-        `[SESSION_APPROVAL] Checking agent ${agent.threadId} for tool call ${toolCallId}`
+    if (!approval) {
+      logger.warn(
+        `[SESSION_APPROVAL_DECISION] Tool call ${toolCallId} not found in session's pending approvals`
       );
-
-      try {
-        const pendingApprovals = agent.getPendingApprovals();
-        logger.info(
-          `[SESSION_APPROVAL] Agent ${agent.threadId} has ${pendingApprovals.length} pending approvals:`,
-          {
-            approvals: pendingApprovals.map((a) => a.toolCallId),
-          }
-        );
-
-        const hasApproval = pendingApprovals.some((approval) => approval.toolCallId === toolCallId);
-
-        if (hasApproval) {
-          logger.info(
-            `[SESSION_APPROVAL] Found tool call ${toolCallId} in agent ${agent.threadId}`
-          );
-          targetAgent = agent;
-          break;
-        }
-      } catch (error) {
-        // Log detailed error
-        logger.warn(`[SESSION_APPROVAL] Failed to check approvals for agent ${agent.threadId}:`, {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-      }
-    }
-
-    if (!targetAgent) {
       return createErrorResponse(
         `Tool call "${toolCallId}" not found in any pending approvals for session ${sessionId}`,
         404,
@@ -110,12 +79,30 @@ export async function action({ request, params }: Route.ActionArgs) {
       );
     }
 
+    // Get the agent that owns this approval
+    const targetAgent = session.getAgent(asThreadId(approval.threadId));
+
+    if (!targetAgent) {
+      logger.error(
+        `[SESSION_APPROVAL_DECISION] Agent ${approval.threadId} not found for tool call ${toolCallId}`
+      );
+      return createErrorResponse(
+        `Agent "${approval.threadId}" not found for tool call "${toolCallId}"`,
+        500,
+        { code: 'INTERNAL_SERVER_ERROR' }
+      );
+    }
+
+    logger.info(
+      `[SESSION_APPROVAL_DECISION] Found tool call ${toolCallId} in agent ${targetAgent.threadId}`
+    );
+
     // Submit approval decision to the correct agent using the same method as thread endpoint
     try {
       await targetAgent.handleApprovalResponse(toolCallId, decision as ApprovalDecision);
 
       logger.info(
-        `[SESSION_APPROVAL] Submitted ${decision} decision for tool call ${toolCallId} to agent ${targetAgent.threadId}`
+        `[SESSION_APPROVAL_DECISION] Successfully submitted ${decision} decision for tool call ${toolCallId} to agent ${targetAgent.threadId}`
       );
 
       return createSuperjsonResponse({
@@ -125,13 +112,13 @@ export async function action({ request, params }: Route.ActionArgs) {
         decision,
       });
     } catch (error) {
-      logger.error(`[SESSION_APPROVAL] Failed to submit approval decision:`, error);
+      logger.error(`[SESSION_APPROVAL_DECISION] Failed to submit approval decision:`, error);
       return createErrorResponse('Failed to submit approval decision', 500, {
         code: 'INTERNAL_SERVER_ERROR',
       });
     }
   } catch (error) {
-    logger.error('[SESSION_APPROVAL] Failed to process approval decision:', error);
+    logger.error('[SESSION_APPROVAL_DECISION] Failed to process approval decision:', error);
     return createErrorResponse('Failed to process approval decision', 500, {
       code: 'INTERNAL_SERVER_ERROR',
     });

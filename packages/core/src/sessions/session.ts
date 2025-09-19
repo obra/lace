@@ -872,6 +872,17 @@ export class Session {
     return this._agents.get(threadId) || null;
   }
 
+  getPendingApprovals(): Array<{
+    toolCallId: string;
+    toolCall: unknown;
+    requestedAt: Date;
+    threadId: string;
+  }> {
+    // Get all pending approvals for the entire session with a single database query
+    const db = getPersistence();
+    return db.getPendingApprovals(this._sessionId);
+  }
+
   async startAgent(threadId: ThreadId): Promise<void> {
     const agent = this.getAgent(threadId);
     if (!agent) {

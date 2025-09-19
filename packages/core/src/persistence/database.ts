@@ -1330,42 +1330,79 @@ export class DatabasePersistence {
   // Approval-related methods
   // ===============================
 
-  getPendingApprovals(threadId: string): Array<{
+  getPendingApprovals(threadOrSessionId: string): Array<{
     toolCallId: string;
     toolCall: unknown;
     requestedAt: Date;
+    threadId: string;
   }> {
     if (this._disabled || !this.db || this._closed) return [];
 
-    const stmt = this.db.prepare(`
-      SELECT 
-        req.data->>'toolCallId' as tool_call_id,
-        tc.data as tool_call_data,
-        req.timestamp as requested_at
-      FROM events req
-      JOIN events tc ON tc.data->>'id' = req.data->>'toolCallId'  
-      WHERE req.type = 'TOOL_APPROVAL_REQUEST'
-        AND req.thread_id = ?
-        AND tc.type = 'TOOL_CALL'
-        AND NOT EXISTS (
-          SELECT 1 FROM events resp
-          WHERE resp.type = 'TOOL_APPROVAL_RESPONSE'
-            AND resp.data->>'toolCallId' = req.data->>'toolCallId'
-            AND resp.thread_id = req.thread_id
-        )
-      ORDER BY req.timestamp ASC
-    `);
+    // Determine if this is a sessionId or threadId by checking if it exists in sessions table
+    const isSession = this.db
+      .prepare('SELECT 1 FROM sessions WHERE id = ? LIMIT 1')
+      .get(threadOrSessionId);
 
-    const rows = stmt.all(threadId) as Array<{
+    let stmt;
+    if (isSession) {
+      // Query for all threads belonging to this session
+      stmt = this.db.prepare(`
+        SELECT
+          req.data->>'toolCallId' as tool_call_id,
+          tc.data as tool_call_data,
+          req.timestamp as requested_at,
+          req.thread_id as thread_id
+        FROM events req
+        JOIN events tc ON tc.data->>'id' = req.data->>'toolCallId'
+        JOIN threads t ON req.thread_id = t.id
+        WHERE req.type = 'TOOL_APPROVAL_REQUEST'
+          AND t.session_id = ?
+          AND tc.type = 'TOOL_CALL'
+          AND tc.thread_id = req.thread_id
+          AND NOT EXISTS (
+            SELECT 1 FROM events resp
+            WHERE resp.type = 'TOOL_APPROVAL_RESPONSE'
+              AND resp.data->>'toolCallId' = req.data->>'toolCallId'
+              AND resp.thread_id = req.thread_id
+          )
+        ORDER BY req.timestamp ASC
+      `);
+    } else {
+      // Original single-thread query
+      stmt = this.db.prepare(`
+        SELECT
+          req.data->>'toolCallId' as tool_call_id,
+          tc.data as tool_call_data,
+          req.timestamp as requested_at,
+          req.thread_id as thread_id
+        FROM events req
+        JOIN events tc ON tc.data->>'id' = req.data->>'toolCallId'
+        WHERE req.type = 'TOOL_APPROVAL_REQUEST'
+          AND req.thread_id = ?
+          AND tc.type = 'TOOL_CALL'
+          AND tc.thread_id = req.thread_id
+          AND NOT EXISTS (
+            SELECT 1 FROM events resp
+            WHERE resp.type = 'TOOL_APPROVAL_RESPONSE'
+              AND resp.data->>'toolCallId' = req.data->>'toolCallId'
+              AND resp.thread_id = req.thread_id
+          )
+        ORDER BY req.timestamp ASC
+      `);
+    }
+
+    const rows = stmt.all(threadOrSessionId) as Array<{
       tool_call_id: string;
       tool_call_data: string;
       requested_at: string;
+      thread_id: string;
     }>;
 
     return rows.map((row) => ({
       toolCallId: row.tool_call_id,
       toolCall: JSON.parse(row.tool_call_data) as unknown,
       requestedAt: new Date(row.requested_at),
+      threadId: row.thread_id,
     }));
   }
 

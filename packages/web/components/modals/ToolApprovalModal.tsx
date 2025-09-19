@@ -266,13 +266,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
 
   return (
     <div className="fixed inset-0 z-50 pointer-events-none">
-      {/* Transparent backdrop - only for modal isolation */}
-      <div
-        className="absolute inset-0 pointer-events-auto"
-        onClick={() => onDecision(currentApproval.toolCallId, ApprovalDecision.DENY)}
-      />
-
-      {/* Modal anchored to bottom */}
+      {/* Modal anchored to bottom - no backdrop blocking UI */}
       <div className="absolute bottom-0 left-0 right-0 p-4 pointer-events-none">
         <div className="max-w-2xl mx-auto pointer-events-auto">
           <div className="bg-base-100/95 backdrop-blur-md rounded-lg shadow-xl border border-base-300">

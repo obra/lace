@@ -129,6 +129,13 @@ export function ToolApprovalProvider({ children, sessionId }: ToolApprovalProvid
     void refreshSessionPendingApprovals();
   }, [sessionId, refreshSessionPendingApprovals]);
 
+  // Also refresh when component mounts (for agent navigation within same session)
+  useEffect(() => {
+    if (sessionId) {
+      void refreshSessionPendingApprovals();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- Intentionally only on mount
+
   const value: ToolApprovalContextType = useMemo(
     () => ({
       // Approval data
