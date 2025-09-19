@@ -1348,9 +1348,10 @@ export class DatabasePersistence {
         AND req.thread_id = ?
         AND tc.type = 'TOOL_CALL'
         AND NOT EXISTS (
-          SELECT 1 FROM events resp 
+          SELECT 1 FROM events resp
           WHERE resp.type = 'TOOL_APPROVAL_RESPONSE'
             AND resp.data->>'toolCallId' = req.data->>'toolCallId'
+            AND resp.thread_id = req.thread_id
         )
       ORDER BY req.timestamp ASC
     `);
