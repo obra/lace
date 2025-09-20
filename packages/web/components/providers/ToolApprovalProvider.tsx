@@ -53,12 +53,13 @@ export function ToolApprovalProvider({ children, sessionId }: ToolApprovalProvid
     }
 
     setLoading(true);
-    try {
-      // Abort any in-flight request before starting a new one
-      abortControllerRef.current?.abort();
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
 
+    // Abort any in-flight request before starting a new one
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
       const data = await api.get<SessionPendingApproval[]>(
         `/api/sessions/${sessionId}/approvals/pending`,
         {
@@ -66,17 +67,26 @@ export function ToolApprovalProvider({ children, sessionId }: ToolApprovalProvid
         }
       );
 
-      if (Array.isArray(data)) {
-        setSessionPendingApprovals(data);
-      } else {
-        setSessionPendingApprovals([]);
+      // Only update state if this request is still the most recent
+      if (abortControllerRef.current === controller) {
+        if (Array.isArray(data)) {
+          setSessionPendingApprovals(data);
+        } else {
+          setSessionPendingApprovals([]);
+        }
       }
     } catch (error) {
       if (error instanceof AbortError) return;
       console.error('[TOOL_APPROVAL] Failed to fetch pending approvals:', error);
-      setSessionPendingApprovals([]);
+      // Only update state if this request is still the most recent
+      if (abortControllerRef.current === controller) {
+        setSessionPendingApprovals([]);
+      }
     } finally {
-      setLoading(false);
+      // Only clear loading if this request is still the most recent
+      if (abortControllerRef.current === controller) {
+        setLoading(false);
+      }
     }
   }, [sessionId]);
 

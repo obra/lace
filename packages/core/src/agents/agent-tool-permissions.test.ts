@@ -43,7 +43,7 @@ describe('Agent Tool Permissions', () => {
   let session: Session;
   let db: DatabasePersistence;
   let threadManager: ThreadManager;
-  let sessionData: any;
+  let sessionData: unknown;
   const _tempLaceDir = setupCoreTest();
 
   const threadId = 'test_thread_001' as ThreadId;
@@ -105,7 +105,11 @@ describe('Agent Tool Permissions', () => {
     ]);
 
     // Update session data with tool policies
-    sessionData.configuration.toolPolicies = {
+    const typedSessionData = sessionData as {
+      configuration: { toolPolicies?: Record<string, string> };
+      [key: string]: unknown;
+    };
+    typedSessionData.configuration.toolPolicies = {
       policy_allowed_tool: 'allow',
       denied_tool: 'deny',
       unsafe_tool: 'ask',
@@ -126,13 +130,20 @@ describe('Agent Tool Permissions', () => {
     });
 
     // Mock getFullSession to return our test session
-    (agent as any).getFullSession = async () => session;
+    (agent as unknown as { getFullSession: () => Promise<Session> }).getFullSession = async () =>
+      session;
   });
 
   it('should auto-allow tools marked as safeInternal', async () => {
     // Use reflection to test the private _checkToolPermission method
     // This is acceptable for unit testing internal behavior
-    const checkPermission = (agent as any)._checkToolPermission.bind(agent);
+    const checkPermission = (
+      agent as unknown as {
+        _checkToolPermission: (
+          toolCall: ToolCall
+        ) => Promise<'granted' | 'approval_required' | 'denied'>;
+      }
+    )._checkToolPermission.bind(agent);
 
     const toolCall: ToolCall = {
       id: 'tool_call_001',
@@ -145,7 +156,13 @@ describe('Agent Tool Permissions', () => {
   });
 
   it('should request approval for tools without safeInternal annotation', async () => {
-    const checkPermission = (agent as any)._checkToolPermission.bind(agent);
+    const checkPermission = (
+      agent as unknown as {
+        _checkToolPermission: (
+          toolCall: ToolCall
+        ) => Promise<'granted' | 'approval_required' | 'denied'>;
+      }
+    )._checkToolPermission.bind(agent);
 
     const toolCall: ToolCall = {
       id: 'tool_call_002',
@@ -158,7 +175,13 @@ describe('Agent Tool Permissions', () => {
   });
 
   it('should deny tools with explicit deny policy', async () => {
-    const checkPermission = (agent as any)._checkToolPermission.bind(agent);
+    const checkPermission = (
+      agent as unknown as {
+        _checkToolPermission: (
+          toolCall: ToolCall
+        ) => Promise<'granted' | 'approval_required' | 'denied'>;
+      }
+    )._checkToolPermission.bind(agent);
 
     const toolCall: ToolCall = {
       id: 'tool_call_003',
@@ -171,7 +194,13 @@ describe('Agent Tool Permissions', () => {
   });
 
   it('should allow tools with explicit allow policy even without safeInternal', async () => {
-    const checkPermission = (agent as any)._checkToolPermission.bind(agent);
+    const checkPermission = (
+      agent as unknown as {
+        _checkToolPermission: (
+          toolCall: ToolCall
+        ) => Promise<'granted' | 'approval_required' | 'denied'>;
+      }
+    )._checkToolPermission.bind(agent);
 
     const toolCall: ToolCall = {
       id: 'tool_call_004',
@@ -188,7 +217,13 @@ describe('Agent Tool Permissions', () => {
     const safeTool = new TestTool('not_in_allowlist_safe', { safeInternal: true });
     toolExecutor.registerTool('not_in_allowlist_safe', safeTool);
 
-    const checkPermission = (agent as any)._checkToolPermission.bind(agent);
+    const checkPermission = (
+      agent as unknown as {
+        _checkToolPermission: (
+          toolCall: ToolCall
+        ) => Promise<'granted' | 'approval_required' | 'denied'>;
+      }
+    )._checkToolPermission.bind(agent);
 
     const toolCall: ToolCall = {
       id: 'tool_call_005',
@@ -202,7 +237,11 @@ describe('Agent Tool Permissions', () => {
 
   it('should prioritize safeInternal over database policies', async () => {
     // Add a policy to deny a safe tool - safeInternal should override
-    const updatedSessionData = { ...sessionData };
+    const baseData = sessionData as {
+      configuration: { toolPolicies?: Record<string, string> };
+      [key: string]: unknown;
+    };
+    const updatedSessionData = { ...baseData };
     updatedSessionData.configuration.toolPolicies = {
       ...updatedSessionData.configuration.toolPolicies,
       safe_tool: 'deny',
@@ -210,7 +249,13 @@ describe('Agent Tool Permissions', () => {
     db.saveSession(updatedSessionData);
     session = new Session(sessionId, updatedSessionData, threadManager);
 
-    const checkPermission = (agent as any)._checkToolPermission.bind(agent);
+    const checkPermission = (
+      agent as unknown as {
+        _checkToolPermission: (
+          toolCall: ToolCall
+        ) => Promise<'granted' | 'approval_required' | 'denied'>;
+      }
+    )._checkToolPermission.bind(agent);
 
     const toolCall: ToolCall = {
       id: 'tool_call_006',
@@ -254,7 +299,13 @@ describe('Agent Tool Permissions', () => {
     db.saveSession(updatedSessionData);
     session = new Session(sessionId, updatedSessionData, threadManager);
 
-    const checkPermission = (agent as any)._checkToolPermission.bind(agent);
+    const checkPermission = (
+      agent as unknown as {
+        _checkToolPermission: (
+          toolCall: ToolCall
+        ) => Promise<'granted' | 'approval_required' | 'denied'>;
+      }
+    )._checkToolPermission.bind(agent);
 
     const toolCall: ToolCall = {
       id: 'tool_call_007',
@@ -280,9 +331,17 @@ describe('Agent Tool Permissions', () => {
     });
 
     // Mock getFullSession to return undefined (no session)
-    (orphanAgent as any).getFullSession = async () => undefined;
+    (
+      orphanAgent as unknown as { getFullSession: () => Promise<Session | undefined> }
+    ).getFullSession = async () => undefined;
 
-    const checkPermission = (orphanAgent as any)._checkToolPermission.bind(orphanAgent);
+    const checkPermission = (
+      orphanAgent as unknown as {
+        _checkToolPermission: (
+          toolCall: ToolCall
+        ) => Promise<'granted' | 'approval_required' | 'denied'>;
+      }
+    )._checkToolPermission.bind(orphanAgent);
 
     const toolCall: ToolCall = {
       id: 'tool_call_008',

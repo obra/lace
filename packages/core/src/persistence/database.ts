@@ -298,6 +298,9 @@ export class DatabasePersistence {
     if (currentVersion < 12) {
       this.migrateToV12();
     }
+    if (currentVersion < 13) {
+      this.upgradeToVersion13();
+    }
   }
 
   private getSchemaVersion(): number {
@@ -463,6 +466,15 @@ export class DatabasePersistence {
     `);
 
     this.setSchemaVersion(12);
+  }
+
+  private upgradeToVersion13(): void {
+    this.db!.exec(`
+      -- Add index for session-wide approval queries
+      CREATE INDEX IF NOT EXISTS idx_threads_session_id ON threads(session_id);
+    `);
+
+    this.setSchemaVersion(13);
   }
 
   transaction<T>(fn: () => T): T {

@@ -3,17 +3,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEye, faCode } from '@/lib/fontawesome';
 import type { PendingApproval } from '@/types/api';
 import { ApprovalDecision } from '@/types/core';
 import { getToolRenderer } from '@/components/timeline/tool';
-import {
-  getToolIcon,
-  createDefaultToolSummary,
-  ToolCallDisplay,
-} from '@/components/ui/ToolCallDisplay';
+import { getToolIcon, createDefaultToolSummary } from '@/components/ui/ToolCallDisplay';
 import FileDiffViewer from '@/components/files/FileDiffViewer';
-import FileRenderer from '@/components/ui/FileRenderer';
 import {
   createPartialDiff,
   createPreviewResult,
