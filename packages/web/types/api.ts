@@ -51,6 +51,11 @@ export interface PendingApproval {
   requestData: ToolApprovalRequestData;
 }
 
+// Session-wide approval with agent context (for aggregation across multiple agents)
+export interface SessionPendingApproval extends PendingApproval {
+  agentId: string; // Which agent created this approval request
+}
+
 // API request types
 
 export interface MessageRequest {

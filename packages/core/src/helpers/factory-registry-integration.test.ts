@@ -44,7 +44,7 @@ describe('Helper and HelperRegistry Integration', () => {
       // Step 1: Create helper
       const helper = registry.createInfrastructureHelper(helperId, {
         model: 'fast',
-        tools: ['file-read', 'ripgrep-search'],
+        tools: ['file_read', 'ripgrep_search'],
       });
 
       expect(helper).toBeDefined();
@@ -142,7 +142,7 @@ describe('Helper and HelperRegistry Integration', () => {
 
       const helper = registry.createInfrastructureHelper(memoryHelperId, {
         model: 'smart', // Use smart model for analysis
-        tools: ['ripgrep-search', 'file-read', 'url-fetch'],
+        tools: ['ripgrep_search', 'file_read', 'url_fetch'],
         workingDirectory: '/path/to/logs',
       });
 
@@ -180,7 +180,7 @@ describe('Helper and HelperRegistry Integration', () => {
       helperIds.forEach((id) => {
         registry.createInfrastructureHelper(id, {
           model: 'fast',
-          tools: ['file-read'],
+          tools: ['file_read'],
         });
       });
 

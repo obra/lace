@@ -14,7 +14,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import type { ThreadId } from '@/types/core';
-import type { PendingApproval } from '@/types/api';
+import type { SessionPendingApproval } from '@/types/api';
 import { api } from '@/lib/api-client';
 import { AbortError } from '@/lib/api-errors';
 import type { ApprovalDecision } from '@/types/core';
@@ -22,83 +22,96 @@ import type { ApprovalDecision } from '@/types/core';
 // Types for tool approval context
 interface ToolApprovalContextType {
   // Approval data
-  pendingApprovals: PendingApproval[];
+  pendingApprovals: SessionPendingApproval[];
   loading: boolean;
 
   // Approval actions
-  handleApprovalRequest: (approval: PendingApproval) => void;
+  handleApprovalRequest: (approval: SessionPendingApproval) => void;
   handleApprovalResponse: (toolCallId: string) => void;
   handleApprovalDecision: (toolCallId: string, decision: ApprovalDecision) => Promise<void>;
   clearApprovalRequest: () => void;
-  refreshPendingApprovals: () => Promise<void>;
+  refreshSessionPendingApprovals: () => Promise<void>;
 }
 
 const ToolApprovalContext = createContext<ToolApprovalContextType | null>(null);
 
 interface ToolApprovalProviderProps {
   children: ReactNode;
-  agentId: ThreadId | null;
+  sessionId: ThreadId | null;
 }
 
-export function ToolApprovalProvider({ children, agentId }: ToolApprovalProviderProps) {
-  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
+export function ToolApprovalProvider({ children, sessionId }: ToolApprovalProviderProps) {
+  const [pendingApprovals, setSessionPendingApprovals] = useState<SessionPendingApproval[]>([]);
   const [loading, setLoading] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Refresh pending approvals from API
-  const refreshPendingApprovals = useCallback(async () => {
-    if (!agentId) {
-      setPendingApprovals([]);
+  // Refresh pending approvals from API (session-wide)
+  const refreshSessionPendingApprovals = useCallback(async () => {
+    if (!sessionId) {
+      setSessionPendingApprovals([]);
       return;
     }
 
     setLoading(true);
+
+    // Abort any in-flight request before starting a new one
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      // Abort any in-flight request before starting a new one
-      abortControllerRef.current?.abort();
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
+      const data = await api.get<SessionPendingApproval[]>(
+        `/api/sessions/${sessionId}/approvals/pending`,
+        {
+          signal: controller.signal,
+        }
+      );
 
-      const data = await api.get<PendingApproval[]>(`/api/threads/${agentId}/approvals/pending`, {
-        signal: controller.signal,
-      });
-
-      if (Array.isArray(data)) {
-        setPendingApprovals(data);
-      } else {
-        setPendingApprovals([]);
+      // Only update state if this request is still the most recent
+      if (abortControllerRef.current === controller) {
+        if (Array.isArray(data)) {
+          setSessionPendingApprovals(data);
+        } else {
+          setSessionPendingApprovals([]);
+        }
       }
     } catch (error) {
       if (error instanceof AbortError) return;
       console.error('[TOOL_APPROVAL] Failed to fetch pending approvals:', error);
-      setPendingApprovals([]);
+      // Only update state if this request is still the most recent
+      if (abortControllerRef.current === controller) {
+        setSessionPendingApprovals([]);
+      }
     } finally {
-      setLoading(false);
+      // Only clear loading if this request is still the most recent
+      if (abortControllerRef.current === controller) {
+        setLoading(false);
+      }
     }
-  }, [agentId]);
+  }, [sessionId]);
 
   // Handle approval requests (triggered by event stream)
   const handleApprovalRequest = useCallback(
-    (_approval: PendingApproval) => {
+    (_approval: SessionPendingApproval) => {
       // When we get a new approval request, refresh the pending approvals
       // to get the most up-to-date data from the API with tool metadata
-      void refreshPendingApprovals();
+      void refreshSessionPendingApprovals();
     },
-    [refreshPendingApprovals]
+    [refreshSessionPendingApprovals]
   );
 
   // Handle approval responses (remove from pending list)
   const handleApprovalResponse = useCallback((toolCallId: string) => {
-    setPendingApprovals((prev) => prev.filter((p) => p.toolCallId !== toolCallId));
+    setSessionPendingApprovals((prev) => prev.filter((p) => p.toolCallId !== toolCallId));
   }, []);
 
-  // Handle approval decision and submit to API
+  // Handle approval decision and submit to API (session-scoped)
   const handleApprovalDecision = useCallback(
     async (toolCallId: string, decision: ApprovalDecision) => {
-      if (!agentId) return;
+      if (!sessionId) return;
 
       try {
-        await api.post(`/api/threads/${agentId}/approvals/${encodeURIComponent(toolCallId)}`, {
+        await api.post(`/api/sessions/${sessionId}/approvals/${encodeURIComponent(toolCallId)}`, {
           decision,
         });
 
@@ -108,23 +121,30 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
         console.error('[TOOL_APPROVAL] Failed to submit approval decision:', error);
       }
     },
-    [agentId, handleApprovalResponse]
+    [sessionId, handleApprovalResponse]
   );
 
   // Clear all approval requests
   const clearApprovalRequest = useCallback(() => {
-    setPendingApprovals([]);
+    setSessionPendingApprovals([]);
   }, []);
 
-  // Load pending approvals when agent changes
+  // Load pending approvals when session changes
   useEffect(() => {
-    if (!agentId) {
-      setPendingApprovals([]);
+    if (!sessionId) {
+      setSessionPendingApprovals([]);
       return;
     }
 
-    void refreshPendingApprovals();
-  }, [agentId, refreshPendingApprovals]);
+    void refreshSessionPendingApprovals();
+  }, [sessionId, refreshSessionPendingApprovals]);
+
+  // Also refresh when component mounts (for agent navigation within same session)
+  useEffect(() => {
+    if (sessionId) {
+      void refreshSessionPendingApprovals();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- Intentionally only on mount
 
   const value: ToolApprovalContextType = useMemo(
     () => ({
@@ -137,7 +157,7 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
       handleApprovalResponse,
       handleApprovalDecision,
       clearApprovalRequest,
-      refreshPendingApprovals,
+      refreshSessionPendingApprovals,
     }),
     [
       pendingApprovals,
@@ -146,7 +166,7 @@ export function ToolApprovalProvider({ children, agentId }: ToolApprovalProvider
       handleApprovalResponse,
       handleApprovalDecision,
       clearApprovalRequest,
-      refreshPendingApprovals,
+      refreshSessionPendingApprovals,
     ]
   );
 

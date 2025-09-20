@@ -11,7 +11,6 @@ import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
 import { z } from 'zod';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { ApprovalDecision } from '~/tools/types';
 
 // Mock provider for controlled testing
 class MockIntegrationProvider extends BaseMockProvider {
@@ -151,11 +150,7 @@ describe('Turn Tracking Provider Integration Tests', () => {
     // setupTestPersistence replaced by setupCoreTest
     toolExecutor = new ToolExecutor();
 
-    // Set up auto-approval callback so tools actually execute and emit turn_complete
-    const autoApprovalCallback = {
-      requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
-    };
-    toolExecutor.setApprovalCallback(autoApprovalCallback);
+    // Mock agent approval for tests - will be applied to agent after creation
 
     threadManager = new ThreadManager();
     threadId = threadManager.generateThreadId();

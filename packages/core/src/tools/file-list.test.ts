@@ -4,12 +4,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { FileListTool } from '~/tools/implementations/file-list';
+import { FileListTool } from '~/tools/implementations/file_list';
 import { createTestTempDir } from '~/test-utils/temp-directory';
 
 describe('FileListTool with schema validation', () => {
   let tool: FileListTool;
-  const tempDir = createTestTempDir('file-list-test-');
+  const tempDir = createTestTempDir('file_list-test-');
   let testDir: string;
 
   beforeEach(async () => {

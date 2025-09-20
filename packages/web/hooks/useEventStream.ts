@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useSSEStore } from '@/lib/sse-store';
 import type { LaceEvent, Task, AgentErrorData } from '@/types/core';
-import type { PendingApproval } from '@/types/api';
+import type { SessionPendingApproval } from '@/types/api';
 
 // Runtime type guard for AgentErrorData
 function isAgentErrorData(value: unknown): value is AgentErrorData {
@@ -90,7 +90,7 @@ interface EventHandlers {
   onTaskNoteAdded?: (event: TaskEvent) => void;
 
   // Approval events
-  onApprovalRequest?: (approval: PendingApproval) => void;
+  onApprovalRequest?: (approval: SessionPendingApproval) => void;
   onApprovalResponse?: (toolCallId: string) => void;
 
   // Project events
@@ -257,7 +257,10 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
               currentOptions.onApprovalRequest?.({
                 toolCallId: approvalData.toolCallId,
                 requestedAt: event.timestamp || new Date(),
-              } as PendingApproval);
+                agentId: event.context?.threadId || 'unknown',
+                // Note: toolCall and requestData will be populated by the ToolApprovalProvider
+                // when it fetches the full approval data from the API
+              } as SessionPendingApproval);
             }
             break;
           case 'TOOL_APPROVAL_RESPONSE':

@@ -75,6 +75,7 @@ describe('SessionHelper', () => {
     // Mock session
     const sessionPartial: Partial<Session> = {
       getToolPolicy: vi.fn().mockReturnValue('require-approval'),
+      getEffectiveConfiguration: vi.fn().mockReturnValue({ tools: undefined }), // No tool allowlist restrictions
       getWorkingDirectory: vi.fn().mockReturnValue('/session/dir'),
       getTools: vi.fn().mockReturnValue([testTool]),
     };
@@ -128,8 +129,13 @@ describe('SessionHelper', () => {
       });
       helper['toolExecutor'] = toolExecutor;
 
-      const executeSpy = vi.spyOn(toolExecutor, 'requestToolPermission');
-      executeSpy.mockResolvedValue('granted');
+      // Mock execute to return successful result
+      const executeSpy = vi.spyOn(toolExecutor, 'execute');
+      executeSpy.mockResolvedValue({
+        id: 'call_1',
+        status: 'completed',
+        content: [{ type: 'text', text: 'Tool executed successfully' }],
+      });
 
       mockProvider.addMockResponse({
         content: 'Using tool',
@@ -159,10 +165,13 @@ describe('SessionHelper', () => {
       });
       helper['toolExecutor'] = toolExecutor;
 
-      const permissionSpy = vi.spyOn(toolExecutor, 'requestToolPermission');
-      permissionSpy.mockResolvedValue('granted');
-
-      const executeSpy = vi.spyOn(toolExecutor, 'executeApprovedTool');
+      // Mock execute to return successful result
+      const executeSpy = vi.spyOn(toolExecutor, 'execute');
+      executeSpy.mockResolvedValue({
+        id: 'call_1',
+        status: 'completed',
+        content: [{ type: 'text', text: 'Tool executed successfully' }],
+      });
 
       mockProvider.addMockResponse({
         content: 'Using tool',
@@ -182,14 +191,11 @@ describe('SessionHelper', () => {
 
       await helper.execute('Test approval flow');
 
-      // Should request permission first
-      expect(permissionSpy).toHaveBeenCalledWith(
+      // Should execute tool directly
+      expect(executeSpy).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'test_tool' }),
         expect.objectContaining({ agent: mockAgent })
       );
-
-      // Then execute if granted
-      expect(executeSpy).toHaveBeenCalled();
     });
 
     it('should handle denied tool permissions', async () => {
@@ -200,12 +206,13 @@ describe('SessionHelper', () => {
       helper['toolExecutor'] = toolExecutor;
 
       // Mock permission denial
+      // Mock execute to return denied result
       const deniedResult = {
         id: 'call_1',
         status: 'failed' as const,
         content: [{ type: 'text' as const, text: 'Permission denied' }],
       };
-      vi.spyOn(toolExecutor, 'requestToolPermission').mockResolvedValue(deniedResult);
+      vi.spyOn(toolExecutor, 'execute').mockResolvedValue(deniedResult);
 
       mockProvider.addMockResponse({
         content: 'Using tool',
@@ -285,22 +292,61 @@ describe('SessionHelper', () => {
       expect(UserSettingsManager.getDefaultModel).toHaveBeenCalledWith('smart');
     });
 
-    it('should handle pending approval gracefully', async () => {
+    it('should allow tools in explicit allowedTools whitelist', async () => {
+      const helper = new SessionHelper({
+        model: 'fast',
+        parentAgent: mockAgent,
+        allowedTools: ['file_read'], // Explicit whitelist
+      });
+      helper['toolExecutor'] = toolExecutor;
+
+      // Mock execute to return successful result
+      const executeSpy = vi.spyOn(toolExecutor, 'execute');
+      executeSpy.mockResolvedValue({
+        id: 'call_1',
+        status: 'completed',
+        content: [{ type: 'text', text: 'File read successfully' }],
+      });
+
+      mockProvider.addMockResponse({
+        content: 'Reading file',
+        toolCalls: [{ id: 'call_1', name: 'file_read', arguments: { path: '/test.txt' } }],
+      });
+
+      mockProvider.addMockResponse({ content: 'Done', toolCalls: [] });
+
+      const result = await helper.execute('Read file');
+
+      // Should execute whitelisted tool regardless of session policy
+      expect(result.toolResults[0].status).toBe('completed');
+      expect(executeSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'file_read' }),
+        expect.any(Object)
+      );
+    });
+
+    it('should fail-closed when tool requires approval (no allowedTools)', async () => {
+      // SessionHelper without explicit allowedTools should fail on approval-required tools
       const helper = new SessionHelper({
         model: 'fast',
         parentAgent: mockAgent,
       });
       helper['toolExecutor'] = toolExecutor;
 
-      // Mock pending approval
-      vi.spyOn(toolExecutor, 'requestToolPermission').mockResolvedValue('pending');
+      // Mock session to have policy that requires approval
+      const sessionWithApprovalPolicy = {
+        getToolPolicy: vi.fn().mockReturnValue('ask'), // Tool requires approval
+        getEffectiveConfiguration: vi.fn().mockReturnValue({ tools: undefined }),
+        getWorkingDirectory: vi.fn().mockReturnValue('/session/dir'),
+      };
+      vi.spyOn(mockAgent, 'getFullSession').mockResolvedValue(sessionWithApprovalPolicy as any);
 
       mockProvider.addMockResponse({
         content: 'Using tool',
         toolCalls: [
           {
             id: 'call_1',
-            name: 'test_tool',
+            name: 'approval_required_tool',
             arguments: { input: 'test' },
           },
         ],
@@ -311,11 +357,13 @@ describe('SessionHelper', () => {
         toolCalls: [],
       });
 
-      const result = await helper.execute('Test pending');
+      const result = await helper.execute('Test approval required tool');
 
-      // Should handle pending gracefully
+      // Should fail-closed when tool requires approval
       expect(result.toolResults[0].status).toBe('failed');
-      expect(result.toolResults[0].content[0].text).toContain('Tool approval pending');
+      expect(result.toolResults[0].content[0].text).toContain(
+        'requires approval - not available in helper context'
+      );
     });
 
     it('should handle abort signal during execution', async () => {

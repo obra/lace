@@ -293,10 +293,6 @@ describe('SessionService approval event forwarding', () => {
     session = (await sessionService.getSession(asThreadId(sessionData.id)))!;
     agent = session.getAgent(asThreadId(sessionData.id))!;
 
-    // Debug: Check if approval callback is set up
-    const approvalCallback = agent.toolExecutor.getApprovalCallback();
-    expect(approvalCallback).toBeDefined();
-
     // Send a message - mock provider will return tool calls which should trigger approval
     await agent.sendMessage('Write to the test file');
 

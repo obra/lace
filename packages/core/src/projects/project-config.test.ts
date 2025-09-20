@@ -34,9 +34,9 @@ describe('Project configuration', () => {
       providerInstanceId,
       modelId: 'claude-3-5-sonnet-20241022',
       maxTokens: 4000,
-      tools: ['file-read', 'file-write', 'bash'],
+      tools: ['file_read', 'file_write', 'bash'],
       toolPolicies: {
-        'file-write': 'allow',
+        file_write: 'allow',
         bash: 'ask',
       },
     });
@@ -62,14 +62,14 @@ describe('Project configuration', () => {
     expect(projectConfig.providerInstanceId).toBe(providerInstanceId);
     expect(projectConfig.modelId).toBe('claude-3-5-sonnet-20241022');
     expect(projectConfig.maxTokens).toBe(4000);
-    expect(projectConfig.tools).toEqual(['file-read', 'file-write', 'bash']);
+    expect(projectConfig.tools).toEqual(['file_read', 'file_write', 'bash']);
 
     // Test that session can calculate effective configuration (runtime-evaluated)
     const effectiveConfig = session.getEffectiveConfiguration();
     expect(effectiveConfig.providerInstanceId).toBe(providerInstanceId); // Inherited from project
     expect(effectiveConfig.modelId).toBe('claude-3-5-sonnet-20241022'); // Inherited from project
     expect(effectiveConfig.maxTokens).toBe(4000); // Inherited from project
-    expect(effectiveConfig.tools).toEqual(['file-read', 'file-write', 'bash']); // Inherited from project
+    expect(effectiveConfig.tools).toEqual(['file_read', 'file_write', 'bash']); // Inherited from project
 
     // Session configuration should be empty (no overrides)
     const sessionConfig = Session.getSession(session.getId())?.configuration || {};
@@ -92,7 +92,7 @@ describe('Project configuration', () => {
     expect(projectConfig.providerInstanceId).toBe(providerInstanceId);
     expect(projectConfig.modelId).toBe('claude-3-5-sonnet-20241022');
     expect(projectConfig.maxTokens).toBe(4000); // Original project value
-    expect(projectConfig.tools).toEqual(['file-read', 'file-write', 'bash']);
+    expect(projectConfig.tools).toEqual(['file_read', 'file_write', 'bash']);
 
     // Verify the session has the override stored
     const sessionFromGet = Session.getSession(session.getId());
@@ -104,7 +104,7 @@ describe('Project configuration', () => {
     expect(effectiveConfig.providerInstanceId).toBe(providerInstanceId); // From project
     expect(effectiveConfig.modelId).toBe('claude-3-5-sonnet-20241022'); // From project
     expect(effectiveConfig.maxTokens).toBe(2000); // Overridden by session
-    expect(effectiveConfig.tools).toEqual(['file-read', 'file-write', 'bash']); // From project
+    expect(effectiveConfig.tools).toEqual(['file_read', 'file_write', 'bash']); // From project
   });
 
   it('should merge tool policies correctly', () => {
@@ -116,8 +116,8 @@ describe('Project configuration', () => {
     // Update configuration with toolPolicies
     session.updateConfiguration({
       toolPolicies: {
-        'file-write': 'ask', // Override
-        'url-fetch': 'allow', // Add new
+        file_write: 'ask', // Override
+        url_fetch: 'allow', // Add new
       },
     });
 
@@ -126,11 +126,11 @@ describe('Project configuration', () => {
 
     expect(sessionFromGet).toBeDefined();
     expect(sessionFromGet?.configuration.toolPolicies).toEqual({
-      'file-write': 'ask', // Overridden
-      'url-fetch': 'allow', // Added
+      file_write: 'ask', // Overridden
+      url_fetch: 'allow', // Added
     });
     expect(projectConfig.toolPolicies).toEqual({
-      'file-write': 'allow', // From project (original)
+      file_write: 'allow', // From project (original)
       bash: 'ask', // From project
     });
   });
@@ -154,6 +154,6 @@ describe('Project configuration', () => {
     expect(effectiveConfig.providerInstanceId).toBe(providerInstanceId); // From project
     expect(effectiveConfig.modelId).toBe('claude-3-5-haiku-20241022'); // Overridden by session
     expect(effectiveConfig.maxTokens).toBe(2000); // Overridden by session
-    expect(effectiveConfig.tools).toEqual(['file-read', 'file-write', 'bash']); // From project
+    expect(effectiveConfig.tools).toEqual(['file_read', 'file_write', 'bash']); // From project
   });
 });

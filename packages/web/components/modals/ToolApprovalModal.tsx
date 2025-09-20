@@ -3,17 +3,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEye, faCode } from '@/lib/fontawesome';
 import type { PendingApproval } from '@/types/api';
 import { ApprovalDecision } from '@/types/core';
 import { getToolRenderer } from '@/components/timeline/tool';
-import {
-  getToolIcon,
-  createDefaultToolSummary,
-  ToolCallDisplay,
-} from '@/components/ui/ToolCallDisplay';
+import { getToolIcon, createDefaultToolSummary } from '@/components/ui/ToolCallDisplay';
 import FileDiffViewer from '@/components/files/FileDiffViewer';
-import FileRenderer from '@/components/ui/FileRenderer';
 import {
   createPartialDiff,
   createPreviewResult,
@@ -266,13 +260,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
 
   return (
     <div className="fixed inset-0 z-50 pointer-events-none">
-      {/* Transparent backdrop - only for modal isolation */}
-      <div
-        className="absolute inset-0 pointer-events-auto"
-        onClick={() => onDecision(currentApproval.toolCallId, ApprovalDecision.DENY)}
-      />
-
-      {/* Modal anchored to bottom */}
+      {/* Modal anchored to bottom - no backdrop blocking UI */}
       <div className="absolute bottom-0 left-0 right-0 p-4 pointer-events-none">
         <div className="max-w-2xl mx-auto pointer-events-auto">
           <div className="bg-base-100/95 backdrop-blur-md rounded-lg shadow-xl border border-base-300">

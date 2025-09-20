@@ -3,8 +3,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
-import { FileReadTool } from '~/tools/implementations/file-read';
-import { ApprovalDecision } from '~/tools/types';
+import { FileReadTool } from '~/tools/implementations/file_read';
 import { createMockToolContext } from '~/test-utils/mock-session';
 
 describe('ToolContext working directory', () => {
@@ -12,7 +11,7 @@ describe('ToolContext working directory', () => {
 
   beforeEach(() => {
     executor = new ToolExecutor();
-    executor.registerTool('file-read', new FileReadTool());
+    executor.registerTool('file_read', new FileReadTool());
   });
 
   it('should pass working directory in ToolContext', () => {
@@ -32,12 +31,7 @@ describe('ToolContext working directory', () => {
   });
 
   it('should preserve working directory in context structure', () => {
-    // Mock approval callback to allow execution
-    executor.setApprovalCallback({
-      requestApproval() {
-        return Promise.resolve(ApprovalDecision.ALLOW_ONCE);
-      },
-    });
+    // Using mock context - no actual tool execution
 
     const context = createMockToolContext({
       workingDirectory: '/test/project/path',

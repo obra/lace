@@ -31,5 +31,5 @@ import '@fontsource/google-sans-code/files/google-sans-code-latin-700-normal.wof
 import '@fontsource/google-sans-code/files/google-sans-code-latin-700-normal.woff';
 import '@fontsource/google-sans-code/files/google-sans-code-latin-800-normal.woff2';
 import '@fontsource/google-sans-code/files/google-sans-code-latin-800-normal.woff';
-import '@fontsource/noto-emoji/files/noto-emoji-0-400-normal.woff2';
-import '@fontsource/noto-emoji/files/noto-emoji-0-400-normal.woff';
+import '@fontsource/noto-emoji/files/noto-emoji-emoji-400-normal.woff2';
+import '@fontsource/noto-emoji/files/noto-emoji-emoji-400-normal.woff';

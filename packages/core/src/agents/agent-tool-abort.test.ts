@@ -22,7 +22,6 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
-import { ApprovalDecision } from '~/tools/types';
 
 class MockProviderWithTools extends BaseMockProvider {
   private mockToolCalls: ToolCall[];
@@ -99,10 +98,7 @@ describe('Agent Tool Abort Functionality', () => {
 
     toolExecutor = new ToolExecutor();
 
-    // Set up auto-approval for tests
-    toolExecutor.setApprovalCallback({
-      requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
-    });
+    // Mock agent approval for tests - will be applied to agent after creation
 
     threadManager = new ThreadManager();
     threadId = threadManager.generateThreadId();
@@ -156,6 +152,12 @@ describe('Agent Tool Abort Functionality', () => {
 
     // Mock provider creation for test
     vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+
+    // Mock agent approval for tests
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
+
+    // Mock agent approval for tests
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
 
     let toolCompletedCount = 0;
     const toolResults: ToolResult[] = [];
@@ -232,6 +234,12 @@ describe('Agent Tool Abort Functionality', () => {
     // Mock provider creation for test
     vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
+    // Mock agent approval for tests
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
+
+    // Mock agent approval for tests
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
+
     const toolResults: ToolResult[] = [];
     agent.on('tool_call_complete', ({ result }: { result: ToolResult }) => {
       toolResults.push(result);
@@ -290,6 +298,9 @@ describe('Agent Tool Abort Functionality', () => {
 
     // Mock provider creation for test
     vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+
+    // Mock agent approval for tests
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
 
     let toolResult: ToolResult | null = null;
     agent.on('tool_call_complete', ({ result }: { result: ToolResult }) => {
@@ -355,6 +366,9 @@ describe('Agent Tool Abort Functionality', () => {
 
     // Mock provider creation for test
     vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+
+    // Mock agent approval for tests
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
 
     const toolResults = new Map<string, ToolResult>();
     agent.on('tool_call_complete', ({ callId, result }: { callId: string; result: ToolResult }) => {
@@ -431,6 +445,9 @@ describe('Agent Tool Abort Functionality', () => {
     // Mock provider creation for test
     vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
 
+    // Mock agent approval for tests
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
+
     let firstResult: ToolResult | null = null;
     agent.on('tool_call_complete', ({ result }: { result: ToolResult }) => {
       if (!firstResult) {
@@ -485,6 +502,9 @@ describe('Agent Tool Abort Functionality', () => {
 
     // Mock provider creation for test
     vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+
+    // Mock agent approval for tests
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
 
     let secondResult: ToolResult | null = null;
     agent.on('tool_call_complete', ({ result }: { result: ToolResult }) => {
@@ -541,6 +561,9 @@ describe('Agent Tool Abort Functionality', () => {
 
     // Mock provider creation for test
     vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+
+    // Mock agent approval for tests
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
 
     const stateChanges: string[] = [];
     const agentEvents: string[] = [];

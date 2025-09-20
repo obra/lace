@@ -1,25 +1,18 @@
-// ABOUTME: Simplified tool execution engine with configuration API and approval integration
-// ABOUTME: Handles tool registration, approval checks, and safe execution with simple configuration
+// ABOUTME: Simplified callback-free tool execution engine
+// ABOUTME: Handles tool registration and execution - Agent owns approval flow
 
-import {
-  ToolResult,
-  ToolContext,
-  ToolCall,
-  createErrorResult,
-  createToolResult,
-} from '~/tools/types';
+import { ToolResult, ToolContext, ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
-import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/types';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { BashTool } from '~/tools/implementations/bash';
-import { FileReadTool } from '~/tools/implementations/file-read';
-import { FileWriteTool } from '~/tools/implementations/file-write';
-import { FileEditTool } from '~/tools/implementations/file-edit';
-import { FileListTool } from '~/tools/implementations/file-list';
-import { RipgrepSearchTool } from '~/tools/implementations/ripgrep-search';
-import { FileFindTool } from '~/tools/implementations/file-find';
+import { FileReadTool } from '~/tools/implementations/file_read';
+import { FileWriteTool } from '~/tools/implementations/file_write';
+import { FileEditTool } from '~/tools/implementations/file_edit';
+import { FileListTool } from '~/tools/implementations/file_list';
+import { RipgrepSearchTool } from '~/tools/implementations/ripgrep_search';
+import { FileFindTool } from '~/tools/implementations/file_find';
 import {
   TaskCreateTool,
   TaskListTool,
@@ -29,7 +22,7 @@ import {
   TaskViewTool,
 } from '~/tools/implementations/task-manager/index';
 import { DelegateTool } from '~/tools/implementations/delegate';
-import { UrlFetchTool } from '~/tools/implementations/url-fetch';
+import { UrlFetchTool } from '~/tools/implementations/url_fetch';
 import { MCPServerManager } from '~/mcp/server-manager';
 import type { MCPServerConnection } from '~/config/mcp-types';
 import { MCPToolAdapter } from '~/mcp/tool-adapter';
@@ -38,7 +31,6 @@ import type { Session } from '~/sessions/session';
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
-  private approvalCallback?: ApprovalCallback;
   private envManager: ProjectEnvironmentManager;
 
   // Constants for temp directory naming
@@ -56,10 +48,6 @@ export class ToolExecutor {
     for (const tool of tools) {
       this.tools.set(tool.name, tool);
     }
-  }
-
-  setApprovalCallback(callback: ApprovalCallback): void {
-    this.approvalCallback = callback;
   }
 
   getTool(toolName: string): Tool | undefined {
@@ -216,10 +204,6 @@ export class ToolExecutor {
     }
   }
 
-  getApprovalCallback(): ApprovalCallback | undefined {
-    return this.approvalCallback;
-  }
-
   getEnvironmentManager(): ProjectEnvironmentManager {
     return this.envManager;
   }
@@ -268,262 +252,46 @@ export class ToolExecutor {
     return toolTempDir;
   }
 
-  async requestToolPermission(
-    call: ToolCall,
-    context?: ToolContext
-  ): Promise<'granted' | 'pending' | ToolResult> {
-    // 1. Check if tool exists
-    const tool = this.tools.get(call.name);
-    if (!tool) {
-      throw new Error(`Tool '${call.name}' not found`);
-    }
-
-    // 2. Check if tool is marked as safe internal (bypasses all approval)
-    if (tool.annotations?.safeInternal === true) {
-      return 'granted';
-    }
-
-    // 3. Check if this is an MCP tool with allow approval (bypasses agent requirement)
-    if (call.name.includes('/') && context?.agent) {
-      // MCP tools have serverId/toolName format
-      try {
-        const approvalLevel = await this.getMCPApprovalLevel(call.name, context);
-        if (approvalLevel === 'allow') {
-          return 'granted';
-        }
-      } catch (error) {
-        // Log but continue with normal flow
-        logger.warn('Failed to check MCP approval level:', error);
-      }
-    }
-
-    // 4. SECURITY: Fail-safe - require agent context for policy enforcement
-    if (!context?.agent) {
-      return createToolResult(
-        'denied',
-        [
-          {
-            type: 'text',
-            text: 'Tool execution denied: agent context required for security policy enforcement',
-          },
-        ],
-        call.id
-      );
-    }
-
-    // 5. Check tool policy with agent context
-    const session = await context.agent.getFullSession();
-    if (!session) {
-      return createToolResult(
-        'denied',
-        [{ type: 'text', text: 'Session not found for policy enforcement' }],
-        call.id
-      );
-    }
-
-    // Check if tool is allowed in configuration
-    const config = session.getEffectiveConfiguration();
-    if (config.tools && !config.tools.includes(call.name)) {
-      return createToolResult(
-        'denied',
-        [{ type: 'text', text: `Tool '${call.name}' not allowed in current configuration` }],
-        call.id
-      );
-    }
-
-    // Check tool policy
-    const policy = session.getToolPolicy(call.name);
-
-    switch (policy) {
-      case 'deny':
-        return createToolResult(
-          'denied',
-          [{ type: 'text', text: `Tool '${call.name}' execution denied by policy` }],
-          call.id
-        );
-
-      case 'allow':
-        return 'granted'; // Skip approval system
-
-      case 'ask':
-        // Fall through to approval system
-        break;
-    }
-
-    // 5. Check approval - fail safe if no callback is configured
-    if (!this.approvalCallback) {
-      throw new Error('Tool execution requires approval but no approval callback is configured');
-    }
-
-    try {
-      const decision = await this.approvalCallback.requestApproval(call);
-
-      if (
-        decision === ApprovalDecision.ALLOW_ONCE ||
-        decision === ApprovalDecision.ALLOW_SESSION ||
-        decision === ApprovalDecision.ALLOW_PROJECT ||
-        decision === ApprovalDecision.ALLOW_ALWAYS
-      ) {
-        return 'granted';
-      } else if (decision === ApprovalDecision.DENY || decision === ApprovalDecision.DISABLE) {
-        return createToolResult(
-          'denied',
-          [{ type: 'text', text: 'Tool execution denied by approval policy' }],
-          call.id
-        );
-      } else {
-        throw new Error(`Unknown approval decision: ${String(decision)}`);
-      }
-    } catch (error) {
-      // Check if this is a pending approval (not an error)
-      if (error instanceof ApprovalPendingError) {
-        return 'pending'; // Approval request was created, waiting for response
-      }
-
-      // Other approval system failures (including denial)
-      throw error;
-    }
-  }
-
   /**
-   * @deprecated This method performs redundant permission checks and should be removed.
-   * Production code should use: requestToolPermission() followed by executeApprovedTool()
-   *
-   * Currently kept for backward compatibility with test suite only.
-   * TODO: Update all tests to use the proper flow:
-   *   1. Call requestToolPermission() to check permissions
-   *   2. Call executeApprovedTool() if permission granted
-   *
-   * No production code uses this method - only tests rely on it.
+   * Execute a tool directly without approval complexity.
+   * Agent owns approval flow - ToolExecutor just executes when told.
    */
-  async executeTool(call: ToolCall, context: ToolContext): Promise<ToolResult> {
-    // 1. Check if tool exists
-    const tool = this.tools.get(call.name);
+  async execute(toolCall: ToolCall, context: ToolContext): Promise<ToolResult> {
+    const tool = this.getTool(toolCall.name);
     if (!tool) {
-      return createErrorResult(`Tool '${call.name}' not found`, call.id);
+      throw new Error(`Tool '${toolCall.name}' not found`);
     }
+    // Create enhanced context with environment and temp directory
+    let toolContext: ToolContext = context || {};
 
-    // 2. DEPRECATED: This permission check is redundant and exists only for test compatibility
-    // Tests should be updated to call requestToolPermission() explicitly
-    try {
-      const permission = await this.requestToolPermission(call, context);
-
-      // If permission is a ToolResult, it means the tool was denied
-      if (typeof permission === 'object' && 'status' in permission) {
-        return permission;
-      }
-
-      if (permission === 'pending') {
-        // This should not happen in the new architecture, but handle gracefully
-        return createErrorResult('Tool approval is pending', call.id);
-      }
-      // permission === 'granted', continue to execution
-    } catch (error) {
-      // Handle any other errors
-      return createErrorResult(error instanceof Error ? error.message : String(error), call.id);
-    }
-
-    // 3. Execute the tool (permissions already checked by the redundant check above)
-    return this.executeToolDirect(tool, call, context);
-  }
-
-  /**
-   * Execute a tool that has already been approved.
-   * This method bypasses permission checks but ensures proper context setup
-   * (temp directory, environment variables, etc.)
-   *
-   * Used by Agent._executeApprovedTool() when handling TOOL_APPROVAL_RESPONSE events.
-   */
-  async executeApprovedTool(call: ToolCall, context: ToolContext): Promise<ToolResult> {
-    // 1. Check if tool exists
-    const tool = this.tools.get(call.name);
-    if (!tool) {
-      return createErrorResult(`Tool '${call.name}' not found`, call.id);
-    }
-
-    // 2. Execute directly without permission check (already approved)
-    return this.executeToolDirect(tool, call, context);
-  }
-
-  private async executeToolDirect(
-    tool: Tool,
-    call: ToolCall,
-    context: ToolContext
-  ): Promise<ToolResult> {
-    try {
-      // Create enhanced context with environment and temp directory
-      let toolContext: ToolContext = context || {};
-
-      // Merge project environment variables if agent is available
-      if (context?.agent) {
-        const session = await context.agent.getFullSession();
-        const projectId = session?.getProjectId();
-
-        // Create merged environment for subprocess execution
-        if (projectId) {
-          const projectEnv = this.envManager.getMergedEnvironment(projectId);
-          toolContext.processEnv = { ...process.env, ...projectEnv };
-        }
-
-        // Use the LLM-provided tool call ID and create temp directory
-        const toolTempDir = await this.createToolTempDirectory(call.id, context);
-
-        // Enhanced context with temp directory information
-        toolContext = {
-          ...toolContext,
-          toolTempDir,
-        };
-      }
-
-      const result = await tool.execute(call.arguments, toolContext);
-
-      // Ensure the result has the call ID if it wasn't set by the tool
-      if (!result.id && call.id) {
-        result.id = call.id;
-      }
-      return result;
-    } catch (error) {
-      return createErrorResult(
-        error instanceof Error ? error.message : 'Unknown error occurred',
-        call.id
-      );
-    }
-  }
-
-  /**
-   * Get MCP tool approval level from session context
-   */
-  private async getMCPApprovalLevel(toolName: string, context?: ToolContext): Promise<string> {
-    if (!toolName.includes('/') || !context?.agent) {
-      return 'ask'; // Safe default
-    }
-
-    try {
-      // Get session from agent context
+    // Merge project environment variables if agent is available
+    if (context?.agent) {
       const session = await context.agent.getFullSession();
-      if (!session) {
-        return 'ask';
+      const projectId = session?.getProjectId();
+
+      // Create merged environment for subprocess execution
+      if (projectId) {
+        const projectEnv = this.envManager.getMergedEnvironment(projectId);
+        toolContext.processEnv = { ...process.env, ...projectEnv };
       }
 
-      const [serverId, toolId] = toolName.split('/', 2);
-      const serverStatus = session.getMCPServerStatus(serverId);
+      // Use the LLM-provided tool call ID and create temp directory
+      const toolTempDir = await this.createToolTempDirectory(toolCall.id, context);
 
-      logger.debug(
-        `MCP approval lookup: ${toolName} → server: ${serverId}, tool: ${toolId}, status: ${serverStatus?.status}`
-      );
-
-      if (serverStatus?.status === 'running') {
-        const approvalLevel = serverStatus.config.tools[toolId] || 'ask';
-        logger.debug(`MCP approval result: ${toolName} → ${approvalLevel}`);
-        return approvalLevel;
-      }
-
-      logger.debug(`MCP approval fallback: ${toolName} → ask (server not running)`);
-      return 'ask';
-    } catch (error) {
-      logger.warn(`Failed to get MCP approval level for ${toolName}:`, error);
-      return 'ask';
+      // Enhanced context with temp directory information
+      toolContext = {
+        ...toolContext,
+        toolTempDir,
+      };
     }
+
+    const result = await tool.execute(toolCall.arguments, toolContext);
+
+    // Ensure the result has the call ID if it wasn't set by the tool
+    if (!result.id && toolCall.id) {
+      result.id = toolCall.id;
+    }
+    return result;
   }
 
   /**

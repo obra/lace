@@ -211,7 +211,7 @@ export class InfrastructureHelper extends BaseHelper {
 
       try {
         // Execute directly (bypass approval)
-        const result = await this.toolExecutor.executeApprovedTool(toolCall, context);
+        const result = await this.toolExecutor.execute(toolCall, context);
         results.push(result);
       } catch (error) {
         logger.error('InfrastructureHelper tool execution failed', {

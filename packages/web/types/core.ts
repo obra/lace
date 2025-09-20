@@ -21,7 +21,7 @@ export type { CombinedTokenUsage, ThreadTokenUsage } from '~/token-management/ty
 
 export type { ToolCall, ToolResult, ToolAnnotations, ToolPolicy } from '~/tools/types';
 
-export type { FileEditDiffContext } from '~/tools/implementations/file-edit';
+export type { FileEditDiffContext } from '~/tools/implementations/file_edit';
 
 export type {
   Task,

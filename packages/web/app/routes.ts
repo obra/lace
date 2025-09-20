@@ -74,6 +74,16 @@ export default [
   route('api/sessions/:sessionId/files', 'routes/api.sessions.$sessionId.files.ts'),
   route('api/sessions/:sessionId/files/*', 'routes/api.sessions.$sessionId.files.$path.ts'),
 
+  // Session-level approval routes (aggregated across all agents)
+  route(
+    'api/sessions/:sessionId/approvals/pending',
+    'routes/api.sessions.$sessionId.approvals.pending.ts'
+  ),
+  route(
+    'api/sessions/:sessionId/approvals/:toolCallId',
+    'routes/api.sessions.$sessionId.approvals.$toolCallId.ts'
+  ),
+
   // Provider management routes
   route('api/provider/catalog', 'routes/api.provider.catalog.ts'),
   route('api/provider/instances', 'routes/api.provider.instances.ts'),

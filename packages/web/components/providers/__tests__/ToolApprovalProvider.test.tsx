@@ -14,7 +14,7 @@ import {
   useToolApprovalContext,
 } from '@/components/providers/ToolApprovalProvider';
 import type { ThreadId } from '@/types/core';
-import type { PendingApproval } from '@/types/api';
+import type { PendingApproval, SessionPendingApproval } from '@/types/api';
 import type { ToolApprovalRequestData } from '@/types/web-events';
 
 // Mock the serialization utility
@@ -46,6 +46,14 @@ const createMockApproval = (overrides?: Partial<PendingApproval>): PendingApprov
     isReadOnly: false,
     riskLevel: 'safe',
   } as ToolApprovalRequestData,
+  ...overrides,
+});
+
+const createMockSessionApproval = (
+  overrides?: Partial<SessionPendingApproval>
+): SessionPendingApproval => ({
+  ...createMockApproval(overrides),
+  agentId: 'test-agent-id',
   ...overrides,
 });
 
@@ -82,7 +90,7 @@ function ContextConsumer() {
     handleApprovalRequest,
     handleApprovalResponse,
     clearApprovalRequest,
-    refreshPendingApprovals,
+    refreshSessionPendingApprovals,
   } = useToolApprovalContext();
 
   return (
@@ -99,7 +107,7 @@ function ContextConsumer() {
       ))}
 
       <button
-        onClick={() => handleApprovalRequest(createMockApproval())}
+        onClick={() => handleApprovalRequest(createMockSessionApproval())}
         data-testid="handle-approval-request"
       >
         Handle Approval Request
@@ -113,7 +121,7 @@ function ContextConsumer() {
       <button onClick={() => clearApprovalRequest()} data-testid="clear-approvals">
         Clear Approvals
       </button>
-      <button onClick={() => void refreshPendingApprovals()} data-testid="refresh-approvals">
+      <button onClick={() => void refreshSessionPendingApprovals()} data-testid="refresh-approvals">
         Refresh Approvals
       </button>
     </div>
@@ -121,7 +129,7 @@ function ContextConsumer() {
 }
 
 describe('ToolApprovalProvider', () => {
-  const testAgentId = 'test-agent-id' as ThreadId;
+  const testSessionId = 'lace_20250916_test01' as ThreadId; // Valid session ID format
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -146,7 +154,7 @@ describe('ToolApprovalProvider', () => {
       } as Response);
 
       render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
@@ -187,7 +195,7 @@ describe('ToolApprovalProvider', () => {
   });
 
   describe('Pending Approvals Management', () => {
-    it('loads pending approvals on mount when agentId is provided', async () => {
+    it('loads pending approvals on mount when sessionId is provided', async () => {
       mockParseResponse.mockResolvedValue(mockApprovals);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
@@ -198,16 +206,19 @@ describe('ToolApprovalProvider', () => {
       } as Response);
 
       render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${testAgentId}/approvals/pending`, {
-          method: 'GET',
-          signal: expect.any(AbortSignal),
-        });
+        expect(global.fetch).toHaveBeenCalledWith(
+          `/api/sessions/${testSessionId}/approvals/pending`,
+          {
+            method: 'GET',
+            signal: expect.any(AbortSignal),
+          }
+        );
       });
 
       await waitFor(() => {
@@ -215,7 +226,7 @@ describe('ToolApprovalProvider', () => {
       });
     });
 
-    it('clears approvals when agentId is null', async () => {
+    it('clears approvals when sessionId is null', async () => {
       mockParseResponse.mockResolvedValue(mockApprovals);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
@@ -226,7 +237,7 @@ describe('ToolApprovalProvider', () => {
       } as Response);
 
       const { rerender } = render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
@@ -238,7 +249,7 @@ describe('ToolApprovalProvider', () => {
 
       // Change to null agentId
       rerender(
-        <ToolApprovalProvider agentId={null}>
+        <ToolApprovalProvider sessionId={null}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
@@ -259,7 +270,7 @@ describe('ToolApprovalProvider', () => {
       } as Response);
 
       render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
@@ -280,7 +291,7 @@ describe('ToolApprovalProvider', () => {
       } as Response);
 
       render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
@@ -303,7 +314,7 @@ describe('ToolApprovalProvider', () => {
       } as Response);
 
       render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
@@ -321,10 +332,13 @@ describe('ToolApprovalProvider', () => {
 
       // Should trigger refresh
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${testAgentId}/approvals/pending`, {
-          method: 'GET',
-          signal: expect.any(AbortSignal),
-        });
+        expect(global.fetch).toHaveBeenCalledWith(
+          `/api/sessions/${testSessionId}/approvals/pending`,
+          {
+            method: 'GET',
+            signal: expect.any(AbortSignal),
+          }
+        );
       });
     });
 
@@ -360,7 +374,7 @@ describe('ToolApprovalProvider', () => {
       }
 
       render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <TestApprovalResponse />
         </ToolApprovalProvider>
       );
@@ -390,7 +404,7 @@ describe('ToolApprovalProvider', () => {
       } as Response);
 
       render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
@@ -417,7 +431,7 @@ describe('ToolApprovalProvider', () => {
       } as Response);
 
       render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
@@ -456,7 +470,7 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockReturnValue(promise);
 
       render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
@@ -484,7 +498,7 @@ describe('ToolApprovalProvider', () => {
       vi.mocked(global.fetch).mockRejectedValue(new Error('Network error'));
 
       render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
@@ -524,7 +538,7 @@ describe('ToolApprovalProvider', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
@@ -567,7 +581,7 @@ describe('ToolApprovalProvider', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
@@ -602,7 +616,7 @@ describe('ToolApprovalProvider', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
@@ -637,7 +651,7 @@ describe('ToolApprovalProvider', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
@@ -654,8 +668,8 @@ describe('ToolApprovalProvider', () => {
     });
   });
 
-  describe('Agent ID Changes', () => {
-    it('reloads approvals when agentId changes', async () => {
+  describe('Session ID Changes', () => {
+    it('reloads approvals when sessionId changes', async () => {
       mockParseResponse.mockResolvedValue(mockApprovals);
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
@@ -666,35 +680,41 @@ describe('ToolApprovalProvider', () => {
       } as Response);
 
       const { rerender } = render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
 
       // Wait for initial load
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${testAgentId}/approvals/pending`, {
-          method: 'GET',
-          signal: expect.any(AbortSignal),
-        });
+        expect(global.fetch).toHaveBeenCalledWith(
+          `/api/sessions/${testSessionId}/approvals/pending`,
+          {
+            method: 'GET',
+            signal: expect.any(AbortSignal),
+          }
+        );
       });
 
       vi.clearAllMocks();
 
-      // Change agent ID
-      const newAgentId = 'new-agent-id' as ThreadId;
+      // Change session ID
+      const newSessionId = 'lace_20250916_test02' as ThreadId;
       rerender(
-        <ToolApprovalProvider agentId={newAgentId}>
+        <ToolApprovalProvider sessionId={newSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );
 
-      // Should fetch for new agent
+      // Should fetch for new session
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(`/api/threads/${newAgentId}/approvals/pending`, {
-          method: 'GET',
-          signal: expect.any(AbortSignal),
-        });
+        expect(global.fetch).toHaveBeenCalledWith(
+          `/api/sessions/${newSessionId}/approvals/pending`,
+          {
+            method: 'GET',
+            signal: expect.any(AbortSignal),
+          }
+        );
       });
     });
   });
@@ -716,7 +736,7 @@ describe('ToolApprovalProvider', () => {
       } as Response);
 
       render(
-        <ToolApprovalProvider agentId={testAgentId}>
+        <ToolApprovalProvider sessionId={testSessionId}>
           <ContextConsumer />
         </ToolApprovalProvider>
       );

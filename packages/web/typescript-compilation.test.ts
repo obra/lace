@@ -17,7 +17,7 @@ describe('Web Package TypeScript Compilation', () => {
     }).not.toThrow();
   }, 35000); // 35 second timeout for vitest
 
-  it('should pass Next.js linting', () => {
+  it('should pass eslint linting', () => {
     expect(() => {
       // Run linting with zero warnings allowed
       execSync('npx eslint --max-warnings 0', {

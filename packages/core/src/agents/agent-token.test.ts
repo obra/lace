@@ -10,7 +10,6 @@ import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ToolResult, ToolContext } from '~/tools/types';
 import { ToolExecutor } from '~/tools/executor';
-import { ApprovalDecision } from '~/tools/types';
 import { z } from 'zod';
 
 // Mock provider for streaming token tests
@@ -94,9 +93,7 @@ describe('Agent Token Management', () => {
   beforeEach(() => {
     threadManager = new ThreadManager();
     toolExecutor = new ToolExecutor();
-    toolExecutor.setApprovalCallback({
-      requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
-    });
+    // Mock agent approval for tests - will be applied to agent after creation
 
     provider = new TestProvider({
       mockResponse: 'Test response',
@@ -119,6 +116,9 @@ describe('Agent Token Management', () => {
 
     // Mock provider creation for test
     vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(provider);
+
+    // Mock agent approval for tests
+    vi.spyOn(agent as any, '_checkToolPermission').mockResolvedValue('granted');
   });
 
   afterEach(() => {

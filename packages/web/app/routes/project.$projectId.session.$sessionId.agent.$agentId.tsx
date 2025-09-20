@@ -32,7 +32,7 @@ export default function ProjectSessionAgent() {
             selectedAgentId={agentId!}
             onAgentChange={noOpCallback}
           >
-            <ToolApprovalProvider agentId={agentId! as ThreadId}>
+            <ToolApprovalProvider sessionId={sessionId! as ThreadId}>
               <EventStreamProvider
                 key={agentId}
                 projectId={projectId!}

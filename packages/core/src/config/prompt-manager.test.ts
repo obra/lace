@@ -65,7 +65,7 @@ describe('PromptManager', () => {
     it('should initialize with tool information', () => {
       const tools = [
         { name: 'bash', description: 'Execute bash commands' },
-        { name: 'file-read', description: 'Read files' },
+        { name: 'file_read', description: 'Read files' },
       ];
 
       const manager = new PromptManager({ tools, templateDirs: [tempDir] });
@@ -125,7 +125,7 @@ describe('PromptManager', () => {
 
       const tools = [
         { name: 'bash', description: 'Execute bash commands' },
-        { name: 'file-read', description: 'Read file contents' },
+        { name: 'file_read', description: 'Read file contents' },
       ];
 
       const manager = new PromptManager({ tools, templateDirs: [tempDir] });
@@ -135,7 +135,7 @@ describe('PromptManager', () => {
       expect(prompt).toContain('OS:');
       expect(prompt).toContain('Working Dir:');
       expect(prompt).toContain('Tool: bash - Execute bash commands');
-      expect(prompt).toContain('Tool: file-read - Read file contents');
+      expect(prompt).toContain('Tool: file_read - Read file contents');
       expect(prompt).toContain('Follow best practices and be helpful.');
       expect(prompt).toContain('start of our conversation');
     });
@@ -277,8 +277,8 @@ describe('PromptManager', () => {
 
       const tools = [
         { name: 'bash', description: 'Execute shell commands' },
-        { name: 'file-edit', description: 'Edit files' },
-        { name: 'web-search', description: 'Search the web' },
+        { name: 'file_edit', description: 'Edit files' },
+        { name: 'web_search', description: 'Search the web' },
       ];
 
       const manager = new PromptManager({ tools, templateDirs: [tempDir] });
@@ -292,8 +292,8 @@ describe('PromptManager', () => {
       expect(prompt).toContain('Session:');
       expect(prompt).toContain('## Available Tools');
       expect(prompt).toContain('- **bash**: Execute shell commands');
-      expect(prompt).toContain('- **file-edit**: Edit files');
-      expect(prompt).toContain('- **web-search**: Search the web');
+      expect(prompt).toContain('- **file_edit**: Edit files');
+      expect(prompt).toContain('- **web_search**: Search the web');
       expect(prompt).toContain('start of our conversation');
     });
 

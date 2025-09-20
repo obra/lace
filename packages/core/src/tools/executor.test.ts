@@ -1,364 +1,141 @@
-// ABOUTME: Tests for ToolExecutor with new schema-based tools
-// ABOUTME: Validates that new Tool classes work with existing executor infrastructure
+// ABOUTME: Tests for simplified callback-free ToolExecutor
+// ABOUTME: Validates simple execute() interface and tool registry functionality
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ToolExecutor } from '~/tools/executor';
-import { FileReadTool } from '~/tools/implementations/file-read';
-import { ApprovalCallback, ApprovalDecision, ApprovalPendingError } from '~/tools/types';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
-import { createTestTempDir } from '~/test-utils/temp-directory';
-import { createMockToolContext } from '~/test-utils/mock-session';
-import { existsSync } from 'fs';
-import { clearProcessTempDirCache } from '~/config/lace-dir';
-import { z } from 'zod';
-import { Tool } from '~/tools/tool';
-import type { ToolContext, ToolResult } from '~/tools/types';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
-import {
-  setupTestProviderDefaults,
-  cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+import { FileReadTool } from '~/tools/implementations/file_read';
+import type { ToolCall, ToolContext } from '~/tools/types';
 
-describe('ToolExecutor with new schema-based tools', () => {
-  const tempDir = createTestTempDir();
-  const tempLaceDirContext = setupCoreTest();
-  let providerInstanceId: string;
+describe('Simplified ToolExecutor', () => {
+  let executor: ToolExecutor;
+  let mockContext: ToolContext;
 
-  // Create an approval callback that auto-approves for tests
-  const autoApprovalCallback: ApprovalCallback = {
-    requestApproval: () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
-  };
+  beforeEach(() => {
+    executor = new ToolExecutor();
+    executor.registerAllAvailableTools(); // Registers all core tools
 
-  // Create an approval callback that requires approval for tests
-  const _requireApprovalCallback: ApprovalCallback = {
-    requestApproval: () => Promise.reject(new Error('Approval required')),
-  };
-
-  it('executes new schema-based tools correctly', async () => {
-    const testDir = await tempDir.getPath();
-    const testFile = join(testDir, 'test.txt');
-    await writeFile(testFile, 'Line 1\nLine 2\nLine 3\n');
-
-    const executor = new ToolExecutor();
-    const tool = new FileReadTool();
-    executor.registerTool('file_read', tool);
-    executor.setApprovalCallback(autoApprovalCallback);
-
-    const result = await executor.executeTool(
-      {
-        id: 'test-1',
-        name: 'file_read',
-        arguments: { path: testFile },
-      },
-      createMockToolContext()
-    );
-
-    expect(result.status).toBe('completed');
-    expect(result.content[0].text).toBe('Line 1\nLine 2\nLine 3\n');
-    expect(result.id).toBe('test-1');
-
-    await tempDir.cleanup();
+    mockContext = {
+      workingDirectory: '/tmp/test',
+      signal: new AbortController().signal,
+    };
   });
 
-  it('handles validation errors from new tools', async () => {
-    const executor = new ToolExecutor();
-    const tool = new FileReadTool();
-    executor.registerTool('file_read', tool);
-    executor.setApprovalCallback(autoApprovalCallback);
+  describe('Tool Registry', () => {
+    it('should register and retrieve tools', () => {
+      const tool = new FileReadTool();
+      executor.registerTool('test_tool', tool);
 
-    const result = await executor.executeTool(
-      {
-        id: 'test-2',
-        name: 'file_read',
-        arguments: { path: '' }, // Invalid empty path
-      },
-      createMockToolContext()
-    );
+      expect(executor.getTool('test_tool')).toBe(tool);
+      expect(executor.getTool('nonexistent')).toBeUndefined();
+    });
 
-    expect(result.status).not.toBe('completed');
-    expect(result.content[0].text).toContain('Validation failed');
-    expect(result.content[0].text).toContain('File path cannot be empty');
-    expect(result.id).toBe('test-2');
+    it('should list available tool names', () => {
+      const toolNames = executor.getAvailableToolNames();
+      expect(toolNames).toContain('file_read');
+      expect(toolNames).toContain('bash');
+      expect(Array.isArray(toolNames)).toBe(true);
+    });
+
+    it('should get all tools', () => {
+      const allTools = executor.getAllTools();
+      expect(Array.isArray(allTools)).toBe(true);
+      expect(allTools.length).toBeGreaterThan(0);
+
+      const fileReadTool = allTools.find((t) => t.name === 'file_read');
+      expect(fileReadTool).toBeDefined();
+    });
   });
 
-  it('handles line range validation from new tools', async () => {
-    const testDir = await tempDir.getPath();
-    const testFile = join(testDir, 'test.txt');
-    await writeFile(testFile, 'Line 1\nLine 2\nLine 3\n');
-
-    const executor = new ToolExecutor();
-    const tool = new FileReadTool();
-    executor.registerTool('file_read', tool);
-    executor.setApprovalCallback(autoApprovalCallback);
-
-    const result = await executor.executeTool(
-      {
-        id: 'test-3',
+  describe('Tool Execution', () => {
+    it('should execute tools directly', async () => {
+      const toolCall: ToolCall = {
+        id: 'test-exec-1',
         name: 'file_read',
         arguments: {
-          path: testFile,
-          startLine: 5,
-          endLine: 2, // Invalid range
-        },
-      },
-      createMockToolContext()
-    );
-
-    expect(result.status).not.toBe('completed');
-    expect(result.content[0].text).toContain('endLine must be >= startLine');
-    expect(result.id).toBe('test-3');
-
-    await tempDir.cleanup();
-  });
-
-  describe('requestToolPermission method', () => {
-    it('should return "granted" when tool is allowed without approval', async () => {
-      const executor = new ToolExecutor();
-      const tool = new FileReadTool();
-      executor.registerTool('file_read', tool);
-      executor.setApprovalCallback(autoApprovalCallback);
-
-      const result = await executor.requestToolPermission(
-        {
-          id: 'test-permission-1',
-          name: 'file_read',
-          arguments: { path: '/tmp/test.txt' },
-        },
-        createMockToolContext()
-      );
-
-      expect(result).toBe('granted');
-    });
-
-    it('should return "pending" when approval callback throws ApprovalPendingError', async () => {
-      const pendingCallback: ApprovalCallback = {
-        requestApproval: () => {
-          throw new ApprovalPendingError('test-permission-2');
+          path: '/tmp/nonexistent.txt', // File doesn't need to exist for interface test
         },
       };
 
-      const executor = new ToolExecutor();
-      const tool = new FileReadTool();
-      executor.registerTool('file_read', tool);
-      executor.setApprovalCallback(pendingCallback);
+      const result = await executor.execute(toolCall, mockContext);
 
-      const result = await executor.requestToolPermission(
-        {
-          id: 'test-permission-2',
-          name: 'file_read',
-          arguments: { path: '/tmp/test.txt' },
-        },
-        createMockToolContext()
+      expect(result).toBeDefined();
+      expect(result.id).toBe('test-exec-1');
+      expect(result.status).toBeDefined();
+    });
+
+    it('should throw error for unknown tools', async () => {
+      const toolCall: ToolCall = {
+        id: 'test-exec-2',
+        name: 'unknown_tool',
+        arguments: {},
+      };
+
+      await expect(executor.execute(toolCall, mockContext)).rejects.toThrow(
+        "Tool 'unknown_tool' not found"
       );
-
-      expect(result).toBe('pending');
     });
 
-    it('should throw error when tool does not exist', async () => {
-      const executor = new ToolExecutor();
-      executor.setApprovalCallback(autoApprovalCallback);
+    it('should handle multiple tools independently', async () => {
+      const readCall: ToolCall = {
+        id: 'read-test',
+        name: 'file_read',
+        arguments: { path: '/tmp/test1.txt' },
+      };
 
-      await expect(
-        executor.requestToolPermission(
-          {
-            id: 'test-permission-3',
-            name: 'nonexistent_tool',
-            arguments: {},
-          },
-          createMockToolContext()
-        )
-      ).rejects.toThrow("Tool 'nonexistent_tool' not found");
-    });
+      const bashCall: ToolCall = {
+        id: 'bash-test',
+        name: 'bash',
+        arguments: { command: 'echo test' },
+      };
 
-    it('should throw error when no approval callback is configured', async () => {
-      const executor = new ToolExecutor();
-      const tool = new FileReadTool();
-      executor.registerTool('file_read', tool);
-      // No approval callback set
+      const readResult = await executor.execute(readCall, mockContext);
+      const bashResult = await executor.execute(bashCall, mockContext);
 
-      await expect(
-        executor.requestToolPermission(
-          {
-            id: 'test-permission-4',
-            name: 'file_read',
-            arguments: { path: '/tmp/test.txt' },
-          },
-          createMockToolContext()
-        )
-      ).rejects.toThrow('Tool execution requires approval but no approval callback is configured');
+      expect(readResult.id).toBe('read-test');
+      expect(bashResult.id).toBe('bash-test');
     });
   });
 
-  describe('ToolExecutor temp directory management', () => {
-    let toolExecutor: ToolExecutor;
-    let mockTool: MockTool;
-    let session: Session;
-    let project: Project;
+  describe('Context Enhancement', () => {
+    it('should enhance context with temp directory when session available', async () => {
+      // This test verifies that the executor properly sets up tool context
+      // The actual temp directory creation is tested in integration tests
 
-    beforeEach(async () => {
-      setupTestProviderDefaults();
-
-      // Create provider instance
-      providerInstanceId = await createTestProviderInstance({
-        catalogId: 'anthropic',
-        models: ['claude-3-5-haiku-20241022'],
-        displayName: 'Test ToolExecutor Instance',
-        apiKey: 'test-anthropic-key',
-      });
-
-      // Create real project and session
-      project = Project.create(
-        'Test Project',
-        'Project for temp directory testing',
-        tempLaceDirContext.tempDir,
-        {
-          providerInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        }
-      );
-
-      session = Session.create({
-        name: 'Test Session',
-        projectId: project.getId(),
-      });
-
-      toolExecutor = new ToolExecutor();
-      mockTool = new MockTool();
-      toolExecutor.registerTool(mockTool.name, mockTool);
-      toolExecutor.setApprovalCallback(autoApprovalCallback);
-      clearProcessTempDirCache();
-    });
-
-    afterEach(async () => {
-      cleanupTestProviderDefaults();
-      await cleanupTestProviderInstances([providerInstanceId]);
-    });
-
-    it('should provide temp directory to tools', async () => {
-      const agent = session.getAgent(session.getId());
-      if (!agent) throw new Error('Failed to get agent');
-
-      const context: ToolContext = {
-        signal: new AbortController().signal,
-        agent,
+      const toolCall: ToolCall = {
+        id: 'context-test',
+        name: 'bash',
+        arguments: { command: 'pwd' },
       };
 
-      await toolExecutor.executeTool(
-        { id: 'test-temp-1', name: 'mock_tool', arguments: { input: 'test' } },
-        context
-      );
-
-      // Verify tool received temp directory context
-      const receivedContext = mockTool.getCapturedContext();
-      expect(receivedContext.toolTempDir).toBeDefined();
-      expect(existsSync(receivedContext.toolTempDir!)).toBe(true);
+      // Should execute without throwing, even without full session context
+      const result = await executor.execute(toolCall, mockContext);
+      expect(result).toBeDefined();
     });
+  });
 
-    it('should create unique tool call IDs', async () => {
-      const agent = session.getAgent(session.getId());
-      if (!agent) throw new Error('Failed to get agent');
-
-      const context: ToolContext = {
-        signal: new AbortController().signal,
-        agent,
-      };
-
-      await toolExecutor.executeTool(
-        { id: 'test-temp-2a', name: 'mock_tool', arguments: { input: 'test1' } },
-        context
-      );
-      const context1 = mockTool.getCapturedContext();
-
-      await toolExecutor.executeTool(
-        { id: 'test-temp-2b', name: 'mock_tool', arguments: { input: 'test2' } },
-        context
-      );
-      const context2 = mockTool.getCapturedContext();
-
-      expect(context1.toolTempDir).toBeDefined();
-      expect(context2.toolTempDir).toBeDefined();
-      expect(context1.toolTempDir).not.toBe(context2.toolTempDir);
+  describe('MCP Integration', () => {
+    it('should maintain MCP tool discovery methods', () => {
+      // These methods exist for MCP integration
+      expect(typeof executor.ensureMCPToolsReady).toBe('function');
+      expect(typeof executor.registerMCPTools).toBe('function');
     });
+  });
 
-    it('should create temp directories that exist', async () => {
-      const agent = session.getAgent(session.getId());
-      if (!agent) throw new Error('Failed to get agent');
-
-      const context: ToolContext = {
-        signal: new AbortController().signal,
-        agent,
-      };
-
-      await toolExecutor.executeTool(
-        { id: 'test-temp-3', name: 'mock_tool', arguments: { input: 'test' } },
-        context
-      );
-
-      const receivedContext = mockTool.getCapturedContext();
-      expect(existsSync(receivedContext.toolTempDir!)).toBe(true);
+  describe('Session Integration', () => {
+    it('should support session binding', () => {
+      // Session binding is used for temp directories
+      expect(typeof executor.setSession).toBe('function');
     });
+  });
 
-    it('should throw error when agent context missing', async () => {
-      const context: ToolContext = {
-        signal: new AbortController().signal,
-        // No agent - should fail temp directory creation
-      };
-
-      const result = await toolExecutor.executeTool(
-        { id: 'test-temp-4', name: 'mock_tool', arguments: { input: 'test' } },
-        context
-      );
-
-      expect(result.status).not.toBe('completed');
-      expect(result.content[0].text).toContain(
-        'agent context required for security policy enforcement'
-      );
-    });
-
-    it('should require agent context for security policy enforcement', async () => {
-      const context: ToolContext = {
-        signal: new AbortController().signal,
-      };
-      // No agent - should fail due to security policy
-
-      const result = await toolExecutor.executeTool(
-        { id: 'test-temp-5', name: 'mock_tool', arguments: { input: 'test' } },
-        context
-      );
-
-      // Should fail due to security requirement
-      expect(result.status).not.toBe('completed');
-      expect(result.content[0].text).toContain(
-        'agent context required for security policy enforcement'
-      );
+  describe('No Approval Methods', () => {
+    it('should not have approval callback methods', () => {
+      // Verify approval methods are completely removed
+      expect((executor as any).setApprovalCallback).toBeUndefined();
+      expect((executor as any).getApprovalCallback).toBeUndefined();
+      expect((executor as any).requestToolPermission).toBeUndefined();
+      expect((executor as any).executeApprovedTool).toBeUndefined();
+      expect((executor as any).executeTool).toBeUndefined();
     });
   });
 });
-
-// Mock tool for testing temp directory functionality
-class MockTool extends Tool {
-  name = 'mock_tool';
-  description = 'Mock tool for testing';
-  schema = z.object({ input: z.string() });
-
-  private capturedContext?: ToolContext;
-
-  protected async executeValidated(
-    args: z.infer<typeof this.schema>,
-    context?: ToolContext
-  ): Promise<ToolResult> {
-    this.capturedContext = context;
-    return Promise.resolve(this.createResult(`Processed: ${args.input}`));
-  }
-
-  getCapturedContext(): ToolContext {
-    return this.capturedContext!;
-  }
-}

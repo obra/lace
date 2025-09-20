@@ -20,7 +20,6 @@ import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
 import { ProviderRegistry } from '~/providers/registry';
-import { ApprovalDecision } from '~/tools/types';
 
 // Mock provider that responds with task completion tool calls
 class MockProvider extends BaseMockProvider {
@@ -136,8 +135,16 @@ describe('Delegation Integration Tests', () => {
     session = Session.create({
       name: 'Delegation Integration Test Session',
       projectId: project.getId(),
-      approvalCallback: {
-        requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE), // Auto-approve all tool calls for testing
+      configuration: {
+        toolPolicies: {
+          // Auto-approve all tools for testing (replaces approvalCallback)
+          delegate: 'allow',
+          bash: 'allow',
+          file_read: 'allow',
+          file_write: 'allow',
+          task_add: 'allow',
+          task_complete: 'allow',
+        },
       },
     });
   });

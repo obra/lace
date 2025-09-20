@@ -18,17 +18,17 @@ import {
   TaskViewTool,
 } from '~/tools/implementations/task-manager';
 import { BashTool } from '~/tools/implementations/bash';
-import { FileReadTool } from '~/tools/implementations/file-read';
-import { FileWriteTool } from '~/tools/implementations/file-write';
+import { FileReadTool } from '~/tools/implementations/file_read';
+import { FileWriteTool } from '~/tools/implementations/file_write';
 import { Project } from '~/projects/project';
-import { FileEditTool } from '~/tools/implementations/file-edit';
-import { FileListTool } from '~/tools/implementations/file-list';
-import { RipgrepSearchTool } from '~/tools/implementations/ripgrep-search';
-import { FileFindTool } from '~/tools/implementations/file-find';
+import { FileEditTool } from '~/tools/implementations/file_edit';
+import { FileListTool } from '~/tools/implementations/file_list';
+import { RipgrepSearchTool } from '~/tools/implementations/ripgrep_search';
+import { FileFindTool } from '~/tools/implementations/file_find';
 import { DelegateTool } from '~/tools/implementations/delegate';
-import { UrlFetchTool } from '~/tools/implementations/url-fetch';
+import { UrlFetchTool } from '~/tools/implementations/url_fetch';
 import { logger } from '~/utils/logger';
-import type { ApprovalCallback, ToolPolicy } from '~/tools/types';
+import type { ToolPolicy } from '~/tools/types';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { getEnvVar } from '~/config/env-loader';
 import { MCPServerManager } from '~/mcp/server-manager';
@@ -75,7 +75,6 @@ export class Session {
     name?: string;
     description?: string;
     projectId: string;
-    approvalCallback?: ApprovalCallback;
     configuration?: Record<string, unknown>;
   }): Session {
     const name = options.name || Session.generateSessionName();
@@ -233,11 +232,7 @@ export class Session {
     // Set up agent creation callback for task-based agent spawning
     session.setupAgentCreationCallback();
 
-    // Set up coordinator agent with approval callback if provided
-    const coordinatorAgent = session.getCoordinatorAgent();
-    if (coordinatorAgent && options.approvalCallback) {
-      coordinatorAgent.toolExecutor.setApprovalCallback(options.approvalCallback);
-    }
+    // Agent owns approval flow - no callback setup needed
 
     // Register session in registry after creation is complete
     Session._sessionRegistry.set(asThreadId(sessionData.id), session);
@@ -393,12 +388,12 @@ export class Session {
     // Create session instance
     const session = new Session(sessionId, sessionData, threadManager);
 
-    // Create fully configured tool executor
-    const toolExecutor = session.createConfiguredToolExecutor();
-
     // Create and initialize coordinator agent
     let coordinatorAgent: Agent;
     try {
+      // Each agent gets its own ToolExecutor (no sharing)
+      const toolExecutor = session.createConfiguredToolExecutor();
+
       coordinatorAgent = await session.createAgent({
         sessionData,
         toolExecutor,
@@ -481,6 +476,9 @@ export class Session {
           delegateMetadata: delegateThread.metadata,
         });
 
+        // Each agent gets its own ToolExecutor (no sharing)
+        const toolExecutor = session.createConfiguredToolExecutor();
+
         // Create and initialize delegate agent
         const delegateAgent = await session.createAgent({
           sessionData,
@@ -512,10 +510,6 @@ export class Session {
 
     // Set up agent creation callback for task-based agent spawning
     session.setupAgentCreationCallback();
-
-    // Register delegate tool (TaskManager accessed via context)
-    const delegateTool = new DelegateTool();
-    toolExecutor.registerTool('delegate', delegateTool);
 
     // Final verification before completing reconstruction
     const finalAgents = session.getAgents();
@@ -812,12 +806,22 @@ export class Session {
       },
     });
 
-    // Set up approval callback for spawned agent (inherit from coordinator)
-    const coordinatorAgent = this.getCoordinatorAgent();
-    const coordinatorApprovalCallback = coordinatorAgent?.toolExecutor.getApprovalCallback();
-    if (coordinatorApprovalCallback) {
-      agent.toolExecutor.setApprovalCallback(coordinatorApprovalCallback);
+    // Inherit tool policies from main session so delegate can execute tools
+    const mainSessionPolicies = this.getEffectiveConfiguration()?.toolPolicies || {};
+    if (Object.keys(mainSessionPolicies).length > 0) {
+      // Create delegate thread with inherited policies
+      const delegateThread = this._threadManager.getThread(targetThreadId);
+      if (delegateThread) {
+        // Update thread metadata with inherited tool policies
+        const updatedMetadata = {
+          ...delegateThread.metadata,
+          inheritedToolPolicies: mainSessionPolicies,
+        };
+        this._threadManager.updateThreadMetadata(targetThreadId, updatedMetadata);
+      }
     }
+
+    // No approval callback setup needed - Agent owns approval flow
 
     this._agents.set(agent.threadId, agent);
 
@@ -866,6 +870,17 @@ export class Session {
 
   getAgent(threadId: ThreadId): Agent | null {
     return this._agents.get(threadId) || null;
+  }
+
+  getPendingApprovals(): Array<{
+    toolCallId: string;
+    toolCall: unknown;
+    requestedAt: Date;
+    threadId: string;
+  }> {
+    // Get all pending approvals for the entire session with a single database query
+    const db = getPersistence();
+    return db.getPendingApprovals(this._sessionId);
   }
 
   async startAgent(threadId: ThreadId): Promise<void> {
@@ -1174,9 +1189,8 @@ Use your task_add_note tool to record important notes as you work and your task_
       logger.info(`Initialized MCP servers for session ${this.getId()}`);
 
       // Fire-and-forget refresh of MCP tools in any existing executors
-      void this.refreshMCPToolsInExecutors().catch((error) => {
-        logger.debug(`Non-blocking MCP tools refresh failed during startup:`, error);
-      });
+      // Refresh MCP tools in existing executors (synchronous)
+      this.refreshMCPToolsInExecutors();
     } catch (error) {
       logger.warn(`Failed to initialize MCP servers for session ${this.getId()}:`, error);
     }
@@ -1185,20 +1199,19 @@ Use your task_add_note tool to record important notes as you work and your task_
   /**
    * Refresh MCP tools in all ToolExecutors for this session
    */
-  private async refreshMCPToolsInExecutors(): Promise<void> {
+  private refreshMCPToolsInExecutors(): void {
     // Update MCP tools in all agents' ToolExecutors
     // Only register for fully initialized agents to avoid timing issues
-    const refreshPromises = [];
     for (const agent of this._agents.values()) {
       if (agent.isRunning) {
         // Only update initialized agents
         const toolExecutor = agent.toolExecutor;
         if (toolExecutor?.registerMCPTools) {
-          refreshPromises.push(toolExecutor.registerMCPTools(this._mcpServerManager));
+          // registerMCPTools is synchronous - just call it
+          toolExecutor.registerMCPTools(this._mcpServerManager);
         }
       }
     }
-    await Promise.all(refreshPromises);
   }
 
   /**
@@ -1225,14 +1238,14 @@ Use your task_add_note tool to record important notes as you work and your task_
             logger.info(`Restarted MCP server ${serverId} with new configuration`);
           }
           // Refresh tools in all ToolExecutors
-          await this.refreshMCPToolsInExecutors();
+          this.refreshMCPToolsInExecutors();
           break;
 
         case 'deleted':
           await this._mcpServerManager.stopServer(serverId);
           logger.info(`Stopped and removed MCP server ${serverId}`);
           // Refresh tools in all ToolExecutors
-          await this.refreshMCPToolsInExecutors();
+          this.refreshMCPToolsInExecutors();
           break;
       }
     } catch (error) {
@@ -1262,12 +1275,12 @@ Use your task_add_note tool to record important notes as you work and your task_
       ...serverConfig,
       cwd: this.getWorkingDirectory(), // Always use session's working directory
     });
-    await this.refreshMCPToolsInExecutors();
+    this.refreshMCPToolsInExecutors();
   }
 
   async stopMCPServer(serverId: string): Promise<void> {
     await this._mcpServerManager.stopServer(serverId);
-    await this.refreshMCPToolsInExecutors();
+    this.refreshMCPToolsInExecutors();
   }
 
   async restartMCPServer(serverId: string): Promise<void> {

@@ -1363,12 +1363,28 @@ export class Agent extends EventEmitter {
 
     const toolCall = toolCallEvent.data as ToolCall;
 
-    if (decision === ApprovalDecision.DENY) {
-      // Create error result for denied tool
+    if (decision === ApprovalDecision.ALLOW_SESSION) {
+      // Update session tool policy for session-wide approval
+      void this._updateSessionToolPolicy(toolCall.name, 'allow');
+
+      // Execute the approved tool
+      void this._executeApprovedTool(toolCall);
+      return; // Early return to avoid double decrementing
+    } else if (decision === ApprovalDecision.ALLOW_ONCE) {
+      // Execute the tool once
+      void this._executeApprovedTool(toolCall);
+      return; // Early return to avoid double decrementing
+    } else {
+      // SECURITY: Handle DENY and unknown decisions (fail-closed)
+      const errorMessage =
+        decision === ApprovalDecision.DENY
+          ? 'Tool execution denied by user'
+          : `Tool execution denied: unknown decision '${decision}'`;
+
       const errorResult: ToolResult = {
         id: toolCallId,
         status: 'denied',
-        content: [{ type: 'text', text: 'Tool execution denied by user' }],
+        content: [{ type: 'text', text: errorMessage }],
       };
       // Remove from active tools tracking (it was denied)
       this._activeToolCalls.delete(toolCallId);
@@ -1377,17 +1393,6 @@ export class Agent extends EventEmitter {
         data: errorResult,
         context: { threadId: this._threadId },
       });
-    } else if (decision === ApprovalDecision.ALLOW_SESSION) {
-      // Update session tool policy for session-wide approval
-      void this._updateSessionToolPolicy(toolCall.name, 'allow');
-
-      // Execute the approved tool
-      void this._executeApprovedTool(toolCall);
-      return; // Early return to avoid double decrementing
-    } else {
-      // allow_once - just execute the tool
-      void this._executeApprovedTool(toolCall);
-      return; // Early return to avoid double decrementing
     }
 
     // Handle denied tool completion
@@ -1437,12 +1442,12 @@ export class Agent extends EventEmitter {
         agent: this,
       };
 
-      // First: Check permission
-      const permission = await this._toolExecutor.requestToolPermission(toolCall, toolContext);
+      // Agent owns permission checking (new callback-free flow)
+      const permission = await this._checkToolPermission(toolCall);
 
       if (permission === 'granted') {
-        // Permission already checked and granted - execute without checking again
-        const result = await this._toolExecutor.executeApprovedTool(toolCall, toolContext);
+        // Execute immediately without approval
+        const result = await this._toolExecutor.execute(toolCall, toolContext);
 
         // Only add events if thread still exists
         if (this._threadManager.getThread(this._threadId)) {
@@ -1470,13 +1475,13 @@ export class Agent extends EventEmitter {
             this._handleBatchComplete();
           }
         }
-      } else if (permission === 'pending') {
-        // Permission pending - approval request was created
-        // Don't decrement pending count yet - wait for approval response
+      } else if (permission === 'approval_required') {
+        // Request approval - don't decrement pending count yet
+        this._requestToolApproval(toolCall);
         return;
       } else {
-        // Permission was denied - we got a ToolResult back
-        const result = permission;
+        // Permission was denied - create denied result
+        const result = this._createDeniedResult(toolCall, 'denied by policy');
 
         // Only add events if thread still exists
         if (this._threadManager.getThread(this._threadId)) {
@@ -1584,7 +1589,7 @@ export class Agent extends EventEmitter {
 
       // Execute through ToolExecutor's approved tool method
       // This bypasses permission checks (already approved) but ensures proper context setup
-      const result = await this._toolExecutor.executeApprovedTool(toolCall, toolContext);
+      const result = await this._toolExecutor.execute(toolCall, toolContext);
 
       // Only add events if thread still exists
       if (this._threadManager.getThread(this._threadId)) {
@@ -2711,6 +2716,76 @@ export class Agent extends EventEmitter {
     }
 
     return event;
+  }
+
+  /**
+   * Check tool policy and determine if approval is required.
+   * Agent owns this logic instead of ToolExecutor.
+   */
+  private async _checkToolPermission(
+    toolCall: ToolCall
+  ): Promise<'granted' | 'approval_required' | 'denied'> {
+    const session = await this.getFullSession();
+    if (!session) return 'denied';
+
+    // SECURITY: Check tool allowlist first (fail-closed)
+    const config = session.getEffectiveConfiguration();
+    if (config.tools && !config.tools.includes(toolCall.name)) {
+      return 'denied'; // Tool not in allowlist
+    }
+
+    // Check if tool is marked as safeInternal (auto-allowed)
+    const tool = this._toolExecutor.getTool(toolCall.name);
+    if (tool?.annotations?.safeInternal) {
+      return 'granted'; // Safe internal tools are always allowed
+    }
+
+    // Check specific tool policy
+    const policy = session.getToolPolicy(toolCall.name);
+
+    switch (policy) {
+      case 'allow':
+        return 'granted';
+      case 'deny':
+        return 'denied';
+      case 'ask':
+        return 'approval_required';
+      default:
+        return 'approval_required'; // Safe default
+    }
+  }
+
+  /**
+   * Request tool approval by creating TOOL_APPROVAL_REQUEST event.
+   * Agent waits for external approval response via _handleToolApprovalResponse().
+   */
+  private _requestToolApproval(toolCall: ToolCall): void {
+    // 1. Create approval request event (in correct thread!)
+    const eventContext = this._getEventContext();
+    this._addEventAndEmit({
+      type: 'TOOL_APPROVAL_REQUEST',
+      data: { toolCallId: toolCall.id },
+      context: {
+        threadId: this._threadId,
+        sessionId: eventContext.sessionId,
+      },
+    });
+
+    // Do NOT wait internally or execute - that happens via _handleToolApprovalResponse()
+    // when TOOL_APPROVAL_RESPONSE events arrive from UI/automation
+
+    // Approval request created, tool remains in pending state until external approval
+  }
+
+  /**
+   * Create denied tool result for rejected approvals.
+   */
+  private _createDeniedResult(toolCall: ToolCall, decision: string): ToolResult {
+    return {
+      id: toolCall.id,
+      content: [{ type: 'text', text: `Tool execution denied: ${decision}` }],
+      status: 'failed',
+    };
   }
 
   private _getWorkingDirectory(): string | undefined {

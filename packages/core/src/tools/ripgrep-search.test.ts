@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { RipgrepSearchTool } from '~/tools/implementations/ripgrep-search';
+import { RipgrepSearchTool } from '~/tools/implementations/ripgrep_search';
 import { createTestTempDir } from '~/test-utils/temp-directory';
 
 describe('RipgrepSearchTool with schema validation', () => {
@@ -46,7 +46,7 @@ describe('RipgrepSearchTool with schema validation', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('ripgrep_search');
       expect(tool.description)
-        .toBe(`Search file contents using regex patterns. Use for text search, file-find for name patterns.
+        .toBe(`Search file contents using regex patterns. Use for text search, file_find for name patterns.
 Supports glob filters (includePattern/excludePattern). Returns path:line:content format.`);
     });
 

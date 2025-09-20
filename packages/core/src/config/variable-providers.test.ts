@@ -247,8 +247,8 @@ describe('Variable Providers', () => {
     it('should provide tool information', () => {
       const tools = [
         { name: 'bash', description: 'Execute bash commands' },
-        { name: 'file-read', description: 'Read file contents' },
-        { name: 'file-write', description: 'Write file contents' },
+        { name: 'file_read', description: 'Read file contents' },
+        { name: 'file_write', description: 'Write file contents' },
       ];
 
       const provider = new ToolVariableProvider(tools);
@@ -261,11 +261,11 @@ describe('Variable Providers', () => {
         description: 'Execute bash commands',
       });
       expect((variables.tools as unknown[])[1]).toEqual({
-        name: 'file-read',
+        name: 'file_read',
         description: 'Read file contents',
       });
       expect((variables.tools as unknown[])[2]).toEqual({
-        name: 'file-write',
+        name: 'file_write',
         description: 'Write file contents',
       });
     });

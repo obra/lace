@@ -5,11 +5,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
+import { ApprovalDecision } from '~/tools/types';
 import { TestProvider } from '~/test-utils/test-provider';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { BashTool } from '~/tools/implementations/bash';
-import { EventApprovalCallback } from '~/tools/event-approval-callback';
-import { ApprovalDecision } from '~/tools/types';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import {
@@ -132,9 +131,8 @@ describe('Tool Approval Race Condition Integration Tests', () => {
     // Mock provider creation for test
     vi.spyOn(agent, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
 
-    // Set up EventApprovalCallback for approval workflow
-    const approvalCallback = new EventApprovalCallback(agent);
-    agent.toolExecutor.setApprovalCallback(approvalCallback);
+    // This test specifically tests approval race conditions - tools should require approval
+    // Remove the auto-grant mock so tools default to 'approval_required'
 
     await agent.start();
   });
