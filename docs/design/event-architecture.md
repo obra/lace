@@ -2,22 +2,31 @@
 
 ## Overview
 
-Lace uses a hierarchical event-driven architecture that enables real-time updates across the web interface while maintaining clean separation between the core system and web-specific concerns. This document defines the complete event architecture, identifies current gaps, and establishes patterns for future development.
+Lace uses a hierarchical event-driven architecture that enables real-time
+updates across the web interface while maintaining clean separation between the
+core system and web-specific concerns. This document defines the complete event
+architecture, identifies current gaps, and establishes patterns for future
+development.
 
 ## Core Principles
 
-1. **Single Unified Stream**: All events flow through one EventStreamManager instance to avoid connection pool exhaustion
-2. **Hierarchical Scoping**: Events are scoped from system → project → session → thread → task levels
-3. **Client-Side Filtering**: Frontend subscribes to specific scopes and filters events locally
-4. **Session Registration**: Session instances register with EventStreamManager to forward events
-5. **Type Safety**: All events use discriminated unions with proper TypeScript typing
+1. **Single Unified Stream**: All events flow through one EventStreamManager
+   instance to avoid connection pool exhaustion
+2. **Hierarchical Scoping**: Events are scoped from system → project → session →
+   thread → task levels
+3. **Client-Side Filtering**: Frontend subscribes to specific scopes and filters
+   events locally
+4. **Session Registration**: Session instances register with EventStreamManager
+   to forward events
+5. **Type Safety**: All events use discriminated unions with proper TypeScript
+   typing
 
 ## Event Hierarchy & Scopes
 
 ```
 System Level (global)
 ├── Project Level (projectId)
-│   ├── Session Level (sessionId) 
+│   ├── Session Level (sessionId)
 │   │   ├── Agent/Thread Level (threadId)
 │   │   │   ├── Tool Level (tool calls, results, approvals)
 │   │   │   └── Message Level (user/agent messages, tokens)
@@ -32,29 +41,30 @@ System Level (global)
 
 ### Current Event Sources
 
-| Source | Events Emitted | Current Status | Event Type Used |
-|--------|---------------|----------------|-----------------|
-| **TaskManager** | `task:created`, `task:updated`, `task:deleted`, `task:note_added`, `agent:spawned` | ❌ NOT forwarded | Should be `task` |
-| **Agent** | `agent_response_complete`, `agent_token`, `tool_call_start`, `tool_call_complete`, `state_change`, `error`, `conversation_complete`, `thread_event_added` | ✅ Forwarded | Currently `session` |
-| **ThreadManager** | `TOOL_APPROVAL_REQUEST`, `TOOL_APPROVAL_RESPONSE` | ✅ Via Agent forwarding | Currently `session` |
-| **Session** | Session lifecycle events | ❌ NOT implemented | Should be `session` |
-| **Project** | Project operations | ❌ NOT implemented | Should be `project` |
-| **System** | Health, diagnostics | ❌ NOT implemented | Should be `system` |
+| Source            | Events Emitted                                                                                                                                            | Current Status          | Event Type Used     |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ------------------- |
+| **TaskManager**   | `task:created`, `task:updated`, `task:deleted`, `task:note_added`, `agent:spawned`                                                                        | ❌ NOT forwarded        | Should be `task`    |
+| **Agent**         | `agent_response_complete`, `agent_token`, `tool_call_start`, `tool_call_complete`, `state_change`, `error`, `conversation_complete`, `thread_event_added` | ✅ Forwarded            | Currently `session` |
+| **ThreadManager** | `TOOL_APPROVAL_REQUEST`, `TOOL_APPROVAL_RESPONSE`                                                                                                         | ✅ Via Agent forwarding | Currently `session` |
+| **Session**       | Session lifecycle events                                                                                                                                  | ❌ NOT implemented      | Should be `session` |
+| **Project**       | Project operations                                                                                                                                        | ❌ NOT implemented      | Should be `project` |
+| **System**        | Health, diagnostics                                                                                                                                       | ❌ NOT implemented      | Should be `system`  |
 
 ### Event Type Classification
 
 ```typescript
-type StreamEventType = 
-  | 'system'    // System-wide events (health, config changes)
-  | 'project'   // Project-scoped events (settings, members)
-  | 'session'   // Session-scoped events (lifecycle, agents, messages)
-  | 'task'      // Task-scoped events (CRUD, assignments, notes)
-  | 'tool'      // Tool-scoped events (calls, results, approvals)
+type StreamEventType =
+  | 'system' // System-wide events (health, config changes)
+  | 'project' // Project-scoped events (settings, members)
+  | 'session' // Session-scoped events (lifecycle, agents, messages)
+  | 'task' // Task-scoped events (CRUD, assignments, notes)
+  | 'tool'; // Tool-scoped events (calls, results, approvals)
 ```
 
 ## Current Architecture
 
 ### EventStreamManager (Web Layer)
+
 ```typescript
 interface StreamEvent {
   id: string;
@@ -62,7 +72,7 @@ interface StreamEvent {
   eventType: 'system' | 'project' | 'session' | 'task' | 'tool';
   scope: {
     projectId?: string;
-    sessionId?: string; 
+    sessionId?: string;
     threadId?: string;
     taskId?: string;
   };
@@ -71,18 +81,20 @@ interface StreamEvent {
 ```
 
 ### Current Implementation: EventStreamManager
+
 - ✅ Global singleton manages all SSE connections
 - ✅ Session instances register to forward TaskManager events
 - ✅ Automatic agent error handling registration
 - ✅ Uses correct LaceEvent format with context hierarchy
 
 ### Frontend Subscription Model
+
 ```typescript
 interface EventSubscription {
-  projects?: string[];      // Filter by project IDs
-  sessions?: string[];      // Filter by session IDs  
-  threads?: string[];       // Filter by thread IDs
-  eventTypes?: string[];    // Filter by event types
+  projects?: string[]; // Filter by project IDs
+  sessions?: string[]; // Filter by session IDs
+  threads?: string[]; // Filter by thread IDs
+  eventTypes?: string[]; // Filter by event types
 }
 ```
 
@@ -99,7 +111,7 @@ interface EventSubscription {
    - Tool events should use `eventType: 'tool'`
    - Makes client-side filtering brittle
 
-3. **Incomplete Scope Information**: 
+3. **Incomplete Scope Information**:
    - Missing projectId in many events
    - taskId not included in task events
    - Prevents proper hierarchical filtering
@@ -125,7 +137,8 @@ interface EventSubscription {
 
 ### 1. EventStreamManager Registration Pattern
 
-The current implementation uses systematic event forwarding via EventStreamManager:
+The current implementation uses systematic event forwarding via
+EventStreamManager:
 
 ```typescript
 // EventStreamManager.registerSession() method
@@ -159,21 +172,21 @@ registerSession(session: Session): void {
 this.broadcast({
   eventType: 'task',
   scope: { projectId, sessionId, taskId },
-  data: taskEvent
+  data: taskEvent,
 });
 
-// Agent events → eventType: 'session' 
+// Agent events → eventType: 'session'
 this.broadcast({
-  eventType: 'session', 
+  eventType: 'session',
   scope: { projectId, sessionId, threadId },
-  data: sessionEvent
+  data: sessionEvent,
 });
 
 // Tool events → eventType: 'tool'
 this.broadcast({
   eventType: 'tool',
   scope: { projectId, sessionId, threadId, toolCallId },
-  data: toolEvent
+  data: toolEvent,
 });
 ```
 
@@ -183,45 +196,54 @@ All events must include complete hierarchical scope:
 
 ```typescript
 interface EventScope {
-  projectId?: string;    // Always include when available
-  sessionId?: string;    // Session-scoped and below
-  threadId?: string;     // Thread-scoped and below  
-  taskId?: string;       // Task-scoped events only
-  toolCallId?: string;   // Tool-scoped events only
+  projectId?: string; // Always include when available
+  sessionId?: string; // Session-scoped and below
+  threadId?: string; // Thread-scoped and below
+  taskId?: string; // Task-scoped events only
+  toolCallId?: string; // Tool-scoped events only
 }
 ```
 
 ### 4. Missing Event Sources
 
 #### Session Lifecycle Events
+
 ```typescript
 // When session created/destroyed/updated
 const sessionEvent: SessionEvent = {
   type: 'SESSION_CREATED' | 'SESSION_DESTROYED' | 'SESSION_UPDATED',
   sessionId,
   timestamp: new Date(),
-  data: { /* session metadata */ }
+  data: {
+    /* session metadata */
+  },
 };
 ```
 
-#### Project Events  
+#### Project Events
+
 ```typescript
 // When project settings change, members added, etc.
 const projectEvent: ProjectEvent = {
   type: 'PROJECT_UPDATED' | 'PROJECT_MEMBER_ADDED',
   projectId,
-  timestamp: new Date(), 
-  data: { /* project changes */ }
+  timestamp: new Date(),
+  data: {
+    /* project changes */
+  },
 };
 ```
 
 #### System Events
+
 ```typescript
 // Health checks, global config changes
 const systemEvent: SystemEvent = {
   type: 'SYSTEM_HEALTH' | 'CONFIG_UPDATED',
   timestamp: new Date(),
-  data: { /* system info */ }
+  data: {
+    /* system info */
+  },
 };
 ```
 
@@ -231,17 +253,18 @@ Standard metadata for all events:
 
 ```typescript
 interface BaseEvent {
-  id: string;           // Unique event ID
-  timestamp: Date;      // Always Date object, not string
-  actor?: string;       // Who triggered the event
-  source: string;       // Which component emitted it
-  version: string;      // Event schema version
+  id: string; // Unique event ID
+  timestamp: Date; // Always Date object, not string
+  actor?: string; // Who triggered the event
+  source: string; // Which component emitted it
+  version: string; // Event schema version
 }
 ```
 
 ## Frontend Subscription Patterns
 
 ### Current Patterns
+
 ```typescript
 // useTaskStream - subscribes to task events for specific session
 useTaskStream({ projectId, sessionId, onTaskCreated, ... });
@@ -251,38 +274,42 @@ useSessionEvents(sessionId, agentId);
 ```
 
 ### Proposed Enhanced Patterns
+
 ```typescript
 // Hierarchical subscriptions
 useEventStream({
   subscription: {
-    projects: ['project-1'],           // All events in project
-    sessions: ['session-1'],           // All events in session  
-    eventTypes: ['task', 'session'],   // Only these event types
-  }
+    projects: ['project-1'], // All events in project
+    sessions: ['session-1'], // All events in session
+    eventTypes: ['task', 'session'], // Only these event types
+  },
 });
 
-// Specific event type subscriptions  
-useTaskEvents({ projectId, sessionId });      // Only task events
-useSessionEvents({ sessionId, threadId });    // Only session events
-useProjectEvents({ projectId });              // Only project events
-useSystemEvents();                            // Only system events
+// Specific event type subscriptions
+useTaskEvents({ projectId, sessionId }); // Only task events
+useSessionEvents({ sessionId, threadId }); // Only session events
+useProjectEvents({ projectId }); // Only project events
+useSystemEvents(); // Only system events
 ```
 
 ## Implementation Plan
 
 ### Phase 1: Fix Critical Issues ⚡
+
 1. Add TaskManager event forwarding to SessionService
-2. Use correct eventType for task events ('task' not 'session')  
+2. Use correct eventType for task events ('task' not 'session')
 3. Include complete scope information in all events
 4. Test task creation updates reach frontend
 
 ### Phase 2: Systematic Architecture 🏗️
+
 1. Replace manual Agent event wiring with systematic approach
 2. Add Session lifecycle event forwarding
 3. Implement Project-level event system
 4. Add System-level event infrastructure
 
-### Phase 3: Enhanced Patterns 🚀  
+### Phase 3: Enhanced Patterns 🚀
+
 1. Unified event metadata across all sources
 2. Enhanced frontend subscription patterns
 3. Event versioning and migration system
@@ -291,16 +318,19 @@ useSystemEvents();                            // Only system events
 ## Testing Strategy
 
 ### Event Flow Testing
+
 - Unit tests: Each event source emits correctly
 - Integration tests: SessionService forwards all event types
 - E2E tests: Frontend receives events in real-time
 
-### Subscription Testing  
+### Subscription Testing
+
 - Client-side filtering works correctly
 - Hierarchical scoping is respected
 - No event loss or duplication
 
 ### Performance Testing
+
 - Single connection handles all event types
 - Client-side filtering is efficient
 - No memory leaks in long-running connections
@@ -308,16 +338,19 @@ useSystemEvents();                            // Only system events
 ## Future Considerations
 
 ### Event Persistence
+
 - Should events be persisted for replay?
 - Event sourcing for audit trails?
 - Event-driven state reconstruction?
 
 ### Multi-Tenant Support
+
 - How do events scope across tenants?
 - Permission-based event filtering?
 - Cross-tenant event isolation?
 
-### Scalability  
+### Scalability
+
 - Event batching for high-frequency events?
 - WebSocket scaling across processes?
 - Event stream partitioning?
@@ -326,11 +359,15 @@ useSystemEvents();                            // Only system events
 
 ## Current Status: IMPLEMENTED
 
-This document describes the event architecture. The core implementation is complete:
+This document describes the event architecture. The core implementation is
+complete:
 
-✅ **TaskManager forwarding** - Session instances register with EventStreamManager to forward all task events
-✅ **Global EventStreamManager** - Single singleton manages all SSE connections with firehose pattern
-✅ **LaceEvent format** - Standardized event structure with context hierarchy
-✅ **Agent error handling** - Automatic registration of error handlers for all agents
+✅ **TaskManager forwarding** - Session instances register with
+EventStreamManager to forward all task events ✅ **Global EventStreamManager** -
+Single singleton manages all SSE connections with firehose pattern ✅
+**LaceEvent format** - Standardized event structure with context hierarchy ✅
+**Agent error handling** - Automatic registration of error handlers for all
+agents
 
-The EventStreamManager pattern successfully replaced the need for a complex SessionService bridge.
+The EventStreamManager pattern successfully replaced the need for a complex
+SessionService bridge.

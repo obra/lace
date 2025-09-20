@@ -35,7 +35,7 @@ my-app/
 │   │   │
 │   │   ├── auth/                   # Auth routes (/auth/*)
 │   │   │   ├── login.tsx           # /auth/login
-│   │   │   ├── register.tsx        # /auth/register  
+│   │   │   ├── register.tsx        # /auth/register
 │   │   │   └── logout.tsx          # /auth/logout
 │   │   │
 │   │   ├── products/               # Product routes (/products/*)
@@ -100,15 +100,15 @@ my-app/
 
 React Router 7 uses file-based routing with specific naming patterns:
 
-| File Pattern | Route | Description |
-|--------------|-------|-------------|
-| `_index.tsx` | `/` | Index route for parent segment |
-| `about.tsx` | `/about` | Static route segment |
-| `$id.tsx` | `/:id` | Dynamic route parameter |
-| `$id_.edit.tsx` | `/:id/edit` | Nested route (dot notation) |
-| `products/$id.tsx` | `/products/:id` | Nested in directory |
-| `_layout.tsx` | N/A | Layout route (no URL segment) |
-| `$.tsx` | `/*` | Splat route (catch-all) |
+| File Pattern       | Route           | Description                    |
+| ------------------ | --------------- | ------------------------------ |
+| `_index.tsx`       | `/`             | Index route for parent segment |
+| `about.tsx`        | `/about`        | Static route segment           |
+| `$id.tsx`          | `/:id`          | Dynamic route parameter        |
+| `$id_.edit.tsx`    | `/:id/edit`     | Nested route (dot notation)    |
+| `products/$id.tsx` | `/products/:id` | Nested in directory            |
+| `_layout.tsx`      | N/A             | Layout route (no URL segment)  |
+| `$.tsx`            | `/*`            | Splat route (catch-all)        |
 
 ### Special Characters
 
@@ -122,25 +122,25 @@ React Router 7 uses file-based routing with specific naming patterns:
 ### Basic Routes (app/routes.ts)
 
 ```typescript
-import { type RouteConfig, route, index } from "@react-router/dev/routes";
+import { type RouteConfig, route, index } from '@react-router/dev/routes';
 
 export default [
   // Index route (/)
-  index("./home.tsx"),
-  
+  index('./home.tsx'),
+
   // Static routes
-  route("/about", "./about.tsx"),
-  route("/contact", "./contact.tsx"),
-  
+  route('/about', './about.tsx'),
+  route('/contact', './contact.tsx'),
+
   // Dynamic routes
-  route("/products/:id", "./product.tsx"),
-  route("/users/:userId", "./user.tsx"),
-  
+  route('/products/:id', './product.tsx'),
+  route('/users/:userId', './user.tsx'),
+
   // Nested routes
-  route("/admin", "./admin/layout.tsx", [
-    index("./admin/dashboard.tsx"),
-    route("users", "./admin/users.tsx"),
-    route("settings", "./admin/settings.tsx"),
+  route('/admin', './admin/layout.tsx', [
+    index('./admin/dashboard.tsx'),
+    route('users', './admin/users.tsx'),
+    route('settings', './admin/settings.tsx'),
   ]),
 ] satisfies RouteConfig;
 ```
@@ -148,28 +148,33 @@ export default [
 ### Advanced Route Configuration
 
 ```typescript
-import { type RouteConfig, route, index, layout } from "@react-router/dev/routes";
+import {
+  type RouteConfig,
+  route,
+  index,
+  layout,
+} from '@react-router/dev/routes';
 
 export default [
   // Layout routes (invisible URL segments)
-  layout("./layouts/auth.tsx", [
-    route("/login", "./auth/login.tsx"),
-    route("/register", "./auth/register.tsx"),
+  layout('./layouts/auth.tsx', [
+    route('/login', './auth/login.tsx'),
+    route('/register', './auth/register.tsx'),
   ]),
-  
+
   // Route with multiple dynamic segments
-  route("/projects/:projectId/tasks/:taskId", "./project-task.tsx"),
-  
+  route('/projects/:projectId/tasks/:taskId', './project-task.tsx'),
+
   // Optional segments
-  route("/search/:query?", "./search.tsx"),
-  
+  route('/search/:query?', './search.tsx'),
+
   // Splat routes (catch-all)
-  route("/files/*", "./file-browser.tsx"),
-  
+  route('/files/*', './file-browser.tsx'),
+
   // Route groups (for organization only)
-  ...route("/api", undefined, [
-    route("users", "./api/users.tsx"),
-    route("products", "./api/products.tsx"),
+  ...route('/api', undefined, [
+    route('users', './api/users.tsx'),
+    route('products', './api/products.tsx'),
   ]),
 ] satisfies RouteConfig;
 ```
@@ -179,43 +184,43 @@ export default [
 ### react-router.config.ts
 
 ```typescript
-import { type Config } from "@react-router/dev/config";
+import { type Config } from '@react-router/dev/config';
 
 export default {
   // Application directory
-  appDirectory: "app",
-  
+  appDirectory: 'app',
+
   // Server-side rendering
   ssr: true,
-  
+
   // Pre-rendering for static sites
   async prerender() {
     return [
-      "/",
-      "/about", 
-      "/products",
+      '/',
+      '/about',
+      '/products',
       // Can be dynamic
-      ...(await getPublicProductIds()).map(id => `/products/${id}`)
+      ...(await getPublicProductIds()).map((id) => `/products/${id}`),
     ];
   },
-  
+
   // Build directory
-  buildDirectory: "build",
-  
+  buildDirectory: 'build',
+
   // Public directory for static assets
-  assetsBuildDirectory: "public/build",
-  
+  assetsBuildDirectory: 'public/build',
+
   // Server build path
-  serverBuildFile: "build/server/index.js",
-  
+  serverBuildFile: 'build/server/index.js',
+
   // Server entry point
-  serverEntryPoint: "app/entry.server.tsx",
-  
+  serverEntryPoint: 'app/entry.server.tsx',
+
   // Vite plugins
   plugins: [
     // Custom Vite plugins
   ],
-  
+
   // Future flags (opt into new features)
   future: {
     unstable_optimizeDeps: true,
@@ -227,37 +232,35 @@ export default {
 
 ```typescript
 // react-router.config.ts
-import { type Config } from "@react-router/dev/config";
+import { type Config } from '@react-router/dev/config';
 
-const isDev = process.env.NODE_ENV === "development";
-const isProd = process.env.NODE_ENV === "production";
+const isDev = process.env.NODE_ENV === 'development';
+const isProd = process.env.NODE_ENV === 'production';
 
 export default {
-  appDirectory: "app",
-  
+  appDirectory: 'app',
+
   // Disable SSR in development for faster builds
   ssr: isProd,
-  
+
   // Pre-render only in production
   async prerender() {
     if (!isProd) return [];
-    
-    return [
-      "/",
-      "/about",
-      "/contact",
-    ];
+
+    return ['/', '/about', '/contact'];
   },
-  
+
   // Development optimizations
-  ...(isDev && {
-    // Dev-specific options
-  }),
-  
-  // Production optimizations  
-  ...(isProd && {
-    // Prod-specific options
-  }),
+  ...(isDev &&
+    {
+      // Dev-specific options
+    }),
+
+  // Production optimizations
+  ...(isProd &&
+    {
+      // Prod-specific options
+    }),
 } satisfies Config;
 ```
 
@@ -334,13 +337,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {/* Global navigation */}
           </nav>
         </header>
-        
+
         <main>{children}</main>
-        
+
         <footer>
           {/* Global footer */}
         </footer>
-        
+
         <ScrollRestoration />
         <Scripts />
         <LiveReload />
@@ -370,6 +373,7 @@ export function ErrorBoundary() {
 ### 1. Route Organization
 
 **✅ Do:**
+
 ```
 app/routes/
 ├── _index.tsx              # Home
@@ -384,6 +388,7 @@ app/routes/
 ```
 
 **❌ Avoid:**
+
 ```
 app/routes/
 ├── index.tsx               # Use _index.tsx
@@ -395,6 +400,7 @@ app/routes/
 ### 2. Component Organization
 
 **✅ Do:**
+
 ```typescript
 // Collocate related components
 app/routes/products/
@@ -410,6 +416,7 @@ app/routes/products/
 ### 3. Type Safety
 
 **✅ Do:**
+
 ```typescript
 // Use generated route types
 import { Route } from "./+types/product";
@@ -432,7 +439,7 @@ export default function Product({ loaderData }: Route.ComponentProps) {
 export const env = {
   DATABASE_URL: process.env.DATABASE_URL!,
   API_KEY: process.env.API_KEY!,
-  NODE_ENV: process.env.NODE_ENV || "development",
+  NODE_ENV: process.env.NODE_ENV || 'development',
 } as const;
 
 // Validate required env vars
@@ -443,4 +450,6 @@ Object.entries(env).forEach(([key, value]) => {
 });
 ```
 
-This structure provides a solid foundation for React Router 7 applications while maintaining clear separation of concerns and leveraging the framework's conventions.
+This structure provides a solid foundation for React Router 7 applications while
+maintaining clear separation of concerns and leveraging the framework's
+conventions.

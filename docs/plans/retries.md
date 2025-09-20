@@ -1,25 +1,37 @@
 # Retry Logic Implementation Plan
 
 ## Overview
-Add retry logic with exponential backoff for LLM API calls to handle transient network failures and rate limits.
+
+Add retry logic with exponential backoff for LLM API calls to handle transient
+network failures and rate limits.
 
 ## Background Context
 
 ### What is Lace?
-Lace is an AI coding assistant that uses an event-sourcing architecture. User messages and AI responses are stored as events that can be replayed to reconstruct conversations.
+
+Lace is an AI coding assistant that uses an event-sourcing architecture. User
+messages and AI responses are stored as events that can be replayed to
+reconstruct conversations.
 
 ### Key Architecture Components
-1. **Agent** (`src/agents/agent.ts`): Orchestrates conversations between users and AI providers
-2. **Providers** (`src/providers/`): Abstractions over different AI services (Anthropic, OpenAI, local models)
-3. **Terminal Interface** (`src/interfaces/terminal-interface.tsx`): React-based UI using Ink (React for CLI)
+
+1. **Agent** (`src/agents/agent.ts`): Orchestrates conversations between users
+   and AI providers
+2. **Providers** (`src/providers/`): Abstractions over different AI services
+   (Anthropic, OpenAI, local models)
+3. **Terminal Interface** (`src/interfaces/terminal-interface.tsx`): React-based
+   UI using Ink (React for CLI)
 
 ### Current Request Flow
+
 1. User sends message → Agent receives it
-2. Agent calls `provider.createResponse()` or `provider.createStreamingResponse()`
+2. Agent calls `provider.createResponse()` or
+   `provider.createStreamingResponse()`
 3. Provider makes HTTP request to AI service
 4. Response flows back through Agent → UI
 
 ### Current Error Handling
+
 - Errors bubble up from providers to Agent
 - Agent catches errors and emits `error` events
 - UI displays errors to user
@@ -31,6 +43,7 @@ Lace is an AI coding assistant that uses an event-sourcing architecture. User me
 ## Requirements
 
 ### Functional Requirements
+
 1. Add retry logic for all providers with consistent UI experience
 2. Maximum 10 retry attempts for all providers
 3. Only retry transient errors (network, rate limits, server errors)
@@ -38,6 +51,7 @@ Lace is an AI coding assistant that uses an event-sourcing architecture. User me
 5. Show retry status in UI
 
 ### Non-Functional Requirements
+
 1. No configuration options - hardcoded retry behavior
 2. Minimal performance impact
 3. Clean, testable implementation
@@ -46,17 +60,19 @@ Lace is an AI coding assistant that uses an event-sourcing architecture. User me
 ## Technical Specification
 
 ### Retry Parameters (Hardcoded)
+
 ```typescript
 const RETRY_CONFIG = {
   maxRetries: 10,
   initialDelayMs: 1000,
   maxDelayMs: 30000,
   backoffFactor: 2,
-  jitterFactor: 0.1  // ±10% randomization
+  jitterFactor: 0.1, // ±10% randomization
 };
 ```
 
 ### Retryable Errors
+
 ```typescript
 // Network errors
 - ECONNREFUSED, ENOTFOUND, ETIMEDOUT, ECONNRESET, EHOSTUNREACH
@@ -75,6 +91,7 @@ const RETRY_CONFIG = {
 ```
 
 ### Non-Retryable Errors
+
 - Authentication errors (401, 403)
 - Client errors (400, 422)
 - User abort (AbortError)
@@ -84,19 +101,26 @@ const RETRY_CONFIG = {
 ## Implementation Strategy
 
 ### Provider-Level Retry with Agent Coordination
-1. **Each provider implements its own retry logic** - They understand their specific error patterns and streaming behavior
-2. **Base retry functionality in AIProvider** - Shared retry utilities for all providers
-3. **Agent forwards retry events** - Ensures consistent UI experience across all providers
+
+1. **Each provider implements its own retry logic** - They understand their
+   specific error patterns and streaming behavior
+2. **Base retry functionality in AIProvider** - Shared retry utilities for all
+   providers
+3. **Agent forwards retry events** - Ensures consistent UI experience across all
+   providers
 4. **All providers use 10 retry attempts** - Ignoring any internal SDK retries
 
-This approach respects the existing architecture while providing consistent retry visibility and UI experience across all providers.
+This approach respects the existing architecture while providing consistent
+retry visibility and UI experience across all providers.
 
 ## Implementation Tasks
 
 ### Task 1: Extend AIProvider Base Class with Retry Support
+
 **File**: `src/providers/base-provider.ts`
 
 **TDD Steps**:
+
 1. Write test file: `src/providers/__tests__/base-provider.test.ts`
 2. Test: `isRetryableError()` identifies network errors
 3. Test: `isRetryableError()` identifies HTTP 5xx errors
@@ -110,6 +134,7 @@ This approach respects the existing architecture while providing consistent retr
 11. Test: `withRetry()` streaming detection prevents retry after first token
 
 **Implementation**:
+
 ```typescript
 // Add to AIProvider class
 protected readonly RETRY_CONFIG = {
@@ -137,7 +162,7 @@ protected calculateBackoffDelay(attempt: number): number {
 
 protected async withRetry<T>(
   operation: () => Promise<T>,
-  options?: { 
+  options?: {
     maxAttempts?: number;
     isStreaming?: boolean;
     canRetry?: () => boolean;
@@ -153,9 +178,11 @@ protected async withRetry<T>(
 **Commit**: "feat: add retry support to AIProvider base class"
 
 ### Task 2: Implement Retry in AnthropicProvider
+
 **File**: `src/providers/anthropic-provider.ts`
 
 **TDD Steps**:
+
 1. Write test file: `src/providers/__tests__/anthropic-provider-retry.test.ts`
 2. Test: Non-streaming requests use retry wrapper
 3. Test: Streaming requests use retry wrapper with streaming detection
@@ -163,6 +190,7 @@ protected async withRetry<T>(
 5. Test: Provider-specific errors are handled
 
 **Implementation**:
+
 ```typescript
 async createResponse(messages: ProviderMessage[], options?: AnthropicProviderConfig): Promise<ProviderResponse> {
   // Wrap existing implementation with retry
@@ -181,19 +209,19 @@ async createStreamingResponse(
   options?: AnthropicProviderConfig
 ): Promise<AsyncGenerator<ProviderStreamEvent>> {
   let streamingStarted = false;
-  
+
   return this.withRetry(
     async () => {
       const stream = await this.anthropic.messages.create({ stream: true, ... });
-      
+
       // Track when streaming starts
       const wrappedStream = this.wrapStream(stream, () => {
         streamingStarted = true;
       });
-      
+
       return wrappedStream;
     },
-    { 
+    {
       isStreaming: true,
       canRetry: () => !streamingStarted
     }
@@ -205,9 +233,11 @@ async createStreamingResponse(
 **Commit**: "feat: add retry logic to AnthropicProvider"
 
 ### Task 3: Implement Retry in OpenAIProvider
+
 **File**: `src/providers/openai-provider.ts`
 
 **Similar to Task 2, but for OpenAI**:
+
 - Uses full 10 retry attempts
 - Handle OpenAI-specific error patterns
 - Implement streaming detection
@@ -215,20 +245,23 @@ async createStreamingResponse(
 **Commit**: "feat: add retry logic to OpenAIProvider"
 
 ### Task 4: Implement Retry in LMStudioProvider
+
 **File**: `src/providers/lmstudio-provider.ts`
 
 **TDD Steps**:
+
 1. Write test file: `src/providers/__tests__/lmstudio-provider-retry.test.ts`
 2. Test: Uses full 10 retry attempts
 3. Test: Provider-specific errors like "Model loading failed"
 4. Test: Streaming detection works correctly
 
 **Implementation**:
+
 ```typescript
 protected isRetryableError(error: unknown): boolean {
   // Call parent implementation first
   if (super.isRetryableError(error)) return true;
-  
+
   // LMStudio-specific errors
   const message = error?.message || '';
   return message.includes('Model loading failed') ||
@@ -248,9 +281,11 @@ async createResponse(...): Promise<ProviderResponse> {
 **Commit**: "feat: add retry logic to LMStudioProvider"
 
 ### Task 5: Implement Retry in OllamaProvider
+
 **File**: `src/providers/ollama-provider.ts`
 
 **Similar to Task 4**:
+
 - Full 10 retry attempts
 - Ollama-specific error patterns
 - Streaming detection
@@ -258,22 +293,26 @@ async createResponse(...): Promise<ProviderResponse> {
 **Commit**: "feat: add retry logic to OllamaProvider"
 
 ### Task 6: Update Agent to Forward Retry Events
+
 **File**: `src/agents/agent.ts`
 
 **Changes**:
+
 1. Add retry event types to `AgentEvents` interface:
+
    ```typescript
    'retry_attempt': [{ attempt: number; delay: number; error: Error; provider: string }];
    'retry_exhausted': [{ attempts: number; lastError: Error; provider: string }];
    ```
 
 2. Set up provider event forwarding:
+
    ```typescript
    private setupProviderListeners() {
      this._provider.on('retry_attempt', (data) => {
        this.emit('retry_attempt', { ...data, provider: this._provider.providerName });
      });
-     
+
      this._provider.on('retry_exhausted', (data) => {
        this.emit('retry_exhausted', { ...data, provider: this._provider.providerName });
      });
@@ -283,20 +322,24 @@ async createResponse(...): Promise<ProviderResponse> {
 3. Clean up listeners on abort/cleanup
 
 **Test**: Update `src/agents/__tests__/agent.test.ts`
+
 - Test that retry events are forwarded correctly
 - Test cleanup of listeners
 
 **Commit**: "feat: forward provider retry events in Agent"
 
 ### Task 7: Add UI Support for Retry Status and User Control
+
 **File**: `src/interfaces/terminal-interface.tsx`
 
-**What is Ink?**: 
+**What is Ink?**:
+
 - Ink is React for building CLI apps
 - Components use React hooks and JSX
 - Renders to terminal instead of DOM
 
 **Changes**:
+
 1. Add retry state to TerminalInterface component
 2. Listen for `retry_attempt` and `retry_exhausted` events
 3. Display retry status with attempt count and delay
@@ -304,6 +347,7 @@ async createResponse(...): Promise<ProviderResponse> {
 5. Handle retry exhaustion with clear error message
 
 **Implementation**:
+
 ```typescript
 // Add to component state
 const [retryStatus, setRetryStatus] = useState<{attempt: number; delay: number} | null>(null);
@@ -337,23 +381,26 @@ agent.on('retry_exhausted', ({ attempts, provider }) => {
 {retryExhausted && (
   <Box borderStyle="round" borderColor="red" paddingX={1}>
     <Text color="red">
-      Failed after {retryExhausted.attempts} retry attempts. 
+      Failed after {retryExhausted.attempts} retry attempts.
       Check your connection and try again.
     </Text>
   </Box>
 )}
 ```
 
-**Test manually**: Hard to unit test Ink components, test via manual verification
+**Test manually**: Hard to unit test Ink components, test via manual
+verification
 
 **Commit**: "feat: add retry status and exhaustion handling to UI"
 
-
 ### Task 8: Add Retry Metrics to Turn Tracking
+
 **File**: `src/agents/agent.ts`
 
 **Changes**:
+
 1. Add to `TurnMetrics` interface:
+
    ```typescript
    retryCount?: number;
    totalRetryDelayMs?: number;
@@ -365,9 +412,11 @@ agent.on('retry_exhausted', ({ attempts, provider }) => {
 **Commit**: "feat: add retry metrics to turn tracking"
 
 ### Task 9: Integration Testing
+
 **File**: `src/agents/__tests__/agent-retry-integration.test.ts` (new)
 
 Write end-to-end tests:
+
 1. Mock provider to simulate network errors
 2. Test full retry flow with Agent
 3. Verify events emitted correctly
@@ -377,7 +426,9 @@ Write end-to-end tests:
 **Commit**: "test: add retry integration tests"
 
 ### Task 10: Documentation
+
 **Files**:
+
 - Update `CLAUDE.md` with retry behavior
 - Update inline comments in code
 
@@ -388,18 +439,20 @@ Write end-to-end tests:
 ### Manual Testing Scenarios
 
 1. **Simulate Network Failure**:
+
    ```bash
    # Start Lace
    npm start
-   
+
    # In another terminal, block network to API
    # macOS: sudo pfctl -e -f /etc/pf.conf
    # Add rule to block api.anthropic.com
-   
+
    # Send message in Lace - should see retries
    ```
 
 2. **Test with Flaky Local Provider**:
+
    ```bash
    # Start Ollama/LMStudio
    # Send message
@@ -415,6 +468,7 @@ Write end-to-end tests:
    ```
 
 ### Automated Testing
+
 ```bash
 # Run specific test suites
 npm test retry.test.ts
@@ -426,6 +480,7 @@ npm test
 ```
 
 ## Code Review Checklist
+
 - [ ] All functions have unit tests
 - [ ] Retry logic preserves abort functionality
 - [ ] No retry after streaming starts
@@ -436,21 +491,30 @@ npm test
 - [ ] Memory leaks prevented (cleanup listeners)
 
 ## Potential Gotchas
-1. **Double retry**: Anthropic/OpenAI SDKs will retry 2 times internally in addition to our 10 retries
-2. **Streaming complexity**: Must track if streaming started - only retry before first token
+
+1. **Double retry**: Anthropic/OpenAI SDKs will retry 2 times internally in
+   addition to our 10 retries
+2. **Streaming complexity**: Must track if streaming started - only retry before
+   first token
 3. **Abort handling**: Check signal.aborted before delays and between retries
-4. **Memory leaks**: Clean up event listeners properly (especially streaming listeners)
-5. **Total time**: With 10 retries at max 30s delay each, worst case is ~5 minutes of retrying
-6. **Error classification**: Some errors may look retryable but aren't (e.g., model not found)
+4. **Memory leaks**: Clean up event listeners properly (especially streaming
+   listeners)
+5. **Total time**: With 10 retries at max 30s delay each, worst case is ~5
+   minutes of retrying
+6. **Error classification**: Some errors may look retryable but aren't (e.g.,
+   model not found)
 
 ## Design Decisions
 
 ### Addressing Key Concerns
 
-1. **Consistent UI Experience**: By implementing retry logic at the provider level with event forwarding, users see retry status consistently across all providers.
+1. **Consistent UI Experience**: By implementing retry logic at the provider
+   level with event forwarding, users see retry status consistently across all
+   providers.
 
-2. **Retry Exhaustion UX**: 
-   - Clear error message: "Failed after X retry attempts. Check your connection and try again."
+2. **Retry Exhaustion UX**:
+   - Clear error message: "Failed after X retry attempts. Check your connection
+     and try again."
    - Error stays visible for 10 seconds
    - User can immediately retry by sending their message again
    - No automatic recovery - user maintains control
@@ -461,17 +525,20 @@ npm test
    - Users can cancel at any time without waiting for all retries
 
 4. **Streaming First Token Failure**:
-   - Each provider tracks when streaming starts using their specific event patterns
+   - Each provider tracks when streaming starts using their specific event
+     patterns
    - Retries work normally until first token arrives
    - Once streaming starts, no retries (to avoid duplicate content)
    - Clean error message if stream fails after starting
 
 5. **Provider-Specific Error Handling**:
-   - Each provider can override `isRetryableError()` for their specific error patterns
+   - Each provider can override `isRetryableError()` for their specific error
+     patterns
    - Base class handles common network and HTTP errors
    - Clean separation of concerns
 
 ## Success Criteria
+
 1. Network interruptions don't immediately fail conversations
 2. Users see clear retry status in UI for all providers
 3. Users can cancel retries with Ctrl+C

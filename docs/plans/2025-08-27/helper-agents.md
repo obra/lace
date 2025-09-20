@@ -2,43 +2,61 @@
 
 ## Overview
 
-We're building a system to execute lightweight LLM (Large Language Model - AI) tasks outside the normal agent/conversation workflow. Think of it as "calling an AI like a function" - you give it a task, it completes it (possibly using tools), and returns a result.
+We're building a system to execute lightweight LLM (Large Language Model - AI)
+tasks outside the normal agent/conversation workflow. Think of it as "calling an
+AI like a function" - you give it a task, it completes it (possibly using
+tools), and returns a result.
 
 **Key Concepts:**
+
 - **Helper**: A lightweight wrapper around an LLM that executes a single task
-- **Tool**: A function the LLM can call (read files, search code, fetch URLs, etc.)
+- **Tool**: A function the LLM can call (read files, search code, fetch URLs,
+  etc.)
 - **Provider**: The AI service (Anthropic, OpenAI, etc.) that runs the LLM
 
 ## Architecture Summary
 
 Two types of helpers:
-1. **InfrastructureHelper**: For Lace's internal code to call (bypasses user approval)
-2. **SessionHelper**: For agents to spawn during conversations (respects user approval)
 
-Both types can make multiple LLM calls internally but return a single result to their caller.
+1. **InfrastructureHelper**: For Lace's internal code to call (bypasses user
+   approval)
+2. **SessionHelper**: For agents to spawn during conversations (respects user
+   approval)
+
+Both types can make multiple LLM calls internally but return a single result to
+their caller.
 
 ## Development Principles
 
 **IMPORTANT**: Follow these principles for EVERY task:
 
-1. **TDD (Test-Driven Development)**: Write the test FIRST, verify it fails, then write code to make it pass
-2. **DRY (Don't Repeat Yourself)**: If you write something twice, extract it into a function
-3. **YAGNI (You Aren't Gonna Need It)**: Don't add features that aren't explicitly required
-4. **Frequent Commits**: Commit after EVERY test that passes, with clear messages
-5. **No Mocking What We Test**: Never mock the thing you're testing. Use real implementations. Only mock external dependencies when absolutely necessary.
+1. **TDD (Test-Driven Development)**: Write the test FIRST, verify it fails,
+   then write code to make it pass
+2. **DRY (Don't Repeat Yourself)**: If you write something twice, extract it
+   into a function
+3. **YAGNI (You Aren't Gonna Need It)**: Don't add features that aren't
+   explicitly required
+4. **Frequent Commits**: Commit after EVERY test that passes, with clear
+   messages
+5. **No Mocking What We Test**: Never mock the thing you're testing. Use real
+   implementations. Only mock external dependencies when absolutely necessary.
 
 ## Implementation Status
 
 ### Completed Phases
 
 **Phase 1: ✅ COMPLETED** - ProviderToolCall → ToolCall migration
-- Eliminated ProviderToolCall interface, standardized on ToolCall with `arguments` property
+
+- Eliminated ProviderToolCall interface, standardized on ToolCall with
+  `arguments` property
 - Created parseProviderModel utility for provider:model string parsing
 - All tests passing (1423/1445)
-- Committed: `refactor: replace ProviderToolCall with ToolCall throughout codebase`
+- Committed:
+  `refactor: replace ProviderToolCall with ToolCall throughout codebase`
 - PR: #238
 
-**Phase 2: ✅ COMPLETED** - Global Configuration System  
+**Phase 2: ✅ COMPLETED** - Global Configuration System
+
 - Implemented GlobalConfigManager with fast/smart model tier configuration
 - Added example configuration files with proper structure
 - All tests passing
@@ -46,20 +64,27 @@ Both types can make multiple LLM calls internally but return a single result to 
 - PR: #239
 
 **Phase 3: ✅ COMPLETED** - Base Helper Implementation
-- Created HelperResult type and BaseHelper abstract class with multi-turn execution logic
-- Fixed token usage aggregation to use proper CombinedTokenUsage structure  
+
+- Created HelperResult type and BaseHelper abstract class with multi-turn
+  execution logic
+- Fixed token usage aggregation to use proper CombinedTokenUsage structure
 - Fixed tool result handling to use user messages with toolResults property
 - All tests passing (1423/1445)
 - Committed: `fix: correct BaseHelper implementation issues`
 
 **Phase 4: ✅ COMPLETED** - Infrastructure Helper
+
 - Implemented InfrastructureHelper with programmatic tool whitelist
-- **DEVIATION**: Added ProviderInstanceManager.getInstance() method (wasn't in original codebase)
-- **ENHANCEMENT**: Expanded test coverage from 4 to 10 tests covering all scenarios
+- **DEVIATION**: Added ProviderInstanceManager.getInstance() method (wasn't in
+  original codebase)
+- **ENHANCEMENT**: Expanded test coverage from 4 to 10 tests covering all
+  scenarios
 - All tests passing (1433/1455) - increased by 6 new tests
-- Committed: `fix: complete InfrastructureHelper with proper API and full test coverage`
+- Committed:
+  `fix: complete InfrastructureHelper with proper API and full test coverage`
 
 **Phase 5: ✅ COMPLETED** - Session Helper
+
 - Implemented SessionHelper with agent context inheritance
 - Inherits tools, tool executor, and working directory from parent agent
 - Respects user approval workflow and session policies
@@ -70,14 +95,17 @@ Both types can make multiple LLM calls internally but return a single result to 
 ### Current Phase
 
 **Phase 6: ✅ COMPLETED** - Helper Factory and Registry
+
 - Implemented HelperFactory with static factory methods for both helper types
 - Created HelperRegistry for centralized helper lifecycle management
-- Added comprehensive test coverage: factory (7 tests), registry (11 tests), integration (7 tests)
+- Added comprehensive test coverage: factory (7 tests), registry (11 tests),
+  integration (7 tests)
 - All tests passing (1468/1490) - increased by 25 new tests
 - Exported public API via helpers/index.ts and main package index
 - Committed: `feat: implement HelperFactory and HelperRegistry system`
 
 **Phase 7: ✅ COMPLETED** - Documentation and Examples
+
 - Created comprehensive usage guide with API reference and troubleshooting
 - Added practical code examples showing common implementation patterns
 - Provided integration examples for all major system components
@@ -87,32 +115,38 @@ Both types can make multiple LLM calls internally but return a single result to 
 
 ## Summary
 
-The helper agents implementation is **complete** and ready for integration. The system provides:
+The helper agents implementation is **complete** and ready for integration. The
+system provides:
 
 ### ✅ Core Implementation
+
 - **BaseHelper**: Multi-turn execution foundation with token tracking
-- **InfrastructureHelper**: System-level tasks with tool whitelisting  
+- **InfrastructureHelper**: System-level tasks with tool whitelisting
 - **SessionHelper**: Agent sub-tasks with context inheritance
 - **HelperFactory**: Type-safe creation with validation
 - **HelperRegistry**: Centralized lifecycle management
 
 ### ✅ Quality Assurance
+
 - **50 comprehensive tests** covering all components and integration patterns
 - **Clean code standards** with full TypeScript strict mode compliance
 - **No linting issues** without eslint-disable rules
 - **1468/1490 total tests passing** in full test suite
 
 ### ✅ Documentation
+
 - **Complete usage guide** with API reference and examples
-- **Integration examples** for memory, agent, task, CLI, and web systems  
+- **Integration examples** for memory, agent, task, CLI, and web systems
 - **Practical patterns** with real-world implementation code
 - **Architecture overview** with benefits and design decisions
 
 ### Current Phase
 
 **Phase 8: ✅ COMPLETED** - Integration Readiness and Final Verification
-- Verified type system consistency across all providers and interfaces  
-- Confirmed all components use standard ToolCall interface (no ProviderToolCall remnants)
+
+- Verified type system consistency across all providers and interfaces
+- Confirmed all components use standard ToolCall interface (no ProviderToolCall
+  remnants)
 - Created comprehensive integration readiness checklist with 100% completion
 - Verified all 1468 tests passing with clean linting and TypeScript compilation
 - Documented complete integration compatibility with existing Lace systems
@@ -120,12 +154,14 @@ The helper agents implementation is **complete** and ready for integration. The 
 
 ## 🎯 IMPLEMENTATION COMPLETE
 
-The helper agents system is **production-ready** and **fully integrated**. All 8 phases complete:
+The helper agents system is **production-ready** and **fully integrated**. All 8
+phases complete:
 
 ### ✅ Phase Summary
+
 1. **BaseHelper Foundation** - Multi-turn execution with token tracking
 2. **InfrastructureHelper** - System-level tasks with tool whitelisting
-3. **SessionHelper** - Agent sub-tasks with context inheritance  
+3. **SessionHelper** - Agent sub-tasks with context inheritance
 4. **Factory & Registry** - Type-safe creation and lifecycle management
 5. **Comprehensive Testing** - 50+ tests with 100% integration coverage
 6. **Factory & Registry** - Centralized helper management system
@@ -133,14 +169,18 @@ The helper agents system is **production-ready** and **fully integrated**. All 8
 8. **Integration Readiness** - Production compatibility verification
 
 ### 📊 Final Statistics
+
 - **Components**: 5 core classes with full TypeScript support
-- **Tests**: 50 helper tests (1468/1490 total tests passing) 
+- **Tests**: 50 helper tests (1468/1490 total tests passing)
 - **Documentation**: 4 comprehensive guides with working examples
 - **Code Quality**: Clean linting, strict TypeScript, no technical debt
 - **Integration**: 100% compatible with existing Lace architecture
 
 ### 🚀 Ready for Production
-The helper system provides a robust, type-safe foundation for lightweight LLM task execution across Lace's infrastructure and agent workflows. All integration points verified and production deployment ready.
+
+The helper system provides a robust, type-safe foundation for lightweight LLM
+task execution across Lace's infrastructure and agent workflows. All integration
+points verified and production deployment ready.
 
 ## Implementation Tasks
 
@@ -148,18 +188,26 @@ The helper system provides a robust, type-safe foundation for lightweight LLM ta
 
 #### Task 1.1: Refactor ProviderToolCall to ToolCall
 
-**Context**: We have two types representing the same thing - `ProviderToolCall` (with `input` property) and `ToolCall` (with `arguments` property). We're standardizing on `ToolCall`.
+**Context**: We have two types representing the same thing - `ProviderToolCall`
+(with `input` property) and `ToolCall` (with `arguments` property). We're
+standardizing on `ToolCall`.
 
 **Files to modify:**
-- `packages/core/src/providers/base-provider.ts` - Remove `ProviderToolCall` interface
-- `packages/core/src/providers/anthropic-provider.ts` - Update to return `ToolCall`
+
+- `packages/core/src/providers/base-provider.ts` - Remove `ProviderToolCall`
+  interface
+- `packages/core/src/providers/anthropic-provider.ts` - Update to return
+  `ToolCall`
 - `packages/core/src/providers/openai-provider.ts` - Update to return `ToolCall`
-- `packages/core/src/providers/lmstudio-provider.ts` - Update to return `ToolCall`
+- `packages/core/src/providers/lmstudio-provider.ts` - Update to return
+  `ToolCall`
 - `packages/core/src/providers/ollama-provider.ts` - Update to return `ToolCall`
-- `packages/core/src/agents/agent.ts` - Update `AgentMessageResult` to use `ToolCall[]`
+- `packages/core/src/agents/agent.ts` - Update `AgentMessageResult` to use
+  `ToolCall[]`
 - `packages/core/src/providers/format-converters.ts` - Update conversion logic
 
 **Testing approach:**
+
 ```bash
 # First, run existing tests to ensure they pass
 npm run test:run
@@ -171,11 +219,14 @@ npm run test:run
 **Detailed steps:**
 
 1. Start by running all tests to ensure they pass:
+
 ```bash
 npm run test:run
 ```
 
-2. Update the base provider interface in `packages/core/src/providers/base-provider.ts`:
+2. Update the base provider interface in
+   `packages/core/src/providers/base-provider.ts`:
+
 ```typescript
 // DELETE this interface:
 export interface ProviderToolCall {
@@ -189,7 +240,7 @@ import { ToolCall } from '~/tools/types';
 
 export interface ProviderResponse {
   content: string;
-  toolCalls: ToolCall[];  // Changed from ProviderToolCall[]
+  toolCalls: ToolCall[]; // Changed from ProviderToolCall[]
   // ... rest unchanged
 }
 
@@ -198,7 +249,7 @@ export interface ProviderMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content?: string;
   name?: string;
-  toolCalls?: ToolCall[];  // Changed from ProviderToolCall[]
+  toolCalls?: ToolCall[]; // Changed from ProviderToolCall[]
   toolResultId?: string;
 }
 ```
@@ -206,6 +257,7 @@ export interface ProviderMessage {
 3. Update each provider to convert to `ToolCall` format:
 
 In `packages/core/src/providers/anthropic-provider.ts`:
+
 ```typescript
 // Find where tool calls are created (around line 263)
 // Change from:
@@ -219,18 +271,19 @@ let toolCalls: ToolCall[] = [];
 toolCalls.push({
   id: toolUse.id,
   name: toolUse.name,
-  input: toolUse.input  // Note: was 'input'
+  input: toolUse.input, // Note: was 'input'
 });
 
 // To:
 toolCalls.push({
   id: toolUse.id,
   name: toolUse.name,
-  arguments: toolUse.input  // Now 'arguments' to match ToolCall
+  arguments: toolUse.input, // Now 'arguments' to match ToolCall
 });
 ```
 
 In `packages/core/src/providers/openai-provider.ts`:
+
 ```typescript
 // Around line 220, change from:
 const toolCalls: ProviderToolCall[] =
@@ -256,7 +309,9 @@ const toolCalls: ToolCall[] =
     // ...
 ```
 
-4. Update format converters in `packages/core/src/providers/format-converters.ts`:
+4. Update format converters in
+   `packages/core/src/providers/format-converters.ts`:
+
 ```typescript
 // Change any references from input to arguments:
 // From:
@@ -269,12 +324,14 @@ msg.toolCalls.forEach((toolCall: ToolCall) => {
 ```
 
 5. Run tests after each file change to catch issues early:
+
 ```bash
 npm run test:run packages/core/src/providers/anthropic-provider.test.ts
 npm run test:run packages/core/src/providers/openai-provider.test.ts
 ```
 
 6. Commit your changes:
+
 ```bash
 git add -A
 git commit -m "refactor: replace ProviderToolCall with ToolCall throughout codebase"
@@ -282,29 +339,35 @@ git commit -m "refactor: replace ProviderToolCall with ToolCall throughout codeb
 
 #### Task 1.2: Extract Provider Model Parsing Utility
 
-**Context**: The pattern `const [instanceId, modelId] = value.split(':')` appears in multiple places. Extract it to a utility.
+**Context**: The pattern `const [instanceId, modelId] = value.split(':')`
+appears in multiple places. Extract it to a utility.
 
 **Files to create:**
+
 - `packages/core/src/utils/provider-utils.ts` - New utility file
 - `packages/core/src/utils/provider-utils.test.ts` - Tests for the utility
 
 **Files to update:**
+
 - `packages/core/src/tools/implementations/delegate.ts` - Use new utility
 - `packages/core/src/tasks/task-manager.ts` - Use new utility
 
 **Test first (TDD):**
 
 Create `packages/core/src/utils/provider-utils.test.ts`:
+
 ```typescript
 import { describe, it, expect } from 'vitest';
 import { parseProviderModel } from './provider-utils';
 
 describe('parseProviderModel', () => {
   it('should parse valid provider:model format', () => {
-    const result = parseProviderModel('anthropic-default:claude-3-opus-20240229');
+    const result = parseProviderModel(
+      'anthropic-default:claude-3-opus-20240229'
+    );
     expect(result).toEqual({
       instanceId: 'anthropic-default',
-      modelId: 'claude-3-opus-20240229'
+      modelId: 'claude-3-opus-20240229',
     });
   });
 
@@ -312,7 +375,7 @@ describe('parseProviderModel', () => {
     const result = parseProviderModel('my-provider:gpt-4:latest:v2');
     expect(result).toEqual({
       instanceId: 'my-provider',
-      modelId: 'gpt-4:latest:v2'
+      modelId: 'gpt-4:latest:v2',
     });
   });
 
@@ -337,11 +400,13 @@ describe('parseProviderModel', () => {
 ```
 
 Run the test to verify it fails:
+
 ```bash
 npm run test:run packages/core/src/utils/provider-utils.test.ts
 ```
 
 Now implement `packages/core/src/utils/provider-utils.ts`:
+
 ```typescript
 // ABOUTME: Utility functions for working with provider configurations
 // ABOUTME: Includes parsing provider:model strings and other provider-related helpers
@@ -363,7 +428,7 @@ export function parseProviderModel(providerModel: string): {
   }
 
   const colonIndex = providerModel.indexOf(':');
-  
+
   if (colonIndex === -1) {
     throw new Error(
       `Invalid provider model format: '${providerModel}'. Expected format: 'instanceId:modelId'`
@@ -384,6 +449,7 @@ export function parseProviderModel(providerModel: string): {
 ```
 
 Run tests to verify they pass:
+
 ```bash
 npm run test:run packages/core/src/utils/provider-utils.test.ts
 ```
@@ -391,6 +457,7 @@ npm run test:run packages/core/src/utils/provider-utils.test.ts
 Update existing code to use the utility:
 
 In `packages/core/src/tools/implementations/delegate.ts`:
+
 ```typescript
 import { parseProviderModel } from '~/utils/provider-utils';
 
@@ -398,10 +465,12 @@ import { parseProviderModel } from '~/utils/provider-utils';
 const [providerInstanceId, modelName] = value.split(':');
 
 // With:
-const { instanceId: providerInstanceId, modelId: modelName } = parseProviderModel(value);
+const { instanceId: providerInstanceId, modelId: modelName } =
+  parseProviderModel(value);
 ```
 
 Commit:
+
 ```bash
 git add -A
 git commit -m "refactor: extract parseProviderModel utility function"
@@ -411,15 +480,18 @@ git commit -m "refactor: extract parseProviderModel utility function"
 
 #### Task 2.1: Create Global Config Manager
 
-**Context**: We need a system to manage global configuration stored in `~/.lace/config.json`.
+**Context**: We need a system to manage global configuration stored in
+`~/.lace/config.json`.
 
 **Files to create:**
+
 - `packages/core/src/config/global-config.ts` - Config manager
 - `packages/core/src/config/global-config.test.ts` - Tests
 
 **Test first (TDD):**
 
 Create `packages/core/src/config/global-config.test.ts`:
+
 ```typescript
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GlobalConfigManager } from './global-config';
@@ -445,8 +517,8 @@ describe('GlobalConfigManager', () => {
       const mockConfig = {
         defaultModels: {
           fast: 'anthropic-default:claude-3-haiku-20240307',
-          smart: 'anthropic-default:claude-3-opus-20240229'
-        }
+          smart: 'anthropic-default:claude-3-opus-20240229',
+        },
       };
 
       vi.mocked(fs.existsSync).mockReturnValue(true);
@@ -460,8 +532,8 @@ describe('GlobalConfigManager', () => {
       const mockConfig = {
         defaultModels: {
           fast: 'anthropic-default:claude-3-haiku-20240307',
-          smart: 'anthropic-default:claude-3-opus-20240229'
-        }
+          smart: 'anthropic-default:claude-3-opus-20240229',
+        },
       };
 
       vi.mocked(fs.existsSync).mockReturnValue(true);
@@ -482,9 +554,9 @@ describe('GlobalConfigManager', () => {
     it('should throw when model tier is not configured', () => {
       const mockConfig = {
         defaultModels: {
-          smart: 'anthropic-default:claude-3-opus-20240229'
+          smart: 'anthropic-default:claude-3-opus-20240229',
           // 'fast' is missing
-        }
+        },
       };
 
       vi.mocked(fs.existsSync).mockReturnValue(true);
@@ -508,8 +580,8 @@ describe('GlobalConfigManager', () => {
       const mockConfig = {
         defaultModels: {
           fast: 'anthropic-default:claude-3-haiku-20240307',
-          smart: 'anthropic-default:claude-3-opus-20240229'
-        }
+          smart: 'anthropic-default:claude-3-opus-20240229',
+        },
       };
 
       vi.mocked(fs.existsSync).mockReturnValue(true);
@@ -517,7 +589,7 @@ describe('GlobalConfigManager', () => {
 
       // First call
       GlobalConfigManager.getDefaultModel('fast');
-      
+
       // Second call should use cache
       GlobalConfigManager.getDefaultModel('smart');
 
@@ -529,11 +601,13 @@ describe('GlobalConfigManager', () => {
 ```
 
 Run test to verify it fails:
+
 ```bash
 npm run test:run packages/core/src/config/global-config.test.ts
 ```
 
 Now implement `packages/core/src/config/global-config.ts`:
+
 ```typescript
 // ABOUTME: Global configuration manager for system-wide settings
 // ABOUTME: Manages ~/.lace/config.json including default model configurations
@@ -562,11 +636,11 @@ export class GlobalConfigManager {
     }
 
     const configPath = getLaceFilePath('config.json');
-    
+
     if (!fs.existsSync(configPath)) {
       throw new Error(
         `Global config not found at ${configPath}. ` +
-        `Please create this file with a 'defaultModels' section containing 'fast' and 'smart' model configurations.`
+          `Please create this file with a 'defaultModels' section containing 'fast' and 'smart' model configurations.`
       );
     }
 
@@ -589,20 +663,20 @@ export class GlobalConfigManager {
    */
   static getDefaultModel(tier: 'fast' | 'smart'): string {
     const config = this.loadConfig();
-    
+
     if (!config.defaultModels) {
       throw new Error(
         `Global config is missing 'defaultModels' section. ` +
-        `Please add a 'defaultModels' object with 'fast' and 'smart' model configurations.`
+          `Please add a 'defaultModels' object with 'fast' and 'smart' model configurations.`
       );
     }
 
     const model = config.defaultModels[tier];
-    
+
     if (!model) {
       throw new Error(
         `No default model configured for '${tier}'. ` +
-        `Please add a '${tier}' entry to the 'defaultModels' section of your global config.`
+          `Please add a '${tier}' entry to the 'defaultModels' section of your global config.`
       );
     }
 
@@ -619,11 +693,13 @@ export class GlobalConfigManager {
 ```
 
 Run tests to verify they pass:
+
 ```bash
 npm run test:run packages/core/src/config/global-config.test.ts
 ```
 
 Commit:
+
 ```bash
 git add -A
 git commit -m "feat: add GlobalConfigManager for system-wide configuration"
@@ -632,6 +708,7 @@ git commit -m "feat: add GlobalConfigManager for system-wide configuration"
 #### Task 2.2: Create Example Config File
 
 Create `docs/examples/config.json`:
+
 ```json
 {
   "defaultModels": {
@@ -641,9 +718,11 @@ Create `docs/examples/config.json`:
 }
 ```
 
-Add documentation in `README.md` or appropriate docs file about setting up `~/.lace/config.json`.
+Add documentation in `README.md` or appropriate docs file about setting up
+`~/.lace/config.json`.
 
 Commit:
+
 ```bash
 git add -A
 git commit -m "docs: add example global config file"
@@ -654,9 +733,11 @@ git commit -m "docs: add example global config file"
 #### Task 3.1: Create HelperResult Type
 
 **Files to create:**
+
 - `packages/core/src/helpers/types.ts` - Type definitions
 
 Create `packages/core/src/helpers/types.ts`:
+
 ```typescript
 // ABOUTME: Type definitions for the helper system
 // ABOUTME: Includes result types and options for different helper modes
@@ -671,19 +752,20 @@ import { CombinedTokenUsage } from '~/token-management/types';
 export interface HelperResult {
   /** The final text response from the LLM */
   content: string;
-  
+
   /** All tool calls made during execution */
   toolCalls: ToolCall[];
-  
+
   /** Results from those tool calls */
   toolResults: ToolResult[];
-  
+
   /** Total token usage across all LLM calls */
   tokenUsage?: CombinedTokenUsage;
 }
 ```
 
 Commit:
+
 ```bash
 git add -A
 git commit -m "feat: add HelperResult type definition"
@@ -691,15 +773,18 @@ git commit -m "feat: add HelperResult type definition"
 
 #### Task 3.2: Create Base Helper Class
 
-**Context**: We'll create a base class with the common multi-turn execution logic, then extend it for Infrastructure and Session variants.
+**Context**: We'll create a base class with the common multi-turn execution
+logic, then extend it for Infrastructure and Session variants.
 
 **Files to create:**
+
 - `packages/core/src/helpers/base-helper.ts` - Base class
 - `packages/core/src/helpers/base-helper.test.ts` - Tests
 
 **Test first (TDD):**
 
 Create `packages/core/src/helpers/base-helper.test.ts`:
+
 ```typescript
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BaseHelper } from './base-helper';
@@ -745,11 +830,13 @@ class TestHelper extends BaseHelper {
     return this.toolExecutor;
   }
 
-  protected async executeToolCalls(toolCalls: ToolCall[]): Promise<ToolResult[]> {
+  protected async executeToolCalls(
+    toolCalls: ToolCall[]
+  ): Promise<ToolResult[]> {
     // Simple implementation for testing
     const results = [];
     for (const call of toolCalls) {
-      const tool = this.tools.find(t => t.name === call.name);
+      const tool = this.tools.find((t) => t.name === call.name);
       if (tool) {
         const result = await tool.execute(call.arguments);
         results.push(result);
@@ -768,12 +855,12 @@ describe('BaseHelper', () => {
   beforeEach(() => {
     provider = new TestProvider({
       modelId: 'test-model',
-      config: {}
+      config: {},
     });
     toolExecutor = new ToolExecutor();
     testTool = new TestTool();
     toolExecutor.registerTool(testTool.name, testTool);
-    
+
     helper = new TestHelper(provider, toolExecutor, [testTool]);
   });
 
@@ -781,7 +868,7 @@ describe('BaseHelper', () => {
     it('should handle simple prompt without tools', async () => {
       provider.addMockResponse({
         content: 'Hello! How can I help?',
-        toolCalls: []
+        toolCalls: [],
       });
 
       const result = await helper.execute('Say hello');
@@ -795,17 +882,19 @@ describe('BaseHelper', () => {
       // First response: LLM wants to use a tool
       provider.addMockResponse({
         content: 'I will use the test tool',
-        toolCalls: [{
-          id: 'call_1',
-          name: 'test_tool',
-          arguments: { input: 'test data' }
-        }]
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            arguments: { input: 'test data' },
+          },
+        ],
       });
 
       // Second response: LLM processes tool result
       provider.addMockResponse({
         content: 'The tool processed: test data',
-        toolCalls: []
+        toolCalls: [],
       });
 
       const result = await helper.execute('Use the test tool');
@@ -820,27 +909,31 @@ describe('BaseHelper', () => {
       // First response: LLM wants to use a tool
       provider.addMockResponse({
         content: 'Using first tool',
-        toolCalls: [{
-          id: 'call_1',
-          name: 'test_tool',
-          arguments: { input: 'first' }
-        }]
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            arguments: { input: 'first' },
+          },
+        ],
       });
 
       // Second response: LLM wants another tool
       provider.addMockResponse({
         content: 'Using second tool',
-        toolCalls: [{
-          id: 'call_2',
-          name: 'test_tool',
-          arguments: { input: 'second' }
-        }]
+        toolCalls: [
+          {
+            id: 'call_2',
+            name: 'test_tool',
+            arguments: { input: 'second' },
+          },
+        ],
       });
 
       // Final response: Done with tools
       provider.addMockResponse({
         content: 'Processed both: first and second',
-        toolCalls: []
+        toolCalls: [],
       });
 
       const result = await helper.execute('Use tools twice');
@@ -855,11 +948,13 @@ describe('BaseHelper', () => {
       for (let i = 0; i < 15; i++) {
         provider.addMockResponse({
           content: `Tool call ${i}`,
-          toolCalls: [{
-            id: `call_${i}`,
-            name: 'test_tool',
-            arguments: { input: `data_${i}` }
-          }]
+          toolCalls: [
+            {
+              id: `call_${i}`,
+              name: 'test_tool',
+              arguments: { input: `data_${i}` },
+            },
+          ],
         });
       }
 
@@ -870,14 +965,16 @@ describe('BaseHelper', () => {
 
     it('should handle abort signal', async () => {
       const controller = new AbortController();
-      
+
       provider.addMockResponse({
         content: 'Starting',
-        toolCalls: [{
-          id: 'call_1',
-          name: 'test_tool',
-          arguments: { input: 'test' }
-        }]
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            arguments: { input: 'test' },
+          },
+        ],
       });
 
       // Abort during execution
@@ -892,11 +989,13 @@ describe('BaseHelper', () => {
 ```
 
 Run test to verify it fails:
+
 ```bash
 npm run test:run packages/core/src/helpers/base-helper.test.ts
 ```
 
 Now implement `packages/core/src/helpers/base-helper.ts`:
+
 ```typescript
 // ABOUTME: Base class for helper agents providing common multi-turn execution logic
 // ABOUTME: Extended by InfrastructureHelper and SessionHelper for specific use cases
@@ -948,11 +1047,9 @@ export abstract class BaseHelper {
   async execute(prompt: string, signal?: AbortSignal): Promise<HelperResult> {
     const provider = await this.getProvider();
     const tools = await this.getTools();
-    
+
     // Build initial conversation
-    const conversation: ProviderMessage[] = [
-      { role: 'user', content: prompt }
-    ];
+    const conversation: ProviderMessage[] = [{ role: 'user', content: prompt }];
 
     // Track all tool usage
     const allToolCalls: ToolCall[] = [];
@@ -961,7 +1058,7 @@ export abstract class BaseHelper {
 
     // Multi-turn execution loop
     let turnCount = 0;
-    
+
     while (true) {
       // Check abort signal
       if (signal?.aborted) {
@@ -970,22 +1067,28 @@ export abstract class BaseHelper {
 
       // Prevent infinite loops
       if (++turnCount > BaseHelper.MAX_TURNS) {
-        throw new Error(`Helper exceeded maximum turns (${BaseHelper.MAX_TURNS})`);
+        throw new Error(
+          `Helper exceeded maximum turns (${BaseHelper.MAX_TURNS})`
+        );
       }
 
       logger.debug('Helper executing turn', {
         turnCount,
-        conversationLength: conversation.length
+        conversationLength: conversation.length,
       });
 
       // Get LLM response
-      const response = await provider.createMessage(conversation, tools, signal);
+      const response = await provider.createMessage(
+        conversation,
+        tools,
+        signal
+      );
 
       // Add assistant response to conversation
       conversation.push({
         role: 'assistant',
         content: response.content,
-        toolCalls: response.toolCalls
+        toolCalls: response.toolCalls,
       });
 
       // Aggregate token usage
@@ -994,7 +1097,7 @@ export abstract class BaseHelper {
           totalUsage = {
             promptTokens: response.usage.promptTokens,
             completionTokens: response.usage.completionTokens,
-            totalTokens: response.usage.totalTokens
+            totalTokens: response.usage.totalTokens,
           };
         } else {
           totalUsage.promptTokens += response.usage.promptTokens;
@@ -1007,25 +1110,28 @@ export abstract class BaseHelper {
       if (!response.toolCalls || response.toolCalls.length === 0) {
         logger.debug('Helper completed', {
           turnCount,
-          toolCallsTotal: allToolCalls.length
+          toolCallsTotal: allToolCalls.length,
         });
 
         return {
           content: response.content,
           toolCalls: allToolCalls,
           toolResults: allToolResults,
-          tokenUsage: totalUsage
+          tokenUsage: totalUsage,
         };
       }
 
       // Execute tool calls
       logger.debug('Helper executing tool calls', {
         turnCount,
-        toolCount: response.toolCalls.length
+        toolCount: response.toolCalls.length,
       });
 
-      const toolResults = await this.executeToolCalls(response.toolCalls, signal);
-      
+      const toolResults = await this.executeToolCalls(
+        response.toolCalls,
+        signal
+      );
+
       // Track tool usage
       allToolCalls.push(...response.toolCalls);
       allToolResults.push(...toolResults);
@@ -1034,13 +1140,15 @@ export abstract class BaseHelper {
       for (let i = 0; i < response.toolCalls.length; i++) {
         const toolCall = response.toolCalls[i];
         const toolResult = toolResults[i];
-        
+
         if (toolResult) {
           // Convert tool result to conversation message
           conversation.push({
             role: 'tool',
-            content: toolResult.content.map(block => block.text || '').join('\n'),
-            toolResultId: toolCall.id
+            content: toolResult.content
+              .map((block) => block.text || '')
+              .join('\n'),
+            toolResultId: toolCall.id,
           });
         }
       }
@@ -1050,11 +1158,13 @@ export abstract class BaseHelper {
 ```
 
 Run tests to verify they pass:
+
 ```bash
 npm run test:run packages/core/src/helpers/base-helper.test.ts
 ```
 
 Commit:
+
 ```bash
 git add -A
 git commit -m "feat: implement BaseHelper with multi-turn execution logic"
@@ -1065,12 +1175,14 @@ git commit -m "feat: implement BaseHelper with multi-turn execution logic"
 #### Task 4.1: Implement InfrastructureHelper
 
 **Files to create:**
+
 - `packages/core/src/helpers/infrastructure-helper.ts` - Implementation
 - `packages/core/src/helpers/infrastructure-helper.test.ts` - Tests
 
 **Test first (TDD):**
 
 Create `packages/core/src/helpers/infrastructure-helper.test.ts`:
+
 ```typescript
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { InfrastructureHelper } from './infrastructure-helper';
@@ -1091,7 +1203,7 @@ class TestTool extends Tool {
   name = 'test_tool';
   description = 'Test tool';
   schema = z.object({ input: z.string() });
-  
+
   protected async executeValidated(args: { input: string }) {
     return this.createResult(`Result: ${args.input}`);
   }
@@ -1101,7 +1213,7 @@ class UnapprovedTool extends Tool {
   name = 'unapproved_tool';
   description = 'Tool not in whitelist';
   schema = z.object({ input: z.string() });
-  
+
   protected async executeValidated(args: { input: string }) {
     return this.createResult(`Should not execute`);
   }
@@ -1122,19 +1234,23 @@ describe('InfrastructureHelper', () => {
     toolExecutor.registerTool(unapprovedTool.name, unapprovedTool);
 
     // Mock global config
-    vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue('test-instance:test-model');
+    vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue(
+      'test-instance:test-model'
+    );
 
     // Setup mock provider
     mockProvider = new TestProvider({
       modelId: 'test-model',
-      config: {}
+      config: {},
     });
 
     // Mock provider instance manager
     const mockInstanceManager = {
-      getInstance: vi.fn().mockResolvedValue(mockProvider)
+      getInstance: vi.fn().mockResolvedValue(mockProvider),
     };
-    vi.mocked(ProviderInstanceManager).mockImplementation(() => mockInstanceManager as any);
+    vi.mocked(ProviderInstanceManager).mockImplementation(
+      () => mockInstanceManager as any
+    );
   });
 
   afterEach(() => {
@@ -1145,7 +1261,7 @@ describe('InfrastructureHelper', () => {
     it('should create with required options', () => {
       const helper = new InfrastructureHelper({
         model: 'fast',
-        tools: ['test_tool']
+        tools: ['test_tool'],
       });
 
       expect(helper).toBeDefined();
@@ -1156,7 +1272,7 @@ describe('InfrastructureHelper', () => {
         model: 'smart',
         tools: ['test_tool'],
         workingDirectory: '/test/dir',
-        processEnv: { TEST: 'value' }
+        processEnv: { TEST: 'value' },
       });
 
       expect(helper).toBeDefined();
@@ -1167,7 +1283,7 @@ describe('InfrastructureHelper', () => {
     it('should execute with whitelisted tools only', async () => {
       const helper = new InfrastructureHelper({
         model: 'fast',
-        tools: ['test_tool'] // Only test_tool is allowed
+        tools: ['test_tool'], // Only test_tool is allowed
       });
 
       // Set tool executor on helper (normally done in constructor)
@@ -1180,19 +1296,19 @@ describe('InfrastructureHelper', () => {
           {
             id: 'call_1',
             name: 'test_tool',
-            arguments: { input: 'allowed' }
+            arguments: { input: 'allowed' },
           },
           {
             id: 'call_2',
             name: 'unapproved_tool',
-            arguments: { input: 'not allowed' }
-          }
-        ]
+            arguments: { input: 'not allowed' },
+          },
+        ],
       });
 
       mockProvider.addMockResponse({
         content: 'Done with tools',
-        toolCalls: []
+        toolCalls: [],
       });
 
       const result = await helper.execute('Test tool whitelist');
@@ -1200,19 +1316,21 @@ describe('InfrastructureHelper', () => {
       // Should execute allowed tool
       expect(result.toolCalls).toHaveLength(2);
       expect(result.toolResults).toHaveLength(2);
-      
+
       // First tool should succeed
       expect(result.toolResults[0].status).toBe('completed');
-      
+
       // Second tool should be denied
       expect(result.toolResults[1].status).toBe('failed');
-      expect(result.toolResults[1].content[0].text).toContain('not in whitelist');
+      expect(result.toolResults[1].content[0].text).toContain(
+        'not in whitelist'
+      );
     });
 
     it('should bypass approval for whitelisted tools', async () => {
       const helper = new InfrastructureHelper({
         model: 'fast',
-        tools: ['test_tool']
+        tools: ['test_tool'],
       });
 
       helper['toolExecutor'] = toolExecutor;
@@ -1222,16 +1340,18 @@ describe('InfrastructureHelper', () => {
 
       mockProvider.addMockResponse({
         content: 'Using tool',
-        toolCalls: [{
-          id: 'call_1',
-          name: 'test_tool',
-          arguments: { input: 'test' }
-        }]
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            arguments: { input: 'test' },
+          },
+        ],
       });
 
       mockProvider.addMockResponse({
         content: 'Done',
-        toolCalls: []
+        toolCalls: [],
       });
 
       await helper.execute('Test bypass approval');
@@ -1247,7 +1367,7 @@ describe('InfrastructureHelper', () => {
       const helper = new InfrastructureHelper({
         model: 'fast',
         tools: ['test_tool'],
-        workingDirectory: '/custom/dir'
+        workingDirectory: '/custom/dir',
       });
 
       helper['toolExecutor'] = toolExecutor;
@@ -1256,16 +1376,18 @@ describe('InfrastructureHelper', () => {
 
       mockProvider.addMockResponse({
         content: 'Using tool',
-        toolCalls: [{
-          id: 'call_1',
-          name: 'test_tool',
-          arguments: { input: 'test' }
-        }]
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            arguments: { input: 'test' },
+          },
+        ],
       });
 
       mockProvider.addMockResponse({
         content: 'Done',
-        toolCalls: []
+        toolCalls: [],
       });
 
       await helper.execute('Test working directory');
@@ -1274,7 +1396,7 @@ describe('InfrastructureHelper', () => {
       expect(executeSpy).toHaveBeenCalledWith(
         expect.any(Object),
         expect.objectContaining({
-          workingDirectory: '/custom/dir'
+          workingDirectory: '/custom/dir',
         })
       );
     });
@@ -1282,14 +1404,14 @@ describe('InfrastructureHelper', () => {
     it('should handle empty tool list', async () => {
       const helper = new InfrastructureHelper({
         model: 'fast',
-        tools: [] // No tools allowed
+        tools: [], // No tools allowed
       });
 
       helper['toolExecutor'] = toolExecutor;
 
       mockProvider.addMockResponse({
         content: 'I cannot use any tools',
-        toolCalls: []
+        toolCalls: [],
       });
 
       const result = await helper.execute('No tools available');
@@ -1301,18 +1423,20 @@ describe('InfrastructureHelper', () => {
 
   describe('model resolution', () => {
     it('should use fast model when specified', async () => {
-      vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue('fast-instance:fast-model');
+      vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue(
+        'fast-instance:fast-model'
+      );
 
       const helper = new InfrastructureHelper({
         model: 'fast',
-        tools: []
+        tools: [],
       });
 
       helper['toolExecutor'] = toolExecutor;
 
       mockProvider.addMockResponse({
         content: 'Using fast model',
-        toolCalls: []
+        toolCalls: [],
       });
 
       await helper.execute('Test fast model');
@@ -1321,18 +1445,20 @@ describe('InfrastructureHelper', () => {
     });
 
     it('should use smart model when specified', async () => {
-      vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue('smart-instance:smart-model');
+      vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue(
+        'smart-instance:smart-model'
+      );
 
       const helper = new InfrastructureHelper({
         model: 'smart',
-        tools: []
+        tools: [],
       });
 
       helper['toolExecutor'] = toolExecutor;
 
       mockProvider.addMockResponse({
         content: 'Using smart model',
-        toolCalls: []
+        toolCalls: [],
       });
 
       await helper.execute('Test smart model');
@@ -1344,11 +1470,13 @@ describe('InfrastructureHelper', () => {
 ```
 
 Run test to verify it fails:
+
 ```bash
 npm run test:run packages/core/src/helpers/infrastructure-helper.test.ts
 ```
 
 Now implement `packages/core/src/helpers/infrastructure-helper.ts`:
+
 ```typescript
 // ABOUTME: Infrastructure helper for Lace's internal systems to execute LLM tasks
 // ABOUTME: Bypasses user approval with programmatic tool whitelist for trusted operations
@@ -1359,23 +1487,28 @@ import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { parseProviderModel } from '~/utils/provider-utils';
 import { ToolExecutor } from '~/tools/executor';
 import { Tool } from '~/tools/tool';
-import { ToolCall, ToolResult, ToolContext, createErrorResult } from '~/tools/types';
+import {
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createErrorResult,
+} from '~/tools/types';
 import { AIProvider } from '~/providers/base-provider';
 import { logger } from '~/utils/logger';
 
 export interface InfrastructureHelperOptions {
   /** Model tier to use - 'fast' or 'smart' */
   model: 'fast' | 'smart';
-  
+
   /** Explicit whitelist of tool names that can be used */
   tools: string[];
-  
+
   /** Optional working directory for file operations */
   workingDirectory?: string;
-  
+
   /** Optional environment variables for subprocess execution */
   processEnv?: NodeJS.ProcessEnv;
-  
+
   /** Optional abort signal for cancellation */
   abortSignal?: AbortSignal;
 }
@@ -1389,7 +1522,7 @@ export class InfrastructureHelper extends BaseHelper {
   private provider: AIProvider | null = null;
   private toolExecutor: ToolExecutor;
   private availableTools: Tool[] = [];
-  
+
   constructor(private options: InfrastructureHelperOptions) {
     super();
     this.toolExecutor = new ToolExecutor();
@@ -1402,26 +1535,28 @@ export class InfrastructureHelper extends BaseHelper {
     }
 
     // Get model configuration from global config
-    const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
+    const providerModel = GlobalConfigManager.getDefaultModel(
+      this.options.model
+    );
     const { instanceId, modelId } = parseProviderModel(providerModel);
 
     logger.debug('InfrastructureHelper resolving provider', {
       tier: this.options.model,
       instanceId,
-      modelId
+      modelId,
     });
 
     // Get provider instance
     const instanceManager = new ProviderInstanceManager();
     const instance = await instanceManager.getInstance(instanceId);
-    
+
     if (!instance) {
       throw new Error(`Provider instance not found: ${instanceId}`);
     }
 
     // Set the model for this helper
     instance.setModelId(modelId);
-    
+
     this.provider = instance;
     return instance;
   }
@@ -1433,12 +1568,12 @@ export class InfrastructureHelper extends BaseHelper {
 
     // Get tool instances for whitelisted names
     this.availableTools = this.options.tools
-      .map(name => this.toolExecutor.getTool(name))
+      .map((name) => this.toolExecutor.getTool(name))
       .filter((tool): tool is Tool => tool !== undefined);
 
     logger.debug('InfrastructureHelper resolved tools', {
       requested: this.options.tools,
-      available: this.availableTools.map(t => t.name)
+      available: this.availableTools.map((t) => t.name),
     });
 
     return this.availableTools;
@@ -1465,19 +1600,22 @@ export class InfrastructureHelper extends BaseHelper {
       if (!this.options.tools.includes(toolCall.name)) {
         logger.warn('InfrastructureHelper blocked non-whitelisted tool', {
           toolName: toolCall.name,
-          whitelist: this.options.tools
+          whitelist: this.options.tools,
         });
-        
-        results.push(createErrorResult(
-          `Tool '${toolCall.name}' not in whitelist`,
-          toolCall.id
-        ));
+
+        results.push(
+          createErrorResult(
+            `Tool '${toolCall.name}' not in whitelist`,
+            toolCall.id
+          )
+        );
         continue;
       }
 
       // Build context without agent (infrastructure mode)
       const context: ToolContext = {
-        signal: this.options.abortSignal || signal || new AbortController().signal,
+        signal:
+          this.options.abortSignal || signal || new AbortController().signal,
         workingDirectory: this.options.workingDirectory,
         processEnv: this.options.processEnv,
         // NO agent property - this is infrastructure mode
@@ -1486,23 +1624,28 @@ export class InfrastructureHelper extends BaseHelper {
       logger.debug('InfrastructureHelper executing tool', {
         toolName: toolCall.name,
         hasWorkingDir: !!context.workingDirectory,
-        hasProcessEnv: !!context.processEnv
+        hasProcessEnv: !!context.processEnv,
       });
 
       try {
         // Execute directly (bypass approval)
-        const result = await this.toolExecutor.executeApprovedTool(toolCall, context);
+        const result = await this.toolExecutor.executeApprovedTool(
+          toolCall,
+          context
+        );
         results.push(result);
       } catch (error) {
         logger.error('InfrastructureHelper tool execution failed', {
           toolName: toolCall.name,
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
-        
-        results.push(createErrorResult(
-          error instanceof Error ? error.message : String(error),
-          toolCall.id
-        ));
+
+        results.push(
+          createErrorResult(
+            error instanceof Error ? error.message : String(error),
+            toolCall.id
+          )
+        );
       }
     }
 
@@ -1522,11 +1665,13 @@ export class InfrastructureHelper extends BaseHelper {
 ```
 
 Run tests to verify they pass:
+
 ```bash
 npm run test:run packages/core/src/helpers/infrastructure-helper.test.ts
 ```
 
 Commit:
+
 ```bash
 git add -A
 git commit -m "feat: implement InfrastructureHelper with programmatic tool whitelist"
@@ -1537,12 +1682,14 @@ git commit -m "feat: implement InfrastructureHelper with programmatic tool white
 #### Task 5.1: Implement SessionHelper
 
 **Files to create:**
+
 - `packages/core/src/helpers/session-helper.ts` - Implementation
 - `packages/core/src/helpers/session-helper.test.ts` - Tests
 
 **Test first (TDD):**
 
 Create `packages/core/src/helpers/session-helper.test.ts`:
+
 ```typescript
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SessionHelper } from './session-helper';
@@ -1561,7 +1708,7 @@ class TestTool extends Tool {
   name = 'test_tool';
   description = 'Test tool';
   schema = z.object({ input: z.string() });
-  
+
   protected async executeValidated(args: { input: string }) {
     return this.createResult(`Result: ${args.input}`);
   }
@@ -1578,7 +1725,7 @@ describe('SessionHelper', () => {
     // Setup mock provider
     mockProvider = new TestProvider({
       modelId: 'test-model',
-      config: {}
+      config: {},
     });
 
     // Setup tool executor
@@ -1590,25 +1737,27 @@ describe('SessionHelper', () => {
     mockSession = {
       getToolPolicy: vi.fn().mockReturnValue('require-approval'),
       getWorkingDirectory: vi.fn().mockReturnValue('/session/dir'),
-      getTools: vi.fn().mockReturnValue([testTool])
+      getTools: vi.fn().mockReturnValue([testTool]),
     } as any;
 
     // Mock agent
     mockAgent = {
       getFullSession: vi.fn().mockResolvedValue(mockSession),
       getProvider: vi.fn().mockResolvedValue(mockProvider),
-      getTools: vi.fn().mockReturnValue([testTool])
+      getTools: vi.fn().mockReturnValue([testTool]),
     } as any;
 
     // Mock global config
-    vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue('test-instance:test-model');
+    vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue(
+      'test-instance:test-model'
+    );
   });
 
   describe('constructor', () => {
     it('should create with parent agent', () => {
       const helper = new SessionHelper({
         model: 'fast',
-        parentAgent: mockAgent
+        parentAgent: mockAgent,
       });
 
       expect(helper).toBeDefined();
@@ -1619,7 +1768,7 @@ describe('SessionHelper', () => {
       const helper = new SessionHelper({
         model: 'smart',
         parentAgent: mockAgent,
-        abortSignal: controller.signal
+        abortSignal: controller.signal,
       });
 
       expect(helper).toBeDefined();
@@ -1630,7 +1779,7 @@ describe('SessionHelper', () => {
     it('should inherit tools from parent agent', async () => {
       const helper = new SessionHelper({
         model: 'fast',
-        parentAgent: mockAgent
+        parentAgent: mockAgent,
       });
 
       // Set internal properties (normally done differently)
@@ -1638,16 +1787,18 @@ describe('SessionHelper', () => {
 
       mockProvider.addMockResponse({
         content: 'Using inherited tools',
-        toolCalls: [{
-          id: 'call_1',
-          name: 'test_tool',
-          arguments: { input: 'from session' }
-        }]
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            arguments: { input: 'from session' },
+          },
+        ],
       });
 
       mockProvider.addMockResponse({
         content: 'Done',
-        toolCalls: []
+        toolCalls: [],
       });
 
       const result = await helper.execute('Use session tools');
@@ -1660,7 +1811,7 @@ describe('SessionHelper', () => {
     it('should use parent agent context for tool execution', async () => {
       const helper = new SessionHelper({
         model: 'fast',
-        parentAgent: mockAgent
+        parentAgent: mockAgent,
       });
 
       helper['toolExecutor'] = toolExecutor;
@@ -1668,11 +1819,13 @@ describe('SessionHelper', () => {
 
       mockProvider.addMockResponse({
         content: 'Using tool',
-        toolCalls: [{
-          id: 'call_1',
-          name: 'test_tool',
-          arguments: { input: 'test' }
-        }]
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            arguments: { input: 'test' },
+          },
+        ],
       });
 
       // Mock approval granted
@@ -1680,7 +1833,7 @@ describe('SessionHelper', () => {
 
       mockProvider.addMockResponse({
         content: 'Done',
-        toolCalls: []
+        toolCalls: [],
       });
 
       await helper.execute('Test with agent context');
@@ -1689,7 +1842,7 @@ describe('SessionHelper', () => {
       expect(executeSpy).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'test_tool' }),
         expect.objectContaining({
-          agent: mockAgent
+          agent: mockAgent,
         })
       );
     });
@@ -1697,31 +1850,33 @@ describe('SessionHelper', () => {
     it('should respect tool approval policies', async () => {
       const helper = new SessionHelper({
         model: 'fast',
-        parentAgent: mockAgent
+        parentAgent: mockAgent,
       });
 
       helper['toolExecutor'] = toolExecutor;
-      
+
       // Mock denial
       const executeSpy = vi.spyOn(toolExecutor, 'requestToolPermission');
       executeSpy.mockResolvedValue({
         id: 'call_1',
         status: 'denied',
-        content: [{ type: 'text', text: 'Tool denied by policy' }]
+        content: [{ type: 'text', text: 'Tool denied by policy' }],
       });
 
       mockProvider.addMockResponse({
         content: 'Want to use tool',
-        toolCalls: [{
-          id: 'call_1',
-          name: 'test_tool',
-          arguments: { input: 'test' }
-        }]
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            arguments: { input: 'test' },
+          },
+        ],
       });
 
       mockProvider.addMockResponse({
         content: 'Could not use tool',
-        toolCalls: []
+        toolCalls: [],
       });
 
       const result = await helper.execute('Test denial');
@@ -1733,26 +1888,28 @@ describe('SessionHelper', () => {
     it('should inherit working directory from session', async () => {
       const helper = new SessionHelper({
         model: 'fast',
-        parentAgent: mockAgent
+        parentAgent: mockAgent,
       });
 
       helper['toolExecutor'] = toolExecutor;
-      
+
       const executeSpy = vi.spyOn(toolExecutor, 'requestToolPermission');
       executeSpy.mockResolvedValue('granted');
 
       mockProvider.addMockResponse({
         content: 'Using tool',
-        toolCalls: [{
-          id: 'call_1',
-          name: 'test_tool',
-          arguments: { input: 'test' }
-        }]
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'test_tool',
+            arguments: { input: 'test' },
+          },
+        ],
       });
 
       mockProvider.addMockResponse({
         content: 'Done',
-        toolCalls: []
+        toolCalls: [],
       });
 
       await helper.execute('Test working dir');
@@ -1763,18 +1920,20 @@ describe('SessionHelper', () => {
 
   describe('model resolution', () => {
     it('should resolve model from global config', async () => {
-      vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue('smart-instance:smart-model');
+      vi.mocked(GlobalConfigManager.getDefaultModel).mockReturnValue(
+        'smart-instance:smart-model'
+      );
 
       const helper = new SessionHelper({
         model: 'smart',
-        parentAgent: mockAgent
+        parentAgent: mockAgent,
       });
 
       helper['toolExecutor'] = toolExecutor;
 
       mockProvider.addMockResponse({
         content: 'Using smart model',
-        toolCalls: []
+        toolCalls: [],
       });
 
       await helper.execute('Test model');
@@ -1786,11 +1945,13 @@ describe('SessionHelper', () => {
 ```
 
 Run test to verify it fails:
+
 ```bash
 npm run test:run packages/core/src/helpers/session-helper.test.ts
 ```
 
 Now implement `packages/core/src/helpers/session-helper.ts`:
+
 ```typescript
 // ABOUTME: Session helper for agents to spawn lightweight LLM tasks within conversation context
 // ABOUTME: Inherits session policies and approval workflow from parent agent
@@ -1802,17 +1963,22 @@ import { parseProviderModel } from '~/utils/provider-utils';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { ToolExecutor } from '~/tools/executor';
 import { Tool } from '~/tools/tool';
-import { ToolCall, ToolResult, ToolContext, createErrorResult } from '~/tools/types';
+import {
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  createErrorResult,
+} from '~/tools/types';
 import { AIProvider } from '~/providers/base-provider';
 import { logger } from '~/utils/logger';
 
 export interface SessionHelperOptions {
   /** Model tier to use - 'fast' or 'smart' */
   model: 'fast' | 'smart';
-  
+
   /** Parent agent to inherit context and policies from */
   parentAgent: Agent;
-  
+
   /** Optional abort signal for cancellation */
   abortSignal?: AbortSignal;
 }
@@ -1826,7 +1992,7 @@ export class SessionHelper extends BaseHelper {
   private provider: AIProvider | null = null;
   private toolExecutor: ToolExecutor | null = null;
   private tools: Tool[] | null = null;
-  
+
   constructor(private options: SessionHelperOptions) {
     super();
   }
@@ -1841,30 +2007,34 @@ export class SessionHelper extends BaseHelper {
       this.provider = await this.options.parentAgent.getProvider();
       if (this.provider) {
         // Clone the provider and set our model
-        const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
+        const providerModel = GlobalConfigManager.getDefaultModel(
+          this.options.model
+        );
         const { modelId } = parseProviderModel(providerModel);
         this.provider.setModelId(modelId);
         return this.provider;
       }
     } catch (error) {
       logger.debug('SessionHelper could not get provider from parent agent', {
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       });
     }
 
     // Fallback: create new provider instance
-    const providerModel = GlobalConfigManager.getDefaultModel(this.options.model);
+    const providerModel = GlobalConfigManager.getDefaultModel(
+      this.options.model
+    );
     const { instanceId, modelId } = parseProviderModel(providerModel);
 
     logger.debug('SessionHelper creating new provider', {
       tier: this.options.model,
       instanceId,
-      modelId
+      modelId,
     });
 
     const instanceManager = new ProviderInstanceManager();
     const instance = await instanceManager.getInstance(instanceId);
-    
+
     if (!instance) {
       throw new Error(`Provider instance not found: ${instanceId}`);
     }
@@ -1881,10 +2051,10 @@ export class SessionHelper extends BaseHelper {
 
     // Inherit tools from parent agent
     this.tools = this.options.parentAgent.getTools();
-    
+
     logger.debug('SessionHelper inherited tools from parent', {
       toolCount: this.tools.length,
-      toolNames: this.tools.map(t => t.name)
+      toolNames: this.tools.map((t) => t.name),
     });
 
     return this.tools;
@@ -1925,7 +2095,8 @@ export class SessionHelper extends BaseHelper {
 
       // Build context with parent agent (inherit session policies)
       const context: ToolContext = {
-        signal: this.options.abortSignal || signal || new AbortController().signal,
+        signal:
+          this.options.abortSignal || signal || new AbortController().signal,
         agent: this.options.parentAgent, // Key difference - has agent context
         workingDirectory: session?.getWorkingDirectory(),
       };
@@ -1933,44 +2104,57 @@ export class SessionHelper extends BaseHelper {
       logger.debug('SessionHelper requesting tool permission', {
         toolName: toolCall.name,
         hasAgent: !!context.agent,
-        hasWorkingDir: !!context.workingDirectory
+        hasWorkingDir: !!context.workingDirectory,
       });
 
       try {
         // Go through normal approval flow
-        const permission = await toolExecutor.requestToolPermission(toolCall, context);
-        
+        const permission = await toolExecutor.requestToolPermission(
+          toolCall,
+          context
+        );
+
         if (typeof permission === 'object' && 'status' in permission) {
           // Permission denied - return as result
           results.push(permission);
           continue;
         }
-        
+
         if (permission === 'pending') {
           // This shouldn't happen in single-shot execution
-          logger.warn('SessionHelper got pending approval in single-shot mode', {
-            toolName: toolCall.name
-          });
-          results.push(createErrorResult(
-            'Tool approval pending in single-shot helper',
-            toolCall.id
-          ));
+          logger.warn(
+            'SessionHelper got pending approval in single-shot mode',
+            {
+              toolName: toolCall.name,
+            }
+          );
+          results.push(
+            createErrorResult(
+              'Tool approval pending in single-shot helper',
+              toolCall.id
+            )
+          );
           continue;
         }
-        
+
         // Permission granted - execute
-        const result = await toolExecutor.executeApprovedTool(toolCall, context);
+        const result = await toolExecutor.executeApprovedTool(
+          toolCall,
+          context
+        );
         results.push(result);
       } catch (error) {
         logger.error('SessionHelper tool execution failed', {
           toolName: toolCall.name,
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
-        
-        results.push(createErrorResult(
-          error instanceof Error ? error.message : String(error),
-          toolCall.id
-        ));
+
+        results.push(
+          createErrorResult(
+            error instanceof Error ? error.message : String(error),
+            toolCall.id
+          )
+        );
       }
     }
 
@@ -1990,11 +2174,13 @@ export class SessionHelper extends BaseHelper {
 ```
 
 Run tests to verify they pass:
+
 ```bash
 npm run test:run packages/core/src/helpers/session-helper.test.ts
 ```
 
 Commit:
+
 ```bash
 git add -A
 git commit -m "feat: implement SessionHelper with session policy inheritance"
@@ -2005,6 +2191,7 @@ git commit -m "feat: implement SessionHelper with session policy inheritance"
 #### Task 6.1: Create Integration Tests
 
 Create `packages/core/src/helpers/integration.test.ts`:
+
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { InfrastructureHelper } from './infrastructure-helper';
@@ -2032,7 +2219,9 @@ class CountFilesTool extends Tool {
       const files = fs.readdirSync(args.directory);
       return this.createResult(`Found ${files.length} files`);
     } catch (error) {
-      return this.createErrorResult(error instanceof Error ? error.message : String(error));
+      return this.createErrorResult(
+        error instanceof Error ? error.message : String(error)
+      );
     }
   }
 }
@@ -2044,20 +2233,20 @@ describe('Helper Integration Tests', () => {
   beforeEach(async () => {
     // Create temp directory structure
     tempDir = await getTempDir('helper-integration');
-    
+
     // Create test config
     configPath = path.join(tempDir, 'config.json');
     const config = {
       defaultModels: {
         fast: 'test-provider:fast-model',
-        smart: 'test-provider:smart-model'
-      }
+        smart: 'test-provider:smart-model',
+      },
     };
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
     // Set LACE_DIR to temp directory
     process.env.LACE_DIR = tempDir;
-    
+
     // Clear config cache
     GlobalConfigManager.clearCache();
   });
@@ -2072,16 +2261,18 @@ describe('Helper Integration Tests', () => {
     it.skip('should execute infrastructure task with real tools', async () => {
       // This test would require real provider setup
       // Marked as skip for unit tests, but shows the pattern
-      
+
       const helper = new InfrastructureHelper({
         model: 'fast',
         tools: ['count_files'],
-        workingDirectory: tempDir
+        workingDirectory: tempDir,
       });
 
       // Would need real provider to work
-      const result = await helper.execute('Count the files in the current directory');
-      
+      const result = await helper.execute(
+        'Count the files in the current directory'
+      );
+
       expect(result.content).toContain('files');
       expect(result.toolCalls).toHaveLength(1);
       expect(result.toolCalls[0].name).toBe('count_files');
@@ -2090,7 +2281,7 @@ describe('Helper Integration Tests', () => {
     it('should load config correctly', () => {
       const fastModel = GlobalConfigManager.getDefaultModel('fast');
       expect(fastModel).toBe('test-provider:fast-model');
-      
+
       const smartModel = GlobalConfigManager.getDefaultModel('smart');
       expect(smartModel).toBe('test-provider:smart-model');
     });
@@ -2098,7 +2289,7 @@ describe('Helper Integration Tests', () => {
     it('should throw on missing config', () => {
       fs.unlinkSync(configPath);
       GlobalConfigManager.clearCache();
-      
+
       expect(() => GlobalConfigManager.getDefaultModel('fast')).toThrow(
         /Global config not found/
       );
@@ -2108,11 +2299,13 @@ describe('Helper Integration Tests', () => {
 ```
 
 Run tests:
+
 ```bash
 npm run test:run packages/core/src/helpers/integration.test.ts
 ```
 
 Commit:
+
 ```bash
 git add -A
 git commit -m "test: add integration tests for helper system"
@@ -2121,23 +2314,29 @@ git commit -m "test: add integration tests for helper system"
 #### Task 6.2: Export Public API
 
 Create `packages/core/src/helpers/index.ts`:
+
 ```typescript
 // ABOUTME: Public API exports for the helper system
 // ABOUTME: Provides lightweight LLM task execution outside normal agent workflows
 
-export { InfrastructureHelper, type InfrastructureHelperOptions } from './infrastructure-helper';
+export {
+  InfrastructureHelper,
+  type InfrastructureHelperOptions,
+} from './infrastructure-helper';
 export { SessionHelper, type SessionHelperOptions } from './session-helper';
 export { type HelperResult } from './types';
 // BaseHelper is not exported - it's an implementation detail
 ```
 
 Update `packages/core/src/index.ts` to include helpers:
+
 ```typescript
 // Add to existing exports
 export * from './helpers';
 ```
 
 Commit:
+
 ```bash
 git add -A
 git commit -m "feat: export helper system public API"
@@ -2148,14 +2347,17 @@ git commit -m "feat: export helper system public API"
 #### Task 7.1: Create Usage Documentation
 
 Create `docs/guides/using-helpers.md`:
-```markdown
+
+````markdown
 # Using Helper Agents
 
-Helper agents provide lightweight LLM task execution outside the normal conversation workflow.
+Helper agents provide lightweight LLM task execution outside the normal
+conversation workflow.
 
 ## When to Use Helpers
 
 Use helpers when you need to:
+
 - Execute a specific LLM task programmatically (infrastructure)
 - Spawn a sub-task from within an agent conversation (session)
 - Get a complete result from a multi-step LLM process
@@ -2169,19 +2371,20 @@ import { InfrastructureHelper } from '@lace/core';
 
 // Memory system analyzing conversations
 const helper = new InfrastructureHelper({
-  model: 'smart',  // Use the smart model for complex analysis
-  tools: ['ripgrep-search', 'file-read'],  // Whitelist specific tools
-  workingDirectory: '/path/to/logs'
+  model: 'smart', // Use the smart model for complex analysis
+  tools: ['ripgrep-search', 'file-read'], // Whitelist specific tools
+  workingDirectory: '/path/to/logs',
 });
 
 const insights = await helper.execute(
   'Analyze the last 10 conversations and identify recurring patterns'
 );
 
-console.log(insights.content);  // The analysis
-console.log(insights.toolCalls);  // What tools were used
-console.log(insights.tokenUsage);  // Token consumption
+console.log(insights.content); // The analysis
+console.log(insights.toolCalls); // What tools were used
+console.log(insights.tokenUsage); // Token consumption
 ```
+````
 
 ### Security Model
 
@@ -2196,8 +2399,8 @@ For agents spawning sub-tasks:
 ```typescript
 // Inside an agent
 const helper = new SessionHelper({
-  model: 'fast',  // Use fast model for simple tasks
-  parentAgent: this  // Inherit context and policies
+  model: 'fast', // Use fast model for simple tasks
+  parentAgent: this, // Inherit context and policies
 });
 
 const summary = await helper.execute(`Summarize this data: ${data}`);
@@ -2248,7 +2451,7 @@ Always use real implementations in tests:
 const helper = new InfrastructureHelper({
   model: 'fast',
   tools: ['file-read'],
-  workingDirectory: testDataDir
+  workingDirectory: testDataDir,
 });
 
 // Bad: Mocking the helper itself
@@ -2265,9 +2468,7 @@ const taskHelper = new InfrastructureHelper({
   tools: ['task-create'],
 });
 
-await taskHelper.execute(
-  `Create tasks from this request: "${userInput}"`
-);
+await taskHelper.execute(`Create tasks from this request: "${userInput}"`);
 ```
 
 ### Error Analysis
@@ -2276,12 +2477,10 @@ await taskHelper.execute(
 const errorHelper = new InfrastructureHelper({
   model: 'smart',
   tools: ['ripgrep-search'],
-  workingDirectory: logDir
+  workingDirectory: logDir,
 });
 
-await errorHelper.execute(
-  'Search for .log files and identify error patterns'
-);
+await errorHelper.execute('Search for .log files and identify error patterns');
 ```
 
 ### URL Summarization
@@ -2289,24 +2488,26 @@ await errorHelper.execute(
 ```typescript
 const helper = new SessionHelper({
   model: 'fast',
-  parentAgent: agent
+  parentAgent: agent,
 });
 
 await helper.execute(`Summarize ${url}`);
 ```
-```
+
+````
 
 Commit:
 ```bash
 git add -A
 git commit -m "docs: add comprehensive helper usage documentation"
-```
+````
 
 ### Phase 8: Example Usage Updates
 
 #### Task 8.1: Update Agent to Show Helper Usage
 
 Create an example in `docs/examples/agent-with-helper.ts`:
+
 ```typescript
 // Example: How an agent might use SessionHelper
 
@@ -2320,7 +2521,7 @@ class EnhancedAgent extends Agent {
   private async summarizeUrl(url: string): Promise<string> {
     const helper = new SessionHelper({
       model: 'fast',
-      parentAgent: this
+      parentAgent: this,
     });
 
     const result = await helper.execute(
@@ -2336,7 +2537,7 @@ class EnhancedAgent extends Agent {
   private async analyzeData(data: string): Promise<string> {
     const helper = new SessionHelper({
       model: 'smart',
-      parentAgent: this
+      parentAgent: this,
     });
 
     const result = await helper.execute(
@@ -2364,6 +2565,7 @@ class EnhancedAgent extends Agent {
 ```
 
 Commit:
+
 ```bash
 git add -A
 git commit -m "docs: add example of agent using SessionHelper"
@@ -2383,14 +2585,16 @@ This implementation plan provides:
 ### Key Testing Principles Followed
 
 - **No mocking what we test**: Tests use real Tool implementations
-- **Test behavior, not implementation**: Tests verify outcomes, not internal state
+- **Test behavior, not implementation**: Tests verify outcomes, not internal
+  state
 - **TDD throughout**: Write failing test, implement, verify passing
 - **Integration tests**: Show real-world usage patterns
 
 ### Architecture Benefits
 
 - **Reuses existing infrastructure**: ToolExecutor, providers, tools unchanged
-- **Clear security model**: Infrastructure bypasses approval, Session inherits policies
+- **Clear security model**: Infrastructure bypasses approval, Session inherits
+  policies
 - **Simple configuration**: Just fast/smart model mapping
 - **Extensible**: Easy to add new helper types or model tiers
 
@@ -2401,4 +2605,5 @@ This implementation plan provides:
 3. Monitor usage and add more model tiers if needed
 4. Consider adding helper metrics/telemetry
 
-The implementation follows YAGNI, DRY, and TDD principles throughout, with frequent commits at each passing test.
+The implementation follows YAGNI, DRY, and TDD principles throughout, with
+frequent commits at each passing test.

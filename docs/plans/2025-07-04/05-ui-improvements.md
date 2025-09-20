@@ -1,11 +1,15 @@
 # Multi-Agent UI Implementation Specification
 
 ## Overview
-Add a tmux/screen-style interface for switching between agents, showing agent status, and managing multi-agent sessions. This builds on the existing Ink/React terminal UI.
+
+Add a tmux/screen-style interface for switching between agents, showing agent
+status, and managing multi-agent sessions. This builds on the existing Ink/React
+terminal UI.
 
 ## Background for Engineers
 
 ### Current UI
+
 - Single conversation view
 - React-based using Ink (terminal renderer)
 - Located in `src/interfaces/terminal-interface.tsx`
@@ -13,6 +17,7 @@ Add a tmux/screen-style interface for switching between agents, showing agent st
 - Thinking indicators
 
 ### What We're Building
+
 - Status bar showing all agents
 - Keyboard shortcuts for switching
 - Visual agent state indicators
@@ -20,6 +25,7 @@ Add a tmux/screen-style interface for switching between agents, showing agent st
 - Queue status display
 
 ### Key Files to Understand
+
 - `src/interfaces/terminal-interface.tsx` - Main UI component
 - `src/interfaces/components/` - UI components
 - `src/interfaces/tool-renderers/` - Tool-specific displays
@@ -28,6 +34,7 @@ Add a tmux/screen-style interface for switching between agents, showing agent st
 ## Ink/React Primer for Terminal UI
 
 ### Ink Basics
+
 ```typescript
 // Regular React, but renders to terminal
 import { Box, Text, useInput, useApp } from 'ink';
@@ -43,6 +50,7 @@ import { Box, Text, useInput, useApp } from 'ink';
 ```
 
 ### Key Differences from Web React
+
 - No onClick - use useInput hook for keyboard
 - No CSS - style via props (color, bold, dim, etc)
 - Layout via flexbox props on Box
@@ -74,10 +82,10 @@ export const AgentStatusBar: React.FC<AgentStatusBarProps> = ({
   queueCounts = {}
 }) => {
   return (
-    <Box 
-      borderStyle="single" 
-      borderTop={false} 
-      borderLeft={false} 
+    <Box
+      borderStyle="single"
+      borderTop={false}
+      borderLeft={false}
       borderRight={false}
       paddingX={1}
     >
@@ -111,10 +119,10 @@ const AgentTab: React.FC<{
       default: return '';
     }
   };
-  
+
   return (
     <Box marginRight={1}>
-      <Text 
+      <Text
         bold={isActive}
         color={isActive ? 'cyan' : undefined}
         dimColor={agent.state === 'suspended'}
@@ -131,6 +139,7 @@ const AgentTab: React.FC<{
 ```
 
 Tests:
+
 - Test renders all agents
 - Test active agent highlighted
 - Test status icons correct
@@ -143,20 +152,21 @@ Tests:
 File: `src/interfaces/terminal-interface.tsx`
 
 Add status bar to layout:
+
 ```typescript
 return (
   <Box flexDirection="column" height="100%">
     {/* Existing header */}
     <Header />
-    
+
     {/* Main content area */}
     <Box flexGrow={1} flexDirection="column">
       <MessageList messages={displayMessages} />
       <InputArea />
     </Box>
-    
+
     {/* New status bar - always at bottom */}
-    <AgentStatusBar 
+    <AgentStatusBar
       agents={visibleAgents}
       activeAgentId={currentAgent?.id}
       queueCounts={queueCounts}
@@ -168,6 +178,7 @@ return (
 Note: Filter agents to hide completed ephemeral ones.
 
 Tests:
+
 - Test status bar positioning
 - Test updates with agent changes
 
@@ -189,7 +200,7 @@ export const useAgentShortcuts = (
   onCreate: () => void
 ) => {
   const [isCtrlA, setIsCtrlA] = useState(false);
-  
+
   useInput((input, key) => {
     // Ctrl+A activates command mode
     if (key.ctrl && input === 'a') {
@@ -197,7 +208,7 @@ export const useAgentShortcuts = (
       setTimeout(() => setIsCtrlA(false), 2000); // timeout
       return;
     }
-    
+
     if (isCtrlA) {
       // Number keys switch agents
       const num = parseInt(input);
@@ -205,25 +216,26 @@ export const useAgentShortcuts = (
         onSwitch(agents[num - 1].id);
         setIsCtrlA(false);
       }
-      
+
       // 'c' creates new agent
       if (input === 'c') {
         onCreate();
         setIsCtrlA(false);
       }
-      
+
       // 'n' next agent, 'p' previous
       if (input === 'n' || input === 'p') {
         // Implementation
       }
     }
   });
-  
+
   return { isCommandMode: isCtrlA };
 };
 ```
 
 Tests:
+
 - Test Ctrl+A activation
 - Test number switching
 - Test create shortcut
@@ -240,7 +252,7 @@ Show available commands when in command mode:
 ```typescript
 export const HelpOverlay: React.FC<{ isVisible: boolean }> = ({ isVisible }) => {
   if (!isVisible) return null;
-  
+
   return (
     <Box
       position="absolute"
@@ -287,16 +299,16 @@ export const TaskDashboard: React.FC<TaskDashboardProps> = ({
       onClose();
     }
   });
-  
+
   const groupedTasks = groupTasksByStatus(tasks);
-  
+
   return (
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>
         <Text bold>Task Dashboard</Text>
         <Text dim> (Press q to close)</Text>
       </Box>
-      
+
       <TaskSection title="ACTIVE" tasks={groupedTasks.active} />
       <TaskSection title="BLOCKED" tasks={groupedTasks.blocked} />
       <TaskSection title="COMPLETED" tasks={groupedTasks.completed} />
@@ -309,7 +321,7 @@ const TaskSection: React.FC<{
   tasks: Task[];
 }> = ({ title, tasks }) => {
   if (tasks.length === 0) return null;
-  
+
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Text bold color="yellow">{title}</Text>
@@ -322,6 +334,7 @@ const TaskSection: React.FC<{
 ```
 
 Tests:
+
 - Test task grouping
 - Test keyboard navigation
 - Test empty sections hidden
@@ -348,7 +361,7 @@ export const AgentIndicator: React.FC<{
     if (agent.state === 'suspended') return 'gray';
     return 'green';
   };
-  
+
   return (
     <Box>
       <Text color={getStateColor()}>
@@ -376,20 +389,20 @@ export const NotificationToast: React.FC<{
   duration?: number;
 }> = ({ message, type, duration = 3000 }) => {
   const [isVisible, setIsVisible] = useState(true);
-  
+
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(false), duration);
     return () => clearTimeout(timer);
   }, [duration]);
-  
+
   if (!isVisible) return null;
-  
+
   const colors = {
     info: 'blue',
     success: 'green',
     warning: 'yellow'
   };
-  
+
   return (
     <Box
       position="absolute"
@@ -405,6 +418,7 @@ export const NotificationToast: React.FC<{
 ```
 
 Use for:
+
 - Agent switched
 - Task completed
 - Message queued
@@ -421,12 +435,12 @@ Since terminal UI can't animate, use visual feedback:
 // Flash effect when switching agents
 const FlashBox: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [flash, setFlash] = useState(false);
-  
+
   useEffect(() => {
     setFlash(true);
     setTimeout(() => setFlash(false), 200);
   }, []);
-  
+
   return (
     <Box borderStyle={flash ? 'double' : 'single'}>
       {children}
@@ -448,24 +462,26 @@ const useTerminalSize = () => {
   const { stdout } = useStdout();
   const [size, setSize] = useState({
     columns: stdout.columns,
-    rows: stdout.rows
+    rows: stdout.rows,
   });
-  
+
   useEffect(() => {
-    const handler = () => setSize({
-      columns: stdout.columns,
-      rows: stdout.rows
-    });
-    
+    const handler = () =>
+      setSize({
+        columns: stdout.columns,
+        rows: stdout.rows,
+      });
+
     stdout.on('resize', handler);
     return () => stdout.off('resize', handler);
   }, [stdout]);
-  
+
   return size;
 };
 ```
 
 Adjust layout based on size:
+
 - Hide task descriptions if narrow
 - Abbreviate agent names if needed
 - Stack vs inline layouts
@@ -475,18 +491,21 @@ Adjust layout based on size:
 ## Testing Strategy
 
 ### Component Tests
+
 - Use React Testing Library
 - Test keyboard interactions
 - Test state updates
 - Mock Ink components
 
 ### Visual Tests
+
 - Manual testing crucial
 - Test in different terminal sizes
 - Test with many agents
 - Test color schemes
 
 ### Integration Tests
+
 - Test with real agent switching
 - Test task updates
 - Test notification flow
@@ -494,18 +513,21 @@ Adjust layout based on size:
 ## Ink/React Best Practices
 
 ### Performance
+
 - Minimize re-renders
 - Use React.memo for static content
 - Avoid deep component trees
 - Profile with React DevTools
 
 ### Accessibility
+
 - Provide keyboard shortcuts
 - Show help text
 - Use clear visual indicators
 - Support monochrome terminals
 
 ### Common Patterns
+
 ```typescript
 // Conditional rendering
 {isVisible && <Component />}

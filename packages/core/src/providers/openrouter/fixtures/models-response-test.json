@@ -10,12 +10,8 @@
       "context_length": 262144,
       "architecture": {
         "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
         "tokenizer": "Qwen3",
         "instruct_type": null
       },
@@ -64,12 +60,8 @@
       "context_length": 262144,
       "architecture": {
         "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
         "tokenizer": "Qwen3",
         "instruct_type": null
       },
@@ -116,12 +108,8 @@
       "context_length": 131072,
       "architecture": {
         "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
         "tokenizer": "Other",
         "instruct_type": null
       },
@@ -167,12 +155,8 @@
       "context_length": 1000000,
       "architecture": {
         "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
         "tokenizer": "Qwen3",
         "instruct_type": null
       },
@@ -212,12 +196,8 @@
       "context_length": 1000000,
       "architecture": {
         "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
         "tokenizer": "Qwen3",
         "instruct_type": null
       },
@@ -259,12 +239,8 @@
       "context_length": 128000,
       "architecture": {
         "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
         "tokenizer": "Other",
         "instruct_type": null
       },
@@ -301,12 +277,8 @@
       "context_length": 131072,
       "architecture": {
         "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
         "tokenizer": "Other",
         "instruct_type": null
       },
@@ -352,13 +324,8 @@
       "context_length": 2000000,
       "architecture": {
         "modality": "text+image->text",
-        "input_modalities": [
-          "text",
-          "image"
-        ],
-        "output_modalities": [
-          "text"
-        ],
+        "input_modalities": ["text", "image"],
+        "output_modalities": ["text"],
         "tokenizer": "Other",
         "instruct_type": null
       },
@@ -394,13 +361,8 @@
       "context_length": 2000000,
       "architecture": {
         "modality": "text+image->text",
-        "input_modalities": [
-          "text",
-          "image"
-        ],
-        "output_modalities": [
-          "text"
-        ],
+        "input_modalities": ["text", "image"],
+        "output_modalities": ["text"],
         "tokenizer": "Other",
         "instruct_type": null
       },
@@ -438,12 +400,8 @@
       "context_length": 256000,
       "architecture": {
         "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
         "tokenizer": "Qwen3",
         "instruct_type": null
       },

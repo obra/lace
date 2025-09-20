@@ -2,13 +2,15 @@
 
 ## Problem Statement
 
-The current approval system suffers from circular dependencies and shared state issues:
+The current approval system suffers from circular dependencies and shared state
+issues:
 
 ```
 Agent → ToolExecutor → ApprovalCallback → Agent.addApprovalRequestEvent()
 ```
 
 This creates:
+
 - Callback sharing between agents
 - Cross-thread approval contamination
 - Complex state management
@@ -60,17 +62,31 @@ class ToolExecutor {
   }
 
   // Tool registry methods (unchanged)
-  getTool(name: string): Tool | undefined { return this.tools.get(name); }
-  registerTool(name: string, tool: Tool): void { this.tools.set(name, tool); }
-  registerTools(tools: Tool[]): void { tools.forEach(t => this.registerTool(t.name, t)); }
-  getAllTools(): Tool[] { return Array.from(this.tools.values()); }
+  getTool(name: string): Tool | undefined {
+    return this.tools.get(name);
+  }
+  registerTool(name: string, tool: Tool): void {
+    this.tools.set(name, tool);
+  }
+  registerTools(tools: Tool[]): void {
+    tools.forEach((t) => this.registerTool(t.name, t));
+  }
+  getAllTools(): Tool[] {
+    return Array.from(this.tools.values());
+  }
 
   // Session binding for policy lookups (unchanged)
-  setSession(session: Session): void { this.session = session; }
-  getSession(): Session | undefined { return this.session; }
+  setSession(session: Session): void {
+    this.session = session;
+  }
+  getSession(): Session | undefined {
+    return this.session;
+  }
 
   // MCP methods (unchanged)
-  async registerMCPTools(mcpManager: MCPServerManager): Promise<void> { /* existing */ }
+  async registerMCPTools(mcpManager: MCPServerManager): Promise<void> {
+    /* existing */
+  }
 }
 ```
 
@@ -84,7 +100,7 @@ class Agent {
       const toolContext = {
         agent: this,
         workingDirectory: this._getWorkingDirectory(),
-        signal: this._getToolAbortSignal()
+        signal: this._getToolAbortSignal(),
       };
 
       // 1. Agent checks policy directly
@@ -94,11 +110,9 @@ class Agent {
         // Execute immediately
         const result = await this._toolExecutor.execute(toolCall, toolContext);
         this._handleToolResult(toolCall.id, result);
-
       } else if (permission === 'approval_required') {
         // Agent orchestrates approval flow
         await this._handleToolApprovalFlow(toolCall, toolContext);
-
       } else {
         // Denied
         const deniedResult = this._createDeniedResult(toolCall, permission);
@@ -110,15 +124,18 @@ class Agent {
   }
 
   // Agent directly manages approval flow
-  private async _handleToolApprovalFlow(toolCall: ToolCall, context: ToolContext): Promise<void> {
+  private async _handleToolApprovalFlow(
+    toolCall: ToolCall,
+    context: ToolContext
+  ): Promise<void> {
     // 1. Create approval request event (in correct thread!)
     this._addEventAndEmit({
       type: 'TOOL_APPROVAL_REQUEST',
       data: { toolCallId: toolCall.id },
       context: {
-        threadId: this._threadId,  // Always correct thread!
-        sessionId: this._getSessionId()
-      }
+        threadId: this._threadId, // Always correct thread!
+        sessionId: this._getSessionId(),
+      },
     });
 
     // 2. Wait for approval decision
@@ -135,22 +152,30 @@ class Agent {
   }
 
   // Policy checking (no external dependencies)
-  private async _checkToolPermission(toolCall: ToolCall): Promise<'granted' | 'approval_required' | 'denied'> {
+  private async _checkToolPermission(
+    toolCall: ToolCall
+  ): Promise<'granted' | 'approval_required' | 'denied'> {
     const session = await this.getFullSession();
     if (!session) return 'denied';
 
     const policy = session.getToolPolicy(toolCall.name);
 
     switch (policy) {
-      case 'allow': return 'granted';
-      case 'deny': return 'denied';
-      case 'ask': return 'approval_required';
-      default: return 'approval_required'; // Safe default
+      case 'allow':
+        return 'granted';
+      case 'deny':
+        return 'denied';
+      case 'ask':
+        return 'approval_required';
+      default:
+        return 'approval_required'; // Safe default
     }
   }
 
   // Wait for approval using existing event system
-  private async _waitForApprovalDecision(toolCallId: string): Promise<ApprovalDecision> {
+  private async _waitForApprovalDecision(
+    toolCallId: string
+  ): Promise<ApprovalDecision> {
     return new Promise((resolve, reject) => {
       // Set up timeout
       const timeout = setTimeout(() => {
@@ -174,15 +199,18 @@ class Agent {
   }
 
   // Public API for external approval submission (replaces callback)
-  async handleApprovalResponse(toolCallId: string, decision: ApprovalDecision): Promise<void> {
+  async handleApprovalResponse(
+    toolCallId: string,
+    decision: ApprovalDecision
+  ): Promise<void> {
     // Write response event to database
     this._addEventAndEmit({
       type: 'TOOL_APPROVAL_RESPONSE',
       data: { toolCallId, decision },
       context: {
         threadId: this._threadId,
-        sessionId: this._getSessionId()
-      }
+        sessionId: this._getSessionId(),
+      },
     });
 
     // The waiting tool execution will pick up this response and continue
@@ -196,17 +224,22 @@ class Agent {
 // Existing session API works perfectly - just queries thread state
 class SessionApprovalService {
   getSessionPendingApprovals(sessionId: ThreadId): PendingApproval[] {
-    const threadIds = this.threadManager.getThreadsBySession(sessionId).map(t => t.id);
+    const threadIds = this.threadManager
+      .getThreadsBySession(sessionId)
+      .map((t) => t.id);
 
     // Same SQL query as before - reads thread state
-    return this.db.query(`
+    return this.db.query(
+      `
       SELECT req.data->>'toolCallId', req.thread_id, tc.data, req.timestamp
       FROM events req
       JOIN events tc ON tc.data->>'id' = req.data->>'toolCallId'
       WHERE req.type = 'TOOL_APPROVAL_REQUEST'
         AND req.thread_id IN (${threadIds.map(() => '?').join(',')})
         AND NOT EXISTS (SELECT 1 FROM events resp WHERE ...)
-    `, threadIds);
+    `,
+      threadIds
+    );
   }
 }
 ```
@@ -218,7 +251,9 @@ class SessionApprovalService {
 // EventStreamProvider already handles session events (no changes!)
 
 // Approval decisions still go to session endpoint
-await api.post(`/api/sessions/${sessionId}/approvals/${toolCallId}`, { decision });
+await api.post(`/api/sessions/${sessionId}/approvals/${toolCallId}`, {
+  decision,
+});
 ```
 
 ## Migration Benefits
@@ -227,12 +262,15 @@ await api.post(`/api/sessions/${sessionId}/approvals/${toolCallId}`, { decision 
 2. ✅ **Zero frontend changes** - existing session-scoped UI works
 3. ✅ **Eliminates circular dependencies** - clean one-way flow
 4. ✅ **Eliminates callback sharing** - no callbacks exist
-5. ✅ **Simplifies ToolExecutor** - remove 4 complex methods, add 1 simple method
-6. ✅ **Fixes cross-thread bug** - approval events always created in correct thread
+5. ✅ **Simplifies ToolExecutor** - remove 4 complex methods, add 1 simple
+   method
+6. ✅ **Fixes cross-thread bug** - approval events always created in correct
+   thread
 
 ## What Gets Removed
 
 **From ToolExecutor**:
+
 - `executeTool()` (deprecated)
 - `requestToolPermission()` (moves to Agent)
 - `executeApprovedTool()` (becomes `execute()`)
@@ -241,17 +279,19 @@ await api.post(`/api/sessions/${sessionId}/approvals/${toolCallId}`, { decision 
 - All approval state management
 
 **From everywhere else**:
+
 - `EventApprovalCallback` class (delete entire file)
 - `setupAgentApprovals()` function (no callbacks to set up)
 - All callback sharing logic in Session, SessionService
 
 ## Result
 
-**ToolExecutor**: 80 lines → 30 lines (just tool registry + execute)
-**Agent**: Gains clear approval orchestration methods
-**Zero sharing issues**: Impossible to have callback contamination
-**Zero circular dependencies**: Agent → ToolExecutor (one way)
+**ToolExecutor**: 80 lines → 30 lines (just tool registry + execute) **Agent**:
+Gains clear approval orchestration methods **Zero sharing issues**: Impossible
+to have callback contamination **Zero circular dependencies**: Agent →
+ToolExecutor (one way)
 
-This architecture is **fundamentally incapable** of having the cross-thread approval bugs we've been fighting!
+This architecture is **fundamentally incapable** of having the cross-thread
+approval bugs we've been fighting!
 
 Want me to implement this clean architecture?

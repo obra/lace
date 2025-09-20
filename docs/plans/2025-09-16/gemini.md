@@ -1,24 +1,27 @@
 # Google Gemini Provider Implementation Plan - TDD/DRY/YAGNI
 
-**Date:** 2025-09-16
-**Status:** Planning
-**Scope:** Gemini API only (no Vertex AI), Web UI configuration (no env vars)
+**Date:** 2025-09-16 **Status:** Planning **Scope:** Gemini API only (no Vertex
+AI), Web UI configuration (no env vars)
 
 ## Project Overview
 
-Implement native Google Gemini API support for Lace following strict Test-Driven Development, keeping code DRY, and building only what's needed (YAGNI).
+Implement native Google Gemini API support for Lace following strict Test-Driven
+Development, keeping code DRY, and building only what's needed (YAGNI).
 
 ## Implementation Steps (TDD Order)
 
 ### Step 1: Update Catalog Data
+
 **Files:** `packages/core/src/providers/catalog/data/gemini.json`
 
 **Changes:**
+
 - Update to current Gemini models (2.0-flash, 1.5-pro, 1.5-flash)
 - Correct pricing and capabilities
 - Set proper defaults
 
 **Expected Models:**
+
 ```json
 {
   "name": "Google Gemini",
@@ -47,9 +50,11 @@ Implement native Google Gemini API support for Lace following strict Test-Driven
 ```
 
 ### Step 2: Write Failing Tests First (TDD)
+
 **File:** `packages/core/src/providers/gemini-provider.test.ts`
 
 **Test Suite Structure:**
+
 ```typescript
 describe('GeminiProvider', () => {
   describe('Configuration', () => {
@@ -94,6 +99,7 @@ describe('GeminiProvider', () => {
 ```
 
 ### Step 3: Add Dependencies
+
 **File:** `packages/core/package.json`
 
 ```bash
@@ -101,9 +107,11 @@ npm install @google/genai
 ```
 
 ### Step 4: Add Format Converter (TDD)
+
 **File:** `packages/core/src/providers/format-converters.ts`
 
 **Implementation:**
+
 ```typescript
 /**
  * Converts enhanced ProviderMessage format to Gemini Content/Part format
@@ -138,8 +146,10 @@ export function convertToGeminiFormat(messages: ProviderMessage[]): Content[] {
             functionResponse: {
               name: result.toolName || '',
               response: {
-                output: result.content.map(c => c.text).join('\n'),
-                ...(result.status !== 'completed' ? { error: 'Tool execution failed' } : {})
+                output: result.content.map((c) => c.text).join('\n'),
+                ...(result.status !== 'completed'
+                  ? { error: 'Tool execution failed' }
+                  : {}),
               },
             },
           });
@@ -155,14 +165,17 @@ export function convertToGeminiFormat(messages: ProviderMessage[]): Content[] {
 ```
 
 **DRY Principles:**
+
 - Reuse existing patterns from `convertToAnthropicFormat`
 - Extract common message filtering logic
 - Share tool conversion patterns
 
 ### Step 5: Implement Core Provider (TDD)
+
 **File:** `packages/core/src/providers/gemini-provider.ts`
 
 **Interface:**
+
 ```typescript
 interface GeminiProviderConfig extends ProviderConfig {
   apiKey: string | null;
@@ -171,6 +184,7 @@ interface GeminiProviderConfig extends ProviderConfig {
 ```
 
 **Minimal Implementation (YAGNI):**
+
 ```typescript
 export class GeminiProvider extends AIProvider {
   private _gemini: GoogleGenAI | null = null;
@@ -208,13 +222,21 @@ export class GeminiProvider extends AIProvider {
     model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    return this.withRetry(async () => {
-      const requestPayload = this._createRequestPayload(messages, tools, model);
+    return this.withRetry(
+      async () => {
+        const requestPayload = this._createRequestPayload(
+          messages,
+          tools,
+          model
+        );
 
-      const response = await this.getGeminiClient().models.generateContent(requestPayload);
+        const response =
+          await this.getGeminiClient().models.generateContent(requestPayload);
 
-      return this._parseResponse(response);
-    }, { signal });
+        return this._parseResponse(response);
+      },
+      { signal }
+    );
   }
 
   async createStreamingResponse(
@@ -223,13 +245,22 @@ export class GeminiProvider extends AIProvider {
     model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
-    return this.withRetry(async () => {
-      const requestPayload = this._createRequestPayload(messages, tools, model, true);
+    return this.withRetry(
+      async () => {
+        const requestPayload = this._createRequestPayload(
+          messages,
+          tools,
+          model,
+          true
+        );
 
-      const stream = this.getGeminiClient().models.generateContentStream(requestPayload);
+        const stream =
+          this.getGeminiClient().models.generateContentStream(requestPayload);
 
-      return this._handleStreamingResponse(stream);
-    }, { signal, isStreaming: true });
+        return this._handleStreamingResponse(stream);
+      },
+      { signal, isStreaming: true }
+    );
   }
 
   private _createRequestPayload(
@@ -241,12 +272,14 @@ export class GeminiProvider extends AIProvider {
     const contents = convertToGeminiFormat(messages);
     const systemInstruction = this.getEffectiveSystemPrompt(messages);
 
-    const geminiTools = tools.map(tool => ({
-      functionDeclarations: [{
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.inputSchema,
-      }]
+    const geminiTools = tools.map((tool) => ({
+      functionDeclarations: [
+        {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.inputSchema,
+        },
+      ],
     }));
 
     return {
@@ -256,7 +289,7 @@ export class GeminiProvider extends AIProvider {
       tools: geminiTools.length > 0 ? geminiTools : undefined,
       config: {
         maxOutputTokens: this._config.maxTokens || 4000,
-      }
+      },
     };
   }
 
@@ -269,24 +302,26 @@ export class GeminiProvider extends AIProvider {
     const parts = candidate.content?.parts || [];
 
     // Extract text content
-    const textParts = parts.filter(part => part.text);
-    const content = textParts.map(part => part.text).join('');
+    const textParts = parts.filter((part) => part.text);
+    const content = textParts.map((part) => part.text).join('');
 
     // Extract tool calls
     const toolCalls = parts
-      .filter(part => part.functionCall)
-      .map(part => ({
+      .filter((part) => part.functionCall)
+      .map((part) => ({
         id: `gemini_${Date.now()}_${Math.random()}`, // Gemini doesn't provide IDs
         name: part.functionCall.name,
         arguments: part.functionCall.args || {},
       }));
 
     // Extract usage
-    const usage = response.usageMetadata ? {
-      promptTokens: response.usageMetadata.promptTokens || 0,
-      completionTokens: response.usageMetadata.candidatesTokens || 0,
-      totalTokens: response.usageMetadata.totalTokens || 0,
-    } : undefined;
+    const usage = response.usageMetadata
+      ? {
+          promptTokens: response.usageMetadata.promptTokens || 0,
+          completionTokens: response.usageMetadata.candidatesTokens || 0,
+          totalTokens: response.usageMetadata.totalTokens || 0,
+        }
+      : undefined;
 
     return {
       content,
@@ -296,7 +331,9 @@ export class GeminiProvider extends AIProvider {
     };
   }
 
-  private async _handleStreamingResponse(stream: any): Promise<ProviderResponse> {
+  private async _handleStreamingResponse(
+    stream: any
+  ): Promise<ProviderResponse> {
     let content = '';
     let toolCalls: ToolCall[] = [];
     let usage: any = undefined;
@@ -311,15 +348,22 @@ export class GeminiProvider extends AIProvider {
     const finalMessage = await stream.finalMessage();
 
     const response = this._parseResponse({
-      candidates: [{ content: finalMessage.content, finishReason: finalMessage.finishReason }],
-      usageMetadata: finalMessage.usageMetadata
+      candidates: [
+        {
+          content: finalMessage.content,
+          finishReason: finalMessage.finishReason,
+        },
+      ],
+      usageMetadata: finalMessage.usageMetadata,
     });
 
     this.emit('complete', { response });
     return response;
   }
 
-  protected normalizeStopReason(stopReason: string | null | undefined): string | undefined {
+  protected normalizeStopReason(
+    stopReason: string | null | undefined
+  ): string | undefined {
     if (!stopReason) return undefined;
 
     switch (stopReason) {
@@ -351,12 +395,14 @@ export class GeminiProvider extends AIProvider {
 ```
 
 **DRY Patterns:**
+
 - Reuse retry logic from base class (`withRetry`)
 - Reuse token estimation from base class
 - Reuse event emission patterns from other providers
 - Reuse error handling patterns
 
 ### Step 6: Provider Registration (YAGNI)
+
 **File:** `packages/core/src/providers/index.ts`
 
 ```typescript
@@ -367,9 +413,11 @@ export { GeminiProvider } from './gemini-provider';
 **No complex registry changes until needed.**
 
 ### Step 7: Integration Testing
+
 **File:** `packages/core/src/providers/gemini-integration.test.ts`
 
 Test with real API (when API key available):
+
 - Basic conversation flow
 - Tool calling end-to-end
 - Streaming functionality
@@ -392,14 +440,20 @@ it('should handle basic text response', async () => {
 
   // Mock Gemini SDK response
   mockGenerateContent.mockResolvedValue({
-    candidates: [{
-      content: { parts: [{ text: 'Hi there!' }] },
-      finishReason: 'STOP'
-    }],
-    usageMetadata: { promptTokens: 5, totalTokens: 10, candidatesTokens: 5 }
+    candidates: [
+      {
+        content: { parts: [{ text: 'Hi there!' }] },
+        finishReason: 'STOP',
+      },
+    ],
+    usageMetadata: { promptTokens: 5, totalTokens: 10, candidatesTokens: 5 },
   });
 
-  const response = await provider.createResponse(messages, [], 'gemini-2.0-flash');
+  const response = await provider.createResponse(
+    messages,
+    [],
+    'gemini-2.0-flash'
+  );
 
   expect(response.content).toBe('Hi there!');
   expect(response.usage?.promptTokens).toBe(5);
@@ -413,6 +467,7 @@ it('should handle basic text response', async () => {
 ## DRY Implementation Strategy
 
 ### Reuse Existing Patterns:
+
 1. **Configuration:** Same as OpenAI/Anthropic providers
 2. **Error Handling:** Use base class retry mechanisms
 3. **Tool Conversion:** Follow established schema patterns
@@ -420,6 +475,7 @@ it('should handle basic text response', async () => {
 5. **Response Parsing:** Extract common parsing utilities
 
 ### Extract Common Code:
+
 ```typescript
 // If we see duplication across providers, extract to base class
 export abstract class StreamingProvider extends AIProvider {
@@ -436,6 +492,7 @@ export abstract class StreamingProvider extends AIProvider {
 ## YAGNI Principles
 
 ### Don't Build Until Needed:
+
 - ❌ No Vertex AI support (not requested)
 - ❌ No vision/multimodal (not in current scope)
 - ❌ No advanced streaming features (unless basic streaming insufficient)
@@ -444,12 +501,14 @@ export abstract class StreamingProvider extends AIProvider {
 - ❌ No environment variable support (web UI only)
 
 ### Build Only When Tests Require:
+
 - ✅ Basic text generation (core requirement)
 - ✅ Tool calling (required by base interface)
 - ✅ Streaming (required by base interface)
 - ✅ Error handling (required for production)
 
 ### Minimal File Structure:
+
 ```
 packages/core/src/providers/
 ├── gemini-provider.ts           # ~250 lines initially
@@ -473,10 +532,13 @@ packages/core/src/providers/
 ## Development Order
 
 1. **Update gemini.json** with current models
-2. **Write failing test** for provider instantiation → implement minimal constructor
+2. **Write failing test** for provider instantiation → implement minimal
+   constructor
 3. **Write failing test** for basic response → implement `createResponse`
-4. **Write failing test** for format conversion → implement `convertToGeminiFormat`
-5. **Write failing test** for tool calling → extend format converter and response parser
+4. **Write failing test** for format conversion → implement
+   `convertToGeminiFormat`
+5. **Write failing test** for tool calling → extend format converter and
+   response parser
 6. **Write failing test** for streaming → implement `createStreamingResponse`
 7. **Write failing test** for error cases → add error handling
 8. **Integration test** with real API
@@ -487,17 +549,20 @@ Each step follows strict TDD: **Red → Green → Refactor**.
 ## Technical Considerations
 
 ### Format Conversion Challenges:
+
 - Gemini uses `Content/Part` structure vs simple strings
 - Tool calls become `functionCall` parts
 - Tool results become `functionResponse` parts
 - System messages handled via `systemInstruction` parameter
 
 ### Streaming Differences:
+
 - Gemini streams via events (`text`, `finalMessage`)
 - Different from OpenAI chunks and Anthropic events
 - Need to adapt to common streaming interface
 
 ### Error Handling:
+
 - Map Gemini-specific errors to normalized format
 - Handle authentication, rate limiting, model errors
 - Use existing retry mechanisms from base class
@@ -526,6 +591,7 @@ Each step follows strict TDD: **Red → Green → Refactor**.
 ---
 
 **Next Steps:**
+
 1. Begin with Step 1 (update gemini.json)
 2. Follow TDD cycle strictly
 3. Review at each major milestone

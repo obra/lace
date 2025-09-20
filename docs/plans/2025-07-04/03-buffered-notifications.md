@@ -1,23 +1,29 @@
 # Buffered Notifications Implementation Specification
 
 ## Overview
-Add message queueing to agents so they can receive notifications (task assignments, status updates) while busy processing. Messages queue up and are delivered when the agent returns to idle state.
+
+Add message queueing to agents so they can receive notifications (task
+assignments, status updates) while busy processing. Messages queue up and are
+delivered when the agent returns to idle state.
 
 ## Background for Engineers
 
 ### Current Message Flow
+
 1. User types message in terminal
 2. UI blocks if agent is busy (shows warning)
 3. User must wait and retry
 4. No way to queue messages
 
 ### Agent States
+
 - `idle` - Ready for messages
-- `thinking` - Processing/planning response  
+- `thinking` - Processing/planning response
 - `streaming` - Outputting response
 - `tool_execution` - Running tools
 
 ### Key Files to Understand
+
 - `src/agents/agent.ts` - Agent class and state machine
 - `src/interfaces/terminal-interface.tsx` - React terminal UI (uses Ink)
 - `src/threads/types.ts` - Message/event types
@@ -53,6 +59,7 @@ export interface MessageQueueStats {
 ```
 
 Tests:
+
 - Type validation tests
 - Queue message creation
 
@@ -63,36 +70,39 @@ Tests:
 File: `src/agents/agent.ts`
 
 Add to Agent class:
+
 ```typescript
 class Agent {
   private messageQueue: QueuedMessage[] = [];
   private isProcessingQueue = false;
-  
+
   // Queue a message (public API)
   queueMessage(
-    content: string, 
+    content: string,
     type: QueuedMessage['type'] = 'user',
     metadata?: QueuedMessage['metadata']
-  ): string // returns message ID
-  
+  ): string; // returns message ID
+
   // Get queue statistics
-  getQueueStats(): MessageQueueStats
-  
+  getQueueStats(): MessageQueueStats;
+
   // Clear queue (with optional filter)
-  clearQueue(filter?: (msg: QueuedMessage) => boolean): number
-  
+  clearQueue(filter?: (msg: QueuedMessage) => boolean): number;
+
   // Process queued messages when idle
-  private async processQueuedMessages(): Promise<void>
+  private async processQueuedMessages(): Promise<void>;
 }
 ```
 
 Implementation notes:
+
 - Only queue when state !== 'idle'
 - Process queue when returning to idle
 - High priority messages go to front
 - Emit events for queue changes
 
 Tests:
+
 - Test queueing while busy
 - Test immediate processing when idle
 - Test priority ordering
@@ -107,12 +117,13 @@ Tests:
 File: `src/agents/agent.ts`
 
 Modify `setState()` method:
+
 ```typescript
 private setState(newState: AgentState): void {
   const oldState = this.state;
   this.state = newState;
   this.emit('state_change', { from: oldState, to: newState });
-  
+
   // Process queue when returning to idle
   if (newState === 'idle' && !this.isProcessingQueue) {
     this.processQueuedMessages();
@@ -121,6 +132,7 @@ private setState(newState: AgentState): void {
 ```
 
 Tests:
+
 - Test queue processing triggers on idle
 - Test no recursive processing
 - Test state transitions during queue processing
@@ -133,8 +145,8 @@ Current `sendMessage()` throws if not idle. Update to:
 
 ```typescript
 async sendMessage(
-  content: string, 
-  options?: { 
+  content: string,
+  options?: {
     queue?: boolean;
     metadata?: QueuedMessage['metadata'];
   }
@@ -143,20 +155,21 @@ async sendMessage(
     // Process immediately
     return this.processMessage(content);
   }
-  
+
   if (options?.queue) {
     // Queue for later
     const id = this.queueMessage(content, 'user', options.metadata);
     this.emit('message_queued', { id, queueLength: this.messageQueue.length });
     return;
   }
-  
+
   // Current behavior - throw error
   throw new Error(`Agent is ${this.state}, cannot accept messages`);
 }
 ```
 
 Tests:
+
 - Test queue option works
 - Test events emitted
 
@@ -185,7 +198,7 @@ Priority: ${task.priority}
 ${task.prompt}
 --- END TASK DETAILS ---`;
   }
-  
+
   static formatTaskCompletion(task: {
     title: string;
     assignedTo: string;
@@ -197,6 +210,7 @@ ${task.prompt}
 ```
 
 Tests:
+
 - Test formatting produces expected output
 - Test escaping/sanitization
 - Test empty fields handled
@@ -214,7 +228,7 @@ Add queue indicator to status bar:
 ```typescript
 const QueueIndicator: React.FC<{ stats: MessageQueueStats }> = ({ stats }) => {
   if (stats.queueLength === 0) return null;
-  
+
   return (
     <Box>
       <Text color="yellow">
@@ -227,11 +241,13 @@ const QueueIndicator: React.FC<{ stats: MessageQueueStats }> = ({ stats }) => {
 ```
 
 Note for React devs:
+
 - Ink uses React but renders to terminal
 - No DOM, uses Box/Text components
 - Flexbox layout works similarly
 
 Tests:
+
 - Test indicator shows/hides correctly
 - Test count updates
 - Test priority indication
@@ -259,13 +275,14 @@ const handleSubmit = (input: string) => {
             content: '📬 Message queued',
           });
         }
-      }
+      },
     });
   }
 };
 ```
 
 Tests:
+
 - Test queue prompt appears
 - Test message queued on 'y'
 - Test cancelled on 'n'
@@ -277,6 +294,7 @@ Tests:
 **Task 5.1: Emit queue events**
 
 Add events to Agent:
+
 - `message_queued` - When message added to queue
 - `queue_processing_start` - Starting to process queue
 - `queue_processing_complete` - Finished processing
@@ -285,6 +303,7 @@ Add events to Agent:
 File: `src/agents/agent.ts`
 
 Tests:
+
 - Test all events emitted
 - Test event data correct
 - Test event ordering
@@ -298,6 +317,7 @@ Tests:
 File: `src/agents/__tests__/agent-queue-e2e.test.ts`
 
 Scenarios:
+
 1. User queues multiple messages during long operation
 2. Task notifications queue while agent busy
 3. High priority messages processed first
@@ -306,23 +326,27 @@ Scenarios:
 **Task 6.2: Add queue management commands**
 
 Add commands to clear/inspect queue:
+
 - `/queue` - Show queue contents
 - `/queue clear` - Clear all queued user messages (not system messages)
 
 ## Testing Strategy
 
 ### Unit Tests
+
 - Queue operations (add, remove)
 - State transition hooks
 - Event emissions
 - Priority handling
 
 ### Integration Tests
+
 - Full message flow with queueing
 - UI updates with queue
 - Multiple agents with separate queues
 
 ### Manual Testing
+
 1. Start long-running task
 2. Try to send message (should offer queue)
 3. Queue several messages
@@ -332,6 +356,7 @@ Add commands to clear/inspect queue:
 ## React/Ink Considerations
 
 ### For React Developers
+
 - Ink renders React to terminal
 - Use Box for layout (like div)
 - Use Text for content (like span)
@@ -340,14 +365,15 @@ Add commands to clear/inspect queue:
 - No onClick - keyboard input only
 
 ### Example Ink Component
+
 ```typescript
 const MyComponent: React.FC = () => {
   const [count, setCount] = useState(0);
-  
+
   useInput((input) => {
     if (input === '+') setCount(c => c + 1);
   });
-  
+
   return (
     <Box flexDirection="column">
       <Text bold>Count: {count}</Text>

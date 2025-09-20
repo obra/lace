@@ -1,15 +1,19 @@
 # Helper Agents Guide
 
-Helper agents provide lightweight LLM task execution outside the normal conversation workflow. Think of them as "calling an AI like a function" - you give it a task, it completes it (possibly using tools), and returns a result.
+Helper agents provide lightweight LLM task execution outside the normal
+conversation workflow. Think of them as "calling an AI like a function" - you
+give it a task, it completes it (possibly using tools), and returns a result.
 
 ## Overview
 
 The helper system consists of two main types:
 
 - **InfrastructureHelper**: For Lace's internal systems (bypasses user approval)
-- **SessionHelper**: For agents spawning sub-tasks (respects user approval policies)
+- **SessionHelper**: For agents spawning sub-tasks (respects user approval
+  policies)
 
-Both types support multi-turn LLM execution internally but return a single consolidated result to their caller.
+Both types support multi-turn LLM execution internally but return a single
+consolidated result to their caller.
 
 ## Quick Start
 
@@ -19,16 +23,18 @@ import { InfrastructureHelper, SessionHelper, HelperFactory } from '@lace/core';
 // Infrastructure helper for system tasks
 const infraHelper = HelperFactory.createInfrastructureHelper({
   model: 'smart', // 'fast' or 'smart'
-  tools: ['file-read', 'ripgrep-search']
+  tools: ['file-read', 'ripgrep-search'],
 });
 
 // Session helper within an agent
 const sessionHelper = HelperFactory.createSessionHelper({
   model: 'fast', // 'fast' or 'smart'
-  parentAgent: this
+  parentAgent: this,
 });
 
-const result = await infraHelper.execute('Analyze the error patterns in the logs');
+const result = await infraHelper.execute(
+  'Analyze the error patterns in the logs'
+);
 console.log(result.content); // The analysis
 console.log(result.toolCalls); // Tools that were used
 console.log(result.tokenUsage); // Token consumption
@@ -36,12 +42,13 @@ console.log(result.tokenUsage); // Token consumption
 
 ## InfrastructureHelper
 
-Use infrastructure helpers when Lace's internal systems need to perform LLM tasks programmatically.
+Use infrastructure helpers when Lace's internal systems need to perform LLM
+tasks programmatically.
 
 ### Security Model
 
 - **Explicit whitelist**: Only tools in the `tools` array can be used
-- **No user approval**: Bypasses approval system entirely  
+- **No user approval**: Bypasses approval system entirely
 - **Trust boundary**: Calling code is responsible for tool safety
 
 ### Basic Usage
@@ -61,11 +68,12 @@ const result = await helper.execute('Task description');
 ### Common Patterns
 
 **Memory System Analysis:**
+
 ```typescript
 const memoryHelper = new InfrastructureHelper({
   model: 'smart',
   tools: ['ripgrep-search', 'file-read'],
-  workingDirectory: conversationLogDir
+  workingDirectory: conversationLogDir,
 });
 
 const insights = await memoryHelper.execute(
@@ -74,11 +82,12 @@ const insights = await memoryHelper.execute(
 ```
 
 **Error Analysis:**
+
 ```typescript
 const errorHelper = new InfrastructureHelper({
   model: 'smart',
   tools: ['ripgrep-search', 'file-read'],
-  workingDirectory: logDirectory
+  workingDirectory: logDirectory,
 });
 
 const errorAnalysis = await errorHelper.execute(
@@ -87,10 +96,11 @@ const errorAnalysis = await errorHelper.execute(
 ```
 
 **Task Creation from Natural Language:**
+
 ```typescript
 const taskHelper = new InfrastructureHelper({
   model: 'fast',
-  tools: ['task-create']
+  tools: ['task-create'],
 });
 
 await taskHelper.execute(`Create tasks for: ${userRequest}`);
@@ -98,7 +108,8 @@ await taskHelper.execute(`Create tasks for: ${userRequest}`);
 
 ## SessionHelper
 
-Use session helpers when agents need to spawn sub-tasks during conversation flow.
+Use session helpers when agents need to spawn sub-tasks during conversation
+flow.
 
 ### Security Model
 
@@ -122,11 +133,12 @@ const result = await helper.execute('Sub-task description');
 ### Common Patterns
 
 **URL Summarization:**
+
 ```typescript
 // Inside agent handling user message with URL
 const helper = new SessionHelper({
   model: 'fast',
-  parentAgent: this
+  parentAgent: this,
 });
 
 const summary = await helper.execute(`Summarize the content at ${url}`);
@@ -134,10 +146,11 @@ const summary = await helper.execute(`Summarize the content at ${url}`);
 ```
 
 **Data Analysis:**
+
 ```typescript
 const helper = new SessionHelper({
   model: 'smart', // Use smart model for complex analysis
-  parentAgent: this
+  parentAgent: this,
 });
 
 const analysis = await helper.execute(
@@ -146,10 +159,11 @@ const analysis = await helper.execute(
 ```
 
 **Code Review:**
+
 ```typescript
 const helper = new SessionHelper({
   model: 'smart',
-  parentAgent: this
+  parentAgent: this,
 });
 
 const review = await helper.execute(
@@ -169,12 +183,12 @@ const registry = new HelperRegistry();
 // Create and track helpers
 const helper1 = registry.createInfrastructureHelper('memory-task', {
   model: 'smart',
-  tools: ['file-read', 'ripgrep-search']
+  tools: ['file-read', 'ripgrep-search'],
 });
 
 const helper2 = registry.createSessionHelper('url-summary', {
   model: 'fast',
-  parentAgent: agent
+  parentAgent: agent,
 });
 
 // Manage helpers
@@ -188,19 +202,22 @@ registry.clearAll();
 
 ## Configuration
 
-Create `~/.lace/config.json` (see docs/examples/config.json for a full template).  
-Each model string is `<providerInstanceId>:<modelId>` (e.g. `anthropic-default:claude-3-5-sonnet-20241022`):
+Create `~/.lace/config.json` (see docs/examples/config.json for a full
+template).  
+Each model string is `<providerInstanceId>:<modelId>` (e.g.
+`anthropic-default:claude-3-5-sonnet-20241022`):
 
 ```json
 {
   "defaultModels": {
     "fast": "anthropic-default:claude-3-5-haiku-20241022",
-    "smart": "anthropic-default:claude-3-5-sonnet-20241022"  
+    "smart": "anthropic-default:claude-3-5-sonnet-20241022"
   }
 }
 ```
 
-If this configuration is missing, helper creation will throw with a clear error.  
+If this configuration is missing, helper creation will throw with a clear
+error.  
 Ensure both `~/.lace/config.json` and `~/.lace/provider-instances.json` exist.
 
 ## Error Handling
@@ -218,10 +235,12 @@ if (result.content.includes('error')) {
 // Check individual tool results
 for (const toolResult of result.toolResults) {
   if (toolResult.status === 'failed') {
-    const msg =
-      Array.isArray(toolResult.content)
-        ? toolResult.content.map((c: any) => (typeof c?.text === 'string' ? c.text : '')).join(' ').trim()
-        : String(toolResult.content ?? '');
+    const msg = Array.isArray(toolResult.content)
+      ? toolResult.content
+          .map((c: any) => (typeof c?.text === 'string' ? c.text : ''))
+          .join(' ')
+          .trim()
+      : String(toolResult.content ?? '');
     console.error(`Tool ${toolResult.toolCallId} failed: ${msg}`);
   }
 }
@@ -235,15 +254,18 @@ if (result.tokenUsage) {
 ## Performance Considerations
 
 **Model Selection:**
+
 - Use `fast` models for simple tasks (summarization, formatting)
 - Use `smart` models for complex analysis or reasoning tasks
 
 **Tool access:**
+
 - Infrastructure helpers require explicit tool whitelisting
 - Only include tools actually needed for the task
 - Session helpers inherit tools from parent agent
 
 **Resource Management:**
+
 - Helpers are lightweight - create as needed
 - Use registry for long-lived helper management
 - Clean up helpers when tasks complete
@@ -258,11 +280,11 @@ describe('Helper Integration', () => {
     const helper = new InfrastructureHelper({
       model: 'fast',
       tools: ['file-read'],
-      workingDirectory: testDataDir
+      workingDirectory: testDataDir,
     });
 
     const result = await helper.execute('Read and summarize test-file.txt');
-    
+
     expect(result.content).toContain('summary');
     expect(result.toolCalls).toHaveLength(1);
     expect(result.toolResults[0].status).toBe('completed');
@@ -270,7 +292,8 @@ describe('Helper Integration', () => {
 });
 ```
 
-**Don't mock the helpers themselves** - test real behavior with controlled inputs.
+**Don't mock the helpers themselves** - test real behavior with controlled
+inputs.
 
 ## Architecture Notes
 
@@ -283,15 +306,18 @@ describe('Helper Integration', () => {
 ## Troubleshooting
 
 **Configuration Issues:**
+
 - Ensure `~/.lace/config.json` exists with proper model mappings
 - Check provider instances are configured in `~/.lace/provider-instances.json`
 
 **Tool Execution:**
+
 - Infrastructure helpers: Check tool is in whitelist
 - Session helpers: Check parent agent has required tools
 - Verify working directory permissions for file operations
 
 **Performance:**
+
 - Monitor token usage with `result.tokenUsage`
 - Use appropriate model tier for task complexity
 - Consider tool execution time in timeout planning

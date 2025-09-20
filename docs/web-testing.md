@@ -1,21 +1,26 @@
 # Web E2E Testing with Playwright
 
-This document covers E2E testing best practices for the Lace web interface, focusing on the current reliable infrastructure and patterns.
+This document covers E2E testing best practices for the Lace web interface,
+focusing on the current reliable infrastructure and patterns.
 
 ## Current Architecture
 
-Our E2E tests use a **per-test server isolation** approach with HTTP-level AI provider mocking for reliable, fast testing.
+Our E2E tests use a **per-test server isolation** approach with HTTP-level AI
+provider mocking for reliable, fast testing.
 
 ### Key Components
 
 **Test Infrastructure:**
+
 - **Per-test servers**: Each test gets its own isolated server process
-- **Manual setup pattern**: Consistent `beforeEach/afterEach` lifecycle management  
+- **Manual setup pattern**: Consistent `beforeEach/afterEach` lifecycle
+  management
 - **HTTP-level mocking**: Anthropic API intercepted at network layer
 - **TIMEOUTS constants**: Semantic timeout values for consistency
 - **Helper functions**: Centralized UI interaction utilities
 
 **Current Test Files (15 allowlisted):**
+
 ```
 e2e/
 ├── console-forward.e2e.ts              # Console forwarding system
@@ -78,14 +83,14 @@ test.describe('Feature Name', () => {
 
   test('specific behavior test', async ({ page }) => {
     await setupAnthropicProvider(page);
-    
+
     const projectPath = path.join(testEnv.tempDir, 'test-project');
     await fs.promises.mkdir(projectPath, { recursive: true });
     await createProject(page, 'Test Project', projectPath);
     await getMessageInput(page);
 
     // Test logic here...
-    
+
     await expect(element).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
   });
 });
@@ -94,12 +99,14 @@ test.describe('Feature Name', () => {
 ### Why Manual Setup is Required
 
 **✅ Manual beforeEach/afterEach**:
+
 - Proper test lifecycle management
 - Cleanup happens after all assertions complete
 - Works reliably with Playwright's async assertion system
 - Supports multi-message conversations correctly
 
 **❌ Wrapper functions don't work**:
+
 - Cleanup runs when function exits, not when assertions complete
 - Breaks multi-message conversation testing
 - Causes intermittent test failures
@@ -109,6 +116,7 @@ test.describe('Feature Name', () => {
 ### Per-Test Server Isolation
 
 Each test gets:
+
 - **Unique server process** on random port
 - **Isolated temporary directory** for database and files
 - **Clean Anthropic provider** configuration
@@ -117,35 +125,41 @@ Each test gets:
 ```typescript
 // setupTestEnvironment() provides:
 const testEnv = {
-  tempDir: '/tmp/lace-test-abc123',     // Unique temp directory
-  serverUrl: 'http://localhost:54321',  // Random port 
-  serverProcess: ChildProcess,          // Isolated server
-  projectName: 'E2E Test Project',      // Default project name
+  tempDir: '/tmp/lace-test-abc123', // Unique temp directory
+  serverUrl: 'http://localhost:54321', // Random port
+  serverProcess: ChildProcess, // Isolated server
+  projectName: 'E2E Test Project', // Default project name
 };
 ```
 
 ### AI Provider Mocking
 
 **HTTP Interception** (not SDK mocking):
+
 ```typescript
 // e2e/helpers/anthropic-mock.ts
 http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
   const body = await request.text();
   const requestData = JSON.parse(body);
-  
+
   // Get LAST user message for multi-turn conversations
-  const userMessages = requestData.messages?.filter(m => m.role === 'user') || [];
+  const userMessages =
+    requestData.messages?.filter((m) => m.role === 'user') || [];
   const userMessage = userMessages[userMessages.length - 1]?.content || '';
-  
+
   // Map specific inputs to specific outputs
   let responseText = "I'm a helpful AI assistant. How can I help you today?";
-  
+
   if (userMessage.includes('test message from Test 1')) {
-    responseText = 'I see you sent a test message from Test 1. This is my response as Claude!';
-  } else if (userMessage.includes('follow-up message to test conversation flow')) {
-    responseText = 'This is my follow-up response. Notice how each message gets its own streaming animation.';
+    responseText =
+      'I see you sent a test message from Test 1. This is my response as Claude!';
+  } else if (
+    userMessage.includes('follow-up message to test conversation flow')
+  ) {
+    responseText =
+      'This is my follow-up response. Notice how each message gets its own streaming animation.';
   }
-  
+
   // Return realistic streaming response
   return createStreamingResponse(responseText);
 });
@@ -159,7 +173,7 @@ http.post('https://api.anthropic.com/v1/messages', async ({ request }) => {
 // Provider setup
 await setupAnthropicProvider(page);
 
-// Project management  
+// Project management
 await createProject(page, name, path);
 await getMessageInput(page);
 
@@ -177,9 +191,9 @@ await waitForSendButton(page, TIMEOUTS.QUICK);
 
 ```typescript
 // Use TIMEOUTS constants instead of hardcoded values
-await expect(element).toBeVisible({ timeout: TIMEOUTS.QUICK });     // 5s - Element visibility
-await expect(element).toBeVisible({ timeout: TIMEOUTS.STANDARD });  // 10s - AI responses  
-await expect(element).toBeVisible({ timeout: TIMEOUTS.EXTENDED });  // 15s - Complex operations
+await expect(element).toBeVisible({ timeout: TIMEOUTS.QUICK }); // 5s - Element visibility
+await expect(element).toBeVisible({ timeout: TIMEOUTS.STANDARD }); // 10s - AI responses
+await expect(element).toBeVisible({ timeout: TIMEOUTS.EXTENDED }); // 15s - Complex operations
 ```
 
 ## Data-TestID Strategy
@@ -194,7 +208,7 @@ await expect(element).toBeVisible({ timeout: TIMEOUTS.EXTENDED });  // 15s - Com
 <input data-testid="project-path-input" placeholder="/path/to/your/project" />
 <button data-testid="create-project-submit">Create Project</button>
 
-// Messaging interface  
+// Messaging interface
 <textarea data-testid="message-input" />
 <button data-testid="send-button">Send</button>
 <button data-testid="stop-button">Stop</button>
@@ -211,8 +225,8 @@ await expect(element).toBeVisible({ timeout: TIMEOUTS.EXTENDED });  // 15s - Com
 await page.getByTestId('send-button').click();
 await expect(page.getByTestId('message-input')).toBeVisible();
 
-// ❌ Avoid text-based selectors  
-await page.click('text="Send Message"');  // Brittle
+// ❌ Avoid text-based selectors
+await page.click('text="Send Message"'); // Brittle
 await page.click('button:has-text("×")'); // Breaks when text changes
 ```
 
@@ -223,12 +237,15 @@ await page.click('button:has-text("×")'); // Breaks when text changes
 The test suite has been **consolidated for efficiency**:
 
 **Core Functionality:**
+
 - `user-messaging-flow.e2e.ts` - Complete user journey and messaging behavior
 - `streaming-core.e2e.ts` - Basic streaming, events, progressive updates
 - `streaming-advanced.e2e.ts` - Reliability, error handling, SSE events
-- `session-agent-management.e2e.ts` - Agent, session, and multi-agent functionality
+- `session-agent-management.e2e.ts` - Agent, session, and multi-agent
+  functionality
 
 **Specialized Features:**
+
 - `file-browser.e2e.ts` - File browsing and management
 - `directory-browser.e2e.ts` - Directory selection UI
 - `task-management.e2e.ts` - Task CRUD operations
@@ -236,6 +253,7 @@ The test suite has been **consolidated for efficiency**:
 - `error-handling.e2e.ts` - Error scenarios and recovery
 
 **Infrastructure:**
+
 - `console-forward.e2e.ts` - Console forwarding system
 - `data-testid-verification.test.e2e.ts` - UI testing infrastructure
 - `example.test.e2e.ts` - Documentation and best practices
@@ -261,15 +279,24 @@ test('multi-message conversation flow', async ({ page }) => {
   ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
 
   // Follow-up exchange
-  await sendMessage(page, 'This is a follow-up message to test conversation flow');
-  await verifyMessageVisible(page, 'This is a follow-up message to test conversation flow');
-  await expect(
-    page.getByText('This is my follow-up response.')
-  ).toBeVisible({ timeout: TIMEOUTS.EXTENDED });
+  await sendMessage(
+    page,
+    'This is a follow-up message to test conversation flow'
+  );
+  await verifyMessageVisible(
+    page,
+    'This is a follow-up message to test conversation flow'
+  );
+  await expect(page.getByText('This is my follow-up response.')).toBeVisible({
+    timeout: TIMEOUTS.EXTENDED,
+  });
 
   // Verify conversation history preserved
   await verifyMessageVisible(page, 'Hello there!');
-  await verifyMessageVisible(page, 'This is a follow-up message to test conversation flow');
+  await verifyMessageVisible(
+    page,
+    'This is a follow-up message to test conversation flow'
+  );
 });
 ```
 
@@ -307,7 +334,8 @@ test('documents current feature capabilities', async ({ page }) => {
 
 - ✅ **Manual beforeEach/afterEach setup** for reliable test lifecycle
 - ✅ **TIMEOUTS constants** instead of hardcoded timeout values
-- ✅ **Helper functions** for common UI interactions (`sendMessage`, `createProject`)
+- ✅ **Helper functions** for common UI interactions (`sendMessage`,
+  `createProject`)
 - ✅ **data-testid selectors** for reliable element targeting
 - ✅ **Per-test isolation** with `setupTestEnvironment()`
 - ✅ **HTTP-level mocking** for external AI APIs
@@ -317,7 +345,7 @@ test('documents current feature capabilities', async ({ page }) => {
 
 - ❌ **Wrapper functions** for test lifecycle (breaks assertion timing)
 - ❌ **Text-based selectors** that break when UI copy changes
-- ❌ **CSS class selectors** that break when styling changes  
+- ❌ **CSS class selectors** that break when styling changes
 - ❌ **Hardcoded timeout values** that are arbitrary and inconsistent
 - ❌ **SDK mocking** instead of HTTP interception
 - ❌ **Shared test environments** that cause race conditions
@@ -327,6 +355,7 @@ test('documents current feature capabilities', async ({ page }) => {
 ### Current CI Configuration
 
 **Playwright tests are enabled in CI** with optimized settings:
+
 - **Chromium only** for reliability (WebKit disabled)
 - **4 workers** for parallel execution
 - **Allowlisted tests** run in CI (15 stable files)
@@ -335,6 +364,7 @@ test('documents current feature capabilities', async ({ page }) => {
 ### Allowlist Management
 
 Tests are added to `.playwright-ci-allowlist` when they meet criteria:
+
 - **100% pass rate** in isolation and parallel execution
 - **Consistent timing** without flakiness
 - **Proper data-testid usage** for reliable selectors
@@ -343,6 +373,7 @@ Tests are added to `.playwright-ci-allowlist` when they meet criteria:
 ### Performance Improvements
 
 **Recent optimizations:**
+
 - **Test consolidation**: 23 → 15 allowlisted files (35% reduction)
 - **HMR port isolation**: Random ports prevent conflicts
 - **Consistent patterns**: Manual setup ensures reliable lifecycle
@@ -353,23 +384,27 @@ Tests are added to `.playwright-ci-allowlist` when they meet criteria:
 ### Investigation Steps
 
 1. **Check error message** - Usually points to exact issue
-2. **Review screenshots** - Available in `test-results/` directory  
+2. **Review screenshots** - Available in `test-results/` directory
 3. **Watch video** - See exactly what happened during test
-4. **Use trace viewer**: `npx playwright show-trace test-results/[test]/trace.zip`
+4. **Use trace viewer**:
+   `npx playwright show-trace test-results/[test]/trace.zip`
 
 ### Common Issues
 
 **"Element not found":**
+
 - Verify `data-testid` exists in component
 - Check if element is conditionally rendered
 - Use proper waiting: `await expect(element).toBeVisible()`
 
 **"Test timeout":**
+
 - Check if UI flow has changed (new steps/modals)
 - Verify helper functions match current UI structure
 - Increase timeout for complex operations: `TIMEOUTS.EXTENDED`
 
 **"Setup timeout":**
+
 - Usually indicates server startup issues
 - Check for port conflicts (now resolved with random HMR ports)
 - Verify test environment cleanup in previous tests
@@ -379,11 +414,13 @@ Tests are added to `.playwright-ci-allowlist` when they meet criteria:
 E2E tests have successfully identified real application bugs:
 
 ### Critical Issues
+
 1. **Agent Error Recovery**: Agent gets stuck after rapid ESC interruptions
 2. **Compaction Feature**: `/compact` command causes JavaScript errors
 3. **Directory Validation**: Invalid paths allowed without validation warnings
 
 ### Infrastructure Issues Fixed
+
 1. **HMR Port Conflicts**: Random ports prevent Vite conflicts
 2. **Console Forwarding**: Converted to standard test pattern
 3. **File Browser**: Fixed test environment setup requirements
@@ -393,11 +430,14 @@ E2E tests have successfully identified real application bugs:
 The current Playwright E2E testing infrastructure provides:
 
 - ✅ **Reliable test execution** with 15 stable allowlisted tests
-- ✅ **Efficient CI integration** with 35% faster execution through consolidation
-- ✅ **Real bug detection** while maintaining test stability  
+- ✅ **Efficient CI integration** with 35% faster execution through
+  consolidation
+- ✅ **Real bug detection** while maintaining test stability
 - ✅ **Maintainable patterns** with consistent setup and helper utilities
 - ✅ **Comprehensive coverage** of all major application functionality
 
-**Focus on testing user behavior** using the established patterns, and use tests to **document current system capabilities** comprehensively.
+**Focus on testing user behavior** using the established patterns, and use tests
+to **document current system capabilities** comprehensively.
 
-See `e2e/example.test.e2e.ts` for complete working examples of all current patterns.
+See `e2e/example.test.e2e.ts` for complete working examples of all current
+patterns.

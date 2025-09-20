@@ -3,7 +3,8 @@
 ## Naming & Structure
 
 - Names reveal intent - be explicit, avoid mental mapping
-- Classes: nouns (UserAccount), Methods: verbs (calculateTotal), Booleans: predicates (isActive)
+- Classes: nouns (UserAccount), Methods: verbs (calculateTotal), Booleans:
+  predicates (isActive)
 - Functions do one thing well, typically <20 lines
 - Minimize parameters (use objects for >3), avoid deep nesting (>3 levels)
 
@@ -57,10 +58,13 @@
 
 ## Comment Standards
 
-**No Temporal References**: Never add comments that reference how code has changed or what it replaced. Comments should describe what the code IS, not what it WAS or how it BECAME. Avoid words like 'now', 'new', 'updated', 'moved', 'changed', 'replaced', 'refactored', 'old', 'previous', 'legacy', etc.
+**No Temporal References**: Never add comments that reference how code has
+changed or what it replaced. Comments should describe what the code IS, not what
+it WAS or how it BECAME. Avoid words like 'now', 'new', 'updated', 'moved',
+'changed', 'replaced', 'refactored', 'old', 'previous', 'legacy', etc.
 
-Good: `// Validates user credentials against database`
-Bad: `// Now validates using the new auth service`
+Good: `// Validates user credentials against database` Bad:
+`// Now validates using the new auth service`
 
 ## Technical Debt
 

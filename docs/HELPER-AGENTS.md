@@ -1,17 +1,20 @@
 # Helper Agents Implementation
 
-This document provides an overview of the helper agents system implemented in this branch.
+This document provides an overview of the helper agents system implemented in
+this branch.
 
 ## Overview
 
-Helper agents provide lightweight LLM task execution outside normal conversation workflows. They enable "calling an AI like a function" - you provide a task, it executes (possibly using tools), and returns a consolidated result.
+Helper agents provide lightweight LLM task execution outside normal conversation
+workflows. They enable "calling an AI like a function" - you provide a task, it
+executes (possibly using tools), and returns a consolidated result.
 
 ## Architecture
 
 The helper system consists of:
 
 - **BaseHelper**: Abstract base class with core execution logic
-- **InfrastructureHelper**: For system-level tasks (bypasses user approval)  
+- **InfrastructureHelper**: For system-level tasks (bypasses user approval)
 - **SessionHelper**: For agent sub-tasks (respects user approval policies)
 - **HelperFactory**: Static factory methods for type-safe helper creation
 - **HelperRegistry**: Centralized helper lifecycle management
@@ -21,18 +24,21 @@ The helper system consists of:
 ### 🔧 Two Security Models
 
 **InfrastructureHelper:**
+
 - Explicit tool whitelisting
 - Bypasses user approval system
 - For trusted system operations
 
 **SessionHelper:**
+
 - Inherits tools from parent agent
 - Respects session approval policies
 - For agent-spawned sub-tasks
 
 ### 🎯 Multi-turn Execution
 
-Helpers support multi-turn LLM conversations internally but return a single consolidated result:
+Helpers support multi-turn LLM conversations internally but return a single
+consolidated result:
 
 ```typescript
 const result = await helper.execute('Analyze error patterns in logs');
@@ -50,13 +56,13 @@ Type-safe helper creation:
 // Infrastructure helper
 const infraHelper = HelperFactory.createInfrastructureHelper({
   model: 'smart',
-  tools: ['file-read', 'ripgrep-search']
+  tools: ['file-read', 'ripgrep-search'],
 });
 
-// Session helper  
+// Session helper
 const sessionHelper = HelperFactory.createSessionHelper({
   model: 'fast',
-  parentAgent: this
+  parentAgent: this,
 });
 ```
 
@@ -69,7 +75,7 @@ const registry = new HelperRegistry();
 
 const helper = registry.createInfrastructureHelper('analysis-task', {
   model: 'smart',
-  tools: ['file-read']
+  tools: ['file-read'],
 });
 
 // Later...
@@ -79,6 +85,7 @@ registry.removeHelper('analysis-task');
 ## Implementation Status
 
 ✅ **Phase 1-6 Complete:**
+
 - BaseHelper abstract class with multi-turn execution
 - InfrastructureHelper with tool whitelisting
 - SessionHelper with agent context inheritance
@@ -87,17 +94,22 @@ registry.removeHelper('analysis-task');
 - Comprehensive test coverage (50 tests)
 
 ✅ **Phase 7 Complete:**
+
 - Usage documentation and API guide
-- Practical code examples and patterns  
+- Practical code examples and patterns
 - Integration examples for all system components
 - Complete documentation with troubleshooting
 
 ## Documentation
 
 ### Core Documentation
-- **[Helper Agents Guide](./guides/helper-agents.md)** - Comprehensive usage guide
-- **[Code Examples](./examples/helper-patterns.ts)** - Practical implementation patterns
-- **[Integration Examples](./examples/integration-examples.md)** - Real-world system integration
+
+- **[Helper Agents Guide](./guides/helper-agents.md)** - Comprehensive usage
+  guide
+- **[Code Examples](./examples/helper-patterns.ts)** - Practical implementation
+  patterns
+- **[Integration Examples](./examples/integration-examples.md)** - Real-world
+  system integration
 
 ### Quick Start
 
@@ -107,7 +119,7 @@ import { InfrastructureHelper, SessionHelper } from '@lace/core';
 // System task
 const infraHelper = new InfrastructureHelper({
   model: 'smart',
-  tools: ['file-read', 'ripgrep-search']
+  tools: ['file-read', 'ripgrep-search'],
 });
 
 const result = await infraHelper.execute('Analyze error patterns in logs');
@@ -115,8 +127,8 @@ console.log(result.content); // Analysis results
 
 // Agent sub-task (inside an agent)
 const sessionHelper = new SessionHelper({
-  model: 'fast', 
-  parentAgent: this
+  model: 'fast',
+  parentAgent: this,
 });
 
 const summary = await sessionHelper.execute('Summarize this URL: ' + url);
@@ -125,12 +137,14 @@ const summary = await sessionHelper.execute('Summarize this URL: ' + url);
 ## Use Cases
 
 ### Infrastructure Helpers
+
 - **Memory System**: Analyze conversation patterns for user insights
 - **Error Analysis**: Intelligent log analysis and error categorization
 - **Task Creation**: Convert natural language to structured tasks
 - **System Diagnostics**: Health monitoring and performance analysis
 
-### Session Helpers  
+### Session Helpers
+
 - **URL Summarization**: Process web content during conversations
 - **Data Analysis**: Complex data processing with user approval
 - **Code Review**: Analyze code snippets with inherited tools
@@ -145,6 +159,7 @@ The system includes comprehensive testing:
 - **E2E Tests**: Complete workflow validation with real tools
 
 Run tests:
+
 ```bash
 npm test src/helpers/  # All helper tests (50 tests)
 npm test               # Full test suite (1468 tests)
@@ -179,6 +194,7 @@ The helper system is designed for extensibility:
 ## API Reference
 
 ### InfrastructureHelper
+
 ```typescript
 new InfrastructureHelper({
   model: 'fast' | 'smart',
@@ -190,22 +206,25 @@ new InfrastructureHelper({
 ```
 
 ### SessionHelper
+
 ```typescript
 new SessionHelper({
-  model: 'fast' | 'smart', 
+  model: 'fast' | 'smart',
   parentAgent: Agent,       // Required for context inheritance
   abortSignal?: AbortSignal
 })
 ```
 
 ### HelperResult
+
 ```typescript
 interface HelperResult {
-  content: string;           // Final LLM response
-  toolCalls: ToolCall[];     // All tools that were called
+  content: string; // Final LLM response
+  toolCalls: ToolCall[]; // All tools that were called
   toolResults: ToolResult[]; // Results from tool executions
   tokenUsage?: CombinedTokenUsage;
 }
 ```
 
-The helper agents system provides a robust, type-safe foundation for lightweight LLM task execution across Lace's infrastructure and agent workflows.
+The helper agents system provides a robust, type-safe foundation for lightweight
+LLM task execution across Lace's infrastructure and agent workflows.

@@ -2,9 +2,11 @@
 
 ## ⚠️ ARCHITECTURE UPDATE REQUIRED
 
-**This document needs updating to reflect the current global persistence architecture:**
+**This document needs updating to reflect the current global persistence
+architecture:**
 
-- **Global Persistence**: All features will use `getPersistence()` instead of separate database connections
+- **Global Persistence**: All features will use `getPersistence()` instead of
+  separate database connections
 - **Project Class**: Fully implemented foundation for advanced features
 - **Session Class**: Fully implemented foundation for advanced features
 - **ThreadManager**: Updated to use global persistence
@@ -16,9 +18,11 @@
 
 **Goal**: Implement per-project token budget tracking and enforcement
 
-**Current Status**: ✅ **FULLY IMPLEMENTED** - Complete implementation with comprehensive test coverage
+**Current Status**: ✅ **FULLY IMPLEMENTED** - Complete implementation with
+comprehensive test coverage
 
 **Test First** (`src/projects/token-budget.test.ts`):
+
 ```typescript
 describe('Token budget management', () => {
   let project: Project;
@@ -33,7 +37,7 @@ describe('Token budget management', () => {
     budgetManager.recordUsage(projectId, 'session1', {
       inputTokens: 100,
       outputTokens: 50,
-      totalTokens: 150
+      totalTokens: 150,
     });
 
     const usage = budgetManager.getProjectUsage(projectId);
@@ -47,7 +51,7 @@ describe('Token budget management', () => {
       projectId,
       maxTokensPerProject: 1000,
       maxTokensPerSession: 500,
-      resetPeriod: 'daily'
+      resetPeriod: 'daily',
     });
 
     budgetManager.setBudget(projectId, budget);
@@ -56,10 +60,12 @@ describe('Token budget management', () => {
     budgetManager.recordUsage(projectId, 'session1', {
       inputTokens: 400,
       outputTokens: 100,
-      totalTokens: 500
+      totalTokens: 500,
     });
 
-    expect(budgetManager.canMakeRequest(projectId, 'session1', 400)).toBe(false); // Would exceed session limit
+    expect(budgetManager.canMakeRequest(projectId, 'session1', 400)).toBe(
+      false
+    ); // Would exceed session limit
     expect(budgetManager.canMakeRequest(projectId, 'session2', 400)).toBe(true); // New session
   });
 
@@ -68,7 +74,7 @@ describe('Token budget management', () => {
       projectId,
       maxTokensPerProject: 1000,
       maxTokensPerSession: 500,
-      resetPeriod: 'daily'
+      resetPeriod: 'daily',
     });
 
     budgetManager.setBudget(projectId, budget);
@@ -77,7 +83,7 @@ describe('Token budget management', () => {
     budgetManager.recordUsage(projectId, 'session1', {
       inputTokens: 500,
       outputTokens: 0,
-      totalTokens: 500
+      totalTokens: 500,
     });
 
     expect(budgetManager.getProjectUsage(projectId).totalTokens).toBe(500);
@@ -95,13 +101,13 @@ describe('Token budget management', () => {
     budgetManager.recordUsage(projectId, 'session1', {
       inputTokens: 100,
       outputTokens: 50,
-      totalTokens: 150
+      totalTokens: 150,
     });
 
     budgetManager.recordUsage(projectId, 'session2', {
       inputTokens: 200,
       outputTokens: 100,
-      totalTokens: 300
+      totalTokens: 300,
     });
 
     const usage = budgetManager.getProjectUsage(projectId);
@@ -114,24 +120,29 @@ describe('Token budget management', () => {
     budgetManager.recordUsage(projectId, 'session1', {
       inputTokens: 100,
       outputTokens: 50,
-      totalTokens: 150
+      totalTokens: 150,
     });
 
     budgetManager.recordUsage(projectId, 'session2', {
       inputTokens: 200,
       outputTokens: 100,
-      totalTokens: 300
+      totalTokens: 300,
     });
 
     const sessions = budgetManager.getSessionUsage(projectId);
     expect(sessions).toHaveLength(2);
-    expect(sessions.find(s => s.sessionId === 'session1')?.totalTokens).toBe(150);
-    expect(sessions.find(s => s.sessionId === 'session2')?.totalTokens).toBe(300);
+    expect(sessions.find((s) => s.sessionId === 'session1')?.totalTokens).toBe(
+      150
+    );
+    expect(sessions.find((s) => s.sessionId === 'session2')?.totalTokens).toBe(
+      300
+    );
   });
 });
 ```
 
 **Implementation** (`src/projects/token-budget.ts`):
+
 ```typescript
 export interface TokenUsage {
   inputTokens: number;
@@ -217,12 +228,19 @@ export class TokenBudgetManager {
     this.budgets.set(projectId, budget);
   }
 
-  recordUsage(projectId: string, sessionId: string, usage: Omit<TokenUsage, 'timestamp'>): void {
+  recordUsage(
+    projectId: string,
+    sessionId: string,
+    usage: Omit<TokenUsage, 'timestamp'>
+  ): void {
     this.recordProjectUsage(projectId, usage);
     this.recordSessionUsage(projectId, sessionId, usage);
   }
 
-  private recordProjectUsage(projectId: string, usage: Omit<TokenUsage, 'timestamp'>): void {
+  private recordProjectUsage(
+    projectId: string,
+    usage: Omit<TokenUsage, 'timestamp'>
+  ): void {
     const budget = this.budgets.get(projectId);
     let projectUsage = this.projectUsage.get(projectId);
 
@@ -234,7 +252,7 @@ export class TokenBudgetManager {
         inputTokens: 0,
         outputTokens: 0,
         sessionCount: 0,
-        lastReset: new Date()
+        lastReset: new Date(),
       };
     }
 
@@ -245,7 +263,7 @@ export class TokenBudgetManager {
         inputTokens: 0,
         outputTokens: 0,
         sessionCount: 0,
-        lastReset: new Date()
+        lastReset: new Date(),
       };
     }
 
@@ -256,7 +274,11 @@ export class TokenBudgetManager {
     this.projectUsage.set(projectId, projectUsage);
   }
 
-  private recordSessionUsage(projectId: string, sessionId: string, usage: Omit<TokenUsage, 'timestamp'>): void {
+  private recordSessionUsage(
+    projectId: string,
+    sessionId: string,
+    usage: Omit<TokenUsage, 'timestamp'>
+  ): void {
     let sessions = this.sessionUsage.get(projectId);
     if (!sessions) {
       sessions = new Map();
@@ -271,7 +293,7 @@ export class TokenBudgetManager {
         inputTokens: 0,
         outputTokens: 0,
         requestCount: 0,
-        lastUsed: new Date()
+        lastUsed: new Date(),
       };
     }
 
@@ -284,21 +306,33 @@ export class TokenBudgetManager {
     sessions.set(sessionId, sessionUsage);
   }
 
-  canMakeRequest(projectId: string, sessionId: string, estimatedTokens: number): boolean {
+  canMakeRequest(
+    projectId: string,
+    sessionId: string,
+    estimatedTokens: number
+  ): boolean {
     const budget = this.budgets.get(projectId);
     if (!budget) return true; // No budget set
 
     const projectUsage = this.getProjectUsage(projectId);
-    const sessionUsage = this.getSessionUsage(projectId).find(s => s.sessionId === sessionId);
+    const sessionUsage = this.getSessionUsage(projectId).find(
+      (s) => s.sessionId === sessionId
+    );
 
     // Check project limit
-    if (projectUsage.totalTokens + estimatedTokens > budget.getMaxTokensPerProject()) {
+    if (
+      projectUsage.totalTokens + estimatedTokens >
+      budget.getMaxTokensPerProject()
+    ) {
       return false;
     }
 
     // Check session limit
     const currentSessionTokens = sessionUsage?.totalTokens || 0;
-    if (currentSessionTokens + estimatedTokens > budget.getMaxTokensPerSession()) {
+    if (
+      currentSessionTokens + estimatedTokens >
+      budget.getMaxTokensPerSession()
+    ) {
       return false;
     }
 
@@ -314,7 +348,7 @@ export class TokenBudgetManager {
         inputTokens: 0,
         outputTokens: 0,
         sessionCount: 0,
-        lastReset: new Date()
+        lastReset: new Date(),
       };
     }
 
@@ -327,7 +361,7 @@ export class TokenBudgetManager {
         inputTokens: 0,
         outputTokens: 0,
         sessionCount: 0,
-        lastReset: new Date()
+        lastReset: new Date(),
       };
       this.projectUsage.set(projectId, resetUsage);
       return resetUsage;
@@ -361,21 +395,27 @@ export class TokenBudgetManager {
 ```
 
 **Implementation Details**:
-- **File**: `src/token-management/token-budget-manager.ts` - Complete TokenBudgetManager class
-- **Tests**: `src/token-management/__tests__/token-budget-manager.test.ts` - Comprehensive test coverage
-- **Features**: Token usage tracking, budget enforcement, conversation estimation, reset functionality
-- **Status**: ✅ **IMPLEMENTATION COMPLETE** - Only integration with Project class needed
+
+- **File**: `src/token-management/token-budget-manager.ts` - Complete
+  TokenBudgetManager class
+- **Tests**: `src/token-management/__tests__/token-budget-manager.test.ts` -
+  Comprehensive test coverage
+- **Features**: Token usage tracking, budget enforcement, conversation
+  estimation, reset functionality
+- **Status**: ✅ **IMPLEMENTATION COMPLETE** - Only integration with Project
+  class needed
 
 **Commit**: "feat: implement token budget management"
-
 
 ## Task 3.2: Environment Variables per Project ✅ **FULLY IMPLEMENTED**
 
 **Goal**: Allow projects to define environment variables for tool execution
 
-**Current Status**: ✅ **FULLY IMPLEMENTED** - Complete implementation with comprehensive test coverage
+**Current Status**: ✅ **FULLY IMPLEMENTED** - Complete implementation with
+comprehensive test coverage
 
 **Test First** (`src/projects/environment-variables.test.ts`):
+
 ```typescript
 describe('Project environment variables', () => {
   let envManager: ProjectEnvironmentManager;
@@ -390,7 +430,7 @@ describe('Project environment variables', () => {
     const envVars = {
       API_KEY: 'test-api-key',
       DEBUG: 'true',
-      NODE_ENV: 'development'
+      NODE_ENV: 'development',
     };
 
     envManager.setEnvironmentVariables(projectId, envVars);
@@ -405,12 +445,12 @@ describe('Project environment variables', () => {
     process.env = {
       ...originalEnv,
       SYSTEM_VAR: 'system-value',
-      OVERRIDE_VAR: 'system-override'
+      OVERRIDE_VAR: 'system-override',
     };
 
     const projectEnvVars = {
       PROJECT_VAR: 'project-value',
-      OVERRIDE_VAR: 'project-override'
+      OVERRIDE_VAR: 'project-override',
     };
 
     envManager.setEnvironmentVariables(projectId, projectEnvVars);
@@ -427,13 +467,13 @@ describe('Project environment variables', () => {
   it('should validate environment variable names', () => {
     expect(() => {
       envManager.setEnvironmentVariables(projectId, {
-        '123INVALID': 'value'
+        '123INVALID': 'value',
       });
     }).toThrow('Invalid environment variable name: 123INVALID');
 
     expect(() => {
       envManager.setEnvironmentVariables(projectId, {
-        'VALID_VAR': 'value'
+        VALID_VAR: 'value',
       });
     }).not.toThrow();
   });
@@ -441,11 +481,13 @@ describe('Project environment variables', () => {
   it('should support environment variable encryption', () => {
     const secretValue = 'super-secret-api-key';
     const envVars = {
-      API_KEY: secretValue
+      API_KEY: secretValue,
     };
 
-    envManager.setEnvironmentVariables(projectId, envVars, { encrypt: ['API_KEY'] });
-    
+    envManager.setEnvironmentVariables(projectId, envVars, {
+      encrypt: ['API_KEY'],
+    });
+
     // Stored value should be encrypted
     const stored = envManager.getStoredEnvironmentVariables(projectId);
     expect(stored.API_KEY).not.toBe(secretValue);
@@ -463,14 +505,18 @@ describe('Project environment variables', () => {
     // Set parent environment variables
     envManager.setEnvironmentVariables(parentProjectId, {
       PARENT_VAR: 'parent-value',
-      SHARED_VAR: 'parent-shared'
+      SHARED_VAR: 'parent-shared',
     });
 
     // Set child environment variables with inheritance
-    envManager.setEnvironmentVariables(childProjectId, {
-      CHILD_VAR: 'child-value',
-      SHARED_VAR: 'child-shared'
-    }, { inheritFrom: parentProjectId });
+    envManager.setEnvironmentVariables(
+      childProjectId,
+      {
+        CHILD_VAR: 'child-value',
+        SHARED_VAR: 'child-shared',
+      },
+      { inheritFrom: parentProjectId }
+    );
 
     const childEnv = envManager.getEnvironmentVariables(childProjectId);
 
@@ -482,6 +528,7 @@ describe('Project environment variables', () => {
 ```
 
 **Implementation** (`src/projects/environment-variables.ts`):
+
 ```typescript
 import crypto from 'crypto';
 
@@ -498,7 +545,8 @@ export class ProjectEnvironmentManager {
 
   constructor() {
     // In production, this should come from secure key management
-    this.encryptionKey = process.env.LACE_ENCRYPTION_KEY || 'default-dev-key-change-in-production';
+    this.encryptionKey =
+      process.env.LACE_ENCRYPTION_KEY || 'default-dev-key-change-in-production';
   }
 
   setEnvironmentVariables(
@@ -555,11 +603,12 @@ export class ProjectEnvironmentManager {
 
   getStoredEnvironmentVariables(projectId: string): Record<string, string> {
     const directVariables = this.environments.get(projectId) || {};
-    
+
     // Handle inheritance
     const parentProjectId = this.inheritanceChain.get(projectId);
     if (parentProjectId) {
-      const parentVariables = this.getStoredEnvironmentVariables(parentProjectId);
+      const parentVariables =
+        this.getStoredEnvironmentVariables(parentProjectId);
       return { ...parentVariables, ...directVariables };
     }
 
@@ -569,7 +618,7 @@ export class ProjectEnvironmentManager {
   getMergedEnvironment(projectId: string): Record<string, string> {
     const systemEnv = process.env;
     const projectEnv = this.getEnvironmentVariables(projectId);
-    
+
     // Project environment overrides system environment
     return { ...systemEnv, ...projectEnv } as Record<string, string>;
   }
@@ -620,7 +669,9 @@ export class ProjectEnvironmentManager {
 }
 ```
 
-**Update ToolExecutor to use project environment** (`src/tools/tool-executor.ts`):
+**Update ToolExecutor to use project environment**
+(`src/tools/tool-executor.ts`):
+
 ```typescript
 export class ToolExecutor {
   private envManager: ProjectEnvironmentManager;
@@ -640,7 +691,9 @@ export class ToolExecutor {
     // Set up environment for tool execution
     const originalEnv = process.env;
     if (context?.projectId) {
-      const projectEnv = this.envManager.getMergedEnvironment(context.projectId);
+      const projectEnv = this.envManager.getMergedEnvironment(
+        context.projectId
+      );
       process.env = projectEnv;
     }
 
@@ -656,10 +709,15 @@ export class ToolExecutor {
 ```
 
 **Implementation Details**:
-- **File**: `src/projects/environment-variables.ts` - Complete ProjectEnvironmentManager class
-- **Tests**: `src/projects/environment-variables.test.ts` - Comprehensive test coverage
-- **Features**: Environment variable storage, encryption, inheritance, validation, system merging
-- **Status**: ✅ **IMPLEMENTATION COMPLETE** - Only integration with Project class needed
+
+- **File**: `src/projects/environment-variables.ts` - Complete
+  ProjectEnvironmentManager class
+- **Tests**: `src/projects/environment-variables.test.ts` - Comprehensive test
+  coverage
+- **Features**: Environment variable storage, encryption, inheritance,
+  validation, system merging
+- **Status**: ✅ **IMPLEMENTATION COMPLETE** - Only integration with Project
+  class needed
 
 **Commit**: "feat: add project-level environment variables"
 
@@ -667,9 +725,11 @@ export class ToolExecutor {
 
 **Goal**: Rich configuration for sessions and agents with validation
 
-**Current Status**: ✅ **FULLY IMPLEMENTED** - Complete implementation with comprehensive test coverage
+**Current Status**: ✅ **FULLY IMPLEMENTED** - Complete implementation with
+comprehensive test coverage
 
 **Test First** (`src/sessions/session-config.test.ts`):
+
 ```typescript
 describe('Session configuration', () => {
   let threadManager: ThreadManager;
@@ -678,7 +738,7 @@ describe('Session configuration', () => {
   beforeEach(() => {
     threadManager = new ThreadManager(':memory:');
     projectId = 'project1';
-    
+
     const project = {
       id: projectId,
       name: 'Test Project',
@@ -687,13 +747,13 @@ describe('Session configuration', () => {
       configuration: {
         provider: 'anthropic',
         model: 'claude-3-sonnet',
-        maxTokens: 4000
+        maxTokens: 4000,
       },
       isArchived: false,
       createdAt: new Date(),
-      lastUsedAt: new Date()
+      lastUsedAt: new Date(),
     };
-    
+
     threadManager.createProject(project);
   });
 
@@ -707,9 +767,10 @@ describe('Session configuration', () => {
         model: 'gpt-4',
         maxTokens: 8000,
         temperature: 0.7,
-        systemPrompt: 'You are a helpful assistant specialized in TypeScript development.'
+        systemPrompt:
+          'You are a helpful assistant specialized in TypeScript development.',
       },
-      threadManager
+      threadManager,
     });
 
     const config = session.getConfiguration();
@@ -717,7 +778,9 @@ describe('Session configuration', () => {
     expect(config.model).toBe('gpt-4');
     expect(config.maxTokens).toBe(8000);
     expect(config.temperature).toBe(0.7);
-    expect(config.systemPrompt).toBe('You are a helpful assistant specialized in TypeScript development.');
+    expect(config.systemPrompt).toBe(
+      'You are a helpful assistant specialized in TypeScript development.'
+    );
   });
 
   it('should validate configuration schema', () => {
@@ -728,9 +791,9 @@ describe('Session configuration', () => {
         name: 'Test Session',
         configuration: {
           maxTokens: -100, // Invalid: negative
-          temperature: 2.5 // Invalid: too high
+          temperature: 2.5, // Invalid: too high
         },
-        threadManager
+        threadManager,
       });
     }).toThrow('Configuration validation failed');
   });
@@ -740,7 +803,7 @@ describe('Session configuration', () => {
       id: 'session1',
       projectId,
       name: 'Test Session',
-      threadManager
+      threadManager,
     });
 
     const agent = session.createAgent({
@@ -748,16 +811,19 @@ describe('Session configuration', () => {
       configuration: {
         model: 'claude-3-haiku',
         temperature: 0.1,
-        systemPrompt: 'You are a senior code reviewer. Focus on security and performance.',
-        specialInstructions: 'Always suggest improvements for type safety.'
-      }
+        systemPrompt:
+          'You are a senior code reviewer. Focus on security and performance.',
+        specialInstructions: 'Always suggest improvements for type safety.',
+      },
     });
 
     const agentConfig = agent.getConfiguration();
     expect(agentConfig.role).toBe('code-reviewer');
     expect(agentConfig.model).toBe('claude-3-haiku');
     expect(agentConfig.temperature).toBe(0.1);
-    expect(agentConfig.specialInstructions).toBe('Always suggest improvements for type safety.');
+    expect(agentConfig.specialInstructions).toBe(
+      'Always suggest improvements for type safety.'
+    );
   });
 
   it('should inherit configuration from session to agent', () => {
@@ -769,16 +835,16 @@ describe('Session configuration', () => {
         provider: 'anthropic',
         model: 'claude-3-sonnet',
         maxTokens: 4000,
-        temperature: 0.5
+        temperature: 0.5,
       },
-      threadManager
+      threadManager,
     });
 
     const agent = session.createAgent({
       role: 'assistant',
       configuration: {
-        temperature: 0.8 // Override session temperature
-      }
+        temperature: 0.8, // Override session temperature
+      },
     });
 
     const effectiveConfig = agent.getEffectiveConfiguration();
@@ -790,17 +856,18 @@ describe('Session configuration', () => {
 
   it('should support configuration presets', () => {
     const presetManager = new ConfigurationPresetManager();
-    
+
     presetManager.savePreset('code-review', {
       model: 'claude-3-sonnet',
       temperature: 0.2,
       maxTokens: 8000,
-      systemPrompt: 'You are a senior software engineer conducting code reviews.',
+      systemPrompt:
+        'You are a senior software engineer conducting code reviews.',
       tools: ['file-read', 'file-write', 'bash'],
       toolPolicies: {
         'file-write': 'require-approval',
-        'bash': 'require-approval'
-      }
+        bash: 'require-approval',
+      },
     });
 
     const session = Session.create({
@@ -808,18 +875,21 @@ describe('Session configuration', () => {
       projectId,
       name: 'Code Review Session',
       configurationPreset: 'code-review',
-      threadManager
+      threadManager,
     });
 
     const config = session.getEffectiveConfiguration();
     expect(config.model).toBe('claude-3-sonnet');
     expect(config.temperature).toBe(0.2);
-    expect(config.systemPrompt).toBe('You are a senior software engineer conducting code reviews.');
+    expect(config.systemPrompt).toBe(
+      'You are a senior software engineer conducting code reviews.'
+    );
   });
 });
 ```
 
 **Implementation** (`src/sessions/session-config.ts`):
+
 ```typescript
 import { z } from 'zod';
 
@@ -831,11 +901,13 @@ export const SessionConfigurationSchema = z.object({
   topP: z.number().min(0).max(1).optional(),
   systemPrompt: z.string().optional(),
   tools: z.array(z.string()).optional(),
-  toolPolicies: z.record(z.enum(['allow', 'require-approval', 'deny'])).optional(),
+  toolPolicies: z
+    .record(z.enum(['allow', 'require-approval', 'deny']))
+    .optional(),
   workingDirectory: z.string().optional(),
   environmentVariables: z.record(z.string()).optional(),
   promptTemplate: z.string().optional(),
-  specialInstructions: z.string().optional()
+  specialInstructions: z.string().optional(),
 });
 
 export const AgentConfigurationSchema = SessionConfigurationSchema.extend({
@@ -843,7 +915,7 @@ export const AgentConfigurationSchema = SessionConfigurationSchema.extend({
   capabilities: z.array(z.string()).optional(),
   restrictions: z.array(z.string()).optional(),
   memorySize: z.number().positive().optional(),
-  conversationHistory: z.number().positive().optional()
+  conversationHistory: z.number().positive().optional(),
 });
 
 export type SessionConfiguration = z.infer<typeof SessionConfigurationSchema>;
@@ -860,17 +932,21 @@ export interface ConfigurationPreset {
 export class ConfigurationPresetManager {
   private presets = new Map<string, ConfigurationPreset>();
 
-  savePreset(id: string, config: Partial<SessionConfiguration>, metadata?: {
-    name?: string;
-    description?: string;
-    isDefault?: boolean;
-  }): void {
+  savePreset(
+    id: string,
+    config: Partial<SessionConfiguration>,
+    metadata?: {
+      name?: string;
+      description?: string;
+      isDefault?: boolean;
+    }
+  ): void {
     const preset: ConfigurationPreset = {
       id,
       name: metadata?.name || id,
       description: metadata?.description || '',
       configuration: SessionConfigurationSchema.parse(config),
-      isDefault: metadata?.isDefault || false
+      isDefault: metadata?.isDefault || false,
     };
 
     this.presets.set(id, preset);
@@ -885,7 +961,7 @@ export class ConfigurationPresetManager {
   }
 
   getDefaultPreset(): ConfigurationPreset | undefined {
-    return Array.from(this.presets.values()).find(p => p.isDefault);
+    return Array.from(this.presets.values()).find((p) => p.isDefault);
   }
 
   deletePreset(id: string): boolean {
@@ -898,7 +974,9 @@ export class ConfigurationValidator {
     try {
       return SessionConfigurationSchema.parse(config);
     } catch (error) {
-      throw new Error(`Configuration validation failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Configuration validation failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -906,7 +984,9 @@ export class ConfigurationValidator {
     try {
       return AgentConfigurationSchema.parse(config);
     } catch (error) {
-      throw new Error(`Agent configuration validation failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Agent configuration validation failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -915,22 +995,26 @@ export class ConfigurationValidator {
     override: Partial<SessionConfiguration>
   ): SessionConfiguration {
     const merged = { ...base, ...override };
-    
+
     // Special handling for nested objects
     if (base.toolPolicies || override.toolPolicies) {
       merged.toolPolicies = { ...base.toolPolicies, ...override.toolPolicies };
     }
-    
+
     if (base.environmentVariables || override.environmentVariables) {
-      merged.environmentVariables = { ...base.environmentVariables, ...override.environmentVariables };
+      merged.environmentVariables = {
+        ...base.environmentVariables,
+        ...override.environmentVariables,
+      };
     }
-    
+
     return SessionConfigurationSchema.parse(merged);
   }
 }
 ```
 
 **Update Session class** (`src/sessions/session.ts`):
+
 ```typescript
 export interface SessionConfig {
   id: string;
@@ -955,7 +1039,7 @@ export class Session {
 
   static create(config: SessionConfig): Session {
     let configuration = config.configuration || {};
-    
+
     // Apply preset if specified
     if (config.configurationPreset) {
       const presetManager = new ConfigurationPresetManager();
@@ -969,7 +1053,8 @@ export class Session {
     }
 
     // Validate configuration
-    const validatedConfig = ConfigurationValidator.validateSessionConfiguration(configuration);
+    const validatedConfig =
+      ConfigurationValidator.validateSessionConfiguration(configuration);
 
     const sessionData: SessionData = {
       id: config.id,
@@ -978,11 +1063,13 @@ export class Session {
       description: config.description || '',
       configuration: {
         ...validatedConfig,
-        ...(config.workingDirectory && { workingDirectoryOverride: config.workingDirectory })
+        ...(config.workingDirectory && {
+          workingDirectoryOverride: config.workingDirectory,
+        }),
       },
       status: 'active',
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     config.threadManager.createSession(sessionData);
@@ -993,7 +1080,7 @@ export class Session {
     const project = this.threadManager.getProject(this.sessionData.projectId);
     const projectConfig = project?.configuration || {};
     const sessionConfig = this.sessionData.configuration || {};
-    
+
     return ConfigurationValidator.mergeConfigurations(
       projectConfig as SessionConfiguration,
       sessionConfig as SessionConfiguration
@@ -1005,21 +1092,24 @@ export class Session {
     configuration?: Partial<AgentConfiguration>;
   }): Agent {
     const agentConfig = config?.configuration || {};
-    
+
     // Validate agent configuration
     const validatedConfig = ConfigurationValidator.validateAgentConfiguration({
       ...agentConfig,
-      role: config?.role
+      role: config?.role,
     });
 
-    const threadId = this.threadManager.createThread(this.sessionData.id, this.sessionData.projectId);
-    
+    const threadId = this.threadManager.createThread(
+      this.sessionData.id,
+      this.sessionData.projectId
+    );
+
     const agent = new Agent({
       threadId,
       sessionId: this.sessionData.id,
       projectId: this.sessionData.projectId,
       configuration: validatedConfig,
-      threadManager: this.threadManager
+      threadManager: this.threadManager,
     });
 
     return agent;
@@ -1028,6 +1118,7 @@ export class Session {
 ```
 
 **Update Agent class** (`src/agents/agent.ts`):
+
 ```typescript
 export interface AgentConfig {
   threadId: string;
@@ -1055,13 +1146,13 @@ export class Agent {
 
   getEffectiveConfiguration(): AgentConfiguration {
     let baseConfig: SessionConfiguration = {};
-    
+
     // Start with project configuration
     if (this.projectId) {
       const project = this.threadManager.getProject(this.projectId);
       baseConfig = project?.configuration || {};
     }
-    
+
     // Layer session configuration
     if (this.sessionId) {
       const session = Session.load(this.sessionId, this.threadManager);
@@ -1072,10 +1163,10 @@ export class Agent {
         );
       }
     }
-    
+
     // Layer agent configuration
     const agentConfig = this.agentConfiguration || {};
-    
+
     return ConfigurationValidator.mergeConfigurations(
       baseConfig,
       agentConfig
@@ -1086,14 +1177,14 @@ export class Agent {
     const currentConfig = this.agentConfiguration || {};
     const newConfig = ConfigurationValidator.validateAgentConfiguration({
       ...currentConfig,
-      ...updates
+      ...updates,
     });
-    
+
     this.agentConfiguration = newConfig;
-    
+
     // Update thread metadata to persist agent configuration
     this.threadManager.updateThreadMetadata(this.threadId, {
-      agentConfiguration: newConfig
+      agentConfiguration: newConfig,
     });
   }
 
@@ -1112,10 +1203,14 @@ export class Agent {
 ```
 
 **Implementation Details**:
-- **File**: `src/sessions/session-config.ts` - Complete SessionConfiguration and AgentConfiguration schemas
+
+- **File**: `src/sessions/session-config.ts` - Complete SessionConfiguration and
+  AgentConfiguration schemas
 - **Tests**: `src/sessions/session-config.test.ts` - Comprehensive test coverage
-- **Features**: Zod validation, preset management, hierarchical configuration, merge capabilities
-- **Status**: ✅ **IMPLEMENTATION COMPLETE** - Only integration with Session/Agent classes needed
+- **Features**: Zod validation, preset management, hierarchical configuration,
+  merge capabilities
+- **Status**: ✅ **IMPLEMENTATION COMPLETE** - Only integration with
+  Session/Agent classes needed
 
 **Commit**: "feat: add rich configuration for sessions and agents"
 
@@ -1123,29 +1218,39 @@ export class Agent {
 
 **Goal**: Add comprehensive UI for managing project settings
 
-**Current Status**: ✅ **COMPLETED** - Full implementation with TDD approach, complete integration, and all tests passing
+**Current Status**: ✅ **COMPLETED** - Full implementation with TDD approach,
+complete integration, and all tests passing
 
 **Implementation Details**:
-- **Component**: `packages/web/components/ProjectSettings.tsx` - Complete React component with tabbed interface
-- **Integration**: `packages/web/components/ProjectManager.tsx` - Settings button and modal integration
-- **Tests**: `packages/web/components/__tests__/ProjectSettings.test.tsx` - 12 comprehensive test cases
+
+- **Component**: `packages/web/components/ProjectSettings.tsx` - Complete React
+  component with tabbed interface
+- **Integration**: `packages/web/components/ProjectManager.tsx` - Settings
+  button and modal integration
+- **Tests**: `packages/web/components/__tests__/ProjectSettings.test.tsx` - 12
+  comprehensive test cases
 - **Validation**: Zod v3.25.69 schema validation with proper error handling
 - **API Integration**: Connected to `/api/projects/[id]/configuration` endpoints
 
 **Features Implemented**:
-  - ✅ Tabbed interface (General, AI Configuration, Tools & Policies, Environment Variables)
-  - ✅ Form validation with user-friendly error messages
-  - ✅ Configuration management for provider, model, maxTokens, temperature
-  - ✅ Tool selection with configurable approval policies
-  - ✅ Environment variable management (add/remove/edit)
-  - ✅ **Settings button in ProjectManager** - Click to open project settings
-  - ✅ **Modal overlay** - Professional modal interface for settings
-  - ✅ **API integration** - Load existing config, save changes to backend
-  - ✅ **Loading states** - Proper loading indicators and error handling
-  - ✅ **TypeScript compliance** - All linting issues resolved
-  - ✅ **Complete test coverage** - All 21 tests passing (ProjectManager + ProjectSettings)
 
-**Test Coverage** (`packages/web/components/__tests__/ProjectSettings.test.tsx`):
+- ✅ Tabbed interface (General, AI Configuration, Tools & Policies, Environment
+  Variables)
+- ✅ Form validation with user-friendly error messages
+- ✅ Configuration management for provider, model, maxTokens, temperature
+- ✅ Tool selection with configurable approval policies
+- ✅ Environment variable management (add/remove/edit)
+- ✅ **Settings button in ProjectManager** - Click to open project settings
+- ✅ **Modal overlay** - Professional modal interface for settings
+- ✅ **API integration** - Load existing config, save changes to backend
+- ✅ **Loading states** - Proper loading indicators and error handling
+- ✅ **TypeScript compliance** - All linting issues resolved
+- ✅ **Complete test coverage** - All 21 tests passing (ProjectManager +
+  ProjectSettings)
+
+**Test Coverage**
+(`packages/web/components/__tests__/ProjectSettings.test.tsx`):
+
 ```typescript
 describe('ProjectSettings', () => {
   const mockProject = {
@@ -1168,7 +1273,7 @@ describe('ProjectSettings', () => {
 
   it('should render project settings form', () => {
     render(<ProjectSettings project={mockProject} onSave={vi.fn()} />);
-    
+
     expect(screen.getByDisplayValue('Test Project')).toBeInTheDocument();
     expect(screen.getByDisplayValue('A test project')).toBeInTheDocument();
     expect(screen.getByDisplayValue('/project/path')).toBeInTheDocument();
@@ -1179,17 +1284,17 @@ describe('ProjectSettings', () => {
   it('should handle configuration updates', async () => {
     const onSave = vi.fn();
     render(<ProjectSettings project={mockProject} onSave={onSave} />);
-    
+
     const modelSelect = screen.getByDisplayValue('claude-3-sonnet');
     await userEvent.selectOptions(modelSelect, 'claude-3-haiku');
-    
+
     const maxTokensInput = screen.getByDisplayValue('4000');
     await userEvent.clear(maxTokensInput);
     await userEvent.type(maxTokensInput, '8000');
-    
+
     const saveButton = screen.getByText('Save Settings');
     await userEvent.click(saveButton);
-    
+
     expect(onSave).toHaveBeenCalledWith({
       ...mockProject,
       configuration: {
@@ -1203,13 +1308,13 @@ describe('ProjectSettings', () => {
   it('should handle tool policy changes', async () => {
     const onSave = vi.fn();
     render(<ProjectSettings project={mockProject} onSave={onSave} />);
-    
+
     const bashPolicySelect = screen.getByTestId('tool-policy-bash');
     await userEvent.selectOptions(bashPolicySelect, 'allow');
-    
+
     const saveButton = screen.getByText('Save Settings');
     await userEvent.click(saveButton);
-    
+
     expect(onSave).toHaveBeenCalledWith({
       ...mockProject,
       configuration: {
@@ -1225,13 +1330,13 @@ describe('ProjectSettings', () => {
   it('should validate form inputs', async () => {
     const onSave = vi.fn();
     render(<ProjectSettings project={mockProject} onSave={onSave} />);
-    
+
     const nameInput = screen.getByDisplayValue('Test Project');
     await userEvent.clear(nameInput);
-    
+
     const saveButton = screen.getByText('Save Settings');
     await userEvent.click(saveButton);
-    
+
     expect(screen.getByText('Project name is required')).toBeInTheDocument();
     expect(onSave).not.toHaveBeenCalled();
   });
@@ -1239,6 +1344,7 @@ describe('ProjectSettings', () => {
 ```
 
 **Implementation** (`packages/web/components/ProjectSettings.tsx`):
+
 ```typescript
 import { useState, useEffect } from 'react';
 import { z } from 'zod';
@@ -1288,7 +1394,7 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       const validatedData = ProjectSettingsSchema.parse(formData);
       setErrors({});
@@ -1310,11 +1416,11 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
       const updated = { ...prev };
       const keys = path.split('.');
       let current = updated;
-      
+
       for (let i = 0; i < keys.length - 1; i++) {
         current = current[keys[i]];
       }
-      
+
       current[keys[keys.length - 1]] = value;
       return updated;
     });
@@ -1323,7 +1429,7 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
   const addEnvironmentVariable = () => {
     const key = prompt('Environment variable name:');
     const value = prompt('Environment variable value:');
-    
+
     if (key && value) {
       updateField('configuration.environmentVariables', {
         ...formData.configuration.environmentVariables,
@@ -1341,7 +1447,7 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow">
       <h1 className="text-2xl font-bold mb-6">Project Settings</h1>
-      
+
       {/* Tab Navigation */}
       <div className="border-b border-gray-200 mb-6">
         <nav className="flex space-x-8">
@@ -1624,6 +1730,7 @@ export function ProjectSettings({ project, onSave, onCancel }: ProjectSettingsPr
 ```
 
 **Add to main page** (`packages/web/app/page.tsx`):
+
 ```typescript
 // Add settings modal to main page
 const [showSettings, setShowSettings] = useState(false);
@@ -1671,31 +1778,47 @@ const handleSaveProject = async (updatedProject: Project) => {
 
 ## Phase 3 Status Summary
 
-**Overall Phase 3 Status**: ✅ **95% COMPLETE** - 4 of 4 tasks implemented, integration in progress
+**Overall Phase 3 Status**: ✅ **95% COMPLETE** - 4 of 4 tasks implemented,
+integration in progress
 
 ### Task Status Overview:
-1. **Task 3.1**: ✅ **FULLY IMPLEMENTED** - Token Budget Management (Complete with tests)
-2. **Task 3.2**: ✅ **FULLY IMPLEMENTED** - Environment Variables per Project (Complete with tests)
-3. **Task 3.3**: ✅ **FULLY IMPLEMENTED** - Session/Agent Configuration (Complete with tests)
-4. **Task 3.4**: ✅ **FULLY IMPLEMENTED** - Project Settings UI (Complete with integration)
+
+1. **Task 3.1**: ✅ **FULLY IMPLEMENTED** - Token Budget Management (Complete
+   with tests)
+2. **Task 3.2**: ✅ **FULLY IMPLEMENTED** - Environment Variables per Project
+   (Complete with tests)
+3. **Task 3.3**: ✅ **FULLY IMPLEMENTED** - Session/Agent Configuration
+   (Complete with tests)
+4. **Task 3.4**: ✅ **FULLY IMPLEMENTED** - Project Settings UI (Complete with
+   integration)
 
 ### What's Been Completed:
-- **Token Budget Management**: Complete TokenBudgetManager with usage tracking, enforcement, and recommendations
-- **Environment Variables**: Complete ProjectEnvironmentManager with encryption, inheritance, and validation
-- **Session/Agent Configuration**: Complete schemas, validation, and preset management with Zod
-- **Project Settings UI**: Full React component with comprehensive form validation and API integration
+
+- **Token Budget Management**: Complete TokenBudgetManager with usage tracking,
+  enforcement, and recommendations
+- **Environment Variables**: Complete ProjectEnvironmentManager with encryption,
+  inheritance, and validation
+- **Session/Agent Configuration**: Complete schemas, validation, and preset
+  management with Zod
+- **Project Settings UI**: Full React component with comprehensive form
+  validation and API integration
 
 ### Current Status - Integration Phase:
-**All core functionality is implemented!** The remaining work is integrating the implemented classes:
-- Connect ProjectEnvironmentManager to Project class  
+
+**All core functionality is implemented!** The remaining work is integrating the
+implemented classes:
+
+- Connect ProjectEnvironmentManager to Project class
 - Connect TokenBudgetManager to Project class
 - Connect SessionConfiguration to Session/Agent classes
 - Add persistence layer integration for managers
 
 ### Implementation Priority:
+
 1. **Integration** - Connect all implemented classes (highest priority)
 2. **Persistence** - Add database persistence for managers
 3. **API Endpoints** - Add advanced feature endpoints
 4. **Testing** - Comprehensive integration tests
 
-**Phase 3 is 95% complete** - all implementations exist and are production-ready. Only final integration remains.
+**Phase 3 is 95% complete** - all implementations exist and are
+production-ready. Only final integration remains.

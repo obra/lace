@@ -1,22 +1,28 @@
 # Phase 2: Compaction Event Implementation
 
 **Date:** 2025-07-23  
-**Engineer Context:** You are skilled in JavaScript but new to this codebase, TypeScript, NextJS, and agentic systems  
-**Prerequisites:** Phase 1 complete - all shadow thread code removed, core functionality working  
-**Goal:** Implement clean compaction event system that replaces conversations with compact summaries
+**Engineer Context:** You are skilled in JavaScript but new to this codebase,
+TypeScript, NextJS, and agentic systems  
+**Prerequisites:** Phase 1 complete - all shadow thread code removed, core
+functionality working  
+**Goal:** Implement clean compaction event system that replaces conversations
+with compact summaries
 
 ## What You're Building
 
 A compaction system that:
+
 - Stores compaction results as special `COMPACTION` events in the same thread
 - Replaces long conversation histories with shorter, summarized versions
-- Allows different compaction strategies (trim tool results, summarize conversations, etc.)
+- Allows different compaction strategies (trim tool results, summarize
+  conversations, etc.)
 - Maintains thread ID stability (threads never change IDs)
 - Preserves original events for reconstruction if needed
 
 ## Critical TypeScript Rules
 
-1. **NEVER use `any` type** - Always use proper types or `unknown` with type guards
+1. **NEVER use `any` type** - Always use proper types or `unknown` with type
+   guards
 2. **Use strict TypeScript** - The project has strict mode enabled
 3. **Define interfaces before implementation** - Think about types first
 4. **Use discriminated unions** - For event types with different payloads
@@ -24,20 +30,23 @@ A compaction system that:
 ## Development Workflow
 
 1. **Test-Driven Development**: Write failing tests first, then implement
-2. **Frequent commits**: Commit after each small task completion  
+2. **Frequent commits**: Commit after each small task completion
 3. **YAGNI**: Don't add features not explicitly required
 4. **Start simple**: Build basic functionality before advanced features
 
 ## Core Concepts
 
 ### Event-Based Compaction
-Instead of creating new threads, compaction creates special COMPACTION events with structured data:
+
+Instead of creating new threads, compaction creates special COMPACTION events
+with structured data:
+
 ```typescript
 interface CompactionData {
-  strategyId: string;                    // Which strategy was used
-  originalEventCount: number;            // How many events were replaced
-  compactedEvents: ThreadEvent[];        // The new replacement events
-  metadata?: Record<string, unknown>;    // Strategy-specific data
+  strategyId: string; // Which strategy was used
+  originalEventCount: number; // How many events were replaced
+  compactedEvents: ThreadEvent[]; // The new replacement events
+  metadata?: Record<string, unknown>; // Strategy-specific data
 }
 
 // CompactionEvent is just a regular ThreadEvent with COMPACTION type and CompactionData
@@ -45,12 +54,17 @@ interface CompactionData {
 ```
 
 ### Conversation Reconstruction
+
 The system builds conversations differently after compaction:
+
 - **Before compaction**: Use all events in chronological order
-- **After compaction**: Use `compactedEvents` from latest COMPACTION + events after that
+- **After compaction**: Use `compactedEvents` from latest COMPACTION + events
+  after that
 
 ### Strategy Pattern
+
 Different compaction approaches implemented as pluggable strategies:
+
 - `TrimToolResultsStrategy` - Truncate tool outputs to save tokens
 - `SummarizeStrategy` - Replace old events with AI-generated summaries
 - Future strategies can be added easily
@@ -60,9 +74,11 @@ Different compaction approaches implemented as pluggable strategies:
 ### Task 1: Define Core Types
 
 **File to create:**
+
 - `src/threads/compaction/types.ts`
 
 **What to implement:**
+
 ```typescript
 // ABOUTME: Core interfaces for the compaction event system
 // ABOUTME: Defines strategy pattern and event types for conversation compaction
@@ -82,7 +98,10 @@ export interface CompactionData {
 
 export interface CompactionStrategy {
   id: string;
-  compact(events: ThreadEvent[], context: CompactionContext): Promise<ThreadEvent>;
+  compact(
+    events: ThreadEvent[],
+    context: CompactionContext
+  ): Promise<ThreadEvent>;
 }
 
 export interface CompactionContext {
@@ -93,9 +112,11 @@ export interface CompactionContext {
 ```
 
 **Also update:**
+
 - `src/threads/types.ts` - Add `'COMPACTION'` to the `EventType` union
 
 **Test your changes:**
+
 ```bash
 npm run build
 # Should build without TypeScript errors
@@ -106,28 +127,32 @@ npm run build
 ### Task 2: Update Event Type System
 
 **File to modify:**
+
 - `src/threads/types.ts`
 
 **What to add:**
+
 ```typescript
 // Add to EventType union (should be around line 8):
-export type EventType = 
-  | 'USER_MESSAGE' 
-  | 'AGENT_MESSAGE' 
-  | 'TOOL_CALL' 
+export type EventType =
+  | 'USER_MESSAGE'
+  | 'AGENT_MESSAGE'
+  | 'TOOL_CALL'
   | 'TOOL_RESULT'
   | 'THINKING'
   | 'SYSTEM_PROMPT'
   | 'USER_SYSTEM_PROMPT'
-  | 'COMPACTION';  // Add this line
+  | 'COMPACTION'; // Add this line
 ```
 
 **Why this matters:**
+
 - TypeScript will now recognize COMPACTION as a valid event type
 - Event processing code can handle compaction events properly
 - Maintains type safety throughout the system
 
 **Test your changes:**
+
 ```bash
 npm run build
 # Should build without errors
@@ -138,9 +163,11 @@ npm run build
 ### Task 3: Create Conversation Builder Logic
 
 **File to create:**
+
 - `src/threads/conversation-builder.ts`
 
 **What to implement:**
+
 ```typescript
 // ABOUTME: Builds working conversations from thread events, handling compaction
 // ABOUTME: Core logic for reconstructing conversations post-compaction
@@ -150,18 +177,15 @@ import type { CompactionData } from '~/threads/compaction/types';
 
 export function buildWorkingConversation(events: ThreadEvent[]): ThreadEvent[] {
   const lastCompaction = findLastCompactionEvent(events);
-  
+
   if (!lastCompaction) {
     return events; // No compaction yet, use all events
   }
-  
+
   // Use compacted events + everything after compaction
   const eventsAfterCompaction = getEventsAfter(events, lastCompaction.id);
   const compactionData = lastCompaction.data as CompactionData;
-  return [
-    ...compactionData.compactedEvents,
-    ...eventsAfterCompaction
-  ];
+  return [...compactionData.compactedEvents, ...eventsAfterCompaction];
 }
 
 export function buildCompleteHistory(events: ThreadEvent[]): ThreadEvent[] {
@@ -179,19 +203,24 @@ function findLastCompactionEvent(events: ThreadEvent[]): ThreadEvent | null {
   return null;
 }
 
-function getEventsAfter(events: ThreadEvent[], afterEventId: string): ThreadEvent[] {
-  const afterIndex = events.findIndex(e => e.id === afterEventId);
+function getEventsAfter(
+  events: ThreadEvent[],
+  afterEventId: string
+): ThreadEvent[] {
+  const afterIndex = events.findIndex((e) => e.id === afterEventId);
   if (afterIndex === -1) return [];
   return events.slice(afterIndex + 1);
 }
 ```
 
 **Why this is important:**
+
 - This is the core logic that makes compaction work
 - `buildWorkingConversation` is what gets passed to AI providers
 - `buildCompleteHistory` preserves all events for debugging
 
 **Test your changes:**
+
 ```bash
 npm run build
 # Should build without errors
@@ -202,12 +231,17 @@ npm run build
 ### Task 4: Write Tests for Conversation Builder
 
 **File to create:**
+
 - `src/threads/conversation-builder.test.ts`
 
 **What to implement:**
+
 ```typescript
 import { describe, it, expect } from 'vitest';
-import { buildWorkingConversation, buildCompleteHistory } from './conversation-builder';
+import {
+  buildWorkingConversation,
+  buildCompleteHistory,
+} from './conversation-builder';
 import type { ThreadEvent } from './types';
 import type { CompactionData } from './compaction/types';
 
@@ -218,22 +252,22 @@ describe('conversation-builder', () => {
       threadId: 'test-thread',
       type: 'USER_MESSAGE',
       timestamp: new Date('2024-01-01T10:00:00Z'),
-      data: 'Hello'
+      data: 'Hello',
     },
     {
-      id: 'e2', 
+      id: 'e2',
       threadId: 'test-thread',
       type: 'AGENT_MESSAGE',
       timestamp: new Date('2024-01-01T10:01:00Z'),
-      data: 'Hi there'
+      data: 'Hi there',
     },
     {
       id: 'e3',
-      threadId: 'test-thread', 
+      threadId: 'test-thread',
       type: 'USER_MESSAGE',
       timestamp: new Date('2024-01-01T10:02:00Z'),
-      data: 'How are you?'
-    }
+      data: 'How are you?',
+    },
   ];
 
   describe('buildWorkingConversation', () => {
@@ -257,18 +291,18 @@ describe('conversation-builder', () => {
               threadId: 'test-thread',
               type: 'AGENT_MESSAGE',
               timestamp: new Date('2024-01-01T10:01:00Z'),
-              data: 'Summary: User said hello, I replied'
-            }
-          ]
-        }
+              data: 'Summary: User said hello, I replied',
+            },
+          ],
+        },
       };
 
       const newEvent: ThreadEvent = {
         id: 'e4',
         threadId: 'test-thread',
-        type: 'AGENT_MESSAGE', 
+        type: 'AGENT_MESSAGE',
         timestamp: new Date('2024-01-01T10:04:00Z'),
-        data: 'I am fine'
+        data: 'I am fine',
       };
 
       const eventsWithCompaction = [...mockEvents, compactionEvent, newEvent];
@@ -277,7 +311,7 @@ describe('conversation-builder', () => {
       expect(result).toEqual([
         (compactionEvent.data as CompactionData).compactedEvents[0],
         mockEvents[2], // Event after compaction
-        newEvent
+        newEvent,
       ]);
     });
 
@@ -290,38 +324,48 @@ describe('conversation-builder', () => {
         data: {
           strategyId: 'test-strategy',
           originalEventCount: 2,
-          compactedEvents: [{
-            id: 'c1',
-            threadId: 'test-thread', 
-            type: 'AGENT_MESSAGE',
-            timestamp: new Date('2024-01-01T10:01:00Z'),
-            data: 'First summary'
-          }]
-        }
+          compactedEvents: [
+            {
+              id: 'c1',
+              threadId: 'test-thread',
+              type: 'AGENT_MESSAGE',
+              timestamp: new Date('2024-01-01T10:01:00Z'),
+              data: 'First summary',
+            },
+          ],
+        },
       };
 
       const secondCompaction: ThreadEvent = {
         id: 'comp2',
         threadId: 'test-thread',
-        type: 'COMPACTION', 
+        type: 'COMPACTION',
         timestamp: new Date('2024-01-01T10:05:00Z'),
         data: {
           strategyId: 'test-strategy',
           originalEventCount: 3,
-          compactedEvents: [{
-            id: 'c2',
-            threadId: 'test-thread',
-            type: 'AGENT_MESSAGE',
-            timestamp: new Date('2024-01-01T10:01:00Z'),
-            data: 'Second summary'
-          }]
-        }
+          compactedEvents: [
+            {
+              id: 'c2',
+              threadId: 'test-thread',
+              type: 'AGENT_MESSAGE',
+              timestamp: new Date('2024-01-01T10:01:00Z'),
+              data: 'Second summary',
+            },
+          ],
+        },
       };
 
-      const eventsWithTwoCompactions = [...mockEvents, firstCompaction, secondCompaction];
+      const eventsWithTwoCompactions = [
+        ...mockEvents,
+        firstCompaction,
+        secondCompaction,
+      ];
       const result = buildWorkingConversation(eventsWithTwoCompactions);
 
-      expect(result).toEqual((secondCompaction.data as CompactionData).compactedEvents);
+      expect(result).toEqual(
+        (secondCompaction.data as CompactionData).compactedEvents
+      );
     });
   });
 
@@ -331,17 +375,17 @@ describe('conversation-builder', () => {
         id: 'comp1',
         threadId: 'test-thread',
         type: 'COMPACTION',
-        timestamp: new Date('2024-01-01T10:03:00Z'), 
+        timestamp: new Date('2024-01-01T10:03:00Z'),
         data: {
           strategyId: 'test-strategy',
           originalEventCount: 2,
-          compactedEvents: []
-        }
+          compactedEvents: [],
+        },
       };
 
       const allEvents = [...mockEvents, compactionEvent];
       const result = buildCompleteHistory(allEvents);
-      
+
       expect(result).toEqual(allEvents);
     });
   });
@@ -349,6 +393,7 @@ describe('conversation-builder', () => {
 ```
 
 **Run your tests:**
+
 ```bash
 npm test src/threads/conversation-builder.test.ts
 # All tests should pass
@@ -359,9 +404,11 @@ npm test src/threads/conversation-builder.test.ts
 ### Task 5: Update ThreadManager with New API
 
 **File to modify:**
+
 - `src/threads/thread-manager.ts`
 
 **What to add:**
+
 ```typescript
 // Add these imports at the top:
 import { buildWorkingConversation, buildCompleteHistory } from './conversation-builder';
@@ -379,7 +426,7 @@ private _compactionStrategies = new Map<string, CompactionStrategy>();
 getEvents(threadId: string): ThreadEvent[] {
   const thread = this.getThread(threadId);
   if (!thread) return [];
-  
+
   return buildWorkingConversation(thread.events);
 }
 
@@ -390,7 +437,7 @@ getEvents(threadId: string): ThreadEvent[] {
 getAllEvents(threadId: string): ThreadEvent[] {
   const thread = this.getThread(threadId);
   if (!thread) return [];
-  
+
   return buildCompleteHistory(thread.events);
 }
 
@@ -423,19 +470,21 @@ async compact(threadId: string, strategyId: string, params?: unknown): Promise<v
 
   // Run compaction strategy
   const compactionEvent = await strategy.compact(thread.events, context);
-  
+
   // Add the compaction event to the thread
   // The compactionEvent is already a complete ThreadEvent with data in the data field
   await this.addEvent(threadId, 'COMPACTION', compactionEvent.data);
 }
 ```
 
-**IMPORTANT:** 
+**IMPORTANT:**
+
 - The existing `getEvents` method (if any) should be replaced
 - Keep all other ThreadManager functionality intact
 - Don't break existing thread creation, event adding, etc.
 
 **Test your changes:**
+
 ```bash
 npm run build
 # Should build without errors
@@ -446,20 +495,25 @@ npm run build
 ### Task 6: Create a Simple Compaction Strategy
 
 **File to create:**
+
 - `src/threads/compaction/trim-tool-results-strategy.ts`
 
 **What to implement:**
+
 ```typescript
 // ABOUTME: Compaction strategy that truncates tool results to save token space
 // ABOUTME: Preserves conversation flow while reducing tool output size
 
-import type { ThreadEvent } from '~/threads/types';  
+import type { ThreadEvent } from '~/threads/types';
 import type { CompactionStrategy, CompactionContext } from './types';
 
 export class TrimToolResultsStrategy implements CompactionStrategy {
   id = 'trim-tool-results';
-  
-  async compact(events: ThreadEvent[], context: CompactionContext): Promise<ThreadEvent> {
+
+  async compact(
+    events: ThreadEvent[],
+    context: CompactionContext
+  ): Promise<ThreadEvent> {
     const compactedEvents: ThreadEvent[] = [];
     let modifiedCount = 0;
 
@@ -490,9 +544,9 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
         metadata: {
           toolResultsModified: modifiedCount,
           maxLines: 3,
-          truncationMessage: '[results truncated to save space.]'
-        }
-      }
+          truncationMessage: '[results truncated to save space.]',
+        },
+      },
     };
 
     return compactionEvent;
@@ -506,19 +560,26 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
     if (typeof event.data === 'string') {
       return {
         ...event,
-        data: this.truncateString(event.data)
+        data: this.truncateString(event.data),
       };
     }
 
     // Handle ToolResult objects (they have a 'content' field)
-    if (event.data && typeof event.data === 'object' && 'content' in event.data) {
-      const toolResult = event.data as { content: Array<{ type: string; text?: string }>; [key: string]: unknown };
-      
-      const truncatedContent = toolResult.content.map(block => {
+    if (
+      event.data &&
+      typeof event.data === 'object' &&
+      'content' in event.data
+    ) {
+      const toolResult = event.data as {
+        content: Array<{ type: string; text?: string }>;
+        [key: string]: unknown;
+      };
+
+      const truncatedContent = toolResult.content.map((block) => {
         if (block.type === 'text' && block.text) {
           return {
             ...block,
-            text: this.truncateString(block.text)
+            text: this.truncateString(block.text),
           };
         }
         return block;
@@ -528,8 +589,8 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
         ...event,
         data: {
           ...toolResult,
-          content: truncatedContent
-        }
+          content: truncatedContent,
+        },
       };
     }
 
@@ -551,6 +612,7 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
 ```
 
 **Test your changes:**
+
 ```bash
 npm run build
 # Should build without errors
@@ -561,9 +623,11 @@ npm run build
 ### Task 7: Write Tests for TrimToolResultsStrategy
 
 **File to create:**
+
 - `src/threads/compaction/trim-tool-results-strategy.test.ts`
 
 **What to implement:**
+
 ```typescript
 import { describe, it, expect } from 'vitest';
 import { TrimToolResultsStrategy } from './trim-tool-results-strategy';
@@ -572,9 +636,9 @@ import type { CompactionContext } from './types';
 
 describe('TrimToolResultsStrategy', () => {
   const strategy = new TrimToolResultsStrategy();
-  
+
   const mockContext: CompactionContext = {
-    threadId: 'test-thread'
+    threadId: 'test-thread',
   };
 
   it('has correct strategy id', () => {
@@ -589,19 +653,19 @@ describe('TrimToolResultsStrategy', () => {
           threadId: 'test-thread',
           type: 'USER_MESSAGE',
           timestamp: new Date(),
-          data: 'Hello'
+          data: 'Hello',
         },
         {
-          id: 'e2', 
+          id: 'e2',
           threadId: 'test-thread',
           type: 'AGENT_MESSAGE',
           timestamp: new Date(),
-          data: 'Hi there'
-        }
+          data: 'Hi there',
+        },
       ];
 
       const result = await strategy.compact(events, mockContext);
-      
+
       expect(result.type).toBe('COMPACTION');
       expect(result.data.compactedEvents).toEqual(events);
       expect(result.data.strategyId).toBe('trim-tool-results');
@@ -613,15 +677,15 @@ describe('TrimToolResultsStrategy', () => {
       const events: ThreadEvent[] = [
         {
           id: 'e1',
-          threadId: 'test-thread', 
+          threadId: 'test-thread',
           type: 'TOOL_RESULT',
           timestamp: new Date(),
-          data: longResult
-        }
+          data: longResult,
+        },
       ];
 
       const result = await strategy.compact(events, mockContext);
-      
+
       expect(result.data.compactedEvents[0].data).toBe(
         'line1\nline2\nline3\n[results truncated to save space.]'
       );
@@ -633,27 +697,27 @@ describe('TrimToolResultsStrategy', () => {
         {
           id: 'e1',
           threadId: 'test-thread',
-          type: 'TOOL_RESULT', 
+          type: 'TOOL_RESULT',
           timestamp: new Date(),
-          data: shortResult
-        }
+          data: shortResult,
+        },
       ];
 
       const result = await strategy.compact(events, mockContext);
-      
+
       expect(result.data.compactedEvents[0].data).toBe(shortResult);
     });
 
     it('handles ToolResult objects with content array', async () => {
       const toolResult = {
         content: [
-          { 
-            type: 'text', 
-            text: 'line1\nline2\nline3\nline4\nline5' 
-          }
+          {
+            type: 'text',
+            text: 'line1\nline2\nline3\nline4\nline5',
+          },
         ],
         isError: false,
-        id: 'tool-123'
+        id: 'tool-123',
       };
 
       const events: ThreadEvent[] = [
@@ -661,14 +725,15 @@ describe('TrimToolResultsStrategy', () => {
           id: 'e1',
           threadId: 'test-thread',
           type: 'TOOL_RESULT',
-          timestamp: new Date(), 
-          data: toolResult
-        }
+          timestamp: new Date(),
+          data: toolResult,
+        },
       ];
 
       const result = await strategy.compact(events, mockContext);
-      
-      const compactedData = result.data.compactedEvents[0].data as typeof toolResult;
+
+      const compactedData = result.data.compactedEvents[0]
+        .data as typeof toolResult;
       expect(compactedData.content[0].text).toBe(
         'line1\nline2\nline3\n[results truncated to save space.]'
       );
@@ -683,23 +748,23 @@ describe('TrimToolResultsStrategy', () => {
           threadId: 'test-thread',
           type: 'TOOL_RESULT',
           timestamp: new Date(),
-          data: 'line1\nline2\nline3\nline4'
+          data: 'line1\nline2\nline3\nline4',
         },
         {
           id: 'e2',
-          threadId: 'test-thread', 
+          threadId: 'test-thread',
           type: 'USER_MESSAGE',
           timestamp: new Date(),
-          data: 'Hello'
-        }
+          data: 'Hello',
+        },
       ];
 
       const result = await strategy.compact(events, mockContext);
-      
+
       expect(result.data.metadata).toEqual({
         toolResultsModified: 1,
         maxLines: 3,
-        truncationMessage: '[results truncated to save space.]'
+        truncationMessage: '[results truncated to save space.]',
       });
     });
   });
@@ -707,6 +772,7 @@ describe('TrimToolResultsStrategy', () => {
 ```
 
 **Run your tests:**
+
 ```bash
 npm test src/threads/compaction/trim-tool-results-strategy.test.ts
 # All tests should pass
@@ -717,20 +783,20 @@ npm test src/threads/compaction/trim-tool-results-strategy.test.ts
 ### Task 8: Create Strategy Registry
 
 **File to create:**
+
 - `src/threads/compaction/registry.ts`
 
 **What to implement:**
+
 ```typescript
-// ABOUTME: Central registry for compaction strategies  
+// ABOUTME: Central registry for compaction strategies
 // ABOUTME: Handles strategy registration and initialization
 
 import { TrimToolResultsStrategy } from './trim-tool-results-strategy';
 import type { CompactionStrategy } from './types';
 
 export function createDefaultStrategies(): CompactionStrategy[] {
-  return [
-    new TrimToolResultsStrategy()
-  ];
+  return [new TrimToolResultsStrategy()];
 }
 
 export function registerDefaultStrategies(
@@ -744,11 +810,13 @@ export function registerDefaultStrategies(
 ```
 
 **Why this exists:**
+
 - Centralized place to add new strategies
 - Makes it easy to register all available strategies
 - Future strategies can be added here
 
 **Test your changes:**
+
 ```bash
 npm run build
 # Should build without errors
@@ -759,9 +827,11 @@ npm run build
 ### Task 9: Update ThreadManager to Auto-Register Strategies
 
 **File to modify:**
+
 - `src/threads/thread-manager.ts`
 
 **What to add:**
+
 ```typescript
 // Add import:
 import { registerDefaultStrategies } from './compaction/registry';
@@ -770,7 +840,7 @@ import { registerDefaultStrategies } from './compaction/registry';
 constructor() {
   this._persistence = getPersistence();
   this._compactionStrategy = new SummarizeStrategy();
-  
+
   // Register default compaction strategies
   registerDefaultStrategies((strategy) => {
     this.registerCompactionStrategy(strategy);
@@ -779,15 +849,19 @@ constructor() {
 ```
 
 **Also remove:**
-- `this._compactionStrategy = new SummarizeStrategy();` (this was shadow thread code)
+
+- `this._compactionStrategy = new SummarizeStrategy();` (this was shadow thread
+  code)
 - Any other shadow thread initialization
 
 **Why this is needed:**
+
 - ThreadManager needs to know about available strategies
 - Auto-registration makes strategies available immediately
 - No manual setup required
 
 **Test your changes:**
+
 ```bash
 npm run build
 # Should build without errors
@@ -798,9 +872,11 @@ npm run build
 ### Task 10: Write Integration Tests
 
 **File to create:**
+
 - `src/threads/compaction-integration.test.ts`
 
 **What to implement:**
+
 ```typescript
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ThreadManager } from './thread-manager';
@@ -819,10 +895,10 @@ describe('Compaction Integration', () => {
     // Add some events
     threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
     threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Hi there');
-    
+
     const workingEvents = threadManager.getEvents(threadId);
     const allEvents = threadManager.getAllEvents(threadId);
-    
+
     expect(workingEvents).toHaveLength(2);
     expect(allEvents).toHaveLength(2);
     expect(workingEvents).toEqual(allEvents);
@@ -831,48 +907,61 @@ describe('Compaction Integration', () => {
   it('compacts conversation using trim-tool-results strategy', async () => {
     // Add events including a long tool result
     threadManager.addEvent(threadId, 'USER_MESSAGE', 'List files');
-    threadManager.addEvent(threadId, 'TOOL_CALL', { name: 'list_files', args: {} });
-    threadManager.addEvent(threadId, 'TOOL_RESULT', 'file1.txt\nfile2.txt\nfile3.txt\nfile4.txt\nfile5.txt');
+    threadManager.addEvent(threadId, 'TOOL_CALL', {
+      name: 'list_files',
+      args: {},
+    });
+    threadManager.addEvent(
+      threadId,
+      'TOOL_RESULT',
+      'file1.txt\nfile2.txt\nfile3.txt\nfile4.txt\nfile5.txt'
+    );
     threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Found 5 files');
-    
+
     expect(threadManager.getAllEvents(threadId)).toHaveLength(4);
-    
+
     // Perform compaction
     await threadManager.compact(threadId, 'trim-tool-results');
-    
+
     // Check results
     const allEvents = threadManager.getAllEvents(threadId);
     const workingEvents = threadManager.getEvents(threadId);
-    
+
     expect(allEvents).toHaveLength(5); // Original 4 + 1 compaction event
     expect(workingEvents).toHaveLength(4); // Compacted conversation length
-    
+
     // Find the tool result in working conversation
-    const toolResult = workingEvents.find(e => e.type === 'TOOL_RESULT');
+    const toolResult = workingEvents.find((e) => e.type === 'TOOL_RESULT');
     expect(toolResult).toBeDefined();
-    expect(toolResult!.data).toBe('file1.txt\nfile2.txt\nfile3.txt\n[results truncated to save space.]');
+    expect(toolResult!.data).toBe(
+      'file1.txt\nfile2.txt\nfile3.txt\n[results truncated to save space.]'
+    );
   });
 
   it('continues conversation after compaction', async () => {
     // Set up conversation and compact it
     threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
-    threadManager.addEvent(threadId, 'TOOL_RESULT', 'line1\nline2\nline3\nline4\nline5');
-    
+    threadManager.addEvent(
+      threadId,
+      'TOOL_RESULT',
+      'line1\nline2\nline3\nline4\nline5'
+    );
+
     await threadManager.compact(threadId, 'trim-tool-results');
-    
+
     // Add more events after compaction
     threadManager.addEvent(threadId, 'USER_MESSAGE', 'What next?');
     threadManager.addEvent(threadId, 'AGENT_MESSAGE', 'Let me help');
-    
+
     const workingEvents = threadManager.getEvents(threadId);
     const allEvents = threadManager.getAllEvents(threadId);
-    
+
     // Working conversation should include compacted events + new events
     expect(workingEvents).toHaveLength(4); // 2 compacted + 2 new
-    
-    // All events should include original + compaction event + new events  
+
+    // All events should include original + compaction event + new events
     expect(allEvents).toHaveLength(6); // 2 original + 1 compaction + 2 new
-    
+
     // Last two events should be the new ones
     expect(workingEvents[2].data).toBe('What next?');
     expect(workingEvents[3].data).toBe('Let me help');
@@ -881,33 +970,41 @@ describe('Compaction Integration', () => {
   it('handles multiple compactions', async () => {
     // Create initial conversation
     threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
-    threadManager.addEvent(threadId, 'TOOL_RESULT', 'long\nresult\nhere\nextra\nlines');
-    
+    threadManager.addEvent(
+      threadId,
+      'TOOL_RESULT',
+      'long\nresult\nhere\nextra\nlines'
+    );
+
     // First compaction
     await threadManager.compact(threadId, 'trim-tool-results');
-    
+
     // Add more events
     threadManager.addEvent(threadId, 'USER_MESSAGE', 'Continue');
-    threadManager.addEvent(threadId, 'TOOL_RESULT', 'another\nlong\nresult\nwith\nextra\nlines');
-    
+    threadManager.addEvent(
+      threadId,
+      'TOOL_RESULT',
+      'another\nlong\nresult\nwith\nextra\nlines'
+    );
+
     // Second compaction
     await threadManager.compact(threadId, 'trim-tool-results');
-    
+
     const workingEvents = threadManager.getEvents(threadId);
     const allEvents = threadManager.getAllEvents(threadId);
-    
+
     // Should use the latest compaction
     expect(workingEvents).toHaveLength(4); // Latest compaction results
     expect(allEvents).toHaveLength(8); // All events including both compactions
-    
+
     // Check that latest compaction is used
-    const compactionEvents = allEvents.filter(e => e.type === 'COMPACTION');
+    const compactionEvents = allEvents.filter((e) => e.type === 'COMPACTION');
     expect(compactionEvents).toHaveLength(2);
   });
 
   it('throws error for unknown strategy', async () => {
     threadManager.addEvent(threadId, 'USER_MESSAGE', 'Hello');
-    
+
     await expect(
       threadManager.compact(threadId, 'unknown-strategy')
     ).rejects.toThrow('Unknown compaction strategy: unknown-strategy');
@@ -922,6 +1019,7 @@ describe('Compaction Integration', () => {
 ```
 
 **Run your tests:**
+
 ```bash
 npm test src/threads/compaction-integration.test.ts
 # All tests should pass
@@ -932,10 +1030,11 @@ npm test src/threads/compaction-integration.test.ts
 ### Task 11: Update Agent to Use New API
 
 **File to modify:**
+
 - `src/agents/agent.ts`
 
-**What to change:**
-Find the conversation building logic in Agent (around `buildConversationFromEvents` or similar) and update it to use the new API:
+**What to change:** Find the conversation building logic in Agent (around
+`buildConversationFromEvents` or similar) and update it to use the new API:
 
 ```typescript
 // OLD (probably something like):
@@ -946,11 +1045,16 @@ const events = this._threadManager.getEvents(this._threadId); // This now return
 ```
 
 **Important notes:**
-- The `getEvents()` method now returns the working conversation (post-compaction)
-- You don't need to change the method call, just verify it uses the new implementation
-- The Agent should not need to know about compaction - it just gets clean conversation events
+
+- The `getEvents()` method now returns the working conversation
+  (post-compaction)
+- You don't need to change the method call, just verify it uses the new
+  implementation
+- The Agent should not need to know about compaction - it just gets clean
+  conversation events
 
 **Test your changes:**
+
 ```bash
 npm run build
 npm run test:unit
@@ -962,9 +1066,11 @@ npm run test:unit
 ### Task 12: Add Manual Compaction Command (Optional)
 
 **File to create:**
+
 - `src/commands/compact.ts`
 
 **What to implement:**
+
 ```typescript
 // ABOUTME: CLI command for manually triggering conversation compaction
 // ABOUTME: Useful for testing and manual conversation maintenance
@@ -979,22 +1085,23 @@ export interface CompactOptions {
 
 export async function compactCommand(options: CompactOptions): Promise<void> {
   const threadManager = new ThreadManager();
-  
+
   try {
     const beforeEvents = threadManager.getAllEvents(options.threadId);
-    logger.info(`Thread ${options.threadId} has ${beforeEvents.length} events before compaction`);
-    
+    logger.info(
+      `Thread ${options.threadId} has ${beforeEvents.length} events before compaction`
+    );
+
     await threadManager.compact(options.threadId, options.strategy);
-    
+
     const afterAllEvents = threadManager.getAllEvents(options.threadId);
     const afterWorkingEvents = threadManager.getEvents(options.threadId);
-    
+
     logger.info(`Compaction complete:`, {
       totalEvents: afterAllEvents.length,
       workingEvents: afterWorkingEvents.length,
-      strategy: options.strategy
+      strategy: options.strategy,
     });
-    
   } catch (error) {
     logger.error('Compaction failed:', error);
     throw error;
@@ -1003,11 +1110,13 @@ export async function compactCommand(options: CompactOptions): Promise<void> {
 ```
 
 **Why this is useful:**
+
 - Allows manual testing of compaction
 - Provides visibility into compaction results
 - Can be used for maintenance operations
 
 **Test your changes:**
+
 ```bash
 npm run build
 # Should build without errors
@@ -1018,25 +1127,29 @@ npm run build
 ### Task 13: Run Full Test Suite
 
 **What to do:**
+
 ```bash
 npm run build
-npm run lint  
+npm run lint
 npm test
 ```
 
 **Expected results:**
+
 - Build should succeed
 - Linting should pass
 - All tests should pass
 - No TypeScript errors
 
 **If tests fail:**
+
 1. Check error messages carefully
 2. Look for missing imports or type errors
 3. Verify you didn't break existing functionality
 4. Make sure your new code follows TypeScript strict mode
 
 **Common issues:**
+
 - Missing imports for new types
 - Incorrect event type handling
 - Thread ID mismatching in tests
@@ -1046,6 +1159,7 @@ npm test
 ### Task 14: Manual Testing
 
 **What to test:**
+
 ```bash
 # Start the application
 npm start
@@ -1057,6 +1171,7 @@ npm start
 ```
 
 **What should work:**
+
 - Creating conversations
 - Adding events
 - Compacting conversations
@@ -1064,6 +1179,7 @@ npm start
 - Thread IDs remain stable throughout
 
 **What to verify:**
+
 - Compacted conversations are shorter but maintain key information
 - New events after compaction work normally
 - Thread persistence works correctly
@@ -1081,7 +1197,8 @@ When Phase 2 is complete:
 4. **Thread IDs stable** - Threads never change IDs during compaction
 5. **Tests comprehensive** - Good test coverage for new functionality
 6. **Integration complete** - Agent and ThreadManager work with new system
-7. **Original events preserved** - Can still access complete history for debugging
+7. **Original events preserved** - Can still access complete history for
+   debugging
 
 ## What You've Accomplished
 
@@ -1091,14 +1208,15 @@ When Phase 2 is complete:
 - Created comprehensive test coverage
 - Preserved all original functionality while adding compaction capability
 
-The system now has clean, maintainable compaction without the complexity of the old shadow thread system.
+The system now has clean, maintainable compaction without the complexity of the
+old shadow thread system.
 
 ## Advanced Features (Future Work)
 
 These are NOT required for Phase 2 completion, but could be added later:
 
 - **Auto-compaction triggers** - Compact when conversations reach token limits
-- **Multiple strategy types** - Summarization, semantic clustering, etc.  
+- **Multiple strategy types** - Summarization, semantic clustering, etc.
 - **Compaction policies** - Rules about when/how to compact
 - **Performance optimizations** - Caching, lazy loading
 - **Compaction analytics** - Track compaction effectiveness
@@ -1110,62 +1228,81 @@ These are NOT required for Phase 2 completion, but could be added later:
 3. **Integration issues:** Verify the conversation builder logic is correct
 4. **Build errors:** Check all imports and exports are correct
 
-Remember: The goal is working compaction with clean, maintainable code. When in doubt, keep it simple and well-tested.
+Remember: The goal is working compaction with clean, maintainable code. When in
+doubt, keep it simple and well-tested.
 
 ## Implementation Status (2025-07-24)
 
-**IN PROGRESS:** Phase 2 compaction events implementation is 71% complete (10 of 14 tasks).
+**IN PROGRESS:** Phase 2 compaction events implementation is 71% complete (10 of
+14 tasks).
 
 ### Prerequisites Completed
+
 - Phase 1 shadow thread removal is complete
 - Core thread management functionality is working
 - Database is reset to clean state
 - Codebase is ready for compaction event implementation
 
 ### Completed Tasks ✅
+
 1. **Core Types** - CompactionData, CompactionStrategy interfaces defined
 2. **Event Type System** - Added COMPACTION to EventType union
-3. **Conversation Builder** - buildWorkingConversation() and buildCompleteHistory() logic
-4. **Conversation Builder Tests** - Comprehensive test coverage for reconstruction logic
+3. **Conversation Builder** - buildWorkingConversation() and
+   buildCompleteHistory() logic
+4. **Conversation Builder Tests** - Comprehensive test coverage for
+   reconstruction logic
 5. **ThreadManager API** - Added getEvents(), getAllEvents(), compact() methods
-6. **TrimToolResultsStrategy** - Working strategy that truncates tool results to 3 lines
+6. **TrimToolResultsStrategy** - Working strategy that truncates tool results to
+   3 lines
 7. **Strategy Tests** - Full test coverage for TrimToolResultsStrategy
 8. **Strategy Registry** - Centralized registration system for strategies
-9. **Auto-Registration** - ThreadManager automatically registers default strategies
-10. **Integration Tests** - 8 comprehensive tests covering all compaction scenarios
+9. **Auto-Registration** - ThreadManager automatically registers default
+   strategies
+10. **Integration Tests** - 8 comprehensive tests covering all compaction
+    scenarios
 
 ### Current Status
-**🎯 Tests Passing:** All 8 integration tests pass with detailed event verification  
+
+**🎯 Tests Passing:** All 8 integration tests pass with detailed event
+verification  
 **⚠️ Lint Errors:** 3 remaining lint issues preventing commit:
+
 - TypeScript error: `args` property doesn't exist in union type (line 29)
-- Two unsafe `any` assignments from expect.stringContaining() usage (lines 133, 143)
+- Two unsafe `any` assignments from expect.stringContaining() usage (lines
+  133, 143)
 
 ### Pending Tasks 📋
-11. **Update Agent** - Modify Agent class to use new conversation building API  
-12. **Manual Compaction CLI** - Optional command for manual compaction  
-13. **Full Test Suite** - Run complete test suite and fix any issues  
-14. **Manual Testing** - End-to-end verification of compaction system  
+
+11. **Update Agent** - Modify Agent class to use new conversation building API
+12. **Manual Compaction CLI** - Optional command for manual compaction
+13. **Full Test Suite** - Run complete test suite and fix any issues
+14. **Manual Testing** - End-to-end verification of compaction system
 
 ### Technical Implementation Details
 
 **Core Architecture:**
+
 - Event-based compaction using COMPACTION events with CompactionData payload
-- Conversation reconstruction via buildWorkingConversation() using latest compaction only
+- Conversation reconstruction via buildWorkingConversation() using latest
+  compaction only
 - Strategy pattern with pluggable compaction approaches
 - Thread ID stability maintained (no dual-ID complexity)
 
 **Files Created:**
+
 - `src/threads/compaction/types.ts` - Core interfaces
-- `src/threads/conversation-builder.ts` - Reconstruction logic  
+- `src/threads/conversation-builder.ts` - Reconstruction logic
 - `src/threads/compaction/trim-tool-results-strategy.ts` - Tool result trimming
 - `src/threads/compaction/registry.ts` - Strategy registration
 - `src/threads/compaction-integration.test.ts` - Integration tests
 
 **Files Modified:**
+
 - `src/threads/types.ts` - Added COMPACTION to EventType union
 - `src/threads/thread-manager.ts` - Added compaction API methods
 
 **Key Features Working:**
+
 - Basic compaction with tool result trimming to 3 lines
 - Multiple compactions with latest-compaction-wins behavior
 - Event ordering preservation after compaction
@@ -1173,4 +1310,6 @@ Remember: The goal is working compaction with clean, maintainable code. When in 
 - Error handling for unknown strategies and missing threads
 
 ### Next Steps
-Complete remaining tasks 11-14 to finish Phase 2 implementation. The core compaction system is functional and well-tested.
+
+Complete remaining tasks 11-14 to finish Phase 2 implementation. The core
+compaction system is functional and well-tested.

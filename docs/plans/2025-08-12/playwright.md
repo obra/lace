@@ -2,11 +2,16 @@
 
 ## Overview
 
-This plan implements a reliable, maintainable Playwright testing infrastructure for the Lace web application. The goal is to create non-brittle tests that can run in parallel and thoroughly test core user workflows, starting with simple onboarding flows and building up to complex interaction patterns like stopping LLM responses mid-stream.
+This plan implements a reliable, maintainable Playwright testing infrastructure
+for the Lace web application. The goal is to create non-brittle tests that can
+run in parallel and thoroughly test core user workflows, starting with simple
+onboarding flows and building up to complex interaction patterns like stopping
+LLM responses mid-stream.
 
 ## 🎉 IMPLEMENTATION COMPLETE
 
-**Status**: ✅ **COMPLETED** - All planned infrastructure and test coverage implemented  
+**Status**: ✅ **COMPLETED** - All planned infrastructure and test coverage
+implemented  
 **Total Test Files**: 18  
 **Total Test Cases**: 54  
 **Date Completed**: August 12, 2025
@@ -15,7 +20,7 @@ This plan implements a reliable, maintainable Playwright testing infrastructure 
 
 1. **Complete Playwright Infrastructure** (Phase 1)
    - ✅ Parallel execution with worker isolation
-   - ✅ Worker-scoped LACE_DIR fixtures 
+   - ✅ Worker-scoped LACE_DIR fixtures
    - ✅ MSW integration for external API mocking
    - ✅ Page Object Model with `data-testid` selectors
 
@@ -32,7 +37,7 @@ This plan implements a reliable, maintainable Playwright testing infrastructure 
    - ✅ Multi-agent workflow coordination
    - ✅ Browser navigation (back/forward, deep linking, refresh)
 
-3. **Robust Testing Philosophy** 
+3. **Robust Testing Philosophy**
    - ✅ Tests preserve failing cases as documentation
    - ✅ Real functionality testing (not mocking app logic)
    - ✅ Comprehensive error boundary and edge case coverage
@@ -40,13 +45,17 @@ This plan implements a reliable, maintainable Playwright testing infrastructure 
 
 ### Outstanding Work
 
-**Intentionally Deferred**: Stop functionality tests (ESC key and stop button) - deferred because the behavior is known to be broken and should be implemented last.
+**Intentionally Deferred**: Stop functionality tests (ESC key and stop button) -
+deferred because the behavior is known to be broken and should be implemented
+last.
 
 ## Prerequisites
 
 - Node.js 20.18.3+ (check `engines` in package.json)
-- Familiarity with TypeScript (no `any` types allowed - use `unknown` with type guards)
-- Understanding that we test real functionality, not mocks (mocks only for external APIs)
+- Familiarity with TypeScript (no `any` types allowed - use `unknown` with type
+  guards)
+- Understanding that we test real functionality, not mocks (mocks only for
+  external APIs)
 
 ## Core Principles
 
@@ -60,9 +69,11 @@ This plan implements a reliable, maintainable Playwright testing infrastructure 
 
 ### Task 1.1: Enable Parallel Execution and Worker Isolation
 
-**Goal**: Configure Playwright for parallel test execution with isolated databases per worker.
+**Goal**: Configure Playwright for parallel test execution with isolated
+databases per worker.
 
 **Files to modify**:
+
 - `packages/web/playwright.config.ts`
 
 **Implementation**:
@@ -85,10 +96,7 @@ export default defineConfig({
   workers: process.env.CI ? 4 : 2, // Use multiple workers instead of 1
 
   // Enhanced reporting and debugging
-  reporter: [
-    ['html', { outputFolder: 'playwright-report' }],
-    ['list']
-  ],
+  reporter: [['html', { outputFolder: 'playwright-report' }], ['list']],
 
   use: {
     baseURL: 'http://localhost:23457',
@@ -122,6 +130,7 @@ export default defineConfig({
 ```
 
 **Files to create**:
+
 - `packages/web/e2e/global-setup.ts`
 - `packages/web/e2e/global-teardown.ts`
 
@@ -134,7 +143,7 @@ import { FullConfig } from '@playwright/test';
 
 async function globalSetup(config: FullConfig): Promise<void> {
   console.log('🎭 Starting Playwright test suite setup');
-  
+
   // Any global setup needed (currently none, but placeholder for future needs)
 }
 
@@ -156,22 +165,27 @@ export default globalTeardown;
 ```
 
 **How to test this task**:
+
 1. Run `npm run test:playwright -- --list` to verify config loads
 2. Check that multiple projects (chromium, webkit) are listed
 3. Verify no syntax errors in TypeScript
 
-**Commit message**: `feat: enable Playwright parallel execution with worker isolation`
+**Commit message**:
+`feat: enable Playwright parallel execution with worker isolation`
 
 ---
 
 ### Task 1.2: Create Worker-Isolated Test Environment Fixture
 
-**Goal**: Create a test fixture that provides isolated LACE_DIR per worker using existing utilities.
+**Goal**: Create a test fixture that provides isolated LACE_DIR per worker using
+existing utilities.
 
 **Files to create**:
+
 - `packages/web/e2e/fixtures/test-environment.ts`
 
 **Files to reference**:
+
 - `src/test-utils/temp-lace-dir.ts` (existing utility to understand the pattern)
 
 **Implementation**:
@@ -194,44 +208,47 @@ export interface TestEnvironmentContext {
 
 // Extend Playwright's base test with our environment fixture
 export const test = baseTest.extend<{}, { testEnv: TestEnvironmentContext }>({
-  testEnv: [async ({ }, use, testInfo) => {
-    // Create worker-specific temp directory (similar to temp-lace-dir.ts pattern)
-    const workerIndex = testInfo.workerIndex;
-    const tempDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), `lace-e2e-worker-${workerIndex}-`)
-    );
+  testEnv: [
+    async ({}, use, testInfo) => {
+      // Create worker-specific temp directory (similar to temp-lace-dir.ts pattern)
+      const workerIndex = testInfo.workerIndex;
+      const tempDir = await fs.promises.mkdtemp(
+        path.join(os.tmpdir(), `lace-e2e-worker-${workerIndex}-`)
+      );
 
-    // Save original LACE_DIR and set to our temp directory
-    const originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = tempDir;
+      // Save original LACE_DIR and set to our temp directory
+      const originalLaceDir = process.env.LACE_DIR;
+      process.env.LACE_DIR = tempDir;
 
-    // Create unique project name for this worker
-    const projectName = `E2E Test Project Worker ${workerIndex}`;
+      // Create unique project name for this worker
+      const projectName = `E2E Test Project Worker ${workerIndex}`;
 
-    console.log(`Worker ${workerIndex}: Using LACE_DIR=${tempDir}`);
+      console.log(`Worker ${workerIndex}: Using LACE_DIR=${tempDir}`);
 
-    const context: TestEnvironmentContext = {
-      tempDir,
-      originalLaceDir,
-      projectName,
-    };
+      const context: TestEnvironmentContext = {
+        tempDir,
+        originalLaceDir,
+        projectName,
+      };
 
-    await use(context);
+      await use(context);
 
-    // Cleanup: restore original LACE_DIR
-    if (originalLaceDir !== undefined) {
-      process.env.LACE_DIR = originalLaceDir;
-    } else {
-      delete process.env.LACE_DIR;
-    }
+      // Cleanup: restore original LACE_DIR
+      if (originalLaceDir !== undefined) {
+        process.env.LACE_DIR = originalLaceDir;
+      } else {
+        delete process.env.LACE_DIR;
+      }
 
-    // Cleanup: remove temp directory
-    if (fs.existsSync(tempDir)) {
-      await fs.promises.rm(tempDir, { recursive: true, force: true });
-    }
+      // Cleanup: remove temp directory
+      if (fs.existsSync(tempDir)) {
+        await fs.promises.rm(tempDir, { recursive: true, force: true });
+      }
 
-    console.log(`Worker ${workerIndex}: Cleaned up LACE_DIR=${tempDir}`);
-  }, { scope: 'worker' }], // Worker scope means one instance per worker process
+      console.log(`Worker ${workerIndex}: Cleaned up LACE_DIR=${tempDir}`);
+    },
+    { scope: 'worker' },
+  ], // Worker scope means one instance per worker process
 });
 
 // Re-export expect for convenience
@@ -239,17 +256,20 @@ export { expect } from '@playwright/test';
 ```
 
 **How to test this task**:
+
 1. Create a simple test file using the fixture:
 
 ```typescript
 // packages/web/e2e/test-environment.test.e2e.ts
 import { test, expect } from './fixtures/test-environment';
 
-test('test environment fixture provides isolated LACE_DIR', async ({ testEnv }) => {
+test('test environment fixture provides isolated LACE_DIR', async ({
+  testEnv,
+}) => {
   // Verify we have a temp directory
   expect(testEnv.tempDir).toMatch(/lace-e2e-worker-\d+-/);
   expect(testEnv.projectName).toContain('E2E Test Project Worker');
-  
+
   // Verify LACE_DIR is set
   expect(process.env.LACE_DIR).toBe(testEnv.tempDir);
 });
@@ -257,7 +277,8 @@ test('test environment fixture provides isolated LACE_DIR', async ({ testEnv }) 
 
 2. Run with `npm run test:playwright test-environment.test.e2e.ts`
 3. Verify temp directories are created and cleaned up
-4. Run with multiple workers: `npm run test:playwright test-environment.test.e2e.ts --workers=2`
+4. Run with multiple workers:
+   `npm run test:playwright test-environment.test.e2e.ts --workers=2`
 
 **Commit message**: `feat: add worker-isolated test environment fixture`
 
@@ -265,18 +286,22 @@ test('test environment fixture provides isolated LACE_DIR', async ({ testEnv }) 
 
 ### Task 1.3: Set Up MSW for API Mocking
 
-**Goal**: Install and configure MSW to mock external API calls (LLM providers, not our own APIs).
+**Goal**: Install and configure MSW to mock external API calls (LLM providers,
+not our own APIs).
 
 **Dependencies to install**:
+
 ```bash
 npm install --save-dev playwright-msw
 ```
 
 **Files to create**:
+
 - `packages/web/e2e/mocks/handlers.ts`
 - `packages/web/e2e/mocks/setup.ts`
 
-**Key principle**: We only mock external APIs (Anthropic, OpenAI), never our own application logic.
+**Key principle**: We only mock external APIs (Anthropic, OpenAI), never our own
+application logic.
 
 ```typescript
 // packages/web/e2e/mocks/handlers.ts
@@ -289,8 +314,8 @@ import { http, HttpResponse } from 'msw';
 export const anthropicSuccessHandler = http.post(
   'https://api.anthropic.com/v1/messages',
   async ({ request }) => {
-    const body = await request.json() as unknown;
-    
+    const body = (await request.json()) as unknown;
+
     // Type guard for request body
     if (!isAnthropicRequest(body)) {
       return HttpResponse.json({ error: 'Invalid request' }, { status: 400 });
@@ -300,17 +325,19 @@ export const anthropicSuccessHandler = http.post(
       id: 'msg_test123',
       type: 'message',
       role: 'assistant',
-      content: [{
-        type: 'text',
-        text: 'Hello! This is a test response from the mocked Anthropic API.'
-      }],
+      content: [
+        {
+          type: 'text',
+          text: 'Hello! This is a test response from the mocked Anthropic API.',
+        },
+      ],
       model: 'claude-3-haiku-20240307',
       stop_reason: 'end_turn',
       stop_sequence: null,
       usage: {
         input_tokens: 10,
-        output_tokens: 15
-      }
+        output_tokens: 15,
+      },
     });
   }
 );
@@ -324,33 +351,33 @@ export const openaiSuccessHandler = http.post(
       object: 'chat.completion',
       created: Date.now(),
       model: 'gpt-3.5-turbo',
-      choices: [{
-        index: 0,
-        message: {
-          role: 'assistant',
-          content: 'Hello! This is a test response from the mocked OpenAI API.'
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: 'assistant',
+            content:
+              'Hello! This is a test response from the mocked OpenAI API.',
+          },
+          finish_reason: 'stop',
         },
-        finish_reason: 'stop'
-      }],
+      ],
       usage: {
         prompt_tokens: 10,
         completion_tokens: 15,
-        total_tokens: 25
-      }
+        total_tokens: 25,
+      },
     });
   }
 );
 
 // Default handlers for successful responses
-export const handlers = [
-  anthropicSuccessHandler,
-  openaiSuccessHandler,
-];
+export const handlers = [anthropicSuccessHandler, openaiSuccessHandler];
 
 // Type guard for Anthropic request body
-function isAnthropicRequest(body: unknown): body is { 
-  model: string; 
-  messages: Array<{ role: string; content: string }>; 
+function isAnthropicRequest(body: unknown): body is {
+  model: string;
+  messages: Array<{ role: string; content: string }>;
 } {
   return (
     typeof body === 'object' &&
@@ -376,7 +403,9 @@ export const mockServiceWorker = new PlaywrightMSW({
 });
 
 // Helper to start MSW for a test
-export async function startMockServiceWorker(page: import('@playwright/test').Page): Promise<void> {
+export async function startMockServiceWorker(
+  page: import('@playwright/test').Page
+): Promise<void> {
   await mockServiceWorker.start(page);
 }
 
@@ -387,6 +416,7 @@ export async function stopMockServiceWorker(): Promise<void> {
 ```
 
 **How to test this task**:
+
 1. Create a simple test to verify MSW setup:
 
 ```typescript
@@ -399,7 +429,7 @@ test('MSW intercepts external API calls', async ({ page }) => {
 
   // Navigate to a page that would make an API call
   await page.goto('/');
-  
+
   // Make a direct API call from the browser to verify interception
   const response = await page.evaluate(async () => {
     const result = await fetch('https://api.anthropic.com/v1/messages', {
@@ -407,14 +437,16 @@ test('MSW intercepts external API calls', async ({ page }) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-3-haiku-20240307',
-        messages: [{ role: 'user', content: 'test' }]
-      })
+        messages: [{ role: 'user', content: 'test' }],
+      }),
     });
     return result.json();
   });
 
   expect(response).toHaveProperty('id', 'msg_test123');
-  expect(response.content[0].text).toContain('test response from the mocked Anthropic API');
+  expect(response.content[0].text).toContain(
+    'test response from the mocked Anthropic API'
+  );
 
   await stopMockServiceWorker();
 });
@@ -431,17 +463,21 @@ test('MSW intercepts external API calls', async ({ page }) => {
 
 ### Task 2.1: Add Essential data-testid Attributes
 
-**Goal**: Add `data-testid` attributes to core UI elements needed for reliable testing.
+**Goal**: Add `data-testid` attributes to core UI elements needed for reliable
+testing.
 
-**Key principle**: Only add `data-testid` to elements that tests need to interact with. Don't add them to every element.
+**Key principle**: Only add `data-testid` to elements that tests need to
+interact with. Don't add them to every element.
 
 **Files to modify**:
+
 - `packages/web/components/pages/LaceApp.tsx`
 - `packages/web/components/chat/EnhancedChatInput.tsx`
 - `packages/web/components/config/ProjectSelectorPanel.tsx`
 
-**Reference existing patterns**:
-Look at lines 229-235 in `packages/web/components/pages/LaceApp.tsx` to see existing `data-testid` usage:
+**Reference existing patterns**: Look at lines 229-235 in
+`packages/web/components/pages/LaceApp.tsx` to see existing `data-testid` usage:
+
 ```typescript
 data-testid="current-project-name"
 data-testid="current-project-name-desktop"
@@ -463,21 +499,21 @@ data-testid="current-project-name-desktop"
 
 // Find the project creation form inputs and add data-testids
 // Project name input:
-<input 
+<input
   placeholder="Enter project name"
   data-testid="project-name-input"
   // ... other props
 />
 
 // Project path input:
-<input 
+<input
   placeholder="/path/to/your/project"
   data-testid="project-path-input"
   // ... other props
 />
 
 // Create project submit button:
-<button 
+<button
   className="btn btn-primary"
   data-testid="create-project-submit"
   // ... other props
@@ -506,17 +542,22 @@ export function EnhancedChatInput({
 }
 ```
 
-**Note**: You may need to also modify the `ChatInputComposer` component to accept and use these `data-testid` props. Find it in the `components/ui` directory.
+**Note**: You may need to also modify the `ChatInputComposer` component to
+accept and use these `data-testid` props. Find it in the `components/ui`
+directory.
 
 **Files you might need to check**:
+
 - `packages/web/components/ui/` directory (to find ChatInputComposer)
 - Look for any existing `data-testid` patterns in the codebase
 
 **How to test this task**:
+
 1. Build the project: `npm run build`
 2. Check for TypeScript errors: `npm run lint`
 3. Start the dev server: `npm run dev`
-4. Open browser dev tools and verify the `data-testid` attributes are present in the DOM
+4. Open browser dev tools and verify the `data-testid` attributes are present in
+   the DOM
 5. Create a simple test to verify elements can be found:
 
 ```typescript
@@ -525,13 +566,13 @@ import { test, expect } from './fixtures/test-environment';
 
 test('essential UI elements have data-testid attributes', async ({ page }) => {
   await page.goto('/');
-  
+
   // Verify new project button exists
   await expect(page.getByTestId('new-project-button')).toBeVisible();
-  
+
   // Click to open project creation form
   await page.getByTestId('new-project-button').click();
-  
+
   // Verify form elements exist
   await expect(page.getByTestId('project-name-input')).toBeVisible();
   await expect(page.getByTestId('project-path-input')).toBeVisible();
@@ -545,16 +586,20 @@ test('essential UI elements have data-testid attributes', async ({ page }) => {
 
 ### Task 2.2: Create Page Object Helpers
 
-**Goal**: Create reusable page object classes that encapsulate common UI interactions.
+**Goal**: Create reusable page object classes that encapsulate common UI
+interactions.
 
 **Files to create**:
+
 - `packages/web/e2e/page-objects/ProjectSelector.ts`
 - `packages/web/e2e/page-objects/ChatInterface.ts`
 - `packages/web/e2e/page-objects/index.ts`
 
 **Key principles**:
+
 - Page objects should represent user actions, not implementation details
-- Use `data-testid` selectors as primary strategy, with `getByRole()` as fallback
+- Use `data-testid` selectors as primary strategy, with `getByRole()` as
+  fallback
 - Never put assertions in page objects - only actions
 - Return meaningful data that tests can assert on
 
@@ -716,6 +761,7 @@ export function createPageObjects(page: Page) {
 ```
 
 **How to test this task**:
+
 1. Check TypeScript compilation: `npm run lint`
 2. Create a test that uses the page objects:
 
@@ -724,14 +770,17 @@ export function createPageObjects(page: Page) {
 import { test, expect } from './fixtures/test-environment';
 import { createPageObjects } from './page-objects';
 
-test('page objects provide clean interface for UI interactions', async ({ page, testEnv }) => {
+test('page objects provide clean interface for UI interactions', async ({
+  page,
+  testEnv,
+}) => {
   const { projectSelector, chatInterface } = createPageObjects(page);
-  
+
   await page.goto('/');
-  
+
   // Use page object methods
   await projectSelector.clickNewProject();
-  
+
   // Verify the form opened (this is an assertion in the test, not page object)
   await expect(projectSelector.projectNameInput).toBeVisible();
 });
@@ -739,7 +788,8 @@ test('page objects provide clean interface for UI interactions', async ({ page, 
 
 3. Run test: `npm run test:playwright page-objects.test.e2e.ts`
 
-**Commit message**: `feat: create page object helpers for common UI interactions`
+**Commit message**:
+`feat: create page object helpers for common UI interactions`
 
 ---
 
@@ -747,17 +797,21 @@ test('page objects provide clean interface for UI interactions', async ({ page, 
 
 ### Task 3.1: Write First Happy Path Test
 
-**Goal**: Create a complete end-to-end test covering the basic user journey from onboarding to first message.
+**Goal**: Create a complete end-to-end test covering the basic user journey from
+onboarding to first message.
 
 **Files to create**:
+
 - `packages/web/e2e/basic-user-journey.e2e.ts`
 
-**Prerequisites**: 
+**Prerequisites**:
+
 - Verify tasks 1.1-2.2 are complete
 - MSW should be set up and working
 - Page objects should be available
 
-**Test Design Principle**: This test should use real codepaths wherever possible. Only the external LLM API calls should be mocked.
+**Test Design Principle**: This test should use real codepaths wherever
+possible. Only the external LLM API calls should be mocked.
 
 ```typescript
 // packages/web/e2e/basic-user-journey.e2e.ts
@@ -771,9 +825,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 test.describe('Basic User Journey', () => {
-  test('complete flow: onboarding → project creation → first message', async ({ 
-    page, 
-    testEnv 
+  test('complete flow: onboarding → project creation → first message', async ({
+    page,
+    testEnv,
   }) => {
     // Set up API mocking for external calls
     await startMockServiceWorker(page);
@@ -782,40 +836,41 @@ test.describe('Basic User Journey', () => {
 
     // Step 1: User lands on the application
     await page.goto('/');
-    
+
     // Step 2: Verify we see project selection interface
     await expect(projectSelector.newProjectButton).toBeVisible();
-    
+
     // Step 3: Create a new project
     const projectPath = path.join(testEnv.tempDir, 'test-project');
-    
+
     // Create the directory so validation passes
     await fs.promises.mkdir(projectPath, { recursive: true });
-    
+
     // Use page object to create project
     await projectSelector.createProject(testEnv.projectName, projectPath);
-    
+
     // Step 4: Verify we're now in the chat interface
     await chatInterface.waitForChatReady();
     await expect(chatInterface.messageInput).toBeVisible();
-    
+
     // Step 5: Send a message to the LLM
     const testMessage = 'Hello, this is my first message!';
     await chatInterface.sendMessage(testMessage);
-    
+
     // Step 6: Verify our message appears in the conversation
     await expect(chatInterface.getMessage(testMessage)).toBeVisible();
-    
+
     // Step 7: Wait for and verify mocked LLM response appears
-    const expectedResponse = 'Hello! This is a test response from the mocked Anthropic API.';
-    await expect(chatInterface.getMessage(expectedResponse)).toBeVisible({ 
-      timeout: 10000 
+    const expectedResponse =
+      'Hello! This is a test response from the mocked Anthropic API.';
+    await expect(chatInterface.getMessage(expectedResponse)).toBeVisible({
+      timeout: 10000,
     });
-    
+
     // Step 8: Verify chat interface is ready for next message
     await chatInterface.waitForSendAvailable();
     await expect(chatInterface.sendButton).toBeVisible();
-    
+
     // Cleanup
     await stopMockServiceWorker();
   });
@@ -824,9 +879,12 @@ test.describe('Basic User Journey', () => {
 
 **Understanding the Test Structure**:
 
-1. **Test Environment**: `testEnv` fixture provides isolated LACE_DIR and project name
-2. **MSW Setup**: Mocks external API calls but lets our application logic run normally
-3. **Page Objects**: Encapsulate UI interactions in reusable, maintainable methods
+1. **Test Environment**: `testEnv` fixture provides isolated LACE_DIR and
+   project name
+2. **MSW Setup**: Mocks external API calls but lets our application logic run
+   normally
+3. **Page Objects**: Encapsulate UI interactions in reusable, maintainable
+   methods
 4. **Real Filesystem**: Creates actual directories that the application expects
 5. **Assertions**: Test the outcomes, not the implementation details
 
@@ -836,7 +894,6 @@ test.describe('Basic User Journey', () => {
    ```bash
    npm run test:playwright basic-user-journey.e2e.ts
    ```
-   
 2. **Identify what's missing** from the failure messages:
    - Are `data-testid` attributes missing?
    - Are page object methods failing?
@@ -848,6 +905,7 @@ test.describe('Basic User Journey', () => {
    - Debug MSW handler setup
 
 4. **Run again until test passes**:
+
    ```bash
    npm run test:playwright basic-user-journey.e2e.ts
    ```
@@ -867,18 +925,20 @@ test.describe('Basic User Journey', () => {
 **Debugging Tips**:
 
 1. **Enable headed mode to see what's happening**:
+
    ```bash
    npm run test:playwright basic-user-journey.e2e.ts --headed
    ```
 
 2. **Add screenshots for debugging**:
+
    ```typescript
    await page.screenshot({ path: 'debug-screenshot.png' });
    ```
 
 3. **Check network requests**:
    ```typescript
-   page.on('request', request => {
+   page.on('request', (request) => {
      console.log('Request:', request.url());
    });
    ```
@@ -892,9 +952,11 @@ test.describe('Basic User Journey', () => {
 **Goal**: Test that projects persist across page reloads and browser sessions.
 
 **Files to create**:
+
 - `packages/web/e2e/project-persistence.e2e.ts`
 
-**Key Focus**: This tests the hash-based routing system and database persistence.
+**Key Focus**: This tests the hash-based routing system and database
+persistence.
 
 ```typescript
 // packages/web/e2e/project-persistence.e2e.ts
@@ -908,74 +970,80 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 test.describe('Project Persistence', () => {
-  test('project selection persists across page reloads', async ({ page, testEnv }) => {
+  test('project selection persists across page reloads', async ({
+    page,
+    testEnv,
+  }) => {
     await startMockServiceWorker(page);
-    
+
     const { projectSelector, chatInterface } = createPageObjects(page);
-    
+
     // Create project
     await page.goto('/');
-    
+
     const projectPath = path.join(testEnv.tempDir, 'persistent-project');
     await fs.promises.mkdir(projectPath, { recursive: true });
-    
+
     await projectSelector.createProject(testEnv.projectName, projectPath);
     await chatInterface.waitForChatReady();
-    
+
     // Capture the URL after project creation
     const projectUrl = page.url();
     expect(projectUrl).toMatch(/#\/project\/[^\/]+$/);
-    
+
     // Reload the page
     await page.reload();
-    
+
     // Verify we're still on the same project
     await expect(page).toHaveURL(projectUrl);
-    
+
     // Verify chat interface is still available
     await chatInterface.waitForChatReady();
     await expect(chatInterface.messageInput).toBeVisible();
-    
+
     await stopMockServiceWorker();
   });
 
-  test('can navigate directly to project via URL', async ({ page, testEnv }) => {
+  test('can navigate directly to project via URL', async ({
+    page,
+    testEnv,
+  }) => {
     await startMockServiceWorker(page);
-    
+
     const { projectSelector, chatInterface } = createPageObjects(page);
-    
+
     // First, create a project through normal flow
     await page.goto('/');
-    
+
     const projectPath = path.join(testEnv.tempDir, 'url-accessible-project');
     await fs.promises.mkdir(projectPath, { recursive: true });
-    
+
     await projectSelector.createProject(testEnv.projectName, projectPath);
     const projectUrl = page.url();
-    
+
     // Open a new page instance (simulating new browser session)
     await page.goto('/');
-    
+
     // Navigate directly to the project URL
     await page.goto(projectUrl);
-    
+
     // Verify we land in the correct project
     await chatInterface.waitForChatReady();
     await expect(chatInterface.messageInput).toBeVisible();
-    
+
     // Verify URL is maintained
     await expect(page).toHaveURL(projectUrl);
-    
+
     await stopMockServiceWorker();
   });
-  
+
   test('handles invalid project URLs gracefully', async ({ page, testEnv }) => {
     // Navigate to invalid project URL
     await page.goto('/#/project/nonexistent-project-id');
-    
+
     // Should redirect back to project selection
     await expect(page.getByText('New Project')).toBeVisible();
-    
+
     // URL should be clean (no invalid hash)
     const finalUrl = page.url();
     expect(finalUrl).not.toContain('#/project/nonexistent');
@@ -986,6 +1054,7 @@ test.describe('Project Persistence', () => {
 **How to test this task**:
 
 1. **Run the test and debug any failures**:
+
    ```bash
    npm run test:playwright project-persistence.e2e.ts
    ```
@@ -1008,12 +1077,15 @@ test.describe('Project Persistence', () => {
 
 ### Task 4.1: Implement Agent Stop Functionality Tests
 
-**Goal**: Test stopping LLM responses mid-stream using both ESC key and stop button.
+**Goal**: Test stopping LLM responses mid-stream using both ESC key and stop
+button.
 
 **Files to create**:
+
 - `packages/web/e2e/agent-stop-functionality.e2e.ts`
 
-**Key Challenge**: Testing interruption requires simulating slow/streaming responses.
+**Key Challenge**: Testing interruption requires simulating slow/streaming
+responses.
 
 ```typescript
 // packages/web/e2e/agent-stop-functionality.e2e.ts
@@ -1034,18 +1106,20 @@ const slowResponseHandler = http.post(
   async () => {
     // Simulate slow API response that can be interrupted
     await delay(5000); // 5 second delay
-    
+
     return HttpResponse.json({
       id: 'msg_slow_response',
       type: 'message',
       role: 'assistant',
-      content: [{
-        type: 'text',
-        text: 'This is a slow response that should be interruptible.'
-      }],
+      content: [
+        {
+          type: 'text',
+          text: 'This is a slow response that should be interruptible.',
+        },
+      ],
       model: 'claude-3-haiku-20240307',
       stop_reason: 'end_turn',
-      usage: { input_tokens: 10, output_tokens: 12 }
+      usage: { input_tokens: 10, output_tokens: 12 },
     });
   }
 );
@@ -1064,112 +1138,127 @@ test.describe('Agent Stop Functionality', () => {
     mockServiceWorker.use(slowResponseHandler);
 
     const { projectSelector, chatInterface } = createPageObjects(page);
-    
+
     // Set up project and chat
     await page.goto('/');
     const projectPath = path.join(testEnv.tempDir, 'stop-test-project');
     await fs.promises.mkdir(projectPath, { recursive: true });
-    
+
     await projectSelector.createProject(testEnv.projectName, projectPath);
     await chatInterface.waitForChatReady();
-    
+
     // Send message that will trigger slow response
     await chatInterface.sendMessage('Tell me a very long story');
-    
+
     // Wait for thinking indicator or stop button to appear
-    await expect(chatInterface.thinkingIndicator.or(chatInterface.stopButton)).toBeVisible();
-    
+    await expect(
+      chatInterface.thinkingIndicator.or(chatInterface.stopButton)
+    ).toBeVisible();
+
     // Press ESC to interrupt
     await chatInterface.pressEscapeToStop();
-    
+
     // Verify stop button disappears and send button is available again
     await expect(chatInterface.stopButton).not.toBeVisible({ timeout: 5000 });
     await expect(chatInterface.sendButton).toBeVisible();
-    
+
     // Verify we can send another message (interface is responsive)
     await chatInterface.sendMessage('Are you still there?');
-    await expect(chatInterface.getMessage('Are you still there?')).toBeVisible();
+    await expect(
+      chatInterface.getMessage('Are you still there?')
+    ).toBeVisible();
   });
 
-  test('can stop LLM response with stop button click', async ({ page, testEnv }) => {
+  test('can stop LLM response with stop button click', async ({
+    page,
+    testEnv,
+  }) => {
     mockServiceWorker.use(slowResponseHandler);
 
     const { projectSelector, chatInterface } = createPageObjects(page);
-    
+
     // Set up project and chat
     await page.goto('/');
     const projectPath = path.join(testEnv.tempDir, 'stop-button-test');
     await fs.promises.mkdir(projectPath, { recursive: true });
-    
+
     await projectSelector.createProject(testEnv.projectName, projectPath);
     await chatInterface.waitForChatReady();
-    
+
     // Send message
     await chatInterface.sendMessage('Generate a long list of items');
-    
+
     // Wait for stop button to appear
     await chatInterface.waitForStopButton();
-    
+
     // Click stop button
     await chatInterface.clickStop();
-    
+
     // Verify interface returns to ready state
     await chatInterface.waitForSendAvailable();
     await expect(chatInterface.sendButton).toBeVisible();
   });
 
-  test('handles rapid stop button clicks gracefully', async ({ page, testEnv }) => {
+  test('handles rapid stop button clicks gracefully', async ({
+    page,
+    testEnv,
+  }) => {
     mockServiceWorker.use(slowResponseHandler);
 
     const { projectSelector, chatInterface } = createPageObjects(page);
-    
+
     // Set up project and chat
     await page.goto('/');
     const projectPath = path.join(testEnv.tempDir, 'rapid-stop-test');
     await fs.promises.mkdir(projectPath, { recursive: true });
-    
+
     await projectSelector.createProject(testEnv.projectName, projectPath);
     await chatInterface.waitForChatReady();
-    
+
     // Send message
     await chatInterface.sendMessage('Process something complex');
-    
+
     // Wait for stop button
     await chatInterface.waitForStopButton();
-    
+
     // Rapid clicks (testing for race conditions)
     await chatInterface.clickStop();
     await chatInterface.clickStop();
     await chatInterface.clickStop();
-    
+
     // Interface should still work correctly
     await chatInterface.waitForSendAvailable();
     await expect(chatInterface.sendButton).toBeVisible();
-    
+
     // Should be able to send new message
     await chatInterface.sendMessage('New message after rapid stops');
-    await expect(chatInterface.getMessage('New message after rapid stops')).toBeVisible();
+    await expect(
+      chatInterface.getMessage('New message after rapid stops')
+    ).toBeVisible();
   });
 
-  test('ESC key during tool approval should not interfere', async ({ page, testEnv }) => {
+  test('ESC key during tool approval should not interfere', async ({
+    page,
+    testEnv,
+  }) => {
     // This test would require setting up tool approval scenarios
     // For now, we'll create a placeholder that can be expanded later
-    
+
     const { projectSelector, chatInterface } = createPageObjects(page);
-    
+
     await page.goto('/');
     const projectPath = path.join(testEnv.tempDir, 'tool-approval-test');
     await fs.promises.mkdir(projectPath, { recursive: true });
-    
+
     await projectSelector.createProject(testEnv.projectName, projectPath);
     await chatInterface.waitForChatReady();
-    
+
     // Send a message
     await chatInterface.sendMessage('Hello');
-    
+
     // Press ESC when no stop action is available
     await page.keyboard.press('Escape');
-    
+
     // Interface should remain functional
     await expect(chatInterface.sendButton).toBeVisible();
   });
@@ -1178,19 +1267,24 @@ test.describe('Agent Stop Functionality', () => {
 
 **Key Points About This Implementation**:
 
-1. **Real Interrupt Testing**: Uses MSW's `delay()` to create genuinely slow responses
-2. **State Verification**: Tests that UI returns to correct state after interruption  
+1. **Real Interrupt Testing**: Uses MSW's `delay()` to create genuinely slow
+   responses
+2. **State Verification**: Tests that UI returns to correct state after
+   interruption
 3. **Race Condition Testing**: Handles rapid button clicks gracefully
-4. **Cross-Feature Testing**: Ensures ESC key doesn't interfere with other features
+4. **Cross-Feature Testing**: Ensures ESC key doesn't interfere with other
+   features
 
 **How to test this task**:
 
 1. **Run in headed mode first** to see the interactions:
+
    ```bash
    npm run test:playwright agent-stop-functionality.e2e.ts --headed
    ```
 
 2. **Check for timing issues**:
+
    ```bash
    npm run test:playwright agent-stop-functionality.e2e.ts --repeat-each=5
    ```
@@ -1201,8 +1295,10 @@ test.describe('Agent Stop Functionality', () => {
    ```
 
 **Common Issues**:
-- **Stop button doesn't appear**: Check if UI shows stop button during processing
-- **ESC key not working**: Verify event handlers are set up correctly  
+
+- **Stop button doesn't appear**: Check if UI shows stop button during
+  processing
+- **ESC key not working**: Verify event handlers are set up correctly
 - **State inconsistencies**: Ensure cleanup happens after interruption
 
 **Commit message**: `test: add agent stop functionality E2E tests`
@@ -1214,6 +1310,7 @@ test.describe('Agent Stop Functionality', () => {
 **Goal**: Test the tool approval modal and workflow end-to-end.
 
 **Files to create**:
+
 - `packages/web/e2e/tool-approval-workflow.e2e.ts`
 - `packages/web/e2e/page-objects/ToolApprovalModal.ts` (extend page objects)
 
@@ -1270,7 +1367,8 @@ export class ToolApprovalModal {
 }
 ```
 
-**Note**: You'll need to add the corresponding `data-testid` attributes to the actual ToolApprovalModal component.
+**Note**: You'll need to add the corresponding `data-testid` attributes to the
+actual ToolApprovalModal component.
 
 ```typescript
 // packages/web/e2e/tool-approval-workflow.e2e.ts
@@ -1297,20 +1395,20 @@ const toolUseResponseHandler = http.post(
       content: [
         {
           type: 'text',
-          text: 'I need to use a tool to help you with that.'
+          text: 'I need to use a tool to help you with that.',
         },
         {
           type: 'tool_use',
           id: 'tool_123',
           name: 'read_file',
           input: {
-            file_path: '/example/file.txt'
-          }
-        }
+            file_path: '/example/file.txt',
+          },
+        },
       ],
       model: 'claude-3-haiku-20240307',
       stop_reason: 'tool_use',
-      usage: { input_tokens: 15, output_tokens: 25 }
+      usage: { input_tokens: 15, output_tokens: 25 },
     });
   }
 );
@@ -1324,93 +1422,104 @@ test.describe('Tool Approval Workflow', () => {
     await stopMockServiceWorker();
   });
 
-  test('shows tool approval modal when agent requests tool use', async ({ page, testEnv }) => {
+  test('shows tool approval modal when agent requests tool use', async ({
+    page,
+    testEnv,
+  }) => {
     mockServiceWorker.use(toolUseResponseHandler);
 
     const { projectSelector, chatInterface } = createPageObjects(page);
     const toolApproval = new ToolApprovalModal(page);
-    
+
     // Set up project
     await page.goto('/');
     const projectPath = path.join(testEnv.tempDir, 'tool-approval-test');
     await fs.promises.mkdir(projectPath, { recursive: true });
-    
+
     await projectSelector.createProject(testEnv.projectName, projectPath);
     await chatInterface.waitForChatReady();
-    
+
     // Send message that will trigger tool use
     await chatInterface.sendMessage('Please read a file for me');
-    
+
     // Wait for tool approval modal to appear
     await toolApproval.waitForModal();
-    
+
     // Verify modal content
     await expect(toolApproval.modal).toBeVisible();
     await expect(toolApproval.approveButton).toBeVisible();
     await expect(toolApproval.denyButton).toBeVisible();
-    
+
     // Verify tool information is displayed
     const toolName = await toolApproval.getToolName();
     expect(toolName).toContain('read_file');
   });
 
-  test('can approve tool use and continue workflow', async ({ page, testEnv }) => {
+  test('can approve tool use and continue workflow', async ({
+    page,
+    testEnv,
+  }) => {
     mockServiceWorker.use(toolUseResponseHandler);
 
     const { projectSelector, chatInterface } = createPageObjects(page);
     const toolApproval = new ToolApprovalModal(page);
-    
+
     // Set up project
     await page.goto('/');
     const projectPath = path.join(testEnv.tempDir, 'tool-approve-test');
     await fs.promises.mkdir(projectPath, { recursive: true });
-    
+
     await projectSelector.createProject(testEnv.projectName, projectPath);
     await chatInterface.waitForChatReady();
-    
+
     // Trigger tool use
     await chatInterface.sendMessage('Read file contents');
     await toolApproval.waitForModal();
-    
+
     // Approve the tool use
     await toolApproval.approveToolUse();
-    
+
     // Verify modal disappears
     await expect(toolApproval.modal).not.toBeVisible();
-    
+
     // Verify workflow continues (tool execution happens)
     // This might require additional API mocking for tool results
     await expect(chatInterface.sendButton).toBeVisible();
   });
 
-  test('can deny tool use and continue conversation', async ({ page, testEnv }) => {
+  test('can deny tool use and continue conversation', async ({
+    page,
+    testEnv,
+  }) => {
     mockServiceWorker.use(toolUseResponseHandler);
 
     const { projectSelector, chatInterface } = createPageObjects(page);
     const toolApproval = new ToolApprovalModal(page);
-    
+
     // Set up project
     await page.goto('/');
     const projectPath = path.join(testEnv.tempDir, 'tool-deny-test');
     await fs.promises.mkdir(projectPath, { recursive: true });
-    
+
     await projectSelector.createProject(testEnv.projectName, projectPath);
     await chatInterface.waitForChatReady();
-    
+
     // Trigger tool use
     await chatInterface.sendMessage('Execute a file operation');
     await toolApproval.waitForModal();
-    
+
     // Deny the tool use
     await toolApproval.denyToolUse();
-    
+
     // Verify modal disappears
     await expect(toolApproval.modal).not.toBeVisible();
-    
+
     // Verify we can continue the conversation
     await chatInterface.waitForSendAvailable();
-    await chatInterface.sendMessage('Let\'s try something else');
-    await expect(chatInterface.getMessage('Let\'s try something else')).toBeVisible();
+    await chatInterface.sendMessage("Let's try something else");
+    await expect(
+      chatInterface.getMessage("Let's try something else")
+    ).toBeVisible();
   });
 });
 ```
@@ -1433,9 +1542,11 @@ test.describe('Tool Approval Workflow', () => {
 **Goal**: Ensure tests run efficiently in parallel without flakiness.
 
 **Files to create**:
+
 - `packages/web/e2e/test-performance.config.ts`
 
 **Files to modify**:
+
 - `packages/web/playwright.config.ts`
 
 **Implementation**:
@@ -1450,39 +1561,40 @@ import baseConfig from '../playwright.config';
 
 export default defineConfig({
   ...baseConfig,
-  
+
   // Optimize for speed
   workers: process.env.CI ? 6 : 4, // More workers for faster execution
-  
+
   // Reduce timeouts where safe
   timeout: 30000, // 30 seconds per test
   expect: { timeout: 10000 }, // 10 seconds for assertions
-  
+
   // Minimal reporting for speed
   reporter: process.env.CI ? 'github' : 'list',
-  
+
   use: {
     ...baseConfig.use,
-    
+
     // Optimize browser settings
     video: 'retain-on-failure',
     trace: 'retain-on-failure',
-    
+
     // Disable animations for speed
     launchOptions: {
-      args: ['--disable-web-security', '--disable-dev-shm-usage']
-    }
+      args: ['--disable-web-security', '--disable-dev-shm-usage'],
+    },
   },
-  
+
   // Run only critical tests in fast mode
   testMatch: [
     '**/basic-user-journey.e2e.ts',
-    '**/agent-stop-functionality.e2e.ts'
-  ]
+    '**/agent-stop-functionality.e2e.ts',
+  ],
 });
 ```
 
 **Update package.json scripts**:
+
 ```json
 {
   "scripts": {
@@ -1495,11 +1607,13 @@ export default defineConfig({
 **How to test this task**:
 
 1. **Measure current test execution time**:
+
    ```bash
    time npm run test:playwright
    ```
 
 2. **Run with optimized config**:
+
    ```bash
    time npm run test:playwright:fast
    ```
@@ -1515,30 +1629,37 @@ export default defineConfig({
 **Goal**: Document the testing setup for future maintainers.
 
 **Files to create**:
+
 - `packages/web/e2e/README.md`
 - `packages/web/e2e/TROUBLESHOOTING.md`
 
-```markdown
+````markdown
 <!-- packages/web/e2e/README.md -->
+
 # E2E Testing Guide
 
 ## Overview
 
-This directory contains end-to-end tests for the Lace web application using Playwright. Tests are designed to be reliable, maintainable, and run in parallel.
+This directory contains end-to-end tests for the Lace web application using
+Playwright. Tests are designed to be reliable, maintainable, and run in
+parallel.
 
 ## Architecture
 
 ### Test Isolation
+
 - Each worker gets isolated `LACE_DIR` via `test-environment.ts` fixture
 - MSW mocks external API calls (Anthropic, OpenAI) only
 - Real application logic and database operations are tested
 
 ### Page Objects
+
 - `page-objects/` contains reusable UI interaction helpers
 - Page objects handle actions, tests handle assertions
 - Prefer `data-testid` selectors over text or CSS
 
 ### MSW Integration
+
 - `mocks/handlers.ts` defines external API responses
 - Only mock external services, never application logic
 - Use `playwright-msw` for proper test isolation
@@ -1561,6 +1682,7 @@ npm run test:playwright -- --headed
 # Fast execution for CI
 npm run test:playwright:fast
 ```
+````
 
 ## Writing New Tests
 
@@ -1611,7 +1733,7 @@ When adding `data-testid` attributes:
 ## Test Categories
 
 - `basic-user-journey.e2e.ts` - Core onboarding flow
-- `project-persistence.e2e.ts` - Data persistence and routing  
+- `project-persistence.e2e.ts` - Data persistence and routing
 - `agent-stop-functionality.e2e.ts` - Interrupt and control features
 - `tool-approval-workflow.e2e.ts` - Tool approval process
 
@@ -1622,7 +1744,8 @@ When adding `data-testid` attributes:
 - Use real codepaths - only mock external APIs
 - Make tests independent and parallel-safe
 - Commit frequently during development
-```
+
+````
 
 ```markdown
 <!-- packages/web/e2e/TROUBLESHOOTING.md -->
@@ -1701,20 +1824,22 @@ await page.screenshot({ path: 'debug-state.png' });
 
 // Record video
 // (automatically enabled on failure)
-```
+````
 
 ### Network Debugging
+
 ```typescript
-page.on('request', request => {
+page.on('request', (request) => {
   console.log('→', request.method(), request.url());
 });
 
-page.on('response', response => {
+page.on('response', (response) => {
   console.log('←', response.status(), response.url());
 });
 ```
 
 ### Element Debugging
+
 ```typescript
 // Check if element exists
 const element = page.getByTestId('my-element');
@@ -1726,6 +1851,7 @@ console.log('Element is visible');
 ```
 
 ### MSW Debugging
+
 ```typescript
 // Add logging to handlers
 export const debugHandler = http.post('*/messages', ({ request }) => {
@@ -1739,6 +1865,7 @@ export const debugHandler = http.post('*/messages', ({ request }) => {
 ### Slow Test Execution
 
 **Solutions**:
+
 1. Use `test:playwright:fast` script for optimized config
 2. Reduce test timeout if safe: `test.setTimeout(15000)`
 3. Optimize MSW handlers - avoid unnecessary delays
@@ -1747,6 +1874,7 @@ export const debugHandler = http.post('*/messages', ({ request }) => {
 ### Memory Issues
 
 **Solutions**:
+
 1. Ensure proper cleanup in test fixtures
 2. Close browser contexts explicitly if needed
 3. Reduce number of parallel workers
@@ -1755,10 +1883,11 @@ export const debugHandler = http.post('*/messages', ({ request }) => {
 ## Getting Help
 
 1. **Check existing tests** for similar patterns
-2. **Review page object implementations** for working examples  
+2. **Review page object implementations** for working examples
 3. **Run individual tests** to isolate issues
 4. **Use headed mode** to see what's actually happening
 5. **Check application logs** during test execution
+
 ```
 
 **How to test this task**:
@@ -1785,7 +1914,7 @@ This implementation plan provides a comprehensive foundation for reliable Playwr
 Once all tasks are complete, you'll have:
 
 - ✅ Parallel test execution with worker isolation
-- ✅ MSW integration for external API mocking  
+- ✅ MSW integration for external API mocking
 - ✅ Page object model for maintainable tests
 - ✅ Core user journey tests including stop functionality
 - ✅ Tool approval workflow testing
@@ -1833,7 +1962,7 @@ Based on analysis of the previous Playwright test implementation (commit 77588d2
 1. **Task management CRUD operations** - Users can create, read, update, and delete tasks within sessions, tasks persist correctly and support filtering by status/priority
 2. **Multi-agent workflows** - Different provider configurations for different agents, agent spawning API, agent listing, agent selection UI
 3. **Browser navigation support** - Browser back/forward buttons work correctly with hash-based routing, users can navigate history without losing context
-4. **Task notes and metadata** - Users can add notes to tasks and track task metadata, notes are timestamped and attributed correctly  
+4. **Task notes and metadata** - Users can add notes to tasks and track task metadata, notes are timestamped and attributed correctly
 5. **Advanced filtering and search** - Users can filter tasks by status, priority, and other criteria, filters work correctly and can be combined
 
 ### Specific Implementation Requirements
@@ -1845,7 +1974,7 @@ Based on analysis of the previous Playwright test implementation (commit 77588d2
 ### Test Priorities for Implementation
 1. **Start with Phase 3 basic user journey** as planned in original implementation plan
 2. **Add URL persistence and deep linking tests** (critical legacy behavior)
-3. **Implement stop functionality tests** (original priority + high legacy priority)  
+3. **Implement stop functionality tests** (original priority + high legacy priority)
 4. **Add session management tests** (critical legacy behavior not in original plan)
 5. **Add multi-agent support tests** (medium priority legacy behavior)
 
@@ -1859,7 +1988,7 @@ This backlog should be systematically worked through after completing the founda
 
 **Phase 1: Foundation Setup**
 - ✅ Task 1.1: Enable Parallel Execution and Worker Isolation
-- ✅ Task 1.2: Create Worker-Isolated Test Environment Fixture  
+- ✅ Task 1.2: Create Worker-Isolated Test Environment Fixture
 - ✅ Task 1.3: Set Up MSW for API Mocking
 
 **Phase 2: Basic Test Infrastructure**
@@ -1872,7 +2001,7 @@ This backlog should be systematically worked through after completing the founda
 
 **Critical Legacy Behaviors**
 - ✅ **Project creation and selection workflow** - Fully tested in basic user journey
-- ✅ **Basic chat functionality (send/receive messages)** - Tested in basic user journey  
+- ✅ **Basic chat functionality (send/receive messages)** - Tested in basic user journey
 - ✅ **URL hash persistence and deep linking** - Tested in project persistence test
   - ✅ Page reload persistence works correctly
   - ⚠️ Deep URL navigation documented (needs improvement)
@@ -1907,3 +2036,4 @@ This backlog should be systematically worked through after completing the founda
 2. **Add `data-testid` attributes as needed** for new UI elements
 3. **Extend page objects** for session and agent management
 4. **Document findings about application behavior** for product team consideration
+```

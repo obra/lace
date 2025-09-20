@@ -1,6 +1,7 @@
 # Troubleshooting & Common Issues
 
-Solutions to frequently encountered problems when working with React Router 7 Framework Mode.
+Solutions to frequently encountered problems when working with React Router 7
+Framework Mode.
 
 ## Build & Development Issues
 
@@ -13,16 +14,17 @@ Error: Cannot find module './+types/product'
 ```
 
 **Solutions:**
+
 1. **Run type generation:** `npm run dev` or `npx react-router typegen`
 2. **Check route file exists:** Ensure `app/product.tsx` exists
 3. **Restart dev server:** Sometimes types need regeneration
 
 ```typescript
 // ✅ Correct import after types are generated
-import { Route } from "./+types/product";
+import { Route } from './+types/product';
 
 // ❌ This will fail if types haven't been generated
-import { Route } from "./+types/nonexistent";
+import { Route } from './+types/nonexistent';
 ```
 
 ### Hydration Mismatches
@@ -34,6 +36,7 @@ Warning: Text content did not match. Server: "Loading..." Client: "Welcome John"
 ```
 
 **Solutions:**
+
 1. **Use `clientLoader` for browser-only data:**
 
 ```typescript
@@ -55,15 +58,15 @@ export default function Component({ loaderData }: Route.ComponentProps) {
 ```typescript
 export default function Component() {
   const [mounted, setMounted] = useState(false);
-  
+
   useEffect(() => {
     setMounted(true);
   }, []);
-  
+
   if (!mounted) {
     return <div>Loading...</div>; // Server version
   }
-  
+
   return <div>Client content</div>; // Client version
 }
 ```
@@ -75,6 +78,7 @@ export default function Component() {
 **Common Causes & Solutions:**
 
 1. **Server code in client bundle:**
+
 ```typescript
 // ❌ This will break the client build
 import { database } from "~/lib/db";
@@ -92,6 +96,7 @@ export async function loader() {
 ```
 
 2. **Missing environment variables:**
+
 ```typescript
 // ❌ Undefined env vars cause build failures
 const apiKey = process.env.API_KEY; // Might be undefined
@@ -99,11 +104,12 @@ const apiKey = process.env.API_KEY; // Might be undefined
 // ✅ Validate environment variables
 const apiKey = process.env.API_KEY;
 if (!apiKey) {
-  throw new Error("API_KEY environment variable is required");
+  throw new Error('API_KEY environment variable is required');
 }
 ```
 
 3. **Type errors:**
+
 ```bash
 # Fix TypeScript errors first
 npm run typecheck
@@ -123,26 +129,29 @@ export default function Product({ loaderData }: Route.ComponentProps) {
 ```
 
 **Solutions:**
+
 1. **Add null checks:**
+
 ```typescript
 export default function Product({ loaderData }: Route.ComponentProps) {
   if (!loaderData?.product) {
     return <div>Product not found</div>;
   }
-  
+
   return <h1>{loaderData.product.name}</h1>;
 }
 ```
 
 2. **Handle in loader:**
+
 ```typescript
 export async function loader({ params }: Route.LoaderArgs) {
   const product = await getProduct(params.id);
-  
+
   if (!product) {
-    throw new Response("Product not found", { status: 404 });
+    throw new Response('Product not found', { status: 404 });
   }
-  
+
   return { product };
 }
 ```
@@ -154,6 +163,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 **Common Issues:**
 
 1. **Missing method attribute:**
+
 ```typescript
 // ❌ Defaults to GET, won't trigger action
 <Form action="/contact">
@@ -169,6 +179,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 ```
 
 2. **Form elements outside Form component:**
+
 ```typescript
 // ❌ Input is outside Form
 <div>
@@ -186,6 +197,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 ```
 
 3. **Missing action function:**
+
 ```typescript
 // ❌ No action export
 export default function Contact() {
@@ -213,18 +225,20 @@ export default function Contact() {
 **Common Causes:**
 
 1. **Incorrect route configuration:**
+
 ```typescript
 // routes.ts
 export default [
   // ❌ This won't match /products/123
-  route("/product/:id", "./product.tsx"),
-  
+  route('/product/:id', './product.tsx'),
+
   // ✅ Correct path
-  route("/products/:id", "./product.tsx"),
+  route('/products/:id', './product.tsx'),
 ];
 ```
 
 2. **File naming mismatch:**
+
 ```typescript
 // routes.ts
 route("/products/:id", "./product.tsx"), // Looking for product.tsx
@@ -235,14 +249,15 @@ route("/products/:id", "./products.$id.tsx"),
 ```
 
 3. **Conflicting routes:**
+
 ```typescript
 export default [
-  route("/products/new", "./new-product.tsx"),
-  route("/products/:id", "./product.tsx"), // This would match "new"
-  
+  route('/products/new', './new-product.tsx'),
+  route('/products/:id', './product.tsx'), // This would match "new"
+
   // ✅ Put specific routes before dynamic ones
-  route("/products/new", "./new-product.tsx"),
-  route("/products/:id", "./product.tsx"),
+  route('/products/new', './new-product.tsx'),
+  route('/products/:id', './product.tsx'),
 ];
 ```
 
@@ -253,6 +268,7 @@ export default [
 **Solution:** Configure server to serve `index.html` for all routes:
 
 **Nginx:**
+
 ```nginx
 location / {
   try_files $uri $uri/ /index.html;
@@ -260,6 +276,7 @@ location / {
 ```
 
 **Apache (.htaccess):**
+
 ```apache
 RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-f
@@ -268,11 +285,10 @@ RewriteRule . /index.html [L]
 ```
 
 **Vercel (vercel.json):**
+
 ```json
 {
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
 ```
 
@@ -285,6 +301,7 @@ RewriteRule . /index.html [L]
 **Solutions:**
 
 1. **Use React Router forms for mutations:**
+
 ```typescript
 // ✅ This will automatically revalidate
 <Form method="post">
@@ -300,8 +317,9 @@ const handleSubmit = async () => {
 ```
 
 2. **Manual revalidation:**
+
 ```typescript
-import { useRevalidator } from "react-router";
+import { useRevalidator } from 'react-router';
 
 const revalidator = useRevalidator();
 
@@ -318,6 +336,7 @@ const handleUpdate = async () => {
 **Solutions:**
 
 1. **Use streaming/Suspense:**
+
 ```typescript
 import { Suspense } from "react";
 import { Await } from "react-router";
@@ -333,7 +352,7 @@ export default function Component({ loaderData }: Route.ComponentProps) {
   return (
     <div>
       <h1>{loaderData.criticalData.title}</h1>
-      
+
       <Suspense fallback={<div>Loading additional data...</div>}>
         <Await resolve={loaderData.slowData}>
           {(data) => <SlowComponent data={data} />}
@@ -345,6 +364,7 @@ export default function Component({ loaderData }: Route.ComponentProps) {
 ```
 
 2. **Optimize database queries:**
+
 ```typescript
 // ❌ N+1 query problem
 export async function loader() {
@@ -381,6 +401,7 @@ export default function Product({ loaderData }: Route.ComponentProps) {
 **Solutions:**
 
 1. **Check loader return type matches usage:**
+
 ```typescript
 // ✅ Ensure loader returns what component expects
 export async function loader({ params }: Route.LoaderArgs) {
@@ -391,11 +412,13 @@ export async function loader({ params }: Route.LoaderArgs) {
 ```
 
 2. **Regenerate types:**
+
 ```bash
 npx react-router typegen
 ```
 
 3. **Manual type assertion (temporary):**
+
 ```typescript
 export default function Product({ loaderData }: Route.ComponentProps) {
   const data = loaderData as { product: Product };
@@ -412,12 +435,14 @@ export default function Product({ loaderData }: Route.ComponentProps) {
 **Solutions:**
 
 1. **Analyze bundle:**
+
 ```bash
 npm run build
 npx vite-bundle-analyzer dist
 ```
 
 2. **Lazy load heavy components:**
+
 ```typescript
 import { lazy, Suspense } from "react";
 
@@ -436,6 +461,7 @@ export default function Dashboard() {
 ```
 
 3. **Split vendor chunks:**
+
 ```typescript
 // vite.config.ts
 export default defineConfig({
@@ -473,22 +499,26 @@ process.env.DEBUG = 'react-router:*';
 ### Common Console Errors
 
 **"Cannot read properties of null"**
+
 - Check if DOM elements exist before accessing
 - Add null checks for optional data
 
 **"React Hook called conditionally"**
+
 - Ensure hooks are called in the same order every render
 - Don't call hooks inside loops or conditions
 
 **"Hydration failed"**
+
 - Server and client must render identical HTML
 - Use `clientLoader` for browser-only data
 
 ### React Developer Tools
 
 Install React Router DevTools extension for:
+
 - Route inspection
-- Data flow visualization  
+- Data flow visualization
 - Performance monitoring
 
 ## Getting Help
@@ -502,4 +532,6 @@ When stuck:
 5. **Search GitHub issues** for similar problems
 6. **Create minimal reproduction** to isolate the problem
 
-Most React Router 7 issues stem from configuration mismatches, missing files, or incorrect data access patterns. Following the framework conventions closely usually resolves most problems.
+Most React Router 7 issues stem from configuration mismatches, missing files, or
+incorrect data access patterns. Following the framework conventions closely
+usually resolves most problems.

@@ -2,39 +2,48 @@
 
 ## Overview
 
-Replace the current direct-communication delegate tool with a task-based implementation that supports parallel execution when the LLM backend makes multiple delegate tool calls simultaneously.
+Replace the current direct-communication delegate tool with a task-based
+implementation that supports parallel execution when the LLM backend makes
+multiple delegate tool calls simultaneously.
 
-**Note**: This plan leverages the existing agent spawning infrastructure (Phase 1 complete) and web UI architecture rather than implementing the original agent spawning spec's separate components.
+**Note**: This plan leverages the existing agent spawning infrastructure (Phase
+1 complete) and web UI architecture rather than implementing the original agent
+spawning spec's separate components.
 
 ## Problem Statement
 
-The current delegate tool has shared state that causes conflicts when multiple delegate calls are executed in parallel:
+The current delegate tool has shared state that causes conflicts when multiple
+delegate calls are executed in parallel:
 
 ```typescript
 export class DelegateTool extends Tool {
-  private parentAgent?: Agent;           // ⚠️ SHARED STATE
+  private parentAgent?: Agent; // ⚠️ SHARED STATE
   private parentToolExecutor?: ToolExecutor; // ⚠️ SHARED STATE
 }
 ```
 
 When the LLM makes multiple delegate tool calls in a single response:
+
 ```json
 {
   "tool_calls": [
     {"name": "delegate", "args": {"title": "Parse logs", ...}},
-    {"name": "delegate", "args": {"title": "Count files", ...}},  
+    {"name": "delegate", "args": {"title": "Count files", ...}},
     {"name": "delegate", "args": {"title": "Check tests", ...}}
   ]
 }
 ```
 
-All three calls execute simultaneously and interfere with each other through shared state.
+All three calls execute simultaneously and interfere with each other through
+shared state.
 
 ## Solution: Task-Based Delegate Tool
 
-Replace the direct agent communication with task-based delegation that leverages the existing agent spawning infrastructure.
+Replace the direct agent communication with task-based delegation that leverages
+the existing agent spawning infrastructure.
 
 ### Benefits
+
 - **Natural parallelism**: Each delegate call gets its own isolated agent
 - **No shared state**: Zero possibility of conflicts between parallel calls
 - **Consistent architecture**: Aligns with multi-agent task-based coordination
@@ -71,7 +80,8 @@ const ModelFormat = z.string().refine(
     return providerName && modelName;
   },
   {
-    message: 'Invalid model format. Use "provider:model" (e.g., "anthropic:claude-3-5-haiku-latest")',
+    message:
+      'Invalid model format. Use "provider:model" (e.g., "anthropic:claude-3-5-haiku-latest")',
   }
 );
 
@@ -79,7 +89,9 @@ const delegateSchema = z.object({
   title: NonEmptyString.describe(
     'Short active voice sentence describing the task (e.g., "Find security vulnerabilities")'
   ),
-  prompt: NonEmptyString.describe('Complete instructions for the subagent - be specific and clear'),
+  prompt: NonEmptyString.describe(
+    'Complete instructions for the subagent - be specific and clear'
+  ),
   expected_response: NonEmptyString.describe(
     'Description of the expected format/content of the response (guides the subagent)'
   ),
@@ -113,39 +125,45 @@ Examples:
 
       // Get TaskManager from context
       const taskManager = this.getTaskManagerFromContext(context);
-      
+
       // Parse provider:model format
       const [providerName, modelName] = model.split(':');
 
       // Create task with agent spawning
-      const task = await taskManager.createTask({
-        title,
-        prompt: this.formatDelegatePrompt(prompt, expected_response),
-        assignedTo: `new:${providerName}/${modelName}`,
-        priority: 'high'
-      }, {
-        actor: context?.threadId || 'unknown'
-      });
+      const task = await taskManager.createTask(
+        {
+          title,
+          prompt: this.formatDelegatePrompt(prompt, expected_response),
+          assignedTo: `new:${providerName}/${modelName}`,
+          priority: 'high',
+        },
+        {
+          actor: context?.threadId || 'unknown',
+        }
+      );
 
       logger.debug('DelegateTool: Created task for delegation', {
         taskId: task.id,
         title,
-        model: `${providerName}/${modelName}`
+        model: `${providerName}/${modelName}`,
       });
 
       // Wait for task completion via events
-      const result = await this.waitForTaskCompletion(task.id, taskManager, context?.threadId || 'unknown');
-      
+      const result = await this.waitForTaskCompletion(
+        task.id,
+        taskManager,
+        context?.threadId || 'unknown'
+      );
+
       logger.debug('DelegateTool: Task completed', {
         taskId: task.id,
-        resultLength: result.length
+        resultLength: result.length,
       });
 
       return this.createResult(result, {
         taskTitle: title,
-        taskId: task.id
+        taskId: task.id,
       });
-
     } catch (error: unknown) {
       return this.createError(
         `Delegate tool execution failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}. Check the parameters and try again.`
@@ -159,7 +177,10 @@ Examples:
     throw new Error('TaskManager context access needs implementation');
   }
 
-  private formatDelegatePrompt(prompt: string, expectedResponse: string): string {
+  private formatDelegatePrompt(
+    prompt: string,
+    expectedResponse: string
+  ): string {
     return `${prompt}
 
 IMPORTANT: Your response should match this format/structure:
@@ -168,10 +189,17 @@ ${expectedResponse}
 Please complete the task and provide your response in the expected format.`;
   }
 
-  private async waitForTaskCompletion(taskId: string, taskManager: TaskManager, creatorThreadId: string): Promise<string> {
+  private async waitForTaskCompletion(
+    taskId: string,
+    taskManager: TaskManager,
+    creatorThreadId: string
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       const handleTaskUpdate = (event: any) => {
-        if (event.task.id === taskId && event.creatorThreadId === creatorThreadId) {
+        if (
+          event.task.id === taskId &&
+          event.creatorThreadId === creatorThreadId
+        ) {
           if (event.task.status === 'completed') {
             taskManager.off('task:updated', handleTaskUpdate);
             const response = this.extractResponseFromTask(event.task);
@@ -182,7 +210,7 @@ Please complete the task and provide your response in the expected format.`;
           }
         }
       };
-      
+
       taskManager.on('task:updated', handleTaskUpdate);
     });
   }
@@ -193,7 +221,7 @@ Please complete the task and provide your response in the expected format.`;
       .filter((note: any) => note.author !== task.createdBy) // Exclude creator's notes
       .map((note: any) => note.content)
       .join('\n\n');
-    
+
     return response || 'Task completed without response';
   }
 }
@@ -217,14 +245,14 @@ private async setupAgentCreationCallback(): void {
     // Check concurrent task limit
     const activeTasks = this._taskManager.getTasks({ status: 'in_progress' });
     const delegateTasks = activeTasks.filter(t => t.assignedTo?.startsWith('lace_'));
-    
+
     if (delegateTasks.length >= Session.MAX_CONCURRENT_DELEGATE_TASKS) {
       throw new Error(`Maximum concurrent delegate tasks (${Session.MAX_CONCURRENT_DELEGATE_TASKS}) exceeded`);
     }
 
     // Create agent with context inheritance and tool filtering
     const agent = this.spawnAgentWithFilteredTools(`task-${task.id.split('_').pop()}`, provider, model);
-    
+
     // Set up error handler for task failure on agent crash
     agent.on('error', (error) => {
       this._taskManager.updateTask(task.id, { status: 'blocked' }, { actor: agent.threadId });
@@ -232,7 +260,7 @@ private async setupAgentCreationCallback(): void {
 
     // Inherit context from parent
     this.inheritParentContext(agent);
-    
+
     await this.sendTaskNotification(agent, task);
     return asThreadId(agent.threadId);
   };
@@ -250,7 +278,7 @@ private spawnAgentWithFilteredTools(name: string, provider?: string, model?: str
   const allTools = this._sessionAgent.toolExecutor.getAllTools();
   const toolsWithoutDelegate = allTools.filter(tool => tool.name !== 'delegate');
   filteredToolExecutor.registerTools(toolsWithoutDelegate);
-  
+
   // Copy approval callback
   const approvalCallback = this._sessionAgent.toolExecutor.getApprovalCallback();
   if (approvalCallback) {
@@ -294,7 +322,7 @@ private inheritParentContext(agent: Agent): void {
   // Inherit working directory and environment from session
   const sessionWorkingDir = this.getWorkingDirectory();
   const sessionEnv = this.getEffectiveConfiguration().environment || {};
-  
+
   agent.updateThreadMetadata({
     ...agent.getThreadMetadata(),
     workingDirectory: sessionWorkingDir,
@@ -325,8 +353,10 @@ Update tool execution to pass TaskManager in context:
 // In tool execution method
 const context: ToolContext = {
   threadId: this._getActiveThreadId(),
-  parentThreadId: this._threadManager.getCanonicalId(this._threadId).split('.')[0],
-  taskManager: this._session?.getTaskManager() // Add this
+  parentThreadId: this._threadManager
+    .getCanonicalId(this._threadId)
+    .split('.')[0],
+  taskManager: this._session?.getTaskManager(), // Add this
 };
 ```
 
@@ -347,7 +377,8 @@ this.emit('task:updated', {
 
 ### Phase 3: Update Agent-Task Communication
 
-The spawned agents need to communicate their results back through task notes rather than direct responses.
+The spawned agents need to communicate their results back through task notes
+rather than direct responses.
 
 **File**: `src/agents/agent.ts`
 
@@ -378,6 +409,7 @@ private async handleResponseComplete(content: string): Promise<void> {
 ### Phase 4: Remove Old Delegate Implementation
 
 **Files to Update**:
+
 - `src/tools/implementations/delegate.ts` - Replace entirely
 - Remove any references to `setDependencies` method
 - Update any tests that rely on the old implementation
@@ -414,7 +446,7 @@ ${task.prompt}
 IMPORTANT TASK MANAGEMENT:
 When you complete your work or encounter an issue:
 1. Add your response as a task note using the task management tools
-2. Update task status to 'completed' or 'blocked' 
+2. Update task status to 'completed' or 'blocked'
 3. This will automatically notify the parent agent
 
 Task management tools are available for this purpose.
@@ -438,13 +470,25 @@ describe('Task-Based DelegateTool', () => {
   it('should handle parallel delegations without conflicts', async () => {
     // Test multiple simultaneous delegate calls
     const tool1 = new DelegateTool();
-    const tool2 = new DelegateTool(); 
+    const tool2 = new DelegateTool();
     const tool3 = new DelegateTool();
 
     const [result1, result2, result3] = await Promise.all([
-      tool1.execute({title: "Task 1", prompt: "...", model: "anthropic:claude-3-haiku"}),
-      tool2.execute({title: "Task 2", prompt: "...", model: "anthropic:claude-3-haiku"}),
-      tool3.execute({title: "Task 3", prompt: "...", model: "anthropic:claude-3-haiku"})
+      tool1.execute({
+        title: 'Task 1',
+        prompt: '...',
+        model: 'anthropic:claude-3-haiku',
+      }),
+      tool2.execute({
+        title: 'Task 2',
+        prompt: '...',
+        model: 'anthropic:claude-3-haiku',
+      }),
+      tool3.execute({
+        title: 'Task 3',
+        prompt: '...',
+        model: 'anthropic:claude-3-haiku',
+      }),
     ]);
 
     expect(result1.success).toBe(true);
@@ -478,20 +522,20 @@ Test full delegation workflow with real agents and task manager.
 
 ## Risks and Mitigations
 
-**Risk**: Event listener memory leaks
-**Mitigation**: Ensure proper cleanup of event listeners on task completion/failure
+**Risk**: Event listener memory leaks **Mitigation**: Ensure proper cleanup of
+event listeners on task completion/failure
 
-**Risk**: Database contention with many parallel delegations
-**Mitigation**: Optimize task queries and consider connection pooling
+**Risk**: Database contention with many parallel delegations **Mitigation**:
+Optimize task queries and consider connection pooling
 
-**Risk**: Agent resource accumulation
-**Mitigation**: Keep spawned agents alive for reuse, but implement session-level cleanup on destroy
+**Risk**: Agent resource accumulation **Mitigation**: Keep spawned agents alive
+for reuse, but implement session-level cleanup on destroy
 
-**Risk**: Spawned agent crashes without task update
-**Mitigation**: Add agent error handlers that automatically mark tasks as blocked
+**Risk**: Spawned agent crashes without task update **Mitigation**: Add agent
+error handlers that automatically mark tasks as blocked
 
-**Risk**: Response formatting differences
-**Mitigation**: Maintain consistent response format through task note aggregation
+**Risk**: Response formatting differences **Mitigation**: Maintain consistent
+response format through task note aggregation
 
 ## Success Criteria
 
@@ -509,7 +553,7 @@ Test full delegation workflow with real agents and task manager.
 
 - **Phase 1-2**: 2 days - Core implementation
 - **Phase 3**: 1 day - Agent-task communication
-- **Phase 4**: 1 day - Cleanup old implementation  
+- **Phase 4**: 1 day - Cleanup old implementation
 - **Phase 5**: 1 day - Session integration
 - **Testing**: 2 days - Comprehensive testing
 - **Total**: ~1 week
@@ -519,12 +563,15 @@ Test full delegation workflow with real agents and task manager.
 ### Relationship to Existing Systems
 
 **Agent Spawning Infrastructure** (Phase 1 Complete):
+
 - ✅ Task assignment to "new:provider/model" triggers agent creation
 - ✅ TaskManager with AgentCreationCallback integration
-- ✅ Thread metadata storage via `updateThreadMetadata()` / `getThreadMetadata()`
+- ✅ Thread metadata storage via `updateThreadMetadata()` /
+  `getThreadMetadata()`
 - ✅ Full test coverage for agent spawning functionality
 
 **Web UI Architecture** (Fully Implemented):
+
 - ✅ Real-time agent management via Next.js + SSE
 - ✅ Session-scoped event streams for multi-agent coordination
 - ✅ Dynamic agent creation through session API
@@ -532,6 +579,7 @@ Test full delegation workflow with real agents and task manager.
 - ✅ No thread switching needed - UI handles multiple agents
 
 **Current Task System**:
+
 - ✅ Full task CRUD operations with persistence
 - ✅ Task notes and status management
 - ✅ Event-driven task updates via SSE
@@ -539,16 +587,26 @@ Test full delegation workflow with real agents and task manager.
 
 ### Why This Approach Works Better
 
-**vs. Original Agent Spawning Spec** (`docs/implementation/04-agent-spawning.md`):
-- ❌ **Separate agent_metadata table** → ✅ **Thread metadata** (integrated, simpler)
-- ❌ **Agent.createForTask() static method** → ✅ **Session.spawnAgent()** (proven pattern)
+**vs. Original Agent Spawning Spec**
+(`docs/implementation/04-agent-spawning.md`):
+
+- ❌ **Separate agent_metadata table** → ✅ **Thread metadata** (integrated,
+  simpler)
+- ❌ **Agent.createForTask() static method** → ✅ **Session.spawnAgent()**
+  (proven pattern)
 - ❌ **Thread switching utilities** → ✅ **Web UI management** (superior UX)
 - ❌ **Manual task notifications** → ✅ **Event-driven SSE system** (real-time)
 
 **vs. Current Delegate Tool**:
-- ❌ **Shared state conflicts** → ✅ **Isolated task-based agents** (parallel-safe)
-- ❌ **Direct communication** → ✅ **Database-mediated coordination** (observable)
-- ❌ **Limited observability** → ✅ **Full task tracking** (web UI + persistence)
+
+- ❌ **Shared state conflicts** → ✅ **Isolated task-based agents**
+  (parallel-safe)
+- ❌ **Direct communication** → ✅ **Database-mediated coordination**
+  (observable)
+- ❌ **Limited observability** → ✅ **Full task tracking** (web UI +
+  persistence)
 - ❌ **No resource limits** → ✅ **Concurrent task limits** (16 per session)
 
-This replaces the problematic shared-state delegate tool with a robust, parallel-safe task-based implementation that leverages proven architecture patterns and existing infrastructure.
+This replaces the problematic shared-state delegate tool with a robust,
+parallel-safe task-based implementation that leverages proven architecture
+patterns and existing infrastructure.

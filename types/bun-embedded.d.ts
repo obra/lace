@@ -10,7 +10,7 @@ declare global {
       name: string;
       text(): Promise<string>;
     }
-    
+
     const embeddedFiles: ReadonlyArray<EmbeddedFile> | undefined;
   }
 }

@@ -2,84 +2,114 @@
 
 ## Executive Summary
 
-Currently, Lace's backend captures and logs errors from providers, tools, and agent operations, but these errors are never surfaced to the frontend. Users have no visibility into backend failures, making debugging and recovery impossible. This plan implements a comprehensive error propagation system that surfaces all backend errors to the UI through the existing SSE stream architecture.
+Currently, Lace's backend captures and logs errors from providers, tools, and
+agent operations, but these errors are never surfaced to the frontend. Users
+have no visibility into backend failures, making debugging and recovery
+impossible. This plan implements a comprehensive error propagation system that
+surfaces all backend errors to the UI through the existing SSE stream
+architecture.
 
 ## Current State Analysis
 
 ### Error Sources Identified
-1. **Agent Errors**: Provider API failures, streaming errors, conversation processing failures, tool execution failures
-2. **Already Partially Captured**: Agent class already emits `error` events, but they're not forwarded to frontend
+
+1. **Agent Errors**: Provider API failures, streaming errors, conversation
+   processing failures, tool execution failures
+2. **Already Partially Captured**: Agent class already emits `error` events, but
+   they're not forwarded to frontend
 
 ### Current Architecture Analysis
-- **Backend**: Agent emits `error` events (line 756 in agent.ts), but SessionService doesn't forward them
-- **Event System**: Robust SSE streaming via EventStreamManager, ready for error events
-- **Frontend**: Error boundaries and API error handling, but no backend error visibility  
+
+- **Backend**: Agent emits `error` events (line 756 in agent.ts), but
+  SessionService doesn't forward them
+- **Event System**: Robust SSE streaming via EventStreamManager, ready for error
+  events
+- **Frontend**: Error boundaries and API error handling, but no backend error
+  visibility
 - **Event Types**: 42 event types defined, but no error-specific events
-- **Tool Architecture**: ToolExecutor instances per agent, return ToolResult with error status instead of emitting events
-- **Provider Architecture**: Errors flow through Agent's provider response handling
+- **Tool Architecture**: ToolExecutor instances per agent, return ToolResult
+  with error status instead of emitting events
+- **Provider Architecture**: Errors flow through Agent's provider response
+  handling
 
 ### Architectural Context
+
 - Event-sourced architecture with immutable event sequences
-- SSE streaming via EventStreamManager with client-side filtering  
+- SSE streaming via EventStreamManager with client-side filtering
 - React frontend with useEventStream hook for real-time updates
 - Strongly-typed event system with discriminated unions
-- **Key Discovery**: Agent ownership hierarchy handles error propagation - Tool → ToolExecutor → Agent → SessionService
+- **Key Discovery**: Agent ownership hierarchy handles error propagation - Tool
+  → ToolExecutor → Agent → SessionService
 
 ## Design Alternatives Analysis
 
 ### Alternative 1: Logging-Based Error Capture
-**Approach**: Intercept logger.error() calls and convert to events
-**Pros**: Captures all existing errors without code changes
-**Cons**: Unstructured, hard to categorize, loses context
-**Decision**: Rejected - loses semantic meaning
 
-### Alternative 2: Event-Based Error Propagation ⭐ RECOMMENDED  
-**Approach**: Extend existing LaceEvent system with single AGENT_ERROR event type, enhance existing agent error emission
-**Pros**: Leverages existing infrastructure, minimal changes, preserves context, follows ownership hierarchy
+**Approach**: Intercept logger.error() calls and convert to events **Pros**:
+Captures all existing errors without code changes **Cons**: Unstructured, hard
+to categorize, loses context **Decision**: Rejected - loses semantic meaning
+
+### Alternative 2: Event-Based Error Propagation ⭐ RECOMMENDED
+
+**Approach**: Extend existing LaceEvent system with single AGENT_ERROR event
+type, enhance existing agent error emission **Pros**: Leverages existing
+infrastructure, minimal changes, preserves context, follows ownership hierarchy
 **Cons**: Requires enhancing existing error emission with more context
 **Decision**: Selected - best architectural fit with minimal disruption
 
 ### Alternative 3: Separate Error Channel
-**Approach**: Create dedicated error WebSocket/SSE endpoint
-**Pros**: Clean separation of concerns
-**Cons**: Duplicates infrastructure, complicates client-side handling
-**Decision**: Rejected - over-engineering
+
+**Approach**: Create dedicated error WebSocket/SSE endpoint **Pros**: Clean
+separation of concerns **Cons**: Duplicates infrastructure, complicates
+client-side handling **Decision**: Rejected - over-engineering
 
 ### Alternative 4: HTTP Polling Error Log
-**Approach**: REST endpoint that clients poll for recent errors
-**Pros**: Simple to implement
-**Cons**: Not real-time, poor user experience
-**Decision**: Rejected - doesn't meet real-time requirements
+
+**Approach**: REST endpoint that clients poll for recent errors **Pros**: Simple
+to implement **Cons**: Not real-time, poor user experience **Decision**:
+Rejected - doesn't meet real-time requirements
 
 ## Implementation Plan
 
 ### Phase 1: Define Error Event Types
 
-#### Task 1.1: Extend LaceEvent Types  
+#### Task 1.1: Extend LaceEvent Types
+
 **Files**: `packages/core/src/threads/types.ts`
 
 Add single error event type to EVENT_TYPES array:
+
 ```typescript
 // Add to EVENT_TYPES array (line 42):
 'AGENT_ERROR',
 ```
 
 Add error data interface (simplified, unified approach):
+
 ```typescript
 // Add after line 150:
 interface AgentErrorData {
-  errorType: 'provider_failure' | 'tool_execution' | 'processing_error' | 'timeout' | 'streaming_error';
+  errorType:
+    | 'provider_failure'
+    | 'tool_execution'
+    | 'processing_error'
+    | 'timeout'
+    | 'streaming_error';
   message: string;
   stack?: string;
   context: {
-    phase: 'provider_response' | 'tool_execution' | 'conversation_processing' | 'initialization';
+    phase:
+      | 'provider_response'
+      | 'tool_execution'
+      | 'conversation_processing'
+      | 'initialization';
     // Available from Agent
-    providerName?: string;        // From this.providerInstance?.providerName
-    providerInstanceId?: string;  // From thread metadata  
-    modelId?: string;            // From thread metadata
+    providerName?: string; // From this.providerInstance?.providerName
+    providerInstanceId?: string; // From thread metadata
+    modelId?: string; // From thread metadata
     // For tool-related errors
-    toolName?: string;           // When phase === 'tool_execution'
-    toolCallId?: string;         // When phase === 'tool_execution'
+    toolName?: string; // When phase === 'tool_execution'
+    toolCallId?: string; // When phase === 'tool_execution'
     // Additional context
     workingDirectory?: string;
     retryAttempt?: number;
@@ -90,6 +120,7 @@ interface AgentErrorData {
 ```
 
 Update LaceEvent union type:
+
 ```typescript
 // Add to LaceEvent union type (around line 200):
 | {
@@ -99,26 +130,35 @@ Update LaceEvent union type:
 ```
 
 Update isTransientEventType function:
+
 ```typescript
 // Add to isTransientEventType function (line 50):
 'AGENT_ERROR',
 ```
 
-**Testing**: 
+**Testing**:
+
 - File: `packages/core/src/threads/types.test.ts`
 - Test error event type validation
 - Test isTransientEventType for error events
 - Test error data interface validation
 
 #### Task 1.2: Create Web Error Types
+
 **Files**: `packages/web/types/web-events.ts`
 
 Add error display interfaces:
+
 ```typescript
 // Add after line 62:
 export interface ErrorEntry extends TimelineEntry {
   type: 'error';
-  errorType: 'provider_failure' | 'tool_execution' | 'processing_error' | 'timeout' | 'streaming_error';
+  errorType:
+    | 'provider_failure'
+    | 'tool_execution'
+    | 'processing_error'
+    | 'timeout'
+    | 'streaming_error';
   errorMessage: string;
   errorContext?: Record<string, unknown>;
   isRetryable: boolean;
@@ -130,7 +170,12 @@ export interface ErrorEntry extends TimelineEntry {
 export interface ErrorLogEntry {
   id: string;
   timestamp: Date;
-  errorType: 'provider_failure' | 'tool_execution' | 'processing_error' | 'timeout' | 'streaming_error';
+  errorType:
+    | 'provider_failure'
+    | 'tool_execution'
+    | 'processing_error'
+    | 'timeout'
+    | 'streaming_error';
   severity: 'warning' | 'error' | 'critical';
   message: string;
   context: Record<string, unknown>;
@@ -146,30 +191,35 @@ export interface ErrorLogEntry {
 ```
 
 **Testing**:
+
 - File: `packages/web/types/web-events.test.ts`
 - Test error entry interface validation
 - Test error log entry interface validation
 
 ### Phase 2: Backend Error Capture
 
-#### Task 2.1: Enhance Agent Error Emission  
+#### Task 2.1: Enhance Agent Error Emission
+
 **Files**: `packages/core/src/agents/agent.ts`
 
 **CRITICAL REQUIREMENTS**:
+
 - NO `any` types allowed - use proper TypeScript types
-- NO mocking the functionality under test - use real implementations  
+- NO mocking the functionality under test - use real implementations
 - Test-first approach - write failing tests before implementation
 - NO backward compatibility - clean implementation
 
-**Key Insight**: Agent already emits `error` events, but they lack context for UI display. Enhance existing error emission instead of creating new events.
+**Key Insight**: Agent already emits `error` events, but they lack context for
+UI display. Enhance existing error emission instead of creating new events.
 
 **Location**: Line 756 (existing provider error handling)
+
 ```typescript
 // ENHANCE existing error emission with structured data:
 this.emit('error', {
   error: error instanceof Error ? error : new Error(String(error)),
-  context: { 
-    phase: 'provider_response', 
+  context: {
+    phase: 'provider_response',
     threadId: this._threadId,
     // ADD: Enhanced context for error propagation
     errorType: 'provider_failure',
@@ -182,7 +232,8 @@ this.emit('error', {
 });
 ```
 
-**Location**: Line 832 (conversation processing error)  
+**Location**: Line 832 (conversation processing error)
+
 ```typescript
 // ENHANCE existing error emission:
 logger.error('AGENT: Unexpected error in conversation processing', {
@@ -208,6 +259,7 @@ this.emit('error', {
 ```
 
 **Location**: Line 1343 (tool execution error)
+
 ```typescript
 // ENHANCE existing error logging with error emission:
 logger.error('AGENT: Tool execution failed', {
@@ -220,7 +272,12 @@ logger.error('AGENT: Tool execution failed', {
 
 // ADD: Emit error event for tool failures
 this.emit('error', {
-  error: error instanceof Error ? error : new Error(`Tool execution failed: ${error instanceof Error ? error.message : String(error)}`),
+  error:
+    error instanceof Error
+      ? error
+      : new Error(
+          `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`
+        ),
   context: {
     phase: 'tool_execution',
     threadId: this._threadId,
@@ -237,6 +294,7 @@ this.emit('error', {
 ```
 
 Add helper method:
+
 ```typescript
 // Add after line 1570:
 private isRetryableError(error: unknown): boolean {
@@ -245,7 +303,7 @@ private isRetryableError(error: unknown): boolean {
     if (error.message.includes('network') || error.message.includes('timeout')) {
       return true;
     }
-    // Rate limit errors are retryable  
+    // Rate limit errors are retryable
     if (error.message.includes('rate limit') || error.message.includes('quota')) {
       return true;
     }
@@ -259,10 +317,11 @@ private isRetryableError(error: unknown): boolean {
 ```
 
 **Testing**:
+
 - File: `packages/core/src/agents/agent-error-emission.test.ts` (NEW)
 - Test enhanced error event emission for provider failures
 - Test enhanced error event emission for processing errors
-- Test enhanced error event emission for tool execution failures  
+- Test enhanced error event emission for tool execution failures
 - Test isRetryableError logic for different error types
 - Test error context preservation and structure
 - NO mocking of agent functionality - use real agent instances
@@ -270,115 +329,142 @@ private isRetryableError(error: unknown): boolean {
 
 #### Task 2.2: ~~Enhance ToolExecutor Error Reporting~~ (REMOVED)
 
-**Key Insight**: ToolExecutor doesn't need to emit events. Tool errors already flow through Agent error handling at line 1343 where tool execution failures are caught and logged. This follows the ownership hierarchy: Tool → ToolExecutor → Agent.
+**Key Insight**: ToolExecutor doesn't need to emit events. Tool errors already
+flow through Agent error handling at line 1343 where tool execution failures are
+caught and logged. This follows the ownership hierarchy: Tool → ToolExecutor →
+Agent.
 
 The existing error flow is:
-1. Tool execution fails in `executeToolDirect()` 
+
+1. Tool execution fails in `executeToolDirect()`
 2. Error caught and returned as ToolResult with 'failed' status
 3. Agent receives error ToolResult and emits error event (enhanced in Task 2.1)
 
-**No changes needed to ToolExecutor** - it correctly returns error results that Agent handles.
+**No changes needed to ToolExecutor** - it correctly returns error results that
+Agent handles.
 
 #### Task 2.3: ~~Add Provider Error Forwarding~~ (REMOVED)
 
-**Key Insight**: Provider errors are already captured in Agent class (Task 2.1, line 756). Agent handles provider calls and emits error events when providers fail. The ownership hierarchy is correct: Provider → Agent.
+**Key Insight**: Provider errors are already captured in Agent class (Task 2.1,
+line 756). Agent handles provider calls and emits error events when providers
+fail. The ownership hierarchy is correct: Provider → Agent.
 
-**No additional implementation needed** - provider errors flow through existing Agent error handling.
+**No additional implementation needed** - provider errors flow through existing
+Agent error handling.
 
 #### Task 2.4: ~~Implement System Error Capture~~ (REMOVED)
 
-**Key Insight**: "System errors" are actually context-specific errors that should flow through their respective ownership hierarchies:
+**Key Insight**: "System errors" are actually context-specific errors that
+should flow through their respective ownership hierarchies:
+
 - Database errors → ThreadManager/ThreadPersistence → (if needed) through Agent
-- File system errors → Tool execution → Agent error handling  
+- File system errors → Tool execution → Agent error handling
 - Environment errors → Tool/Agent initialization → Agent error handling
 
-Creating a global SystemErrorCapture would bypass the ownership hierarchy and lose important context.
+Creating a global SystemErrorCapture would bypass the ownership hierarchy and
+lose important context.
 
-**No additional implementation needed** - system-level errors should be handled at their point of occurrence and flow through existing hierarchies.
+**No additional implementation needed** - system-level errors should be handled
+at their point of occurrence and flow through existing hierarchies.
 
 ### Phase 3: Error Broadcasting
 
-#### Task 3.1: Update EventStreamManager to Handle Agent Errors  
+#### Task 3.1: Update EventStreamManager to Handle Agent Errors
+
 **Files**: `packages/web/lib/event-stream-manager.ts`
 
-**Key Insight**: The implementer correctly enhanced Agent error emission but created an unnecessary `ErrorEventBridge` class. We should use the existing `EventStreamManager.registerSession()` pattern instead.
+**Key Insight**: The implementer correctly enhanced Agent error emission but
+created an unnecessary `ErrorEventBridge` class. We should use the existing
+`EventStreamManager.registerSession()` pattern instead.
 
 **FIRST: Delete the unnecessary bridge**
-- Delete file: `packages/core/src/agents/error-event-bridge.ts`  
+
+- Delete file: `packages/core/src/agents/error-event-bridge.ts`
 - Remove unused import and field from `packages/core/src/agents/agent.ts`:
   - Remove `import { ErrorEventBridge } from './error-event-bridge';`
   - Remove `private readonly _errorEventBridge: ErrorEventBridge;`
 
 **SECOND: Add agent error handling to existing EventStreamManager**
 
-**Location**: In `EventStreamManager.registerSession()` method, after existing task event handlers (around line 176)
+**Location**: In `EventStreamManager.registerSession()` method, after existing
+task event handlers (around line 176)
+
 ```typescript
 // Handle agent errors (same pattern as task events)
 const agents = session.getAgents();
 for (const agentInfo of agents) {
   const agent = session.getAgent(agentInfo.threadId);
   if (agent) {
-    agent.on('error', (errorEvent: { error: Error; context: Record<string, unknown> }) => {
-      const { error, context } = errorEvent;
-      
-      logger.debug(
-        `[EVENT_STREAM] Agent ${agentInfo.threadId} error occurred, broadcasting AGENT_ERROR`
-      );
-      
-      this.broadcast({
-        type: 'AGENT_ERROR',
-        threadId: agentInfo.threadId,
-        timestamp: new Date(),
-        data: {
-          errorType: context.errorType as string,
-          message: error.message,
-          stack: error.stack,
-          context: {
-            phase: context.phase as string,
-            providerName: context.providerName as string | undefined,
-            providerInstanceId: context.providerInstanceId as string | undefined,
-            modelId: context.modelId as string | undefined,
-            toolName: context.toolName as string | undefined,
-            toolCallId: context.toolCallId as string | undefined,
-            workingDirectory: context.workingDirectory as string | undefined,
-            retryAttempt: context.retryAttempt as number | undefined,
+    agent.on(
+      'error',
+      (errorEvent: { error: Error; context: Record<string, unknown> }) => {
+        const { error, context } = errorEvent;
+
+        logger.debug(
+          `[EVENT_STREAM] Agent ${agentInfo.threadId} error occurred, broadcasting AGENT_ERROR`
+        );
+
+        this.broadcast({
+          type: 'AGENT_ERROR',
+          threadId: agentInfo.threadId,
+          timestamp: new Date(),
+          data: {
+            errorType: context.errorType as string,
+            message: error.message,
+            stack: error.stack,
+            context: {
+              phase: context.phase as string,
+              providerName: context.providerName as string | undefined,
+              providerInstanceId: context.providerInstanceId as
+                | string
+                | undefined,
+              modelId: context.modelId as string | undefined,
+              toolName: context.toolName as string | undefined,
+              toolCallId: context.toolCallId as string | undefined,
+              workingDirectory: context.workingDirectory as string | undefined,
+              retryAttempt: context.retryAttempt as number | undefined,
+            },
+            isRetryable: context.isRetryable as boolean,
+            retryCount: context.retryCount as number,
           },
-          isRetryable: context.isRetryable as boolean,
-          retryCount: context.retryCount as number,
-        },
-        transient: true,
-        context: { 
-          projectId, 
-          sessionId, 
-          agentId: agentInfo.threadId 
-        },
-      });
-    });
+          transient: true,
+          context: {
+            projectId,
+            sessionId,
+            agentId: agentInfo.threadId,
+          },
+        });
+      }
+    );
   }
 }
 ```
 
 **Why This Approach**:
+
 - Follows existing pattern used for task events and agent spawning
 - Uses existing `registerSession()` method that SessionService already calls
 - No new bridge classes - leverages existing EventStreamManager bridge
 - Consistent with how all other system events work
 
 **Testing**:
+
 - File: `packages/web/lib/event-stream-manager-agent-errors.test.ts` (NEW)
 - Test agent error event forwarding through EventStreamManager
-- Test error event broadcasting to SSE stream  
+- Test error event broadcasting to SSE stream
 - Test error context extraction and structure
 - Use real session instances with real agents
 - Verify error events reach frontend with correct data structure
 
 #### Task 3.2: ~~Ensure EventStreamManager Handles Error Events~~ (MINIMAL CHANGES)
 
-**Key Insight**: EventStreamManager already handles all LaceEvent types generically. AGENT_ERROR events will automatically work without changes.
+**Key Insight**: EventStreamManager already handles all LaceEvent types
+generically. AGENT_ERROR events will automatically work without changes.
 
 **Optional Enhancement**: Add specific logging for error events:
 
 **Location**: After line 265 (in broadcast method)
+
 ```typescript
 // Optional: Add debug logging for error events
 if (fullEvent.type === 'AGENT_ERROR') {
@@ -391,24 +477,30 @@ if (fullEvent.type === 'AGENT_ERROR') {
 }
 ```
 
-**Testing**: 
+**Testing**:
+
 - Extend existing EventStreamManager tests to include AGENT_ERROR events
 - No new functionality needed - just verify existing broadcast works
 
 #### Task 3.3: ~~Add Error Serialization with SuperJSON~~ (REMOVED)
 
-**Key Insight**: SuperJSON already handles Error serialization correctly. The error objects in our AGENT_ERROR events are plain objects, not Error instances, so standard JSON serialization works fine.
+**Key Insight**: SuperJSON already handles Error serialization correctly. The
+error objects in our AGENT_ERROR events are plain objects, not Error instances,
+so standard JSON serialization works fine.
 
-**No additional implementation needed** - existing serialization handles our error data structure.
+**No additional implementation needed** - existing serialization handles our
+error data structure.
 
 ### Phase 4: Frontend Error Display
 
 #### Task 4.1: Extend useEventStream Hook
+
 **Files**: `packages/web/hooks/useEventStream.ts`
 
 Add error event handlers to EventHandlers interface:
 
 **Location**: After line 100 (existing event handlers)
+
 ```typescript
 // Error event handlers
 onAgentError?: (event: LaceEvent) => void;
@@ -418,6 +510,7 @@ onError?: (event: LaceEvent) => void; // Generic error handler
 Add error event processing in the hook implementation:
 
 **Location**: In the event processing section (around line 200)
+
 ```typescript
 // Add error event handling
 case 'AGENT_ERROR':
@@ -426,28 +519,35 @@ case 'AGENT_ERROR':
   break;
 ```
 
-
 **Testing**:
+
 - File: `packages/web/hooks/useEventStream-errors.test.ts` (NEW)
 - Test AGENT_ERROR event handler registration
-- Test error event processing  
+- Test error event processing
 - Test generic error handler invocation
 - Use React Testing Library and real EventSource mocks
 
 #### Task 4.2: Create Error Display Components
-**Files**: 
+
+**Files**:
+
 - `packages/web/components/errors/ErrorDisplay.tsx` (NEW)
 - `packages/web/components/errors/ErrorLogEntry.tsx` (NEW)
 - `packages/web/components/errors/ErrorToast.tsx` (NEW)
 
 **ErrorDisplay.tsx**:
+
 ```tsx
 // ABOUTME: Display component for error events in timeline and error log
 // ABOUTME: Shows error details, context, and recovery actions with DaisyUI styling
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExclamationTriangle, faRedo, faInfo } from '@fortawesome/free-solid-svg-icons';
+import {
+  faExclamationTriangle,
+  faRedo,
+  faInfo,
+} from '@fortawesome/free-solid-svg-icons';
 import type { ErrorLogEntry } from '@/types/web-events';
 
 interface ErrorDisplayProps {
@@ -458,40 +558,48 @@ interface ErrorDisplayProps {
   compact?: boolean;
 }
 
-export function ErrorDisplay({ 
-  error, 
-  showContext = true, 
-  onRetry, 
-  onDismiss, 
-  compact = false 
+export function ErrorDisplay({
+  error,
+  showContext = true,
+  onRetry,
+  onDismiss,
+  compact = false,
 }: ErrorDisplayProps): React.JSX.Element {
   const getErrorIcon = () => {
     switch (error.severity) {
-      case 'critical': return faExclamationTriangle;
-      case 'error': return faExclamationTriangle;
-      case 'warning': return faInfo;
-      default: return faInfo;
+      case 'critical':
+        return faExclamationTriangle;
+      case 'error':
+        return faExclamationTriangle;
+      case 'warning':
+        return faInfo;
+      default:
+        return faInfo;
     }
   };
 
   const getAlertClass = () => {
     switch (error.severity) {
-      case 'critical': return 'alert-error';
-      case 'error': return 'alert-error';
-      case 'warning': return 'alert-warning';
-      default: return 'alert-info';
+      case 'critical':
+        return 'alert-error';
+      case 'error':
+        return 'alert-error';
+      case 'warning':
+        return 'alert-warning';
+      default:
+        return 'alert-info';
     }
   };
 
   return (
     <div className={`alert ${getAlertClass()} ${compact ? 'alert-sm' : ''}`}>
       <FontAwesomeIcon icon={getErrorIcon()} className="text-lg" />
-      
+
       <div className="flex-1">
         <div className="font-medium">
           {error.errorType.toUpperCase()}: {error.message}
         </div>
-        
+
         {showContext && Object.keys(error.context).length > 0 && (
           <div className="text-sm opacity-80 mt-1">
             <details className="collapse collapse-arrow">
@@ -506,7 +614,7 @@ export function ErrorDisplay({
             </details>
           </div>
         )}
-        
+
         <div className="text-xs opacity-60 mt-1">
           {error.timestamp.toLocaleTimeString()}
         </div>
@@ -514,7 +622,7 @@ export function ErrorDisplay({
 
       <div className="flex gap-2">
         {error.isRetryable && onRetry && (
-          <button 
+          <button
             className="btn btn-xs btn-outline btn-primary"
             onClick={onRetry}
           >
@@ -522,12 +630,9 @@ export function ErrorDisplay({
             Retry
           </button>
         )}
-        
+
         {onDismiss && (
-          <button 
-            className="btn btn-xs btn-ghost"
-            onClick={onDismiss}
-          >
+          <button className="btn btn-xs btn-ghost" onClick={onDismiss}>
             ✕
           </button>
         )}
@@ -538,6 +643,7 @@ export function ErrorDisplay({
 ```
 
 **ErrorLogEntry.tsx**:
+
 ```tsx
 // ABOUTME: Individual error entry in the error log with expand/collapse functionality
 // ABOUTME: Shows full error details including stack traces and retry history
@@ -552,29 +658,33 @@ interface ErrorLogEntryProps {
   onResolve?: () => void;
 }
 
-export function ErrorLogEntry({ error, onRetry, onResolve }: ErrorLogEntryProps): React.JSX.Element {
+export function ErrorLogEntry({
+  error,
+  onRetry,
+  onResolve,
+}: ErrorLogEntryProps): React.JSX.Element {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="card bg-base-100 shadow-sm border border-base-200 mb-2">
       <div className="card-body p-3">
-        <ErrorDisplay 
+        <ErrorDisplay
           error={error}
           showContext={false}
           onRetry={onRetry}
           compact
         />
-        
+
         <div className="flex gap-2 mt-2">
-          <button 
+          <button
             className="btn btn-xs btn-ghost"
             onClick={() => setExpanded(!expanded)}
           >
             {expanded ? 'Less' : 'More'} details
           </button>
-          
+
           {!error.resolved && onResolve && (
-            <button 
+            <button
               className="btn btn-xs btn-outline btn-success"
               onClick={onResolve}
             >
@@ -582,16 +692,18 @@ export function ErrorLogEntry({ error, onRetry, onResolve }: ErrorLogEntryProps)
             </button>
           )}
         </div>
-        
+
         {expanded && (
           <div className="mt-2 space-y-2">
             <div>
-              <div className="text-xs font-medium text-base-content/60">Context:</div>
+              <div className="text-xs font-medium text-base-content/60">
+                Context:
+              </div>
               <pre className="text-xs bg-base-200 p-2 rounded overflow-x-auto">
                 {JSON.stringify(error.context, null, 2)}
               </pre>
             </div>
-            
+
             {error.retryCount && error.retryCount > 0 && (
               <div>
                 <div className="text-xs font-medium text-base-content/60">
@@ -608,6 +720,7 @@ export function ErrorLogEntry({ error, onRetry, onResolve }: ErrorLogEntryProps)
 ```
 
 **ErrorToast.tsx**:
+
 ```tsx
 // ABOUTME: Toast notification for real-time error events
 // ABOUTME: Provides immediate user feedback when errors occur
@@ -623,11 +736,11 @@ interface ErrorToastProps {
   onRetry?: () => void;
 }
 
-export function ErrorToast({ 
-  error, 
-  duration = 5000, 
-  onDismiss, 
-  onRetry 
+export function ErrorToast({
+  error,
+  duration = 5000,
+  onDismiss,
+  onRetry,
 }: ErrorToastProps): React.JSX.Element {
   const [visible, setVisible] = useState(true);
 
@@ -664,8 +777,9 @@ export function ErrorToast({
 ```
 
 **Testing**:
+
 - File: `packages/web/components/errors/ErrorDisplay.test.tsx` (NEW)
-- File: `packages/web/components/errors/ErrorLogEntry.test.tsx` (NEW)  
+- File: `packages/web/components/errors/ErrorLogEntry.test.tsx` (NEW)
 - File: `packages/web/components/errors/ErrorToast.test.tsx` (NEW)
 - Test component rendering for different error types
 - Test retry button functionality
@@ -674,6 +788,7 @@ export function ErrorToast({
 - Use React Testing Library and proper TypeScript types
 
 #### Task 4.3: Add Error Log UI
+
 **Files**: `packages/web/components/errors/ErrorLog.tsx` (NEW)
 
 Create a dedicated error log component:
@@ -684,7 +799,11 @@ Create a dedicated error log component:
 
 import React, { useState, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFilter, faTrash, faRefresh } from '@fortawesome/free-solid-svg-icons';
+import {
+  faFilter,
+  faTrash,
+  faRefresh,
+} from '@fortawesome/free-solid-svg-icons';
 import { ErrorLogEntry } from './ErrorLogEntry';
 import type { ErrorLogEntry as ErrorLogEntryType } from '@/types/web-events';
 
@@ -696,34 +815,41 @@ interface ErrorLogProps {
   onRefresh?: () => void;
 }
 
-export function ErrorLog({ 
-  errors, 
-  onRetryError, 
-  onResolveError, 
+export function ErrorLog({
+  errors,
+  onRetryError,
+  onResolveError,
   onClearResolved,
-  onRefresh 
+  onRefresh,
 }: ErrorLogProps): React.JSX.Element {
-  const [filter, setFilter] = useState<'all' | 'unresolved' | 'retryable'>('unresolved');
-  const [severityFilter, setSeverityFilter] = useState<'all' | 'critical' | 'error' | 'warning'>('all');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'agent' | 'tool' | 'provider' | 'system'>('all');
+  const [filter, setFilter] = useState<'all' | 'unresolved' | 'retryable'>(
+    'unresolved'
+  );
+  const [severityFilter, setSeverityFilter] = useState<
+    'all' | 'critical' | 'error' | 'warning'
+  >('all');
+  const [typeFilter, setTypeFilter] = useState<
+    'all' | 'agent' | 'tool' | 'provider' | 'system'
+  >('all');
 
   const filteredErrors = useMemo(() => {
-    return errors.filter(error => {
+    return errors.filter((error) => {
       // Status filter
       if (filter === 'unresolved' && error.resolved) return false;
       if (filter === 'retryable' && !error.isRetryable) return false;
 
       // Severity filter
-      if (severityFilter !== 'all' && error.severity !== severityFilter) return false;
+      if (severityFilter !== 'all' && error.severity !== severityFilter)
+        return false;
 
-      // Type filter  
+      // Type filter
       if (typeFilter !== 'all' && error.errorType !== typeFilter) return false;
 
       return true;
     });
   }, [errors, filter, severityFilter, typeFilter]);
 
-  const unresolvedCount = errors.filter(e => !e.resolved).length;
+  const unresolvedCount = errors.filter((e) => !e.resolved).length;
 
   return (
     <div className="flex flex-col h-full">
@@ -735,23 +861,17 @@ export function ErrorLog({
             {unresolvedCount} unresolved, {errors.length} total
           </div>
         </div>
-        
+
         <div className="flex gap-2">
           {onClearResolved && (
-            <button 
-              className="btn btn-sm btn-ghost"
-              onClick={onClearResolved}
-            >
+            <button className="btn btn-sm btn-ghost" onClick={onClearResolved}>
               <FontAwesomeIcon icon={faTrash} className="mr-2" />
               Clear Resolved
             </button>
           )}
-          
+
           {onRefresh && (
-            <button 
-              className="btn btn-sm btn-primary"
-              onClick={onRefresh}
-            >
+            <button className="btn btn-sm btn-primary" onClick={onRefresh}>
               <FontAwesomeIcon icon={faRefresh} className="mr-2" />
               Refresh
             </button>
@@ -764,7 +884,7 @@ export function ErrorLog({
         <div className="flex flex-wrap gap-4">
           <div className="form-control">
             <label className="label label-text text-xs">Status</label>
-            <select 
+            <select
               className="select select-xs select-bordered"
               value={filter}
               onChange={(e) => setFilter(e.target.value as typeof filter)}
@@ -777,10 +897,12 @@ export function ErrorLog({
 
           <div className="form-control">
             <label className="label label-text text-xs">Severity</label>
-            <select 
+            <select
               className="select select-xs select-bordered"
               value={severityFilter}
-              onChange={(e) => setSeverityFilter(e.target.value as typeof severityFilter)}
+              onChange={(e) =>
+                setSeverityFilter(e.target.value as typeof severityFilter)
+              }
             >
               <option value="all">All</option>
               <option value="critical">Critical</option>
@@ -791,10 +913,12 @@ export function ErrorLog({
 
           <div className="form-control">
             <label className="label label-text text-xs">Type</label>
-            <select 
+            <select
               className="select select-xs select-bordered"
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
+              onChange={(e) =>
+                setTypeFilter(e.target.value as typeof typeFilter)
+              }
             >
               <option value="all">All</option>
               <option value="agent">Agent</option>
@@ -814,7 +938,7 @@ export function ErrorLog({
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredErrors.map(error => (
+            {filteredErrors.map((error) => (
               <ErrorLogEntry
                 key={error.id}
                 error={error}
@@ -831,6 +955,7 @@ export function ErrorLog({
 ```
 
 **Testing**:
+
 - File: `packages/web/components/errors/ErrorLog.test.tsx` (NEW)
 - Test error filtering by status, severity, and type
 - Test bulk actions (clear resolved, refresh)
@@ -838,11 +963,15 @@ export function ErrorLog({
 - Test error retry and resolve actions
 
 #### Task 4.4: Integrate Errors into Timeline
-**Files**: `packages/web/components/timeline/TimelineProcessor.tsx` (or equivalent timeline processing file)
 
-The timeline needs to display error events as timeline entries. Find the main timeline processing logic and add error event handling:
+**Files**: `packages/web/components/timeline/TimelineProcessor.tsx` (or
+equivalent timeline processing file)
+
+The timeline needs to display error events as timeline entries. Find the main
+timeline processing logic and add error event handling:
 
 **Location**: In the event-to-timeline-entry conversion logic
+
 ```typescript
 // Add error event processing
 case 'AGENT_ERROR': {
@@ -852,7 +981,7 @@ case 'AGENT_ERROR': {
     context: Record<string, unknown>;
     isRetryable: boolean;
   };
-  
+
   return {
     id: event.id || `error-${Date.now()}`,
     type: 'error',
@@ -868,9 +997,10 @@ case 'AGENT_ERROR': {
 }
 ```
 
-
 **Testing**:
-- File: `packages/web/components/timeline/TimelineProcessor-errors.test.tsx` (NEW)
+
+- File: `packages/web/components/timeline/TimelineProcessor-errors.test.tsx`
+  (NEW)
 - Test AGENT_ERROR event to timeline entry conversion
 - Test error timeline entry rendering
 - Test error context display in timeline
@@ -878,11 +1008,14 @@ case 'AGENT_ERROR': {
 ### Phase 5: Error Recovery
 
 #### Task 5.1: Add Retry Mechanisms
-**Files**: 
+
+**Files**:
+
 - `packages/web/hooks/useErrorRecovery.ts` (NEW)
 - `packages/core/src/agents/retry-manager.ts` (NEW)
 
 **useErrorRecovery.ts**:
+
 ```typescript
 // ABOUTME: Hook for handling error recovery actions like retry and resolution
 // ABOUTME: Manages retry state and communicates with backend for error recovery
@@ -897,101 +1030,123 @@ interface RetryState {
 }
 
 export function useErrorRecovery(sessionId: string) {
-  const [retryStates, setRetryStates] = useState<Record<string, RetryState>>({});
+  const [retryStates, setRetryStates] = useState<Record<string, RetryState>>(
+    {}
+  );
   const sessionAPI = useSessionAPI(sessionId);
 
-  const retryAgentOperation = useCallback(async (
-    threadId: string,
-    errorType: 'provider_failure' | 'processing_error' | 'streaming_error' | 'timeout'
-  ): Promise<boolean> => {
-    const currentState = retryStates[threadId] || { retrying: false, retryCount: 0 };
-    
-    if (currentState.retrying) {
-      return false; // Already retrying
-    }
+  const retryAgentOperation = useCallback(
+    async (
+      threadId: string,
+      errorType:
+        | 'provider_failure'
+        | 'processing_error'
+        | 'streaming_error'
+        | 'timeout'
+    ): Promise<boolean> => {
+      const currentState = retryStates[threadId] || {
+        retrying: false,
+        retryCount: 0,
+      };
 
-    setRetryStates(prev => ({
-      ...prev,
-      [threadId]: {
-        ...currentState,
-        retrying: true,
-        lastRetryAt: new Date(),
-      },
-    }));
+      if (currentState.retrying) {
+        return false; // Already retrying
+      }
 
-    try {
-      // Call backend retry endpoint
-      const result = await sessionAPI.retryAgent(threadId, errorType);
-      
-      setRetryStates(prev => ({
+      setRetryStates((prev) => ({
         ...prev,
         [threadId]: {
-          retrying: false,
+          ...currentState,
+          retrying: true,
           lastRetryAt: new Date(),
-          retryCount: currentState.retryCount + 1,
         },
       }));
 
-      return result.success;
-    } catch (error) {
-      setRetryStates(prev => ({
-        ...prev,
-        [threadId]: {
-          retrying: false,
-          lastRetryAt: new Date(),
-          retryCount: currentState.retryCount + 1,
-        },
-      }));
-      return false;
-    }
-  }, [retryStates, sessionAPI]);
+      try {
+        // Call backend retry endpoint
+        const result = await sessionAPI.retryAgent(threadId, errorType);
 
-  const retryToolOperation = useCallback(async (
-    threadId: string,
-    toolCallId: string,
-    toolName: string
-  ): Promise<boolean> => {
-    const key = `${threadId}-${toolCallId}`;
-    const currentState = retryStates[key] || { retrying: false, retryCount: 0 };
-    
-    if (currentState.retrying) {
-      return false;
-    }
+        setRetryStates((prev) => ({
+          ...prev,
+          [threadId]: {
+            retrying: false,
+            lastRetryAt: new Date(),
+            retryCount: currentState.retryCount + 1,
+          },
+        }));
 
-    setRetryStates(prev => ({
-      ...prev,
-      [key]: {
-        ...currentState,
-        retrying: true,
-        lastRetryAt: new Date(),
-      },
-    }));
+        return result.success;
+      } catch (error) {
+        setRetryStates((prev) => ({
+          ...prev,
+          [threadId]: {
+            retrying: false,
+            lastRetryAt: new Date(),
+            retryCount: currentState.retryCount + 1,
+          },
+        }));
+        return false;
+      }
+    },
+    [retryStates, sessionAPI]
+  );
 
-    try {
-      const result = await sessionAPI.retryTool(threadId, toolCallId, toolName);
-      
-      setRetryStates(prev => ({
-        ...prev,
-        [key]: {
-          retrying: false,
-          lastRetryAt: new Date(),
-          retryCount: currentState.retryCount + 1,
-        },
-      }));
+  const retryToolOperation = useCallback(
+    async (
+      threadId: string,
+      toolCallId: string,
+      toolName: string
+    ): Promise<boolean> => {
+      const key = `${threadId}-${toolCallId}`;
+      const currentState = retryStates[key] || {
+        retrying: false,
+        retryCount: 0,
+      };
 
-      return result.success;
-    } catch (error) {
-      setRetryStates(prev => ({
+      if (currentState.retrying) {
+        return false;
+      }
+
+      setRetryStates((prev) => ({
         ...prev,
         [key]: {
-          retrying: false,
+          ...currentState,
+          retrying: true,
           lastRetryAt: new Date(),
-          retryCount: currentState.retryCount + 1,
         },
       }));
-      return false;
-    }
-  }, [retryStates, sessionAPI]);
+
+      try {
+        const result = await sessionAPI.retryTool(
+          threadId,
+          toolCallId,
+          toolName
+        );
+
+        setRetryStates((prev) => ({
+          ...prev,
+          [key]: {
+            retrying: false,
+            lastRetryAt: new Date(),
+            retryCount: currentState.retryCount + 1,
+          },
+        }));
+
+        return result.success;
+      } catch (error) {
+        setRetryStates((prev) => ({
+          ...prev,
+          [key]: {
+            retrying: false,
+            lastRetryAt: new Date(),
+            retryCount: currentState.retryCount + 1,
+          },
+        }));
+        return false;
+      }
+    },
+    [retryStates, sessionAPI]
+  );
 
   return {
     retryStates,
@@ -1002,6 +1157,7 @@ export function useErrorRecovery(sessionId: string) {
 ```
 
 **retry-manager.ts**:
+
 ```typescript
 // ABOUTME: Backend retry coordination for failed operations
 // ABOUTME: Handles agent and tool retry logic with exponential backoff
@@ -1013,7 +1169,11 @@ export class RetryManager {
 
   async retryAgentOperation(
     agent: Agent,
-    errorType: 'provider_failure' | 'processing_error' | 'streaming_error' | 'timeout'
+    errorType:
+      | 'provider_failure'
+      | 'processing_error'
+      | 'streaming_error'
+      | 'timeout'
   ): Promise<{ success: boolean; error?: string }> {
     const key = `agent-${agent.threadId}-${errorType}`;
     const currentAttempts = this.retryAttempts.get(key) || 0;
@@ -1024,7 +1184,7 @@ export class RetryManager {
 
     // Calculate exponential backoff delay
     const delay = this.BASE_DELAY * Math.pow(2, currentAttempts);
-    await new Promise(resolve => setTimeout(resolve, delay));
+    await new Promise((resolve) => setTimeout(resolve, delay));
 
     this.retryAttempts.set(key, currentAttempts + 1);
 
@@ -1034,17 +1194,17 @@ export class RetryManager {
           // Retry the last conversation turn
           await agent.processQueuedMessages();
           break;
-        
+
         case 'processing_error':
           // Restart conversation processing
           await agent.processQueuedMessages();
           break;
-          
+
         case 'streaming_error':
           // Retry with non-streaming mode
           // Implementation depends on Agent streaming API
           break;
-          
+
         case 'timeout':
           // Retry with extended timeout
           // Implementation depends on provider timeout configuration
@@ -1055,9 +1215,9 @@ export class RetryManager {
       this.retryAttempts.delete(key);
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Retry failed' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Retry failed',
       };
     }
   }
@@ -1075,13 +1235,13 @@ export class RetryManager {
     }
 
     const delay = this.BASE_DELAY * Math.pow(2, currentAttempts);
-    await new Promise(resolve => setTimeout(resolve, delay));
+    await new Promise((resolve) => setTimeout(resolve, delay));
 
     this.retryAttempts.set(key, currentAttempts + 1);
 
     try {
       const result = await toolExecutor.executeApprovedTool(toolCall, context);
-      
+
       if (result.error) {
         return { success: false, error: result.error };
       }
@@ -1091,7 +1251,7 @@ export class RetryManager {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Tool retry failed'
+        error: error instanceof Error ? error.message : 'Tool retry failed',
       };
     }
   }
@@ -1107,6 +1267,7 @@ export class RetryManager {
 ```
 
 **Testing**:
+
 - File: `packages/web/hooks/useErrorRecovery.test.ts` (NEW)
 - File: `packages/core/src/agents/retry-manager.test.ts` (NEW)
 - Test retry state management
@@ -1116,6 +1277,7 @@ export class RetryManager {
 - Use real implementations, no mocks of retry logic
 
 #### Task 5.2: Implement Error Context Display
+
 **Files**: `packages/web/components/errors/ErrorContext.tsx` (NEW)
 
 Create detailed error context display:
@@ -1126,7 +1288,11 @@ Create detailed error context display:
 
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown, faChevronUp, faCopy } from '@fortawesome/free-solid-svg-icons';
+import {
+  faChevronDown,
+  faChevronUp,
+  faCopy,
+} from '@fortawesome/free-solid-svg-icons';
 
 interface ErrorContextProps {
   context: Record<string, unknown>;
@@ -1135,11 +1301,11 @@ interface ErrorContextProps {
   component?: string;
 }
 
-export function ErrorContext({ 
-  context, 
-  stack, 
-  errorType, 
-  component 
+export function ErrorContext({
+  context,
+  stack,
+  errorType,
+  component,
 }: ErrorContextProps): React.JSX.Element {
   const [expanded, setExpanded] = useState(false);
   const [stackExpanded, setStackExpanded] = useState(false);
@@ -1160,13 +1326,17 @@ export function ErrorContext({
   };
 
   const contextString = JSON.stringify(context, null, 2);
-  const debugInfo = JSON.stringify({
-    errorType,
-    component,
-    timestamp: new Date().toISOString(),
-    context,
-    stack,
-  }, null, 2);
+  const debugInfo = JSON.stringify(
+    {
+      errorType,
+      component,
+      timestamp: new Date().toISOString(),
+      context,
+      stack,
+    },
+    null,
+    2
+  );
 
   return (
     <div className="space-y-2">
@@ -1189,7 +1359,9 @@ export function ErrorContext({
             </div>
             {component && (
               <div>
-                <div className="font-medium text-base-content/60">Component:</div>
+                <div className="font-medium text-base-content/60">
+                  Component:
+                </div>
                 <div className="font-mono">{component}</div>
               </div>
             )}
@@ -1198,7 +1370,9 @@ export function ErrorContext({
           {/* Context Data */}
           <div>
             <div className="flex justify-between items-center mb-1">
-              <div className="font-medium text-base-content/60 text-xs">Context:</div>
+              <div className="font-medium text-base-content/60 text-xs">
+                Context:
+              </div>
               <button
                 className="btn btn-xs btn-ghost"
                 onClick={() => copyToClipboard(contextString)}
@@ -1219,10 +1393,14 @@ export function ErrorContext({
                 className="btn btn-xs btn-ghost w-full justify-between mb-1"
                 onClick={() => setStackExpanded(!stackExpanded)}
               >
-                <span className="font-medium text-base-content/60">Stack Trace</span>
-                <FontAwesomeIcon icon={stackExpanded ? faChevronUp : faChevronDown} />
+                <span className="font-medium text-base-content/60">
+                  Stack Trace
+                </span>
+                <FontAwesomeIcon
+                  icon={stackExpanded ? faChevronUp : faChevronDown}
+                />
               </button>
-              
+
               {stackExpanded && (
                 <div className="relative">
                   <button
@@ -1243,7 +1421,9 @@ export function ErrorContext({
           {/* Debug Info */}
           <div>
             <div className="flex justify-between items-center mb-1">
-              <div className="font-medium text-base-content/60 text-xs">Full Debug Info:</div>
+              <div className="font-medium text-base-content/60 text-xs">
+                Full Debug Info:
+              </div>
               <button
                 className="btn btn-xs btn-ghost"
                 onClick={() => copyToClipboard(debugInfo)}
@@ -1261,6 +1441,7 @@ export function ErrorContext({
 ```
 
 **Testing**:
+
 - File: `packages/web/components/errors/ErrorContext.test.tsx` (NEW)
 - Test context expansion/collapse
 - Test stack trace display
@@ -1268,6 +1449,7 @@ export function ErrorContext({
 - Test context formatting
 
 #### Task 5.3: Add User Recovery Actions
+
 **Files**: `packages/web/components/errors/ErrorActions.tsx` (NEW)
 
 Create error action buttons:
@@ -1278,12 +1460,12 @@ Create error action buttons:
 
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faRedo, 
-  faFlag, 
-  faEye, 
-  faEyeSlash, 
-  faExternalLinkAlt 
+import {
+  faRedo,
+  faFlag,
+  faEye,
+  faEyeSlash,
+  faExternalLinkAlt,
 } from '@fortawesome/free-solid-svg-icons';
 
 interface ErrorActionsProps {
@@ -1372,10 +1554,7 @@ export function ErrorActions({
         )}
 
         {onViewLogs && (
-          <button
-            className="btn btn-sm btn-ghost"
-            onClick={onViewLogs}
-          >
+          <button className="btn btn-sm btn-ghost" onClick={onViewLogs}>
             <FontAwesomeIcon icon={faExternalLinkAlt} className="mr-2" />
             View Logs
           </button>
@@ -1391,10 +1570,7 @@ export function ErrorActions({
           </button>
         )}
 
-        <button
-          className="btn btn-sm btn-ghost"
-          onClick={handleDismiss}
-        >
+        <button className="btn btn-sm btn-ghost" onClick={handleDismiss}>
           <FontAwesomeIcon icon={faEyeSlash} className="mr-2" />
           Dismiss
         </button>
@@ -1420,6 +1596,7 @@ export function ErrorActions({
 ```
 
 **Testing**:
+
 - File: `packages/web/components/errors/ErrorActions.test.tsx` (NEW)
 - Test retry button behavior and loading states
 - Test retry limit enforcement
@@ -1427,6 +1604,7 @@ export function ErrorActions({
 - Test dismiss functionality
 
 #### Task 5.4: Create Error Notification System
+
 **Files**: `packages/web/hooks/useErrorNotifications.ts` (NEW)
 
 Create a notification system for error events:
@@ -1465,68 +1643,84 @@ export function useErrorNotifications(
   const [notifications, setNotifications] = useState<ActiveNotification[]>([]);
   const [errorLog, setErrorLog] = useState<ErrorLogEntry[]>([]);
 
-  const addError = useCallback((event: LaceEvent) => {
-    const errorData = event.data as {
-      errorType: string;
-      message: string;
-      context: Record<string, unknown>;
-      isRetryable: boolean;
-      retryCount?: number;
-    };
+  const addError = useCallback(
+    (event: LaceEvent) => {
+      const errorData = event.data as {
+        errorType: string;
+        message: string;
+        context: Record<string, unknown>;
+        isRetryable: boolean;
+        retryCount?: number;
+      };
 
-    const severity = errorData.errorType.includes('critical') ? 'critical' : 
-                    errorData.errorType.includes('error') ? 'error' : 'warning';
-    
-    const errorType = event.type.includes('AGENT') ? 'agent' :
-                     event.type.includes('TOOL') ? 'tool' :
-                     event.type.includes('PROVIDER') ? 'provider' : 'system';
+      const severity = errorData.errorType.includes('critical')
+        ? 'critical'
+        : errorData.errorType.includes('error')
+          ? 'error'
+          : 'warning';
 
-    // Filter based on config
-    if (config.severity !== 'all' && severity !== config.severity) return;
-    if (!config.types.includes(errorType)) return;
+      const errorType = event.type.includes('AGENT')
+        ? 'agent'
+        : event.type.includes('TOOL')
+          ? 'tool'
+          : event.type.includes('PROVIDER')
+            ? 'provider'
+            : 'system';
 
-    const errorEntry: ActiveNotification = {
-      id: event.id || `error-${Date.now()}`,
-      timestamp: event.timestamp || new Date(),
-      errorType,
-      severity,
-      message: errorData.message,
-      context: errorData.context,
-      isRetryable: errorData.isRetryable,
-      retryCount: errorData.retryCount || 0,
-      resolved: false,
-      threadId: event.threadId,
-      sessionId,
-      showToast: config.showToasts,
-    };
+      // Filter based on config
+      if (config.severity !== 'all' && severity !== config.severity) return;
+      if (!config.types.includes(errorType)) return;
 
-    // Add to error log
-    setErrorLog(prev => [errorEntry, ...prev].slice(0, 1000)); // Keep last 1000 errors
+      const errorEntry: ActiveNotification = {
+        id: event.id || `error-${Date.now()}`,
+        timestamp: event.timestamp || new Date(),
+        errorType,
+        severity,
+        message: errorData.message,
+        context: errorData.context,
+        isRetryable: errorData.isRetryable,
+        retryCount: errorData.retryCount || 0,
+        resolved: false,
+        threadId: event.threadId,
+        sessionId,
+        showToast: config.showToasts,
+      };
 
-    // Add to notifications if toasts are enabled
-    if (config.showToasts) {
-      setNotifications(prev => {
-        const newNotifications = [errorEntry, ...prev].slice(0, config.maxToasts);
-        return newNotifications;
-      });
-    }
-  }, [sessionId, config]);
+      // Add to error log
+      setErrorLog((prev) => [errorEntry, ...prev].slice(0, 1000)); // Keep last 1000 errors
+
+      // Add to notifications if toasts are enabled
+      if (config.showToasts) {
+        setNotifications((prev) => {
+          const newNotifications = [errorEntry, ...prev].slice(
+            0,
+            config.maxToasts
+          );
+          return newNotifications;
+        });
+      }
+    },
+    [sessionId, config]
+  );
 
   const dismissNotification = useCallback((notificationId: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
   }, []);
 
-  const resolveError = useCallback((errorId: string) => {
-    setErrorLog(prev => 
-      prev.map(error => 
-        error.id === errorId ? { ...error, resolved: true } : error
-      )
-    );
-    dismissNotification(errorId);
-  }, [dismissNotification]);
+  const resolveError = useCallback(
+    (errorId: string) => {
+      setErrorLog((prev) =>
+        prev.map((error) =>
+          error.id === errorId ? { ...error, resolved: true } : error
+        )
+      );
+      dismissNotification(errorId);
+    },
+    [dismissNotification]
+  );
 
   const clearResolvedErrors = useCallback(() => {
-    setErrorLog(prev => prev.filter(error => !error.resolved));
+    setErrorLog((prev) => prev.filter((error) => !error.resolved));
   }, []);
 
   // Subscribe to error events
@@ -1548,6 +1742,7 @@ export function useErrorNotifications(
 ```
 
 **Testing**:
+
 - File: `packages/web/hooks/useErrorNotifications.test.ts` (NEW)
 - Test error event subscription and processing
 - Test notification filtering by severity and type
@@ -1558,14 +1753,19 @@ export function useErrorNotifications(
 ### Phase 6: Testing & Documentation
 
 #### Task 6.1: Write Comprehensive Tests
+
 **Files**: Multiple test files as specified in previous tasks
 
 **Testing Strategy**:
+
 - **Unit Tests**: Test individual components and hooks in isolation
-- **Integration Tests**: Test error flow from backend emission to frontend display
-- **E2E Tests**: Test complete error scenarios with real backend/frontend interaction
+- **Integration Tests**: Test error flow from backend emission to frontend
+  display
+- **E2E Tests**: Test complete error scenarios with real backend/frontend
+  interaction
 
 **Key Testing Requirements**:
+
 - NO `any` types in test code - use proper TypeScript types
 - NO mocking of functionality under test - use real implementations
 - Test-first approach - write failing tests before implementing features
@@ -1574,6 +1774,7 @@ export function useErrorNotifications(
 - Create predictably failing scenarios instead of mocks
 
 **Error Flow Integration Test**:
+
 ```typescript
 // File: packages/web/e2e/error-propagation.e2e.ts (NEW)
 import { test, expect } from '@playwright/test';
@@ -1581,40 +1782,43 @@ import { test, expect } from '@playwright/test';
 test('error propagation flow', async ({ page }) => {
   // Navigate to app
   await page.goto('/');
-  
+
   // Start a session that will trigger errors
   await page.click('[data-testid="start-session"]');
-  
+
   // Trigger an agent error by using a broken provider
   await page.click('[data-testid="trigger-provider-error"]');
-  
+
   // Verify error appears in timeline
   await expect(page.locator('[data-testid="timeline-error"]')).toBeVisible();
-  
+
   // Verify error toast appears
   await expect(page.locator('[data-testid="error-toast"]')).toBeVisible();
-  
+
   // Open error log
   await page.click('[data-testid="open-error-log"]');
-  
+
   // Verify error appears in log
   await expect(page.locator('[data-testid="error-log-entry"]')).toBeVisible();
-  
+
   // Test retry functionality
   await page.click('[data-testid="retry-error"]');
-  
+
   // Verify retry attempt is recorded
   await expect(page.locator('[data-testid="retry-count"]')).toContainText('1');
 });
 ```
 
 #### Task 6.2: Add E2E Tests for Error Scenarios
-**Files**: 
+
+**Files**:
+
 - `packages/web/e2e/agent-errors.e2e.ts` (NEW)
 - `packages/web/e2e/tool-errors.e2e.ts` (NEW)
 - `packages/web/e2e/provider-errors.e2e.ts` (NEW)
 
 Create comprehensive E2E tests covering:
+
 - Provider API failures and retries
 - Tool execution errors and recovery
 - Agent processing errors
@@ -1623,25 +1827,32 @@ Create comprehensive E2E tests covering:
 - Retry mechanisms
 
 #### Task 6.3: Update Documentation
+
 **Files**:
+
 - `packages/web/components/errors/README.md` (NEW)
-- `docs/architecture/ERROR-HANDLING.md` (NEW) 
+- `docs/architecture/ERROR-HANDLING.md` (NEW)
 - Update existing component documentation
 
 **Error Handling Documentation**:
-```markdown
+
+````markdown
 # Error Handling Architecture
 
 ## Overview
-Lace implements comprehensive error propagation from backend to frontend, providing users with visibility into all system errors and recovery options.
+
+Lace implements comprehensive error propagation from backend to frontend,
+providing users with visibility into all system errors and recovery options.
 
 ## Error Types
+
 - **Agent Errors**: Provider failures, processing errors, streaming issues
-- **Tool Errors**: Execution failures, validation errors, permission issues  
+- **Tool Errors**: Execution failures, validation errors, permission issues
 - **Provider Errors**: API errors, authentication failures, rate limits
 - **System Errors**: Database failures, resource limitations
 
 ## Error Flow
+
 1. Error occurs in backend component
 2. Error event emitted with structured data
 3. SessionService forwards error to EventStreamManager
@@ -1650,16 +1861,17 @@ Lace implements comprehensive error propagation from backend to frontend, provid
 6. User can retry, dismiss, or view details
 
 ## Component Usage
+
 ```tsx
 import { useErrorNotifications } from '@/hooks/useErrorNotifications';
 import { ErrorLog } from '@/components/errors/ErrorLog';
 
 function MyComponent() {
   const { notifications, errorLog } = useErrorNotifications(sessionId);
-  
+
   return (
     <>
-      {notifications.map(error => (
+      {notifications.map((error) => (
         <ErrorToast key={error.id} error={error} />
       ))}
       <ErrorLog errors={errorLog} />
@@ -1667,7 +1879,9 @@ function MyComponent() {
   );
 }
 ```
-```
+````
+
+````
 
 #### Task 6.4: Add Error Handling Guidelines
 **Files**: `docs/development/ERROR-HANDLING-GUIDELINES.md` (NEW)
@@ -1685,7 +1899,7 @@ Create developer guidelines for proper error handling:
 
 ## Error Emission Best Practices
 - Always include structured context data
-- Set `isRetryable` flag appropriately  
+- Set `isRetryable` flag appropriately
 - Include retry count for tracking attempts
 - Use consistent error type naming
 
@@ -1700,44 +1914,49 @@ Create developer guidelines for proper error handling:
 - Use real implementations, not mocks
 - Test error recovery flows
 - Verify error context preservation
-```
-
+````
 
 ## Success Criteria
 
 ### Functional Requirements ✅
+
 - [ ] All backend agent errors visible in frontend
-- [ ] Real-time error notifications via SSE  
+- [ ] Real-time error notifications via SSE
 - [ ] Error log with filtering and search
 - [ ] Retry mechanisms for retryable errors
 - [ ] Error context and stack trace display
 - [ ] Timeline integration for error events
 
 ### Technical Requirements ✅
+
 - [ ] No `any` types used anywhere
 - [ ] No mocks of functionality under test
 - [ ] Single AGENT_ERROR event type strongly typed
 - [ ] Comprehensive test coverage >90%
 - [ ] Performance: <100ms error event latency
 - [ ] Memory: Error log bounded to prevent leaks
-- [ ] **Architecture Alignment**: Follow existing ownership hierarchy (Tool → ToolExecutor → Agent → SessionService)
+- [ ] **Architecture Alignment**: Follow existing ownership hierarchy (Tool →
+      ToolExecutor → Agent → SessionService)
 
 ### User Experience ✅
+
 - [ ] Clear error descriptions for users
 - [ ] Appropriate recovery actions for provider/tool failures
-- [ ] Non-disruptive error notifications  
+- [ ] Non-disruptive error notifications
 - [ ] Error resolution tracking
 - [ ] Contextual help for error types
 
 ## Risk Mitigation
 
 ### Technical Risks
+
 - **Event ordering issues**: Use existing event sequence guarantees
 - **Performance impact**: Batch error events and limit notifications
 - **Memory leaks**: Bound error log size and clean up resolved errors
 - **Type safety**: Comprehensive TypeScript coverage and runtime validation
 
-### UX Risks  
+### UX Risks
+
 - **Error notification fatigue**: Smart filtering and grouping
 - **Information overload**: Progressive disclosure and contextual information
 - **Recovery confusion**: Clear action guidance and inline help
@@ -1745,6 +1964,7 @@ Create developer guidelines for proper error handling:
 ## Notes for Implementation
 
 ### DO:
+
 - Follow existing architectural patterns
 - Use strongly-typed interfaces throughout
 - Write tests first before implementation
@@ -1752,17 +1972,22 @@ Create developer guidelines for proper error handling:
 - Use existing UI components and styling
 
 ### DON'T:
+
 - Use `any` types anywhere in the implementation
 - Mock functionality under test - use real implementations
-- Add backward compatibility - this is clean new architecture  
+- Add backward compatibility - this is clean new architecture
 - Ignore error context - always preserve debugging information
 - Create notification spam - implement smart filtering
 
 ## Architecture Overview
 
 ### Error Flow
+
 ```
 Error Occurs → Agent.emit('error', enhancedContext) → SessionService → EventStreamManager → Frontend
 ```
 
-This plan provides comprehensive error visibility while maintaining Lace's high code quality standards and architectural consistency. The implementation leverages existing infrastructure and follows established ownership patterns for maximum reliability and maintainability.
+This plan provides comprehensive error visibility while maintaining Lace's high
+code quality standards and architectural consistency. The implementation
+leverages existing infrastructure and follows established ownership patterns for
+maximum reliability and maintainability.

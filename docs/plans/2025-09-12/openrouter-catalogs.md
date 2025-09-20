@@ -2,11 +2,15 @@
 
 ## Overview
 
-OpenRouter provides access to 500+ AI models (177 with tool support) from various providers, with models changing daily. This system replaces static JSON catalogs with dynamic API-based fetching for OpenRouter instances, while maintaining backward compatibility with other providers.
+OpenRouter provides access to 500+ AI models (177 with tool support) from
+various providers, with models changing daily. This system replaces static JSON
+catalogs with dynamic API-based fetching for OpenRouter instances, while
+maintaining backward compatibility with other providers.
 
 ## Problem Statement
 
-- OpenRouter's model catalog changes daily (new models, pricing updates, capability changes)
+- OpenRouter's model catalog changes daily (new models, pricing updates,
+  capability changes)
 - Static JSON files from Catwalk become stale quickly for OpenRouter
 - Users need ability to filter 500+ models to find relevant ones
 - Different OpenRouter instances may need different model subsets
@@ -14,6 +18,7 @@ OpenRouter provides access to 500+ AI models (177 with tool support) from variou
 ## Solution
 
 Dynamic catalog fetching system that:
+
 1. Fetches fresh model data from OpenRouter's API
 2. Caches locally with daily refresh
 3. Provides per-instance model filtering and configuration
@@ -99,11 +104,15 @@ Extended `ProviderInstance` in `provider-instances.json`:
 ### Model Filtering Rules
 
 Applied in order:
-1. **Provider Filter**: Skip if model's provider (extracted from ID) is in `disabledProviders`
+
+1. **Provider Filter**: Skip if model's provider (extracted from ID) is in
+   `disabledProviders`
 2. **Model Filter**: Skip if model ID is in `disabledModels`
-3. **New Model Policy**: New models (not in disabled lists) follow `enableNewModels` setting
+3. **New Model Policy**: New models (not in disabled lists) follow
+   `enableNewModels` setting
 4. **Capability Filter**: Must have all parameters in `requiredParameters`
-5. **Cost Filter**: Must be within `maxPromptCostPerMillion` and `maxCompletionCostPerMillion`
+5. **Cost Filter**: Must be within `maxPromptCostPerMillion` and
+   `maxCompletionCostPerMillion`
 6. **Context Filter**: Must meet `minContextLength` requirement
 
 ### Refresh Strategy
@@ -157,11 +166,13 @@ Applied in order:
 ### OpenRouter API
 
 **GET /api/v1/models**
+
 - Returns all available models
 - No authentication required for basic info
 - Response includes pricing, capabilities, context windows
 
 **GET /api/v1/models/user** (with auth)
+
 - Returns user-filtered models based on preferences
 - Requires API key authentication
 
@@ -177,9 +188,11 @@ Applied in order:
 ### File Modifications
 
 - `packages/core/src/providers/catalog/types.ts` - Add modelConfig to schema
-- `packages/core/src/providers/instance/manager.ts` - Support modelConfig persistence
+- `packages/core/src/providers/instance/manager.ts` - Support modelConfig
+  persistence
 - `packages/core/src/providers/registry.ts` - Integrate dynamic catalog support
-- `packages/web/components/providers/ProviderCatalogCard.tsx` - Add model management UI
+- `packages/web/components/providers/ProviderCatalogCard.tsx` - Add model
+  management UI
 - `packages/web/components/ui/ModelSelector.tsx` - Use filtered model lists
 
 ## Testing Strategy

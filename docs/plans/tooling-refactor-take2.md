@@ -2,11 +2,20 @@
 
 ## ✅ COMPLETED: Foundation + 9 Tools Migrated + Architecture Cleanup
 
-**STATUS**: Foundation established with output helpers. FileRead, Bash, UrlFetch, FileWrite, FileInsert, FileFind, FileList, RipgrepSearch, FileEdit, TaskManager, and Delegate tools successfully migrated to schema validation. Old Tool interface completely replaced with new schema-based Tool class. Executor and Agent updated to use only new Tool class. All 12 tools migrated successfully.
+**STATUS**: Foundation established with output helpers. FileRead, Bash,
+UrlFetch, FileWrite, FileInsert, FileFind, FileList, RipgrepSearch, FileEdit,
+TaskManager, and Delegate tools successfully migrated to schema validation. Old
+Tool interface completely replaced with new schema-based Tool class. Executor
+and Agent updated to use only new Tool class. All 12 tools migrated
+successfully.
 
 ## Overview
 
-Refactoring the tool system in Lace, an AI coding assistant. Tools are how the AI interacts with the filesystem and system (reading files, running commands, etc). We've successfully moved from 40+ lines of manual validation per tool to Zod schemas, eliminating boilerplate while preparing for future MCP (Model Context Protocol) integration.
+Refactoring the tool system in Lace, an AI coding assistant. Tools are how the
+AI interacts with the filesystem and system (reading files, running commands,
+etc). We've successfully moved from 40+ lines of manual validation per tool to
+Zod schemas, eliminating boilerplate while preparing for future MCP (Model
+Context Protocol) integration.
 
 ## Key Principles
 
@@ -19,12 +28,15 @@ Refactoring the tool system in Lace, an AI coding assistant. Tools are how the A
 ## Background Context
 
 ### What is Lace?
+
 - AI coding assistant built with TypeScript/Node.js
-- Uses "tools" to let AI interact with the system (read/write files, run bash, search code)
+- Uses "tools" to let AI interact with the system (read/write files, run bash,
+  search code)
 - Event-sourced architecture - all interactions stored as immutable events
 - Built with React/Ink for terminal UI
 
 ### What is MCP?
+
 - Model Context Protocol - standard for AI tools
 - Allows external servers to provide tools to AI systems
 - Uses JSON Schema for tool definitions
@@ -61,19 +73,30 @@ src/tools/
 ```
 
 ### ✅ Problems SOLVED
-1. ✅ **70%+ Code Reduction**: Schema validation eliminates manual parameter checking
-2. ✅ **Full Type Safety**: No more `as { param: type }` - everything properly typed
-3. ✅ **Clean Separation**: Validation handled by schemas, business logic is pure
-4. ✅ **Consistent Error Messages**: AI-optimized messages that prevent repeated failures
-5. ✅ **Advanced Features**: Misspelling detection, cross-field validation, file suggestions
-6. ✅ **Consistent Output Helpers**: `createResult()`/`createError()` eliminate manual JSON construction
-7. ✅ **Structured Data Support**: Tools seamlessly handle both text and JSON output patterns
-8. ✅ **Clean Architecture**: Old Tool interface completely removed, single schema-based Tool class
-9. ✅ **Simplified Executor**: No compatibility layer needed, direct schema-based execution
+
+1. ✅ **70%+ Code Reduction**: Schema validation eliminates manual parameter
+   checking
+2. ✅ **Full Type Safety**: No more `as { param: type }` - everything properly
+   typed
+3. ✅ **Clean Separation**: Validation handled by schemas, business logic is
+   pure
+4. ✅ **Consistent Error Messages**: AI-optimized messages that prevent repeated
+   failures
+5. ✅ **Advanced Features**: Misspelling detection, cross-field validation, file
+   suggestions
+6. ✅ **Consistent Output Helpers**: `createResult()`/`createError()` eliminate
+   manual JSON construction
+7. ✅ **Structured Data Support**: Tools seamlessly handle both text and JSON
+   output patterns
+8. ✅ **Clean Architecture**: Old Tool interface completely removed, single
+   schema-based Tool class
+9. ✅ **Simplified Executor**: No compatibility layer needed, direct
+   schema-based execution
 
 ## Development Setup
 
 ### Prerequisites
+
 ```bash
 # Clone and install
 git clone <repo>
@@ -88,6 +111,7 @@ npm run build
 ```
 
 ### Key Commands
+
 ```bash
 npm test            # Run tests in watch mode
 npm run test:unit   # Unit tests only
@@ -97,6 +121,7 @@ npm run build       # TypeScript build
 ```
 
 ### Important Files to Read First
+
 1. `src/tools/base-tool.ts` - Current base class
 2. `src/tools/types.ts` - Tool interfaces
 3. `src/tools/implementations/file-read.ts` - Example tool
@@ -108,6 +133,7 @@ npm run build       # TypeScript build
 ### Phase 1: Foundation (Day 1)
 
 #### Task 1.1: Install Dependencies
+
 ```bash
 git checkout -b refactor/tool-system
 npm install zod zod-to-json-schema
@@ -117,6 +143,7 @@ git commit -m "add zod dependencies for tool validation"
 ```
 
 #### Task 1.2: Create Tool Schema Tests
+
 **File**: `src/tools/tool.test.ts` (NEW)
 
 Write tests FIRST for the new Tool base class:
@@ -138,9 +165,9 @@ class TestTool extends Tool {
     required: z.string().min(1),
     optional: z.number().optional(),
   });
-  
+
   async executeValidated(
-    args: z.infer<typeof this.schema>, 
+    args: z.infer<typeof this.schema>,
     context?: ToolContext
   ) {
     return {
@@ -153,11 +180,8 @@ class TestTool extends Tool {
 describe('Tool with schema validation', () => {
   it('validates and executes with valid parameters', async () => {
     const tool = new TestTool();
-    const result = await tool.execute(
-      { required: 'hello' },
-      undefined
-    );
-    
+    const result = await tool.execute({ required: 'hello' }, undefined);
+
     expect(result.isError).toBe(false);
     expect(result.content[0].text).toBe('Got: hello');
   });
@@ -168,7 +192,7 @@ describe('Tool with schema validation', () => {
       { optional: 123 }, // missing required field
       undefined
     );
-    
+
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Validation failed');
     expect(result.content[0].text).toContain('required');
@@ -177,7 +201,7 @@ describe('Tool with schema validation', () => {
   it('generates JSON schema from Zod schema', () => {
     const tool = new TestTool();
     const jsonSchema = tool.inputSchema;
-    
+
     expect(jsonSchema.type).toBe('object');
     expect(jsonSchema.properties.required).toBeDefined();
     expect(jsonSchema.required).toContain('required');
@@ -186,17 +210,20 @@ describe('Tool with schema validation', () => {
 ```
 
 Run tests - they should fail:
+
 ```bash
 npm test tool.test.ts
 ```
 
 Commit the failing tests:
+
 ```bash
 git add src/tools/tool.test.ts
 git commit -m "add tests for schema-based tool validation"
 ```
 
 #### Task 1.3: Implement New Tool Base Class
+
 **File**: `src/tools/tool.ts` (NEW)
 
 Now implement to make tests pass:
@@ -207,17 +234,13 @@ Now implement to make tests pass:
 
 import { z, ZodType, ZodError } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import type { 
-  ToolResult, 
-  ToolContext, 
-  ToolInputSchema 
-} from './types.js';
+import type { ToolResult, ToolContext, ToolInputSchema } from './types.js';
 
 export abstract class Tool {
   abstract name: string;
   abstract description: string;
   abstract schema: ZodType;
-  
+
   // Generate JSON Schema for AI providers
   get inputSchema(): ToolInputSchema {
     return zodToJsonSchema(this.schema, {
@@ -225,12 +248,9 @@ export abstract class Tool {
       $refStrategy: 'none',
     }) as ToolInputSchema;
   }
-  
+
   // Public execute method that handles validation
-  async execute(
-    args: unknown, 
-    context?: ToolContext
-  ): Promise<ToolResult> {
+  async execute(args: unknown, context?: ToolContext): Promise<ToolResult> {
     try {
       const validated = this.schema.parse(args);
       return await this.executeValidated(validated, context);
@@ -241,15 +261,15 @@ export abstract class Tool {
       throw error;
     }
   }
-  
+
   // Implement this in subclasses with validated args
   protected abstract executeValidated(
     args: any,
     context?: ToolContext
   ): Promise<ToolResult>;
-  
+
   // Output helpers for consistent result construction
-  
+
   // Public API for creating results
   protected createResult(
     content: string | object,
@@ -257,46 +277,47 @@ export abstract class Tool {
   ): ToolResult {
     return this._makeResult({ content, metadata, isError: false });
   }
-  
+
   protected createError(
     content: string | object,
     metadata?: Record<string, any>
   ): ToolResult {
     return this._makeResult({ content, metadata, isError: true });
   }
-  
+
   // Private implementation
   private _makeResult(options: {
     content: string | object;
     metadata?: Record<string, any>;
     isError: boolean;
   }): ToolResult {
-    const text = typeof options.content === 'string' 
-      ? options.content 
-      : JSON.stringify(options.content, null, 2);
-    
+    const text =
+      typeof options.content === 'string'
+        ? options.content
+        : JSON.stringify(options.content, null, 2);
+
     return {
       content: [{ type: 'text', text }],
       isError: options.isError,
       ...(options.metadata && { metadata: options.metadata }),
     };
   }
-  
+
   private formatValidationError(error: ZodError): ToolResult {
     const issues = error.issues
-      .map(issue => {
-        const path = issue.path.length > 0 
-          ? issue.path.join('.') 
-          : 'root';
+      .map((issue) => {
+        const path = issue.path.length > 0 ? issue.path.join('.') : 'root';
         return `${path}: ${issue.message}`;
       })
       .join('; ');
-    
+
     return {
-      content: [{
-        type: 'text',
-        text: `Validation failed: ${issues}. Check parameter types and values.`,
-      }],
+      content: [
+        {
+          type: 'text',
+          text: `Validation failed: ${issues}. Check parameter types and values.`,
+        },
+      ],
       isError: true,
     };
   }
@@ -304,17 +325,20 @@ export abstract class Tool {
 ```
 
 Run tests - they should pass:
+
 ```bash
 npm test tool.test.ts
 ```
 
 Commit:
+
 ```bash
 git add src/tools/tool.ts
 git commit -m "implement schema-based Tool base class"
 ```
 
 #### Task 1.4: Create Schema Utilities
+
 **File**: `src/tools/schemas/common.test.ts` (NEW)
 
 Test common schema patterns first:
@@ -332,25 +356,25 @@ describe('Common schema patterns', () => {
     it('accepts non-empty strings', () => {
       expect(NonEmptyString.parse('hello')).toBe('hello');
     });
-    
+
     it('rejects empty strings', () => {
       expect(() => NonEmptyString.parse('')).toThrow();
     });
   });
-  
+
   describe('FilePath', () => {
     it('normalizes relative paths to absolute', () => {
       const result = FilePath.parse('./test.txt');
       expect(result).toMatch(/^\/.*test\.txt$/);
     });
   });
-  
+
   describe('LineNumber', () => {
     it('accepts positive integers', () => {
       expect(LineNumber.parse(1)).toBe(1);
       expect(LineNumber.parse(100)).toBe(100);
     });
-    
+
     it('rejects zero and negative numbers', () => {
       expect(() => LineNumber.parse(0)).toThrow();
       expect(() => LineNumber.parse(-1)).toThrow();
@@ -360,6 +384,7 @@ describe('Common schema patterns', () => {
 ```
 
 Commit failing tests:
+
 ```bash
 git add src/tools/schemas/common.test.ts
 git commit -m "add tests for common schema patterns"
@@ -376,33 +401,25 @@ Implement patterns:
 import { z } from 'zod';
 import { resolve } from 'path';
 
-export const NonEmptyString = z
-  .string()
-  .min(1, 'Cannot be empty');
+export const NonEmptyString = z.string().min(1, 'Cannot be empty');
 
 export const FilePath = z
   .string()
   .min(1, 'File path cannot be empty')
-  .transform(path => resolve(path));
+  .transform((path) => resolve(path));
 
 export const LineNumber = z
   .number()
   .int('Must be an integer')
   .positive('Must be positive');
 
-export const MaxResults = z
-  .number()
-  .int()
-  .min(1)
-  .max(1000)
-  .default(100);
+export const MaxResults = z.number().int().min(1).max(1000).default(100);
 
-export const FilePattern = z
-  .string()
-  .min(1, 'Pattern cannot be empty');
+export const FilePattern = z.string().min(1, 'Pattern cannot be empty');
 ```
 
 Verify tests pass and commit:
+
 ```bash
 npm test common.test.ts
 git add src/tools/schemas/common.ts
@@ -414,18 +431,21 @@ git commit -m "implement common schema patterns"
 #### Task 2.1: Choose Complex Tool for Proof of Concept
 
 We'll migrate `file-read` as it has:
+
 - Path validation
 - Optional parameters with constraints
 - File size limits
 - Error cases needing rich context
 
 First, study the existing implementation:
+
 ```bash
 cat src/tools/implementations/file-read.ts
 cat src/tools/implementations/file-read.test.ts
 ```
 
 #### Task 2.2: Write Tests for New FileRead Tool
+
 **File**: `src/tools/implementations/file-read-new.test.ts` (NEW)
 
 ```typescript
@@ -441,24 +461,24 @@ import { tmpdir } from 'os';
 describe('FileReadTool with schema validation', () => {
   const testDir = join(tmpdir(), 'lace-test-' + Date.now());
   const testFile = join(testDir, 'test.txt');
-  
+
   beforeEach(async () => {
     await mkdir(testDir, { recursive: true });
     await writeFile(testFile, 'Line 1\nLine 2\nLine 3\n');
   });
-  
+
   afterEach(async () => {
     await rm(testDir, { recursive: true, force: true });
   });
-  
+
   it('reads entire file', async () => {
     const tool = new FileReadTool();
     const result = await tool.execute({ path: testFile });
-    
+
     expect(result.isError).toBe(false);
     expect(result.content[0].text).toBe('Line 1\nLine 2\nLine 3\n');
   });
-  
+
   it('reads file with line range', async () => {
     const tool = new FileReadTool();
     const result = await tool.execute({
@@ -466,11 +486,11 @@ describe('FileReadTool with schema validation', () => {
       startLine: 2,
       endLine: 2,
     });
-    
+
     expect(result.isError).toBe(false);
     expect(result.content[0].text).toBe('Line 2');
   });
-  
+
   it('validates line range constraints', async () => {
     const tool = new FileReadTool();
     const result = await tool.execute({
@@ -478,17 +498,17 @@ describe('FileReadTool with schema validation', () => {
       startLine: 3,
       endLine: 1, // Invalid: end before start
     });
-    
+
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('endLine must be >= startLine');
   });
-  
+
   it('handles file not found with suggestions', async () => {
     const tool = new FileReadTool();
     const result = await tool.execute({
       path: join(testDir, 'missing.txt'),
     });
-    
+
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('File not found');
     expect(result.content[0].text).toContain('Similar files');
@@ -497,12 +517,14 @@ describe('FileReadTool with schema validation', () => {
 ```
 
 Commit failing tests:
+
 ```bash
 git add src/tools/implementations/file-read-new.test.ts
 git commit -m "add tests for schema-based file read tool"
 ```
 
 #### Task 2.3: Implement New FileRead Tool
+
 **File**: `src/tools/implementations/file-read-new.ts` (NEW)
 
 ```typescript
@@ -525,7 +547,7 @@ const fileReadSchema = z
     endLine: LineNumber.optional(),
   })
   .refine(
-    data => {
+    (data) => {
       if (data.startLine && data.endLine) {
         return data.endLine >= data.startLine;
       }
@@ -541,7 +563,7 @@ export class FileReadTool extends Tool {
   name = 'file_read';
   description = 'Read contents of a file with optional line range';
   schema = fileReadSchema;
-  
+
   protected async executeValidated(
     args: z.infer<typeof fileReadSchema>,
     context?: ToolContext
@@ -554,11 +576,11 @@ export class FileReadTool extends Tool {
           `File too large: ${stats.size} bytes (max: ${MAX_FILE_SIZE} bytes). Use startLine/endLine to read portions.`
         );
       }
-      
+
       // Read file
       const content = await readFile(args.path, 'utf-8');
       const lines = content.split('\n');
-      
+
       // Apply line range if specified
       let result = content;
       if (args.startLine || args.endLine) {
@@ -566,7 +588,7 @@ export class FileReadTool extends Tool {
         const end = args.endLine || lines.length;
         result = lines.slice(start, end).join('\n');
       }
-      
+
       return this.createResult(result, {
         totalLines: lines.length,
         linesReturned: result.split('\n').length,
@@ -576,15 +598,16 @@ export class FileReadTool extends Tool {
       // File not found - provide suggestions
       if (error.code === 'ENOENT') {
         const suggestions = await findSimilarPaths(args.path);
-        const suggestionText = suggestions.length > 0
-          ? `\nSimilar files: ${suggestions.join(', ')}`
-          : '';
-          
+        const suggestionText =
+          suggestions.length > 0
+            ? `\nSimilar files: ${suggestions.join(', ')}`
+            : '';
+
         return this.createError(
           `File not found: ${args.path}${suggestionText}`
         );
       }
-      
+
       throw error;
     }
   }
@@ -592,6 +615,7 @@ export class FileReadTool extends Tool {
 ```
 
 #### Task 2.4: Implement File Suggestions Utility
+
 **File**: `src/tools/utils/file-suggestions.ts` (NEW)
 
 ```typescript
@@ -607,26 +631,26 @@ export async function findSimilarPaths(
 ): Promise<string[]> {
   const dir = dirname(targetPath);
   const name = basename(targetPath);
-  
+
   try {
     // Find files in same directory
-    const files = await glob('*', { 
+    const files = await glob('*', {
       cwd: dir,
       nodir: true,
       dot: true,
     });
-    
+
     // Simple similarity: shared prefix/suffix
     const scored = files
-      .map(file => ({
+      .map((file) => ({
         file,
         score: calculateSimilarity(name, file),
       }))
-      .filter(item => item.score > 0.3)
+      .filter((item) => item.score > 0.3)
       .sort((a, b) => b.score - a.score)
       .slice(0, maxSuggestions)
-      .map(item => `${dir}/${item.file}`);
-    
+      .map((item) => `${dir}/${item.file}`);
+
     return scored;
   } catch {
     return [];
@@ -637,9 +661,9 @@ function calculateSimilarity(a: string, b: string): number {
   // Simple similarity based on common characters
   const longer = a.length > b.length ? a : b;
   const shorter = a.length > b.length ? b : a;
-  
+
   if (longer.length === 0) return 1.0;
-  
+
   const editDistance = getEditDistance(longer, shorter);
   return (longer.length - editDistance) / longer.length;
 }
@@ -647,15 +671,15 @@ function calculateSimilarity(a: string, b: string): number {
 function getEditDistance(a: string, b: string): number {
   // Simple Levenshtein distance
   const matrix: number[][] = [];
-  
+
   for (let i = 0; i <= b.length; i++) {
     matrix[i] = [i];
   }
-  
+
   for (let j = 0; j <= a.length; j++) {
     matrix[0][j] = j;
   }
-  
+
   for (let i = 1; i <= b.length; i++) {
     for (let j = 1; j <= a.length; j++) {
       if (b.charAt(i - 1) === a.charAt(j - 1)) {
@@ -669,12 +693,13 @@ function getEditDistance(a: string, b: string): number {
       }
     }
   }
-  
+
   return matrix[b.length][a.length];
 }
 ```
 
 Run tests and commit when passing:
+
 ```bash
 npm test file-read-new.test.ts
 git add src/tools/implementations/file-read-new.ts
@@ -683,6 +708,7 @@ git commit -m "implement schema-based file read tool"
 ```
 
 #### Task 2.5: Update Tool Registration
+
 **File**: `src/tools/implementations/index.ts` (MODIFY)
 
 Temporarily export both versions:
@@ -693,6 +719,7 @@ export { FileReadTool as FileReadToolNew } from './file-read-new.js';
 ```
 
 Test that new tool can be registered:
+
 ```typescript
 // In test file or manually:
 import { ToolExecutor } from '../tool-executor.js';
@@ -703,6 +730,7 @@ executor.registerTool(new FileReadToolNew());
 ```
 
 Commit:
+
 ```bash
 git add src/tools/implementations/index.ts
 git commit -m "export new file read tool for testing"
@@ -711,6 +739,7 @@ git commit -m "export new file read tool for testing"
 ### Phase 3: Integration and Compatibility (Day 3)
 
 #### Task 3.1: Update Tool Executor Compatibility
+
 **File**: `src/tools/tool-executor.test.ts` (ADD TESTS)
 
 Add test to verify new tools work with existing executor:
@@ -720,21 +749,23 @@ it('executes new schema-based tools', async () => {
   const executor = new ToolExecutor();
   const tool = new FileReadToolNew();
   executor.registerTool(tool);
-  
+
   const result = await executor.executeTool({
     id: 'test-1',
     name: 'file_read',
     arguments: { path: '/etc/hosts' },
   });
-  
+
   expect(result.isError).toBe(false);
 });
 ```
 
 #### Task 3.2: Make Tool Executor Work with Both Tool Types
+
 **File**: `src/tools/tool-executor.ts` (MODIFY)
 
-The executor needs to work with both old tools (implementing `Tool` interface from types.ts) and new tools (extending `Tool` class):
+The executor needs to work with both old tools (implementing `Tool` interface
+from types.ts) and new tools (extending `Tool` class):
 
 ```typescript
 // Add type guard
@@ -753,6 +784,7 @@ if (isNewTool(tool)) {
 ```
 
 #### Task 3.3: Verify End-to-End Integration
+
 Run integration tests to ensure the new tool works in real conversations:
 
 ```bash
@@ -763,7 +795,9 @@ npm run test:integration -- --grep "file.*read"
 
 #### Important: Structured Output Helpers
 
-All tools MUST use the base class output helpers for consistency. This eliminates manual JSON.stringify() calls and ensures uniform result construction across all tools.
+All tools MUST use the base class output helpers for consistency. This
+eliminates manual JSON.stringify() calls and ensures uniform result construction
+across all tools.
 
 **Examples of proper usage:**
 
@@ -771,7 +805,7 @@ All tools MUST use the base class output helpers for consistency. This eliminate
 // Bash tool - structured output
 protected async executeValidated(args: z.infer<typeof bashSchema>) {
   const { stdout, stderr } = await execAsync(args.command);
-  
+
   // Use createResult for structured data - it handles JSON.stringify
   return this.createResult({
     stdout: stdout || '',
@@ -783,7 +817,7 @@ protected async executeValidated(args: z.infer<typeof bashSchema>) {
 // File operations with metadata
 protected async executeValidated(args: z.infer<typeof fileReadSchema>) {
   const content = await readFile(args.path);
-  
+
   // Text content with metadata
   return this.createResult(content, {
     totalLines: lines.length,
@@ -803,11 +837,13 @@ catch (error) {
 ```
 
 **DO NOT:**
+
 - Manually call JSON.stringify() in tools
 - Construct ToolResult objects directly
 - Mix patterns within the same tool
 
 **Benefits:**
+
 - Consistent JSON formatting (2-space indent)
 - Uniform error handling
 - Easier to change output format globally
@@ -815,9 +851,11 @@ catch (error) {
 
 ### Phase 4: Migration Pattern Established (Day 4)
 
-Now that we have one tool migrated and working, establish the pattern for remaining tools.
+Now that we have one tool migrated and working, establish the pattern for
+remaining tools.
 
 #### Task 4.1: Document Migration Process
+
 **File**: `docs/tool-migration-guide.md` (NEW)
 
 ```markdown
@@ -857,6 +895,7 @@ Now that we have one tool migrated and working, establish the pattern for remain
 ```
 
 #### Task 4.2: Create Migration Checklist Template
+
 **File**: `docs/tool-migration-checklist.md` (NEW)
 
 ```markdown
@@ -879,41 +918,59 @@ Now that we have one tool migrated and working, establish the pattern for remain
 For each remaining tool, follow the pattern:
 
 #### Day 5: Migrate Simple Tools
-- ✅ **bash.ts**: ✅ COMPLETED - Single string parameter (NonEmptyString schema, structured JSON output)
-- ✅ **url-fetch.ts**: ✅ COMPLETED - Complex URL validation with protocol checks and structured output
 
-#### Day 6: Migrate File Write Tools  
-- ✅ **file-write.ts**: ✅ COMPLETED - Schema-based validation with enhanced error handling and structured output
-- ✅ **file-insert.ts**: ✅ COMPLETED - Line number validation with line range checking and structured output
+- ✅ **bash.ts**: ✅ COMPLETED - Single string parameter (NonEmptyString schema,
+  structured JSON output)
+- ✅ **url-fetch.ts**: ✅ COMPLETED - Complex URL validation with protocol
+  checks and structured output
+
+#### Day 6: Migrate File Write Tools
+
+- ✅ **file-write.ts**: ✅ COMPLETED - Schema-based validation with enhanced
+  error handling and structured output
+- ✅ **file-insert.ts**: ✅ COMPLETED - Line number validation with line range
+  checking and structured output
 
 #### Day 7: Migrate Search Tools
-- ✅ **file-find.ts**: ✅ COMPLETED - Complex glob pattern matching with type filtering and depth control
-- ✅ **file-list.ts**: ✅ COMPLETED - Directory tree formatting with summarization and pattern filtering
+
+- ✅ **file-find.ts**: ✅ COMPLETED - Complex glob pattern matching with type
+  filtering and depth control
+- ✅ **file-list.ts**: ✅ COMPLETED - Directory tree formatting with
+  summarization and pattern filtering
 
 #### Day 8: Migrate Complex Search
-- ✅ **ripgrep-search.ts**: ✅ COMPLETED - Most complex parameter set with pattern, path, search options, and context lines
+
+- ✅ **ripgrep-search.ts**: ✅ COMPLETED - Most complex parameter set with
+  pattern, path, search options, and context lines
 
 #### Day 9: Migrate Edit Tools
-- ✅ **file-edit.ts**: ✅ COMPLETED - Multi-field validation with exact text matching and enhanced error handling
+
+- ✅ **file-edit.ts**: ✅ COMPLETED - Multi-field validation with exact text
+  matching and enhanced error handling
 
 #### Day 10: Migrate Remaining Tools
-- ✅ **task-manager.ts**: ✅ COMPLETED - Task operations with complex JSON array parsing and thread isolation
-- ✅ **delegate.ts**: ✅ COMPLETED - Complex delegation logic with model format validation and subagent management
+
+- ✅ **task-manager.ts**: ✅ COMPLETED - Task operations with complex JSON array
+  parsing and thread isolation
+- ✅ **delegate.ts**: ✅ COMPLETED - Complex delegation logic with model format
+  validation and subagent management
 
 ### Phase 6: Cleanup (Day 11)
 
 #### Task 6.1: Remove Old Base Tool Code
+
 Once all tools migrated:
 
 1. Delete validation methods from BaseTool
-2. Remove old Tool interface 
+2. Remove old Tool interface
 3. Update all imports
 4. Ensure everything still builds
 
 #### Task 6.2: Final Testing
+
 ```bash
 npm run test:run
-npm run test:integration  
+npm run test:integration
 npm run test:coverage
 npm run lint
 npm run build
@@ -922,9 +979,10 @@ npm run build
 ### Phase 7: Documentation (Day 12)
 
 #### Task 7.1: Update CLAUDE.md
+
 Add section on tool development:
 
-```markdown
+````markdown
 ## Tool Development
 
 Tools extend the `Tool` base class and define a Zod schema:
@@ -936,13 +994,15 @@ class MyTool extends Tool {
   schema = z.object({
     param: z.string().min(1),
   });
-  
+
   async executeValidated(args: z.infer<typeof this.schema>) {
     // Implementation
   }
 }
 ```
-```
+````
+
+````
 
 #### Task 7.2: Update README
 Document how to add new tools with the new system.
@@ -1001,14 +1061,16 @@ git push origin refactor/tool-system
 # After migration complete
 git checkout main
 git merge refactor/tool-system
-```
+````
 
 ## Questions/Issues
 
 If you get stuck:
+
 1. Check existing tool implementations for patterns
-2. Look at test files for expected behavior  
+2. Look at test files for expected behavior
 3. Run existing tool to see current error messages
 4. Ask about specific issues rather than general problems
 
-Remember: The goal is cleaner, more maintainable code that behaves identically to the current system while preparing for future MCP tool integration.
+Remember: The goal is cleaner, more maintainable code that behaves identically
+to the current system while preparing for future MCP tool integration.

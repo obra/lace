@@ -1,14 +1,19 @@
 # Task Management UI Implementation Plan
 
 ## Overview
-This document outlines the implementation of two key improvements to the task management system:
 
-1. **Safe Internal Tool Annotation System** - Mark task tools as never needing user approval
-2. **Custom Task Tool Renderers** - Replace generic JSON output with clean, readable UI components
+This document outlines the implementation of two key improvements to the task
+management system:
+
+1. **Safe Internal Tool Annotation System** - Mark task tools as never needing
+   user approval
+2. **Custom Task Tool Renderers** - Replace generic JSON output with clean,
+   readable UI components
 
 ## Context Reading
 
 Before starting, read these documents to understand the codebase:
+
 - `docs/architecture.md` - Overall system architecture
 - `docs/development.md` - Development setup and workflow
 - `docs/design/tools.md` - Tool system design and patterns
@@ -17,21 +22,31 @@ Before starting, read these documents to understand the codebase:
 ## Current System Analysis
 
 ### Tool Approval Flow
+
 - **Location**: `src/tools/policy-wrapper.ts`
-- **How it works**: Global policy wrapper checks CLI options, then delegates to interface callback
-- **Current annotations**: `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`
-- **Decision flow**: Session cache → disabled checks → guardrails → auto-approve → tool hints → user prompt
+- **How it works**: Global policy wrapper checks CLI options, then delegates to
+  interface callback
+- **Current annotations**: `readOnlyHint`, `destructiveHint`, `idempotentHint`,
+  `openWorldHint`
+- **Decision flow**: Session cache → disabled checks → guardrails → auto-approve
+  → tool hints → user prompt
 
 ### Tool Renderer System
+
 - **Location**: `src/interfaces/terminal/components/events/tool-renderers/`
-- **Pattern**: Each tool has optional custom renderer (e.g., `BashToolRenderer.tsx`)
+- **Pattern**: Each tool has optional custom renderer (e.g.,
+  `BashToolRenderer.tsx`)
 - **Discovery**: `getToolRenderer.ts` uses naming convention to find renderers
-- **Fallback**: `GenericToolRenderer.tsx` shows raw JSON with `[GENERIC]` indicator
-- **Base Component**: All renderers use `TimelineEntry` component with status indicators
+- **Fallback**: `GenericToolRenderer.tsx` shows raw JSON with `[GENERIC]`
+  indicator
+- **Base Component**: All renderers use `TimelineEntry` component with status
+  indicators
 
 ### Task Management Tools
+
 - **Location**: `src/tools/implementations/task-manager/tools.ts`
-- **Tools**: `TaskCreateTool`, `TaskListTool`, `TaskViewTool`, `TaskUpdateTool`, `TaskAddNoteTool`, `TaskCompleteTool`
+- **Tools**: `TaskCreateTool`, `TaskListTool`, `TaskViewTool`, `TaskUpdateTool`,
+  `TaskAddNoteTool`, `TaskCompleteTool`
 - **Output**: Currently uses generic JSON rendering
 - **Formatter**: `formatter.ts` has CLI-friendly formatting utilities
 
@@ -42,13 +57,18 @@ Before starting, read these documents to understand the codebase:
 **Goal**: Enable tools to bypass all approval prompts
 
 **Files modified**:
+
 - `src/tools/types.ts` - Added `safeInternal` to `ToolAnnotations` interface
 - `src/tools/policy-wrapper.ts` - Added safe internal check at step 1.5
-- `src/tools/implementations/task-manager/tools.ts` - Added annotation to all 6 task tools
-- `src/tools/__tests__/policy-wrapper.test.ts` - Added comprehensive test coverage
+- `src/tools/implementations/task-manager/tools.ts` - Added annotation to all 6
+  task tools
+- `src/tools/__tests__/policy-wrapper.test.ts` - Added comprehensive test
+  coverage
 
 **TDD Steps completed**:
-1. ✅ Wrote failing test that verifies `safeInternal` annotation bypasses approval
+
+1. ✅ Wrote failing test that verifies `safeInternal` annotation bypasses
+   approval
 2. ✅ Added `safeInternal?: boolean` to `ToolAnnotations` interface
 3. ✅ Ran test to confirm it fails
 4. ✅ Added safe internal check to policy wrapper (step 1.5 in decision flow)
@@ -58,6 +78,7 @@ Before starting, read these documents to understand the codebase:
 **Test coverage**: All tests passing, including new safe internal test
 
 **Implementation completed**:
+
 ```typescript
 // In src/tools/types.ts
 export interface ToolAnnotations {
@@ -66,7 +87,7 @@ export interface ToolAnnotations {
   destructiveHint?: boolean;
   idempotentHint?: boolean;
   openWorldHint?: boolean;
-  safeInternal?: boolean;  // NEW: Always approved, never needs user consent
+  safeInternal?: boolean; // NEW: Always approved, never needs user consent
 }
 
 // In src/tools/policy-wrapper.ts (added after step 1, before step 2)
@@ -91,10 +112,14 @@ annotations = {
 **Goal**: Replace generic JSON with detailed task creation confirmation
 
 **Files created**:
-- `src/interfaces/terminal/components/events/tool-renderers/TaskAddToolRenderer.tsx` ✅
-- `src/interfaces/terminal/components/events/tool-renderers/TaskAddToolRenderer.test.tsx` ✅
+
+- `src/interfaces/terminal/components/events/tool-renderers/TaskAddToolRenderer.tsx`
+  ✅
+- `src/interfaces/terminal/components/events/tool-renderers/TaskAddToolRenderer.test.tsx`
+  ✅
 
 **Design specification implemented**:
+
 ```
 ✔ task_add: Created task "Test task management suite"
   → task_20250705_b9qers [high priority]
@@ -103,6 +128,7 @@ annotations = {
 ```
 
 **TDD Steps completed**:
+
 1. ✅ Wrote failing test for successful task creation rendering
 2. ✅ Created `TaskAddToolRenderer.tsx` with minimal implementation
 3. ✅ Ran test to confirm it fails
@@ -115,6 +141,7 @@ annotations = {
 **Test coverage**: 4 comprehensive test cases covering all states
 
 **Implementation completed**:
+
 - ✅ Parse task creation arguments from `item.call.arguments`
 - ✅ Extract task ID from result content using regex
 - ✅ Show priority with clean formatting
@@ -123,7 +150,8 @@ annotations = {
 - ✅ Handle creation errors gracefully
 - ✅ Support pending state while running
 
-**Commit**: `feat: add TaskAddToolRenderer with detailed creation confirmation` (fb84115)
+**Commit**: `feat: add TaskAddToolRenderer with detailed creation confirmation`
+(fb84115)
 
 **Result**: Custom task creation UI replaces generic JSON output
 
@@ -132,18 +160,21 @@ annotations = {
 **Goal**: Replace generic JSON with compact, readable task list
 
 **Files to create**:
+
 - `src/interfaces/terminal/components/events/tool-renderers/TaskListToolRenderer.tsx`
 - `src/interfaces/terminal/components/events/tool-renderers/TaskListToolRenderer.test.tsx`
 
 **Design specification**:
+
 ```
 ✓ task_list: 3 tasks found (filter: thread)
   ○ task_20250705_b9qers [high] Test task management suite
-  ◐ task_20250705_wpd92m [medium] Create sample bug fix task  
+  ◐ task_20250705_wpd92m [medium] Create sample bug fix task
   ⊗ task_20250705_xyz123 [low] Blocked dependency task
 ```
 
 **TDD Steps**:
+
 1. Write failing test for task list rendering
 2. Create `TaskListToolRenderer.tsx` with minimal implementation
 3. Run test to confirm it fails
@@ -154,12 +185,14 @@ annotations = {
 8. Add priority color coding
 
 **Status icons mapping**:
+
 - `pending`: ○
-- `in_progress`: ◐  
+- `in_progress`: ◐
 - `completed`: ✓
 - `blocked`: ⊗
 
 **Implementation details**:
+
 - Parse task list from result content
 - Extract filter parameters from arguments
 - Show task count and filter type
@@ -174,25 +207,28 @@ annotations = {
 **Goal**: Replace generic JSON with clean, detailed task view
 
 **Files to create**:
+
 - `src/interfaces/terminal/components/events/tool-renderers/TaskViewToolRenderer.tsx`
 - `src/interfaces/terminal/components/events/tool-renderers/TaskViewToolRenderer.test.tsx`
 
 **Design specification**:
+
 ```
 ✓ task_view: task_20250705_b9qers
-  
+
   Test task management suite [high] ○ pending
-  
+
   Description: Testing the upgraded task management system
-  
+
   Prompt: Systematically test all task management tools...
-  
+
   Notes (1):
     • [lace_20250705_2opxkw] 7/5/2025, 9:07:10 AM
       Started investigation - checking current timeout
 ```
 
 **TDD Steps**:
+
 1. Write failing test for task view rendering
 2. Create `TaskViewToolRenderer.tsx` with minimal implementation
 3. Run test to confirm it fails
@@ -203,6 +239,7 @@ annotations = {
 8. Add test for long content truncation
 
 **Implementation details**:
+
 - Parse task details from result content
 - Show title, priority, and status on one line
 - Skip "Created by" line per specification
@@ -218,10 +255,12 @@ annotations = {
 **Goal**: Replace generic JSON with detailed change summary
 
 **Files to create**:
+
 - `src/interfaces/terminal/components/events/tool-renderers/TaskUpdateToolRenderer.tsx`
 - `src/interfaces/terminal/components/events/tool-renderers/TaskUpdateToolRenderer.test.tsx`
 
 **Design specification**:
+
 ```
 ✓ task_update: Updated task "Create sample bug fix task"
   • Status changed: pending → in_progress
@@ -229,6 +268,7 @@ annotations = {
 ```
 
 **TDD Steps**:
+
 1. Write failing test for task update rendering
 2. Create `TaskUpdateToolRenderer.tsx` with minimal implementation
 3. Run test to confirm it fails
@@ -239,6 +279,7 @@ annotations = {
 8. Add test for multiple simultaneous updates
 
 **Implementation details**:
+
 - Parse update arguments to detect changes
 - Show task title from result content
 - List specific changes with bullet points
@@ -253,16 +294,19 @@ annotations = {
 **Goal**: Replace generic JSON with note preview
 
 **Files to create**:
+
 - `src/interfaces/terminal/components/events/tool-renderers/TaskAddNoteToolRenderer.tsx`
 - `src/interfaces/terminal/components/events/tool-renderers/TaskAddNoteToolRenderer.test.tsx`
 
 **Design specification**:
+
 ```
 ✓ task_add_note: Added note to task_20250705_wpd92m
   💬 "Started investigation - checking current timeout..."
 ```
 
 **TDD Steps**:
+
 1. Write failing test for note addition rendering
 2. Create `TaskAddNoteToolRenderer.tsx` with minimal implementation
 3. Run test to confirm it fails
@@ -273,6 +317,7 @@ annotations = {
 8. Add test for special characters in notes
 
 **Implementation details**:
+
 - Parse note content from arguments
 - Extract task ID from arguments
 - Show note content with speech bubble emoji
@@ -287,15 +332,18 @@ annotations = {
 **Goal**: Replace generic JSON with simple success confirmation
 
 **Files to create**:
+
 - `src/interfaces/terminal/components/events/tool-renderers/TaskCompleteToolRenderer.tsx`
 - `src/interfaces/terminal/components/events/tool-renderers/TaskCompleteToolRenderer.test.tsx`
 
 **Design specification**:
+
 ```
 ✓ task_complete: task_20250705_b9qers completed
 ```
 
 **TDD Steps**:
+
 1. Write failing test for task completion rendering
 2. Create `TaskCompleteToolRenderer.tsx` with minimal implementation
 3. Run test to confirm it fails
@@ -306,6 +354,7 @@ annotations = {
 8. Add test for already completed tasks
 
 **Implementation details**:
+
 - Parse task ID from arguments
 - Extract task title from result content
 - Show simple completion confirmation
@@ -313,18 +362,21 @@ annotations = {
 - Use consistent success icon (✓)
 - Keep message brief per specification
 
-**Commit**: `feat: add TaskCompleteToolRenderer with simple success confirmation`
+**Commit**:
+`feat: add TaskCompleteToolRenderer with simple success confirmation`
 
 ### Task 8: Integration and Testing ✅ COMPLETED
 
 **Goal**: Ensure all renderers work together and follow patterns
 
 **Files to verify**:
+
 - `src/interfaces/terminal/components/events/tool-renderers/getToolRenderer.ts`
 - Test all renderers with real task operations
 - Verify consistent styling and behavior
 
 **Integration tests**:
+
 1. Test tool renderer discovery for all task tools
 2. Test fallback to generic renderer if custom renderer fails
 3. Test error boundaries and graceful degradation
@@ -332,6 +384,7 @@ annotations = {
 5. Test expandable/collapsible behavior
 
 **Manual testing**:
+
 ```bash
 # Test the task management suite
 npm run build
@@ -345,12 +398,14 @@ npm run lace -- --help
 ## Technical Requirements
 
 ### Dependencies
+
 - React and Ink for UI components
 - `TimelineEntry` component for consistent styling
 - `ink-testing-library` for component testing
 - Existing task management system
 
 ### Code Quality
+
 - Follow existing patterns in `BashToolRenderer.tsx`
 - Use TypeScript strict mode
 - Handle errors gracefully with fallback to generic renderer
@@ -358,6 +413,7 @@ npm run lace -- --help
 - Follow TDD approach strictly
 
 ### Testing Strategy
+
 - Unit tests for each renderer component
 - Integration tests for tool discovery
 - Error handling tests for malformed data
@@ -365,6 +421,7 @@ npm run lace -- --help
 - Test with real task operations
 
 ### Performance Considerations
+
 - Avoid heavy computations in render methods
 - Use React.memo for expensive components
 - Minimize re-renders with proper dependencies
@@ -372,7 +429,8 @@ npm run lace -- --help
 
 ## Success Criteria
 
-1. **Safe Internal Tools**: All task management tools execute without approval prompts
+1. **Safe Internal Tools**: All task management tools execute without approval
+   prompts
 2. **Custom Renderers**: All task tools show custom UI instead of generic JSON
 3. **Consistent Design**: All renderers follow the same visual patterns
 4. **Error Handling**: Graceful degradation when renderers fail
@@ -382,6 +440,7 @@ npm run lace -- --help
 ## Rollback Plan
 
 If issues arise:
+
 1. Disable custom renderers by removing them from `getToolRenderer.ts`
 2. Revert to generic JSON rendering
 3. Fix issues and re-enable gradually
@@ -398,33 +457,50 @@ If issues arise:
 ## Current Status
 
 ### ✅ Completed Tasks
-- **Task 1**: Safe Internal Tool Annotation System - All task management tools now bypass approval prompts
-- **Task 2**: Create Task Add Renderer - Custom UI for task creation with detailed confirmation display
-- **Task 3**: Create Task List Renderer - Compact task list with status icons and priority display
-- **Task 4**: Create Task View Renderer - Clean detailed task view with notes and description
-- **Task 5**: Create Task Update Renderer - Detailed change summary with before/after values
-- **Task 6**: Create Task Note Renderer - Note addition with truncated content preview
-- **Task 7**: Create Task Complete Renderer - Simple success confirmation for completions
+
+- **Task 1**: Safe Internal Tool Annotation System - All task management tools
+  now bypass approval prompts
+- **Task 2**: Create Task Add Renderer - Custom UI for task creation with
+  detailed confirmation display
+- **Task 3**: Create Task List Renderer - Compact task list with status icons
+  and priority display
+- **Task 4**: Create Task View Renderer - Clean detailed task view with notes
+  and description
+- **Task 5**: Create Task Update Renderer - Detailed change summary with
+  before/after values
+- **Task 6**: Create Task Note Renderer - Note addition with truncated content
+  preview
+- **Task 7**: Create Task Complete Renderer - Simple success confirmation for
+  completions
 
 ### 🔄 Next Steps
-- **Task 4**: Create Task View Renderer - Replace generic JSON with clean, detailed task view
-- **Task 5**: Create Task Update Renderer - Replace generic JSON with detailed change summary
+
+- **Task 4**: Create Task View Renderer - Replace generic JSON with clean,
+  detailed task view
+- **Task 5**: Create Task Update Renderer - Replace generic JSON with detailed
+  change summary
 - **Task 6**: Create Task Note Renderer - Replace generic JSON with note preview
-- **Task 7**: Create Task Complete Renderer - Replace generic JSON with simple success confirmation
-- **Task 8**: Integration and Testing - ✅ Complete - Automatic discovery via naming convention
+- **Task 7**: Create Task Complete Renderer - Replace generic JSON with simple
+  success confirmation
+- **Task 8**: Integration and Testing - ✅ Complete - Automatic discovery via
+  naming convention
 
 ### 📋 Implementation Progress
+
 - **Safe Internal System**: ✅ Complete - Task tools execute without approval
 - **Custom Renderers**: ✅ Complete - All 6 task tool renderers implemented
 - **Testing**: ✅ Complete - Comprehensive test suite with 30 total tests
-- **Integration**: ✅ Complete - Tool renderer discovery automatic via naming convention
+- **Integration**: ✅ Complete - Tool renderer discovery automatic via naming
+  convention
 
 ## 🎉 PROJECT COMPLETE!
 
 All task management UI improvements have been successfully implemented:
+
 - ✅ Safe internal tool system - no more approval prompts for task tools
 - ✅ Beautiful custom renderers for all 6 task management tools
 - ✅ Comprehensive test coverage with 30 passing tests
 - ✅ Automatic integration with existing tool renderer system
 
-This plan provides a complete, step-by-step implementation guide following TDD principles with frequent commits and thorough testing.
+This plan provides a complete, step-by-step implementation guide following TDD
+principles with frequent commits and thorough testing.

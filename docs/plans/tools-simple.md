@@ -2,7 +2,9 @@
 
 ## Overview
 
-Eliminate abstraction layers. Each tool renderer directly composes small, focused components. No central data extraction. No prop drilling. Just simple composition.
+Eliminate abstraction layers. Each tool renderer directly composes small,
+focused components. No central data extraction. No prop drilling. Just simple
+composition.
 
 ## Core Principles
 
@@ -19,14 +21,14 @@ Eliminate abstraction layers. Each tool renderer directly composes small, focuse
 // src/interfaces/terminal/components/events/tool-renderers/components/shared.tsx
 
 // Standard header with icon, title, and status indicator
-export function ToolHeader({ 
-  icon = '🔧', 
+export function ToolHeader({
+  icon = '🔧',
   status, // 'pending' | 'success' | 'error'
-  children 
+  children
 }: Props) {
   const statusIcon = status === 'pending' ? '⏳' : status === 'success' ? '✓' : '✗';
   const statusColor = status === 'pending' ? 'gray' : status === 'success' ? 'green' : 'red';
-  
+
   return (
     <Box>
       <Text color="yellow">{icon} </Text>
@@ -57,7 +59,7 @@ export function ToolContent({ children }: Props) {
 // The ONLY shared hook - for expansion state
 export function useToolExpansion(isSelected: boolean, onToggle?: () => void) {
   const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(isSelected, onToggle);
-  
+
   return {
     isExpanded,
     toggle: () => isExpanded ? onCollapse() : onExpand()
@@ -74,16 +76,16 @@ import { ToolHeader, ToolPreview, ToolContent, useToolExpansion } from './compon
 
 export function BashToolRenderer({ item, isSelected, onToggle }: Props) {
   const { isExpanded } = useToolExpansion(isSelected, onToggle);
-  
+
   // Extract data directly - no abstraction needed
   const { command, description } = item.call.arguments;
   const output = item.result?.content?.[0]?.text || '';
   const hasError = item.result?.isError;
   const isRunning = !item.result;
-  
+
   // Determine status
   const status = isRunning ? 'pending' : hasError ? 'error' : 'success';
-  
+
   return (
     <Box flexDirection="column">
       <ToolHeader status={status}>
@@ -91,13 +93,13 @@ export function BashToolRenderer({ item, isSelected, onToggle }: Props) {
         <Text> $ {command}</Text>
         {description && <Text dim> - {description}</Text>}
       </ToolHeader>
-      
+
       {!isExpanded && output && (
         <ToolPreview>
           <Text numberOfLines={2}>{output}</Text>
         </ToolPreview>
       )}
-      
+
       {isExpanded && output && (
         <ToolContent>
           <Box borderStyle="round" borderColor="gray">
@@ -113,12 +115,15 @@ export function BashToolRenderer({ item, isSelected, onToggle }: Props) {
 ## Implementation Tasks
 
 ### 1. Create shared components file
-- [ ] Create `src/interfaces/terminal/components/events/tool-renderers/components/shared.tsx`
+
+- [ ] Create
+      `src/interfaces/terminal/components/events/tool-renderers/components/shared.tsx`
 - [ ] Implement ToolHeader, ToolPreview, ToolContent
 - [ ] Implement useToolExpansion hook
 - [ ] NO OTHER ABSTRACTIONS - resist the urge
 
 ### 2. Migrate each tool renderer
+
 Order matters - start simple, build confidence:
 
 - [ ] BashToolRenderer - simplest, good template
@@ -131,6 +136,7 @@ Order matters - start simple, build confidence:
 - [ ] DelegateToolRenderer - special case, keep custom logic
 
 ### 3. Remove old abstractions
+
 - [ ] Delete `useToolData.ts` - completely unnecessary
 - [ ] Delete `useToolState.ts` - replaced by simpler useToolExpansion
 - [ ] Delete `ToolDisplay.tsx` - replaced by composition
@@ -140,11 +146,16 @@ Order matters - start simple, build confidence:
 ### 4. Update tests
 
 Test files that need editing (remove mocks for deleted hooks):
-- [ ] `__tests__/FileListToolRenderer.test.tsx` - remove useToolData/useToolState mocks
-- [ ] `__tests__/GenericToolRenderer.test.tsx` - remove useToolData/useToolState mocks  
-- [ ] `__tests__/DelegateToolRenderer.test.tsx` - remove useToolData/useDelegateToolData/useDelegateToolState mocks
+
+- [ ] `__tests__/FileListToolRenderer.test.tsx` - remove
+      useToolData/useToolState mocks
+- [ ] `__tests__/GenericToolRenderer.test.tsx` - remove useToolData/useToolState
+      mocks
+- [ ] `__tests__/DelegateToolRenderer.test.tsx` - remove
+      useToolData/useDelegateToolData/useDelegateToolState mocks
 
 Changes needed:
+
 1. Remove all vi.mock() calls for the deleted hooks
 2. Remove imports of deleted hooks
 3. Test the actual rendered output instead of mocked return values
@@ -153,12 +164,14 @@ Changes needed:
 No test files to delete - the hooks didn't have their own tests.
 
 ### 5. Clean up any remaining references
+
 - [ ] Search for imports of deleted files
 - [ ] Remove unused imports
 
 ## Testing Strategy
 
 Each tool renderer test should:
+
 1. Render the component with mock data
 2. Check the header shows correct command/title
 3. Check collapsed state shows preview
@@ -166,13 +179,14 @@ Each tool renderer test should:
 5. NO MOCKING OF HOOKS - test the actual component
 
 Example test:
+
 ```typescript
 it('should show bash command and output', () => {
   const item = {
     call: { name: 'bash', arguments: { command: 'ls -la' } },
     result: { content: [{ text: 'file1.txt\nfile2.txt' }] }
   };
-  
+
   const { lastFrame } = render(<BashToolRenderer item={item} />);
   expect(lastFrame()).toContain('bash $ ls -la');
   expect(lastFrame()).toContain('file1.txt');
@@ -182,6 +196,7 @@ it('should show bash command and output', () => {
 ## Pitfalls to Avoid
 
 ### 1. Over-abstracting status logic
+
 ```typescript
 // BAD - unnecessary abstraction
 const useToolStatus = (item) => {
@@ -193,6 +208,7 @@ const status = isRunning ? 'pending' : hasError ? 'error' : 'success';
 ```
 
 ### 2. Creating "data objects"
+
 ```typescript
 // BAD - pointless intermediate object
 const toolData = {
@@ -211,6 +227,7 @@ return (
 ```
 
 ### 3. Extracting too early
+
 ```typescript
 // BAD - extracted after seeing it twice
 function formatBashCommand(cmd) { return `$ ${cmd}`; }
@@ -220,6 +237,7 @@ function formatBashCommand(cmd) { return `$ ${cmd}`; }
 ```
 
 ### 4. Making components too flexible
+
 ```typescript
 // BAD - too many options
 <ToolHeader icon={icon} color={color} size={size} bold={bold}>
@@ -231,36 +249,39 @@ function formatBashCommand(cmd) { return `$ ${cmd}`; }
 ## Success Criteria
 
 1. **Less code** - We should delete more than we add
-2. **Easier to understand** - New dev can understand a tool renderer in 30 seconds
+2. **Easier to understand** - New dev can understand a tool renderer in 30
+   seconds
 3. **Easier to add tools** - Copy existing renderer, modify the specifics, done
 4. **Tests are simpler** - No mocking layers of hooks
 
 ## File Naming
 
 - Keep existing tool renderer names (BashToolRenderer.tsx, etc.)
-- Shared components in `components/shared.tsx` (not `ToolComponents` or other fancy names)
+- Shared components in `components/shared.tsx` (not `ToolComponents` or other
+  fancy names)
 - No "utils", "helpers", or "common" files - be specific
 
 ## Code Style
 
 ```typescript
 // Clear variable names
-const command = item.call.arguments.command;  // GOOD
-const cmd = item.call.arguments.command;      // BAD - unclear
-const c = item.call.arguments.command;        // BAD - too short
+const command = item.call.arguments.command; // GOOD
+const cmd = item.call.arguments.command; // BAD - unclear
+const c = item.call.arguments.command; // BAD - too short
 
 // Status in one line
-const status = isRunning ? 'pending' : hasError ? 'error' : 'success';  // GOOD
-const status = getComputedStatusForToolExecution(item);                 // BAD - overwrought
+const status = isRunning ? 'pending' : hasError ? 'error' : 'success'; // GOOD
+const status = getComputedStatusForToolExecution(item); // BAD - overwrought
 
 // Direct property access
-const output = item.result?.content?.[0]?.text || '';  // GOOD
-const output = extractOutputFromResult(item.result);   // BAD - unnecessary
+const output = item.result?.content?.[0]?.text || ''; // GOOD
+const output = extractOutputFromResult(item.result); // BAD - unnecessary
 ```
 
 ## Final Checklist
 
 Before marking complete:
+
 - [ ] Can a new developer understand BashToolRenderer in 30 seconds?
 - [ ] Is each tool renderer self-contained?
 - [ ] Did we delete more code than we added?
@@ -270,11 +291,13 @@ Before marking complete:
 ## Summary
 
 Move from:
+
 ```
 useToolData (giant switch) → useToolState → ToolDisplay → specific components
 ```
 
 To:
+
 ```
 ToolRenderer → composes ToolHeader/Preview/Content directly
 ```

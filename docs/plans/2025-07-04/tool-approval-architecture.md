@@ -2,7 +2,9 @@
 
 ## Overview
 
-The tool approval system in Lace provides a secure mechanism for users to approve or deny tool execution requests from the AI agent. This document describes the implementation details and data flow.
+The tool approval system in Lace provides a secure mechanism for users to
+approve or deny tool execution requests from the AI agent. This document
+describes the implementation details and data flow.
 
 ## Core Types
 
@@ -59,18 +61,21 @@ The `TerminalInterface` class implements `ApprovalCallback`:
 
 ```typescript
 class TerminalInterface implements ApprovalCallback {
-  async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
+  async requestApproval(
+    toolName: string,
+    input: unknown
+  ): Promise<ApprovalDecision> {
     // 1. Get tool information for risk assessment
     const tool = this.agent.toolExecutor.getTool(toolName);
     const isReadOnly = tool?.annotations?.readOnlyHint ?? false;
-    
+
     // 2. Generate unique request ID
     const requestId = generateRequestId();
-    
+
     // 3. Create promise to wait for user decision
     const promise = new Promise<ApprovalDecision>((resolve) => {
       this.pendingApprovalRequests.set(requestId, resolve);
-      
+
       // 4. Emit approval request event to agent
       this.agent.emit('approval_request', {
         toolName,
@@ -83,7 +88,7 @@ class TerminalInterface implements ApprovalCallback {
         },
       });
     });
-    
+
     return promise;
   }
 }
@@ -110,10 +115,10 @@ class ApprovalManager {
     if (sessionApproved?.has(toolName)) {
       return 'allow_session';
     }
-    
+
     // 2. Create pending approval with timeout
     const requestId = randomUUID();
-    
+
     // 3. Emit SSE event to client
     const event: SessionEvent = {
       type: 'TOOL_APPROVAL_REQUEST',
@@ -126,12 +131,12 @@ class ApprovalManager {
         isReadOnly,
         riskLevel: this.getRiskLevel(toolName, isReadOnly),
         input,
-        timeout: Math.floor(timeoutMs / 1000)
-      } as ToolApprovalRequestData
+        timeout: Math.floor(timeoutMs / 1000),
+      } as ToolApprovalRequestData,
     };
-    
+
     SSEManager.getInstance().broadcast(sessionId, event);
-    
+
     // 4. Wait for client response or timeout
   }
 }
@@ -143,30 +148,33 @@ Handles agent events and coordinates with ApprovalManager:
 
 ```typescript
 // Listen for tool approval requests from agent
-agent.on('approval_request', async ({ toolName, input, isReadOnly, requestId, resolve }) => {
-  const approvalManager = getApprovalManager();
-  
-  try {
-    // Get tool description
-    const tool = agent._toolExecutor?.getTool(toolName);
-    const toolDescription = tool?.description;
-    
-    // Request approval through manager
-    const decision = await approvalManager.requestApproval(
-      threadId,
-      sessionId,
-      toolName,
-      toolDescription,
-      input,
-      isReadOnly
-    );
-    
-    resolve(decision);
-  } catch (error) {
-    // On timeout or error, deny the request
-    resolve('deny');
+agent.on(
+  'approval_request',
+  async ({ toolName, input, isReadOnly, requestId, resolve }) => {
+    const approvalManager = getApprovalManager();
+
+    try {
+      // Get tool description
+      const tool = agent._toolExecutor?.getTool(toolName);
+      const toolDescription = tool?.description;
+
+      // Request approval through manager
+      const decision = await approvalManager.requestApproval(
+        threadId,
+        sessionId,
+        toolName,
+        toolDescription,
+        input,
+        isReadOnly
+      );
+
+      resolve(decision);
+    } catch (error) {
+      // On timeout or error, deny the request
+      resolve('deny');
+    }
   }
-});
+);
 ```
 
 ### 3. API Types (`packages/web/types/api.ts`)
@@ -194,7 +202,8 @@ interface SessionEvent {
 
 1. **Tool Execution Request**: Agent attempts to execute a tool
 2. **Approval Check**: ToolExecutor checks if approval is needed
-3. **Callback Invocation**: ToolExecutor calls `ApprovalCallback.requestApproval()`
+3. **Callback Invocation**: ToolExecutor calls
+   `ApprovalCallback.requestApproval()`
 4. **Event Emission**: Interface emits `approval_request` event to agent
 5. **SSE Broadcast**: Web interface broadcasts event to client via SSE
 6. **User Decision**: Client UI presents approval dialog to user
@@ -213,6 +222,7 @@ The system classifies tools into three risk levels:
 ## Session-Wide Approvals
 
 When a user selects "Allow for Session", the ApprovalManager:
+
 1. Stores the tool name in a session-specific Set
 2. Auto-approves future requests for that tool in the same session
 3. Clears all approvals when the session ends

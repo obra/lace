@@ -1,18 +1,25 @@
 # Design System Import Plan
 
-This document provides step-by-step instructions for importing the sophisticated design system from `f-web-spicy` into the monorepo structure at `f-integrate-spicy-web/packages/web/`.
+This document provides step-by-step instructions for importing the sophisticated
+design system from `f-web-spicy` into the monorepo structure at
+`f-integrate-spicy-web/packages/web/`.
 
 **CRITICAL:** All commits importing content from f-web-spicy MUST use:
+
 ```bash
 git commit --author "Jason Shellen <jason@shellen.com>" -m "commit message"
 ```
 
-**IMPORTANT:** We are ONLY importing the design system components and infrastructure. We are NOT importing anything from the `app/` directory of f-web-spicy - our existing web application is more mature and should be preserved completely.
+**IMPORTANT:** We are ONLY importing the design system components and
+infrastructure. We are NOT importing anything from the `app/` directory of
+f-web-spicy - our existing web application is more mature and should be
+preserved completely.
 
 ## Prerequisites
 
 1. Ensure you're in the correct worktree: `f-integrate-spicy-web`
-2. Current branch should be a feature branch for this work (e.g., `feature/import-design-system`)
+2. Current branch should be a feature branch for this work (e.g.,
+   `feature/import-design-system`)
 3. Verify both source (`../f-web-spicy`) and target directories exist
 4. Start from the root of the f-integrate-spicy-web worktree
 
@@ -20,9 +27,11 @@ git commit --author "Jason Shellen <jason@shellen.com>" -m "commit message"
 
 ### Step 1: Move Existing Components to Safe Namespace
 
-**Goal:** Move current components to `old/` namespace so they keep working while we import new design system
+**Goal:** Move current components to `old/` namespace so they keep working while
+we import new design system
 
 **Actions:**
+
 1. Navigate to: `packages/web/components/`
 2. Create new directory: `mkdir old`
 3. Move ALL existing component files to the `old/` directory:
@@ -50,6 +59,7 @@ git commit --author "Jason Shellen <jason@shellen.com>" -m "commit message"
    - ToolApprovalModal.tsx
 
 **Commit:**
+
 ```bash
 git add packages/web/components/
 git commit -m "refactor: move existing components to old/ namespace for design system migration
@@ -60,13 +70,16 @@ All components moved to packages/web/components/old/ directory."
 
 ### Step 2: Update Component Imports
 
-**Goal:** Update all imports to use the new `old/` namespace so the app continues working
+**Goal:** Update all imports to use the new `old/` namespace so the app
+continues working
 
 **Files to update:**
+
 - All files that import components from `../components/ComponentName`
 - Search across the entire `packages/web/` directory
 
 **Actions:**
+
 1. Search for component imports:
    ```bash
    grep -r "from.*components/" packages/web/
@@ -78,16 +91,19 @@ All components moved to packages/web/components/old/ directory."
    - Replace: `from './components/old/ConversationDisplay'`
 
 **Expected files to update:**
+
 - Look in `packages/web/app/` directory for page files
 - Check any files that import from the components directory
 
 **Verification:**
+
 1. Run: `cd packages/web && npm run build`
 2. Should build successfully
 3. Run: `cd packages/web && npm run dev`
 4. Should start successfully and show the existing application
 
 **Commit:**
+
 ```bash
 git add packages/web/
 git commit -m "fix: update component imports to use old/ namespace
@@ -105,10 +121,12 @@ Ensures existing application continues working during design system migration."
 **File to modify:** `packages/web/package.json`
 
 **Actions:**
+
 1. Open `packages/web/package.json`
 2. Compare with `../f-web-spicy/package.json` and update these dependencies:
 
 **Update existing dependencies to these versions:**
+
 ```json
 "next": "15.3.5",
 "react": "18.3.1",
@@ -117,7 +135,9 @@ Ensures existing application continues working during design system migration."
 "tailwindcss": "4.1.11"
 ```
 
-**Add these new dependencies (copy exact versions from ../f-web-spicy/package.json):**
+**Add these new dependencies (copy exact versions from
+../f-web-spicy/package.json):**
+
 ```json
 "daisyui": "5.0.46",
 "@fortawesome/fontawesome-svg-core": "6.7.0",
@@ -130,6 +150,7 @@ Ensures existing application continues working during design system migration."
 ```
 
 **Add these dev dependencies:**
+
 ```json
 "@storybook/react": "9.0.17",
 "@storybook/addon-essentials": "9.0.17",
@@ -143,6 +164,7 @@ Ensures existing application continues working during design system migration."
 ```
 
 **Add these scripts:**
+
 ```json
 "storybook": "storybook dev -p 6006",
 "build-storybook": "storybook build",
@@ -150,6 +172,7 @@ Ensures existing application continues working during design system migration."
 ```
 
 **Commit:**
+
 ```bash
 git add packages/web/package.json
 git commit --author "Jason Shellen <jason@shellen.com>" -m "feat: add design system dependencies and Storybook tooling
@@ -163,13 +186,16 @@ to support the comprehensive design system being imported."
 **Goal:** Install all the new dependencies
 
 **Actions:**
+
 1. Navigate to: `cd packages/web`
 2. Install dependencies: `npm install`
 3. Verify no errors during installation
 
-**Note:** If there are dependency conflicts, note them and we'll resolve them in later steps.
+**Note:** If there are dependency conflicts, note them and we'll resolve them in
+later steps.
 
 **Commit (only if changes were made to package-lock.json):**
+
 ```bash
 git add package-lock.json
 git commit -m "chore: install new design system dependencies
@@ -179,15 +205,20 @@ Updates package-lock.json with design system dependencies."
 
 ### Step 5: Import Tailwind Configuration
 
-**Goal:** Replace basic Tailwind config with advanced design system configuration
+**Goal:** Replace basic Tailwind config with advanced design system
+configuration
 
 **Files to copy:**
+
 - Source: `../f-web-spicy/tailwind.config.js`
 - Target: `packages/web/tailwind.config.js` (replace existing)
 
 **Actions:**
-1. Backup existing config: `cp packages/web/tailwind.config.js packages/web/tailwind.config.js.backup`
-2. Copy new config: `cp ../f-web-spicy/tailwind.config.js packages/web/tailwind.config.js`
+
+1. Backup existing config:
+   `cp packages/web/tailwind.config.js packages/web/tailwind.config.js.backup`
+2. Copy new config:
+   `cp ../f-web-spicy/tailwind.config.js packages/web/tailwind.config.js`
 3. Open `packages/web/tailwind.config.js` and update the content paths:
    ```javascript
    content: [
@@ -199,6 +230,7 @@ Updates package-lock.json with design system dependencies."
    ```
 
 **Commit:**
+
 ```bash
 git add packages/web/tailwind.config.js
 git commit --author "Jason Shellen <jason@shellen.com>" -m "feat: import advanced Tailwind config with DaisyUI themes
@@ -212,13 +244,17 @@ config including DaisyUI themes, custom colors, and advanced features."
 **Goal:** Add modern PostCSS pipeline
 
 **Files to copy:**
+
 - Source: `../f-web-spicy/postcss.config.js`
 - Target: `packages/web/postcss.config.js` (replace if exists)
 
 **Actions:**
-1. Copy file: `cp ../f-web-spicy/postcss.config.js packages/web/postcss.config.js`
+
+1. Copy file:
+   `cp ../f-web-spicy/postcss.config.js packages/web/postcss.config.js`
 
 **Commit:**
+
 ```bash
 git add packages/web/postcss.config.js
 git commit --author "Jason Shellen <jason@shellen.com>" -m "feat: import PostCSS configuration for design system
@@ -232,15 +268,20 @@ Tailwind CSS and DaisyUI processing."
 **Goal:** Import advanced Next.js config features
 
 **Files to copy:**
+
 - Source: `../f-web-spicy/next.config.js`
 - Target: `packages/web/next.config.js` (replace existing)
 
 **Actions:**
-1. Backup existing: `cp packages/web/next.config.js packages/web/next.config.js.backup`
-2. Copy new config: `cp ../f-web-spicy/next.config.js packages/web/next.config.js`
+
+1. Backup existing:
+   `cp packages/web/next.config.js packages/web/next.config.js.backup`
+2. Copy new config:
+   `cp ../f-web-spicy/next.config.js packages/web/next.config.js`
 3. Review the new config - no modifications should be needed for monorepo
 
 **Commit:**
+
 ```bash
 git add packages/web/next.config.js
 git commit --author "Jason Shellen <jason@shellen.com>" -m "feat: import advanced Next.js configuration
@@ -254,20 +295,27 @@ Next.js configuration features for improved development experience."
 **Goal:** Import design system CSS foundation while preserving custom styles
 
 **Files to copy:**
+
 - Source: `../f-web-spicy/src/app/globals.css`
 - Target: `packages/web/src/app/globals.css` (carefully merge)
 
 **Actions:**
-1. **IMPORTANT:** Backup existing styles: `cp packages/web/src/app/globals.css packages/web/src/app/globals.css.backup`
-2. Review the backup file for any custom terminal colors or styles that should be preserved
-3. Copy new styles: `cp ../f-web-spicy/src/app/globals.css packages/web/src/app/globals.css`
-4. If the backup contained custom styles (like terminal colors), add them to the end of the new globals.css file:
+
+1. **IMPORTANT:** Backup existing styles:
+   `cp packages/web/src/app/globals.css packages/web/src/app/globals.css.backup`
+2. Review the backup file for any custom terminal colors or styles that should
+   be preserved
+3. Copy new styles:
+   `cp ../f-web-spicy/src/app/globals.css packages/web/src/app/globals.css`
+4. If the backup contained custom styles (like terminal colors), add them to the
+   end of the new globals.css file:
    ```css
    /* Custom terminal theme colors - preserved from old implementation */
    /* Add any custom styles from the backup file here */
    ```
 
 **Commit:**
+
 ```bash
 git add packages/web/src/app/globals.css
 git commit --author "Jason Shellen <jason@shellen.com>" -m "feat: import design system global styles
@@ -284,15 +332,17 @@ custom styles for terminal theme compatibility."
 **Goal:** Set up Storybook 9 with all advanced features
 
 **Directory to copy:**
+
 - Source: `../f-web-spicy/.storybook/`
 - Target: `packages/web/.storybook/` (create new)
 
 **Actions:**
+
 1. Create directory: `mkdir packages/web/.storybook`
 2. Copy all files: `cp -r ../f-web-spicy/.storybook/* packages/web/.storybook/`
 3. Verify these files were copied:
    - main.ts
-   - preview.ts  
+   - preview.ts
    - manager.ts
    - preview-head.html
 4. Update `packages/web/.storybook/main.ts` to fix the stories path:
@@ -303,6 +353,7 @@ custom styles for terminal theme compatibility."
    ```
 
 **Commit:**
+
 ```bash
 git add packages/web/.storybook/
 git commit --author "Jason Shellen <jason@shellen.com>" -m "feat: import complete Storybook 9 configuration
@@ -316,15 +367,20 @@ accessibility addon, docs addon, and advanced development features."
 **Goal:** Import Storybook helper utilities and decorators
 
 **Files to copy:**
+
 - Source: `../f-web-spicy/src/lib/storybook-utils.ts`
 - Target: `packages/web/src/lib/storybook-utils.ts`
 
 **Actions:**
+
 1. Create directory if needed: `mkdir -p packages/web/src/lib`
-2. Copy file: `cp ../f-web-spicy/src/lib/storybook-utils.ts packages/web/src/lib/storybook-utils.ts`
-3. Check if there are other storybook-related files in `../f-web-spicy/src/lib/` and copy them too
+2. Copy file:
+   `cp ../f-web-spicy/src/lib/storybook-utils.ts packages/web/src/lib/storybook-utils.ts`
+3. Check if there are other storybook-related files in `../f-web-spicy/src/lib/`
+   and copy them too
 
 **Commit:**
+
 ```bash
 git add packages/web/src/lib/
 git commit --author "Jason Shellen <jason@shellen.com>" -m "feat: import Storybook utilities and helper functions
@@ -340,12 +396,15 @@ and component documentation helpers."
 **Goal:** Import all atomic design system components
 
 **Directory to copy:**
+
 - Source: `../f-web-spicy/src/components/ui/`
 - Target: `packages/web/components/ui/`
 
 **Actions:**
+
 1. Create directory: `mkdir -p packages/web/components/ui`
-2. Copy all files: `cp -r ../f-web-spicy/src/components/ui/* packages/web/components/ui/`
+2. Copy all files:
+   `cp -r ../f-web-spicy/src/components/ui/* packages/web/components/ui/`
 3. Verify all component and story files are present (should be 35+ components):
    - Button.tsx + Button.stories.tsx
    - Card.tsx + Card.stories.tsx
@@ -354,6 +413,7 @@ and component documentation helpers."
    - And many more...
 
 **Expected files (verify these exist):**
+
 ```
 packages/web/components/ui/
 ├── Avatar.tsx + Avatar.stories.tsx
@@ -372,6 +432,7 @@ packages/web/components/ui/
 ```
 
 **Commit:**
+
 ```bash
 git add packages/web/components/ui/
 git commit --author "Jason Shellen <jason@shellen.com>" -m "feat: import complete UI component library (atoms and molecules)
@@ -386,15 +447,19 @@ and all foundational UI primitives."
 **Goal:** Import page-level component templates
 
 **Directory to copy:**
+
 - Source: `../f-web-spicy/src/components/pages/`
 - Target: `packages/web/components/pages/`
 
 **Actions:**
+
 1. Create directory: `mkdir -p packages/web/components/pages`
-2. Copy all files: `cp -r ../f-web-spicy/src/components/pages/* packages/web/components/pages/`
+2. Copy all files:
+   `cp -r ../f-web-spicy/src/components/pages/* packages/web/components/pages/`
 3. Verify page components and their stories are present
 
 **Commit:**
+
 ```bash
 git add packages/web/components/pages/
 git commit --author "Jason Shellen <jason@shellen.com>" -m "feat: import page template components
@@ -410,34 +475,49 @@ that demonstrate proper composition of atomic design system elements."
 **Directories to copy (do each separately):**
 
 **Timeline Components:**
+
 1. Create: `mkdir -p packages/web/components/timeline`
-2. Copy: `cp -r ../f-web-spicy/src/components/timeline/* packages/web/components/timeline/`
+2. Copy:
+   `cp -r ../f-web-spicy/src/components/timeline/* packages/web/components/timeline/`
 
 **File Components:**
+
 1. Create: `mkdir -p packages/web/components/files`
-2. Copy: `cp -r ../f-web-spicy/src/components/files/* packages/web/components/files/`
+2. Copy:
+   `cp -r ../f-web-spicy/src/components/files/* packages/web/components/files/`
 
 **Layout Components:**
+
 1. Create: `mkdir -p packages/web/components/layout`
-2. Copy: `cp -r ../f-web-spicy/src/components/layout/* packages/web/components/layout/`
+2. Copy:
+   `cp -r ../f-web-spicy/src/components/layout/* packages/web/components/layout/`
 
 **Modal Components:**
+
 1. Create: `mkdir -p packages/web/components/modals`
-2. Copy: `cp -r ../f-web-spicy/src/components/modals/* packages/web/components/modals/`
+2. Copy:
+   `cp -r ../f-web-spicy/src/components/modals/* packages/web/components/modals/`
 
 **Feedback Components:**
+
 1. Create: `mkdir -p packages/web/components/feedback`
-2. Copy: `cp -r ../f-web-spicy/src/components/feedback/* packages/web/components/feedback/`
+2. Copy:
+   `cp -r ../f-web-spicy/src/components/feedback/* packages/web/components/feedback/`
 
 **Chat Components:**
+
 1. Create: `mkdir -p packages/web/components/chat`
-2. Copy: `cp -r ../f-web-spicy/src/components/chat/* packages/web/components/chat/`
+2. Copy:
+   `cp -r ../f-web-spicy/src/components/chat/* packages/web/components/chat/`
 
 **Organism Components:**
+
 1. Create: `mkdir -p packages/web/components/organisms`
-2. Copy: `cp -r ../f-web-spicy/src/components/organisms/* packages/web/components/organisms/`
+2. Copy:
+   `cp -r ../f-web-spicy/src/components/organisms/* packages/web/components/organisms/`
 
 **Commit:**
+
 ```bash
 git add packages/web/components/
 git commit --author "Jason Shellen <jason@shellen.com>" -m "feat: import specialized component collections
@@ -452,14 +532,18 @@ comprehensive Storybook documentation."
 **Goal:** Import demonstration and example components
 
 **Directory to copy:**
+
 - Source: `../f-web-spicy/src/components/demo/`
 - Target: `packages/web/components/demo/`
 
 **Actions:**
+
 1. Create directory: `mkdir -p packages/web/components/demo`
-2. Copy all files: `cp -r ../f-web-spicy/src/components/demo/* packages/web/components/demo/`
+2. Copy all files:
+   `cp -r ../f-web-spicy/src/components/demo/* packages/web/components/demo/`
 
 **Commit:**
+
 ```bash
 git add packages/web/components/demo/
 git commit --author "Jason Shellen <jason@shellen.com>" -m "feat: import demo and example components
@@ -475,13 +559,17 @@ and provide interactive examples for development reference."
 **Goal:** Import component tracking and registry system
 
 **Files to copy:**
+
 - Source: `../f-web-spicy/src/lib/component-registry.ts`
 - Target: `packages/web/src/lib/component-registry.ts`
 
 **Actions:**
-1. Copy file: `cp ../f-web-spicy/src/lib/component-registry.ts packages/web/src/lib/component-registry.ts`
+
+1. Copy file:
+   `cp ../f-web-spicy/src/lib/component-registry.ts packages/web/src/lib/component-registry.ts`
 
 **Commit:**
+
 ```bash
 git add packages/web/src/lib/component-registry.ts
 git commit --author "Jason Shellen <jason@shellen.com>" -m "feat: import component registry and tracking system
@@ -495,18 +583,22 @@ completion and providing development insights."
 **Goal:** Import design system utility functions
 
 **Files to check and copy from `../f-web-spicy/src/lib/`:**
+
 - `utils.ts` (if exists)
-- `cn.ts` (if exists) 
+- `cn.ts` (if exists)
 - Any other utility files that support the design system
 
 **Actions:**
+
 1. List files: `ls ../f-web-spicy/src/lib/`
 2. Copy relevant utility files (exclude API-related utilities)
 3. Common files to look for:
-   - `cp ../f-web-spicy/src/lib/utils.ts packages/web/src/lib/utils.ts` (if exists)
+   - `cp ../f-web-spicy/src/lib/utils.ts packages/web/src/lib/utils.ts` (if
+     exists)
    - `cp ../f-web-spicy/src/lib/cn.ts packages/web/src/lib/cn.ts` (if exists)
 
 **Commit:**
+
 ```bash
 git add packages/web/src/lib/
 git commit --author "Jason Shellen <jason@shellen.com>" -m "feat: import design system utility functions
@@ -520,10 +612,12 @@ and other design system support functions."
 **Goal:** Import design system type definitions
 
 **Files to check in `../f-web-spicy/src/types/`:**
+
 - Look for component-related types
 - Skip API-related types (we keep our own)
 
 **Actions:**
+
 1. List files: `ls ../f-web-spicy/src/types/`
 2. Copy design system related types:
    - Look for files like `component.ts`, `ui.ts`, `theme.ts`
@@ -532,6 +626,7 @@ and other design system support functions."
 4. Copy relevant files
 
 **Commit:**
+
 ```bash
 git add packages/web/src/types/
 git commit --author "Jason Shellen <jason@shellen.com>" -m "feat: import design system type definitions
@@ -547,10 +642,12 @@ themes, and variant configurations."
 **Goal:** Import design system documentation and guides
 
 **Directory to copy:**
+
 - Source: `../f-web-spicy/docs/visualdesign/`
 - Target: `packages/web/docs/design-system/`
 
 **Actions:**
+
 1. Create directory: `mkdir -p packages/web/docs/design-system`
 2. Copy documentation files:
    ```bash
@@ -561,6 +658,7 @@ themes, and variant configurations."
 3. Skip any files that appear to be work-in-progress or outdated
 
 **Commit:**
+
 ```bash
 git add packages/web/docs/design-system/
 git commit --author "Jason Shellen <jason@shellen.com>" -m "docs: import design system documentation
@@ -578,6 +676,7 @@ Storybook integration, and visual regression testing."
 **Files to create:**
 
 **packages/web/components/ui/index.ts:**
+
 ```typescript
 // Export all UI components for clean imports
 export { Button } from './Button';
@@ -599,6 +698,7 @@ export { Spinner } from './Spinner';
 ```
 
 **packages/web/components/index.ts:**
+
 ```typescript
 // Re-export everything for convenience
 export * from './ui';
@@ -614,14 +714,17 @@ export * from './demo';
 ```
 
 **Actions:**
-1. Create the ui/index.ts file with exports for all components found in the ui directory
-2. Create the main index.ts file 
+
+1. Create the ui/index.ts file with exports for all components found in the ui
+   directory
+2. Create the main index.ts file
 3. List all components to ensure exports are complete:
    ```bash
    ls packages/web/components/ui/*.tsx | grep -v stories
    ```
 
 **Commit:**
+
 ```bash
 git add packages/web/components/index.ts packages/web/components/ui/index.ts
 git commit -m "feat: create component index files for clean imports
@@ -637,6 +740,7 @@ and provides convenient re-exports for all design system components."
 **File to modify:** `packages/web/tsconfig.json`
 
 **Actions:**
+
 1. Open `packages/web/tsconfig.json`
 2. Add or update the `paths` section in `compilerOptions`:
    ```json
@@ -654,6 +758,7 @@ and provides convenient re-exports for all design system components."
    ```
 
 **Commit:**
+
 ```bash
 git add packages/web/tsconfig.json
 git commit -m "feat: configure TypeScript path aliases for clean imports
@@ -667,6 +772,7 @@ for improved developer experience and consistent import patterns."
 **Goal:** Verify everything builds and runs correctly
 
 **Actions:**
+
 1. Navigate to: `cd packages/web`
 2. Build the project: `npm run build`
 3. If build succeeds, start Storybook: `npm run storybook`
@@ -676,12 +782,14 @@ for improved developer experience and consistent import patterns."
 7. Verify existing app loads at `http://localhost:3000`
 
 **If there are build errors:**
+
 - Check import paths in components
 - Ensure all dependencies are installed
 - Look for TypeScript compilation errors
 - Update any broken relative imports to use new path aliases
 
 **Commit (only if fixes were needed):**
+
 ```bash
 git add packages/web/src/
 git commit -m "fix: resolve build issues and import path conflicts
@@ -695,6 +803,7 @@ discovered during initial build testing."
 **Goal:** Ensure existing app functionality is preserved
 
 **Actions:**
+
 1. Start the development server: `cd packages/web && npm run dev`
 2. Open browser to `http://localhost:3000`
 3. Test all existing functionality:
@@ -705,11 +814,13 @@ discovered during initial build testing."
 4. Verify all existing components in `old/` directory are working
 
 **If there are issues:**
+
 - Check that all imports were updated correctly in Step 2
 - Verify no components were missed in the move to `old/`
 - Check browser console for any missing imports
 
 **Commit (only if fixes were needed):**
+
 ```bash
 git add packages/web/src/
 git commit -m "fix: resolve issues with existing application functionality
@@ -727,22 +838,30 @@ and component reorganization."
 **File to create:** `packages/web/docs/DESIGN_SYSTEM_USAGE.md`
 
 **Content:**
-```markdown
+
+````markdown
 # Design System Usage Guide
 
 ## Overview
-This document explains how to use the imported design system components in the Lace web application.
+
+This document explains how to use the imported design system components in the
+Lace web application.
 
 ## Available Components
+
 The design system includes 35+ UI components organized into:
-- **UI Components** (`src/components/ui/`): Atoms and molecules (Button, Card, Input, Modal, etc.)
+
+- **UI Components** (`src/components/ui/`): Atoms and molecules (Button, Card,
+  Input, Modal, etc.)
 - **Page Templates** (`src/components/pages/`): Full page layouts
-- **Specialized Collections**: Timeline, files, layout, modals, feedback, chat, organisms
+- **Specialized Collections**: Timeline, files, layout, modals, feedback, chat,
+  organisms
 - **Demo Components** (`src/components/demo/`): Examples and demonstrations
 
 ## Using Components
 
 ### Clean Imports
+
 ```typescript
 // Import individual components
 import { Button, Card, Input } from '@/components/ui';
@@ -750,8 +869,10 @@ import { Button, Card, Input } from '@/components/ui';
 // Or import everything
 import * from '@/components';
 ```
+````
 
 ### Example Usage
+
 ```typescript
 import { Button } from '@/components/ui';
 
@@ -765,22 +886,27 @@ export function MyComponent() {
 ```
 
 ## Storybook
+
 View all available components and their documentation:
+
 ```bash
 npm run storybook
 ```
 
 ## Migration Strategy
+
 - Existing components are in `src/components/old/`
 - New features should use design system components
 - Gradually replace old components with new ones built using the design system
 - Remove components from `old/` directory when no longer used
 
 ## Resources
+
 - Storybook: http://localhost:6006 (when running)
 - Design System Docs: `docs/design-system/`
 - Component Registry: `src/lib/component-registry.ts`
-```
+
+````
 
 **Actions:**
 1. Create the file with the content above
@@ -793,7 +919,7 @@ git commit -m "docs: create design system usage guide for developers
 
 Provides comprehensive guide for using imported design system components,
 migration strategy, and development resources."
-```
+````
 
 ### Step 24: Update Root Package Scripts
 
@@ -802,6 +928,7 @@ migration strategy, and development resources."
 **File to modify:** `package.json` (in root of f-integrate-spicy-web)
 
 **Actions:**
+
 1. Open root `package.json`
 2. Add these scripts to the `scripts` section:
    ```json
@@ -812,6 +939,7 @@ migration strategy, and development resources."
    ```
 
 **Commit:**
+
 ```bash
 git add package.json
 git commit -m "feat: add web package convenience scripts to root
@@ -825,6 +953,7 @@ with npm run web:dev, web:storybook, etc."
 After completing all steps, verify:
 
 ### Build and Development
+
 - [ ] `cd packages/web && npm install` completes without errors
 - [ ] `cd packages/web && npm run build` succeeds
 - [ ] `cd packages/web && npm run dev` starts the app successfully
@@ -832,18 +961,21 @@ After completing all steps, verify:
 - [ ] All existing functionality (tasks, conversations, etc.) works
 
 ### Storybook
+
 - [ ] `cd packages/web && npm run storybook` starts successfully
 - [ ] Storybook opens at http://localhost:6006
 - [ ] All imported components are visible in Storybook
 - [ ] Component stories load and render correctly
 
 ### Code Quality
+
 - [ ] No TypeScript compilation errors
 - [ ] No console errors in browser
 - [ ] All imports resolve correctly
 - [ ] Existing components in `old/` directory work normally
 
 ### File Structure
+
 - [ ] All existing components moved to `packages/web/components/old/`
 - [ ] Design system components imported to `packages/web/components/ui/`
 - [ ] Specialized components imported to appropriate directories
@@ -854,36 +986,44 @@ After completing all steps, verify:
 
 After successful completion:
 
-1. **Start Using Design System**: New features should use components from `@/components/ui`
-2. **Plan Component Migration**: Identify which components in `old/` to replace first
+1. **Start Using Design System**: New features should use components from
+   `@/components/ui`
+2. **Plan Component Migration**: Identify which components in `old/` to replace
+   first
 3. **Team Training**: Share the usage documentation with the development team
 4. **Visual Testing**: Set up Chromatic for visual regression testing
-5. **Gradual Migration**: Replace old components one at a time with new design system implementations
+5. **Gradual Migration**: Replace old components one at a time with new design
+   system implementations
 
 ## Troubleshooting
 
 ### Common Issues
 
 **Dependency Conflicts:**
+
 - Delete `node_modules` and `package-lock.json`, then run `npm install`
 - Check for version mismatches in `package.json`
 
 **Import Path Errors:**
+
 - Verify TypeScript path aliases are configured correctly
 - Check that all relative imports have been updated
 - Ensure index files export all components
 
 **Storybook Issues:**
+
 - Verify `.storybook/main.ts` has correct stories path
 - Check that all story files are properly formatted
 - Ensure all component dependencies are available
 
 **Build Failures:**
+
 - Check TypeScript compilation errors carefully
 - Verify all imported files exist
 - Look for missing dependencies
 
 If you encounter issues, check:
+
 1. Console output for specific error messages
 2. That all files were copied to correct locations
 3. That git commits used the correct author attribution

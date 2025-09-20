@@ -2,13 +2,16 @@
 
 ## Overview
 
-This document outlines the comprehensive animation system implemented in Lace using Framer Motion. The system provides best-in-class animations with smooth transitions, micro-interactions, and gesture-based controls.
+This document outlines the comprehensive animation system implemented in Lace
+using Framer Motion. The system provides best-in-class animations with smooth
+transitions, micro-interactions, and gesture-based controls.
 
 ## 🚀 Key Features
 
 ### ✨ Core Animation Library (`@/lib/animations.ts`)
 
 **Spring Configurations:**
+
 - `gentle` - Soft, natural animations for UI transitions
 - `snappy` - Quick, responsive animations for interactions
 - `bouncy` - Playful animations with spring bounce
@@ -16,6 +19,7 @@ This document outlines the comprehensive animation system implemented in Lace us
 - `stiff` - Precise animations for data visualization
 
 **Animation Variants:**
+
 - **Fade Animations**: `fadeInUp`, `fadeInDown`, `fadeInLeft`, `fadeInRight`
 - **Scale Animations**: `scaleIn`, `popIn`
 - **Stagger Animations**: `staggerContainer`, `staggerItem`
@@ -27,6 +31,7 @@ This document outlines the comprehensive animation system implemented in Lace us
 ### 🎯 Enhanced Components
 
 #### 1. **AnimatedTimelineMessage** (`@/components/timeline/AnimatedTimelineMessage.tsx`)
+
 - Staggered message appearance with delay based on index
 - Animated avatars with rotation and scale effects
 - Typing indicators with pulsing rings
@@ -34,6 +39,7 @@ This document outlines the comprehensive animation system implemented in Lace us
 - Carousel integration with animated cards
 
 #### 2. **AnimatedTimelineView** (`@/components/timeline/AnimatedTimelineView.tsx`)
+
 - Staggered container animations for message groups
 - Smooth auto-scroll with momentum scrolling (iOS optimized)
 - Animated scroll-to-bottom button with path drawing
@@ -41,6 +47,7 @@ This document outlines the comprehensive animation system implemented in Lace us
 - Performance-optimized with capped delays
 
 #### 3. **AnimatedCarousel** (`@/components/timeline/AnimatedCarousel.tsx`)
+
 - Smooth page-based navigation with spring physics
 - Drag gesture support with elastic constraints
 - Progressive loading of carousel items
@@ -49,18 +56,21 @@ This document outlines the comprehensive animation system implemented in Lace us
 - Touch-optimized for mobile devices
 
 #### 4. **AnimatedLaceApp** (`@/components/pages/AnimatedLaceApp.tsx`)
+
 - Full application animation with staggered component reveals
 - Smooth page transitions and state changes
 - Gesture-based interactions for mobile
 - Coordinated sidebar and content animations
 
 #### 5. **AnimatedButton** (`@/components/ui/AnimatedButton.tsx`)
+
 - Multiple animation presets: `hover`, `tap`, `loading`
 - Configurable spring physics and timing
 - Icon integration with synchronized animations
 - Accessible state management
 
 #### 6. **AnimatedModal** (`@/components/ui/AnimatedModal.tsx`)
+
 - Smooth backdrop fade with content scale
 - Gesture-based dismissal on mobile
 - Focus trap with animated transitions
@@ -69,6 +79,7 @@ This document outlines the comprehensive animation system implemented in Lace us
 ### 🛠 Implementation Guidelines
 
 #### Performance Best Practices
+
 1. **Use `will-change` CSS property** for animated elements
 2. **Prefer transform and opacity** over layout-affecting properties
 3. **Use `AnimatePresence`** for mount/unmount animations
@@ -76,12 +87,14 @@ This document outlines the comprehensive animation system implemented in Lace us
 5. **Cap stagger delays** to prevent excessive animation times
 
 #### Animation Timing
+
 - **Micro-interactions**: 150-250ms
 - **Component transitions**: 300-500ms
 - **Page transitions**: 500-800ms
 - **Loading states**: 1000ms+ (with escape hatches)
 
 #### Accessibility
+
 - Respect `prefers-reduced-motion` media query
 - Provide immediate completion for critical actions
 - Use semantic HTML for screen reader compatibility
@@ -90,12 +103,14 @@ This document outlines the comprehensive animation system implemented in Lace us
 ### 📱 Mobile Optimizations
 
 #### Touch Gestures
+
 - **Pan gestures** for carousel navigation
 - **Tap gestures** with haptic feedback
 - **Drag gestures** for modal dismissal
 - **Momentum scrolling** for timeline views
 
 #### Performance
+
 - **Reduced complexity** on lower-end devices
 - **Optimized re-renders** with `useMemo` and `useCallback`
 - **GPU acceleration** for transform-based animations
@@ -104,16 +119,18 @@ This document outlines the comprehensive animation system implemented in Lace us
 ### 🎨 Design Tokens
 
 #### Timing Functions
+
 ```typescript
 const easing = {
   easeInOut: [0.4, 0, 0.2, 1],
   easeOut: [0, 0, 0.2, 1],
   easeIn: [0.4, 0, 1, 1],
   sharp: [0.4, 0, 0.6, 1],
-}
+};
 ```
 
 #### Duration Scale
+
 ```typescript
 const duration = {
   instant: 0,
@@ -121,7 +138,7 @@ const duration = {
   normal: 300,
   slow: 500,
   slower: 800,
-}
+};
 ```
 
 ## 🚨 Migration Notes

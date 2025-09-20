@@ -7,14 +7,18 @@
 
 ## Problem Statement
 
-During implementation of the event-driven tool architecture, we made an architectural mistake that violates separation of concerns. The Agent currently creates TOOL_APPROVAL_REQUEST events directly, bypassing the approval system entirely. This breaks the intended design and causes integration tests to fail.
+During implementation of the event-driven tool architecture, we made an
+architectural mistake that violates separation of concerns. The Agent currently
+creates TOOL_APPROVAL_REQUEST events directly, bypassing the approval system
+entirely. This breaks the intended design and causes integration tests to fail.
 
 ### Current Broken Flow
+
 ```
 Agent.sendMessage()
 ↓
 Agent._executeToolCalls() creates TOOL_CALL events
-↓ 
+↓
 Agent directly creates TOOL_APPROVAL_REQUEST events ❌ WRONG
 ↓
 Agent goes idle
@@ -22,7 +26,8 @@ Agent goes idle
 TOOL_APPROVAL_RESPONSE events trigger tool execution
 ```
 
-### Intended Correct Flow  
+### Intended Correct Flow
+
 ```
 Agent.sendMessage()
 ↓
@@ -48,16 +53,19 @@ TOOL_APPROVAL_RESPONSE events trigger actual tool execution
 ## Root Cause Analysis
 
 ### 1. **Violation of Separation of Concerns**
+
 - **Agent's Responsibility**: Conversation flow and tool coordination
 - **Approval System's Responsibility**: Approval workflow and policy enforcement
 - **Problem**: Agent is doing approval system work
 
 ### 2. **Bypassed Architecture**
+
 - EventApprovalCallback.requestApproval() is never called in normal flow
 - Approval policies and logic are completely bypassed
 - System becomes less flexible and testable
 
 ### 3. **Integration Test Failures**
+
 - Tests expect approval requests to be created by EventApprovalCallback
 - Tests assume tools are attempted immediately, triggering approval flow
 - Current implementation skips this entire flow
@@ -65,6 +73,7 @@ TOOL_APPROVAL_RESPONSE events trigger actual tool execution
 ## Architectural Principles to Restore
 
 ### **Separation of Concerns**
+
 ```typescript
 // Agent: Orchestrates conversation and tool coordination
 class Agent {
@@ -77,7 +86,10 @@ class Agent {
 
 // Approval System: Handles approval workflow
 class EventApprovalCallback {
-  async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
+  async requestApproval(
+    toolName: string,
+    input: unknown
+  ): Promise<ApprovalDecision> {
     // Create TOOL_APPROVAL_REQUEST events
     // Throw ApprovalPendingError for event-driven flow
   }
@@ -85,7 +97,10 @@ class EventApprovalCallback {
 
 // Tool Executor: Coordinates between tools and approval
 class ToolExecutor {
-  async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
+  async executeTool(
+    call: ToolCall,
+    context?: ToolContext
+  ): Promise<ToolResult> {
     // Handle approval flow
     // Return pending results when approval needed
     // Execute tools when approved
@@ -94,8 +109,10 @@ class ToolExecutor {
 ```
 
 ### **Event-Driven Flow Integrity**
+
 - Tools should be **attempted immediately** when tool calls are created
-- **ApprovalPendingError** should be the mechanism that prevents actual execution
+- **ApprovalPendingError** should be the mechanism that prevents actual
+  execution
 - **EventApprovalCallback** should own the approval request creation process
 
 ## Implementation Plan
@@ -103,9 +120,11 @@ class ToolExecutor {
 ### **Phase 1: Restore Proper Agent Tool Execution Flow**
 
 #### **Task 1.1: Remove Direct Approval Request Creation from Agent**
+
 **File:** `src/agents/agent.ts`
 
-**Current broken code in _executeToolCalls:**
+**Current broken code in \_executeToolCalls:**
+
 ```typescript
 // Create approval request immediately  ❌ WRONG
 const approvalRequestEvent = this._threadManager.addEvent(
@@ -124,23 +143,26 @@ this.emit('thread_event_added', {
 ```
 
 **Correct code:**
+
 ```typescript
 // NO DIRECT APPROVAL REQUEST CREATION
 // Tool execution attempt will trigger approval flow
 ```
 
 #### **Task 1.2: Restore Immediate Tool Execution Attempts**
+
 **File:** `src/agents/agent.ts`
 
-**Update _executeToolCalls to attempt execution:**
+**Update \_executeToolCalls to attempt execution:**
+
 ```typescript
 private _executeToolCalls(toolCalls: ProviderToolCall[]): void {
   this._setState('tool_execution');
-  
+
   // Initialize tool batch tracking
   this._pendingToolCount = toolCalls.length;
   this._hasRejectionsInBatch = false;
-  
+
   for (const providerToolCall of toolCalls) {
     // Convert and add TOOL_CALL event
     const toolCall: ToolCall = {
@@ -149,35 +171,39 @@ private _executeToolCalls(toolCalls: ProviderToolCall[]): void {
       arguments: providerToolCall.input,
     };
     this._addEventAndEmit(this._threadId, 'TOOL_CALL', toolCall);
-    
+
     // Emit tool call start event for UI
     this.emit('tool_call_start', {
       toolName: providerToolCall.name,
       input: providerToolCall.input,
       callId: providerToolCall.id,
     });
-    
+
     // Attempt tool execution immediately
     // This will trigger approval flow and create approval requests
     void this._executeSingleTool(toolCall);
   }
-  
+
   // Agent goes idle immediately - tool execution attempts are non-blocking
   this._setState('idle');
 }
 ```
 
 **Key Changes:**
+
 - Remove direct TOOL_APPROVAL_REQUEST creation
 - Add immediate `this._executeSingleTool(toolCall)` calls
 - Keep non-blocking behavior (don't await)
 
 #### **Task 1.3: Update Tool Batch Tracking Logic**
+
 **File:** `src/agents/agent.ts`
 
-**Current issue:** Batch tracking assumes approval responses trigger execution, but we need to handle both pending results and completed results.
+**Current issue:** Batch tracking assumes approval responses trigger execution,
+but we need to handle both pending results and completed results.
 
-**Update _executeSingleTool to handle pending results:**
+**Update \_executeSingleTool to handle pending results:**
+
 ```typescript
 private async _executeSingleTool(toolCall: ToolCall): Promise<void> {
   try {
@@ -259,11 +285,14 @@ private _handleBatchComplete(): void {
 ```
 
 #### **Task 1.4: Fix Approval Response Handler Logic**
+
 **File:** `src/agents/agent.ts`
 
-**Current issue:** The approval response handler needs to coordinate with the new immediate execution flow.
+**Current issue:** The approval response handler needs to coordinate with the
+new immediate execution flow.
 
-**Update _handleToolApprovalResponse:**
+**Update \_handleToolApprovalResponse:**
+
 ```typescript
 private _handleToolApprovalResponse(event: ThreadEvent): void {
   if (event.type !== 'TOOL_APPROVAL_RESPONSE') return;
@@ -314,9 +343,11 @@ private _handleToolApprovalResponse(event: ThreadEvent): void {
 ### **Phase 2: Verify EventApprovalCallback Correctness**
 
 #### **Task 2.1: Confirm EventApprovalCallback Implementation**
+
 **File:** `src/tools/event-approval-callback.ts`
 
 **Current implementation should be correct:**
+
 ```typescript
 async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
   // Find the TOOL_CALL event that triggered this approval
@@ -324,15 +355,15 @@ async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecisio
   if (!toolCallEvent) {
     throw new Error(`Could not find TOOL_CALL event for ${toolName}`);
   }
-  
+
   const toolCallId = (toolCallEvent.data as ToolCall).id;
-  
+
   // Check if approval response already exists (recovery case)
   const existingResponse = this.checkExistingApprovalResponse(toolCallId);
   if (existingResponse) {
     return existingResponse;
   }
-  
+
   // Check if approval request already exists to avoid duplicates
   const existingRequest = this.checkExistingApprovalRequest(toolCallId);
   if (!existingRequest) {
@@ -340,17 +371,18 @@ async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecisio
     const event = this.threadManager.addEvent(this.threadId, 'TOOL_APPROVAL_REQUEST', {
       toolCallId: toolCallId,
     });
-    
+
     // Emit the event so the SSE stream delivers it to the frontend immediately
     this.agent.emit('thread_event_added', { event, threadId: this.threadId });
   }
-  
+
   // Instead of blocking, throw an error that indicates approval is pending
   throw new ApprovalPendingError(toolCallId);
 }
 ```
 
 **Verification needed:**
+
 - Ensure duplicate request prevention works correctly
 - Verify existing approval recovery logic
 - Test approval request creation and emission
@@ -358,64 +390,81 @@ async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecisio
 ### **Phase 3: Update Tests to Match Correct Architecture**
 
 #### **Task 3.1: Fix Integration Test Expectations**
+
 **File:** `src/tools/event-approval-callback.test.ts`
 
 **Current failing tests need expectation updates:**
 
-1. **"should create TOOL_APPROVAL_REQUEST when Agent executes tool requiring approval"**
+1. **"should create TOOL_APPROVAL_REQUEST when Agent executes tool requiring
+   approval"**
    - Should pass once Agent attempts tool execution immediately
    - EventApprovalCallback.requestApproval() will be called
    - Approval requests will be created by EventApprovalCallback as expected
 
 2. **"should handle multiple concurrent tool calls"**
    - Update comment about sequential processing (line 209)
-   - Both approval requests should be created immediately when both tools are attempted
+   - Both approval requests should be created immediately when both tools are
+     attempted
    - Test logic should expect parallel approval request creation
 
 3. **"should recover from existing approvals in the thread"**
    - Should work correctly once proper flow is restored
-   - EventApprovalCallback will check for existing approvals and not create duplicates
+   - EventApprovalCallback will check for existing approvals and not create
+     duplicates
 
 #### **Task 3.2: Add Tests for New Flow Scenarios**
+
 **File:** `src/tools/event-approval-callback.test.ts`
 
 **New test cases needed:**
+
 ```typescript
 it('should handle immediate tool execution attempts with pending results', async () => {
   // Agent creates tool calls and immediately attempts execution
   mockProvider.setResponse({
-    toolCalls: [{ id: 'call_immediate', name: 'bash', input: { command: 'test' } }],
+    toolCalls: [
+      { id: 'call_immediate', name: 'bash', input: { command: 'test' } },
+    ],
   });
 
   const conversationPromise = agent.sendMessage('Run test command');
-  await new Promise(resolve => setTimeout(resolve, 50));
+  await new Promise((resolve) => setTimeout(resolve, 50));
 
   // Verify tool call was created
   const events = threadManager.getEvents(agent.threadId);
-  const toolCall = events.find(e => e.type === 'TOOL_CALL');
+  const toolCall = events.find((e) => e.type === 'TOOL_CALL');
   expect(toolCall).toBeDefined();
 
   // Verify approval request was created by EventApprovalCallback
-  const approvalRequest = events.find(e => e.type === 'TOOL_APPROVAL_REQUEST');
+  const approvalRequest = events.find(
+    (e) => e.type === 'TOOL_APPROVAL_REQUEST'
+  );
   expect(approvalRequest).toBeDefined();
 
   // Verify no tool result exists yet (pending)
-  const toolResult = events.find(e => e.type === 'TOOL_RESULT');
+  const toolResult = events.find((e) => e.type === 'TOOL_RESULT');
   expect(toolResult).toBeUndefined();
 
   // Approve and verify execution
-  const responseEvent = threadManager.addEvent(agent.threadId, 'TOOL_APPROVAL_RESPONSE', {
-    toolCallId: 'call_immediate',
-    decision: ApprovalDecision.ALLOW_ONCE,
+  const responseEvent = threadManager.addEvent(
+    agent.threadId,
+    'TOOL_APPROVAL_RESPONSE',
+    {
+      toolCallId: 'call_immediate',
+      decision: ApprovalDecision.ALLOW_ONCE,
+    }
+  );
+  agent.emit('thread_event_added', {
+    event: responseEvent,
+    threadId: agent.threadId,
   });
-  agent.emit('thread_event_added', { event: responseEvent, threadId: agent.threadId });
 
-  await new Promise(resolve => setTimeout(resolve, 50));
+  await new Promise((resolve) => setTimeout(resolve, 50));
   await conversationPromise;
 
   // Now tool result should exist
   const finalEvents = threadManager.getEvents(agent.threadId);
-  const finalToolResult = finalEvents.find(e => e.type === 'TOOL_RESULT');
+  const finalToolResult = finalEvents.find((e) => e.type === 'TOOL_RESULT');
   expect(finalToolResult).toBeDefined();
 });
 ```
@@ -423,6 +472,7 @@ it('should handle immediate tool execution attempts with pending results', async
 ### **Phase 4: Integration and Testing**
 
 #### **Task 4.1: Comprehensive Flow Testing**
+
 **File:** `src/agents/agent.integration.test.ts` (NEW)
 
 Create comprehensive integration tests that verify the entire corrected flow:
@@ -446,6 +496,7 @@ describe('Corrected Tool Execution Flow Integration', () => {
 ```
 
 #### **Task 4.2: Performance and Edge Case Testing**
+
 - Test rapid approval responses
 - Test concurrent tool execution attempts
 - Test error handling in corrected flow
@@ -454,12 +505,14 @@ describe('Corrected Tool Execution Flow Integration', () => {
 ## Success Criteria
 
 ### **Architecture Restored**
+
 - ✅ Agent no longer creates TOOL_APPROVAL_REQUEST events directly
 - ✅ EventApprovalCallback owns approval request creation
 - ✅ Proper separation of concerns maintained
 - ✅ Tools are attempted immediately when tool calls are created
 
 ### **Event Flow Integrity**
+
 - ✅ TOOL_CALL events created by Agent
 - ✅ Tool execution attempted immediately by Agent
 - ✅ TOOL_APPROVAL_REQUEST events created by EventApprovalCallback
@@ -468,12 +521,14 @@ describe('Corrected Tool Execution Flow Integration', () => {
 - ✅ TOOL_RESULT events created when tools complete
 
 ### **Test Suite Success**
+
 - ✅ All EventApprovalCallback integration tests pass
 - ✅ All Agent event-driven tests continue to pass
 - ✅ New integration tests verify corrected flow
 - ✅ No regression in existing functionality
 
 ### **System Properties Maintained**
+
 - ✅ Non-blocking Agent behavior preserved
 - ✅ Parallel approval capability maintained
 - ✅ Process-safe design unchanged
@@ -482,11 +537,14 @@ describe('Corrected Tool Execution Flow Integration', () => {
 ## Risk Mitigation
 
 ### **Potential Issues**
-1. **Double Tool Execution**: Tool might be attempted twice (initially and after approval)
+
+1. **Double Tool Execution**: Tool might be attempted twice (initially and after
+   approval)
    - **Mitigation**: Ensure ToolExecutor handles duplicate attempts gracefully
    - **Solution**: Use tool call ID tracking to prevent duplicate execution
 
-2. **Race Conditions**: Approval responses arriving before initial attempt completes
+2. **Race Conditions**: Approval responses arriving before initial attempt
+   completes
    - **Mitigation**: Proper event ordering and state management
    - **Solution**: Use pending tool tracking to handle timing issues
 
@@ -497,7 +555,7 @@ describe('Corrected Tool Execution Flow Integration', () => {
 ## Implementation Timeline
 
 1. **Phase 1**: Restore proper Agent flow (2-3 hours)
-2. **Phase 2**: Verify EventApprovalCallback (30 minutes)  
+2. **Phase 2**: Verify EventApprovalCallback (30 minutes)
 3. **Phase 3**: Update and fix tests (1-2 hours)
 4. **Phase 4**: Integration testing (1 hour)
 
@@ -507,22 +565,28 @@ describe('Corrected Tool Execution Flow Integration', () => {
 
 ### **Issue: Semantic Confusion in executeTool Method**
 
-The current corrected design has `ToolExecutor.executeTool()` being called twice with different purposes:
-1. **First call**: Check permissions and create approval requests (doesn't execute)
+The current corrected design has `ToolExecutor.executeTool()` being called twice
+with different purposes:
+
+1. **First call**: Check permissions and create approval requests (doesn't
+   execute)
 2. **Second call**: Actually execute the tool (does execute)
 
 This violates single responsibility principle and creates semantic confusion.
 
 ### **Task 5.1: Split Tool Permission and Execution**
+
 **Files:** `src/tools/executor.ts`, `src/tools/types.ts`, `src/agents/agent.ts`
 
 **Current Problematic API:**
+
 ```typescript
 // Confusing: same method does different things based on context
 async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult>
 ```
 
 **New Clean API:**
+
 ```typescript
 // Clear separation of concerns
 async requestToolPermission(call: ToolCall, context?: ToolContext): Promise<'granted' | 'pending'>
@@ -532,6 +596,7 @@ async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult>
 **Implementation Steps:**
 
 #### **Step 5.1.1: Add requestToolPermission Method**
+
 ```typescript
 // src/tools/executor.ts
 async requestToolPermission(call: ToolCall, context?: ToolContext): Promise<'granted' | 'pending'> {
@@ -572,6 +637,7 @@ async requestToolPermission(call: ToolCall, context?: ToolContext): Promise<'gra
 ```
 
 #### **Step 5.1.2: Simplify executeTool Method**
+
 ```typescript
 // src/tools/executor.ts - executeTool now only executes
 async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
@@ -587,6 +653,7 @@ async executeTool(call: ToolCall, context?: ToolContext): Promise<ToolResult> {
 ```
 
 #### **Step 5.1.3: Update Agent Flow**
+
 ```typescript
 // src/agents/agent.ts
 private async _executeSingleTool(toolCall: ToolCall): Promise<void> {
@@ -600,11 +667,11 @@ private async _executeSingleTool(toolCall: ToolCall): Promise<void> {
 
     // First: Check permission
     const permission = await this._toolExecutor.requestToolPermission(toolCall, toolContext);
-    
+
     if (permission === 'granted') {
       // Execute immediately if allowed
       const result = await this._toolExecutor.executeTool(toolCall, toolContext);
-      
+
       // Add result and update tracking
       this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
       this.emit('tool_call_complete', {
@@ -627,7 +694,7 @@ private async _executeSingleTool(toolCall: ToolCall): Promise<void> {
       // Don't decrement pending count yet - wait for approval response
       return;
     }
-    
+
   } catch (error: unknown) {
     // Handle permission/execution errors
     logger.error('AGENT: Tool execution failed', {
@@ -656,6 +723,7 @@ private async _executeSingleTool(toolCall: ToolCall): Promise<void> {
 ```
 
 #### **Step 5.1.4: Simplify Approval Response Handler**
+
 ```typescript
 // src/agents/agent.ts
 private _handleToolApprovalResponse(event: ThreadEvent): void {
@@ -713,7 +781,7 @@ private async _executeApprovedTool(toolCall: ToolCall): Promise<void> {
 
     // Execute directly (permission already granted)
     const result = await this._toolExecutor.executeTool(toolCall, toolContext);
-    
+
     // Add result and update tracking
     this._addEventAndEmit(this._threadId, 'TOOL_RESULT', result);
     this.emit('tool_call_complete', {
@@ -731,7 +799,7 @@ private async _executeApprovedTool(toolCall: ToolCall): Promise<void> {
     if (this._pendingToolCount === 0) {
       this._handleBatchComplete();
     }
-    
+
   } catch (error: unknown) {
     // Handle execution errors
     logger.error('AGENT: Approved tool execution failed', {
@@ -762,6 +830,7 @@ private async _executeApprovedTool(toolCall: ToolCall): Promise<void> {
 ### **Task 5.2: Remove Obsolete Types and Patterns**
 
 #### **Step 5.2.1: Remove isPending from ToolResult**
+
 ```typescript
 // src/tools/types.ts
 export interface ToolResult {
@@ -776,6 +845,7 @@ export interface ToolResult {
 ```
 
 #### **Step 5.2.2: Remove ApprovalPendingError Usage in ToolExecutor**
+
 ```typescript
 // ApprovalPendingError still needed by EventApprovalCallback
 // But ToolExecutor no longer catches it - requestToolPermission handles it
@@ -784,21 +854,25 @@ export interface ToolResult {
 ### **Benefits of This Refactor**
 
 #### **Semantic Clarity**
+
 - `requestToolPermission()` always checks permissions
 - `executeTool()` always executes tools
 - No dual-purpose methods
 
 #### **Single Responsibility**
+
 - Permission checking is separate from execution
 - Each method has one clear purpose
 - Easier to test and reason about
 
 #### **Simplified Error Handling**
+
 - Permission errors vs execution errors are distinct
 - No need for `isPending` result type
 - No need for dual-purpose error handling
 
 #### **Better Architecture**
+
 - Clear separation between permission and execution phases
 - Agent flow is more explicit and understandable
 - Approval system boundaries are cleaner
@@ -807,17 +881,23 @@ export interface ToolResult {
 
 1. **Phase 1**: Restore proper Agent flow (2-3 hours) ✅ **COMPLETE**
 2. **Phase 2**: Verify EventApprovalCallback (30 minutes) ✅ **COMPLETE**
-3. **Phase 3**: Update tests to match correct architecture (1-2 hours) 
+3. **Phase 3**: Update tests to match correct architecture (1-2 hours)
 4. **Phase 4**: Integration testing (1 hour)
-5. **Phase 5**: Architectural improvement - separate permission/execution (2-3 hours)
+5. **Phase 5**: Architectural improvement - separate permission/execution (2-3
+   hours)
 
 **Total Estimated Time**: 6-9 hours
 
 ## Conclusion
 
 This plan restores the intended architecture where:
-- **Agent** orchestrates conversation and coordinates tool execution
-- **EventApprovalCallback** owns the approval workflow and creates approval events  
-- **ToolExecutor** provides clean separation between permission checking and tool execution
 
-The final design eliminates semantic confusion, maintains all benefits of the event-driven architecture, and provides a much cleaner API that follows single responsibility principles.
+- **Agent** orchestrates conversation and coordinates tool execution
+- **EventApprovalCallback** owns the approval workflow and creates approval
+  events
+- **ToolExecutor** provides clean separation between permission checking and
+  tool execution
+
+The final design eliminates semantic confusion, maintains all benefits of the
+event-driven architecture, and provides a much cleaner API that follows single
+responsibility principles.

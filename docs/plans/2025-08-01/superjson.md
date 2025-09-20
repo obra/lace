@@ -2,15 +2,22 @@
 
 ## Overview
 
-**Problem:** We have two parallel type systems - "core" types with branded strings and Date objects, and "API" types with plain strings for JSON serialization. This creates complexity, bugs, and manual transformation code.
+**Problem:** We have two parallel type systems - "core" types with branded
+strings and Date objects, and "API" types with plain strings for JSON
+serialization. This creates complexity, bugs, and manual transformation code.
 
-**Solution:** **DESTROY THE DUAL TYPE SYSTEM COMPLETELY.** Delete all transformation code and API types. Use superjson everywhere. Break everything, then fix it with strong types.
+**Solution:** **DESTROY THE DUAL TYPE SYSTEM COMPLETELY.** Delete all
+transformation code and API types. Use superjson everywhere. Break everything,
+then fix it with strong types.
 
-**Outcome:** One set of types used everywhere. ~200 lines of transformation code deleted. No backward compatibility. Clean slate.
+**Outcome:** One set of types used everywhere. ~200 lines of transformation code
+deleted. No backward compatibility. Clean slate.
 
 ## ⚠️ THIS IS A BREAKING CHANGE - NO ROLLBACK
 
-This plan **intentionally destroys** the existing API serialization system. There is no gradual migration. We delete the transformation layer first, then fix all the compilation errors. This forces a clean, consistent implementation.
+This plan **intentionally destroys** the existing API serialization system.
+There is no gradual migration. We delete the transformation layer first, then
+fix all the compilation errors. This forces a clean, consistent implementation.
 
 ## Prerequisites
 
@@ -24,7 +31,7 @@ This plan **intentionally destroys** the existing API serialization system. Ther
 
 ```
 Core Types (server):           API Types (client):
-- SessionInfo                  - ApiSession  
+- SessionInfo                  - ApiSession
 - ProjectInfo                  - ApiProject
 - ThreadId (branded string)    - string
 - Date objects                 - ISO strings
@@ -45,41 +52,53 @@ Core Types (everywhere):
 
 ### Task 1: DESTROY THE TRANSFORMATION LAYER
 
-**Goal:** Delete all transformation code. Break the build. Force superjson adoption.
+**Goal:** Delete all transformation code. Break the build. Force superjson
+adoption.
 
 **Files to DELETE entirely:**
+
 - `lib/validation/api-schemas.ts` - **DELETE THE WHOLE FILE**
 - All `Api*` interfaces from `types/api.ts`
 
 **What to do:**
+
 1. **DELETE `lib/validation/api-schemas.ts`** - The entire file. Gone. Forever.
 2. **DELETE from `types/api.ts`:**
    ```typescript
    // DELETE THESE INTERFACES - NO MERCY
    export interface ApiSession { ... }
-   export interface ApiAgent { ... } 
+   export interface ApiAgent { ... }
    export interface ApiProject { ... }
    ```
 3. **KEEP ONLY** request/response wrappers in `types/api.ts`:
    ```typescript
    // KEEP THESE - they're just wrappers
-   export interface CreateSessionRequest { name?: string; }
-   export interface SessionsResponse { sessions: SessionInfo[]; }  // Uses core type now
+   export interface CreateSessionRequest {
+     name?: string;
+   }
+   export interface SessionsResponse {
+     sessions: SessionInfo[];
+   } // Uses core type now
    ```
 
-**Expected result:** BUILD WILL FAIL. Hundreds of TypeScript errors. This is GOOD.
+**Expected result:** BUILD WILL FAIL. Hundreds of TypeScript errors. This is
+GOOD.
 
-**Commit:** "feat: DESTROY dual type system - delete api-schemas and Api* types"
+**Commit:** "feat: DESTROY dual type system - delete api-schemas and Api\*
+types"
 
 ### Task 2: Setup Superjson Configuration
 
 **Files to create:**
+
 - `packages/web/lib/serialization.ts` (already exists)
 
 **Files to verify:**
+
 - `packages/web/package.json` - confirm superjson is installed
 
 **What to do:**
+
 1. Read `lib/serialization.ts` to understand the branded type transformers
 2. Write a test to verify all branded type serialization works:
 
@@ -96,7 +115,7 @@ describe('Serialization', () => {
     const threadId = 'lace_20250801_abc123' as ThreadId;
     const serialized = serialize(threadId);
     const deserialized = deserialize<ThreadId>(serialized);
-    
+
     expect(deserialized).toBe(threadId);
     expect(typeof deserialized).toBe('string');
   });
@@ -105,7 +124,7 @@ describe('Serialization', () => {
     const agentSpec = 'agent-claude-3-5' as NewAgentSpec;
     const serialized = serialize(agentSpec);
     const deserialized = deserialize<NewAgentSpec>(serialized);
-    
+
     expect(deserialized).toBe(agentSpec);
     expect(typeof deserialized).toBe('string');
   });
@@ -114,7 +133,7 @@ describe('Serialization', () => {
     const date = new Date('2025-08-01T12:00:00Z');
     const serialized = serialize(date);
     const deserialized = deserialize<Date>(serialized);
-    
+
     expect(deserialized).toEqual(date);
     expect(deserialized instanceof Date).toBe(true);
   });
@@ -124,12 +143,12 @@ describe('Serialization', () => {
       sessionId: 'lace_20250801_abc123' as ThreadId,
       assignedTo: 'agent-claude-3-5' as NewAgentSpec,
       createdAt: new Date('2025-08-01T12:00:00Z'),
-      metadata: { key: 'value' }
+      metadata: { key: 'value' },
     };
-    
+
     const serialized = serialize(complexObject);
     const deserialized = deserialize<typeof complexObject>(serialized);
-    
+
     expect(deserialized.sessionId).toBe(complexObject.sessionId);
     expect(deserialized.assignedTo).toBe(complexObject.assignedTo);
     expect(deserialized.createdAt).toEqual(complexObject.createdAt);
@@ -140,6 +159,7 @@ describe('Serialization', () => {
 ```
 
 **How to test:**
+
 ```bash
 npm test lib/serialization.test.ts
 ```
@@ -150,9 +170,11 @@ npm test lib/serialization.test.ts
 
 **Goal:** Every API route now returns core types with superjson. No exceptions.
 
-**Strategy:** Find every compilation error from deleted transformations. Fix with superjson.
+**Strategy:** Find every compilation error from deleted transformations. Fix
+with superjson.
 
 **Find broken API routes:**
+
 ```bash
 npm run build  # Will show all the broken imports
 rg "transformSessionInfo|transformProjectInfo" app/api/  # Find usage
@@ -160,12 +182,13 @@ rg "ApiSession|ApiAgent|ApiProject" app/api/  # Find type usage
 ```
 
 **Pattern for EVERY API route:**
+
 ```typescript
 // BEFORE (BROKEN after Task 1):
-import { transformSessionInfo } from '@/lib/validation/api-schemas';  // DELETED
+import { transformSessionInfo } from '@/lib/validation/api-schemas'; // DELETED
 export async function GET() {
   const sessions = await sessionService.listSessions();
-  const apiSessions = sessions.map(transformSessionInfo);  // BROKEN
+  const apiSessions = sessions.map(transformSessionInfo); // BROKEN
   return NextResponse.json({ sessions: apiSessions });
 }
 
@@ -185,7 +208,7 @@ export async function GET() {
 // hooks/useSessionAPI.ts
 // BEFORE:
 import type { ApiSession } from '@/types/api';
-const data = await response.json() as { sessions: ApiSession[] };
+const data = (await response.json()) as { sessions: ApiSession[] };
 
 // AFTER:
 import type { SessionInfo } from '@/types/core';
@@ -197,6 +220,7 @@ const data = parse(responseText) as { sessions: SessionInfo[] };
 **Step 2c: Update Components Using This Hook**
 
 Find components importing `ApiSession` and change to `SessionInfo`:
+
 - Search: `rg "ApiSession" --type ts`
 - Update each import and type annotation
 
@@ -213,7 +237,7 @@ describe('/api/sessions', () => {
     const response = await GET();
     const text = await response.text();
     const data = parse(text) as { sessions: SessionInfo[] };
-    
+
     expect(Array.isArray(data.sessions)).toBe(true);
     if (data.sessions.length > 0) {
       const session = data.sessions[0];
@@ -227,6 +251,7 @@ describe('/api/sessions', () => {
 ```
 
 **How to test:**
+
 ```bash
 npm test app/api/sessions/route.test.ts
 npm run build # Should compile without errors
@@ -236,10 +261,11 @@ npm run build # Should compile without errors
 
 ### Task 3: Convert SSE Streaming
 
-**Target:** `app/api/sessions/[sessionId]/stream/route.ts`
-**Goal:** Use superjson for event serialization instead of JSON.stringify
+**Target:** `app/api/sessions/[sessionId]/stream/route.ts` **Goal:** Use
+superjson for event serialization instead of JSON.stringify
 
 **Files to modify:**
+
 1. `app/api/sessions/[sessionId]/stream/route.ts`
 2. `hooks/useEventStream.ts`
 3. `lib/server/session-service.ts`
@@ -295,20 +321,22 @@ import { parse } from '@/lib/serialization';
 
 describe('SSE with Superjson', () => {
   it('should preserve event types over SSE', async () => {
-    const { eventSource, cleanup } = await createSSEConnection('/api/sessions/test_session_id/stream');
-    
+    const { eventSource, cleanup } = await createSSEConnection(
+      '/api/sessions/test_session_id/stream'
+    );
+
     return new Promise<void>((resolve, reject) => {
       eventSource.onmessage = (event) => {
         try {
           const sessionEvent = parse(event.data);
-          
+
           // Verify timestamp is a Date object
           expect(sessionEvent.timestamp instanceof Date).toBe(true);
-          
+
           // Verify threadId is branded
           expect(typeof sessionEvent.threadId).toBe('string');
           expect(sessionEvent.threadId).toMatch(/^lace_\d{8}_[a-z0-9]{6}/);
-          
+
           cleanup();
           resolve();
         } catch (error) {
@@ -316,7 +344,7 @@ describe('SSE with Superjson', () => {
           reject(error);
         }
       };
-      
+
       // Trigger an event by sending a message
       // Implementation depends on your test setup
     });
@@ -325,6 +353,7 @@ describe('SSE with Superjson', () => {
 ```
 
 **How to test:**
+
 ```bash
 npm test e2e/sse-superjson.test.ts
 # Manual test: Open browser dev tools, watch SSE events in Network tab
@@ -334,22 +363,25 @@ npm test e2e/sse-superjson.test.ts
 
 ### Task 4: DESTROY ALL CLIENT-SIDE API PARSING
 
-**Goal:** Every client hook now expects core types with superjson. Break all existing parsing.
+**Goal:** Every client hook now expects core types with superjson. Break all
+existing parsing.
 
 **Strategy:** Find every `response.json()` call. Replace with superjson parsing.
 
 **Find broken client code:**
+
 ```bash
 rg "response\.json\(\)" hooks/  # Find all JSON parsing
 rg "ApiSession|ApiAgent|ApiProject" hooks/  # Find type usage
 ```
 
 **Pattern for EVERY client hook:**
+
 ```typescript
 // BEFORE (BROKEN after Task 1):
-import type { ApiSession } from '@/types/api';  // DELETED TYPE
+import type { ApiSession } from '@/types/api'; // DELETED TYPE
 const response = await fetch('/api/sessions');
-const data = await response.json() as { sessions: ApiSession[] };  // BROKEN
+const data = (await response.json()) as { sessions: ApiSession[] }; // BROKEN
 
 // AFTER (SUPERJSON):
 import type { SessionInfo } from '@/types/core';
@@ -365,11 +397,13 @@ const data = parse(await response.text()) as { sessions: SessionInfo[] };
 **Goal:** Replace all `Api*` type imports with core types
 
 **Files to find and update:**
+
 ```bash
 rg "ApiSession|ApiAgent|ApiProject" --type ts
 ```
 
 **Pattern for each file:**
+
 1. Change imports: `ApiSession` → `SessionInfo`
 2. Update type annotations in function signatures
 3. Update parsing: `response.json()` → `parse(await response.text())`
@@ -382,7 +416,7 @@ rg "ApiSession|ApiAgent|ApiProject" --type ts
 // BEFORE:
 import type { ApiSession } from '@/types/api';
 const response = await fetch('/api/sessions');
-const data = await response.json() as { sessions: ApiSession[] };
+const data = (await response.json()) as { sessions: ApiSession[] };
 
 // AFTER:
 import type { SessionInfo } from '@/types/core';
@@ -392,18 +426,21 @@ const data = parse(await response.text()) as { sessions: SessionInfo[] };
 ```
 
 **Test each component:**
+
 ```bash
 npm run build  # Should compile without errors
 npm test       # Should pass all tests
 ```
 
-**Commit after each file:** "refactor: convert [component-name] to use core types"
+**Commit after each file:** "refactor: convert [component-name] to use core
+types"
 
 ### Task 5: FINAL DESTRUCTION - VERIFY NOTHING REMAINS
 
 **Goal:** Confirm the dual type system is completely eliminated.
 
 **Verification commands:**
+
 ```bash
 # These should return ZERO results:
 rg "api-schemas" --type ts  # Transformation imports
@@ -414,9 +451,11 @@ rg "transformSessionInfo|transformProjectInfo" --type ts  # Transform functions
 npm run build  # Should compile successfully
 ```
 
-**If ANY results found:** You missed something. Find it. Delete it. No survivors.
+**If ANY results found:** You missed something. Find it. Delete it. No
+survivors.
 
 **Final verification:**
+
 - `lib/validation/api-schemas.ts` - **SHOULD NOT EXIST**
 - `types/api.ts` - **ONLY request/response wrappers remain**
 - All imports use core types: `SessionInfo`, `ProjectInfo`, `ThreadId`
@@ -427,6 +466,7 @@ npm run build  # Should compile successfully
 ### Task 7: Final Testing and Cleanup
 
 **Integration tests to run:**
+
 ```bash
 npm run build          # TypeScript compilation
 npm run lint           # Linting
@@ -435,6 +475,7 @@ npm run test:e2e       # End-to-end tests
 ```
 
 **Manual testing checklist:**
+
 1. Load application in browser
 2. Create a new session - verify it appears correctly
 3. Send messages - verify they display with correct timestamps
@@ -442,30 +483,35 @@ npm run test:e2e       # End-to-end tests
 5. Verify no console errors related to type parsing
 
 **Performance check:**
+
 - Superjson adds ~2-5KB to bundle size
 - Check that SSE events still stream smoothly
 - Verify API response times haven't increased significantly
 
 **Documentation to update:**
+
 - Update any API documentation that mentions response formats
 - Update component props documentation if types changed
 
-**Final commit:** "feat: complete superjson migration - single type system achieved"
+**Final commit:** "feat: complete superjson migration - single type system
+achieved"
 
 ## Success Criteria
 
 1. **Build passes:** `npm run build` succeeds without type errors
 2. **Tests pass:** All existing tests continue to work
 3. **No dual types:** No more `Api*` prefixed types in codebase
-4. **Strong typing:** ThreadId brands and Date objects preserved across client-server
+4. **Strong typing:** ThreadId brands and Date objects preserved across
+   client-server
 5. **Simplified code:** ~200 lines of transformation code removed
 6. **Performance maintained:** No significant performance regression
 
 ## NO ROLLBACK PLAN
 
-**There is no rollback.** This is intentional destruction of legacy code. 
+**There is no rollback.** This is intentional destruction of legacy code.
 
 **If something breaks:**
+
 1. Fix it forward with superjson
 2. Use TypeScript errors to guide you to broken code
 3. **Never restore the dual type system**
@@ -474,14 +520,18 @@ npm run test:e2e       # End-to-end tests
 
 ## TypeScript Tips for Non-TS Developers
 
-- **Branded types:** `type ThreadId = string & { __brand: 'ThreadId' }` - prevents mixing different string types
+- **Branded types:** `type ThreadId = string & { __brand: 'ThreadId' }` -
+  prevents mixing different string types
 - **Type assertions:** Use `as TypeName` to tell TS about types it can't infer
-- **Unknown vs any:** Always use `unknown` instead of `any` - forces you to check types at runtime
-- **Type guards:** Functions that return `x is Type` to narrow unknown types safely
+- **Unknown vs any:** Always use `unknown` instead of `any` - forces you to
+  check types at runtime
+- **Type guards:** Functions that return `x is Type` to narrow unknown types
+  safely
 
 ## Testing Guidelines
 
 - **No mocking:** Always test real implementations, not mocks
 - **Integration over unit:** Test the full API request/response cycle
-- **Type preservation:** Always verify that complex types (Dates, branded strings) survive serialization
+- **Type preservation:** Always verify that complex types (Dates, branded
+  strings) survive serialization
 - **Error cases:** Test malformed responses, network failures, etc.

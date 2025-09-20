@@ -1,23 +1,29 @@
 # Agent Spawning Implementation Specification
 
 ## Overview
-Enable task-based agent spawning by extending the existing delegate pattern and task manager. Agents are created when tasks are assigned to "new:provider/model" and inherit the existing thread hierarchy.
+
+Enable task-based agent spawning by extending the existing delegate pattern and
+task manager. Agents are created when tasks are assigned to "new:provider/model"
+and inherit the existing thread hierarchy.
 
 ## Background for Engineers
 
 ### Current Delegate Pattern
+
 - Location: `src/tools/implementations/delegate.ts`
 - Creates child threads: `parent.1`, `parent.2`, etc.
 - Temporary sub-agents for specific tasks
 - Returns to parent when done
 
 ### What We're Adding
+
 - Persistent child threads (don't terminate when task done)
 - Task assignment to "new:provider/model" triggers agent creation
 - UI can switch between child threads
 - No complex agent management - just thread switching
 
 ### Key Files to Understand
+
 - `src/tools/implementations/delegate.ts` - Current delegation pattern
 - `src/tools/implementations/task-manager.ts` - Task assignment
 - `src/threads/thread-manager.ts` - Thread creation and management
@@ -32,13 +38,14 @@ Enable task-based agent spawning by extending the existing delegate pattern and 
 File: `src/tools/implementations/task-manager.ts`
 
 Update `assignedTo` handling:
+
 ```typescript
 // In task creation
 if (args.assignedTo?.startsWith('new:')) {
   // Parse: "new:anthropic/claude-3-sonnet"
   const [, providerModel] = args.assignedTo.split(':');
   const [provider, model] = providerModel.split('/');
-  
+
   // Create agent and assign task
   const agentId = await this.createTaskAgent(provider, model, task);
   task.assignedTo = agentId;
@@ -46,6 +53,7 @@ if (args.assignedTo?.startsWith('new:')) {
 ```
 
 Tests:
+
 - Test "new:provider/model" parsing
 - Test invalid format rejection
 - Test agent creation triggered
@@ -58,8 +66,8 @@ File: `src/tools/implementations/task-manager.ts`
 
 ```typescript
 private async createTaskAgent(
-  provider: string, 
-  model: string, 
+  provider: string,
+  model: string,
   task: Task
 ): Promise<string> {
   // Get current session (parent thread)
@@ -67,11 +75,11 @@ private async createTaskAgent(
   if (!parentThreadId) {
     throw new Error('No session context for agent creation');
   }
-  
+
   // Create delegate thread (reuse existing pattern)
   const delegateThread = this.threadManager.createDelegateThreadFor(parentThreadId);
   const agentThreadId = delegateThread.id;
-  
+
   // Store agent metadata (simple approach)
   await this.storeAgentMetadata(agentThreadId, {
     name: `agent-${Date.now()}`, // Or generate better name
@@ -81,20 +89,22 @@ private async createTaskAgent(
     createdFor: task.id,
     parentThreadId
   });
-  
+
   // Send task notification to new agent
   await this.notifyTaskAssignment(agentThreadId, task);
-  
+
   return agentThreadId;
 }
 ```
 
 Implementation notes:
-- Reuse `ThreadManager.createDelegateThreadFor()` 
+
+- Reuse `ThreadManager.createDelegateThreadFor()`
 - Store minimal metadata in SQLite
 - Send task as first message to agent
 
 Tests:
+
 - Test thread creation
 - Test metadata storage
 - Test task notification
@@ -124,6 +134,7 @@ CREATE TABLE agent_metadata (
 ```
 
 Add methods:
+
 ```typescript
 storeAgentMetadata(threadId: string, metadata: AgentMetadata): void
 getAgentMetadata(threadId: string): AgentMetadata | null
@@ -132,6 +143,7 @@ updateCurrentTask(threadId: string, taskDescription: string): void
 ```
 
 Tests:
+
 - Test metadata CRUD
 - Test session filtering
 - Test foreign key constraints
@@ -161,11 +173,11 @@ static async createForTask(
     provider,
     model
   );
-  
+
   // Create agent with restricted tools (no delegate to prevent recursion)
   const tools = dependencies.toolExecutor.getAvailableTools()
     .filter(tool => tool.name !== 'delegate');
-  
+
   const agent = new Agent({
     provider: providerInstance,
     toolExecutor: dependencies.toolExecutor,
@@ -173,10 +185,10 @@ static async createForTask(
     threadId,
     tools,
   });
-  
+
   // Send initial task notification
   await agent.queueMessage(formatTaskAssignment(task), 'task_notification');
-  
+
   return agent;
 }
 ```
@@ -184,6 +196,7 @@ static async createForTask(
 This is just a factory method, not a separate class.
 
 Tests:
+
 - Test agent creation
 - Test tool filtering
 - Test initial task message
@@ -196,7 +209,10 @@ Tests:
 
 File: `src/tools/implementations/task-manager/notifications.ts` (new)
 
-Note: The buffered notifications spec (03-buffered-notifications.md) references `src/agents/notifications.ts` for these formatters, but they should actually be implemented here in the task manager since they're part of the task system integration.
+Note: The buffered notifications spec (03-buffered-notifications.md) references
+`src/agents/notifications.ts` for these formatters, but they should actually be
+implemented here in the task manager since they're part of the task system
+integration.
 
 ```typescript
 export function formatTaskAssignment(task: Task): string {
@@ -215,7 +231,15 @@ export function formatTaskCompletion(task: Task): string {
 Task: "${task.title}"
 Status: ${task.status.toUpperCase()}
 
-${task.notes?.length ? 'Recent notes:\n' + task.notes.slice(-3).map(n => `- ${n.content}`).join('\n') : ''}`;
+${
+  task.notes?.length
+    ? 'Recent notes:\n' +
+      task.notes
+        .slice(-3)
+        .map((n) => `- ${n.content}`)
+        .join('\n')
+    : ''
+}`;
 }
 ```
 
@@ -236,6 +260,7 @@ if (oldStatus !== 'completed' && newStatus === 'completed') {
 ```
 
 Tests:
+
 - Test completion notifications sent
 - Test no self-notification
 - Test notification content
@@ -265,7 +290,7 @@ export async function switchToAgent(
   if (!metadata) {
     throw new Error(`No agent found for thread ${threadId}`);
   }
-  
+
   // For now, create new instance (could cache later)
   return Agent.createForTask(
     threadId,
@@ -280,6 +305,7 @@ export async function switchToAgent(
 This provides utilities for the UI layer without complex state management.
 
 Tests:
+
 - Test agent listing
 - Test thread switching
 - Test missing agent handling
@@ -289,17 +315,20 @@ Tests:
 ## Testing Strategy
 
 ### Unit Tests
+
 - Task assignment parsing
 - Agent metadata CRUD
 - Notification formatting
 - Thread creation
 
 ### Integration Tests
+
 - End-to-end task assignment and agent creation
 - Task completion notifications
 - Multi-agent workflows
 
 ### Manual Testing
+
 1. Create task with `assignedTo: "new:anthropic/claude-3-sonnet"`
 2. Verify agent thread created
 3. Verify task notification sent
@@ -308,6 +337,7 @@ Tests:
 ## Migration from Delegate
 
 This builds on the existing delegate pattern:
+
 - Delegate creates temporary agents
 - Task assignment creates persistent agents
 - Same thread hierarchy (`parent.1`, `parent.2`)
@@ -322,4 +352,5 @@ This builds on the existing delegate pattern:
 5. **No complex lifecycle** - Agents exist or they don't
 6. **CLI agnostic** - UI handles agent switching
 
-This is much simpler and builds directly on existing patterns rather than creating new infrastructure.
+This is much simpler and builds directly on existing patterns rather than
+creating new infrastructure.

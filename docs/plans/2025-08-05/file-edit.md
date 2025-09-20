@@ -2,7 +2,9 @@
 
 ## Overview
 
-A unified file editing tool that handles both single and multiple edits to a file with precise occurrence validation, atomic operations, and comprehensive error reporting designed for LLM self-correction.
+A unified file editing tool that handles both single and multiple edits to a
+file with precise occurrence validation, atomic operations, and comprehensive
+error reporting designed for LLM self-correction.
 
 ## Core Principles
 
@@ -18,15 +20,15 @@ A unified file editing tool that handles both single and multiple edits to a fil
 
 ```typescript
 interface FileEditArgs {
-  path: FilePath;            // File path (absolute or relative) with validation
-  edits: EditOperation[];    // Array of edit operations (always an array)
-  dry_run?: boolean;         // Preview changes without applying (default: false)
+  path: FilePath; // File path (absolute or relative) with validation
+  edits: EditOperation[]; // Array of edit operations (always an array)
+  dry_run?: boolean; // Preview changes without applying (default: false)
 }
 
 interface EditOperation {
-  old_text: string;          // Exact text to find and replace
-  new_text: string;          // Replacement text
-  occurrences?: number;      // Expected number of occurrences (default: 1)
+  old_text: string; // Exact text to find and replace
+  new_text: string; // Replacement text
+  occurrences?: number; // Expected number of occurrences (default: 1)
 }
 ```
 
@@ -42,17 +44,17 @@ interface FileEditResult {
 interface FileEditMetadata {
   // Always present
   path: string;
-  
+
   // For successful edits
-  diff?: FileEditDiffContext;      // Full diff with context
-  edits_applied?: EditSummary[];   // Summary of each edit
-  total_replacements?: number;      // Total replacements made
-  
+  diff?: FileEditDiffContext; // Full diff with context
+  edits_applied?: EditSummary[]; // Summary of each edit
+  total_replacements?: number; // Total replacements made
+
   // For dry run mode
   dry_run?: boolean;
   would_modify?: boolean;
   preview?: DiffPreview[];
-  
+
   // For validation errors
   validation_error?: ValidationError;
   suggested_fixes?: SuggestedFix[];
@@ -64,35 +66,40 @@ interface FileEditMetadata {
 
 ```typescript
 interface ValidationError {
-  type: 'NO_MATCH' | 'WRONG_COUNT' | 'FILE_NOT_FOUND' | 'BINARY_FILE' | 'PERMISSION_DENIED';
-  edit_index: number;        // Which edit failed (0-based)
-  total_edits: number;       // How many edits were requested
-  message: string;           // Human-readable error
-  
+  type:
+    | 'NO_MATCH'
+    | 'WRONG_COUNT'
+    | 'FILE_NOT_FOUND'
+    | 'BINARY_FILE'
+    | 'PERMISSION_DENIED';
+  edit_index: number; // Which edit failed (0-based)
+  total_edits: number; // How many edits were requested
+  message: string; // Human-readable error
+
   // For occurrence errors
   expected_occurrences?: number;
   actual_occurrences?: number;
   match_locations?: MatchLocation[];
-  
+
   // For no match errors
   search_text?: string;
-  similar_content?: SimilarContent[];  // Fuzzy matches to help LLM
+  similar_content?: SimilarContent[]; // Fuzzy matches to help LLM
 }
 
 interface MatchLocation {
   line_number: number;
   column_start: number;
   column_end: number;
-  line_content: string;      // Full line containing the match
-  context_before?: string;   // Previous line
-  context_after?: string;    // Next line
+  line_content: string; // Full line containing the match
+  context_before?: string; // Previous line
+  context_after?: string; // Next line
 }
 
 interface SimilarContent {
   line_number: number;
   content: string;
-  similarity_score: number;   // 0-1, how similar to search_text
-  differences: StringDiff[];  // What's different
+  similarity_score: number; // 0-1, how similar to search_text
+  differences: StringDiff[]; // What's different
 }
 
 interface StringDiff {
@@ -102,7 +109,11 @@ interface StringDiff {
 }
 
 interface SuggestedFix {
-  type: 'USE_EXACT_TEXT' | 'ADJUST_COUNT' | 'ESCAPE_SPECIAL' | 'CHECK_WHITESPACE';
+  type:
+    | 'USE_EXACT_TEXT'
+    | 'ADJUST_COUNT'
+    | 'ESCAPE_SPECIAL'
+    | 'CHECK_WHITESPACE';
   suggestion: string;
   example?: string;
 }
@@ -111,7 +122,7 @@ interface FilePreview {
   total_lines: number;
   preview_start_line: number;
   preview_end_line: number;
-  content: string;            // Relevant section of file
+  content: string; // Relevant section of file
   highlights?: LineHighlight[];
 }
 ```
@@ -124,7 +135,7 @@ async function executeFileEdit(args: FileEditArgs): Promise<FileEditResult> {
   if (!args.edits || args.edits.length === 0) {
     return createError('No edits provided');
   }
-  
+
   // 2. Read file once
   let originalContent: string;
   try {
@@ -132,51 +143,54 @@ async function executeFileEdit(args: FileEditArgs): Promise<FileEditResult> {
   } catch (error) {
     return createFileNotFoundError(args.path, error);
   }
-  
+
   // 3. Check for binary file
   if (isBinaryContent(originalContent)) {
     return createBinaryFileError(args.path);
   }
-  
+
   // 4. Pre-validation pass
   const validationResult = validateAllEdits(originalContent, args.edits);
   if (validationResult.hasError) {
     return createValidationError(validationResult, originalContent);
   }
-  
+
   // 5. Dry run mode
   if (args.dry_run) {
     return createDryRunResult(originalContent, validationResult);
   }
-  
+
   // 6. Apply all edits sequentially
   let workingContent = originalContent;
   const editSummaries: EditSummary[] = [];
-  
+
   for (const [index, edit] of args.edits.entries()) {
     const result = applyEdit(workingContent, edit, index);
     workingContent = result.content;
     editSummaries.push(result.summary);
   }
-  
+
   // 7. Write file atomically (temp + fsync + rename)
   try {
     const tempPath = `${args.path}.tmp.${Date.now()}.${Math.random().toString(36).slice(2)}`;
     await writeFile(tempPath, workingContent, 'utf-8');
-    await fsync(tempPath);  // Ensure data is written to disk
-    await rename(tempPath, args.path);  // Atomic replacement
+    await fsync(tempPath); // Ensure data is written to disk
+    await rename(tempPath, args.path); // Atomic replacement
   } catch (error) {
     return createWriteError(args.path, error);
   }
-  
+
   // 8. Generate comprehensive diff
   const diffContext = extractDiffContext(originalContent, workingContent);
-  
+
   return createSuccessResult({
     path: args.path,
     diff: diffContext,
     edits_applied: editSummaries,
-    total_replacements: editSummaries.reduce((sum, e) => sum + e.occurrences_replaced, 0)
+    total_replacements: editSummaries.reduce(
+      (sum, e) => sum + e.occurrences_replaced,
+      0
+    ),
   });
 }
 ```
@@ -191,7 +205,7 @@ async function executeFileEdit(args: FileEditArgs): Promise<FileEditResult> {
   content: [{
     type: 'text',
     text: `Edit 1 of 3 failed: Could not find exact text in /src/app.ts.
-    
+
 Searched for (between >>>markers<<<):
 >>>${searchText}<<<
 
@@ -199,8 +213,8 @@ File contains similar content that might be what you're looking for:
 
 Line 45: ${similarLine1}
   Difference: Extra space after 'const'
-  
-Line 67: ${similarLine2}  
+
+Line 67: ${similarLine2}
   Difference: Uses double quotes instead of single quotes
 
 Suggestions:
@@ -249,7 +263,7 @@ Suggestions:
 
 Expected to replace 3 instances of 'console.log' but found 5 instances at:
   Line 12, column 5
-  Line 34, column 9  
+  Line 34, column 9
   Line 56, column 5
   Line 78, column 13
   Line 102, column 5
@@ -287,6 +301,7 @@ Options to fix:
 ### Test Categories
 
 #### 1. Basic Operations
+
 - Single edit with default occurrence (1)
 - Single edit with explicit occurrence count
 - Multiple edits in sequence
@@ -295,78 +310,86 @@ Options to fix:
 - Very long lines (>10000 chars)
 
 #### 2. Occurrence Validation
+
 ```typescript
 describe('Occurrence validation', () => {
-  it('should replace single occurrence by default')
-  it('should replace exact number when specified')
-  it('should fail when expected count does not match actual')
-  it('should count occurrences correctly across line boundaries')
-  it('should handle non-overlapping matches (overlapping matches not supported)')
-  it('should count occurrences after each edit in sequence')
-})
+  it('should replace single occurrence by default');
+  it('should replace exact number when specified');
+  it('should fail when expected count does not match actual');
+  it('should count occurrences correctly across line boundaries');
+  it(
+    'should handle non-overlapping matches (overlapping matches not supported)'
+  );
+  it('should count occurrences after each edit in sequence');
+});
 ```
 
 #### 3. Sequential Edit Behavior
+
 ```typescript
 describe('Sequential edits', () => {
-  it('should apply edits in order')
-  it('should allow second edit to modify results of first edit')
-  it('should count occurrences based on current state, not original')
-  it('should handle edit that creates text for next edit')
-  it('should handle edit that removes text next edit would target')
-})
+  it('should apply edits in order');
+  it('should allow second edit to modify results of first edit');
+  it('should count occurrences based on current state, not original');
+  it('should handle edit that creates text for next edit');
+  it('should handle edit that removes text next edit would target');
+});
 ```
 
 #### 4. Edge Cases
+
 ```typescript
 describe('Edge cases', () => {
   // Text matching
-  it('should match text with special regex characters literally')
-  it('should preserve different line endings (LF, CRLF, CR)')
-  it('should handle unicode and emoji correctly')
-  it('should match empty strings correctly')
-  it('should handle null bytes in text')
-  
+  it('should match text with special regex characters literally');
+  it('should preserve different line endings (LF, CRLF, CR)');
+  it('should handle unicode and emoji correctly');
+  it('should match empty strings correctly');
+  it('should handle null bytes in text');
+
   // File operations
-  it('should handle permission denied errors')
-  it('should handle file not found errors')  
-  it('should detect and reject binary files')
-  it('should handle symlinks correctly')
-  it('should preserve file permissions and attributes')
-  
+  it('should handle permission denied errors');
+  it('should handle file not found errors');
+  it('should detect and reject binary files');
+  it('should handle symlinks correctly');
+  it('should preserve file permissions and attributes');
+
   // Boundary conditions
-  it('should handle editing at start of file')
-  it('should handle editing at end of file')
-  it('should handle replacing entire file content')
-  it('should handle file with no newline at end')
-})
+  it('should handle editing at start of file');
+  it('should handle editing at end of file');
+  it('should handle replacing entire file content');
+  it('should handle file with no newline at end');
+});
 ```
 
 #### 5. Dry Run Mode
+
 ```typescript
 describe('Dry run mode', () => {
-  it('should not modify file in dry run')
-  it('should return preview of all changes')
-  it('should validate all edits in dry run')
-  it('should return same errors as real run would')
-  it('should include line numbers in preview')
-})
+  it('should not modify file in dry run');
+  it('should return preview of all changes');
+  it('should validate all edits in dry run');
+  it('should return same errors as real run would');
+  it('should include line numbers in preview');
+});
 ```
 
 #### 6. Error Reporting for LLMs
+
 ```typescript
 describe('LLM-friendly error reporting', () => {
-  it('should suggest fixes for whitespace mismatches')
-  it('should identify case sensitivity issues')
-  it('should show similar content when no exact match')
-  it('should provide line numbers for all matches')
-  it('should suggest using file_read for exact content')
-  it('should explain why binary files cannot be edited')
-  it('should provide clear next steps for each error type')
-})
+  it('should suggest fixes for whitespace mismatches');
+  it('should identify case sensitivity issues');
+  it('should show similar content when no exact match');
+  it('should provide line numbers for all matches');
+  it('should suggest using file_read for exact content');
+  it('should explain why binary files cannot be edited');
+  it('should provide clear next steps for each error type');
+});
 ```
 
 #### 7. Complex Scenarios
+
 ```typescript
 describe('Complex real-world scenarios', () => {
   it('should handle renaming a variable throughout a file', async () => {
@@ -377,41 +400,45 @@ describe('Complex real-world scenarios', () => {
         return userId.toString();
       }
     `;
-    
+
     const result = await tool.execute({
       path: testFile,
-      edits: [{
-        old_text: 'userId',
-        new_text: 'userIdentifier',
-        occurrences: 4
-      }]
+      edits: [
+        {
+          old_text: 'userId',
+          new_text: 'userIdentifier',
+          occurrences: 4,
+        },
+      ],
     });
-    
+
     expect(result.isError).toBe(false);
     const newContent = await readFile(testFile);
     expect(newContent).not.toContain('userId');
     expect(newContent).toContain('userIdentifier');
   });
-  
+
   it('should handle updating multiple import statements', async () => {
     const content = `
       import { foo } from './old-path';
       import { bar } from './old-path';
       import { baz } from './other-path';
     `;
-    
+
     const result = await tool.execute({
       path: testFile,
-      edits: [{
-        old_text: "'./old-path'",
-        new_text: "'./new-path'",
-        occurrences: 2
-      }]
+      edits: [
+        {
+          old_text: "'./old-path'",
+          new_text: "'./new-path'",
+          occurrences: 2,
+        },
+      ],
     });
-    
+
     expect(result.isError).toBe(false);
   });
-  
+
   it('should handle comment updates across file', async () => {
     const content = `
       // TODO: implement this
@@ -424,30 +451,33 @@ describe('Complex real-world scenarios', () => {
         return null; // TODO: implement this
       }
     `;
-    
+
     const result = await tool.execute({
       path: testFile,
-      edits: [{
-        old_text: '// TODO: implement this',
-        new_text: '// DONE: implemented',
-        occurrences: 4
-      }]
+      edits: [
+        {
+          old_text: '// TODO: implement this',
+          new_text: '// DONE: implemented',
+          occurrences: 4,
+        },
+      ],
     });
-    
+
     expect(result.isError).toBe(false);
   });
-})
+});
 ```
 
 #### 8. Performance Tests
+
 ```typescript
 describe('Performance', () => {
-  it('should handle 1000 edits efficiently')
-  it('should handle 10MB file efficiently')
-  it('should not read file multiple times')
-  it('should not write file multiple times')
-  it('should validate all edits before any modifications')
-})
+  it('should handle 1000 edits efficiently');
+  it('should handle 10MB file efficiently');
+  it('should not read file multiple times');
+  it('should not write file multiple times');
+  it('should validate all edits before any modifications');
+});
 ```
 
 ### Test Data Fixtures
@@ -458,36 +488,36 @@ export const fixtures = {
   simple: {
     content: 'Hello World',
     edits: [{ old_text: 'World', new_text: 'Universe' }],
-    expected: 'Hello Universe'
+    expected: 'Hello Universe',
   },
-  
+
   multipleOccurrences: {
     content: 'foo bar foo baz foo',
     edits: [{ old_text: 'foo', new_text: 'qux', occurrences: 3 }],
-    expected: 'qux bar qux baz qux'
+    expected: 'qux bar qux baz qux',
   },
-  
+
   sequential: {
     content: 'const a = 1;\nconst b = 2;',
     edits: [
       { old_text: 'const', new_text: 'let', occurrences: 2 },
       { old_text: 'let a', new_text: 'let x' },
-      { old_text: '= 1', new_text: '= 100' }
+      { old_text: '= 1', new_text: '= 100' },
     ],
-    expected: 'let x = 100;\nlet b = 2;'
+    expected: 'let x = 100;\nlet b = 2;',
   },
-  
+
   whitespace: {
     content: 'function  foo() {\n\treturn  true;\n}',
     edits: [{ old_text: 'function  foo', new_text: 'function bar' }],
-    expected: 'function bar() {\n\treturn  true;\n}'
+    expected: 'function bar() {\n\treturn  true;\n}',
   },
-  
+
   lineEndings: {
     windows: 'line1\r\nline2\r\nline3',
     unix: 'line1\nline2\nline3',
-    mac: 'line1\rline2\rline3'
-  }
+    mac: 'line1\rline2\rline3',
+  },
 };
 ```
 
@@ -505,10 +535,12 @@ export const fixtures = {
 
 1. **Single File Read**: Read entire file once into memory
 2. **Single File Write**: Write entire file once after all edits
-3. **Efficient String Operations**: Use indexOf for searching (non-overlapping matches), not regex
+3. **Efficient String Operations**: Use indexOf for searching (non-overlapping
+   matches), not regex
 4. **Memory Limits**: Refuse to edit files > 100MB
 5. **Edit Limit**: Maximum 1000 edits per operation
-6. **Overlapping Matches**: Not supported - indexOf advances past full match length
+6. **Overlapping Matches**: Not supported - indexOf advances past full match
+   length
 
 ### Security Considerations
 

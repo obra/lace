@@ -1,6 +1,7 @@
 # 🚀 Storybook Migration Execution Guide
 
-This guide provides step-by-step instructions to execute the migration from Storybook to Ladle + Playground workflow.
+This guide provides step-by-step instructions to execute the migration from
+Storybook to Ladle + Playground workflow.
 
 ## ✅ Pre-Migration Setup (Completed)
 
@@ -14,10 +15,12 @@ This guide provides step-by-step instructions to execute the migration from Stor
 ## 🎯 Next Steps to Complete Migration
 
 ### 1. Verify Ladle Setup
+
 ```bash
 cd packages/web
 npm run ladle
 ```
+
 Should open Ladle dev server at http://localhost:61000 with KEEP stories.
 
 ### 2. Execute CONVERT Migrations (52 stories)
@@ -25,26 +28,30 @@ Should open Ladle dev server at http://localhost:61000 with KEEP stories.
 Use the AgentBadge template as reference for each CONVERT story:
 
 #### For each CONVERT story:
+
 1. **Create MDX file** next to component:
+
    ```bash
    # Example for TokenUsageDisplay
    touch components/ui/TokenUsageDisplay.mdx
    ```
 
 2. **Add component to playground** (`/app/play/page.tsx`):
+
    ```tsx
    import TokenUsageDisplay from '@/components/ui/TokenUsageDisplay';
-   
+
    // Add section with usage examples
    ```
 
 3. **Create test file** (`components/ui/__tests__/ComponentName.test.tsx`):
+
    ```tsx
    import React from 'react';
    import { render, screen } from '@testing-library/react';
    import { describe, it, expect } from 'vitest';
    import ComponentName from '../ComponentName';
-   
+
    describe('ComponentName', () => {
      it('renders correctly', () => {
        // Test basic functionality
@@ -60,12 +67,14 @@ Use the AgentBadge template as reference for each CONVERT story:
 ### 3. Execute PARK Migrations (12 stories)
 
 Move complex stories to parked directory:
+
 ```bash
 # Example
 mv packages/web/components/timeline/AnimatedTimelineView.stories.tsx packages/web/stories_parked/
 ```
 
 Add header comment to parked files:
+
 ```ts
 /** PARKED STORY — not in active use, see STORYBOOK_MIGRATION_GUIDE.md */
 ```
@@ -73,6 +82,7 @@ Add header comment to parked files:
 ## 📋 Migration Checklist
 
 ### KEEP Stories (11) - Ladle Migration
+
 - [ ] `Badge.stories.tsx` → Verify works in Ladle
 - [ ] `Modal.stories.tsx` → Verify works in Ladle
 - [ ] `CodeBlock.stories.tsx` → Verify works in Ladle
@@ -86,6 +96,7 @@ Add header comment to parked files:
 - [ ] `Carousel.stories.tsx` → Verify works in Ladle
 
 ### CONVERT Stories (52) - MDX + Playground + Tests
+
 - [x] `AgentBadge.stories.tsx` → **TEMPLATE COMPLETED** ✅
 - [ ] `TokenUsageDisplay.stories.tsx` → MDX + Playground + Test
 - [ ] `DirectoryField.stories.tsx` → MDX + Playground + Test
@@ -126,6 +137,7 @@ Add header comment to parked files:
 - [ ] Plus 17 feature component stories...
 
 ### PARK Stories (12) - Archive
+
 - [ ] `AnimatedTimelineView.stories.tsx` → Move to stories_parked/
 - [ ] `AnimatedTypingIndicator.stories.tsx` → Move to stories_parked/
 - [ ] `UnknownEventEntry.stories.tsx` → Move to stories_parked/
@@ -142,6 +154,7 @@ Add header comment to parked files:
 ## 🧪 Testing Your Migration
 
 ### Test Ladle
+
 ```bash
 cd packages/web
 npm run ladle
@@ -149,12 +162,14 @@ npm run ladle
 ```
 
 ### Test Playground
+
 ```bash
 npm run dev
 # Visit /play to see component examples
 ```
 
 ### Test Components
+
 ```bash
 npm test
 # All migrated component tests should pass
@@ -170,16 +185,19 @@ npm test
 ## 💡 Development Workflow After Migration
 
 ### For KEEP Components (Primitives)
+
 ```bash
 npm run ladle  # Fast Ladle server for core components
 ```
 
-### For CONVERT Components (Feature Components)  
+### For CONVERT Components (Feature Components)
+
 ```bash
 npm run dev    # Next.js with /play page for rapid testing
 ```
 
 ### For New Components
+
 - **Primitives**: Create .stories.tsx file → shows in Ladle
 - **Feature Components**: Add to /play page + create .mdx docs + tests
 
@@ -192,6 +210,6 @@ npm run dev    # Next.js with /play page for rapid testing
 
 ---
 
-**Migration Status**: Setup complete, ready for execution
-**Template**: AgentBadge completed as reference pattern  
+**Migration Status**: Setup complete, ready for execution **Template**:
+AgentBadge completed as reference pattern  
 **Next Action**: Choose your first CONVERT story to migrate!

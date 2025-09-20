@@ -2,7 +2,7 @@ name: CI
 
 # Minimal permissions for security
 permissions:
-  contents: read          # Read repository contents
+  contents: read # Read repository contents
 
 # Prevent overlapping deployments
 concurrency:
@@ -11,24 +11,24 @@ concurrency:
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   release:
-    types: [ published ]   # Deploy to release channel
-  workflow_dispatch:       # Manual trigger
+    types: [published] # Deploy to release channel
+  workflow_dispatch: # Manual trigger
     inputs:
       channel:
-        description: 'Deployment channel'
+        description: "Deployment channel"
         required: true
-        default: 'nightly'
+        default: "nightly"
         type: choice
         options:
           - nightly
           - release
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: "20"
 
 jobs:
   ci-and-deploy:
@@ -70,7 +70,7 @@ jobs:
 
       - name: Check Prettier formatting (core)
         run: npx prettier --check "packages/core/src/*.ts"
-      
+
       - name: Check Prettier formatting (web)
         run: npx prettier --check "packages/web/**/*.ts" "packages/web/**/*.tsx"
 
@@ -115,17 +115,17 @@ jobs:
           cd platforms/macos
           echo "$SPARKLE_PRIVATE_KEY" > sparkle_private_key
           chmod 600 sparkle_private_key
-          
+
           # Verify key was created
           echo "🔍 Verifying EdDSA key setup..."
           ls -la sparkle_private_key
           echo "Key length: $(wc -c < sparkle_private_key) bytes"
           echo "Key starts with: $(head -c 10 sparkle_private_key)..."
-          
+
           # Also verify from build script perspective
           cd ../..
           ls -la platforms/macos/sparkle_private_key
-          
+
           echo "✅ EdDSA private key configured for appcast signing"
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
@@ -177,13 +177,13 @@ jobs:
           BUILD_TIMESTAMP=$(date -u '+%Y%m%d%H%M')
           echo "BUILD_TIMESTAMP=$BUILD_TIMESTAMP" >> $GITHUB_ENV
           echo "🕒 Using stable timestamp: $BUILD_TIMESTAMP"
-          
+
           bun scripts/build-macos-app.ts \
             --dmg \
             --channel ${{ steps.channel.outputs.channel }}
         env:
           BUILD_CHANNEL: ${{ steps.channel.outputs.channel }}
-      
+
       - name: Verify app bundle exists before signing
         if: steps.signing_check.outputs.available == 'true' && steps.channel.outputs.deploy == 'true'
         run: |
@@ -196,40 +196,40 @@ jobs:
             echo "❌ App bundle missing!"
             exit 1
           fi
-      
+
       - name: Sign and notarize macOS app (proven approach)
         if: steps.signing_check.outputs.available == 'true' && steps.channel.outputs.deploy == 'true'
         run: |
           echo "🔐 Setting up signing keychain..."
-          
+
           # Create temporary keychain (delete if exists)
           security delete-keychain signing.keychain 2>/dev/null || true
           security create-keychain -p actions signing.keychain
           security default-keychain -s signing.keychain
           security unlock-keychain -p actions signing.keychain
           security set-keychain-settings -t 3600 -u signing.keychain
-          
+
           # Import certificate with proper access
           echo "$APPLE_DEVELOPER_CERTIFICATE_P12" | base64 --decode > /tmp/cert.p12
           security import /tmp/cert.p12 -k signing.keychain -P "$APPLE_DEVELOPER_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productsign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions signing.keychain
-          
+
           # Add keychain to search list
           security list-keychains -d user -s signing.keychain login.keychain
-          
+
           # Find the correct signing identity
           SIGNING_IDENTITY=$(security find-identity -v signing.keychain | grep "Developer ID Application" | head -1 | grep -o '"[^"]*"' | tr -d '"')
           echo "🔑 Using signing identity: $SIGNING_IDENTITY"
-          
+
           if [ -z "$SIGNING_IDENTITY" ]; then
             echo "❌ No Developer ID Application certificate found in keychain"
             security find-identity -v signing.keychain
             exit 1
           fi
-          
+
           # Sign app bundle (inside-out approach)
           echo "✍️  Signing app bundle with: $SIGNING_IDENTITY"
-          
+
           # Sign Sparkle framework components thoroughly
           if [ -d "build/Lace.app/Contents/Frameworks/Sparkle.framework" ]; then
             echo "   ⚡ Signing Sparkle framework components..."
@@ -256,39 +256,39 @@ jobs:
             echo "   ⚡ Signing Sparkle framework..."
             codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/Frameworks/Sparkle.framework"
           fi
-          
+
           # Sign inner binaries with proper entitlements
           echo "   🔧 Signing inner binaries..."
-          
+
           # lace-server: Use Bun-specific entitlements WITH hardened runtime (required for notarization)
           codesign --force --options runtime --timestamp --entitlements scripts/bun-entitlements.plist --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/MacOS/lace-server"
-          
+
           # Main Lace app: Standard app entitlements WITH hardened runtime
           if [ -f "scripts/entitlements.plist" ]; then
             codesign --force --options runtime --timestamp --entitlements scripts/entitlements.plist --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/MacOS/Lace"
           else
             codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "build/Lace.app/Contents/MacOS/Lace"
           fi
-          
+
           # Sign main app bundle
           codesign --force --options runtime --sign "$SIGNING_IDENTITY" "build/Lace.app"
-          
+
           echo "✅ App bundle signed"
-          
+
           # Create new signed DMG (appcast already generated by --dmg build)
           echo "📦 Creating new signed DMG..."
-          
+
           # Remove old unsigned DMG first
           rm -f build/Lace-*.dmg
-          
+
           # Create new DMG with signed app
           bun scripts/create-dmg.ts --app build/Lace.app --output build
-          
+
           # Notarize DMG with maximum verbosity
           DMG_FILE=$(ls build/Lace-*.dmg | head -n1)
           echo "📤 Notarizing $DMG_FILE with verbose output..."
           echo "📝 File info: $(ls -lh "$DMG_FILE")"
-          
+
           # Debug credentials (without exposing values)
           echo "🔍 Checking notarization credentials..."
           echo "Apple ID: ${APPLE_ID_EMAIL:0:10}..."
@@ -296,12 +296,12 @@ jobs:
           echo "Team ID starts with: ${APPLE_TEAM_ID:0:3}..."
           echo "Password length: ${#APPLE_ID_PASSWORD} chars"
           echo "Password starts with: ${APPLE_ID_PASSWORD:0:4}..."
-          
+
           # Check if any are empty
           [ -z "$APPLE_ID_EMAIL" ] && echo "❌ Apple ID is empty!" || echo "✅ Apple ID present"
           [ -z "$APPLE_TEAM_ID" ] && echo "❌ Team ID is empty!" || echo "✅ Team ID present"  
           [ -z "$APPLE_ID_PASSWORD" ] && echo "❌ Password is empty!" || echo "✅ Password present"
-          
+
           # Submit directly without storing credentials (avoids keychain UI prompts)
           echo "📤 Submitting for notarization (this will be VERY verbose)..."
           SUBMISSION_OUTPUT=$(xcrun notarytool submit "$DMG_FILE" \
@@ -311,10 +311,10 @@ jobs:
             --wait --timeout 30m \
             --verbose \
             --progress 2>&1)
-          
+
           SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep "id:" | head -1 | awk '{print $2}')
           echo "📝 Submission ID: $SUBMISSION_ID"
-          
+
           # If notarization failed, get detailed logs from Apple
           if echo "$SUBMISSION_OUTPUT" | grep -q "status: Invalid"; then
             echo "❌ Notarization failed - getting detailed logs from Apple..."
@@ -329,36 +329,36 @@ jobs:
             echo "⚠️  Unknown notarization status"
             echo "$SUBMISSION_OUTPUT"
           fi
-          
+
           # Staple notarization
           echo "📎 Stapling notarization..."
           xcrun stapler staple "$DMG_FILE"
-          
+
           echo "✅ App bundle signed and notarized!"
-          
+
           # Generate appcast AFTER final signed DMG is ready
           echo "📡 Generating appcast for final signed DMG..."
           CHANNEL="${{ steps.channel.outputs.channel }}"
-          
+
           # Create appcast directory
           mkdir -p "build/appcast/$CHANNEL"
-          
+
           # Copy final signed DMG to appcast directory with correct name (using same timestamp)
           # Use the existing DMG filename instead of reconstructing version
           DMG_BASENAME=$(basename "$DMG_FILE")
           cp "$DMG_FILE" "build/appcast/$CHANNEL/$DMG_BASENAME"
-          
+
           # Generate appcast using Sparkle tools
           cd platforms/macos
           ./bin/generate_appcast "../../build/appcast/$CHANNEL" --ed-key-file sparkle_private_key
           cd ../..
-          
+
           # Replace placeholder URLs in appcast
           echo "🔧 Replacing placeholder URL with: https://fsck.com/lace/dist/$CHANNEL/$DMG_BASENAME"
           node -e "const fs = require('fs'); const filePath = 'build/appcast/$CHANNEL/appcast.xml'; let content = fs.readFileSync(filePath, 'utf8'); content = content.replace(/PLACEHOLDER_URL_TO_BE_REPLACED/g, 'https://fsck.com/lace/dist/$CHANNEL/$DMG_BASENAME'); fs.writeFileSync(filePath, content); console.log('✅ URL replacement completed');"
-          
+
           echo "✅ Appcast generated with correct signature for signed DMG"
-          
+
           # Cleanup
           security delete-keychain signing.keychain
           rm /tmp/cert.p12
@@ -368,7 +368,7 @@ jobs:
           APPLE_ID_EMAIL: ${{ secrets.APPLE_ID_EMAIL }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      
+
       # DMG creation and notarization handled in signing step above
 
       - name: Fail if signing not available (never deploy unsigned)
@@ -377,7 +377,7 @@ jobs:
           echo "❌ Cannot deploy without proper signing certificates"
           echo "All deployments must be signed and notarized"
           exit 1
-      
+
       - name: Build macOS app (unsigned) for testing only
         if: steps.signing_check.outputs.available == 'false' && steps.channel.outputs.deploy == 'false'
         run: |
@@ -390,24 +390,24 @@ jobs:
         if: steps.channel.outputs.deploy == 'true' && steps.signing_check.outputs.available == 'true'
         run: |
           echo "🚀 Deploying to fsck.com..."
-          
+
           # Setup SSH key
           mkdir -p ~/.ssh
           echo "${{ secrets.FSCK_SSH_PRIVATE_KEY }}" > ~/.ssh/fsck_deploy_key
           chmod 600 ~/.ssh/fsck_deploy_key
           ssh-keyscan fsck.com >> ~/.ssh/known_hosts
-          
+
           CHANNEL="${{ steps.channel.outputs.channel }}"
           DMG_PATH=$(ls -1 build/Lace-*.dmg | head -n1)
           DMG_FILENAME=$(basename "$DMG_PATH")
-          
+
           # Create staging directory
           mkdir -p staging/$CHANNEL
-          
+
           # Stage DMG
           cp "$DMG_PATH" "staging/$CHANNEL/$DMG_FILENAME"
           echo "✅ DMG staged: $DMG_FILENAME"
-          
+
           # Stage appcast
           APPCAST_FILE=$(find "build/appcast/$CHANNEL" -name "*.xml" | head -n1)
           if [ -n "$APPCAST_FILE" ] && [ -f "$APPCAST_FILE" ]; then
@@ -416,16 +416,16 @@ jobs:
           else
             echo "⚠️  No appcast found"
           fi
-          
+
           # Final staging verification
           echo "📁 Staging contents:"
           ls -la staging/$CHANNEL/
-          
+
           # Upload everything
           echo "📦 Uploading to fsck.com..."
           rsync -av -e "ssh -i ~/.ssh/fsck_deploy_key -o StrictHostKeyChecking=no" \
             staging/$CHANNEL/ jesse@fsck.com:/opt/web/hosted/www.fsck.com/html/lace/dist/$CHANNEL/
-          
+
           echo "🚀 Deployment complete!"
           echo "🔗 DMG: https://fsck.com/lace/dist/$CHANNEL/$DMG_FILENAME"
           echo "📡 Appcast: https://fsck.com/lace/dist/$CHANNEL/appcast.xml"
@@ -436,22 +436,22 @@ jobs:
         if: always()
         run: |
           echo "🧹 Cleaning up mounted volumes and temporary files..."
-          
+
           # Unmount any Lace-related volumes that may be left behind
           hdiutil info -plist | grep -A5 -B5 "Lace" || true
           for volume in $(hdiutil info | grep "Lace" | awk '{print $1}' | sort -u); do
             echo "🔧 Force unmounting volume: $volume"
             hdiutil detach "$volume" -force 2>/dev/null || true
           done
-          
+
           # Clean up any temporary DMG files in /tmp
           find /tmp -name "*Lace*.dmg" -type f -delete 2>/dev/null || true
           find /tmp -name "*lace*.dmg" -type f -delete 2>/dev/null || true
-          
+
           # Clean up any build artifacts that might be holding references
           rm -rf build/dmg-temp 2>/dev/null || true
           rm -rf build/*-temp.dmg 2>/dev/null || true
-          
+
           echo "✅ Cleanup completed"
 
       - name: Notify completion

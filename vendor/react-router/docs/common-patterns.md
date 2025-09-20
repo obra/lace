@@ -1,6 +1,7 @@
 # Common Patterns
 
-Copy-paste implementations of frequently used patterns in React Router 7 Framework Mode.
+Copy-paste implementations of frequently used patterns in React Router 7
+Framework Mode.
 
 ## Authentication & Authorization
 
@@ -53,16 +54,16 @@ export async function action({ request }: Route.ActionArgs) {
   try {
     const user = await signIn(email, password);
     const session = await createSession(user.id);
-    
+
     return redirect("/dashboard", {
       headers: {
         "Set-Cookie": `session=${session.id}; HttpOnly; Secure; SameSite=Strict`
       }
     });
   } catch (error) {
-    return { 
-      errors: { form: "Invalid email or password" }, 
-      status: 401 
+    return {
+      errors: { form: "Invalid email or password" },
+      status: 401
     };
   }
 }
@@ -79,7 +80,7 @@ export default function Login() {
           <p className="error">{actionData.errors.email}</p>
         )}
       </div>
-      
+
       <div>
         <label htmlFor="password">Password</label>
         <input type="password" name="password" required />
@@ -87,11 +88,11 @@ export default function Login() {
           <p className="error">{actionData.errors.password}</p>
         )}
       </div>
-      
+
       {actionData?.errors?.form && (
         <p className="error">{actionData.errors.form}</p>
       )}
-      
+
       <button type="submit">Sign In</button>
     </Form>
   );
@@ -134,7 +135,7 @@ export default function ProductsList({ loaderData }: Route.ComponentProps) {
   const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
     const formData = new FormData(event.currentTarget);
     const search = formData.get("search") as string;
-    
+
     submit(
       { search, page: "1" },
       { method: "get", replace: true }
@@ -210,11 +211,11 @@ export async function action({ request, params }: Route.ActionArgs) {
   // Update product
   const name = formData.get("name") as string;
   const price = parseFloat(formData.get("price") as string);
-  
+
   const errors: Record<string, string> = {};
   if (!name) errors.name = "Name is required";
   if (!price || price <= 0) errors.price = "Price must be greater than 0";
-  
+
   if (Object.keys(errors).length > 0) {
     return { errors };
   }
@@ -314,7 +315,7 @@ export async function action({ request }: Route.ActionArgs) {
   // Save file
   const filename = `${Date.now()}-${file.name}`;
   const filepath = path.join(process.cwd(), "public", "uploads", filename);
-  
+
   const writeStream = createWriteStream(filepath);
   if (file.stream) {
     await writeAsyncIterableToWritable(file.stream(), writeStream);
@@ -340,7 +341,7 @@ export default function FileUpload() {
             <p className="error">{actionData.errors.file}</p>
           )}
         </div>
-        
+
         <button type="submit">Upload</button>
       </Form>
 
@@ -378,7 +379,7 @@ export default function LiveData() {
 
   useEffect(() => {
     const eventSource = new EventSource("/api/live-updates");
-    
+
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === "data-update") {
@@ -396,7 +397,7 @@ export default function LiveData() {
       <h1>Live Data</h1>
       <p>Last updated: {new Date(loaderData.timestamp).toLocaleTimeString()}</p>
       <pre>{JSON.stringify(loaderData.data, null, 2)}</pre>
-      
+
       {revalidator.state === "loading" && (
         <p>Updating...</p>
       )}
@@ -416,14 +417,14 @@ import { isRouteErrorResponse, useRouteError } from "react-router";
 
 export async function loader({ params }: Route.LoaderArgs) {
   const product = await getProduct(params.id);
-  
+
   if (!product) {
     throw new Response("Product not found", {
       status: 404,
       statusText: "Product not found"
     });
   }
-  
+
   return { product };
 }
 
@@ -495,16 +496,16 @@ import { Route } from "./+types/weather";
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const city = url.searchParams.get("city") || "New York";
-  
+
   // Cache key for this request
   const cacheKey = `weather-${city}`;
-  
+
   // Try to get from cache first
   const cached = await getCachedData(cacheKey);
   if (cached && Date.now() - cached.timestamp < 5 * 60 * 1000) {
     return { weather: cached.data, city, fromCache: true };
   }
-  
+
   // Fetch from API
   try {
     const response = await fetch(
@@ -515,27 +516,27 @@ export async function loader({ request }: Route.LoaderArgs) {
         }
       }
     );
-    
+
     if (!response.ok) {
       throw new Error(`Weather API error: ${response.status}`);
     }
-    
+
     const weather = await response.json();
-    
+
     // Cache the result
     await setCachedData(cacheKey, {
       data: weather,
       timestamp: Date.now()
     });
-    
+
     return { weather, city, fromCache: false };
-    
+
   } catch (error) {
     // If API fails, return cached data if available
     if (cached) {
       return { weather: cached.data, city, fromCache: true, stale: true };
     }
-    
+
     throw new Error("Unable to fetch weather data");
   }
 }
@@ -546,7 +547,7 @@ export default function Weather({ loaderData }: Route.ComponentProps) {
       <h1>Weather in {loaderData.city}</h1>
       <p>Temperature: {loaderData.weather.temperature}°F</p>
       <p>Conditions: {loaderData.weather.conditions}</p>
-      
+
       {loaderData.fromCache && (
         <p className="cache-notice">
           {loaderData.stale ? "(Showing cached data - API unavailable)" : "(Cached data)"}
@@ -573,7 +574,7 @@ export async function loader() {
 export async function action({ request }: Route.ActionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent");
-  
+
   if (intent === "create") {
     const text = formData.get("text") as string;
     await createTodo({ text });
@@ -581,13 +582,13 @@ export async function action({ request }: Route.ActionArgs) {
     const id = formData.get("id") as string;
     await toggleTodo(id);
   }
-  
+
   return null; // Revalidate automatically
 }
 
 export default function Todos({ loaderData }: Route.ComponentProps) {
   const fetcher = useFetcher();
-  
+
   // Optimistic updates: show pending state
   const isAdding = fetcher.formData?.get("intent") === "create";
   const newTodoText = fetcher.formData?.get("text") as string;
@@ -595,12 +596,12 @@ export default function Todos({ loaderData }: Route.ComponentProps) {
   return (
     <div>
       <h1>Todos</h1>
-      
+
       <fetcher.Form method="post">
         <input name="text" placeholder="Add todo..." required />
-        <button 
-          type="submit" 
-          name="intent" 
+        <button
+          type="submit"
+          name="intent"
           value="create"
           disabled={fetcher.state === "submitting"}
         >
@@ -616,7 +617,7 @@ export default function Todos({ loaderData }: Route.ComponentProps) {
             <span>{newTodoText}</span>
           </li>
         )}
-        
+
         {loaderData.todos.map((todo) => (
           <li key={todo.id}>
             <fetcher.Form method="post" style={{ display: "inline" }}>
@@ -627,10 +628,10 @@ export default function Todos({ loaderData }: Route.ComponentProps) {
                 value="toggle"
                 style={{ background: "none", border: "none" }}
               >
-                <input 
-                  type="checkbox" 
-                  checked={todo.completed} 
-                  readOnly 
+                <input
+                  type="checkbox"
+                  checked={todo.completed}
+                  readOnly
                 />
               </button>
             </fetcher.Form>
@@ -645,4 +646,6 @@ export default function Todos({ loaderData }: Route.ComponentProps) {
 }
 ```
 
-These patterns provide solid foundations for most React Router 7 applications. Each pattern emphasizes the framework's core principles: server-first architecture, progressive enhancement, and type safety.
+These patterns provide solid foundations for most React Router 7 applications.
+Each pattern emphasizes the framework's core principles: server-first
+architecture, progressive enhancement, and type safety.

@@ -3,13 +3,18 @@
 ## Context for External Engineer
 
 ### Prerequisites
-You must have completed **Part 1** (core MCP integration) before starting this. This includes:
+
+You must have completed **Part 1** (core MCP integration) before starting this.
+This includes:
+
 - MCP types, config loader, server manager, tool registry, tool adapter
 - ToolExecutor integration with extended approval levels
 - All core infrastructure tested and working
 
 ### What This Part Adds
+
 Complete web interface for MCP server management, including:
+
 - REST API endpoints for server and tool management
 - React settings pages for MCP configuration
 - Real-time server status monitoring
@@ -18,17 +23,22 @@ Complete web interface for MCP server management, including:
 ### Key Files to Understand First
 
 **Existing Web Patterns:**
-- `packages/web/app/routes/api.projects.$projectId.configuration.ts` - Configuration API pattern
-- `packages/web/app/routes/api.sessions.$sessionId.configuration.ts` - Session config pattern
+
+- `packages/web/app/routes/api.projects.$projectId.configuration.ts` -
+  Configuration API pattern
+- `packages/web/app/routes/api.sessions.$sessionId.configuration.ts` - Session
+  config pattern
 - `packages/web/lib/server/api-utils.ts` - API response helpers
 - `packages/web/lib/server/serialization.ts` - SuperJSON response utilities
 
 **Component Patterns:**
+
 - Look at existing settings components in `packages/web/components/`
 - Study form handling and validation patterns
 - Review DaisyUI component wrappers (Alert, Button, etc.)
 
 **Web Architecture:**
+
 - **Remix/React Router**: File-based routing in `app/routes/`
 - **SuperJSON**: Serialization for complex objects (dates, errors, etc.)
 - **DaisyUI + Tailwind**: Component library and styling system
@@ -36,10 +46,11 @@ Complete web interface for MCP server management, including:
 - **TypeScript**: Strict typing throughout
 
 ### Development Commands
+
 ```bash
 cd packages/web
 npm run dev          # Start web development server
-npm run build        # Build web application  
+npm run build        # Build web application
 npm test            # Run web tests
 npm run lint        # Check code style
 ```
@@ -53,13 +64,16 @@ npm run lint        # Check code style
 **Objective**: API endpoint for listing and managing MCP servers
 
 **Files to Create:**
+
 - `packages/web/app/routes/api.mcp.servers.ts`
 
 **Study First:**
+
 - `packages/web/app/routes/api.projects.$projectId.configuration.ts` for pattern
 - `packages/web/lib/server/api-utils.ts` for response helpers
 
 **Implementation:**
+
 ```typescript
 // ABOUTME: REST API for MCP server list management - GET all servers, POST new server
 // ABOUTME: Provides server status info and handles server creation with validation
@@ -74,13 +88,23 @@ const CreateServerSchema = z.object({
   name: z.string().min(1, 'Server name is required'),
   command: z.string().min(1, 'Command is required'),
   args: z.array(z.string()).optional(),
-  env: z.record(z.string(), z.string()).optional(), 
+  env: z.record(z.string(), z.string()).optional(),
   cwd: z.string().optional(),
   enabled: z.boolean().default(true),
-  tools: z.record(z.string(), z.enum([
-    'disable', 'deny', 'require-approval',
-    'allow-once', 'allow-session', 'allow-project', 'allow-always'
-  ])).default({})
+  tools: z
+    .record(
+      z.string(),
+      z.enum([
+        'disable',
+        'deny',
+        'require-approval',
+        'allow-once',
+        'allow-session',
+        'allow-project',
+        'allow-always',
+      ])
+    )
+    .default({}),
 });
 
 // Global server manager instance (in production, would be dependency injected)
@@ -97,29 +121,32 @@ export async function loader({ request }: Route.LoaderArgs) {
   try {
     const url = new URL(request.url);
     const projectRoot = url.searchParams.get('projectRoot') || process.cwd();
-    
+
     // Load current configuration
     const config = MCPConfigLoader.loadConfig(projectRoot);
     const serverManager = getServerManager();
-    
+
     // Get runtime server status
     const serverConnections = serverManager.getAllServers();
-    
+
     // Combine configuration with runtime status
-    const servers = Object.entries(config.servers).map(([serverId, serverConfig]) => {
-      const connection = serverConnections.find(conn => conn.id === serverId);
-      
-      return {
-        id: serverId,
-        ...serverConfig,
-        status: connection?.status || 'stopped',
-        lastError: connection?.lastError,
-        connectedAt: connection?.connectedAt
-      };
-    });
+    const servers = Object.entries(config.servers).map(
+      ([serverId, serverConfig]) => {
+        const connection = serverConnections.find(
+          (conn) => conn.id === serverId
+        );
+
+        return {
+          id: serverId,
+          ...serverConfig,
+          status: connection?.status || 'stopped',
+          lastError: connection?.lastError,
+          connectedAt: connection?.connectedAt,
+        };
+      }
+    );
 
     return createSuperjsonResponse({ servers });
-    
   } catch (error) {
     console.error('Failed to get MCP servers:', error);
     return createErrorResponse('Failed to load server configuration', 500);
@@ -134,27 +161,30 @@ export async function action({ request }: Route.ActionArgs) {
   try {
     const formData = await request.formData();
     const data = Object.fromEntries(formData.entries());
-    
+
     // Parse and validate server data
     const serverData = CreateServerSchema.parse({
       ...data,
       args: data.args ? JSON.parse(data.args as string) : undefined,
       env: data.env ? JSON.parse(data.env as string) : undefined,
       tools: data.tools ? JSON.parse(data.tools as string) : {},
-      enabled: data.enabled === 'true'
+      enabled: data.enabled === 'true',
     });
-    
+
     const url = new URL(request.url);
     const projectRoot = url.searchParams.get('projectRoot') || process.cwd();
-    
+
     // Load current config
     const config = MCPConfigLoader.loadConfig(projectRoot);
-    
+
     // Check if server already exists
     if (config.servers[serverData.name]) {
-      return createErrorResponse(`Server '${serverData.name}' already exists`, 409);
+      return createErrorResponse(
+        `Server '${serverData.name}' already exists`,
+        409
+      );
     }
-    
+
     // Add new server to config
     config.servers[serverData.name] = {
       command: serverData.command,
@@ -162,34 +192,39 @@ export async function action({ request }: Route.ActionArgs) {
       env: serverData.env,
       cwd: serverData.cwd,
       enabled: serverData.enabled,
-      tools: serverData.tools
+      tools: serverData.tools,
     };
-    
+
     // TODO: Save configuration back to file (implement in next task)
-    
+
     // If enabled, start the server
     if (serverData.enabled) {
       const serverManager = getServerManager();
       try {
-        await serverManager.startServer(serverData.name, config.servers[serverData.name]);
+        await serverManager.startServer(
+          serverData.name,
+          config.servers[serverData.name]
+        );
       } catch (startError) {
         // Log but don't fail - user can start manually later
         console.warn(`Failed to start server ${serverData.name}:`, startError);
       }
     }
-    
-    return createSuperjsonResponse({ 
-      message: `Server '${serverData.name}' created successfully`,
-      server: config.servers[serverData.name]
-    }, { status: 201 });
-    
+
+    return createSuperjsonResponse(
+      {
+        message: `Server '${serverData.name}' created successfully`,
+        server: config.servers[serverData.name],
+      },
+      { status: 201 }
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid server configuration', 400, { 
-        details: error.errors 
+      return createErrorResponse('Invalid server configuration', 400, {
+        details: error.errors,
       });
     }
-    
+
     console.error('Failed to create MCP server:', error);
     return createErrorResponse('Failed to create server', 500);
   }
@@ -197,6 +232,7 @@ export async function action({ request }: Route.ActionArgs) {
 ```
 
 **Test to Write (`packages/web/app/routes/__tests__/api.mcp.servers.test.ts`):**
+
 ```typescript
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { loader, action } from '../api.mcp.servers';
@@ -210,21 +246,21 @@ vi.mock('@lace/core/mcp', () => ({
           command: 'node',
           args: ['fs-server.js'],
           enabled: true,
-          tools: { read_file: 'allow-session' }
-        }
-      }
-    })
+          tools: { read_file: 'allow-session' },
+        },
+      },
+    }),
   },
   MCPServerManager: vi.fn().mockImplementation(() => ({
     getAllServers: vi.fn().mockReturnValue([
       {
         id: 'filesystem',
         status: 'running',
-        connectedAt: new Date()
-      }
+        connectedAt: new Date(),
+      },
     ]),
-    startServer: vi.fn().mockResolvedValue(undefined)
-  }))
+    startServer: vi.fn().mockResolvedValue(undefined),
+  })),
 }));
 
 describe('MCP Servers API', () => {
@@ -236,22 +272,24 @@ describe('MCP Servers API', () => {
     it('should return server list with status', async () => {
       const request = new Request('http://localhost/api/mcp/servers');
       const response = await loader({ request, params: {}, context: {} });
-      
+
       const data = await response.json();
-      
+
       expect(response.status).toBe(200);
       expect(data.servers).toHaveLength(1);
       expect(data.servers[0]).toMatchObject({
         id: 'filesystem',
         command: 'node',
-        status: 'running'
+        status: 'running',
       });
     });
 
     it('should handle project root parameter', async () => {
-      const request = new Request('http://localhost/api/mcp/servers?projectRoot=/test/project');
+      const request = new Request(
+        'http://localhost/api/mcp/servers?projectRoot=/test/project'
+      );
       await loader({ request, params: {}, context: {} });
-      
+
       const { MCPConfigLoader } = await import('@lace/core/mcp');
       expect(MCPConfigLoader.loadConfig).toHaveBeenCalledWith('/test/project');
     });
@@ -268,7 +306,7 @@ describe('MCP Servers API', () => {
 
       const request = new Request('http://localhost/api/mcp/servers', {
         method: 'POST',
-        body: formData
+        body: formData,
       });
 
       const response = await action({ request, params: {}, context: {} });
@@ -285,7 +323,7 @@ describe('MCP Servers API', () => {
 
       const request = new Request('http://localhost/api/mcp/servers', {
         method: 'POST',
-        body: formData
+        body: formData,
       });
 
       const response = await action({ request, params: {}, context: {} });
@@ -303,9 +341,9 @@ describe('MCP Servers API', () => {
           filesystem: {
             command: 'existing',
             enabled: true,
-            tools: {}
-          }
-        }
+            tools: {},
+          },
+        },
       });
 
       const formData = new FormData();
@@ -314,7 +352,7 @@ describe('MCP Servers API', () => {
 
       const request = new Request('http://localhost/api/mcp/servers', {
         method: 'POST',
-        body: formData
+        body: formData,
       });
 
       const response = await action({ request, params: {}, context: {} });
@@ -328,6 +366,7 @@ describe('MCP Servers API', () => {
 ```
 
 **How to Test:**
+
 ```bash
 cd packages/web && npm run test app/routes/__tests__/api.mcp.servers.test.ts
 ```
@@ -338,18 +377,22 @@ cd packages/web && npm run test app/routes/__tests__/api.mcp.servers.test.ts
 
 #### Task 1.2: Create Configuration Persistence
 
-**Objective**: Add save functionality to MCPConfigLoader for persistent configuration updates
+**Objective**: Add save functionality to MCPConfigLoader for persistent
+configuration updates
 
 **Files to Modify:**
+
 - `packages/core/src/mcp/config-loader.ts`
 
 **Key Understanding:**
+
 - Current loader is read-only
 - Need to save to correct file (global vs project)
 - Must preserve file structure and formatting
 - Handle concurrent access and file locking
 
 **Implementation Changes:**
+
 ```typescript
 // Add to MCPConfigLoader class
 
@@ -373,7 +416,7 @@ static saveConfig(config: MCPConfig, projectRoot?: string): void {
     if (!homePath) {
       throw new Error('Cannot determine home directory for global config');
     }
-    
+
     const globalConfigPath = join(homePath, '.lace', this.CONFIG_FILENAME);
     this.saveConfigFile(globalConfigPath, config);
   }
@@ -384,7 +427,7 @@ private static saveConfigFile(filepath: string, config: MCPConfig): void {
     // Ensure directory exists
     const dir = dirname(filepath);
     mkdirSync(dir, { recursive: true });
-    
+
     // Write with pretty formatting
     const content = JSON.stringify(config, null, 2);
     writeFileSync(filepath, content, 'utf-8');
@@ -399,8 +442,8 @@ private static saveConfigFile(filepath: string, config: MCPConfig): void {
  * Update specific server configuration
  */
 static updateServerConfig(
-  serverId: string, 
-  serverConfig: MCPServerConfig, 
+  serverId: string,
+  serverConfig: MCPServerConfig,
   projectRoot?: string
 ): void {
   const config = this.loadConfig(projectRoot);
@@ -422,22 +465,23 @@ static deleteServerConfig(serverId: string, projectRoot?: string): void {
  */
 static updateToolPolicy(
   serverId: string,
-  toolId: string, 
+  toolId: string,
   approvalLevel: ApprovalLevel,
   projectRoot?: string
 ): void {
   const config = this.loadConfig(projectRoot);
-  
+
   if (!config.servers[serverId]) {
     throw new Error(`Server '${serverId}' not found in configuration`);
   }
-  
+
   config.servers[serverId].tools[toolId] = approvalLevel;
   this.saveConfig(config, projectRoot);
 }
 ```
 
 **Test to Add (`packages/core/src/mcp/config-loader.test.ts`):**
+
 ```typescript
 // Add these tests to existing test file
 
@@ -449,18 +493,18 @@ describe('Configuration Persistence', () => {
           command: 'node',
           args: ['server.js'],
           enabled: true,
-          tools: { tool1: 'allow-session' }
-        }
-      }
+          tools: { tool1: 'allow-session' },
+        },
+      },
     };
 
     // Save to temp directory project config
     MCPConfigLoader.saveConfig(config, tempDir);
-    
+
     // Verify file exists
     const configPath = join(tempDir, '.lace', 'mcp-config.json');
     expect(existsSync(configPath)).toBe(true);
-    
+
     // Reload and verify
     const reloaded = MCPConfigLoader.loadConfig(tempDir);
     expect(reloaded).toEqual(config);
@@ -473,23 +517,23 @@ describe('Configuration Persistence', () => {
         fs: {
           command: 'node',
           enabled: false,
-          tools: {}
-        }
-      }
+          tools: {},
+        },
+      },
     };
-    
+
     MCPConfigLoader.saveConfig(initialConfig, tempDir);
-    
+
     // Update server config
     const updatedServerConfig: MCPServerConfig = {
       command: 'python',
       args: ['new-server.py'],
       enabled: true,
-      tools: { new_tool: 'allow-always' }
+      tools: { new_tool: 'allow-always' },
     };
-    
+
     MCPConfigLoader.updateServerConfig('fs', updatedServerConfig, tempDir);
-    
+
     // Verify update
     const updated = MCPConfigLoader.loadConfig(tempDir);
     expect(updated.servers.fs).toEqual(updatedServerConfig);
@@ -501,19 +545,19 @@ describe('Configuration Persistence', () => {
         fs: {
           command: 'node',
           enabled: true,
-          tools: { 
+          tools: {
             read: 'allow-session',
-            write: 'require-approval' 
-          }
-        }
-      }
+            write: 'require-approval',
+          },
+        },
+      },
     };
-    
+
     MCPConfigLoader.saveConfig(config, tempDir);
-    
+
     // Update just one tool policy
     MCPConfigLoader.updateToolPolicy('fs', 'write', 'deny', tempDir);
-    
+
     const updated = MCPConfigLoader.loadConfig(tempDir);
     expect(updated.servers.fs.command).toBe('node'); // Unchanged
     expect(updated.servers.fs.tools.read).toBe('allow-session'); // Unchanged
@@ -522,28 +566,32 @@ describe('Configuration Persistence', () => {
 
   it('should handle save errors gracefully', () => {
     const config: MCPConfig = { servers: {} };
-    
+
     // Try to save to invalid path
     expect(() => MCPConfigLoader.saveConfig(config, '/root/invalid')).toThrow();
   });
 });
 ```
 
-**Commit Message**: `feat: add configuration persistence for MCP server management`
+**Commit Message**:
+`feat: add configuration persistence for MCP server management`
 
 ---
 
 #### Task 1.3: Create Individual Server API Routes
 
-**Objective**: API endpoints for individual server management (status, control, tools)
+**Objective**: API endpoints for individual server management (status, control,
+tools)
 
 **Files to Create:**
+
 - `packages/web/app/routes/api.mcp.servers.$serverId.ts`
-- `packages/web/app/routes/api.mcp.servers.$serverId.control.ts` 
+- `packages/web/app/routes/api.mcp.servers.$serverId.control.ts`
 - `packages/web/app/routes/api.mcp.servers.$serverId.tools.ts`
 - `packages/web/app/routes/api.mcp.servers.$serverId.tools.$toolId.policy.ts`
 
 **Server Management Route (`api.mcp.servers.$serverId.ts`):**
+
 ```typescript
 // ABOUTME: REST API for individual MCP server management - GET, PUT, DELETE specific server
 // ABOUTME: Handles server configuration updates and deletion with proper validation
@@ -560,10 +608,20 @@ const UpdateServerSchema = z.object({
   env: z.record(z.string(), z.string()).optional(),
   cwd: z.string().optional(),
   enabled: z.boolean().optional(),
-  tools: z.record(z.string(), z.enum([
-    'disable', 'deny', 'require-approval',
-    'allow-once', 'allow-session', 'allow-project', 'allow-always'
-  ])).optional()
+  tools: z
+    .record(
+      z.string(),
+      z.enum([
+        'disable',
+        'deny',
+        'require-approval',
+        'allow-once',
+        'allow-session',
+        'allow-project',
+        'allow-always',
+      ])
+    )
+    .optional(),
 });
 
 let globalServerManager: MCPServerManager | undefined;
@@ -580,26 +638,25 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     const { serverId } = params as { serverId: string };
     const url = new URL(request.url);
     const projectRoot = url.searchParams.get('projectRoot') || process.cwd();
-    
+
     const config = MCPConfigLoader.loadConfig(projectRoot);
     const serverConfig = config.servers[serverId];
-    
+
     if (!serverConfig) {
       return createErrorResponse(`Server '${serverId}' not found`, 404);
     }
-    
+
     // Get runtime status
     const serverManager = getServerManager();
     const connection = serverManager.getServer(serverId);
-    
+
     return createSuperjsonResponse({
       id: serverId,
       ...serverConfig,
       status: connection?.status || 'stopped',
       lastError: connection?.lastError,
-      connectedAt: connection?.connectedAt
+      connectedAt: connection?.connectedAt,
     });
-    
   } catch (error) {
     console.error('Failed to get server:', error);
     return createErrorResponse('Failed to load server configuration', 500);
@@ -608,72 +665,70 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 export async function action({ request, params }: Route.ActionArgs) {
   const { serverId } = params as { serverId: string };
-  
+
   try {
     if (request.method === 'PUT') {
       // Update server configuration
       const formData = await request.formData();
       const data = Object.fromEntries(formData.entries());
-      
+
       const updates = UpdateServerSchema.parse({
         ...data,
         args: data.args ? JSON.parse(data.args as string) : undefined,
         env: data.env ? JSON.parse(data.env as string) : undefined,
         tools: data.tools ? JSON.parse(data.tools as string) : undefined,
-        enabled: data.enabled === 'true'
+        enabled: data.enabled === 'true',
       });
-      
+
       const url = new URL(request.url);
       const projectRoot = url.searchParams.get('projectRoot') || process.cwd();
-      
+
       // Load current config
       const config = MCPConfigLoader.loadConfig(projectRoot);
       const currentServer = config.servers[serverId];
-      
+
       if (!currentServer) {
         return createErrorResponse(`Server '${serverId}' not found`, 404);
       }
-      
+
       // Merge updates with current configuration
       const updatedServer = { ...currentServer, ...updates };
       MCPConfigLoader.updateServerConfig(serverId, updatedServer, projectRoot);
-      
+
       return createSuperjsonResponse({
         message: `Server '${serverId}' updated successfully`,
-        server: updatedServer
+        server: updatedServer,
       });
-      
     } else if (request.method === 'DELETE') {
       // Delete server configuration
       const url = new URL(request.url);
       const projectRoot = url.searchParams.get('projectRoot') || process.cwd();
-      
+
       const config = MCPConfigLoader.loadConfig(projectRoot);
       if (!config.servers[serverId]) {
         return createErrorResponse(`Server '${serverId}' not found`, 404);
       }
-      
+
       // Stop server if running
       const serverManager = getServerManager();
       await serverManager.stopServer(serverId);
-      
+
       // Remove from configuration
       MCPConfigLoader.deleteServerConfig(serverId, projectRoot);
-      
+
       return createSuperjsonResponse({
-        message: `Server '${serverId}' deleted successfully`
+        message: `Server '${serverId}' deleted successfully`,
       });
     }
-    
+
     return createErrorResponse('Method not allowed', 405);
-    
   } catch (error) {
     if (error instanceof z.ZodError) {
       return createErrorResponse('Invalid server configuration', 400, {
-        details: error.errors
+        details: error.errors,
       });
     }
-    
+
     console.error('Failed to update server:', error);
     return createErrorResponse('Failed to update server', 500);
   }
@@ -681,6 +736,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 ```
 
 **Server Control Route (`api.mcp.servers.$serverId.control.ts`):**
+
 ```typescript
 // ABOUTME: REST API for MCP server process control - start, stop, restart operations
 // ABOUTME: Handles server lifecycle management with proper error handling and status updates
@@ -692,7 +748,7 @@ import { z } from 'zod';
 import type { Route } from './+types/api.mcp.servers.$serverId.control';
 
 const ControlActionSchema = z.object({
-  action: z.enum(['start', 'stop', 'restart'])
+  action: z.enum(['start', 'stop', 'restart']),
 });
 
 let globalServerManager: MCPServerManager | undefined;
@@ -713,35 +769,38 @@ export async function action({ request, params }: Route.ActionArgs) {
     const { serverId } = params as { serverId: string };
     const formData = await request.formData();
     const { action } = ControlActionSchema.parse(Object.fromEntries(formData));
-    
+
     const url = new URL(request.url);
     const projectRoot = url.searchParams.get('projectRoot') || process.cwd();
     const config = MCPConfigLoader.loadConfig(projectRoot);
-    
+
     // Check if server exists in configuration
     const serverConfig = config.servers[serverId];
     if (!serverConfig) {
-      return createErrorResponse(`Server '${serverId}' not found in configuration`, 404);
+      return createErrorResponse(
+        `Server '${serverId}' not found in configuration`,
+        404
+      );
     }
-    
+
     const serverManager = getServerManager();
-    
+
     try {
       switch (action) {
         case 'start':
           if (!serverConfig.enabled) {
             return createErrorResponse(
-              `Server '${serverId}' is disabled in configuration`, 
+              `Server '${serverId}' is disabled in configuration`,
               400
             );
           }
           await serverManager.startServer(serverId, serverConfig);
           break;
-          
+
         case 'stop':
           await serverManager.stopServer(serverId);
           break;
-          
+
         case 'restart':
           await serverManager.stopServer(serverId);
           if (serverConfig.enabled) {
@@ -749,34 +808,32 @@ export async function action({ request, params }: Route.ActionArgs) {
           }
           break;
       }
-      
+
       // Get updated status
       const server = serverManager.getServer(serverId);
-      
+
       return createSuperjsonResponse({
         message: `Server '${serverId}' ${action} completed`,
         server: {
           id: serverId,
           status: server?.status || 'stopped',
           lastError: server?.lastError,
-          connectedAt: server?.connectedAt
-        }
+          connectedAt: server?.connectedAt,
+        },
       });
-      
     } catch (serverError) {
       return createErrorResponse(
         `Failed to ${action} server: ${serverError instanceof Error ? serverError.message : 'Unknown error'}`,
         500
       );
     }
-    
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid action', 400, { 
-        details: error.errors 
+      return createErrorResponse('Invalid action', 400, {
+        details: error.errors,
       });
     }
-    
+
     console.error('Server control error:', error);
     return createErrorResponse('Internal server error', 500);
   }
@@ -784,6 +841,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 ```
 
 **Tool Policy Route (`api.mcp.servers.$serverId.tools.$toolId.policy.ts`):**
+
 ```typescript
 // ABOUTME: REST API for MCP tool approval policy management - GET, PUT tool policies
 // ABOUTME: Handles granular tool permission management with validation
@@ -795,7 +853,15 @@ import { z } from 'zod';
 import type { Route } from './+types/api.mcp.servers.$serverId.tools.$toolId.policy';
 
 const PolicyUpdateSchema = z.object({
-  policy: z.enum(['disable', 'deny', 'require-approval', 'allow-once', 'allow-session', 'allow-project', 'allow-always'])
+  policy: z.enum([
+    'disable',
+    'deny',
+    'require-approval',
+    'allow-once',
+    'allow-session',
+    'allow-project',
+    'allow-always',
+  ]),
 });
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -803,22 +869,21 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     const { serverId, toolId } = params as { serverId: string; toolId: string };
     const url = new URL(request.url);
     const projectRoot = url.searchParams.get('projectRoot') || process.cwd();
-    
+
     const config = MCPConfigLoader.loadConfig(projectRoot);
     const serverConfig = config.servers[serverId];
-    
+
     if (!serverConfig) {
       return createErrorResponse(`Server '${serverId}' not found`, 404);
     }
-    
+
     const policy = serverConfig.tools[toolId] || 'require-approval';
-    
+
     return createSuperjsonResponse({
       serverId,
       toolId,
-      policy
+      policy,
     });
-    
   } catch (error) {
     console.error('Failed to get tool policy:', error);
     return createErrorResponse('Failed to get tool policy', 500);
@@ -834,34 +899,33 @@ export async function action({ request, params }: Route.ActionArgs) {
     const { serverId, toolId } = params as { serverId: string; toolId: string };
     const formData = await request.formData();
     const { policy } = PolicyUpdateSchema.parse(Object.fromEntries(formData));
-    
+
     const url = new URL(request.url);
     const projectRoot = url.searchParams.get('projectRoot') || process.cwd();
-    
+
     const config = MCPConfigLoader.loadConfig(projectRoot);
     const serverConfig = config.servers[serverId];
-    
+
     if (!serverConfig) {
       return createErrorResponse(`Server '${serverId}' not found`, 404);
     }
-    
+
     // Update tool policy
     MCPConfigLoader.updateToolPolicy(serverId, toolId, policy, projectRoot);
-    
+
     return createSuperjsonResponse({
       message: `Policy for tool '${toolId}' updated to '${policy}'`,
       serverId,
       toolId,
-      policy
+      policy,
     });
-    
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid policy value', 400, { 
-        details: error.errors 
+      return createErrorResponse('Invalid policy value', 400, {
+        details: error.errors,
       });
     }
-    
+
     console.error('Failed to update tool policy:', error);
     return createErrorResponse('Failed to update tool policy', 500);
   }
@@ -869,21 +933,25 @@ export async function action({ request, params }: Route.ActionArgs) {
 ```
 
 **Test for Control Route:**
+
 ```typescript
 describe('Server Control API', () => {
   it('should start enabled servers', async () => {
     const formData = new FormData();
     formData.set('action', 'start');
 
-    const request = new Request('http://localhost/api/mcp/servers/filesystem/control', {
-      method: 'POST',
-      body: formData
-    });
+    const request = new Request(
+      'http://localhost/api/mcp/servers/filesystem/control',
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
 
-    const response = await action({ 
-      request, 
-      params: { serverId: 'filesystem' }, 
-      context: {} 
+    const response = await action({
+      request,
+      params: { serverId: 'filesystem' },
+      context: {},
     });
 
     expect(response.status).toBe(200);
@@ -898,23 +966,26 @@ describe('Server Control API', () => {
         filesystem: {
           command: 'node',
           enabled: false,
-          tools: {}
-        }
-      }
+          tools: {},
+        },
+      },
     });
 
     const formData = new FormData();
     formData.set('action', 'start');
 
-    const request = new Request('http://localhost/api/mcp/servers/filesystem/control', {
-      method: 'POST', 
-      body: formData
-    });
+    const request = new Request(
+      'http://localhost/api/mcp/servers/filesystem/control',
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
 
-    const response = await action({ 
-      request, 
-      params: { serverId: 'filesystem' }, 
-      context: {} 
+    const response = await action({
+      request,
+      params: { serverId: 'filesystem' },
+      context: {},
     });
 
     expect(response.status).toBe(400);
@@ -925,6 +996,7 @@ describe('Server Control API', () => {
 ```
 
 **How to Test Each Route:**
+
 ```bash
 cd packages/web
 npm run test app/routes/__tests__/api.mcp.servers.$serverId.test.ts
@@ -942,16 +1014,19 @@ npm run test app/routes/__tests__/api.mcp.servers.$serverId.control.test.ts
 **Objective**: Main settings page for MCP server management
 
 **Files to Create:**
+
 - `packages/web/app/routes/settings.mcp.tsx`
 - `packages/web/components/mcp/ServerStatusBadge.tsx`
 - `packages/web/components/mcp/ServerList.tsx`
 
 **Study First:**
+
 - Existing settings pages in `packages/web/app/routes/settings.*`
 - Component patterns in `packages/web/components/`
 - DaisyUI integration patterns
 
 **Main Settings Page (`routes/settings.mcp.tsx`):**
+
 ```typescript
 // ABOUTME: Main MCP settings page with server list and management controls
 // ABOUTME: Provides overview of all MCP servers with status and quick actions
@@ -968,20 +1043,20 @@ export async function loader({ request }: Route.LoaderArgs) {
   try {
     const url = new URL(request.url);
     const projectRoot = url.searchParams.get('projectRoot') || process.cwd();
-    
+
     const config = MCPConfigLoader.loadConfig(projectRoot);
-    
-    return createSuperjsonResponse({ 
+
+    return createSuperjsonResponse({
       config,
-      projectRoot 
+      projectRoot
     });
-    
+
   } catch (error) {
     console.error('Failed to load MCP configuration:', error);
-    return json({ 
-      config: { servers: {} }, 
+    return json({
+      config: { servers: {} },
       projectRoot: process.cwd(),
-      error: 'Failed to load configuration' 
+      error: 'Failed to load configuration'
     }, { status: 500 });
   }
 }
@@ -1011,8 +1086,8 @@ export default function MCPSettings() {
             Manage Model Context Protocol servers and their tools
           </p>
         </div>
-        
-        <button 
+
+        <button
           className="btn btn-primary"
           onClick={() => setShowAddModal(true)}
         >
@@ -1021,7 +1096,7 @@ export default function MCPSettings() {
       </div>
 
       {/* Server List */}
-      <ServerList 
+      <ServerList
         servers={config.servers}
         projectRoot={projectRoot}
         onServerUpdate={() => fetcher.load(window.location.href)}
@@ -1044,6 +1119,7 @@ export default function MCPSettings() {
 ```
 
 **Server Status Badge Component (`components/mcp/ServerStatusBadge.tsx`):**
+
 ```typescript
 // ABOUTME: Visual indicator for MCP server status with color coding and tooltips
 // ABOUTME: Displays running/stopped/failed states with appropriate DaisyUI styling
@@ -1058,28 +1134,28 @@ export function ServerStatusBadge({ status, lastError, className = '' }: ServerS
   const getStatusConfig = () => {
     switch (status) {
       case 'running':
-        return { 
-          text: 'Running', 
-          class: 'badge-success', 
-          tooltip: 'Server is running and healthy' 
+        return {
+          text: 'Running',
+          class: 'badge-success',
+          tooltip: 'Server is running and healthy'
         };
       case 'starting':
-        return { 
-          text: 'Starting', 
-          class: 'badge-warning', 
-          tooltip: 'Server is starting up...' 
+        return {
+          text: 'Starting',
+          class: 'badge-warning',
+          tooltip: 'Server is starting up...'
         };
       case 'stopped':
-        return { 
-          text: 'Stopped', 
-          class: 'badge-neutral', 
-          tooltip: 'Server is not running' 
+        return {
+          text: 'Stopped',
+          class: 'badge-neutral',
+          tooltip: 'Server is not running'
         };
       case 'failed':
-        return { 
-          text: 'Failed', 
-          class: 'badge-error', 
-          tooltip: lastError || 'Server failed to start' 
+        return {
+          text: 'Failed',
+          class: 'badge-error',
+          tooltip: lastError || 'Server failed to start'
         };
     }
   };
@@ -1102,14 +1178,17 @@ export function ServerStatusBadge({ status, lastError, className = '' }: ServerS
 
 #### Task 2.2: Create Server Management Components
 
-**Objective**: Interactive components for adding, editing, and controlling MCP servers
+**Objective**: Interactive components for adding, editing, and controlling MCP
+servers
 
 **Files to Create:**
+
 - `packages/web/components/mcp/AddServerModal.tsx`
-- `packages/web/components/mcp/ServerCard.tsx`  
+- `packages/web/components/mcp/ServerCard.tsx`
 - `packages/web/components/mcp/ToolPolicyEditor.tsx`
 
 **Add Server Modal Component:**
+
 ```typescript
 // ABOUTME: Modal form for adding new MCP servers with validation and error handling
 // ABOUTME: Provides guided server setup with transport options and tool configuration
@@ -1139,9 +1218,9 @@ export function AddServerModal({ projectRoot, onClose, onServerAdded }: AddServe
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    
+
     const formData = new FormData(event.currentTarget);
-    
+
     // Validate form data
     try {
       const data = Object.fromEntries(formData.entries());
@@ -1149,14 +1228,14 @@ export function AddServerModal({ projectRoot, onClose, onServerAdded }: AddServe
         ...data,
         enabled: data.enabled === 'on'
       });
-      
+
       // Clear errors and submit
       setErrors({});
       fetcher.submit(formData, {
         method: 'POST',
         action: `/api/mcp/servers?projectRoot=${encodeURIComponent(projectRoot)}`
       });
-      
+
     } catch (error) {
       if (error instanceof z.ZodError) {
         const newErrors: Record<string, string> = {};
@@ -1178,14 +1257,14 @@ export function AddServerModal({ projectRoot, onClose, onServerAdded }: AddServe
     <div className="modal modal-open">
       <div className="modal-box w-11/12 max-w-2xl">
         <h3 className="font-bold text-lg mb-4">Add MCP Server</h3>
-        
+
         <fetcher.Form onSubmit={handleSubmit} className="space-y-4">
           {/* Server Name */}
           <div className="form-control">
             <label className="label">
               <span className="label-text">Server Name</span>
             </label>
-            <input 
+            <input
               type="text"
               name="name"
               className={`input input-bordered ${errors.name ? 'input-error' : ''}`}
@@ -1204,7 +1283,7 @@ export function AddServerModal({ projectRoot, onClose, onServerAdded }: AddServe
             <label className="label">
               <span className="label-text">Command</span>
             </label>
-            <input 
+            <input
               type="text"
               name="command"
               className={`input input-bordered ${errors.command ? 'input-error' : ''}`}
@@ -1223,7 +1302,7 @@ export function AddServerModal({ projectRoot, onClose, onServerAdded }: AddServe
             <label className="label">
               <span className="label-text">Arguments (JSON Array)</span>
             </label>
-            <textarea 
+            <textarea
               name="args"
               className="textarea textarea-bordered"
               placeholder='["server.js", "--port", "3001"]'
@@ -1236,7 +1315,7 @@ export function AddServerModal({ projectRoot, onClose, onServerAdded }: AddServe
             <label className="label">
               <span className="label-text">Environment Variables (JSON Object)</span>
             </label>
-            <textarea 
+            <textarea
               name="env"
               className="textarea textarea-bordered"
               placeholder='{"NODE_ENV": "development", "DEBUG": "mcp:*"}'
@@ -1249,7 +1328,7 @@ export function AddServerModal({ projectRoot, onClose, onServerAdded }: AddServe
             <label className="label">
               <span className="label-text">Working Directory</span>
             </label>
-            <input 
+            <input
               type="text"
               name="cwd"
               className="input input-bordered"
@@ -1261,8 +1340,8 @@ export function AddServerModal({ projectRoot, onClose, onServerAdded }: AddServe
           <div className="form-control">
             <label className="label cursor-pointer">
               <span className="label-text">Enable Server</span>
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 name="enabled"
                 className="checkbox checkbox-primary"
                 defaultChecked
@@ -1279,14 +1358,14 @@ export function AddServerModal({ projectRoot, onClose, onServerAdded }: AddServe
 
           {/* Actions */}
           <div className="modal-action">
-            <button 
+            <button
               type="button"
               className="btn btn-ghost"
               onClick={onClose}
             >
               Cancel
             </button>
-            <button 
+            <button
               type="submit"
               className={`btn btn-primary ${fetcher.state !== 'idle' ? 'loading' : ''}`}
               disabled={fetcher.state !== 'idle'}
@@ -1302,6 +1381,7 @@ export function AddServerModal({ projectRoot, onClose, onServerAdded }: AddServe
 ```
 
 **Test for Modal Component:**
+
 ```typescript
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -1310,7 +1390,7 @@ import { AddServerModal } from '../AddServerModal';
 // Mock Remix hooks
 vi.mock('@remix-run/react', () => ({
   useFetcher: () => ({
-    Form: ({ children, onSubmit, className }: any) => 
+    Form: ({ children, onSubmit, className }: any) =>
       <form onSubmit={onSubmit} className={className}>{children}</form>,
     submit: vi.fn(),
     data: null,
@@ -1336,7 +1416,7 @@ describe('AddServerModal', () => {
 
   it('should validate required fields', async () => {
     const onClose = vi.fn();
-    
+
     render(
       <AddServerModal
         projectRoot="/test"
@@ -1369,11 +1449,13 @@ describe('AddServerModal', () => {
 **Objective**: UI for managing tool approval policies with bulk operations
 
 **Files to Create:**
+
 - `packages/web/components/mcp/ToolPolicyTable.tsx`
 - `packages/web/components/mcp/PolicySelector.tsx`
 - `packages/web/routes/settings.mcp.$serverId.tools.tsx`
 
 **Tool Policy Table Component:**
+
 ```typescript
 // ABOUTME: Table interface for managing MCP tool approval policies with bulk operations
 // ABOUTME: Displays all tools for a server with individual and bulk policy controls
@@ -1390,19 +1472,19 @@ interface ToolPolicyTableProps {
   onPolicyChange: () => void;
 }
 
-export function ToolPolicyTable({ 
-  serverId, 
-  tools, 
-  availableTools, 
+export function ToolPolicyTable({
+  serverId,
+  tools,
+  availableTools,
   projectRoot,
-  onPolicyChange 
+  onPolicyChange
 }: ToolPolicyTableProps) {
   const fetcher = useFetcher();
 
   const handlePolicyChange = (toolId: string, newPolicy: ApprovalLevel) => {
     const formData = new FormData();
     formData.set('policy', newPolicy);
-    
+
     fetcher.submit(formData, {
       method: 'PUT',
       action: `/api/mcp/servers/${serverId}/tools/${toolId}/policy?projectRoot=${encodeURIComponent(projectRoot)}`
@@ -1428,25 +1510,25 @@ export function ToolPolicyTable({
         <div className="card-body">
           <h3 className="card-title text-sm">Bulk Actions</h3>
           <div className="flex gap-2">
-            <button 
+            <button
               className="btn btn-sm btn-success"
               onClick={() => handleBulkPolicyChange('allow-always')}
             >
               Allow All
             </button>
-            <button 
+            <button
               className="btn btn-sm btn-warning"
               onClick={() => handleBulkPolicyChange('require-approval')}
             >
               Require Approval
             </button>
-            <button 
+            <button
               className="btn btn-sm btn-error"
               onClick={() => handleBulkPolicyChange('deny')}
             >
               Deny All
             </button>
-            <button 
+            <button
               className="btn btn-sm btn-ghost"
               onClick={() => handleBulkPolicyChange('disable')}
             >
@@ -1469,7 +1551,7 @@ export function ToolPolicyTable({
           <tbody>
             {availableTools.map(toolId => {
               const currentPolicy = tools[toolId] || 'require-approval';
-              
+
               return (
                 <tr key={toolId}>
                   <td>
@@ -1506,6 +1588,7 @@ export function ToolPolicyTable({
 ```
 
 **Policy Selector Component:**
+
 ```typescript
 // ABOUTME: Dropdown selector for MCP tool approval policies with color coding
 // ABOUTME: Provides visual feedback for policy hierarchy and clear labeling
@@ -1519,11 +1602,11 @@ interface PolicySelectorProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
-export function PolicySelector({ 
-  value, 
-  onChange, 
-  disabled = false, 
-  size = 'sm' 
+export function PolicySelector({
+  value,
+  onChange,
+  disabled = false,
+  size = 'sm'
 }: PolicySelectorProps) {
   const policies: Array<{ value: ApprovalLevel; label: string; color: string }> = [
     { value: 'disable', label: 'Disable', color: 'text-gray-500' },
@@ -1538,15 +1621,15 @@ export function PolicySelector({
   const currentPolicy = policies.find(p => p.value === value);
 
   return (
-    <select 
+    <select
       className={`select select-bordered select-${size} w-full max-w-xs ${currentPolicy?.color || ''}`}
       value={value}
       onChange={(e) => onChange(e.target.value as ApprovalLevel)}
       disabled={disabled}
     >
       {policies.map(policy => (
-        <option 
-          key={policy.value} 
+        <option
+          key={policy.value}
           value={policy.value}
           className={policy.color}
         >
@@ -1559,6 +1642,7 @@ export function PolicySelector({
 ```
 
 **Test for Policy Selector:**
+
 ```typescript
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -1567,7 +1651,7 @@ import { PolicySelector } from '../PolicySelector';
 describe('PolicySelector', () => {
   it('should render all approval levels', () => {
     const onChange = vi.fn();
-    
+
     render(
       <PolicySelector
         value="require-approval"
@@ -1581,12 +1665,12 @@ describe('PolicySelector', () => {
     // Check that all options are present
     const options = screen.getAllByRole('option');
     expect(options).toHaveLength(7);
-    
+
     const expectedLabels = [
-      'Disable', 'Deny', 'Require Approval', 
+      'Disable', 'Deny', 'Require Approval',
       'Allow Once', 'Allow Session', 'Allow Project', 'Allow Always'
     ];
-    
+
     expectedLabels.forEach(label => {
       expect(screen.getByText(label)).toBeInTheDocument();
     });
@@ -1594,7 +1678,7 @@ describe('PolicySelector', () => {
 
   it('should call onChange when policy is selected', () => {
     const onChange = vi.fn();
-    
+
     render(
       <PolicySelector
         value="require-approval"
@@ -1623,7 +1707,8 @@ describe('PolicySelector', () => {
 });
 ```
 
-**Commit Message**: `feat: add tool policy management components with bulk operations`
+**Commit Message**:
+`feat: add tool policy management components with bulk operations`
 
 ---
 
@@ -1634,11 +1719,13 @@ describe('PolicySelector', () => {
 **Objective**: Real-time server status monitoring with WebSocket updates
 
 **Files to Create:**
+
 - `packages/web/app/routes/api.mcp.servers.$serverId.status.ts`
 - `packages/web/lib/server/mcp-status-monitor.ts`
 - `packages/web/components/mcp/ServerMonitor.tsx`
 
 **Server Status API:**
+
 ```typescript
 // ABOUTME: Real-time MCP server status API with WebSocket support for live updates
 // ABOUTME: Provides server health monitoring and status change notifications
@@ -1661,11 +1748,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   try {
     const { serverId } = params as { serverId: string };
     const serverManager = getServerManager();
-    
+
     const server = serverManager.getServer(serverId);
-    
+
     if (!server) {
-      return createErrorResponse(`Server '${serverId}' not found or not started`, 404);
+      return createErrorResponse(
+        `Server '${serverId}' not found or not started`,
+        404
+      );
     }
 
     // Get detailed status information
@@ -1677,24 +1767,23 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       config: {
         command: server.config.command,
         args: server.config.args,
-        enabled: server.config.enabled
+        enabled: server.config.enabled,
       },
       // Add health check information
-      healthCheck: await performHealthCheck(server)
+      healthCheck: await performHealthCheck(server),
     };
 
     return createSuperjsonResponse({ server: status });
-    
   } catch (error) {
     console.error('Failed to get server status:', error);
     return createErrorResponse('Failed to get server status', 500);
   }
 }
 
-async function performHealthCheck(server: any): Promise<{ 
-  responsive: boolean; 
-  lastPing?: Date; 
-  error?: string 
+async function performHealthCheck(server: any): Promise<{
+  responsive: boolean;
+  lastPing?: Date;
+  error?: string;
 }> {
   try {
     if (!server.client || server.status !== 'running') {
@@ -1703,22 +1792,22 @@ async function performHealthCheck(server: any): Promise<{
 
     // Use MCP SDK ping method for health check
     await server.client.ping();
-    
-    return { 
-      responsive: true, 
-      lastPing: new Date() 
+
+    return {
+      responsive: true,
+      lastPing: new Date(),
     };
-    
   } catch (error) {
-    return { 
-      responsive: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+    return {
+      responsive: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }
 ```
 
 **Real-Time Status Monitor Component:**
+
 ```typescript
 // ABOUTME: React component for real-time MCP server status monitoring with auto-refresh
 // ABOUTME: Displays server health, connection status, and automatic error detection
@@ -1733,10 +1822,10 @@ interface ServerMonitorProps {
   refreshInterval?: number; // milliseconds
 }
 
-export function ServerMonitor({ 
-  serverId, 
-  projectRoot, 
-  refreshInterval = 5000 
+export function ServerMonitor({
+  serverId,
+  projectRoot,
+  refreshInterval = 5000
 }: ServerMonitorProps) {
   const fetcher = useFetcher();
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -1776,7 +1865,7 @@ export function ServerMonitor({
       <div className="card-body">
         <div className="card-title text-sm">
           {serverId}
-          <ServerStatusBadge 
+          <ServerStatusBadge
             status={serverStatus.status}
             lastError={serverStatus.lastError}
           />
@@ -1839,11 +1928,13 @@ export function ServerMonitor({
 **Objective**: Common MCP server templates and configuration import/export
 
 **Files to Create:**
+
 - `packages/web/lib/mcp/server-templates.ts`
 - `packages/web/components/mcp/ConfigurationExport.tsx`
 - `packages/web/routes/api.mcp.config.import.ts`
 
 **Server Templates:**
+
 ```typescript
 // ABOUTME: Pre-built MCP server configuration templates for common use cases
 // ABOUTME: Provides validated starting points for filesystem, browser, git servers
@@ -1866,34 +1957,34 @@ export const SERVER_TEMPLATES: ServerTemplate[] = [
     description: 'Read, write, and manage files and directories',
     config: {
       command: 'npx',
-      args: ['-y', '@modelcontextprotocol/server-filesystem', './']
+      args: ['-y', '@modelcontextprotocol/server-filesystem', './'],
     },
     defaultTools: {
-      'read_text_file': 'allow-session',
-      'write_text_file': 'require-approval',
-      'list_directory': 'allow-session',
-      'move_file': 'require-approval',
-      'create_directory': 'require-approval'
+      read_text_file: 'allow-session',
+      write_text_file: 'require-approval',
+      list_directory: 'allow-session',
+      move_file: 'require-approval',
+      create_directory: 'require-approval',
     },
-    requirements: ['Node.js installed', 'npx available']
+    requirements: ['Node.js installed', 'npx available'],
   },
-  
+
   {
     id: 'git',
-    name: 'Git Server', 
+    name: 'Git Server',
     description: 'Git repository operations and history',
     config: {
       command: 'npx',
-      args: ['-y', '@modelcontextprotocol/server-git']
+      args: ['-y', '@modelcontextprotocol/server-git'],
     },
     defaultTools: {
-      'git_status': 'allow-always',
-      'git_log': 'allow-session',
-      'git_diff': 'allow-session',
-      'git_commit': 'require-approval',
-      'git_push': 'require-approval'
+      git_status: 'allow-always',
+      git_log: 'allow-session',
+      git_diff: 'allow-session',
+      git_commit: 'require-approval',
+      git_push: 'require-approval',
     },
-    requirements: ['Node.js installed', 'Git installed', 'Git repository']
+    requirements: ['Node.js installed', 'Git installed', 'Git repository'],
   },
 
   {
@@ -1902,23 +1993,25 @@ export const SERVER_TEMPLATES: ServerTemplate[] = [
     description: 'Web browsing and automation capabilities',
     config: {
       command: 'npx',
-      args: ['-y', '@modelcontextprotocol/server-puppeteer']
+      args: ['-y', '@modelcontextprotocol/server-puppeteer'],
     },
     defaultTools: {
-      'puppeteer_navigate': 'require-approval',
-      'puppeteer_screenshot': 'allow-session',
-      'puppeteer_extract_text': 'allow-session',
-      'puppeteer_click': 'require-approval'
+      puppeteer_navigate: 'require-approval',
+      puppeteer_screenshot: 'allow-session',
+      puppeteer_extract_text: 'allow-session',
+      puppeteer_click: 'require-approval',
     },
-    requirements: ['Node.js installed', 'Chrome/Chromium browser']
-  }
+    requirements: ['Node.js installed', 'Chrome/Chromium browser'],
+  },
 ];
 
 /**
  * Get template by ID
  */
-export function getServerTemplate(templateId: string): ServerTemplate | undefined {
-  return SERVER_TEMPLATES.find(t => t.id === templateId);
+export function getServerTemplate(
+  templateId: string
+): ServerTemplate | undefined {
+  return SERVER_TEMPLATES.find((t) => t.id === templateId);
 }
 
 /**
@@ -1942,13 +2035,14 @@ export function createServerFromTemplate(
     enabled: overrides.enabled ?? true,
     tools: {
       ...template.defaultTools,
-      ...overrides.customTools
-    }
+      ...overrides.customTools,
+    },
   };
 }
 ```
 
 **Template Selector Modal:**
+
 ```typescript
 // ABOUTME: Modal for selecting MCP server templates with preview and customization
 // ABOUTME: Guides users through server setup with pre-configured templates
@@ -2006,14 +2100,14 @@ export function TemplateModal({ projectRoot, onClose, onServerAdded }: TemplateM
     <div className="modal modal-open">
       <div className="modal-box w-11/12 max-w-4xl">
         <h3 className="font-bold text-lg mb-4">Add Server from Template</h3>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Template Selection */}
           <div>
             <h4 className="font-medium mb-3">Choose Template</h4>
             <div className="space-y-2">
               {SERVER_TEMPLATES.map(tmpl => (
-                <div 
+                <div
                   key={tmpl.id}
                   className={`card card-compact cursor-pointer transition-all ${
                     selectedTemplate === tmpl.id ? 'bg-primary text-primary-content' : 'bg-base-200 hover:bg-base-300'
@@ -2026,7 +2120,7 @@ export function TemplateModal({ projectRoot, onClose, onServerAdded }: TemplateM
                   <div className="card-body">
                     <h5 className="card-title text-sm">{tmpl.name}</h5>
                     <p className="text-xs opacity-70">{tmpl.description}</p>
-                    
+
                     <div className="text-xs mt-2">
                       <strong>Requirements:</strong>
                       <ul className="list-disc list-inside opacity-70">
@@ -2049,7 +2143,7 @@ export function TemplateModal({ projectRoot, onClose, onServerAdded }: TemplateM
                   <label className="label">
                     <span className="label-text">Server Name</span>
                   </label>
-                  <input 
+                  <input
                     type="text"
                     className="input input-bordered w-full"
                     value={serverName}
@@ -2073,7 +2167,7 @@ export function TemplateModal({ projectRoot, onClose, onServerAdded }: TemplateM
                         <span className="font-mono">{toolId}</span>
                         <PolicySelector
                           value={customTools[toolId] || policy}
-                          onChange={(newPolicy) => 
+                          onChange={(newPolicy) =>
                             setCustomTools(prev => ({ ...prev, [toolId]: newPolicy }))
                           }
                           size="sm"
@@ -2099,7 +2193,7 @@ export function TemplateModal({ projectRoot, onClose, onServerAdded }: TemplateM
           <button className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button 
+          <button
             className={`btn btn-primary ${fetcher.state !== 'idle' ? 'loading' : ''}`}
             onClick={handleCreateFromTemplate}
             disabled={!selectedTemplate || !serverName.trim() || fetcher.state !== 'idle'}
@@ -2124,9 +2218,11 @@ export function TemplateModal({ projectRoot, onClose, onServerAdded }: TemplateM
 **Objective**: Add MCP settings to main settings navigation
 
 **Files to Modify:**
+
 - Settings navigation/routing files to add MCP section
 
 **Files to Create:**
+
 - `packages/web/app/routes/settings.mcp.$serverId.tsx` (detailed server page)
 
 **Task 6.2**: End-to-End Web Interface Test
@@ -2134,9 +2230,11 @@ export function TemplateModal({ projectRoot, onClose, onServerAdded }: TemplateM
 **Objective**: Test complete web workflow from adding server to using tools
 
 **Files to Create:**
+
 - `packages/web/app/__tests__/mcp-web-integration.test.ts`
 
 **Implementation:**
+
 ```typescript
 // ABOUTME: End-to-end test for complete MCP web interface workflow
 // ABOUTME: Tests server creation through UI to tool execution via API
@@ -2189,14 +2287,14 @@ describe('MCP Web Interface E2E', () => {
 
     // Step 2: Open add server modal
     fireEvent.click(screen.getByText('Add Server'));
-    
+
     expect(screen.getByText(/Server Name/)).toBeInTheDocument();
 
     // Step 3: Fill out server form
     fireEvent.change(screen.getByLabelText(/Server Name/), {
       target: { value: 'test-server' }
     });
-    
+
     fireEvent.change(screen.getByLabelText(/Command/), {
       target: { value: 'echo' }
     });
@@ -2216,6 +2314,7 @@ describe('MCP Web Interface E2E', () => {
 ```
 
 **Final Validation Script:**
+
 ```bash
 #!/bin/bash
 # Script to validate complete MCP integration
@@ -2226,7 +2325,7 @@ echo "🧪 Testing MCP Integration..."
 cd packages/core
 npm run test:run src/mcp/ || exit 1
 
-# 2. Web tests  
+# 2. Web tests
 cd ../web
 npm run test app/routes/__tests__/api.mcp* || exit 1
 npm run test components/mcp/ || exit 1
@@ -2249,14 +2348,16 @@ echo "✅ All MCP integration tests pass!"
 This Part 2 implementation plan provides:
 
 **Complete Web Interface for MCP:**
+
 - ✅ Full REST API for server and tool management
-- ✅ React settings pages with real-time status monitoring  
+- ✅ React settings pages with real-time status monitoring
 - ✅ Tool policy management with bulk operations
 - ✅ Server templates for guided setup
 - ✅ Configuration import/export capabilities
 - ✅ Integration with existing settings system
 
 **Quality Standards:**
+
 - ✅ TDD approach with comprehensive testing
 - ✅ DRY principles with reusable components
 - ✅ YAGNI - focused on essential functionality
@@ -2264,8 +2365,9 @@ This Part 2 implementation plan provides:
 - ✅ DaisyUI component patterns
 - ✅ Proper error handling and validation
 
-**Estimated Implementation Time**: 10-12 days for experienced developer
-**Key Dependencies**: Completed Part 1 MCP core integration
-**Testing Strategy**: 60+ test cases covering API routes, React components, and E2E workflows
+**Estimated Implementation Time**: 10-12 days for experienced developer **Key
+Dependencies**: Completed Part 1 MCP core integration **Testing Strategy**: 60+
+test cases covering API routes, React components, and E2E workflows
 
-This completes the missing web interface work that makes MCP actually usable by end users.
+This completes the missing web interface work that makes MCP actually usable by
+end users.

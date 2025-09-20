@@ -2,22 +2,32 @@
 
 ## Overview
 
-This plan implements a flexible provider system with three key components: provider catalogs (available models/metadata), provider instances (connection configs), and agent-level model selection. The system uses Catwalk's provider data as a baseline catalog while supporting user extensions and multiple instance configurations.
+This plan implements a flexible provider system with three key components:
+provider catalogs (available models/metadata), provider instances (connection
+configs), and agent-level model selection. The system uses Catwalk's provider
+data as a baseline catalog while supporting user extensions and multiple
+instance configurations.
 
 ## Key Concepts for the Engineer
 
 ### Three-Tier Architecture
-1. **Provider Catalogs**: Available models and metadata (shipped Catwalk data + user extensions)
-2. **Provider Instances**: Connection configurations (credentials, endpoints, timeouts)
-3. **Agent/Session Model Selection**: Users pick specific models from available catalogs when creating agents
+
+1. **Provider Catalogs**: Available models and metadata (shipped Catwalk data +
+   user extensions)
+2. **Provider Instances**: Connection configurations (credentials, endpoints,
+   timeouts)
+3. **Agent/Session Model Selection**: Users pick specific models from available
+   catalogs when creating agents
 
 ### Current System
+
 - Providers are created based on environment variables
 - Only one instance per provider type is possible
 - Limited model metadata
 - No UI for configuration
 
 ### New System
+
 - Rich provider/model catalogs with costs and capabilities
 - Multiple instances of each provider type with custom configurations
 - User-extensible catalogs for local/custom providers
@@ -27,19 +37,23 @@ This plan implements a flexible provider system with three key components: provi
 ## Architecture Guidelines
 
 ### TypeScript Rules
+
 - **NEVER use `any` type** - use `unknown` and type guards instead
 - All types must be explicit
 - Use Zod schemas for runtime validation
 - Interfaces for data shapes, not classes
 
 ### Testing Rules
+
 - **Write tests FIRST** (TDD)
 - **NEVER mock the functionality you're testing**
 - Use real implementations, not mocks
-- Test files live next to source files (e.g., `provider-config.ts` → `provider-config.test.ts`)
+- Test files live next to source files (e.g., `provider-config.ts` →
+  `provider-config.test.ts`)
 - Run tests with `npm test` (watch mode) or `npm run test:run` (single run)
 
 ### Code Style
+
 - YAGNI - only implement what's needed
 - DRY - no code duplication
 - Small, focused functions
@@ -47,26 +61,39 @@ This plan implements a flexible provider system with three key components: provi
 
 ## Implementation Status
 
-**BACKEND COMPLETE** ✅ - All backend functionality implemented and tested with proper TDD approach.
+**BACKEND COMPLETE** ✅ - All backend functionality implemented and tested with
+proper TDD approach.
 
-**ADDITIONAL BACKEND FEATURES COMPLETE** ✅ - E2E testing, custom catalog management, and session integration.
+**ADDITIONAL BACKEND FEATURES COMPLETE** ✅ - E2E testing, custom catalog
+management, and session integration.
 
 ### Summary of Completed Backend Work
 
 **Core Components Implemented:**
-1. **Provider Catalog System** - Loads Catwalk data with user extensions (`src/providers/catalog/`)
-2. **Provider Instance Management** - User configuration and secure credential storage (`src/providers/instance/`)  
-3. **ProviderRegistry Refactor** - Integrated catalog/instance functionality into existing registry
-4. **E2E Testing System** - Comprehensive testing with MSW for all provider types (`src/providers/provider-instance-e2e.test.ts`)
-5. **Custom Catalog Management** - Full CRUD system for user-defined catalogs (`src/providers/catalog/custom-manager.ts`)
-6. **Session Integration** - Provider instance selection in session creation (`packages/web/components/providers/ModelSelectionForm.tsx`)
+
+1. **Provider Catalog System** - Loads Catwalk data with user extensions
+   (`src/providers/catalog/`)
+2. **Provider Instance Management** - User configuration and secure credential
+   storage (`src/providers/instance/`)
+3. **ProviderRegistry Refactor** - Integrated catalog/instance functionality
+   into existing registry
+4. **E2E Testing System** - Comprehensive testing with MSW for all provider
+   types (`src/providers/provider-instance-e2e.test.ts`)
+5. **Custom Catalog Management** - Full CRUD system for user-defined catalogs
+   (`src/providers/catalog/custom-manager.ts`)
+6. **Session Integration** - Provider instance selection in session creation
+   (`packages/web/components/providers/ModelSelectionForm.tsx`)
 
 **Key Features:**
-- ✅ **Type-Safe Schemas** - Full Zod validation for all data structures (17 test cases)
-- ✅ **Catwalk Integration** - Real provider catalog data imported from Charmbracelet Catwalk (9 providers)
+
+- ✅ **Type-Safe Schemas** - Full Zod validation for all data structures (17
+  test cases)
+- ✅ **Catwalk Integration** - Real provider catalog data imported from
+  Charmbracelet Catwalk (9 providers)
 - ✅ **Secure Credentials** - 0600 file permissions, separate credential storage
 - ✅ **Backward Compatibility** - All existing env var providers still work
-- ✅ **Error Resilience** - Graceful handling of corrupted files and missing data
+- ✅ **Error Resilience** - Graceful handling of corrupted files and missing
+  data
 - ✅ **Comprehensive Testing** - 80+ test cases with 100% TDD approach
 - ✅ **E2E Testing** - Full provider instance resolution with HTTP mocking
 - ✅ **Custom Catalogs** - Template-based catalog creation with validation
@@ -74,32 +101,40 @@ This plan implements a flexible provider system with three key components: provi
 - ✅ **BaseURL Bug Fixes** - Critical routing fixes for all provider types
 
 **Files Created/Modified:**
+
 - `src/providers/catalog/types.ts` + tests (17 tests)
-- `src/providers/catalog/manager.ts` + tests (14 tests) 
+- `src/providers/catalog/manager.ts` + tests (14 tests)
 - `src/providers/instance/manager.ts` + tests (16 tests)
 - `src/providers/registry.ts` + updated tests (25 tests total)
 - `src/providers/catalog/data/` - 9 Catwalk provider JSON files
-- `src/providers/provider-instance-e2e.test.ts` - E2E tests with MSW (comprehensive)
+- `src/providers/provider-instance-e2e.test.ts` - E2E tests with MSW
+  (comprehensive)
 - `src/providers/catalog/custom-manager.ts` + tests (23 tests)
-- `packages/web/components/providers/ModelSelectionForm.tsx` - Session integration
-- Provider bug fixes: `openai-provider.ts`, `anthropic-provider.ts`, `ollama-provider.ts`
+- `packages/web/components/providers/ModelSelectionForm.tsx` - Session
+  integration
+- Provider bug fixes: `openai-provider.ts`, `anthropic-provider.ts`,
+  `ollama-provider.ts`
 - `docs/design/providers.md` - Architecture documentation
 
 **What's Ready for Frontend:**
+
 - `ProviderRegistry.getCatalogProviders()` - Browse available providers/models
 - `ProviderRegistry.getConfiguredInstances()` - List user instances
-- `ProviderRegistry.createProviderFromInstance()` - Create AI providers from instances
+- `ProviderRegistry.createProviderFromInstance()` - Create AI providers from
+  instances
 - `ProviderInstanceManager` - CRUD operations for instances and credentials
-- `CustomProviderCatalogManager` - Complete custom catalog management with templates
+- `CustomProviderCatalogManager` - Complete custom catalog management with
+  templates
 - Rich model metadata (costs, capabilities, context windows) for UI display
 - Session integration with provider instance and model selection
 
-**Next Phase: Frontend Integration**
-The backend API is ready for web UI implementation. The remaining tasks below are for frontend components.
+**Next Phase: Frontend Integration** The backend API is ready for web UI
+implementation. The remaining tasks below are for frontend components.
 
 ### ✅ Task 1: Create Provider Catalog and Instance Types (COMPLETED)
 
 **Files to create:**
+
 - `src/providers/catalog/catalog-types.ts`
 - `src/providers/catalog/catalog-types.test.ts`
 
@@ -124,7 +159,7 @@ export const CatalogModelSchema = z.object({
   default_max_tokens: z.number(),
   can_reason: z.boolean().optional(),
   has_reasoning_effort: z.boolean().optional(),
-  supports_attachments: z.boolean().optional()
+  supports_attachments: z.boolean().optional(),
 });
 
 // Catwalk catalog provider schema
@@ -136,7 +171,7 @@ export const CatalogProviderSchema = z.object({
   api_endpoint: z.string().optional(),
   default_large_model_id: z.string(),
   default_small_model_id: z.string(),
-  models: z.array(CatalogModelSchema)
+  models: z.array(CatalogModelSchema),
 });
 
 // User provider instance schema (connection config only)
@@ -145,29 +180,32 @@ export const ProviderInstanceSchema = z.object({
   catalogProviderId: z.string().min(1),
   endpoint: z.string().url().optional(),
   timeout: z.number().int().positive().optional(),
-  retryPolicy: z.string().optional()
+  retryPolicy: z.string().optional(),
 });
 
 // User instances configuration file
 export const ProviderInstancesConfigSchema = z.object({
   version: z.literal('1.0'),
-  instances: z.record(ProviderInstanceSchema)
+  instances: z.record(ProviderInstanceSchema),
 });
 
 // Credential schema (unchanged)
 export const CredentialSchema = z.object({
   apiKey: z.string().min(1),
-  additionalAuth: z.record(z.unknown()).optional()
+  additionalAuth: z.record(z.unknown()).optional(),
 });
 
 export type CatalogModel = z.infer<typeof CatalogModelSchema>;
 export type CatalogProvider = z.infer<typeof CatalogProviderSchema>;
 export type ProviderInstance = z.infer<typeof ProviderInstanceSchema>;
-export type ProviderInstancesConfig = z.infer<typeof ProviderInstancesConfigSchema>;
+export type ProviderInstancesConfig = z.infer<
+  typeof ProviderInstancesConfigSchema
+>;
 export type Credential = z.infer<typeof CredentialSchema>;
 ```
 
 **How to test:**
+
 ```typescript
 // src/providers/catalog/catalog-types.test.ts
 import { describe, it, expect } from 'vitest';
@@ -181,16 +219,18 @@ describe('CatalogProviderSchema', () => {
       type: 'openai',
       default_large_model_id: 'gpt-4o',
       default_small_model_id: 'gpt-4o-mini',
-      models: [{
-        id: 'gpt-4o',
-        name: 'GPT-4o',
-        cost_per_1m_in: 2.5,
-        cost_per_1m_out: 10.0,
-        context_window: 128000,
-        default_max_tokens: 4096
-      }]
+      models: [
+        {
+          id: 'gpt-4o',
+          name: 'GPT-4o',
+          cost_per_1m_in: 2.5,
+          cost_per_1m_out: 10.0,
+          context_window: 128000,
+          default_max_tokens: 4096,
+        },
+      ],
     };
-    
+
     const result = CatalogProviderSchema.safeParse(valid);
     expect(result.success).toBe(true);
   });
@@ -201,20 +241,22 @@ describe('ProviderInstanceSchema', () => {
     const valid = {
       displayName: 'OpenAI Production',
       catalogProviderId: 'openai',
-      timeout: 30000
+      timeout: 30000,
     };
-    
+
     const result = ProviderInstanceSchema.safeParse(valid);
     expect(result.success).toBe(true);
   });
 });
 ```
 
-**Commit message:** "feat: add provider catalog and instance types with Catwalk schema support"
+**Commit message:** "feat: add provider catalog and instance types with Catwalk
+schema support"
 
 ### ✅ Task 2: Create Provider Catalog Manager (COMPLETED)
 
 **Files to create:**
+
 - `src/providers/catalog/catalog-manager.ts`
 - `src/providers/catalog/catalog-manager.test.ts`
 - Copy Catwalk JSON files to `src/providers/catalog/data/`
@@ -229,7 +271,11 @@ describe('ProviderInstanceSchema', () => {
 import fs from 'fs';
 import path from 'path';
 import { getLaceDir } from '~/config/lace-dir';
-import { CatalogProvider, CatalogProviderSchema, CatalogModel } from './catalog-types';
+import {
+  CatalogProvider,
+  CatalogProviderSchema,
+  CatalogModel,
+} from './catalog-types';
 
 export class ProviderCatalogManager {
   private shippedCatalogDir: string;
@@ -243,10 +289,10 @@ export class ProviderCatalogManager {
 
   async loadCatalogs(): Promise<void> {
     this.catalogCache.clear();
-    
+
     // Load shipped catalogs
     await this.loadCatalogDirectory(this.shippedCatalogDir);
-    
+
     // Load user catalog extensions (override shipped if same ID)
     if (await this.directoryExists(this.userCatalogDir)) {
       await this.loadCatalogDirectory(this.userCatalogDir);
@@ -255,7 +301,7 @@ export class ProviderCatalogManager {
 
   private async loadCatalogDirectory(dirPath: string): Promise<void> {
     const files = await fs.promises.readdir(dirPath);
-    
+
     for (const file of files) {
       if (file.endsWith('.json')) {
         try {
@@ -285,17 +331,17 @@ export class ProviderCatalogManager {
 
   getModel(providerId: string, modelId: string): CatalogModel | null {
     const models = this.getProviderModels(providerId);
-    return models.find(m => m.id === modelId) || null;
+    return models.find((m) => m.id === modelId) || null;
   }
 
-  async saveUserCatalog(providerId: string, provider: CatalogProvider): Promise<void> {
+  async saveUserCatalog(
+    providerId: string,
+    provider: CatalogProvider
+  ): Promise<void> {
     await fs.promises.mkdir(this.userCatalogDir, { recursive: true });
     const filePath = path.join(this.userCatalogDir, `${providerId}.json`);
-    await fs.promises.writeFile(
-      filePath,
-      JSON.stringify(provider, null, 2)
-    );
-    
+    await fs.promises.writeFile(filePath, JSON.stringify(provider, null, 2));
+
     // Update cache
     this.catalogCache.set(provider.id, provider);
   }
@@ -312,6 +358,7 @@ export class ProviderCatalogManager {
 ```
 
 **How to test:**
+
 ```typescript
 // src/providers/provider-config-manager.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -345,9 +392,9 @@ describe('ProviderConfigManager', () => {
         'openai-prod': {
           name: 'OpenAI Production',
           type: 'openai-api' as const,
-          config: { baseUrl: 'https://api.openai.com/v1' }
-        }
-      }
+          config: { baseUrl: 'https://api.openai.com/v1' },
+        },
+      },
     };
 
     await manager.saveConfig(config);
@@ -357,11 +404,13 @@ describe('ProviderConfigManager', () => {
 });
 ```
 
-**Commit message:** "feat: add provider catalog manager with Catwalk data support"
+**Commit message:** "feat: add provider catalog manager with Catwalk data
+support"
 
 ### ✅ Task 3: Create Provider Instance Manager (COMPLETED)
 
 **Files to create:**
+
 - `src/providers/instance/instance-manager.ts`
 - `src/providers/instance/instance-manager.test.ts`
 
@@ -375,7 +424,13 @@ describe('ProviderConfigManager', () => {
 import fs from 'fs';
 import path from 'path';
 import { getLaceDir } from '~/config/lace-dir';
-import { ProviderInstancesConfig, ProviderInstancesConfigSchema, ProviderInstance, Credential, CredentialSchema } from '../catalog/catalog-types';
+import {
+  ProviderInstancesConfig,
+  ProviderInstancesConfigSchema,
+  ProviderInstance,
+  Credential,
+  CredentialSchema,
+} from '../catalog/catalog-types';
 
 export class ProviderInstanceManager {
   private configPath: string;
@@ -394,7 +449,7 @@ export class ProviderInstanceManager {
     } catch (error) {
       return {
         version: '1.0',
-        instances: {}
+        instances: {},
       };
     }
   }
@@ -416,14 +471,15 @@ export class ProviderInstanceManager {
     }
   }
 
-  async saveCredential(instanceId: string, credential: Credential): Promise<void> {
+  async saveCredential(
+    instanceId: string,
+    credential: Credential
+  ): Promise<void> {
     await fs.promises.mkdir(this.credentialsDir, { recursive: true });
     const credPath = path.join(this.credentialsDir, `${instanceId}.json`);
-    await fs.promises.writeFile(
-      credPath,
-      JSON.stringify(credential, null, 2),
-      { mode: 0o600 }
-    );
+    await fs.promises.writeFile(credPath, JSON.stringify(credential, null, 2), {
+      mode: 0o600,
+    });
   }
 
   async deleteInstance(instanceId: string): Promise<void> {
@@ -443,16 +499,19 @@ export class ProviderInstanceManager {
 }
 ```
 
-**Commit message:** "feat: add provider instance manager for connection configuration"
+**Commit message:** "feat: add provider instance manager for connection
+configuration"
 
 ### ✅ Task 4: Refactor ProviderRegistry Integration (COMPLETED)
 
 **Files to modify:**
+
 - `src/providers/registry.ts`
 - `src/providers/registry.test.ts`
 
-**Current code to understand:**
-The registry currently creates providers from environment variables. Look at:
+**Current code to understand:** The registry currently creates providers from
+environment variables. Look at:
+
 - How `ProviderRegistry.getAllProviders()` works
 - How providers are instantiated
 
@@ -469,7 +528,7 @@ export class ProviderRegistry {
   // Add new method to load configured providers
   async loadConfiguredProviders(): Promise<void> {
     const config = await this.configManager.loadConfig();
-    
+
     for (const [id, instance] of Object.entries(config.providers)) {
       const credential = await this.configManager.loadCredential(id);
       if (!credential) continue;
@@ -478,17 +537,23 @@ export class ProviderRegistry {
       switch (instance.type) {
         case 'anthropic-api':
           // Create AnthropicProvider with custom config
-          this.registerProvider(id, new AnthropicProvider({
-            apiKey: credential.apiKey,
-            baseUrl: instance.config.baseUrl as string
-          }));
+          this.registerProvider(
+            id,
+            new AnthropicProvider({
+              apiKey: credential.apiKey,
+              baseUrl: instance.config.baseUrl as string,
+            })
+          );
           break;
         case 'openai-api':
           // Create OpenAIProvider with custom config
-          this.registerProvider(id, new OpenAIProvider({
-            apiKey: credential.apiKey,
-            baseUrl: instance.config.baseUrl as string
-          }));
+          this.registerProvider(
+            id,
+            new OpenAIProvider({
+              apiKey: credential.apiKey,
+              baseUrl: instance.config.baseUrl as string,
+            })
+          );
           break;
       }
     }
@@ -501,14 +566,15 @@ export class ProviderRegistry {
 }
 ```
 
-**How to test:**
-Write tests that create a config file, then verify providers are loaded correctly.
+**How to test:** Write tests that create a config file, then verify providers
+are loaded correctly.
 
 **Commit message:** "feat: add configured provider loading to registry"
 
 ### ❌ Task 5: Environment Variable Migration (SKIPPED)
 
 **Files to create:**
+
 - `src/providers/provider-migration.ts`
 - `src/providers/provider-migration.test.ts`
 
@@ -527,7 +593,7 @@ export class ProviderMigration {
 
   async migrateFromEnv(): Promise<boolean> {
     const config = await this.configManager.loadConfig();
-    
+
     // Don't migrate if already has providers
     if (Object.keys(config.providers).length > 0) {
       return false;
@@ -541,12 +607,12 @@ export class ProviderMigration {
         name: 'Anthropic (Migrated)',
         type: 'anthropic-api',
         config: {
-          baseUrl: 'https://api.anthropic.com/v1'
-        }
+          baseUrl: 'https://api.anthropic.com/v1',
+        },
       };
 
       await this.configManager.saveCredential('anthropic-default', {
-        apiKey: process.env.ANTHROPIC_API_KEY
+        apiKey: process.env.ANTHROPIC_API_KEY,
       });
 
       migrated = true;
@@ -558,12 +624,12 @@ export class ProviderMigration {
         name: 'OpenAI (Migrated)',
         type: 'openai-api',
         config: {
-          baseUrl: 'https://api.openai.com/v1'
-        }
+          baseUrl: 'https://api.openai.com/v1',
+        },
       };
 
       await this.configManager.saveCredential('openai-default', {
-        apiKey: process.env.OPENAI_API_KEY
+        apiKey: process.env.OPENAI_API_KEY,
       });
 
       migrated = true;
@@ -578,37 +644,43 @@ export class ProviderMigration {
 }
 ```
 
-**How to test:**
-Set environment variables in test, run migration, verify files created.
+**How to test:** Set environment variables in test, run migration, verify files
+created.
 
 **Commit message:** "feat: add environment variable migration"
 
 ### ✅ Task 5: Create Web API Endpoints (COMPLETED)
 
 **Files created:**
+
 - `packages/web/app/api/provider/catalog/route.ts` + tests
-- `packages/web/app/api/provider/instances/route.ts` + tests  
+- `packages/web/app/api/provider/instances/route.ts` + tests
 - `packages/web/app/api/provider/instances/[instanceId]/route.ts` + tests
 - Updated `packages/web/lib/server/lace-imports.ts` with new exports
 
 **What was implemented:**
 
 ✅ **API Endpoints Created:**
+
 - `GET /api/provider/catalog` - Returns available providers from Catwalk catalog
 - `GET /api/provider/instances` - Lists configured provider instances
-- `POST /api/provider/instances` - Creates new provider instances with validation
-- `GET /api/provider/instances/[id]` - Gets specific instance details  
+- `POST /api/provider/instances` - Creates new provider instances with
+  validation
+- `GET /api/provider/instances/[id]` - Gets specific instance details
 - `DELETE /api/provider/instances/[id]` - Deletes instances and credentials
 
 ✅ **Key Features:**
+
 - Real implementation testing (no mocking of business logic)
 - Comprehensive Zod schema validation
 - Proper error handling with HTTP status codes
-- Integration with ProviderRegistry, ProviderCatalogManager, ProviderInstanceManager
+- Integration with ProviderRegistry, ProviderCatalogManager,
+  ProviderInstanceManager
 - Secure credential management with 0600 file permissions
 - Full TypeScript type safety
 
 ✅ **Testing:**
+
 - 22 comprehensive test cases across 4 test files
 - TDD approach with failing tests first, then implementation
 - Tests use real file system operations with temp directories
@@ -620,6 +692,7 @@ The API endpoints are ready for frontend integration.
 ### Task 6: Provider Management App Routes & Layout
 
 **Files to create:**
+
 - `packages/web/app/providers/layout.tsx`
 - `packages/web/app/providers/page.tsx`
 - `packages/web/app/providers/catalog/page.tsx`
@@ -651,7 +724,7 @@ export default function ProvidersLayout({
   );
 }
 
-// packages/web/app/providers/page.tsx  
+// packages/web/app/providers/page.tsx
 // ABOUTME: Main provider instances dashboard
 // ABOUTME: Shows configured instances with status and management actions
 
@@ -671,11 +744,13 @@ export default function ProvidersPage() {
 }
 ```
 
-**Commit message:** "feat: add provider management app routes with Next.js app router"
+**Commit message:** "feat: add provider management app routes with Next.js app
+router"
 
 ### Task 7: Provider Catalog Browser Components
 
 **Files to create:**
+
 - `packages/web/components/providers/ProviderCatalogGrid.tsx`
 - `packages/web/components/providers/ProviderCatalogCard.tsx`
 - `packages/web/components/providers/ModelComparisonTable.tsx`
@@ -767,11 +842,11 @@ export function ProviderCatalogCard({ provider, onAddInstance }: ProviderCatalog
             {provider.models.length} models
           </Badge>
         </div>
-        
+
         <p className="text-sm text-base-content/60">
           ${minPrice}-${maxPrice}/1M tokens
         </p>
-        
+
         <div className="space-y-1 text-xs">
           {provider.models.slice(0, 2).map(model => (
             <div key={model.id}>• {model.name}</div>
@@ -780,9 +855,9 @@ export function ProviderCatalogCard({ provider, onAddInstance }: ProviderCatalog
             <div>• And {provider.models.length - 2} more...</div>
           )}
         </div>
-        
+
         <div className="card-actions justify-end">
-          <button 
+          <button
             className="btn btn-primary btn-sm"
             onClick={onAddInstance}
           >
@@ -795,11 +870,13 @@ export function ProviderCatalogCard({ provider, onAddInstance }: ProviderCatalog
 }
 ```
 
-**Commit message:** "feat: add provider catalog browser components with design system"
+**Commit message:** "feat: add provider catalog browser components with design
+system"
 
 ### Task 8: Provider Instance Management Components
 
 **Files to create:**
+
 - `packages/web/components/providers/ProviderInstanceList.tsx`
 - `packages/web/components/providers/ProviderInstanceCard.tsx`
 - `packages/web/components/providers/AddInstanceModal.tsx`
@@ -861,7 +938,7 @@ export function ProviderInstanceList() {
         {instances.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-base-content/60 mb-4">No provider instances configured</p>
-            <button 
+            <button
               className="btn btn-primary"
               onClick={() => setShowAddModal(true)}
             >
@@ -935,7 +1012,7 @@ export function ProviderInstanceCard({ instance, onTest, onDelete }: ProviderIns
               </p>
             </div>
           </div>
-          
+
           <div className="flex space-x-2">
             <button className="btn btn-ghost btn-sm" onClick={onTest}>
               Test
@@ -959,6 +1036,7 @@ export function ProviderInstanceCard({ instance, onTest, onDelete }: ProviderIns
 ### Task 9: Instance Configuration Modals
 
 **Files to create:**
+
 - `packages/web/components/providers/AddInstanceModal.tsx`
 - `packages/web/components/providers/ModelSelectionForm.tsx`
 - `packages/web/components/providers/CredentialInput.tsx`
@@ -1019,7 +1097,7 @@ export function AddInstanceModal({ isOpen, onClose, onSuccess }: AddInstanceModa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const response = await fetch('/api/providers/instances', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1060,7 +1138,7 @@ export function AddInstanceModal({ isOpen, onClose, onSuccess }: AddInstanceModa
           <p className="text-sm text-base-content/60">
             Choose a provider from the catalog to create a new instance.
           </p>
-          
+
           <div className="grid gap-3">
             {providers.map(provider => (
               <button
@@ -1138,7 +1216,7 @@ export function AddInstanceModal({ isOpen, onClose, onSuccess }: AddInstanceModa
             <p className="text-sm font-medium mb-1">This will enable:</p>
             <p className="text-xs text-base-content/60">
               {selectedProvider?.models.slice(0, 3).map(m => m.name).join(', ')}
-              {selectedProvider && selectedProvider.models.length > 3 && 
+              {selectedProvider && selectedProvider.models.length > 3 &&
                 ` and ${selectedProvider.models.length - 3} more models`
               }
             </p>
@@ -1159,17 +1237,19 @@ export function AddInstanceModal({ isOpen, onClose, onSuccess }: AddInstanceModa
 }
 ```
 
-**Commit message:** "feat: add instance configuration modal with multi-step form"
+**Commit message:** "feat: add instance configuration modal with multi-step
+form"
 
 ### ✅ Task 10: Session Creation Integration (COMPLETED)
 
 **Files created/modified:**
+
 - `packages/web/components/providers/ModelSelectionForm.tsx` + integration
 
 **What to implement:**
 
 ```typescript
-// packages/web/components/sessions/ModelSelectionForm.tsx  
+// packages/web/components/sessions/ModelSelectionForm.tsx
 // ABOUTME: Model selection component for session creation
 // ABOUTME: Shows available models from selected provider instance with pricing
 
@@ -1234,7 +1314,7 @@ export function ModelSelectionForm({ onSelectionChange }: ModelSelectionFormProp
         <label className="label">
           <span className="label-text">Provider Instance</span>
         </label>
-        <select 
+        <select
           className="select select-bordered w-full"
           value={selectedInstance}
           onChange={(e) => setSelectedInstance(e.target.value)}
@@ -1246,7 +1326,7 @@ export function ModelSelectionForm({ onSelectionChange }: ModelSelectionFormProp
             </option>
           ))}
         </select>
-        
+
         {selectedInstance && (
           <div className="flex items-center space-x-2 mt-1">
             <StatusDot status="success" size="sm" />
@@ -1311,6 +1391,7 @@ export function ModelSelectionForm({ onSelectionChange }: ModelSelectionFormProp
 **What was implemented:**
 
 ✅ **Session Creation Integration Complete:**
+
 - `ModelSelectionForm.tsx` - Provider instance and model selection component
 - Integration with session creation API endpoints
 - Model metadata display (costs, capabilities, context windows)
@@ -1318,30 +1399,36 @@ export function ModelSelectionForm({ onSelectionChange }: ModelSelectionFormProp
 - Session API updates to accept `providerInstanceId` and `modelId`
 
 ✅ **Key Features:**
+
 - Provider instance dropdown with connection status indicators
-- Model selection with pricing and capability badges  
+- Model selection with pricing and capability badges
 - Real-time model availability based on selected instance
 - Cost estimation for typical conversation usage
 - Form validation and error handling
 - Integration with existing session creation workflow
 
 ✅ **Testing:**
+
 - Component properly loads provider instances from API
 - Model selection updates based on instance selection
 - Form submission includes provider instance and model IDs
 - Committed as `9feb3755`
 
-**Commit message:** "feat: integrate provider instance and model selection into session creation"
+**Commit message:** "feat: integrate provider instance and model selection into
+session creation"
 
 ### ✅ Task 11: Custom Provider Catalog Management (COMPLETED)
 
 **Files created:**
+
 - `src/providers/catalog/custom-manager.ts` - CustomProviderCatalogManager class
-- `src/providers/catalog/custom-manager.test.ts` - Comprehensive test suite (23 tests)
+- `src/providers/catalog/custom-manager.test.ts` - Comprehensive test suite (23
+  tests)
 
 **What was implemented:**
 
 ✅ **CustomProviderCatalogManager Complete:**
+
 - CRUD operations for custom catalogs (create, read, update, delete)
 - Model management within catalogs (add, update, remove models)
 - Comprehensive validation system (schema + business logic)
@@ -1352,6 +1439,7 @@ export function ModelSelectionForm({ onSelectionChange }: ModelSelectionFormProp
 - User catalog filtering (distinguish custom vs built-in)
 
 ✅ **Key Features:**
+
 - Template-based catalog creation with sensible defaults
 - Validation catches missing models, duplicate IDs, unreasonable costs
 - Safe operations with automatic backups and built-in catalog protection
@@ -1360,6 +1448,7 @@ export function ModelSelectionForm({ onSelectionChange }: ModelSelectionFormProp
 - Error handling with detailed validation messages
 
 ✅ **Testing:**
+
 - 23 comprehensive test cases covering all functionality
 - CRUD operations, validation, import/export, templates
 - Error scenarios and edge cases handled
@@ -1367,13 +1456,15 @@ export function ModelSelectionForm({ onSelectionChange }: ModelSelectionFormProp
 - All tests passing, clean TypeScript compilation
 - Committed as `9feb3755`
 
-The backend CustomProviderCatalogManager provides all the necessary functionality for frontend components to be built on top of this API.
+The backend CustomProviderCatalogManager provides all the necessary
+functionality for frontend components to be built on top of this API.
 
 **Commit message:** "feat: add custom provider catalog management"
 
-### Task 12: Provider Testing & Status Components  
+### Task 12: Provider Testing & Status Components
 
 **Files to create:**
+
 - `packages/web/components/providers/ConnectionTest.tsx`
 - `packages/web/components/providers/ProviderStatusBadge.tsx`
 - `packages/web/hooks/useProviderStatus.ts`
@@ -1471,16 +1562,16 @@ export function ConnectionTest({ instanceId, onStatusChange }: ConnectionTestPro
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <StatusDot 
-            status={statusDisplay.dot} 
-            size="sm" 
+          <StatusDot
+            status={statusDisplay.dot}
+            size="sm"
             pulse={status.status === 'testing'}
           />
           <span className={`text-sm ${statusDisplay.color}`}>
             {statusDisplay.text}
           </span>
         </div>
-        
+
         <button
           className="btn btn-outline btn-sm"
           onClick={handleTest}
@@ -1506,90 +1597,121 @@ export function ConnectionTest({ instanceId, onStatusChange }: ConnectionTestPro
 }
 ```
 
-**Commit message:** "feat: add provider connection testing with real-time status"
+**Commit message:** "feat: add provider connection testing with real-time
+status"
 
 ### ❌ Task 13: Backend Integration & API Updates (INCOMPLETE - CRITICAL GAPS)
 
-**Status: 🔴 PARTIALLY IMPLEMENTED** - Core integration was skipped, causing the provider management UI to be non-functional.
+**Status: 🔴 PARTIALLY IMPLEMENTED** - Core integration was skipped, causing the
+provider management UI to be non-functional.
 
-**CRITICAL ISSUE:** The configurable provider system was built completely but **NOT CONNECTED** to actual session/agent functionality. Users can configure provider instances but they're never used for AI conversations.
+**CRITICAL ISSUE:** The configurable provider system was built completely but
+**NOT CONNECTED** to actual session/agent functionality. Users can configure
+provider instances but they're never used for AI conversations.
 
 **Files that NEED updating (HIGH PRIORITY):**
 
 #### **1. Session Creation Integration**
-- `packages/web/app/api/projects/[projectId]/sessions/route.ts` - 🔴 **BROKEN** - Has crude fallback, doesn't resolve provider instances
-- `packages/web/lib/server/session-service.ts` - 🔴 **BROKEN** - Still expects old provider/model strings
+
+- `packages/web/app/api/projects/[projectId]/sessions/route.ts` - 🔴
+  **BROKEN** - Has crude fallback, doesn't resolve provider instances
+- `packages/web/lib/server/session-service.ts` - 🔴 **BROKEN** - Still expects
+  old provider/model strings
 - **Required changes:**
-  - Update `createSession()` to accept `providerInstanceId` and `modelId` instead of provider/model strings
-  - Use `ProviderRegistry.createProviderFromInstanceAndModel()` to resolve instances
+  - Update `createSession()` to accept `providerInstanceId` and `modelId`
+    instead of provider/model strings
+  - Use `ProviderRegistry.createProviderFromInstanceAndModel()` to resolve
+    instances
   - Update CreateSessionSchema to require new fields
 
-#### **2. Agent Creation Integration**  
-- `packages/web/app/api/sessions/[sessionId]/agents/route.ts` - 🔴 **BROKEN** - Same crude fallback as sessions
+#### **2. Agent Creation Integration**
+
+- `packages/web/app/api/sessions/[sessionId]/agents/route.ts` - 🔴 **BROKEN** -
+  Same crude fallback as sessions
 - **Required changes:**
   - Replace provider instance lookup with proper resolution
   - Update agent spawning to use resolved provider instances
   - Update CreateAgentRequest types
 
 #### **3. Provider Discovery Integration**
-- `packages/web/app/api/providers/route.ts` - 🔴 **COMPLETELY WRONG** - Shows old environment-based providers
+
+- `packages/web/app/api/providers/route.ts` - 🔴 **COMPLETELY WRONG** - Shows
+  old environment-based providers
 - **Required changes:**
   - Replace entire implementation to return configured provider instances
   - Use `ProviderRegistry.getConfiguredInstances()` instead of auto-discovery
 
 #### **4. Frontend Component Integration**
-- `packages/web/components/pages/LaceApp.tsx` - 🔴 **USES OLD SYSTEM** - Fetches `/api/providers`
-- `packages/web/components/config/ProviderDropdown.tsx` - 🔴 **USES OLD SYSTEM** - Expects old provider format
+
+- `packages/web/components/pages/LaceApp.tsx` - 🔴 **USES OLD SYSTEM** - Fetches
+  `/api/providers`
+- `packages/web/components/config/ProviderDropdown.tsx` - 🔴 **USES OLD
+  SYSTEM** - Expects old provider format
 - **Required changes:**
   - Update to fetch from `/api/provider/instances` instead of `/api/providers`
   - Adapt to new provider instance data format
 
 #### **5. Missing API Endpoints**
-- `GET /api/provider/instances/[instanceId]/models` - 🔴 **MISSING** - List models for specific instance
-- `POST /api/provider/instances/[instanceId]/test` - ✅ **EXISTS** but may need frontend integration
-- `GET /api/provider/instances/[instanceId]` - ✅ **EXISTS** 
+
+- `GET /api/provider/instances/[instanceId]/models` - 🔴 **MISSING** - List
+  models for specific instance
+- `POST /api/provider/instances/[instanceId]/test` - ✅ **EXISTS** but may need
+  frontend integration
+- `GET /api/provider/instances/[instanceId]` - ✅ **EXISTS**
 
 #### **6. Type System Integration**
-- `packages/web/types/api.ts` - 🔴 **OUTDATED** - Missing provider instance fields
+
+- `packages/web/types/api.ts` - 🔴 **OUTDATED** - Missing provider instance
+  fields
 - **Required changes:**
   - Add `providerInstanceId` and `modelId` to session/agent creation types
   - Update all related interfaces
 
-**IMPACT:** Without these integrations, the provider management UI is a "ghost feature" - users can configure provider instances that are never actually used for AI conversations.
+**IMPACT:** Without these integrations, the provider management UI is a "ghost
+feature" - users can configure provider instances that are never actually used
+for AI conversations.
 
-**ROOT CAUSE:** The new provider system was built alongside the old one without completing the integration bridge between them.
+**ROOT CAUSE:** The new provider system was built alongside the old one without
+completing the integration bridge between them.
 
-**Commit message:** "feat: integrate provider system with existing session/agent infrastructure"
+**Commit message:** "feat: integrate provider system with existing session/agent
+infrastructure"
 
 ## Testing Strategy
 
 ### Unit Tests
+
 - Test each class/function in isolation
 - Use real implementations, not mocks
 - Test error cases and edge conditions
 
 ### Integration Tests
+
 - Test provider loading from files
 - Test API endpoints with real file system
 - Test migration scenarios
 
 ### E2E Tests
+
 - Test full UI flow: add provider, enter credentials, test connection
 - Test provider selection in session creation
 
 ## Common Pitfalls to Avoid
 
 ### TypeScript
+
 - Don't use `any` - use `unknown` with type guards
 - Don't use `as` type assertions - use type guards
 - Always handle null/undefined cases
 
 ### Testing
+
 - Don't mock the code you're testing
 - Don't test implementation details
 - Do test behavior and outcomes
 
 ### Security
+
 - Never log credentials
 - Always use 0600 permissions for credential files
 - Never return credentials in API responses
@@ -1616,22 +1738,32 @@ Before starting, read these files to understand the codebase:
 ## Success Criteria
 
 ### ✅ **COMPLETED FEATURES**
+
 1. ✅ Users can add multiple provider instances via web UI - **WORKING**
 2. ✅ Credentials are stored securely - **WORKING**
 3. ✅ Provider catalog browsing and instance management - **WORKING**
 4. ✅ Backend provider system (catalog + instances) - **WORKING**
 
-### 🔴 **CRITICAL MISSING INTEGRATIONS** 
-5. ❌ **Sessions can use any configured provider** - **BROKEN** - Still uses old provider system
-6. ❌ **Agent creation uses configured providers** - **BROKEN** - Still uses old provider system  
-7. ❌ **Provider discovery shows configured instances** - **BROKEN** - Shows wrong data
+### 🔴 **CRITICAL MISSING INTEGRATIONS**
+
+5. ❌ **Sessions can use any configured provider** - **BROKEN** - Still uses old
+   provider system
+6. ❌ **Agent creation uses configured providers** - **BROKEN** - Still uses old
+   provider system
+7. ❌ **Provider discovery shows configured instances** - **BROKEN** - Shows
+   wrong data
 8. ❌ **Frontend components fully integrated** - **MIXED** - Some use old system
 9. ❌ **All API endpoints integrated** - **BROKEN** - Missing key endpoints
 10. ❌ **Type system updated** - **OUTDATED** - Missing provider instance types
 
 ### **CURRENT STATE ASSESSMENT**
-**Overall Status: 🟡 60% COMPLETE** - Backend system works, provider management UI works, but **core functionality integration is missing**.
 
-**User Impact:** Users can configure provider instances but they **don't work for actual AI conversations**. This creates a confusing and broken user experience where the UI suggests functionality that doesn't work.
+**Overall Status: 🟡 60% COMPLETE** - Backend system works, provider management
+UI works, but **core functionality integration is missing**.
 
-**Next Priority:** Complete the integration tasks in Task 13 to bridge the new provider system with existing session/agent functionality.
+**User Impact:** Users can configure provider instances but they **don't work
+for actual AI conversations**. This creates a confusing and broken user
+experience where the UI suggests functionality that doesn't work.
+
+**Next Priority:** Complete the integration tasks in Task 13 to bridge the new
+provider system with existing session/agent functionality.

@@ -2,17 +2,22 @@
 
 ## Problem Statement
 
-The bash tool currently returns unbounded stderr and stdout output. A single test run can generate 800k+ of stderr, which:
+The bash tool currently returns unbounded stderr and stdout output. A single
+test run can generate 800k+ of stderr, which:
+
 - Blows out token windows (800k = ~200k tokens, 4x Claude's context window)
-- Makes conversation history unusable  
+- Makes conversation history unusable
 - Causes massive API costs
 - Breaks the model's ability to process results
 
 ## Solution Overview
 
 Implement two-tier output management:
-1. **Full output storage**: Store complete output in temporary files for audit/debugging
-2. **Smart truncation**: Return head + tail summaries to model with file references
+
+1. **Full output storage**: Store complete output in temporary files for
+   audit/debugging
+2. **Smart truncation**: Return head + tail summaries to model with file
+   references
 
 ## Architecture
 
@@ -23,19 +28,22 @@ Session Temp Directory Structure:
 │   └── session-{sessionId}/
 │       └── tool-call-{toolCallId}/
 │           ├── stdout.txt       # Complete stdout
-│           ├── stderr.txt       # Complete stderr  
+│           ├── stderr.txt       # Complete stderr
 │           └── combined.txt     # Combined output
 ```
 
 ## Implementation Plan: Two Stacked PRs
 
 ### PR 1: Temp Directory Infrastructure ✅ COMPLETED
+
 Foundation for session-scoped temporary directories
 
 ### PR 1.5: Architecture Fixes
+
 Fix architecture issues discovered after PR 1 implementation
 
-### PR 2: Bash Tool Output Management  
+### PR 2: Bash Tool Output Management
+
 Update bash tool to use temp directories and implement smart truncation
 
 ---
@@ -43,17 +51,24 @@ Update bash tool to use temp directories and implement smart truncation
 # PR 1.5: Architecture Fixes
 
 ## Overview
-PR 1 has been implemented, but there are two critical architecture issues that need to be fixed before implementing the bash tool changes:
 
-1. **Sessions always have projects** - Remove dead fallback code for sessions without projects
-2. **ToolExecutor should provide temp directories** - Move temp directory responsibility from Tool base class to ToolExecutor for better separation of concerns
+PR 1 has been implemented, but there are two critical architecture issues that
+need to be fixed before implementing the bash tool changes:
+
+1. **Sessions always have projects** - Remove dead fallback code for sessions
+   without projects
+2. **ToolExecutor should provide temp directories** - Move temp directory
+   responsibility from Tool base class to ToolExecutor for better separation of
+   concerns
 
 ---
 
 ## Task 1: Fix Session Temp Directory - Remove Dead Fallback Code
 
 ### Background Context
-All sessions must have a `projectId`. The current implementation has a fallback case for sessions without projects, but this can never happen in practice.
+
+All sessions must have a `projectId`. The current implementation has a fallback
+case for sessions without projects, but this can never happen in practice.
 
 ### Code Changes
 
@@ -79,7 +94,8 @@ static getSessionTempDir(sessionId: string, projectId: string): string {
 
 **File**: `src/sessions/session.test.ts`
 
-Update the tests to remove the "without project" test cases and make `projectId` required:
+Update the tests to remove the "without project" test cases and make `projectId`
+required:
 
 ```typescript
 describe('temp directory management', () => {
@@ -87,7 +103,7 @@ describe('temp directory management', () => {
     const sessionId = 'test-session-123';
     const projectId = 'test-project-456';
     const tempDir = Session.getSessionTempDir(sessionId, projectId);
-    
+
     expect(tempDir).toContain(`project-${projectId}`);
     expect(tempDir).toContain(`session-${sessionId}`);
     expect(existsSync(tempDir)).toBe(true);
@@ -98,7 +114,7 @@ describe('temp directory management', () => {
     const projectId = 'stable-project';
     const tempDir1 = Session.getSessionTempDir(sessionId, projectId);
     const tempDir2 = Session.getSessionTempDir(sessionId, projectId);
-    
+
     expect(tempDir1).toBe(tempDir2);
   });
 
@@ -106,7 +122,7 @@ describe('temp directory management', () => {
     const projectId = 'same-project';
     const tempDir1 = Session.getSessionTempDir('session-a', projectId);
     const tempDir2 = Session.getSessionTempDir('session-b', projectId);
-    
+
     expect(tempDir1).not.toBe(tempDir2);
     expect(tempDir1).toContain('session-a');
     expect(tempDir2).toContain('session-b');
@@ -117,7 +133,7 @@ describe('temp directory management', () => {
     const projectId = 'parent-project';
     const sessionTempDir = Session.getSessionTempDir(sessionId, projectId);
     const projectTempDir = Project.getProjectTempDir(projectId);
-    
+
     expect(sessionTempDir).toContain(projectTempDir);
   });
 
@@ -126,6 +142,7 @@ describe('temp directory management', () => {
 ```
 
 ### Commit Message
+
 ```
 fix(sessions): make projectId required in getSessionTempDir
 
@@ -138,7 +155,10 @@ fix(sessions): make projectId required in getSessionTempDir
 ## Task 2: Move Temp Directory Logic from Tool to ToolExecutor
 
 ### Background Context
-The current architecture has the Tool base class managing temp directories, but this violates separation of concerns. The ToolExecutor should manage temp directories because:
+
+The current architecture has the Tool base class managing temp directories, but
+this violates separation of concerns. The ToolExecutor should manage temp
+directories because:
 
 - ToolExecutor already has session context
 - ToolExecutor generates tool call IDs
@@ -159,11 +179,12 @@ export interface ToolContext {
   sessionId?: string;
   projectId?: string;
   session?: Session; // TaskManager accessed via session.getTaskManager()
-  
+
   // Temp directory management - provided by ToolExecutor
-  toolCallId?: string;        // Unique ID for this tool call
-  toolTempDir?: string;       // Tool-specific temp directory
-  outputFilePaths?: {         // Standard output file paths
+  toolCallId?: string; // Unique ID for this tool call
+  toolTempDir?: string; // Tool-specific temp directory
+  outputFilePaths?: {
+    // Standard output file paths
     stdout: string;
     stderr: string;
     combined: string;
@@ -178,11 +199,11 @@ Remove the temp directory methods and update to use provided context:
 ```typescript
 export abstract class Tool {
   // ... existing code ...
-  
+
   // Remove these methods - ToolExecutor will provide temp directories:
   // - getToolCallTempDir()
   // - getOutputFilePaths()
-  
+
   /**
    * Get output file paths provided by ToolExecutor
    * Throws error if ToolExecutor didn't provide temp directory
@@ -193,7 +214,9 @@ export abstract class Tool {
     combined: string;
   } {
     if (!context?.outputFilePaths) {
-      throw new Error('Output file paths not provided by ToolExecutor. This is a system error.');
+      throw new Error(
+        'Output file paths not provided by ToolExecutor. This is a system error.'
+      );
     }
     return context.outputFilePaths;
   }
@@ -204,7 +227,9 @@ export abstract class Tool {
    */
   protected getToolTempDir(context?: ToolContext): string {
     if (!context?.toolTempDir) {
-      throw new Error('Tool temp directory not provided by ToolExecutor. This is a system error.');
+      throw new Error(
+        'Tool temp directory not provided by ToolExecutor. This is a system error.'
+      );
     }
     return context.toolTempDir;
   }
@@ -222,7 +247,7 @@ import { join } from 'path';
 
 export class ToolExecutor {
   // ... existing code ...
-  
+
   // Constants for temp directory naming
   private static readonly TOOL_CALL_TEMP_PREFIX = 'tool-call-';
   private static readonly OUTPUT_FILE_STDOUT = 'stdout.txt';
@@ -241,7 +266,10 @@ export class ToolExecutor {
   /**
    * Create temp directory and file paths for a tool call
    */
-  private createToolTempDirectory(toolCallId: string, context: ToolContext): {
+  private createToolTempDirectory(
+    toolCallId: string,
+    context: ToolContext
+  ): {
     toolTempDir: string;
     outputFilePaths: {
       stdout: string;
@@ -250,14 +278,22 @@ export class ToolExecutor {
     };
   } {
     if (!context.sessionId || !context.projectId) {
-      throw new Error('Session ID and Project ID required for temp directory creation');
+      throw new Error(
+        'Session ID and Project ID required for temp directory creation'
+      );
     }
 
     // Get session temp directory
-    const sessionTempDir = Session.getSessionTempDir(context.sessionId, context.projectId);
-    
+    const sessionTempDir = Session.getSessionTempDir(
+      context.sessionId,
+      context.projectId
+    );
+
     // Create tool-specific directory
-    const toolTempDir = join(sessionTempDir, `${ToolExecutor.TOOL_CALL_TEMP_PREFIX}${toolCallId}`);
+    const toolTempDir = join(
+      sessionTempDir,
+      `${ToolExecutor.TOOL_CALL_TEMP_PREFIX}${toolCallId}`
+    );
     mkdirSync(toolTempDir, { recursive: true });
 
     // Create output file paths
@@ -270,7 +306,11 @@ export class ToolExecutor {
     return { toolTempDir, outputFilePaths };
   }
 
-  async executeTool(toolName: string, args: unknown, context: ToolContext): Promise<ToolResult> {
+  async executeTool(
+    toolName: string,
+    args: unknown,
+    context: ToolContext
+  ): Promise<ToolResult> {
     const tool = this.getTool(toolName);
     if (!tool) {
       throw new Error(`Tool not found: ${toolName}`);
@@ -278,7 +318,10 @@ export class ToolExecutor {
 
     // Generate tool call ID and create temp directory
     const toolCallId = this.generateToolCallId();
-    const { toolTempDir, outputFilePaths } = this.createToolTempDirectory(toolCallId, context);
+    const { toolTempDir, outputFilePaths } = this.createToolTempDirectory(
+      toolCallId,
+      context
+    );
 
     // Enhanced context with temp directory information
     const toolContext: ToolContext = {
@@ -376,7 +419,7 @@ class MockTool extends Tool {
   name = 'mock_tool';
   description = 'Mock tool for testing';
   schema = z.object({ input: z.string() });
-  
+
   private capturedContext?: ToolContext;
 
   protected async executeValidated(
@@ -460,6 +503,7 @@ describe('Tool temp directory functionality', () => {
 ```
 
 ### Commit Message
+
 ```
 refactor(tools): move temp directory management to ToolExecutor
 
@@ -473,7 +517,8 @@ refactor(tools): move temp directory management to ToolExecutor
 
 ## Task 3: Update Integration Tests
 
-Since the architecture changed, update the integration tests to reflect the new pattern:
+Since the architecture changed, update the integration tests to reflect the new
+pattern:
 
 **File**: `src/tools/temp-directory-integration.test.ts`
 
@@ -497,14 +542,21 @@ describe('Temp Directory Integration', () => {
       projectId: 'integration-project',
     };
 
-    await toolExecutor.executeTool('integration_test_tool', { content: 'test' }, context);
+    await toolExecutor.executeTool(
+      'integration_test_tool',
+      { content: 'test' },
+      context
+    );
 
     // Tool should have received proper temp directory context
     const receivedContext = integrationTool.getCapturedContext();
-    
+
     // Verify the hierarchy exists
     const toolTempDir = receivedContext.toolTempDir!;
-    const sessionTempDir = Session.getSessionTempDir(context.sessionId!, context.projectId!);
+    const sessionTempDir = Session.getSessionTempDir(
+      context.sessionId!,
+      context.projectId!
+    );
     const projectTempDir = Project.getProjectTempDir(context.projectId!);
     const processTempDir = getProcessTempDir();
 
@@ -525,7 +577,11 @@ describe('Temp Directory Integration', () => {
       projectId: 'file-ops-project',
     };
 
-    await toolExecutor.executeTool('integration_test_tool', { content: 'test content' }, context);
+    await toolExecutor.executeTool(
+      'integration_test_tool',
+      { content: 'test content' },
+      context
+    );
 
     const receivedContext = integrationTool.getCapturedContext();
     const outputFiles = receivedContext.outputFilePaths!;
@@ -538,12 +594,15 @@ describe('Temp Directory Integration', () => {
     // Verify files exist and have correct content
     expect(readFileSync(outputFiles.stdout, 'utf-8')).toBe('stdout content');
     expect(readFileSync(outputFiles.stderr, 'utf-8')).toBe('stderr content');
-    expect(readFileSync(outputFiles.combined, 'utf-8')).toBe('combined content');
+    expect(readFileSync(outputFiles.combined, 'utf-8')).toBe(
+      'combined content'
+    );
   });
 });
 ```
 
 ### How to Test
+
 ```bash
 # Run all tool tests
 npm test -- src/tools/
@@ -556,6 +615,7 @@ npm test
 ```
 
 ### Final Commit Message
+
 ```
 test: update temp directory integration tests for new architecture
 
@@ -570,31 +630,40 @@ test: update temp directory integration tests for new architecture
 # PR 2: Bash Tool Output Management
 
 ## Overview
-Add process-stable temporary directory management with project/session/tool-call hierarchy. This provides the foundation for tools to store large outputs without overwhelming the model.
+
+Add process-stable temporary directory management with project/session/tool-call
+hierarchy. This provides the foundation for tools to store large outputs without
+overwhelming the model.
 
 ## Files to Modify
 
 ### 1. `src/config/lace-dir.ts`
+
 Add process-scoped temporary directory management.
 
-### 2. `src/projects/project.ts`  
+### 2. `src/projects/project.ts`
+
 Add project temporary directory helper.
 
 ### 3. `src/sessions/session.ts`
+
 Add session temporary directory helper.
 
 ### 4. `src/tools/tool.ts`
+
 Add tool-call temporary directory helpers to base class.
 
 ### 5. Test files
+
 - `src/config/lace-dir.test.ts`
-- `src/projects/project.test.ts` 
+- `src/projects/project.test.ts`
 - `src/sessions/session.test.ts`
 - `src/tools/tool.test.ts`
 
 ## Task 1: Add Process Temp Directory to lace-dir.ts
 
 ### Background Context
+
 - `lace-dir.ts` manages Lace's directory structure (config, database, etc.)
 - Uses `getLaceDir()` which returns `~/.lace/` or `LACE_DIR` env var
 - Has utilities like `ensureLaceDir()`, `getLaceFilePath()`, etc.
@@ -604,12 +673,14 @@ Add tool-call temporary directory helpers to base class.
 **File**: `src/config/lace-dir.ts`
 
 Add these imports at the top:
+
 ```typescript
 import { mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 ```
 
 Add after existing exports:
+
 ```typescript
 /**
  * Process-scoped temporary directory for this server runtime
@@ -625,7 +696,9 @@ export function getProcessTempDir(): string {
   if (!_processTempDir) {
     const processId = process.pid;
     const timestamp = Date.now();
-    _processTempDir = mkdtempSync(path.join(tmpdir(), `lace-runtime-${processId}-${timestamp}-`));
+    _processTempDir = mkdtempSync(
+      path.join(tmpdir(), `lace-runtime-${processId}-${timestamp}-`)
+    );
   }
   return _processTempDir;
 }
@@ -653,7 +726,7 @@ describe('process temp directory', () => {
 
   it('should create a process temp directory', () => {
     const tempDir = getProcessTempDir();
-    
+
     expect(tempDir).toMatch(/^.*lace-runtime-\d+-\d+-[a-zA-Z0-9]+$/);
     expect(existsSync(tempDir)).toBe(true);
   });
@@ -661,7 +734,7 @@ describe('process temp directory', () => {
   it('should return the same directory on multiple calls', () => {
     const tempDir1 = getProcessTempDir();
     const tempDir2 = getProcessTempDir();
-    
+
     expect(tempDir1).toBe(tempDir2);
   });
 
@@ -669,20 +742,21 @@ describe('process temp directory', () => {
     const tempDir1 = getProcessTempDir();
     clearProcessTempDirCache();
     const tempDir2 = getProcessTempDir();
-    
+
     expect(tempDir1).not.toBe(tempDir2);
   });
 
   it('should create directory under system tmpdir', () => {
     const tempDir = getProcessTempDir();
     const systemTmpDir = tmpdir();
-    
+
     expect(tempDir).toContain(systemTmpDir);
   });
 });
 ```
 
 **Required imports to add**:
+
 ```typescript
 import { existsSync } from 'fs';
 import { tmpdir } from 'os';
@@ -690,6 +764,7 @@ import { getProcessTempDir, clearProcessTempDirCache } from './lace-dir';
 ```
 
 ### How to Test
+
 ```bash
 # Run the specific test
 npm test -- src/config/lace-dir.test.ts
@@ -699,6 +774,7 @@ npm run test:coverage -- src/config/lace-dir.test.ts
 ```
 
 ### Commit Message
+
 ```
 feat: add process-scoped temporary directory management
 
@@ -711,6 +787,7 @@ feat: add process-scoped temporary directory management
 ## Task 2: Add Project Temp Directory Helper
 
 ### Background Context
+
 - `Project` class in `src/projects/project.ts` manages project configuration
 - Has methods like `getById()`, `getWorkingDirectory()`, etc.
 - Projects have IDs that we can use for temp directory names
@@ -720,6 +797,7 @@ feat: add process-scoped temporary directory management
 **File**: `src/projects/project.ts`
 
 Add import at the top:
+
 ```typescript
 import { getProcessTempDir } from '~/config/lace-dir';
 import { mkdirSync } from 'fs';
@@ -727,6 +805,7 @@ import { join } from 'path';
 ```
 
 Add static method to the `Project` class:
+
 ```typescript
 /**
  * Get temporary directory for a project
@@ -751,7 +830,7 @@ describe('temp directory management', () => {
   it('should create project temp directory', () => {
     const projectId = 'test-project-123';
     const tempDir = Project.getProjectTempDir(projectId);
-    
+
     expect(tempDir).toContain(`project-${projectId}`);
     expect(existsSync(tempDir)).toBe(true);
   });
@@ -760,14 +839,14 @@ describe('temp directory management', () => {
     const projectId = 'test-project-456';
     const tempDir1 = Project.getProjectTempDir(projectId);
     const tempDir2 = Project.getProjectTempDir(projectId);
-    
+
     expect(tempDir1).toBe(tempDir2);
   });
 
   it('should create different directories for different projects', () => {
     const tempDir1 = Project.getProjectTempDir('project-a');
     const tempDir2 = Project.getProjectTempDir('project-b');
-    
+
     expect(tempDir1).not.toBe(tempDir2);
     expect(tempDir1).toContain('project-a');
     expect(tempDir2).toContain('project-b');
@@ -777,24 +856,27 @@ describe('temp directory management', () => {
     const projectId = 'nested-test';
     const tempDir = Project.getProjectTempDir(projectId);
     const processTempDir = getProcessTempDir();
-    
+
     expect(tempDir).toContain(processTempDir);
   });
 });
 ```
 
 **Required imports to add**:
+
 ```typescript
 import { existsSync } from 'fs';
 import { getProcessTempDir } from '~/config/lace-dir';
 ```
 
 ### How to Test
+
 ```bash
 npm test -- src/projects/project.test.ts
 ```
 
 ### Commit Message
+
 ```
 feat(projects): add project temp directory management
 
@@ -806,6 +888,7 @@ feat(projects): add project temp directory management
 ## Task 3: Add Session Temp Directory Helper
 
 ### Background Context
+
 - `Session` class manages collections of agents and session-level operations
 - Has methods like `create()`, `getById()`, etc.
 - Sessions have IDs and optional project IDs
@@ -816,6 +899,7 @@ feat(projects): add project temp directory management
 **File**: `src/sessions/session.ts`
 
 Add imports at the top (check if they already exist):
+
 ```typescript
 import { getProcessTempDir } from '~/config/lace-dir';
 import { mkdirSync } from 'fs';
@@ -823,6 +907,7 @@ import { join } from 'path';
 ```
 
 Add static method to the `Session` class:
+
 ```typescript
 /**
  * Get temporary directory for a session
@@ -830,10 +915,10 @@ Add static method to the `Session` class:
  * or: /tmp/lace-runtime-{pid}-{timestamp}/session-{sessionId}/ (if no project)
  */
 static getSessionTempDir(sessionId: string, projectId?: string): string {
-  const baseDir = projectId 
+  const baseDir = projectId
     ? Project.getProjectTempDir(projectId)
     : getProcessTempDir();
-    
+
   const sessionTempPath = join(baseDir, `session-${sessionId}`);
   mkdirSync(sessionTempPath, { recursive: true });
   return sessionTempPath;
@@ -851,7 +936,7 @@ describe('temp directory management', () => {
   it('should create session temp directory without project', () => {
     const sessionId = 'test-session-123';
     const tempDir = Session.getSessionTempDir(sessionId);
-    
+
     expect(tempDir).toContain(`session-${sessionId}`);
     expect(existsSync(tempDir)).toBe(true);
   });
@@ -860,7 +945,7 @@ describe('temp directory management', () => {
     const sessionId = 'test-session-456';
     const projectId = 'test-project-789';
     const tempDir = Session.getSessionTempDir(sessionId, projectId);
-    
+
     expect(tempDir).toContain(`project-${projectId}`);
     expect(tempDir).toContain(`session-${sessionId}`);
     expect(existsSync(tempDir)).toBe(true);
@@ -871,7 +956,7 @@ describe('temp directory management', () => {
     const projectId = 'stable-project';
     const tempDir1 = Session.getSessionTempDir(sessionId, projectId);
     const tempDir2 = Session.getSessionTempDir(sessionId, projectId);
-    
+
     expect(tempDir1).toBe(tempDir2);
   });
 
@@ -879,7 +964,7 @@ describe('temp directory management', () => {
     const projectId = 'same-project';
     const tempDir1 = Session.getSessionTempDir('session-a', projectId);
     const tempDir2 = Session.getSessionTempDir('session-b', projectId);
-    
+
     expect(tempDir1).not.toBe(tempDir2);
     expect(tempDir1).toContain('session-a');
     expect(tempDir2).toContain('session-b');
@@ -890,7 +975,7 @@ describe('temp directory management', () => {
     const projectId = 'parent-project';
     const sessionTempDir = Session.getSessionTempDir(sessionId, projectId);
     const projectTempDir = Project.getProjectTempDir(projectId);
-    
+
     expect(sessionTempDir).toContain(projectTempDir);
   });
 
@@ -898,13 +983,14 @@ describe('temp directory management', () => {
     const sessionId = 'root-session';
     const sessionTempDir = Session.getSessionTempDir(sessionId);
     const processTempDir = getProcessTempDir();
-    
+
     expect(sessionTempDir).toContain(processTempDir);
   });
 });
 ```
 
 **Required imports to add**:
+
 ```typescript
 import { existsSync } from 'fs';
 import { getProcessTempDir } from '~/config/lace-dir';
@@ -912,11 +998,13 @@ import { Project } from '~/projects/project';
 ```
 
 ### How to Test
+
 ```bash
 npm test -- src/sessions/session.test.ts
 ```
 
 ### Commit Message
+
 ```
 feat(sessions): add session temp directory management
 
@@ -928,9 +1016,11 @@ feat(sessions): add session temp directory management
 ## Task 4: Add Tool Temp Directory Helpers
 
 ### Background Context
+
 - `Tool` is the base class for all tools in `src/tools/tool.ts`
 - Has methods like `execute()`, `createResult()`, helper methods
-- Tools receive `ToolContext` which includes `sessionId`, `projectId`, `threadId`
+- Tools receive `ToolContext` which includes `sessionId`, `projectId`,
+  `threadId`
 - We want tools to easily get temp directories for their specific tool call
 
 ### Code Changes
@@ -938,6 +1028,7 @@ feat(sessions): add session temp directory management
 **File**: `src/tools/tool.ts`
 
 Add imports at the top:
+
 ```typescript
 import { Session } from '~/sessions/session';
 import { mkdirSync } from 'fs';
@@ -945,6 +1036,7 @@ import { join } from 'path';
 ```
 
 Add constants and methods to the `Tool` class:
+
 ```typescript
 // Constants for temp directory naming
 private static readonly TOOL_CALL_TEMP_PREFIX = 'tool-call-';
@@ -960,11 +1052,11 @@ protected getToolCallTempDir(toolCallId: string, context?: ToolContext): string 
   if (!context?.sessionId) {
     throw new Error('Session ID required for tool temp directory');
   }
-  
+
   const sessionDir = Session.getSessionTempDir(context.sessionId, context.projectId);
   const toolCallDir = join(sessionDir, `${Tool.TOOL_CALL_TEMP_PREFIX}${toolCallId}`);
   mkdirSync(toolCallDir, { recursive: true });
-  
+
   return toolCallDir;
 }
 
@@ -1020,7 +1112,10 @@ class TestTool extends Tool {
   }
 
   // Expose protected methods for testing
-  public getToolCallTempDirPublic(toolCallId: string, context?: ToolContext): string {
+  public getToolCallTempDirPublic(
+    toolCallId: string,
+    context?: ToolContext
+  ): string {
     return this.getToolCallTempDir(toolCallId, context);
   }
 
@@ -1103,8 +1198,14 @@ describe('Tool temp directory functionality', () => {
         sessionId: 'same-session',
       };
 
-      const tempDir1 = testTool.getToolCallTempDirPublic('tool-call-a', context);
-      const tempDir2 = testTool.getToolCallTempDirPublic('tool-call-b', context);
+      const tempDir1 = testTool.getToolCallTempDirPublic(
+        'tool-call-a',
+        context
+      );
+      const tempDir2 = testTool.getToolCallTempDirPublic(
+        'tool-call-b',
+        context
+      );
 
       expect(tempDir1).not.toBe(tempDir2);
       expect(tempDir1).toContain('tool-call-a');
@@ -1126,7 +1227,10 @@ describe('Tool temp directory functionality', () => {
       expect(paths.combined).toContain('combined.txt');
 
       // All paths should be in the same directory
-      const toolCallDir = testTool.getToolCallTempDirPublic(toolCallId, context);
+      const toolCallDir = testTool.getToolCallTempDirPublic(
+        toolCallId,
+        context
+      );
       expect(paths.stdout).toContain(toolCallDir);
       expect(paths.stderr).toContain(toolCallDir);
       expect(paths.combined).toContain(toolCallDir);
@@ -1163,11 +1267,13 @@ describe('Tool temp directory functionality', () => {
 ```
 
 ### How to Test
+
 ```bash
 npm test -- src/tools/tool.test.ts
 ```
 
 ### Commit Message
+
 ```
 feat(tools): add temp directory support to Tool base class
 
@@ -1212,7 +1318,10 @@ class IntegrationTestTool extends Tool {
     return this.createResult(`Integration test: ${args.content}`);
   }
 
-  public getToolCallTempDirPublic(toolCallId: string, context?: ToolContext): string {
+  public getToolCallTempDirPublic(
+    toolCallId: string,
+    context?: ToolContext
+  ): string {
     return this.getToolCallTempDir(toolCallId, context);
   }
 
@@ -1238,12 +1347,15 @@ describe('Temp Directory Integration', () => {
     const processTempDir = getProcessTempDir();
     const projectTempDir = Project.getProjectTempDir(projectId);
     const sessionTempDir = Session.getSessionTempDir(sessionId, projectId);
-    
+
     const context: ToolContext = {
       sessionId,
       projectId,
     };
-    const toolCallTempDir = testTool.getToolCallTempDirPublic(toolCallId, context);
+    const toolCallTempDir = testTool.getToolCallTempDirPublic(
+      toolCallId,
+      context
+    );
 
     // Verify hierarchy
     expect(projectTempDir).toContain(processTempDir);
@@ -1269,7 +1381,7 @@ describe('Temp Directory Integration', () => {
     // Write test content to each output file
     const testContent = {
       stdout: 'This is stdout content',
-      stderr: 'This is stderr content', 
+      stderr: 'This is stderr content',
       combined: 'This is combined content',
     };
 
@@ -1311,7 +1423,10 @@ describe('Temp Directory Integration', () => {
       // No projectId
     };
 
-    const toolCallTempDir = testTool.getToolCallTempDirPublic(toolCallId, context);
+    const toolCallTempDir = testTool.getToolCallTempDirPublic(
+      toolCallId,
+      context
+    );
     const processTempDir = getProcessTempDir();
     const sessionTempDir = Session.getSessionTempDir(sessionId);
 
@@ -1325,11 +1440,13 @@ describe('Temp Directory Integration', () => {
 ```
 
 ### How to Test
+
 ```bash
 npm test -- src/tools/temp-directory-integration.test.ts
 ```
 
 ### Commit Message
+
 ```
 test: add comprehensive temp directory integration tests
 
@@ -1342,6 +1459,7 @@ test: add comprehensive temp directory integration tests
 ## Task 6: Run Full Test Suite and Fix Issues
 
 ### Run All Tests
+
 ```bash
 # Run all tests to ensure nothing is broken
 npm test
@@ -1359,20 +1477,24 @@ npm run build
 ### Common Issues and Fixes
 
 **TypeScript Errors**:
+
 - Never use `any` type - use `unknown` and type guards instead
 - Import types properly: `import type { Session } from '~/sessions/session'`
 - Use proper type assertions: `as string` not `as any`
 
 **Test Failures**:
+
 - Always test real functionality, never mock what you're testing
 - Use real file operations, real directories, real temp paths
 - Clean up temp directories between tests with `clearProcessTempDirCache()`
 
 **Import Issues**:
+
 - Use `~/` path aliases, not relative imports like `../../../`
 - Import Node.js modules explicitly: `import { join } from 'path'`
 
 ### Final Commit
+
 ```
 feat: complete temp directory infrastructure
 
@@ -1389,14 +1511,19 @@ feat: complete temp directory infrastructure
 # PR 2: Bash Tool Output Management
 
 ## Overview
-Update the bash tool to store complete output in temp files while returning truncated head+tail summaries to the model. This prevents token window overflow while maintaining full audit capability.
+
+Update the bash tool to store complete output in temp files while returning
+truncated head+tail summaries to the model. This prevents token window overflow
+while maintaining full audit capability.
 
 ## Files to Modify
 
 ### 1. `src/tools/implementations/bash.ts`
+
 Update bash tool to use temp directories and implement smart truncation.
 
-### 2. `src/tools/bash.test.ts`  
+### 2. `src/tools/bash.test.ts`
+
 Update existing tests and add new tests for output management.
 
 ### 3. New test file for large output scenarios
@@ -1404,14 +1531,17 @@ Update existing tests and add new tests for output management.
 ## Task 1: Understand Current Bash Tool Implementation
 
 ### Read and Analyze
+
 Before making changes, read these files carefully:
 
 **Files to read**:
+
 - `src/tools/implementations/bash.ts` - Current implementation
-- `src/tools/bash.test.ts` - Existing tests  
+- `src/tools/bash.test.ts` - Existing tests
 - `src/tools/types.ts` - Tool result types
 
 **Key things to understand**:
+
 1. How `execAsync` is used with `maxBuffer` limit
 2. The `BashOutput` interface structure
 3. How tool results are created with `this.createResult()`
@@ -1419,6 +1549,7 @@ Before making changes, read these files carefully:
 5. Current test patterns and expectations
 
 ### Current Problems to Note
+
 - `maxBuffer: 10485760` (10MB) will throw on large output
 - Raw stdout/stderr returned directly to model
 - No audit trail for debugging failed commands
@@ -1430,22 +1561,23 @@ Before making changes, read these files carefully:
 **File**: `src/tools/implementations/bash.ts`
 
 Update the `BashOutput` interface:
+
 ```typescript
 interface BashOutput {
   command: string;
   exitCode: number;
   runtime: number;
-  
+
   // Truncated output for model consumption
   stdoutPreview: string;
   stderrPreview: string;
-  
+
   // Truncation info
   truncated: {
     stdout: { skipped: number; total: number };
     stderr: { skipped: number; total: number };
   };
-  
+
   // Full output file references
   outputFiles: {
     stdout: string;
@@ -1458,6 +1590,7 @@ interface BashOutput {
 ### Define Constants
 
 Add these constants to the bash tool class:
+
 ```typescript
 // Output truncation limits
 private static readonly PREVIEW_HEAD_LINES = 100;
@@ -1468,6 +1601,7 @@ private static readonly MAX_PREVIEW_CHARS = 10000; // Safety limit
 ## Task 3: Implement Output Streaming and Storage
 
 ### Background
+
 - We need to capture output as it streams (don't wait for command completion)
 - Store complete output to temp files
 - Keep head/tail lines in memory for preview
@@ -1478,6 +1612,7 @@ private static readonly MAX_PREVIEW_CHARS = 10000; // Safety limit
 **File**: `src/tools/implementations/bash.ts`
 
 Add these imports:
+
 ```typescript
 import { spawn } from 'child_process';
 import { createWriteStream } from 'fs';
@@ -1485,50 +1620,51 @@ import { readFileSync, statSync } from 'fs';
 ```
 
 Replace the `executeCommand` method:
+
 ```typescript
 private async executeCommand(command: string, context?: ToolContext): Promise<ToolResult> {
   // Remove maxBuffer limit, we'll handle large output gracefully
   const startTime = Date.now();
-  
+
   // Generate tool call ID for this execution
   // In real implementation, this would come from the tool executor
   // For now, generate a unique ID
   const toolCallId = `bash-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-  
+
   try {
     // Get temp file paths
     const outputPaths = this.getOutputFilePaths(toolCallId, context);
-    
+
     // Set up output streams
     const stdoutStream = createWriteStream(outputPaths.stdout);
     const stderrStream = createWriteStream(outputPaths.stderr);
     const combinedStream = createWriteStream(outputPaths.combined);
-    
+
     // Buffers for head/tail preview
     const stdoutLines: string[] = [];
     const stderrLines: string[] = [];
     let stdoutLineCount = 0;
     let stderrLineCount = 0;
-    
+
     // Execute command with spawn for streaming
     const childProcess = spawn('/bin/bash', ['-c', command], {
       cwd: context?.workingDirectory || process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
     });
-    
+
     return new Promise<ToolResult>((resolve) => {
       let stdoutData = '';
       let stderrData = '';
-      
+
       // Handle stdout
       childProcess.stdout?.on('data', (data: Buffer) => {
         const text = data.toString();
         stdoutData += text;
-        
+
         // Write to files
         stdoutStream.write(data);
         combinedStream.write(data);
-        
+
         // Track lines for preview
         const lines = text.split('\n');
         for (const line of lines) {
@@ -1542,16 +1678,16 @@ private async executeCommand(command: string, context?: ToolContext): Promise<To
           stdoutLineCount++;
         }
       });
-      
+
       // Handle stderr
       childProcess.stderr?.on('data', (data: Buffer) => {
         const text = data.toString();
         stderrData += text;
-        
+
         // Write to files
         stderrStream.write(data);
         combinedStream.write(data);
-        
+
         // Track lines for preview
         const lines = text.split('\n');
         for (const line of lines) {
@@ -1565,21 +1701,21 @@ private async executeCommand(command: string, context?: ToolContext): Promise<To
           stderrLineCount++;
         }
       });
-      
+
       // Handle completion
       childProcess.on('close', (exitCode) => {
         // Close file streams
         stdoutStream.end();
         stderrStream.end();
         combinedStream.end();
-        
+
         const endTime = Date.now();
         const runtime = endTime - startTime;
-        
+
         // Create truncated previews
         const stdoutPreview = this.createPreview(stdoutLines, stdoutLineCount);
         const stderrPreview = this.createPreview(stderrLines, stderrLineCount);
-        
+
         const result: BashOutput = {
           command,
           exitCode: exitCode || 0,
@@ -1598,7 +1734,7 @@ private async executeCommand(command: string, context?: ToolContext): Promise<To
           },
           outputFiles: outputPaths,
         };
-        
+
         // Same error handling logic as before
         if (exitCode === 127 && (!stdoutData || stdoutData.trim() === '')) {
           resolve(this.createError(result as unknown as Record<string, unknown>));
@@ -1606,14 +1742,14 @@ private async executeCommand(command: string, context?: ToolContext): Promise<To
           resolve(this.createResult(result as unknown as Record<string, unknown>));
         }
       });
-      
+
       // Handle process errors
       childProcess.on('error', (error) => {
         // Close streams
         stdoutStream.end();
         stderrStream.end();
         combinedStream.end();
-        
+
         const result: BashOutput = {
           command,
           exitCode: 1,
@@ -1626,11 +1762,11 @@ private async executeCommand(command: string, context?: ToolContext): Promise<To
           },
           outputFiles: outputPaths,
         };
-        
+
         resolve(this.createError(result as unknown as Record<string, unknown>));
       });
     });
-    
+
   } catch (error: unknown) {
     const err = error as Error;
     const result: BashOutput = {
@@ -1649,7 +1785,7 @@ private async executeCommand(command: string, context?: ToolContext): Promise<To
         combined: '',
       },
     };
-    
+
     return this.createError(result as unknown as Record<string, unknown>);
   }
 }
@@ -1661,17 +1797,17 @@ private createPreview(lines: string[], totalLines: number): string {
   if (totalLines === 0) {
     return '';
   }
-  
+
   if (totalLines <= BashTool.PREVIEW_HEAD_LINES + BashTool.PREVIEW_TAIL_LINES) {
     // No truncation needed
     return lines.join('\n');
   }
-  
+
   // Split into head and tail
   const headLines = lines.slice(0, BashTool.PREVIEW_HEAD_LINES);
   const tailLines = lines.slice(-BashTool.PREVIEW_TAIL_LINES);
   const skippedLines = totalLines - headLines.length - tailLines.length;
-  
+
   const preview = [
     ...headLines,
     `\n=== OUTPUT TRUNCATED ===`,
@@ -1679,12 +1815,12 @@ private createPreview(lines: string[], totalLines: number): string {
     `=== LAST ${tailLines.length} LINES ===\n`,
     ...tailLines,
   ].join('\n');
-  
+
   // Safety limit on preview size
   if (preview.length > BashTool.MAX_PREVIEW_CHARS) {
     return preview.substring(0, BashTool.MAX_PREVIEW_CHARS) + '\n[PREVIEW TRUNCATED]';
   }
-  
+
   return preview;
 }
 ```
@@ -1692,10 +1828,14 @@ private createPreview(lines: string[], totalLines: number): string {
 ## Task 4: Handle Tool Call ID Injection
 
 ### Problem
-Tools need the tool call ID to create temp directories, but currently don't receive it.
+
+Tools need the tool call ID to create temp directories, but currently don't
+receive it.
 
 ### Temporary Solution
-For this PR, generate a unique ID within the bash tool. In a future PR, the tool executor should provide the real tool call ID.
+
+For this PR, generate a unique ID within the bash tool. In a future PR, the tool
+executor should provide the real tool call ID.
 
 ```typescript
 // In executeValidated method, before calling executeCommand:
@@ -1706,15 +1846,16 @@ protected async executeValidated(
   // Generate unique tool call ID for this execution
   // TODO: Tool call ID should be provided by ToolExecutor in future PR
   const toolCallId = `bash-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-  
+
   return await this.executeCommand(args.command, context, toolCallId);
 }
 ```
 
 Update `executeCommand` signature:
+
 ```typescript
 private async executeCommand(
-  command: string, 
+  command: string,
   context?: ToolContext,
   toolCallId?: string
 ): Promise<ToolResult>
@@ -1723,11 +1864,14 @@ private async executeCommand(
 ## Task 5: Update Tests for New Behavior
 
 ### Background
-Current tests expect raw stdout/stderr in results. We need to update them for the new `BashOutput` format.
+
+Current tests expect raw stdout/stderr in results. We need to update them for
+the new `BashOutput` format.
 
 ### Test Strategy
+
 - Test small outputs (no truncation)
-- Test large outputs (with truncation) 
+- Test large outputs (with truncation)
 - Test file creation and storage
 - Test error scenarios
 - Never mock the bash execution - use real commands
@@ -1737,14 +1881,18 @@ Current tests expect raw stdout/stderr in results. We need to update them for th
 **File**: `src/tools/bash.test.ts`
 
 Update test expectations for new output format:
+
 ```typescript
 // Update existing tests to expect new BashOutput format
 it('should execute simple bash command', async () => {
   const tool = new BashTool();
-  const result = await tool.execute({ command: 'echo "hello world"' }, mockContext);
-  
+  const result = await tool.execute(
+    { command: 'echo "hello world"' },
+    mockContext
+  );
+
   expect(result.isError).toBe(false);
-  
+
   // Parse the result content
   const content = JSON.parse(result.content[0].text) as BashOutput;
   expect(content.command).toBe('echo "hello world"');
@@ -1752,11 +1900,11 @@ it('should execute simple bash command', async () => {
   expect(content.stdoutPreview).toContain('hello world');
   expect(content.stderrPreview).toBe('');
   expect(content.runtime).toBeGreaterThan(0);
-  
+
   // Check truncation info
   expect(content.truncated.stdout.total).toBeGreaterThan(0);
   expect(content.truncated.stdout.skipped).toBe(0); // No truncation for small output
-  
+
   // Check output files exist
   expect(existsSync(content.outputFiles.stdout)).toBe(true);
   expect(existsSync(content.outputFiles.stderr)).toBe(true);
@@ -1798,15 +1946,15 @@ describe('BashTool Large Output Handling', () => {
     // Generate 50 lines of output (under the 100 line head limit)
     const command = 'for i in {1..50}; do echo "Line $i of output"; done';
     const result = await tool.execute({ command }, mockContext);
-    
+
     expect(result.isError).toBe(false);
-    
+
     const content = JSON.parse(result.content[0].text);
     expect(content.truncated.stdout.total).toBe(50);
     expect(content.truncated.stdout.skipped).toBe(0);
     expect(content.stdoutPreview).toContain('Line 1 of output');
     expect(content.stdoutPreview).toContain('Line 50 of output');
-    
+
     // Verify full output in file
     const fullOutput = readFileSync(content.outputFiles.stdout, 'utf-8');
     expect(fullOutput).toContain('Line 1 of output');
@@ -1817,25 +1965,25 @@ describe('BashTool Large Output Handling', () => {
     // Generate 200 lines of output (will trigger truncation)
     const command = 'for i in {1..200}; do echo "Line $i of many lines"; done';
     const result = await tool.execute({ command }, mockContext);
-    
+
     expect(result.isError).toBe(false);
-    
+
     const content = JSON.parse(result.content[0].text);
     expect(content.truncated.stdout.total).toBe(200);
     expect(content.truncated.stdout.skipped).toBe(50); // 200 - 100 head - 50 tail
-    
+
     // Preview should contain head lines
     expect(content.stdoutPreview).toContain('Line 1 of many lines');
     expect(content.stdoutPreview).toContain('Line 100 of many lines');
-    
+
     // Preview should contain truncation indicator
     expect(content.stdoutPreview).toContain('=== OUTPUT TRUNCATED ===');
     expect(content.stdoutPreview).toContain('[Skipped 50 lines');
-    
+
     // Preview should contain tail lines
     expect(content.stdoutPreview).toContain('Line 151 of many lines'); // First tail line
     expect(content.stdoutPreview).toContain('Line 200 of many lines'); // Last line
-    
+
     // Full output should be complete in file
     const fullOutput = readFileSync(content.outputFiles.stdout, 'utf-8');
     expect(fullOutput).toContain('Line 1 of many lines');
@@ -1848,17 +1996,17 @@ describe('BashTool Large Output Handling', () => {
     // Generate large stderr output
     const command = 'for i in {1..200}; do echo "Error $i" >&2; done';
     const result = await tool.execute({ command }, mockContext);
-    
+
     expect(result.isError).toBe(false); // Tool succeeds even with stderr
-    
+
     const content = JSON.parse(result.content[0].text);
     expect(content.truncated.stderr.total).toBe(200);
     expect(content.truncated.stderr.skipped).toBe(50);
-    
+
     expect(content.stderrPreview).toContain('Error 1');
     expect(content.stderrPreview).toContain('=== OUTPUT TRUNCATED ===');
     expect(content.stderrPreview).toContain('Error 200');
-    
+
     // Check stderr file
     const stderrOutput = readFileSync(content.outputFiles.stderr, 'utf-8');
     expect(stderrOutput).toContain('Error 1');
@@ -1873,15 +2021,15 @@ describe('BashTool Large Output Handling', () => {
       done
     `;
     const result = await tool.execute({ command }, mockContext);
-    
+
     expect(result.isError).toBe(false);
-    
+
     const content = JSON.parse(result.content[0].text);
-    
+
     // Both should have some lines
     expect(content.truncated.stdout.total).toBe(100);
     expect(content.truncated.stderr.total).toBe(100);
-    
+
     // Check combined file has both streams
     const combinedOutput = readFileSync(content.outputFiles.combined, 'utf-8');
     expect(combinedOutput).toContain('Stdout line');
@@ -1890,18 +2038,19 @@ describe('BashTool Large Output Handling', () => {
 
   it('should handle commands with extremely large output', async () => {
     // Generate very large output (1000 lines)
-    const command = 'for i in {1..1000}; do echo "Very long line $i with lots of text to make it bigger"; done';
+    const command =
+      'for i in {1..1000}; do echo "Very long line $i with lots of text to make it bigger"; done';
     const result = await tool.execute({ command }, mockContext);
-    
+
     expect(result.isError).toBe(false);
-    
+
     const content = JSON.parse(result.content[0].text);
     expect(content.truncated.stdout.total).toBe(1000);
     expect(content.truncated.stdout.skipped).toBe(850); // 1000 - 100 head - 50 tail
-    
+
     // Preview should be under safety limit
     expect(content.stdoutPreview.length).toBeLessThan(10000);
-    
+
     // Full output should be much larger
     const fullOutput = readFileSync(content.outputFiles.stdout, 'utf-8');
     expect(fullOutput.length).toBeGreaterThan(50000);
@@ -1910,20 +2059,20 @@ describe('BashTool Large Output Handling', () => {
   it('should create separate files for stdout, stderr, and combined', async () => {
     const command = 'echo "stdout content"; echo "stderr content" >&2';
     const result = await tool.execute({ command }, mockContext);
-    
+
     const content = JSON.parse(result.content[0].text);
-    
+
     // All three files should exist and have different content
     const stdoutContent = readFileSync(content.outputFiles.stdout, 'utf-8');
     const stderrContent = readFileSync(content.outputFiles.stderr, 'utf-8');
     const combinedContent = readFileSync(content.outputFiles.combined, 'utf-8');
-    
+
     expect(stdoutContent).toContain('stdout content');
     expect(stdoutContent).not.toContain('stderr content');
-    
+
     expect(stderrContent).toContain('stderr content');
     expect(stderrContent).not.toContain('stdout content');
-    
+
     expect(combinedContent).toContain('stdout content');
     expect(combinedContent).toContain('stderr content');
   });
@@ -1931,16 +2080,16 @@ describe('BashTool Large Output Handling', () => {
   it('should handle command that produces no output', async () => {
     const command = 'true'; // Command that exits successfully with no output
     const result = await tool.execute({ command }, mockContext);
-    
+
     expect(result.isError).toBe(false);
-    
+
     const content = JSON.parse(result.content[0].text);
     expect(content.exitCode).toBe(0);
     expect(content.stdoutPreview).toBe('');
     expect(content.stderrPreview).toBe('');
     expect(content.truncated.stdout.total).toBe(0);
     expect(content.truncated.stderr.total).toBe(0);
-    
+
     // Files should still exist but be empty
     expect(existsSync(content.outputFiles.stdout)).toBe(true);
     expect(readFileSync(content.outputFiles.stdout, 'utf-8')).toBe('');
@@ -1949,7 +2098,7 @@ describe('BashTool Large Output Handling', () => {
   it('should include runtime information', async () => {
     const command = 'sleep 0.1; echo "done"'; // Command that takes some time
     const result = await tool.execute({ command }, mockContext);
-    
+
     const content = JSON.parse(result.content[0].text);
     expect(content.runtime).toBeGreaterThan(100); // At least 100ms
     expect(typeof content.runtime).toBe('number');
@@ -1958,13 +2107,13 @@ describe('BashTool Large Output Handling', () => {
   it('should handle non-zero exit codes correctly', async () => {
     const command = 'echo "before error"; exit 42';
     const result = await tool.execute({ command }, mockContext);
-    
+
     expect(result.isError).toBe(false); // Tool execution succeeds
-    
+
     const content = JSON.parse(result.content[0].text);
     expect(content.exitCode).toBe(42);
     expect(content.stdoutPreview).toContain('before error');
-    
+
     // Output should still be stored in files
     const stdoutContent = readFileSync(content.outputFiles.stdout, 'utf-8');
     expect(stdoutContent).toContain('before error');
@@ -1975,6 +2124,7 @@ describe('BashTool Large Output Handling', () => {
 ## Task 6: Test the Implementation
 
 ### Run Tests
+
 ```bash
 # Run bash tool specific tests
 npm test -- src/tools/bash.test.ts
@@ -1988,9 +2138,11 @@ npm test
 ```
 
 ### Manual Testing
+
 Create a test script to verify large output handling:
 
 **File**: `test-bash-output.js` (temporary, for manual testing)
+
 ```javascript
 import { BashTool } from './src/tools/implementations/bash.js';
 
@@ -2001,9 +2153,13 @@ const context = {
 };
 
 // Test large output
-const result = await tool.execute({
-  command: 'for i in {1..500}; do echo "Line $i of test output with some content"; done'
-}, context);
+const result = await tool.execute(
+  {
+    command:
+      'for i in {1..500}; do echo "Line $i of test output with some content"; done',
+  },
+  context
+);
 
 console.log('Result preview length:', result.content[0].text.length);
 console.log('Result sample:', result.content[0].text.substring(0, 500));
@@ -2017,6 +2173,7 @@ console.log('Truncation info:', content.truncated);
 Run with: `node test-bash-output.js`
 
 ### Performance Testing
+
 Test with very large outputs to ensure memory doesn't explode:
 
 ```bash
@@ -2032,10 +2189,11 @@ echo 'for i in {1..10000}; do echo "Line $i with lots of content to make it larg
 
 Add section about temp directory usage:
 
-```markdown
+````markdown
 ## Tool Temp Directory Usage
 
-Tools can store large outputs and intermediate files using the temp directory system.
+Tools can store large outputs and intermediate files using the temp directory
+system.
 
 ### Getting Temp Directories
 
@@ -2051,6 +2209,7 @@ const tempDir = this.getToolCallTempDir(toolCallId, context);
 const paths = this.getOutputFilePaths(toolCallId, context);
 // paths.stdout, paths.stderr, paths.combined
 ```
+````
 
 ### Directory Structure
 
@@ -2071,8 +2230,10 @@ const paths = this.getOutputFilePaths(toolCallId, context);
 
 ### Best Practices
 
-1. **Large Output Management**: Store full output in temp files, return summaries to model
-2. **File Naming**: Use standard names (stdout.txt, stderr.txt, combined.txt) for consistency
+1. **Large Output Management**: Store full output in temp files, return
+   summaries to model
+2. **File Naming**: Use standard names (stdout.txt, stderr.txt, combined.txt)
+   for consistency
 3. **Error Handling**: Always create temp directories even if command fails
 4. **Memory Usage**: Stream output to files, don't buffer everything in memory
 5. **Audit Trail**: Full output is preserved for debugging and analysis
@@ -2080,6 +2241,7 @@ const paths = this.getOutputFilePaths(toolCallId, context);
 ### Example: Bash Tool Implementation
 
 The bash tool demonstrates proper large output handling:
+
 - Streams output to temp files during execution
 - Returns head+tail preview to model (first 100 + last 50 lines)
 - Includes truncation statistics and file references
@@ -2104,7 +2266,8 @@ The bash tool demonstrates proper large output handling:
   }
 }
 ```
-```
+
+````
 
 ### Run Final Tests
 ```bash
@@ -2117,14 +2280,15 @@ npm run build
 
 # Test coverage
 npm run test:coverage
-```
+````
 
 ### Final Commit Message
+
 ```
 feat(bash): implement large output management with temp file storage
 
 - Replace maxBuffer limit with streaming output capture
-- Store complete output in session-scoped temp directories  
+- Store complete output in session-scoped temp directories
 - Return head+tail previews (100+50 lines) to prevent token overflow
 - Include truncation statistics and temp file references
 - Maintain full audit trail for debugging
@@ -2137,17 +2301,21 @@ Fixes: 800k stderr output causing token window overflow
 ## Task 8: Clean Up and Documentation
 
 ### Remove Temporary Files
+
 ```bash
 rm test-bash-output.js  # If created for manual testing
 ```
 
 ### Update CLAUDE.md
+
 Add note about temp directory system:
 
 ```markdown
 ### Tool Output Management
 
-Tools that generate large outputs (like bash commands) use the temp directory system:
+Tools that generate large outputs (like bash commands) use the temp directory
+system:
+
 - Full outputs stored in `/tmp/lace-runtime-{pid}-{timestamp}/`
 - Organized by project/session/tool-call hierarchy
 - Model receives truncated previews with file references
@@ -2155,6 +2323,7 @@ Tools that generate large outputs (like bash commands) use the temp directory sy
 ```
 
 ### Final Integration Test
+
 Run a real scenario to verify everything works:
 
 ```bash
@@ -2173,22 +2342,26 @@ npm start
 This plan implements a complete solution for bash tool output management:
 
 **PR 1: Temp Directory Infrastructure**
-- Process-stable temp directories 
+
+- Process-stable temp directories
 - Hierarchical organization (process/project/session/tool-call)
 - Tool base class integration
 - Comprehensive testing
 
-**PR 2: Bash Tool Output Management**  
+**PR 2: Bash Tool Output Management**
+
 - Streaming output capture to temp files
 - Head+tail truncation for model consumption
 - Complete audit trail preservation
 - Large output test coverage
 
 **Key Design Principles Applied**:
+
 - YAGNI: Simple directory creation, no complex retention policies
 - DRY: Reusable temp directory system across all tools
 - TDD: Tests written first, real functionality never mocked
 - Frequent commits: Each task gets its own commit
 - Type safety: No `any` types, proper TypeScript throughout
 
-The result: bash tools can handle 800k+ output without breaking the model, while maintaining complete debugging capabilities.
+The result: bash tools can handle 800k+ output without breaking the model, while
+maintaining complete debugging capabilities.
