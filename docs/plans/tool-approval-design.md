@@ -2,14 +2,16 @@
 
 ## Overview
 
-This document outlines the design for an interactive tool approval system in the Lace web UI, allowing users to approve or deny tool executions in real-time through a modal interface.
+This document outlines the design for an interactive tool approval system in the
+Lace web UI, allowing users to approve or deny tool executions in real-time
+through a modal interface.
 
 ## Architecture
 
 ### 1. Event Flow
 
 ```
-Agent needs approval → Emit SSE event → Frontend shows modal → User decides → 
+Agent needs approval → Emit SSE event → Frontend shows modal → User decides →
 API call with decision → Resolve approval callback → Agent continues
 ```
 
@@ -18,44 +20,50 @@ API call with decision → Resolve approval callback → Agent continues
 #### 2.1 Event Types
 
 **New SSE Event Type:**
+
 ```typescript
 interface ToolApprovalRequest {
   type: 'TOOL_APPROVAL_REQUEST';
   threadId: ThreadId;
   timestamp: string;
   data: {
-    requestId: string;          // Unique ID to track this approval
-    toolName: string;           // e.g., "file-write"
-    toolDescription?: string;   // Human-readable description
-    isReadOnly: boolean;        // Whether tool is read-only
+    requestId: string; // Unique ID to track this approval
+    toolName: string; // e.g., "file-write"
+    toolDescription?: string; // Human-readable description
+    isReadOnly: boolean; // Whether tool is read-only
     riskLevel: 'safe' | 'moderate' | 'destructive';
-    input: Record<string, unknown>;  // Tool arguments
-    timeout?: number;           // Optional timeout in seconds
+    input: Record<string, unknown>; // Tool arguments
+    timeout?: number; // Optional timeout in seconds
   };
 }
 ```
 
 **New API Response Type:**
+
 ```typescript
 interface ToolApprovalResponse {
   requestId: string;
   decision: 'allow_once' | 'allow_session' | 'deny';
-  reason?: string;  // Optional reason for audit
+  reason?: string; // Optional reason for audit
 }
 ```
 
 #### 2.2 Backend Changes
 
 **Approval State Manager (`packages/web/lib/server/approval-manager.ts`):**
+
 ```typescript
 class ApprovalManager {
-  private pendingApprovals = new Map<string, {
-    resolve: (decision: ApprovalDecision) => void;
-    reject: (error: Error) => void;
-    timeout: NodeJS.Timeout;
-    threadId: ThreadId;
-    toolName: string;
-  }>();
+  private pendingApprovals = new Map<
+    string,
+    {
+      resolve: (decision: ApprovalDecision) => void;
+      reject: (error: Error) => void;
+      timeout: NodeJS.Timeout;
+      threadId: ThreadId;
+      toolName: string;
+    }
+  >();
 
   async requestApproval(
     threadId: ThreadId,
@@ -65,7 +73,7 @@ class ApprovalManager {
     timeoutMs: number = 30000
   ): Promise<ApprovalDecision> {
     const requestId = randomUUID();
-    
+
     return new Promise((resolve, reject) => {
       // Set timeout
       const timeout = setTimeout(() => {
@@ -79,7 +87,7 @@ class ApprovalManager {
         reject,
         timeout,
         threadId,
-        toolName
+        toolName,
       });
 
       // Emit SSE event
@@ -93,14 +101,11 @@ class ApprovalManager {
           isReadOnly,
           riskLevel: this.getRiskLevel(toolName, isReadOnly),
           input,
-          timeout: timeoutMs / 1000
-        }
+          timeout: timeoutMs / 1000,
+        },
       };
-      
-      SSEManager.getInstance().broadcast(
-        this.getSessionId(threadId),
-        event
-      );
+
+      SSEManager.getInstance().broadcast(this.getSessionId(threadId), event);
     });
   }
 
@@ -114,9 +119,13 @@ class ApprovalManager {
     return true;
   }
 
-  private getRiskLevel(toolName: string, isReadOnly: boolean): 'safe' | 'moderate' | 'destructive' {
+  private getRiskLevel(
+    toolName: string,
+    isReadOnly: boolean
+  ): 'safe' | 'moderate' | 'destructive' {
     if (isReadOnly) return 'safe';
-    if (['file-write', 'file-edit', 'file-delete'].includes(toolName)) return 'moderate';
+    if (['file-write', 'file-edit', 'file-delete'].includes(toolName))
+      return 'moderate';
     if (['bash', 'delegate'].includes(toolName)) return 'destructive';
     return 'moderate';
   }
@@ -124,6 +133,7 @@ class ApprovalManager {
 ```
 
 **New API Endpoint (`packages/web/app/api/approvals/[requestId]/route.ts`):**
+
 ```typescript
 export async function POST(
   request: NextRequest,
@@ -131,17 +141,17 @@ export async function POST(
 ): Promise<NextResponse> {
   const { requestId } = await params;
   const body: ToolApprovalResponse = await request.json();
-  
+
   const approvalManager = getApprovalManager();
   const success = approvalManager.resolveApproval(requestId, body.decision);
-  
+
   if (!success) {
     return NextResponse.json(
       { error: 'Approval request not found or expired' },
       { status: 404 }
     );
   }
-  
+
   return NextResponse.json({ status: 'resolved' });
 }
 ```
@@ -149,6 +159,7 @@ export async function POST(
 #### 2.3 Frontend Components
 
 **Approval Modal Component (`packages/web/components/ToolApprovalModal.tsx`):**
+
 ```typescript
 interface ToolApprovalModalProps {
   request: ToolApprovalRequest['data'];
@@ -158,7 +169,7 @@ interface ToolApprovalModalProps {
 
 export function ToolApprovalModal({ request, onDecision, onTimeout }: ToolApprovalModalProps) {
   const [timeLeft, setTimeLeft] = useState(request.timeout || 30);
-  
+
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft(prev => {
@@ -169,7 +180,7 @@ export function ToolApprovalModal({ request, onDecision, onTimeout }: ToolApprov
         return prev - 1;
       });
     }, 1000);
-    
+
     return () => clearInterval(timer);
   }, [onTimeout]);
 
@@ -188,7 +199,7 @@ export function ToolApprovalModal({ request, onDecision, onTimeout }: ToolApprov
           <h2 className="text-xl font-bold">Tool Approval Required</h2>
           <span className="text-sm text-gray-400">{timeLeft}s</span>
         </div>
-        
+
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg font-mono">{request.toolName}</span>
@@ -196,11 +207,11 @@ export function ToolApprovalModal({ request, onDecision, onTimeout }: ToolApprov
               {request.riskLevel}
             </span>
           </div>
-          
+
           {request.toolDescription && (
             <p className="text-gray-400 text-sm mb-3">{request.toolDescription}</p>
           )}
-          
+
           <div className="bg-gray-900 rounded p-3">
             <div className="text-xs text-gray-500 mb-1">Parameters:</div>
             <pre className="text-sm text-gray-300 overflow-x-auto">
@@ -208,7 +219,7 @@ export function ToolApprovalModal({ request, onDecision, onTimeout }: ToolApprov
             </pre>
           </div>
         </div>
-        
+
         <div className="flex gap-2">
           <button
             onClick={() => onDecision('allow_once')}
@@ -229,7 +240,7 @@ export function ToolApprovalModal({ request, onDecision, onTimeout }: ToolApprov
             Deny
           </button>
         </div>
-        
+
         <div className="mt-4 text-xs text-gray-500">
           <div>• Allow Once: Approve this specific call only</div>
           <div>• Allow Session: Approve all calls to {request.toolName} this session</div>
@@ -242,6 +253,7 @@ export function ToolApprovalModal({ request, onDecision, onTimeout }: ToolApprov
 ```
 
 **Updated Main Page (`packages/web/app/page.tsx`):**
+
 ```typescript
 // Add to state
 const [approvalRequest, setApprovalRequest] = useState<ToolApprovalRequest['data'] | null>(null);
@@ -255,14 +267,14 @@ eventSource.addEventListener('TOOL_APPROVAL_REQUEST', (event: MessageEvent) => {
 // Handle approval decision
 const handleApprovalDecision = async (decision: ApprovalDecision) => {
   if (!approvalRequest) return;
-  
+
   try {
     await fetch(`/api/approvals/${approvalRequest.requestId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ decision })
     });
-    
+
     setApprovalRequest(null);
   } catch (error) {
     console.error('Failed to submit approval decision:', error);
@@ -283,16 +295,17 @@ const handleApprovalDecision = async (decision: ApprovalDecision) => {
 
 1. **Request ID Validation**: Use cryptographically secure random IDs
 2. **Timeout Enforcement**: Auto-deny after timeout to prevent hanging
-3. **Session Validation**: Ensure approval requests can only be resolved by the session owner
+3. **Session Validation**: Ensure approval requests can only be resolved by the
+   session owner
 4. **Rate Limiting**: Prevent approval request spam
 5. **Audit Trail**: Log all approval decisions with timestamps and reasons
 
 ### 4. User Experience
 
 1. **Modal Design**: Clear, non-intrusive modal with risk indicators
-2. **Keyboard Shortcuts**: 
+2. **Keyboard Shortcuts**:
    - `Y` or `A` = Allow Once
-   - `S` = Allow Session  
+   - `S` = Allow Session
    - `N` or `D` = Deny
    - `ESC` = Deny
 3. **Risk Indicators**:
@@ -305,18 +318,21 @@ const handleApprovalDecision = async (decision: ApprovalDecision) => {
 ### 5. Implementation Phases
 
 #### Phase 1: Basic Approval Flow
+
 - Create approval manager and state tracking
 - Implement SSE event for approval requests
 - Build basic modal UI
 - Create API endpoint for decisions
 
 #### Phase 2: Enhanced UX
+
 - Add keyboard shortcuts
 - Implement risk level indicators
 - Add parameter formatting for common tools
 - Create approval history view
 
 #### Phase 3: Advanced Features
+
 - Session-wide approval policies
 - Approval templates/presets
 - Batch approvals for multiple tools
@@ -329,4 +345,5 @@ const handleApprovalDecision = async (decision: ApprovalDecision) => {
 3. **E2E Tests**: User interaction with modal
 4. **Security Tests**: Request forgery, timeout enforcement
 
-This design provides a secure, user-friendly tool approval system that maintains the safety guarantees of the CLI while enabling interactive web-based workflows.
+This design provides a secure, user-friendly tool approval system that maintains
+the safety guarantees of the CLI while enabling interactive web-based workflows.

@@ -73,4 +73,6 @@ When stopping work, always communicate:
 
 ## Remember
 
-The user owns the code. You're a collaborator who respects existing patterns, asks before architectural changes, and maintains compatibility unless explicitly told otherwise.
+The user owns the code. You're a collaborator who respects existing patterns,
+asks before architectural changes, and maintains compatibility unless explicitly
+told otherwise.

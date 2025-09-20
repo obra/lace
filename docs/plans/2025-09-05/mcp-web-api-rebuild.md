@@ -3,14 +3,20 @@
 ## Context for External Engineer
 
 ### Background
-The initial MCP integration has good core infrastructure but the web API was architecturally wrong. It used global APIs with client-provided project paths instead of following Lace's established project/session hierarchy patterns. This plan rebuilds the web API correctly.
+
+The initial MCP integration has good core infrastructure but the web API was
+architecturally wrong. It used global APIs with client-provided project paths
+instead of following Lace's established project/session hierarchy patterns. This
+plan rebuilds the web API correctly.
 
 ### Prerequisites
+
 - Part 1 MCP core integration must be complete and working
 - Understanding of Lace's project/session architecture
 - Understanding of LaceEvent system in `src/threads/types.ts`
 
 ### Key Architectural Principles
+
 1. **Project Hierarchy**: `/api/projects/$projectId/mcp/*` not `/api/mcp/*`
 2. **Session Runtime**: MCP servers run per-session, not globally
 3. **Event-Driven**: Use existing LaceEvent system for configuration changes
@@ -18,6 +24,7 @@ The initial MCP integration has good core infrastructure but the web API was arc
 5. **RESTful Design**: Per-resource endpoints, not monolithic blobs
 
 ### Current Architecture Issues to Fix
+
 - MCP config files in wrong directory (`src/mcp/` should be `src/config/`)
 - Web APIs bypass project context (security issue)
 - No integration with project/session configuration inheritance
@@ -29,16 +36,20 @@ The initial MCP integration has good core infrastructure but the web API was arc
 
 #### Task 1.1: Move MCP Configuration to Proper Location and Add Project Integration
 
-**Objective**: Move MCP configuration to correct directory structure, add proper event types, and integrate MCP configuration management into Project class using proper delegation patterns.
+**Objective**: Move MCP configuration to correct directory structure, add proper
+event types, and integrate MCP configuration management into Project class using
+proper delegation patterns.
 
 **Files to Move:**
+
 ```bash
 mv src/mcp/config-loader.ts src/config/mcp-config-loader.ts
-mv src/mcp/types.ts src/config/mcp-types.ts  
+mv src/mcp/types.ts src/config/mcp-types.ts
 mv src/mcp/config-loader.test.ts src/config/mcp-config-loader.test.ts
 ```
 
 **Files to Modify:**
+
 - `src/threads/types.ts` (add MCP event types)
 - `src/projects/project.ts` (add MCP configuration methods)
 - `src/sessions/session.ts` (add MCP event announcement)
@@ -49,15 +60,17 @@ mv src/mcp/config-loader.test.ts src/config/mcp-config-loader.test.ts
 **File**: `src/threads/types.ts`
 
 **Add to EVENT_TYPES array:**
+
 ```typescript
 export const EVENT_TYPES = [
   // ... existing events
-  'MCP_CONFIG_CHANGED',        // When project MCP config changes
-  'MCP_SERVER_STATUS_CHANGED', // When MCP server starts/stops/fails  
+  'MCP_CONFIG_CHANGED', // When project MCP config changes
+  'MCP_SERVER_STATUS_CHANGED', // When MCP server starts/stops/fails
 ] as const;
 ```
 
 **Add to LaceEvent union type:**
+
 ```typescript
 export type LaceEvent =
   // ... existing event types
@@ -80,6 +93,7 @@ export type LaceEvent =
 ```
 
 **Test:**
+
 ```typescript
 // Add to existing event type tests
 describe('MCP Event Types', () => {
@@ -87,7 +101,7 @@ describe('MCP Event Types', () => {
     expect(EVENT_TYPES).toContain('MCP_CONFIG_CHANGED');
     expect(EVENT_TYPES).toContain('MCP_SERVER_STATUS_CHANGED');
   });
-  
+
   it('should validate MCP event structure', () => {
     const mcpConfigEvent: LaceEvent = {
       type: 'MCP_CONFIG_CHANGED',
@@ -98,16 +112,16 @@ describe('MCP Event Types', () => {
         serverConfig: {
           command: 'npx',
           enabled: true,
-          tools: {}
-        }
+          tools: {},
+        },
       },
       context: {
         sessionId: 'test-session',
-        projectId: 'test-project'
+        projectId: 'test-project',
       },
-      transient: true
+      transient: true,
     };
-    
+
     expect(mcpConfigEvent.type).toBe('MCP_CONFIG_CHANGED');
     expect(mcpConfigEvent.data.serverId).toBe('filesystem');
   });
@@ -119,6 +133,7 @@ describe('MCP Event Types', () => {
 **File**: `src/config/mcp-config-loader.ts` (moved from `src/mcp/`)
 
 **Enhanced validation:**
+
 ```typescript
 export class MCPConfigLoader {
   /**
@@ -128,14 +143,16 @@ export class MCPConfigLoader {
     const rawConfig = this.loadRawConfig(projectRoot);
     return this.validateConfig(rawConfig);
   }
-  
+
   /**
    * Validate config and disable invalid servers (graceful degradation)
    */
   static validateConfig(config: MCPConfig): MCPConfig {
     const validatedConfig = { ...config };
-    
-    for (const [serverId, serverConfig] of Object.entries(validatedConfig.servers)) {
+
+    for (const [serverId, serverConfig] of Object.entries(
+      validatedConfig.servers
+    )) {
       try {
         MCPServerConfigSchema.parse(serverConfig);
       } catch (error) {
@@ -143,15 +160,15 @@ export class MCPConfigLoader {
         validatedConfig.servers[serverId] = {
           ...serverConfig,
           enabled: false,
-          tools: {}
+          tools: {},
         };
         logger.warn(`Disabled invalid MCP server ${serverId}:`, error);
       }
     }
-    
+
     return validatedConfig;
   }
-  
+
   /**
    * Save config with validation
    */
@@ -160,7 +177,7 @@ export class MCPConfigLoader {
     const validatedConfig = this.validateConfig(config);
     this.saveConfigFile(this.getConfigPath(projectRoot), validatedConfig);
   }
-  
+
   // ... existing methods remain unchanged
 }
 ```
@@ -170,6 +187,7 @@ export class MCPConfigLoader {
 **File**: `src/projects/project.ts`
 
 **Import updates:**
+
 ```typescript
 import { MCPConfigLoader } from '~/config/mcp-config-loader';
 import type { MCPServerConfig } from '~/config/mcp-types';
@@ -177,6 +195,7 @@ import { ThreadManager } from '~/threads/thread-manager';
 ```
 
 **Methods to add:**
+
 ```typescript
 class Project {
   /**
@@ -186,7 +205,7 @@ class Project {
     const config = MCPConfigLoader.loadConfig(this.getWorkingDirectory());
     return config.servers;
   }
-  
+
   /**
    * Add new MCP server to project configuration
    */
@@ -196,19 +215,27 @@ class Project {
     if (existingServers[serverId]) {
       throw new Error(`MCP server '${serverId}' already exists in project`);
     }
-    
-    MCPConfigLoader.updateServerConfig(serverId, serverConfig, this.getWorkingDirectory());
+
+    MCPConfigLoader.updateServerConfig(
+      serverId,
+      serverConfig,
+      this.getWorkingDirectory()
+    );
     this.notifySessionsMCPChange(serverId, 'created', serverConfig);
   }
-  
+
   /**
    * Update existing MCP server configuration
    */
   updateMCPServer(serverId: string, serverConfig: MCPServerConfig): void {
-    MCPConfigLoader.updateServerConfig(serverId, serverConfig, this.getWorkingDirectory());
+    MCPConfigLoader.updateServerConfig(
+      serverId,
+      serverConfig,
+      this.getWorkingDirectory()
+    );
     this.notifySessionsMCPChange(serverId, 'updated', serverConfig);
   }
-  
+
   /**
    * Remove MCP server from project configuration
    */
@@ -216,17 +243,17 @@ class Project {
     MCPConfigLoader.deleteServerConfig(serverId, this.getWorkingDirectory());
     this.notifySessionsMCPChange(serverId, 'deleted');
   }
-  
+
   private notifySessionsMCPChange(
-    serverId: string, 
-    action: 'created' | 'updated' | 'deleted', 
+    serverId: string,
+    action: 'created' | 'updated' | 'deleted',
     serverConfig?: MCPServerConfig
   ): void {
     const threadManager = ThreadManager.getInstance();
-    
+
     // Notify all active sessions in this project
     const sessions = this.getAllSessions();
-    sessions.forEach(session => {
+    sessions.forEach((session) => {
       session.announceMCPConfigChange(serverId, action, serverConfig);
     });
   }
@@ -238,24 +265,25 @@ class Project {
 **File**: `src/sessions/session.ts`
 
 **Method to add:**
+
 ```typescript
 class Session {
   /**
    * Announce MCP configuration change to this session's thread
    */
   announceMCPConfigChange(
-    serverId: string, 
+    serverId: string,
     action: 'created' | 'updated' | 'deleted',
     serverConfig?: MCPServerConfig
   ): void {
     this._threadManager.addEvent(this.getThreadId(), {
       type: 'MCP_CONFIG_CHANGED',
       data: { serverId, action, serverConfig },
-      context: { 
-        sessionId: this.getId(), 
-        projectId: this.getProjectId() 
+      context: {
+        sessionId: this.getId(),
+        projectId: this.getProjectId(),
       },
-      transient: true
+      transient: true,
     });
   }
 }
@@ -264,6 +292,7 @@ class Session {
 #### **Step 1.1.5: Update All Import Paths**
 
 **Files to Update:**
+
 - `src/mcp/server-manager.ts` (import from `~/config/mcp-types`)
 - `src/mcp/tool-registry.ts` (import from `~/config/mcp-types`)
 - `src/mcp/tool-adapter.ts` (import from `~/config/mcp-types`)
@@ -271,23 +300,26 @@ class Session {
 - Any other files importing from old mcp config locations
 
 **Example:**
+
 ```typescript
 // OLD
 import { MCPConfigLoader } from '~/mcp/config-loader';
 import type { MCPConfig } from '~/mcp/types';
 
-// NEW  
+// NEW
 import { MCPConfigLoader } from '~/config/mcp-config-loader';
 import type { MCPConfig } from '~/config/mcp-types';
 ```
 
 **Testing:**
+
 ```bash
 npm run build  # Verify all imports resolve correctly
 npm test      # Verify all tests still pass
 ```
 
-**Commit Message**: `refactor: move MCP config to proper location and add project integration with event system`
+**Commit Message**:
+`refactor: move MCP config to proper location and add project integration with event system`
 
 ---
 
@@ -306,75 +338,90 @@ This task establishes the foundation for proper MCP configuration management by:
 
 ### Task 1.2: Session-Level MCP Server Management
 
-**Objective**: Enable Sessions to manage running MCP servers (start/stop/restart) and handle MCP configuration change events from Projects, with proper ToolExecutor lifecycle management.
+**Objective**: Enable Sessions to manage running MCP servers
+(start/stop/restart) and handle MCP configuration change events from Projects,
+with proper ToolExecutor lifecycle management.
 
 **Key Design Decisions:**
+
 - MCP servers start eagerly for tool discovery
-- Session-level MCPServerManager shared by all agents' ToolExecutors  
+- Session-level MCPServerManager shared by all agents' ToolExecutors
 - Auto-restart only servers that were specifically changed in config events
 - Continue with degraded functionality if servers fail to start
-- Agent → Session → MCPServerManager delegation chain (uses existing `getFullSession()`)
+- Agent → Session → MCPServerManager delegation chain (uses existing
+  `getFullSession()`)
 
 #### **Step 1.2.1: Add MCPServerManager to Session Class**
 
 **File**: `src/sessions/session.ts`
 
 **Import additions:**
+
 ```typescript
 import { MCPServerManager } from '~/mcp/server-manager';
 import type { MCPServerConnection } from '~/mcp/types';
 ```
 
 **Add to Session class:**
+
 ```typescript
 class Session {
   private _mcpServerManager: MCPServerManager;
-  
+
   constructor() {
     // ... existing constructor logic
-    
+
     // Create session-scoped MCP server manager
     this._mcpServerManager = new MCPServerManager();
-    
+
     // Start enabled MCP servers eagerly for tool discovery
     this.initializeMCPServers();
-    
+
     // Listen for MCP config changes from project
     this.setupMCPEventHandling();
   }
-  
+
   private async initializeMCPServers(): Promise<void> {
     try {
       const project = Project.getById(this.getProjectId());
       const mcpServers = project.getMCPServers();
-      
+
       // Start all enabled servers for tool discovery
       const startPromises = Object.entries(mcpServers)
         .filter(([_, config]) => config.enabled)
-        .map(([serverId, config]) => 
-          this._mcpServerManager.startServer(serverId, config)
-            .catch(error => {
+        .map(([serverId, config]) =>
+          this._mcpServerManager
+            .startServer(serverId, config)
+            .catch((error) => {
               // Continue with server disabled on failure (graceful degradation)
-              logger.warn(`MCP server ${serverId} failed to start, continuing disabled:`, error);
+              logger.warn(
+                `MCP server ${serverId} failed to start, continuing disabled:`,
+                error
+              );
             })
         );
-        
+
       await Promise.allSettled(startPromises);
       logger.info(`Initialized MCP servers for session ${this.getId()}`);
     } catch (error) {
-      logger.warn(`Failed to initialize MCP servers for session ${this.getId()}:`, error);
+      logger.warn(
+        `Failed to initialize MCP servers for session ${this.getId()}:`,
+        error
+      );
     }
   }
-  
+
   private setupMCPEventHandling(): void {
     this._threadManager.on('event', (event) => {
-      if (event.type === 'MCP_CONFIG_CHANGED' && 
-          event.context?.sessionId === this.getId()) {
+      if (
+        event.type === 'MCP_CONFIG_CHANGED' &&
+        event.context?.sessionId === this.getId()
+      ) {
         this.handleMCPConfigChange(event.data);
       }
     });
   }
-  
+
   /**
    * Handle MCP configuration changes from project (auto-restart changed servers)
    */
@@ -384,7 +431,7 @@ class Session {
     serverConfig?: MCPServerConfig;
   }): Promise<void> {
     const { serverId, action, serverConfig } = data;
-    
+
     try {
       // Auto-restart only the specific server that changed
       switch (action) {
@@ -393,20 +440,25 @@ class Session {
           await this._mcpServerManager.stopServer(serverId);
           if (serverConfig?.enabled) {
             await this._mcpServerManager.startServer(serverId, serverConfig);
-            logger.info(`Restarted MCP server ${serverId} with new configuration`);
+            logger.info(
+              `Restarted MCP server ${serverId} with new configuration`
+            );
           }
           break;
-          
+
         case 'deleted':
           await this._mcpServerManager.stopServer(serverId);
           logger.info(`Stopped and removed MCP server ${serverId}`);
           break;
       }
     } catch (error) {
-      logger.warn(`Failed to handle MCP config change for server ${serverId}:`, error);
+      logger.warn(
+        `Failed to handle MCP config change for server ${serverId}:`,
+        error
+      );
     }
   }
-  
+
   /**
    * Server control methods (delegate to MCPServerManager)
    */
@@ -414,56 +466,58 @@ class Session {
     const project = Project.getById(this.getProjectId());
     const serverConfig = project.getMCPServers()[serverId];
     if (!serverConfig) {
-      throw new Error(`MCP server '${serverId}' not found in project configuration`);
+      throw new Error(
+        `MCP server '${serverId}' not found in project configuration`
+      );
     }
     await this._mcpServerManager.startServer(serverId, serverConfig);
   }
-  
+
   async stopMCPServer(serverId: string): Promise<void> {
     await this._mcpServerManager.stopServer(serverId);
   }
-  
+
   async restartMCPServer(serverId: string): Promise<void> {
     await this.stopMCPServer(serverId);
     await this.startMCPServer(serverId);
   }
-  
+
   getMCPServerStatus(serverId: string): MCPServerConnection | undefined {
     return this._mcpServerManager.getServer(serverId);
   }
-  
+
   /**
    * Provide MCPServerManager access for ToolExecutor to query directly
    */
   getMCPServerManager(): MCPServerManager {
     return this._mcpServerManager;
   }
-  
+
   /**
    * Announce MCP configuration change to this session's thread
    */
   announceMCPConfigChange(
-    serverId: string, 
+    serverId: string,
     action: 'created' | 'updated' | 'deleted',
     serverConfig?: MCPServerConfig
   ): void {
     this._threadManager.addEvent(this.getThreadId(), {
       type: 'MCP_CONFIG_CHANGED',
       data: { serverId, action, serverConfig },
-      context: { 
-        sessionId: this.getId(), 
-        projectId: this.getProjectId() 
+      context: {
+        sessionId: this.getId(),
+        projectId: this.getProjectId(),
       },
-      transient: true
+      transient: true,
     });
   }
-  
+
   /**
    * Cleanup MCP servers when session ends
    */
   async cleanup(): Promise<void> {
     // ... existing cleanup logic
-    
+
     // Shutdown MCP servers for this session
     await this._mcpServerManager.shutdown();
   }
@@ -475,6 +529,7 @@ class Session {
 **File**: `src/tools/executor.ts`
 
 **Remove existing MCP initialization:**
+
 ```typescript
 // REMOVE these lines:
 // private mcpRegistry?: MCPToolRegistry;
@@ -484,6 +539,7 @@ class Session {
 ```
 
 **Add session-based MCP access:**
+
 ```typescript
 class ToolExecutor {
   private getMCPServerManager(): MCPServerManager | undefined {
@@ -496,7 +552,7 @@ class ToolExecutor {
       return undefined;
     }
   }
-  
+
   /**
    * Get all available tools including MCP tools from session
    */
@@ -505,35 +561,38 @@ class ToolExecutor {
     const mcpTools = this.getMCPTools();
     return [...nativeTools, ...mcpTools];
   }
-  
+
   private getNativeTools(): Tool[] {
     // Extract existing logic for native tools
-    return Array.from(this.tools.values()).filter(tool => !tool.name.includes('/'));
+    return Array.from(this.tools.values()).filter(
+      (tool) => !tool.name.includes('/')
+    );
   }
-  
+
   private getMCPTools(): Tool[] {
     const mcpManager = this.getMCPServerManager();
     if (!mcpManager) return [];
-    
+
     const allMCPTools: Tool[] = [];
-    
+
     // Query all running MCP servers for their tools
-    mcpManager.getAllServers()
-      .filter(server => server.status === 'running')
-      .forEach(server => {
+    mcpManager
+      .getAllServers()
+      .filter((server) => server.status === 'running')
+      .forEach((server) => {
         const serverTools = this.discoverMCPServerTools(server);
         allMCPTools.push(...serverTools);
       });
-      
+
     return allMCPTools;
   }
-  
+
   private discoverMCPServerTools(server: MCPServerConnection): Tool[] {
     // Implementation: query server.client.listTools() and create MCPToolAdapter instances
     // This logic exists in current MCPToolRegistry, move it here or extract to utility
     try {
       if (!server.client) return [];
-      
+
       // This is a simplified version - real implementation would be async
       // and handle tool discovery properly
       return []; // TODO: Implement tool discovery from server.client
@@ -542,23 +601,23 @@ class ToolExecutor {
       return [];
     }
   }
-  
+
   private getMCPApprovalLevel(toolName: string): ApprovalLevel | null {
     const mcpManager = this.getMCPServerManager();
     if (!mcpManager || !toolName.includes('/')) {
       return null;
     }
-    
+
     const [serverId, toolId] = toolName.split('/', 2);
     const server = mcpManager.getServer(serverId);
-    
+
     if (server?.status === 'running') {
       return server.config.tools[toolId] || 'require-approval';
     }
-    
+
     return 'require-approval';
   }
-  
+
   /**
    * Remove MCP cleanup from ToolExecutor (Session handles it now)
    */
@@ -573,6 +632,7 @@ class ToolExecutor {
 **File**: `src/sessions/session-mcp.test.ts`
 
 **Test session MCP lifecycle:**
+
 ```typescript
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session } from './session';
@@ -584,7 +644,7 @@ vi.mock('~/projects/project');
 
 describe('Session MCP Integration', () => {
   let session: Session;
-  
+
   beforeEach(() => {
     // Mock project with MCP servers
     vi.mocked(Project.getById).mockReturnValue({
@@ -593,57 +653,65 @@ describe('Session MCP Integration', () => {
           command: 'npx',
           args: ['-y', '@modelcontextprotocol/server-filesystem'],
           enabled: true,
-          tools: { read_file: 'allow-session' }
-        }
-      })
+          tools: { read_file: 'allow-session' },
+        },
+      }),
     } as any);
-    
+
     session = new Session(/* session data */);
   });
-  
+
   afterEach(async () => {
     await session.cleanup();
   });
 
   it('should initialize MCP servers eagerly on construction', async () => {
     const mcpManager = session.getMCPServerManager();
-    
+
     // Wait for async initialization
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    expect(mcpManager.startServer).toHaveBeenCalledWith('filesystem', expect.objectContaining({
-      command: 'npx',
-      enabled: true
-    }));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(mcpManager.startServer).toHaveBeenCalledWith(
+      'filesystem',
+      expect.objectContaining({
+        command: 'npx',
+        enabled: true,
+      })
+    );
   });
 
   it('should handle MCP config changes with auto-restart', async () => {
     const mcpManager = session.getMCPServerManager();
-    
+
     // Simulate config change event
     await session.announceMCPConfigChange('filesystem', 'updated', {
       command: 'node',
       args: ['new-server.js'],
       enabled: true,
-      tools: { new_tool: 'allow-always' }
+      tools: { new_tool: 'allow-always' },
     });
-    
+
     // Should stop then start the server with new config
     expect(mcpManager.stopServer).toHaveBeenCalledWith('filesystem');
-    expect(mcpManager.startServer).toHaveBeenCalledWith('filesystem', expect.objectContaining({
-      command: 'node',
-      args: ['new-server.js']
-    }));
+    expect(mcpManager.startServer).toHaveBeenCalledWith(
+      'filesystem',
+      expect.objectContaining({
+        command: 'node',
+        args: ['new-server.js'],
+      })
+    );
   });
 
   it('should continue with degraded functionality when server fails', async () => {
     // Mock server start failure
     const mcpManager = session.getMCPServerManager();
-    vi.mocked(mcpManager.startServer).mockRejectedValue(new Error('Server failed to start'));
-    
+    vi.mocked(mcpManager.startServer).mockRejectedValue(
+      new Error('Server failed to start')
+    );
+
     // Session should not throw, should continue
     expect(() => session.initializeMCPServers()).not.toThrow();
-    
+
     // Session should remain functional
     expect(session.getId()).toBeDefined();
   });
@@ -653,34 +721,45 @@ describe('Session MCP Integration', () => {
 #### **Step 1.2.4: Update Import Paths Throughout Codebase**
 
 **Files to Update:**
-- `src/mcp/server-manager.ts` → `import type { MCPServerConfig } from '~/config/mcp-types'`
-- `src/mcp/tool-registry.ts` → `import type { MCPConfig } from '~/config/mcp-types'`
-- `src/mcp/tool-adapter.ts` → `import type { MCPTool } from '~/config/mcp-types'`
-- `src/tools/executor.ts` → `import { MCPConfigLoader } from '~/config/mcp-config-loader'`
+
+- `src/mcp/server-manager.ts` →
+  `import type { MCPServerConfig } from '~/config/mcp-types'`
+- `src/mcp/tool-registry.ts` →
+  `import type { MCPConfig } from '~/config/mcp-types'`
+- `src/mcp/tool-adapter.ts` →
+  `import type { MCPTool } from '~/config/mcp-types'`
+- `src/tools/executor.ts` →
+  `import { MCPConfigLoader } from '~/config/mcp-config-loader'`
 
 **Testing:**
+
 ```bash
 npm run build  # Verify all imports resolve correctly
 npm test       # Verify all tests pass after refactoring
 ```
 
-**Commit Message**: `feat: add session-level MCP server management with event-driven config updates`
+**Commit Message**:
+`feat: add session-level MCP server management with event-driven config updates`
 
 ---
 
-**Task 1.2 establishes proper session-level MCP server lifecycle management using existing patterns and relationships.**
+**Task 1.2 establishes proper session-level MCP server lifecycle management
+using existing patterns and relationships.**
 
 ---
 
 ### Task 1.3: Global MCP Server Configuration API
 
-**Objective**: Create RESTful endpoints for managing individual global MCP servers in `~/.lace/mcp-config.json`, following proper resource-based API design.
+**Objective**: Create RESTful endpoints for managing individual global MCP
+servers in `~/.lace/mcp-config.json`, following proper resource-based API
+design.
 
 #### **Step 1.3.1: Global Server List Endpoint**
 
 **File**: `packages/web/app/routes/api.mcp.servers.ts`
 
 **Implementation:**
+
 ```typescript
 // ABOUTME: Global MCP server list API for discovering available servers
 // ABOUTME: Provides read-only list of global MCP server configurations
@@ -694,15 +773,16 @@ export async function loader({ request }: Route.LoaderArgs) {
   try {
     // Load global MCP configuration only (no project context)
     const globalConfig = MCPConfigLoader.loadGlobalConfig();
-    
+
     // Return server list with just configuration (no runtime status)
-    const servers = Object.entries(globalConfig?.servers || {}).map(([serverId, serverConfig]) => ({
-      id: serverId,
-      ...serverConfig
-    }));
-    
+    const servers = Object.entries(globalConfig?.servers || {}).map(
+      ([serverId, serverConfig]) => ({
+        id: serverId,
+        ...serverConfig,
+      })
+    );
+
     return createSuperjsonResponse({ servers });
-    
   } catch (error) {
     console.error('Failed to load global MCP configuration:', error);
     return createErrorResponse('Failed to load global MCP configuration', 500);
@@ -710,7 +790,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 ```
 
-**Test**: 
+**Test**:
+
 ```typescript
 describe('Global MCP Server List API', () => {
   it('should return global server configurations', async () => {
@@ -721,9 +802,9 @@ describe('Global MCP Server List API', () => {
           command: 'npx',
           args: ['-y', '@modelcontextprotocol/server-filesystem'],
           enabled: true,
-          tools: { read_file: 'allow-session' }
-        }
-      }
+          tools: { read_file: 'allow-session' },
+        },
+      },
     });
 
     const request = new Request('http://localhost/api/mcp/servers');
@@ -735,7 +816,7 @@ describe('Global MCP Server List API', () => {
     expect(data.servers[0]).toMatchObject({
       id: 'filesystem',
       command: 'npx',
-      enabled: true
+      enabled: true,
     });
   });
 });
@@ -746,6 +827,7 @@ describe('Global MCP Server List API', () => {
 **File**: `packages/web/app/routes/api.mcp.servers.$serverId.ts`
 
 **Implementation:**
+
 ```typescript
 // ABOUTME: Individual global MCP server management API with CRUD operations
 // ABOUTME: Handles GET, PUT, DELETE for specific global MCP servers
@@ -764,10 +846,20 @@ const UpdateServerSchema = z.object({
   env: z.record(z.string(), z.string()).optional(),
   cwd: z.string().optional(),
   enabled: z.boolean().optional(),
-  tools: z.record(z.string(), z.enum([
-    'disable', 'deny', 'require-approval',
-    'allow-once', 'allow-session', 'allow-project', 'allow-always'
-  ])).optional()
+  tools: z
+    .record(
+      z.string(),
+      z.enum([
+        'disable',
+        'deny',
+        'require-approval',
+        'allow-once',
+        'allow-session',
+        'allow-project',
+        'allow-always',
+      ])
+    )
+    .optional(),
 });
 
 const CreateServerSchema = z.object({
@@ -776,33 +868,47 @@ const CreateServerSchema = z.object({
   env: z.record(z.string(), z.string()).optional(),
   cwd: z.string().optional(),
   enabled: z.boolean().default(true),
-  tools: z.record(z.string(), z.enum([
-    'disable', 'deny', 'require-approval',
-    'allow-once', 'allow-session', 'allow-project', 'allow-always'
-  ])).default({})
+  tools: z
+    .record(
+      z.string(),
+      z.enum([
+        'disable',
+        'deny',
+        'require-approval',
+        'allow-once',
+        'allow-session',
+        'allow-project',
+        'allow-always',
+      ])
+    )
+    .default({}),
 });
 
 export async function loader({ params }: Route.LoaderArgs) {
   try {
     const serverId = ServerIdSchema.parse(params.serverId);
-    
+
     const globalConfig = MCPConfigLoader.loadGlobalConfig();
     const serverConfig = globalConfig?.servers[serverId];
-    
+
     if (!serverConfig) {
-      return createErrorResponse(`Global MCP server '${serverId}' not found`, 404);
+      return createErrorResponse(
+        `Global MCP server '${serverId}' not found`,
+        404
+      );
     }
-    
+
     return createSuperjsonResponse({
       id: serverId,
-      ...serverConfig
+      ...serverConfig,
     });
-    
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid server ID', 400, { details: error.errors });
+      return createErrorResponse('Invalid server ID', 400, {
+        details: error.errors,
+      });
     }
-    
+
     console.error('Failed to get global MCP server:', error);
     return createErrorResponse('Failed to load server configuration', 500);
   }
@@ -811,107 +917,125 @@ export async function loader({ params }: Route.LoaderArgs) {
 export async function action({ request, params }: Route.ActionArgs) {
   try {
     const serverId = ServerIdSchema.parse(params.serverId);
-    
+
     if (request.method === 'PUT') {
       // Update existing global server
       const updates = UpdateServerSchema.parse(await request.json());
-      
-      const globalConfig = MCPConfigLoader.loadGlobalConfig() || { servers: {} };
+
+      const globalConfig = MCPConfigLoader.loadGlobalConfig() || {
+        servers: {},
+      };
       const currentServer = globalConfig.servers[serverId];
-      
+
       if (!currentServer) {
-        return createErrorResponse(`Global MCP server '${serverId}' not found`, 404);
+        return createErrorResponse(
+          `Global MCP server '${serverId}' not found`,
+          404
+        );
       }
-      
+
       // Merge updates with current configuration
       const updatedServer = { ...currentServer, ...updates };
       const updatedConfig = {
         ...globalConfig,
         servers: {
           ...globalConfig.servers,
-          [serverId]: updatedServer
-        }
+          [serverId]: updatedServer,
+        },
       };
-      
+
       MCPConfigLoader.saveGlobalConfig(updatedConfig);
-      
+
       return createSuperjsonResponse({
         message: `Global MCP server '${serverId}' updated successfully`,
-        server: { id: serverId, ...updatedServer }
+        server: { id: serverId, ...updatedServer },
       });
-      
     } else if (request.method === 'POST') {
       // Create new global server
       const serverConfig = CreateServerSchema.parse(await request.json());
-      
-      const globalConfig = MCPConfigLoader.loadGlobalConfig() || { servers: {} };
-      
+
+      const globalConfig = MCPConfigLoader.loadGlobalConfig() || {
+        servers: {},
+      };
+
       // Check for duplicates
       if (globalConfig.servers[serverId]) {
-        return createErrorResponse(`Global MCP server '${serverId}' already exists`, 409);
+        return createErrorResponse(
+          `Global MCP server '${serverId}' already exists`,
+          409
+        );
       }
-      
+
       // Add new server
       const updatedConfig = {
         ...globalConfig,
         servers: {
           ...globalConfig.servers,
-          [serverId]: serverConfig
-        }
+          [serverId]: serverConfig,
+        },
       };
-      
+
       MCPConfigLoader.saveGlobalConfig(updatedConfig);
-      
-      return createSuperjsonResponse({
-        message: `Global MCP server '${serverId}' created successfully`,
-        server: { id: serverId, ...serverConfig }
-      }, { status: 201 });
-      
+
+      return createSuperjsonResponse(
+        {
+          message: `Global MCP server '${serverId}' created successfully`,
+          server: { id: serverId, ...serverConfig },
+        },
+        { status: 201 }
+      );
     } else if (request.method === 'DELETE') {
       // Delete global server
       const globalConfig = MCPConfigLoader.loadGlobalConfig();
       if (!globalConfig?.servers[serverId]) {
-        return createErrorResponse(`Global MCP server '${serverId}' not found`, 404);
+        return createErrorResponse(
+          `Global MCP server '${serverId}' not found`,
+          404
+        );
       }
-      
+
       const updatedConfig = { ...globalConfig };
       delete updatedConfig.servers[serverId];
-      
+
       MCPConfigLoader.saveGlobalConfig(updatedConfig);
-      
+
       return createSuperjsonResponse({
-        message: `Global MCP server '${serverId}' deleted successfully`
+        message: `Global MCP server '${serverId}' deleted successfully`,
       });
     }
-    
+
     return createErrorResponse('Method not allowed', 405);
-    
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid request data', 400, { details: error.errors });
+      return createErrorResponse('Invalid request data', 400, {
+        details: error.errors,
+      });
     }
-    
+
     console.error('Failed to manage global MCP server:', error);
     return createErrorResponse('Server management failed', 500);
   }
 }
 ```
 
-**Commit Message**: `feat: add global MCP server configuration API with individual server management`
+**Commit Message**:
+`feat: add global MCP server configuration API with individual server management`
 
 ---
 
 ### Task 1.4: Project-Scoped MCP Server Configuration API
 
-**Objective**: Create project-scoped MCP server management endpoints following Lace's established project API patterns.
+**Objective**: Create project-scoped MCP server management endpoints following
+Lace's established project API patterns.
 
 #### **Step 1.4.1: Project MCP Server List**
 
 **File**: `packages/web/app/routes/api.projects.$projectId.mcp.servers.ts`
 
 **Implementation:**
+
 ```typescript
-// ABOUTME: Project-scoped MCP server list API following Lace project hierarchy patterns  
+// ABOUTME: Project-scoped MCP server list API following Lace project hierarchy patterns
 // ABOUTME: Provides project MCP server configurations with inheritance from global config
 
 import { Project } from '@/lib/server/lace-imports';
@@ -925,34 +1049,37 @@ const ProjectIdSchema = z.string().min(1, 'Project ID is required');
 export async function loader({ params }: Route.LoaderArgs) {
   try {
     const projectId = ProjectIdSchema.parse(params.projectId);
-    
+
     // Verify project exists and user has access (existing pattern)
     const project = Project.getById(projectId);
     if (!project) {
-      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
-    }
-    
-    // Get effective MCP configuration (global + project merged)
-    const mcpServers = project.getMCPServers();
-    
-    const servers = Object.entries(mcpServers).map(([serverId, serverConfig]) => ({
-      id: serverId,
-      ...serverConfig
-    }));
-    
-    return createSuperjsonResponse({ 
-      projectId,
-      servers 
-    });
-    
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid project ID', 400, { 
-        code: 'VALIDATION_FAILED',
-        details: error.errors 
+      return createErrorResponse('Project not found', 404, {
+        code: 'RESOURCE_NOT_FOUND',
       });
     }
-    
+
+    // Get effective MCP configuration (global + project merged)
+    const mcpServers = project.getMCPServers();
+
+    const servers = Object.entries(mcpServers).map(
+      ([serverId, serverConfig]) => ({
+        id: serverId,
+        ...serverConfig,
+      })
+    );
+
+    return createSuperjsonResponse({
+      projectId,
+      servers,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return createErrorResponse('Invalid project ID', 400, {
+        code: 'VALIDATION_FAILED',
+        details: error.errors,
+      });
+    }
+
     console.error('Failed to load project MCP servers:', error);
     return createErrorResponse('Failed to load server configuration', 500);
   }
@@ -961,9 +1088,11 @@ export async function loader({ params }: Route.LoaderArgs) {
 
 #### **Step 1.4.2: Individual Project MCP Server Management**
 
-**File**: `packages/web/app/routes/api.projects.$projectId.mcp.servers.$serverId.ts`
+**File**:
+`packages/web/app/routes/api.projects.$projectId.mcp.servers.$serverId.ts`
 
 **Implementation:**
+
 ```typescript
 // ABOUTME: Individual project MCP server management following established project API patterns
 // ABOUTME: Handles CRUD operations for project-specific MCP server configurations
@@ -976,7 +1105,7 @@ import type { Route } from './+types/api.projects.$projectId.mcp.servers.$server
 
 const RouteParamsSchema = z.object({
   projectId: z.string().min(1, 'Project ID is required'),
-  serverId: z.string().min(1, 'Server ID is required')
+  serverId: z.string().min(1, 'Server ID is required'),
 });
 
 const UpdateServerSchema = z.object({
@@ -985,10 +1114,20 @@ const UpdateServerSchema = z.object({
   env: z.record(z.string(), z.string()).optional(),
   cwd: z.string().optional(),
   enabled: z.boolean().optional(),
-  tools: z.record(z.string(), z.enum([
-    'disable', 'deny', 'require-approval',
-    'allow-once', 'allow-session', 'allow-project', 'allow-always'
-  ])).optional()
+  tools: z
+    .record(
+      z.string(),
+      z.enum([
+        'disable',
+        'deny',
+        'require-approval',
+        'allow-once',
+        'allow-session',
+        'allow-project',
+        'allow-always',
+      ])
+    )
+    .optional(),
 });
 
 const CreateServerSchema = z.object({
@@ -997,43 +1136,57 @@ const CreateServerSchema = z.object({
   env: z.record(z.string(), z.string()).optional(),
   cwd: z.string().optional(),
   enabled: z.boolean().default(true),
-  tools: z.record(z.string(), z.enum([
-    'disable', 'deny', 'require-approval',
-    'allow-once', 'allow-session', 'allow-project', 'allow-always'
-  ])).default({})
+  tools: z
+    .record(
+      z.string(),
+      z.enum([
+        'disable',
+        'deny',
+        'require-approval',
+        'allow-once',
+        'allow-session',
+        'allow-project',
+        'allow-always',
+      ])
+    )
+    .default({}),
 });
 
 export async function loader({ params }: Route.LoaderArgs) {
   try {
     const { projectId, serverId } = RouteParamsSchema.parse(params);
-    
+
     const project = Project.getById(projectId);
     if (!project) {
-      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      return createErrorResponse('Project not found', 404, {
+        code: 'RESOURCE_NOT_FOUND',
+      });
     }
-    
+
     // Get server configuration from project's effective config
     const mcpServers = project.getMCPServers();
     const serverConfig = mcpServers[serverId];
-    
+
     if (!serverConfig) {
-      return createErrorResponse(`MCP server '${serverId}' not found in project`, 404);
+      return createErrorResponse(
+        `MCP server '${serverId}' not found in project`,
+        404
+      );
     }
-    
+
     return createSuperjsonResponse({
       projectId,
-      serverId, 
-      ...serverConfig
+      serverId,
+      ...serverConfig,
     });
-    
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid route parameters', 400, { 
+      return createErrorResponse('Invalid route parameters', 400, {
         code: 'VALIDATION_FAILED',
-        details: error.errors 
+        details: error.errors,
       });
     }
-    
+
     console.error('Failed to get project MCP server:', error);
     return createErrorResponse('Failed to load server configuration', 500);
   }
@@ -1042,96 +1195,108 @@ export async function loader({ params }: Route.LoaderArgs) {
 export async function action({ request, params }: Route.ActionArgs) {
   try {
     const { projectId, serverId } = RouteParamsSchema.parse(params);
-    
+
     const project = Project.getById(projectId);
     if (!project) {
-      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      return createErrorResponse('Project not found', 404, {
+        code: 'RESOURCE_NOT_FOUND',
+      });
     }
-    
+
     if (request.method === 'PUT') {
       // Update project MCP server
       const updates = UpdateServerSchema.parse(await request.json());
-      
+
       const currentServers = project.getMCPServers();
       const currentServer = currentServers[serverId];
-      
+
       if (!currentServer) {
-        return createErrorResponse(`MCP server '${serverId}' not found in project`, 404);
+        return createErrorResponse(
+          `MCP server '${serverId}' not found in project`,
+          404
+        );
       }
-      
+
       // Merge updates with current config
       const updatedServer = { ...currentServer, ...updates };
-      
+
       // Update via Project method (triggers events)
       project.updateMCPServer(serverId, updatedServer);
-      
+
       return createSuperjsonResponse({
         message: `Project MCP server '${serverId}' updated successfully`,
         projectId,
         serverId,
-        server: updatedServer
+        server: updatedServer,
       });
-      
     } else if (request.method === 'POST') {
       // Create new project MCP server
       const serverConfig = CreateServerSchema.parse(await request.json());
-      
+
       // Add via Project method (triggers events)
       project.addMCPServer(serverId, serverConfig);
-      
-      return createSuperjsonResponse({
-        message: `Project MCP server '${serverId}' created successfully`,
-        projectId,
-        serverId,
-        server: serverConfig
-      }, { status: 201 });
-      
+
+      return createSuperjsonResponse(
+        {
+          message: `Project MCP server '${serverId}' created successfully`,
+          projectId,
+          serverId,
+          server: serverConfig,
+        },
+        { status: 201 }
+      );
     } else if (request.method === 'DELETE') {
       // Delete project MCP server
       const currentServers = project.getMCPServers();
       if (!currentServers[serverId]) {
-        return createErrorResponse(`MCP server '${serverId}' not found in project`, 404);
+        return createErrorResponse(
+          `MCP server '${serverId}' not found in project`,
+          404
+        );
       }
-      
+
       // Delete via Project method (triggers events)
       project.deleteMCPServer(serverId);
-      
+
       return createSuperjsonResponse({
         message: `Project MCP server '${serverId}' deleted successfully`,
         projectId,
-        serverId
+        serverId,
       });
     }
-    
+
     return createErrorResponse('Method not allowed', 405);
-    
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid request data', 400, { 
+      return createErrorResponse('Invalid request data', 400, {
         code: 'VALIDATION_FAILED',
-        details: error.errors 
+        details: error.errors,
       });
     }
-    
+
     console.error('Failed to manage project MCP server:', error);
     return createErrorResponse('Server management failed', 500);
   }
 }
 ```
 
-**Commit Message**: `feat: add project-scoped MCP server configuration API with proper hierarchy`
+**Commit Message**:
+`feat: add project-scoped MCP server configuration API with proper hierarchy`
 
 ---
 
-### Task 1.5: Session MCP Server Control API  
+### Task 1.5: Session MCP Server Control API
 
-**Objective**: Create session-scoped endpoints for MCP server runtime control (start/stop/restart) where servers actually run.
+**Objective**: Create session-scoped endpoints for MCP server runtime control
+(start/stop/restart) where servers actually run.
 
 #### **Step 1.5.1: Session MCP Server List**
 
-**File**: `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.ts`
+**File**:
+`packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.ts`
 
 **Implementation:**
+
 ```typescript
 // ABOUTME: Session MCP server list with runtime status from session's MCPServerManager
 // ABOUTME: Shows which servers are actually running in this session context
@@ -1145,64 +1310,71 @@ import type { Route } from './+types/api.projects.$projectId.sessions.$sessionId
 
 const RouteParamsSchema = z.object({
   projectId: z.string().min(1),
-  sessionId: z.string().min(1)
+  sessionId: z.string().min(1),
 });
 
 export async function loader({ params }: Route.LoaderArgs) {
   try {
     const { projectId, sessionId } = RouteParamsSchema.parse(params);
-    
+
     // Verify project exists
     const project = Project.getById(projectId);
     if (!project) {
-      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      return createErrorResponse('Project not found', 404, {
+        code: 'RESOURCE_NOT_FOUND',
+      });
     }
-    
+
     // Get session (following existing session API pattern)
     if (!isValidThreadId(sessionId)) {
-      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
+      return createErrorResponse('Invalid session ID', 400, {
+        code: 'VALIDATION_FAILED',
+      });
     }
-    
+
     const sessionService = getSessionService();
     const session = await sessionService.getSession(sessionId);
     if (!session) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      return createErrorResponse('Session not found', 404, {
+        code: 'RESOURCE_NOT_FOUND',
+      });
     }
-    
+
     // Get runtime server status from session's MCPServerManager
     const mcpManager = session.getMCPServerManager();
     const runningServers = mcpManager.getAllServers();
-    
+
     // Get project configuration to show intended vs actual status
     const projectMCPServers = project.getMCPServers();
-    
-    const servers = Object.entries(projectMCPServers).map(([serverId, serverConfig]) => {
-      const runningServer = runningServers.find(s => s.id === serverId);
-      
-      return {
-        id: serverId,
-        ...serverConfig,
-        // Runtime status from session
-        status: runningServer?.status || 'stopped',
-        lastError: runningServer?.lastError,
-        connectedAt: runningServer?.connectedAt
-      };
-    });
-    
+
+    const servers = Object.entries(projectMCPServers).map(
+      ([serverId, serverConfig]) => {
+        const runningServer = runningServers.find((s) => s.id === serverId);
+
+        return {
+          id: serverId,
+          ...serverConfig,
+          // Runtime status from session
+          status: runningServer?.status || 'stopped',
+          lastError: runningServer?.lastError,
+          connectedAt: runningServer?.connectedAt,
+        };
+      }
+    );
+
     return createSuperjsonResponse({
       projectId,
       sessionId,
-      servers
+      servers,
     });
-    
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid route parameters', 400, { 
+      return createErrorResponse('Invalid route parameters', 400, {
         code: 'VALIDATION_FAILED',
-        details: error.errors 
+        details: error.errors,
       });
     }
-    
+
     console.error('Failed to load session MCP servers:', error);
     return createErrorResponse('Failed to load server status', 500);
   }
@@ -1211,9 +1383,11 @@ export async function loader({ params }: Route.LoaderArgs) {
 
 #### **Step 1.5.2: Session MCP Server Control**
 
-**File**: `packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.$serverId.control.ts`
+**File**:
+`packages/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.$serverId.control.ts`
 
 **Implementation:**
+
 ```typescript
 // ABOUTME: Session MCP server control API for runtime server management
 // ABOUTME: Handles start/stop/restart operations on session's running MCP servers
@@ -1228,45 +1402,54 @@ import type { Route } from './+types/api.projects.$projectId.sessions.$sessionId
 const RouteParamsSchema = z.object({
   projectId: z.string().min(1),
   sessionId: z.string().min(1),
-  serverId: z.string().min(1)
+  serverId: z.string().min(1),
 });
 
 const ControlActionSchema = z.object({
-  action: z.enum(['start', 'stop', 'restart'])
+  action: z.enum(['start', 'stop', 'restart']),
 });
 
 export async function action({ request, params }: Route.ActionArgs) {
   if (request.method !== 'POST') {
     return createErrorResponse('Method not allowed', 405);
   }
-  
+
   try {
     const { projectId, sessionId, serverId } = RouteParamsSchema.parse(params);
     const { action } = ControlActionSchema.parse(await request.json());
-    
+
     // Verify project exists
     const project = Project.getById(projectId);
     if (!project) {
-      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      return createErrorResponse('Project not found', 404, {
+        code: 'RESOURCE_NOT_FOUND',
+      });
     }
-    
+
     // Verify session exists
     if (!isValidThreadId(sessionId)) {
-      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
+      return createErrorResponse('Invalid session ID', 400, {
+        code: 'VALIDATION_FAILED',
+      });
     }
-    
+
     const sessionService = getSessionService();
     const session = await sessionService.getSession(sessionId);
     if (!session) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      return createErrorResponse('Session not found', 404, {
+        code: 'RESOURCE_NOT_FOUND',
+      });
     }
-    
+
     // Verify server exists in project configuration
     const projectServers = project.getMCPServers();
     if (!projectServers[serverId]) {
-      return createErrorResponse(`MCP server '${serverId}' not configured for this project`, 404);
+      return createErrorResponse(
+        `MCP server '${serverId}' not configured for this project`,
+        404
+      );
     }
-    
+
     // Delegate to session MCP server control methods
     try {
       switch (action) {
@@ -1280,10 +1463,10 @@ export async function action({ request, params }: Route.ActionArgs) {
           await session.restartMCPServer(serverId);
           break;
       }
-      
+
       // Get updated status
       const serverStatus = session.getMCPServerStatus(serverId);
-      
+
       return createSuperjsonResponse({
         message: `MCP server '${serverId}' ${action} completed`,
         projectId,
@@ -1292,50 +1475,54 @@ export async function action({ request, params }: Route.ActionArgs) {
         server: {
           status: serverStatus?.status || 'stopped',
           lastError: serverStatus?.lastError,
-          connectedAt: serverStatus?.connectedAt
-        }
+          connectedAt: serverStatus?.connectedAt,
+        },
       });
-      
     } catch (serverError) {
       return createErrorResponse(
         `Failed to ${action} MCP server: ${serverError instanceof Error ? serverError.message : 'Unknown error'}`,
         500
       );
     }
-    
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return createErrorResponse('Invalid request data', 400, { 
+      return createErrorResponse('Invalid request data', 400, {
         code: 'VALIDATION_FAILED',
-        details: error.errors 
+        details: error.errors,
       });
     }
-    
+
     console.error('Failed to control MCP server:', error);
     return createErrorResponse('Server control failed', 500);
   }
 }
 ```
 
-**Commit Message**: `feat: add session-scoped MCP server control API for runtime management`
+**Commit Message**:
+`feat: add session-scoped MCP server control API for runtime management`
 
 ---
 
 ### Task 1.6: Fix Configuration APIs to Include MCP Tools
 
-**Objective**: Update existing project and session configuration APIs to include MCP tools in available tool lists, fixing the original issue where MCP tools don't appear in tool configuration.
+**Objective**: Update existing project and session configuration APIs to include
+MCP tools in available tool lists, fixing the original issue where MCP tools
+don't appear in tool configuration.
 
 #### **Step 1.6.1: Fix Project Configuration API**
 
 **File**: `packages/web/app/routes/api.projects.$projectId.configuration.ts`
 
 **Replace ToolExecutor creation logic:**
+
 ```typescript
 export async function loader({ params }: Route.LoaderArgs) {
   try {
     const project = Project.getById(params.projectId);
     if (!project) {
-      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      return createErrorResponse('Project not found', 404, {
+        code: 'RESOURCE_NOT_FOUND',
+      });
     }
 
     const configuration = project.getConfiguration();
@@ -1348,7 +1535,7 @@ export async function loader({ params }: Route.LoaderArgs) {
       .map((tool) => ({
         name: tool.name,
         description: tool.description,
-        isMCP: tool.name.includes('/') // Distinguish MCP vs native tools
+        isMCP: tool.name.includes('/'), // Distinguish MCP vs native tools
       }));
 
     return createSuperjsonResponse({
@@ -1370,13 +1557,16 @@ export async function loader({ params }: Route.LoaderArgs) {
 **File**: `packages/web/app/routes/api.sessions.$sessionId.configuration.ts`
 
 **Replace ToolExecutor creation logic:**
+
 ```typescript
 export async function loader({ params }: Route.LoaderArgs) {
   try {
     const sessionService = getSessionService();
     const session = await sessionService.getSession(params.sessionId);
     if (!session) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      return createErrorResponse('Session not found', 404, {
+        code: 'RESOURCE_NOT_FOUND',
+      });
     }
 
     const configuration = session.getEffectiveConfiguration();
@@ -1391,9 +1581,9 @@ export async function loader({ params }: Route.LoaderArgs) {
         description: tool.description,
         isMCP: tool.name.includes('/'),
         // Show current approval level for MCP tools
-        currentPolicy: tool.name.includes('/') 
+        currentPolicy: tool.name.includes('/')
           ? session.getMCPToolPolicy?.(tool.name) || 'require-approval'
-          : configuration.toolPolicies?.[tool.name] || 'require-approval'
+          : configuration.toolPolicies?.[tool.name] || 'require-approval',
       }));
 
     return createSuperjsonResponse({
@@ -1402,7 +1592,9 @@ export async function loader({ params }: Route.LoaderArgs) {
     });
   } catch (error) {
     return createErrorResponse(
-      error instanceof Error ? error.message : 'Failed to fetch session configuration',
+      error instanceof Error
+        ? error.message
+        : 'Failed to fetch session configuration',
       500,
       { code: 'INTERNAL_SERVER_ERROR' }
     );
@@ -1410,11 +1602,14 @@ export async function loader({ params }: Route.LoaderArgs) {
 }
 ```
 
-**Commit Message**: `fix: include MCP tools in project and session configuration APIs`
+**Commit Message**:
+`fix: include MCP tools in project and session configuration APIs`
 
 ---
 
-**Tasks 1.3-1.6 establish proper RESTful MCP API architecture with individual server management and correct integration with existing tool configuration systems.**
+**Tasks 1.3-1.6 establish proper RESTful MCP API architecture with individual
+server management and correct integration with existing tool configuration
+systems.**
 
 ---
 
@@ -1422,9 +1617,12 @@ export async function loader({ params }: Route.LoaderArgs) {
 
 ### Task 2.1: Eliminate Fresh ToolExecutor Creation in Web Routes
 
-**Objective**: Fix configuration APIs to show appropriate tools without creating unnecessary ToolExecutor instances. Projects show configured tools, Sessions show actual running tools.
+**Objective**: Fix configuration APIs to show appropriate tools without creating
+unnecessary ToolExecutor instances. Projects show configured tools, Sessions
+show actual running tools.
 
-**Key Insight**: Projects don't need ToolExecutors - they're configuration containers, not runtime environments.
+**Key Insight**: Projects don't need ToolExecutors - they're configuration
+containers, not runtime environments.
 
 #### **Step 2.1.1: Fix Project Configuration API (Static Tool List)**
 
@@ -1434,12 +1632,17 @@ export async function loader({ params }: Route.LoaderArgs) {
 **Solution**: Show configured tools based on project MCP config
 
 **Replace existing logic:**
+
 ```typescript
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
-    const project = Project.getById((params as { projectId: string }).projectId);
+    const project = Project.getById(
+      (params as { projectId: string }).projectId
+    );
     if (!project) {
-      return createErrorResponse('Project not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      return createErrorResponse('Project not found', 404, {
+        code: 'RESOURCE_NOT_FOUND',
+      });
     }
 
     const configuration = project.getConfiguration();
@@ -1491,13 +1694,14 @@ function getConfiguredToolsForProject(project: Project): Array<{
 
   // Configured MCP tools (from project MCP config - static)
   const mcpServers = project.getMCPServers();
-  const configuredMCPTools = Object.entries(mcpServers).flatMap(([serverId, serverConfig]) =>
-    Object.entries(serverConfig.tools).map(([toolId, policy]) => ({
-      name: `${serverId}/${toolId}`,
-      description: `MCP ${serverId}: ${toolId}`,
-      isMCP: true,
-      configuredPolicy: policy
-    }))
+  const configuredMCPTools = Object.entries(mcpServers).flatMap(
+    ([serverId, serverConfig]) =>
+      Object.entries(serverConfig.tools).map(([toolId, policy]) => ({
+        name: `${serverId}/${toolId}`,
+        description: `MCP ${serverId}: ${toolId}`,
+        isMCP: true,
+        configuredPolicy: policy,
+      }))
   );
 
   return [...nativeTools, ...configuredMCPTools];
@@ -1512,13 +1716,16 @@ function getConfiguredToolsForProject(project: Project): Array<{
 **Solution**: Use session's actual ToolExecutor that has MCP tools initialized
 
 **Replace existing logic:**
+
 ```typescript
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
     const { sessionId: sessionIdParam } = params as { sessionId: string };
 
     if (!isValidThreadId(sessionIdParam)) {
-      return createErrorResponse('Invalid session ID', 400, { code: 'VALIDATION_FAILED' });
+      return createErrorResponse('Invalid session ID', 400, {
+        code: 'VALIDATION_FAILED',
+      });
     }
 
     const sessionId = sessionIdParam;
@@ -1526,7 +1733,9 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     const session = await sessionService.getSession(sessionId);
 
     if (!session) {
-      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+      return createErrorResponse('Session not found', 404, {
+        code: 'RESOURCE_NOT_FOUND',
+      });
     }
 
     const configuration = session.getEffectiveConfiguration();
@@ -1541,9 +1750,9 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
         description: tool.description,
         isMCP: tool.name.includes('/'),
         // For MCP tools, show current policy from MCP config
-        currentPolicy: tool.name.includes('/') 
+        currentPolicy: tool.name.includes('/')
           ? this.getMCPToolCurrentPolicy(tool.name, session)
-          : (configuration.toolPolicies?.[tool.name] || 'require-approval')
+          : configuration.toolPolicies?.[tool.name] || 'require-approval',
       }));
 
     return createSuperjsonResponse({
@@ -1552,7 +1761,9 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     });
   } catch (error) {
     return createErrorResponse(
-      error instanceof Error ? error.message : 'Failed to fetch session configuration',
+      error instanceof Error
+        ? error.message
+        : 'Failed to fetch session configuration',
       500,
       { code: 'INTERNAL_SERVER_ERROR' }
     );
@@ -1565,11 +1776,11 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 function getMCPToolCurrentPolicy(toolName: string, session: Session): string {
   const [serverId, toolId] = toolName.split('/', 2);
   const serverStatus = session.getMCPServerStatus(serverId);
-  
+
   if (serverStatus?.status === 'running') {
     return serverStatus.config.tools[toolId] || 'require-approval';
   }
-  
+
   return 'require-approval';
 }
 ```
@@ -1579,6 +1790,7 @@ function getMCPToolCurrentPolicy(toolName: string, session: Session): string {
 **File**: `packages/web/app/routes/api.projects.$projectId.configuration.ts`
 
 **Remove this pattern from action method:**
+
 ```typescript
 // REMOVE: Fresh ToolExecutor creation
 const toolExecutor = new ToolExecutor();
@@ -1589,11 +1801,13 @@ const userConfigurableTools = toolExecutor.getAllTools()...
 const configuredTools = getConfiguredToolsForProject(project);
 ```
 
-**Commit Message**: `fix: eliminate fresh ToolExecutor creation in configuration APIs`
+**Commit Message**:
+`fix: eliminate fresh ToolExecutor creation in configuration APIs`
 
 ---
 
-**This phase ensures configuration APIs use actual runtime tools instead of creating mismatched fresh instances.**
+**This phase ensures configuration APIs use actual runtime tools instead of
+creating mismatched fresh instances.**
 
 ---
 
@@ -1601,20 +1815,23 @@ const configuredTools = getConfiguredToolsForProject(project);
 
 ### Task 3.1: Burn the House Down (Clean Slate)
 
-**Objective**: Remove all existing broken MCP web implementation and start fresh with clean architecture.
+**Objective**: Remove all existing broken MCP web implementation and start fresh
+with clean architecture.
 
-**Migration Strategy**: Since nothing has been pushed to GitHub, completely replace broken implementation without backward compatibility concerns.
+**Migration Strategy**: Since nothing has been pushed to GitHub, completely
+replace broken implementation without backward compatibility concerns.
 
 #### **Step 3.1.1: Delete Current Broken Web APIs**
 
 **Files to Remove:**
+
 ```bash
 # Remove all current MCP web routes (wrong architecture)
 rm -rf packages/web/app/routes/api.mcp.*
 rm -rf packages/web/app/routes/settings.mcp.*
 rm -rf packages/web/app/routes/__tests__/api.mcp.*
 
-# Remove wrong MCP components (will rebuild with correct patterns)  
+# Remove wrong MCP components (will rebuild with correct patterns)
 rm -rf packages/web/components/mcp/
 rm -rf packages/web/lib/mcp/
 ```
@@ -1624,6 +1841,7 @@ rm -rf packages/web/lib/mcp/
 **File**: `packages/web/components/settings/SettingsContainer.tsx`
 
 **Remove MCP integration:**
+
 ```typescript
 // REMOVE these imports:
 // import { MCPPanel } from './panels/MCPPanel';
@@ -1631,7 +1849,7 @@ rm -rf packages/web/lib/mcp/
 // REMOVE from tabConfig array:
 // {
 //   id: 'mcp',
-//   label: 'MCP', 
+//   label: 'MCP',
 //   icon: <FontAwesomeIcon icon={faCog} className="w-4 h-4" />,
 // },
 
@@ -1646,6 +1864,7 @@ rm -rf packages/web/lib/mcp/
 **File**: `src/tools/executor.ts`
 
 **Remove broken MCP integration:**
+
 ```typescript
 // REMOVE these imports:
 // import { MCPToolRegistry } from '~/mcp/tool-registry';
@@ -1668,24 +1887,29 @@ rm -rf packages/web/lib/mcp/
 ```
 
 **Testing:**
+
 ```bash
 npm run build  # Verify clean removal
 npm test       # Verify existing functionality still works
 ```
 
-**Commit Message**: `refactor: remove broken MCP web implementation for clean rebuild`
+**Commit Message**:
+`refactor: remove broken MCP web implementation for clean rebuild`
 
 ---
 
 ### Task 3.2: End-to-End Integration Test (Prove New Architecture)
 
-**Objective**: Create comprehensive test that validates the complete flow: Project MCP config → Session server startup → ToolExecutor tool discovery → API tool list inclusion.
+**Objective**: Create comprehensive test that validates the complete flow:
+Project MCP config → Session server startup → ToolExecutor tool discovery → API
+tool list inclusion.
 
 #### **Step 3.2.1: Create Full System Integration Test**
 
 **File**: `packages/core/src/mcp/full-system-integration.test.ts`
 
 **Implementation:**
+
 ```typescript
 // ABOUTME: End-to-end test proving complete MCP integration through entire system
 // ABOUTME: Tests Project config → Session servers → ToolExecutor tools → API responses
@@ -1706,7 +1930,7 @@ describe('Complete MCP Integration System Test', () => {
   beforeEach(async () => {
     originalCwd = process.cwd();
     tempDir = mkdtempSync(join(tmpdir(), 'mcp-system-test-'));
-    
+
     // Create test project with working directory
     const projectData = {
       id: 'test-project',
@@ -1716,11 +1940,11 @@ describe('Complete MCP Integration System Test', () => {
       isArchived: false,
       createdAt: new Date(),
       lastUsedAt: new Date(),
-      configuration: {}
+      configuration: {},
     };
-    
+
     project = new Project(projectData);
-    
+
     // Add MCP server configuration to project
     project.addMCPServer('filesystem', {
       command: 'npx',
@@ -1729,13 +1953,13 @@ describe('Complete MCP Integration System Test', () => {
       tools: {
         read_text_file: 'allow-session',
         write_text_file: 'require-approval',
-        list_directory: 'allow-session'
-      }
+        list_directory: 'allow-session',
+      },
     });
-    
+
     // Create test file for filesystem server to access
     writeFileSync(join(tempDir, 'test.txt'), 'Hello MCP Integration!');
-    
+
     // Create session (should auto-start MCP servers)
     const sessionData = {
       id: 'test-session',
@@ -1743,11 +1967,11 @@ describe('Complete MCP Integration System Test', () => {
       name: 'Test Session',
       createdAt: new Date(),
       lastUsedAt: new Date(),
-      configuration: {}
+      configuration: {},
     };
-    
+
     session = new Session(sessionData);
-    
+
     // Change to temp directory
     process.chdir(tempDir);
   });
@@ -1764,11 +1988,13 @@ describe('Complete MCP Integration System Test', () => {
     const projectServers = project.getMCPServers();
     expect(projectServers.filesystem).toBeDefined();
     expect(projectServers.filesystem.command).toBe('npx');
-    expect(projectServers.filesystem.tools.read_text_file).toBe('allow-session');
+    expect(projectServers.filesystem.tools.read_text_file).toBe(
+      'allow-session'
+    );
 
-    // Step 2: Wait for session MCP server initialization 
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
+    // Step 2: Wait for session MCP server initialization
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
     // Verify MCP servers started in session
     const serverStatus = session.getMCPServerStatus('filesystem');
     expect(serverStatus?.status).toBe('running');
@@ -1777,21 +2003,27 @@ describe('Complete MCP Integration System Test', () => {
     // Step 3: Verify ToolExecutor includes MCP tools from running servers
     const toolExecutor = await session.getToolExecutor();
     const allTools = toolExecutor.getAllTools();
-    
+
     // Should include native tools
-    const nativeToolNames = allTools.filter(t => !t.name.includes('/')).map(t => t.name);
+    const nativeToolNames = allTools
+      .filter((t) => !t.name.includes('/'))
+      .map((t) => t.name);
     expect(nativeToolNames).toContain('bash');
     expect(nativeToolNames).toContain('file_read');
-    
+
     // Should include MCP tools from running servers
-    const mcpToolNames = allTools.filter(t => t.name.includes('/')).map(t => t.name);
+    const mcpToolNames = allTools
+      .filter((t) => t.name.includes('/'))
+      .map((t) => t.name);
     expect(mcpToolNames).toContain('filesystem/read_text_file');
     expect(mcpToolNames).toContain('filesystem/write_text_file');
 
     // Step 4: Test actual MCP tool execution through ToolExecutor
-    const readTool = allTools.find(t => t.name === 'filesystem/read_text_file');
+    const readTool = allTools.find(
+      (t) => t.name === 'filesystem/read_text_file'
+    );
     expect(readTool).toBeDefined();
-    
+
     const result = await readTool!.execute({ path: 'test.txt' });
     expect(result.status).toBe('completed');
     expect(result.content[0].text).toContain('Hello MCP Integration!');
@@ -1800,50 +2032,54 @@ describe('Complete MCP Integration System Test', () => {
     // (This would be tested via actual API call in full implementation)
     // For now, verify ToolExecutor provides correct tool list
     const userConfigurableTools = allTools
-      .filter(tool => !tool.annotations?.safeInternal)
-      .map(tool => ({
+      .filter((tool) => !tool.annotations?.safeInternal)
+      .map((tool) => ({
         name: tool.name,
         description: tool.description,
-        isMCP: tool.name.includes('/')
+        isMCP: tool.name.includes('/'),
       }));
-      
-    const mcpConfigurableTools = userConfigurableTools.filter(t => t.isMCP);
+
+    const mcpConfigurableTools = userConfigurableTools.filter((t) => t.isMCP);
     expect(mcpConfigurableTools.length).toBeGreaterThan(0);
-    expect(mcpConfigurableTools.map(t => t.name)).toContain('filesystem/read_text_file');
+    expect(mcpConfigurableTools.map((t) => t.name)).toContain(
+      'filesystem/read_text_file'
+    );
   }, 10000); // Long timeout for real server startup
 
   it('should handle project MCP config changes with session auto-restart', async () => {
     // Wait for initial startup
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
     // Verify initial server is running
     let serverStatus = session.getMCPServerStatus('filesystem');
     expect(serverStatus?.status).toBe('running');
-    
+
     // Update project MCP server configuration
     project.updateMCPServer('filesystem', {
       command: 'echo',
       args: ['updated-server'],
       enabled: true,
-      tools: { 
+      tools: {
         echo_test: 'allow-always',
-        new_tool: 'require-approval' 
-      }
+        new_tool: 'require-approval',
+      },
     });
-    
+
     // Wait for session to receive event and restart server
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     // Verify server restarted with new configuration
     serverStatus = session.getMCPServerStatus('filesystem');
     expect(serverStatus?.config.command).toBe('echo');
     expect(serverStatus?.config.args).toEqual(['updated-server']);
-    
+
     // Verify ToolExecutor tools updated
     const toolExecutor = await session.getToolExecutor();
     const updatedTools = toolExecutor.getAllTools();
-    const mcpToolNames = updatedTools.filter(t => t.name.includes('/')).map(t => t.name);
-    
+    const mcpToolNames = updatedTools
+      .filter((t) => t.name.includes('/'))
+      .map((t) => t.name);
+
     // Should have new tools from updated server
     expect(mcpToolNames).toContain('filesystem/echo_test');
     expect(mcpToolNames).toContain('filesystem/new_tool');
@@ -1854,55 +2090,59 @@ describe('Complete MCP Integration System Test', () => {
     project.addMCPServer('invalid', {
       command: 'nonexistent-command',
       enabled: true,
-      tools: { broken_tool: 'allow-session' }
+      tools: { broken_tool: 'allow-session' },
     });
-    
+
     // Wait for initialization attempt
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
     // Session should continue working despite failed server
     expect(session.getId()).toBeDefined();
-    
+
     // Working server should still be running
     const workingServer = session.getMCPServerStatus('filesystem');
     expect(workingServer?.status).toBe('running');
-    
+
     // Failed server should show failure status
     const failedServer = session.getMCPServerStatus('invalid');
     expect(failedServer?.status).toBe('failed');
     expect(failedServer?.lastError).toContain('nonexistent-command');
-    
+
     // ToolExecutor should include only tools from working servers
     const toolExecutor = await session.getToolExecutor();
     const allTools = toolExecutor.getAllTools();
-    
+
     // Should have filesystem tools
-    expect(allTools.map(t => t.name)).toContain('filesystem/read_text_file');
-    
+    expect(allTools.map((t) => t.name)).toContain('filesystem/read_text_file');
+
     // Should NOT have broken server tools
-    expect(allTools.map(t => t.name)).not.toContain('invalid/broken_tool');
+    expect(allTools.map((t) => t.name)).not.toContain('invalid/broken_tool');
   });
 });
 ```
 
 **How to Test:**
+
 ```bash
 npm run test:run packages/core/src/mcp/full-system-integration.test.ts
 ```
 
-**Commit Message**: `test: add comprehensive end-to-end MCP system integration test`
+**Commit Message**:
+`test: add comprehensive end-to-end MCP system integration test`
 
 ---
 
 ### Task 3.3: API Contract Validation
 
-**Objective**: Validate all new API endpoints work correctly with proper error handling, validation, and response formats.
+**Objective**: Validate all new API endpoints work correctly with proper error
+handling, validation, and response formats.
 
 #### **Step 3.3.1: Test All MCP API Endpoints**
 
 **File**: `packages/web/app/routes/__tests__/mcp-api-contract.test.ts`
 
 **Implementation:**
+
 ```typescript
 // ABOUTME: Contract tests for all MCP API endpoints ensuring proper behavior
 // ABOUTME: Tests global, project, and session MCP APIs with real data flow
@@ -1934,45 +2174,45 @@ describe('MCP API Contract Tests', () => {
           command: 'echo',
           args: ['hello'],
           enabled: true,
-          tools: { echo: 'allow-session' }
-        })
+          tools: { echo: 'allow-session' },
+        }),
       });
-      
+
       expect(createResponse.status).toBe(201);
       const createData = await createResponse.json();
       expect(createData.message).toContain('created successfully');
-      
+
       // READ
       const readResponse = await fetch('/api/mcp/servers/test');
       expect(readResponse.status).toBe(200);
       const readData = await readResponse.json();
       expect(readData.command).toBe('echo');
       expect(readData.args).toEqual(['hello']);
-      
+
       // UPDATE
       const updateResponse = await fetch('/api/mcp/servers/test', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           command: 'node',
-          enabled: false
-        })
+          enabled: false,
+        }),
       });
-      
+
       expect(updateResponse.status).toBe(200);
       const updateData = await updateResponse.json();
       expect(updateData.server.command).toBe('node');
       expect(updateData.server.enabled).toBe(false);
-      
+
       // DELETE
       const deleteResponse = await fetch('/api/mcp/servers/test', {
-        method: 'DELETE'
+        method: 'DELETE',
       });
-      
+
       expect(deleteResponse.status).toBe(200);
       const deleteData = await deleteResponse.json();
       expect(deleteData.message).toContain('deleted successfully');
-      
+
       // Verify deletion
       const verifyResponse = await fetch('/api/mcp/servers/test');
       expect(verifyResponse.status).toBe(404);
@@ -1985,10 +2225,10 @@ describe('MCP API Contract Tests', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           command: '', // Invalid empty command
-          enabled: 'not-boolean' // Invalid type
-        })
+          enabled: 'not-boolean', // Invalid type
+        }),
       });
-      
+
       expect(invalidResponse.status).toBe(400);
       const errorData = await invalidResponse.json();
       expect(errorData.code).toBe('VALIDATION_FAILED');
@@ -2003,10 +2243,10 @@ describe('MCP API Contract Tests', () => {
         body: JSON.stringify({
           command: 'echo',
           enabled: true,
-          tools: {}
-        })
+          tools: {},
+        }),
       });
-      
+
       // Try to create same server again
       const duplicateResponse = await fetch('/api/mcp/servers/duplicate', {
         method: 'POST',
@@ -2014,10 +2254,10 @@ describe('MCP API Contract Tests', () => {
         body: JSON.stringify({
           command: 'node',
           enabled: true,
-          tools: {}
-        })
+          tools: {},
+        }),
       });
-      
+
       expect(duplicateResponse.status).toBe(409);
       const errorData = await duplicateResponse.json();
       expect(errorData.message).toContain('already exists');
@@ -2027,57 +2267,70 @@ describe('MCP API Contract Tests', () => {
   describe('Project MCP Server API', () => {
     it('should handle project-scoped server management', async () => {
       const projectId = project.getId();
-      
+
       // CREATE project server
-      const createResponse = await fetch(`/api/projects/${projectId}/mcp/servers/git`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          command: 'npx',
-          args: ['-y', '@modelcontextprotocol/server-git'],
-          enabled: true,
-          tools: { 
-            git_status: 'allow-always',
-            git_commit: 'require-approval' 
-          }
-        })
-      });
-      
+      const createResponse = await fetch(
+        `/api/projects/${projectId}/mcp/servers/git`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            command: 'npx',
+            args: ['-y', '@modelcontextprotocol/server-git'],
+            enabled: true,
+            tools: {
+              git_status: 'allow-always',
+              git_commit: 'require-approval',
+            },
+          }),
+        }
+      );
+
       expect(createResponse.status).toBe(201);
-      
+
       // READ project server
-      const readResponse = await fetch(`/api/projects/${projectId}/mcp/servers/git`);
+      const readResponse = await fetch(
+        `/api/projects/${projectId}/mcp/servers/git`
+      );
       expect(readResponse.status).toBe(200);
       const readData = await readResponse.json();
       expect(readData.projectId).toBe(projectId);
       expect(readData.serverId).toBe('git');
       expect(readData.command).toBe('npx');
-      
+
       // UPDATE project server
-      const updateResponse = await fetch(`/api/projects/${projectId}/mcp/servers/git`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          enabled: false,
-          tools: { git_status: 'deny' }
-        })
-      });
-      
+      const updateResponse = await fetch(
+        `/api/projects/${projectId}/mcp/servers/git`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            enabled: false,
+            tools: { git_status: 'deny' },
+          }),
+        }
+      );
+
       expect(updateResponse.status).toBe(200);
-      
+
       // DELETE project server
-      const deleteResponse = await fetch(`/api/projects/${projectId}/mcp/servers/git`, {
-        method: 'DELETE'
-      });
-      
+      const deleteResponse = await fetch(
+        `/api/projects/${projectId}/mcp/servers/git`,
+        {
+          method: 'DELETE',
+        }
+      );
+
       expect(deleteResponse.status).toBe(200);
     });
 
     it('should enforce project ownership', async () => {
       // Try to access non-existent project
-      const response = await fetch('/api/projects/nonexistent/mcp/servers/test');
+      const response = await fetch(
+        '/api/projects/nonexistent/mcp/servers/test'
+      );
       expect(response.status).toBe(404);
-      
+
       const errorData = await response.json();
       expect(errorData.code).toBe('RESOURCE_NOT_FOUND');
     });
@@ -2087,71 +2340,86 @@ describe('MCP API Contract Tests', () => {
     it('should handle session server control operations', async () => {
       const projectId = project.getId();
       const sessionId = session.getId();
-      
+
       // Add MCP server to project first
       project.addMCPServer('control-test', {
         command: 'echo',
         args: ['test-server'],
         enabled: false, // Start disabled
-        tools: { test_tool: 'allow-session' }
+        tools: { test_tool: 'allow-session' },
       });
-      
+
       // START server via session control API
-      const startResponse = await fetch(`/api/projects/${projectId}/sessions/${sessionId}/mcp/servers/control-test/control`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'start' })
-      });
-      
+      const startResponse = await fetch(
+        `/api/projects/${projectId}/sessions/${sessionId}/mcp/servers/control-test/control`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'start' }),
+        }
+      );
+
       expect(startResponse.status).toBe(200);
       const startData = await startResponse.json();
       expect(startData.message).toContain('start completed');
-      
+
       // Verify server is running in session
       const serverStatus = session.getMCPServerStatus('control-test');
       expect(serverStatus?.status).toBe('running');
-      
+
       // STOP server
-      const stopResponse = await fetch(`/api/projects/${projectId}/sessions/${sessionId}/mcp/servers/control-test/control`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'stop' })
-      });
-      
+      const stopResponse = await fetch(
+        `/api/projects/${projectId}/sessions/${sessionId}/mcp/servers/control-test/control`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'stop' }),
+        }
+      );
+
       expect(stopResponse.status).toBe(200);
-      
+
       // RESTART server
-      const restartResponse = await fetch(`/api/projects/${projectId}/sessions/${sessionId}/mcp/servers/control-test/control`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'restart' })
-      });
-      
+      const restartResponse = await fetch(
+        `/api/projects/${projectId}/sessions/${sessionId}/mcp/servers/control-test/control`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'restart' }),
+        }
+      );
+
       expect(restartResponse.status).toBe(200);
     });
 
     it('should validate session and project ownership', async () => {
       // Try to control server for non-existent session
-      const response = await fetch('/api/projects/test/sessions/nonexistent/mcp/servers/test/control', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'start' })
-      });
-      
+      const response = await fetch(
+        '/api/projects/test/sessions/nonexistent/mcp/servers/test/control',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'start' }),
+        }
+      );
+
       expect(response.status).toBe(404);
     });
 
     it('should prevent control of unconfigured servers', async () => {
       const projectId = project.getId();
       const sessionId = session.getId();
-      
+
       // Try to start server that's not configured in project
-      const response = await fetch(`/api/projects/${projectId}/sessions/${sessionId}/mcp/servers/unconfigured/control`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'start' })
-      });
-      
+      const response = await fetch(
+        `/api/projects/${projectId}/sessions/${sessionId}/mcp/servers/unconfigured/control`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'start' }),
+        }
+      );
+
       expect(response.status).toBe(404);
       const errorData = await response.json();
       expect(errorData.message).toContain('not configured for this project');
@@ -2161,45 +2429,57 @@ describe('MCP API Contract Tests', () => {
   describe('Configuration API MCP Tool Integration', () => {
     it('should show MCP tools in session configuration after server startup', async () => {
       // Wait for MCP server to start and tools to be discovered
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
       // Get session configuration API response
-      const configResponse = await fetch(`/api/sessions/${session.getId()}/configuration`);
+      const configResponse = await fetch(
+        `/api/sessions/${session.getId()}/configuration`
+      );
       expect(configResponse.status).toBe(200);
-      
+
       const configData = await configResponse.json();
-      const toolNames = configData.availableTools.map(t => t.name);
-      
+      const toolNames = configData.availableTools.map((t) => t.name);
+
       // Should include native tools
       expect(toolNames).toContain('bash');
       expect(toolNames).toContain('file_read');
-      
-      // Should include MCP tools from running servers  
+
+      // Should include MCP tools from running servers
       expect(toolNames).toContain('filesystem/read_text_file');
       expect(toolNames).toContain('filesystem/write_text_file');
-      
+
       // MCP tools should be properly marked
-      const mcpTools = configData.availableTools.filter(t => t.isMCP);
+      const mcpTools = configData.availableTools.filter((t) => t.isMCP);
       expect(mcpTools.length).toBeGreaterThan(0);
-      
-      const readFileTool = mcpTools.find(t => t.name === 'filesystem/read_text_file');
+
+      const readFileTool = mcpTools.find(
+        (t) => t.name === 'filesystem/read_text_file'
+      );
       expect(readFileTool.currentPolicy).toBe('allow-session');
     });
 
     it('should show only configured tools in project configuration (no runtime)', async () => {
       // Project configuration should show configured MCP tools, not discovered ones
-      const configResponse = await fetch(`/api/projects/${project.getId()}/configuration`);
+      const configResponse = await fetch(
+        `/api/projects/${project.getId()}/configuration`
+      );
       expect(configResponse.status).toBe(200);
-      
+
       const configData = await configResponse.json();
-      
+
       // Should include configured MCP tools from project config
-      const mcpTools = configData.availableTools.filter(t => t.isMCP);
-      expect(mcpTools.map(t => t.name)).toContain('filesystem/read_text_file');
-      expect(mcpTools.map(t => t.name)).toContain('filesystem/write_text_file');
-      
+      const mcpTools = configData.availableTools.filter((t) => t.isMCP);
+      expect(mcpTools.map((t) => t.name)).toContain(
+        'filesystem/read_text_file'
+      );
+      expect(mcpTools.map((t) => t.name)).toContain(
+        'filesystem/write_text_file'
+      );
+
       // Should show configured policies, not runtime discovery
-      const readFileTool = mcpTools.find(t => t.name === 'filesystem/read_text_file');
+      const readFileTool = mcpTools.find(
+        (t) => t.name === 'filesystem/read_text_file'
+      );
       expect(readFileTool.configuredPolicy).toBe('allow-session');
     });
   });
@@ -2207,6 +2487,7 @@ describe('MCP API Contract Tests', () => {
 ```
 
 **How to Test:**
+
 ```bash
 npm run test:run packages/core/src/mcp/full-system-integration.test.ts
 npm run test:run packages/web/app/routes/__tests__/mcp-api-contract.test.ts
@@ -2218,12 +2499,13 @@ npm run test:run packages/web/app/routes/__tests__/mcp-api-contract.test.ts
 
 ## Phase Summary
 
-**Phase 3 Strategy:**
-✅ **Clean Slate**: Remove broken implementation completely  
+**Phase 3 Strategy:** ✅ **Clean Slate**: Remove broken implementation
+completely  
 ✅ **Prove Architecture**: End-to-end test validates complete system works  
 ✅ **Validate APIs**: Contract tests ensure all endpoints work correctly  
 ✅ **No Rollback**: Commit fully to correct architecture
 
-**This proves the new design fixes the original issue: MCP tools appearing in session/project tool configuration.**
+**This proves the new design fixes the original issue: MCP tools appearing in
+session/project tool configuration.**
 
 Ready for Phase 4 (implementation execution)?

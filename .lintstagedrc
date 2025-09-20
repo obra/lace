@@ -1,4 +1,11 @@
 {
+  "packages/core/src/**/*.{ts,tsx}": [
+    "cd packages/core && npx eslint --fix",
+    "prettier --write"
+  ],
+  "packages/web/**/*.{ts,tsx}": [
+    "prettier --write"
+  ],
   "*.{ts,tsx}": [
     "eslint --fix",
     "prettier --write"

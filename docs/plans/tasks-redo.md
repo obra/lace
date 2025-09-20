@@ -2,11 +2,15 @@
 
 ## Overview
 
-This plan implements a human-visible web UI for the task manager system. Currently, tasks can only be managed through agent tools - we need to lift the task manager to be a first-class core service accessible to both agents and humans.
+This plan implements a human-visible web UI for the task manager system.
+Currently, tasks can only be managed through agent tools - we need to lift the
+task manager to be a first-class core service accessible to both agents and
+humans.
 
 ## Context for Engineers
 
 ### What is Lace?
+
 - AI coding assistant with event-sourcing architecture
 - Supports multiple AI agents working together on projects
 - Built with TypeScript, Node.js, SQLite, React/Next.js for web UI
@@ -15,6 +19,7 @@ This plan implements a human-visible web UI for the task manager system. Current
 ### Development Discipline
 
 **CRITICAL: Follow TDD strictly for every task**
+
 1. **Write tests first** - Always write failing tests before implementation
 2. **Verify tests fail** - Run tests to confirm they fail as expected
 3. **Implement minimal code** - Write only enough code to make tests pass
@@ -23,6 +28,7 @@ This plan implements a human-visible web UI for the task manager system. Current
 6. **Lint clean** - Ensure code passes linting before committing
 
 **Before every commit:**
+
 ```bash
 # Run tests
 npm test [relevant-test-file]
@@ -38,6 +44,7 @@ npm run build
 ```
 
 **Commit only when:**
+
 - [ ] All tests pass
 - [ ] Linting is clean
 - [ ] TypeScript compiles without errors
@@ -48,42 +55,51 @@ npm run build
 **FOR EVERY SINGLE TASK - NO EXCEPTIONS:**
 
 **Step 1: Write Tests First**
+
 - [ ] Create test file with failing tests
 - [ ] Tests cover all requirements
 - [ ] Tests are specific and focused
 - [ ] Run tests to verify they fail as expected
 
 **Step 2: Implement Minimal Code**
+
 - [ ] Write ONLY enough code to make tests pass
 - [ ] No extra features beyond test requirements
 - [ ] Follow existing code patterns
 - [ ] Use existing utilities where possible
 
 **Step 3: Verify Success**
+
 - [ ] All tests pass: `npm test [test-file]`
 - [ ] Linting passes: `npm run lint`
 - [ ] TypeScript compiles: `npm run build`
 - [ ] No console errors or warnings
 
 **Step 4: Commit**
+
 - [ ] Add clear commit message
 - [ ] Include only related changes
 - [ ] Reference task number/description
 
 **Step 5: Refactor (if needed)**
+
 - [ ] Keep tests green during refactoring
 - [ ] Improve code quality without changing behavior
 - [ ] Run full test suite after refactoring
 
 ### Current State
-- Task manager exists as agent-only tools (`src/tools/implementations/task-manager/`)
+
+- Task manager exists as agent-only tools
+  (`src/tools/implementations/task-manager/`)
 - Full multi-agent support with SQLite persistence
 - Rich data model with status, priority, notes, thread-based assignment
 - 6 tool classes: create, list, complete, update, add-note, view
 - No human-accessible APIs - all operations through agent tool calls
 
 ### Goal
+
 Create web UI for humans to:
+
 - View all tasks across agents in a session
 - Create, edit, assign, and complete tasks
 - Add notes and communicate with agents
@@ -92,26 +108,32 @@ Create web UI for humans to:
 ## Architecture Overview
 
 ### Key Concepts
-- **Sessions**: Top-level containers (maps to parent thread like `lace_20250714_abc123`)
+
+- **Sessions**: Top-level containers (maps to parent thread like
+  `lace_20250714_abc123`)
 - **Primary Agent**: The main AI agent in a session (represented by session ID)
-- **Delegate Agents**: Additional AI agents spawned within session (child threads like `lace_20250714_abc123.1`)
+- **Delegate Agents**: Additional AI agents spawned within session (child
+  threads like `lace_20250714_abc123.1`)
 - **Human Users**: Human participants who create sessions and manage tasks
 - **Tasks**: Work items that can be assigned to agents or humans
-- **Thread IDs**: Hierarchical identifiers for agents (`parent.child.grandchild`)
-- **User IDs**: Identifier for human users (current: `${sessionId}:human`, future: `user:alice`)
+- **Thread IDs**: Hierarchical identifiers for agents
+  (`parent.child.grandchild`)
+- **User IDs**: Identifier for human users (current: `${sessionId}:human`,
+  future: `user:alice`)
 
 ### Data Model (Already Implemented)
+
 ```typescript
 interface Task {
-  id: string;                    // task_YYYYMMDD_random
-  title: string;                 // Brief summary
-  description: string;           // Human-readable details
-  prompt: string;                // Instructions for assigned agent
+  id: string; // task_YYYYMMDD_random
+  title: string; // Brief summary
+  description: string; // Human-readable details
+  prompt: string; // Instructions for assigned agent
   status: 'pending' | 'in_progress' | 'completed' | 'blocked';
   priority: 'high' | 'medium' | 'low';
-  assignedTo?: string;           // ThreadId, "sessionId:human", or "new:provider/model"
-  createdBy: string;             // ThreadId of creator or "sessionId:human"
-  threadId: string;              // Parent thread (session)
+  assignedTo?: string; // ThreadId, "sessionId:human", or "new:provider/model"
+  createdBy: string; // ThreadId of creator or "sessionId:human"
+  threadId: string; // Parent thread (session)
   createdAt: Date;
   updatedAt: Date;
   notes: TaskNote[];
@@ -119,13 +141,14 @@ interface Task {
 
 interface TaskNote {
   id: string;
-  author: string;                // ThreadId of note author or "sessionId:human"
+  author: string; // ThreadId of note author or "sessionId:human"
   content: string;
   timestamp: Date;
 }
 ```
 
 ### Technology Stack
+
 - **Backend**: Node.js, TypeScript, SQLite (better-sqlite3)
 - **Frontend**: Next.js 15, React 19, Tailwind CSS
 - **Real-time**: Server-Sent Events (SSE)
@@ -138,28 +161,32 @@ interface TaskNote {
 **Objective**: Create session-scoped task management system
 
 **Files to Create**:
+
 - `src/tasks/task-manager.ts` - Core task management system
 - `src/tasks/types.ts` - Task type definitions
 - `src/tasks/__tests__/task-manager.test.ts` - Core system tests
 
 **Files to Modify**:
+
 - `src/tools/implementations/task-manager/tools.ts` - Use session's TaskManager
-- `src/sessions/session.ts` - Add TaskManager to session (if session class exists)
+- `src/sessions/session.ts` - Add TaskManager to session (if session class
+  exists)
 
 **Implementation**:
 
 1. **Create task types** (`src/tasks/types.ts`):
+
 ```typescript
 export interface Task {
-  id: string;                    // task_YYYYMMDD_random
-  title: string;                 // Brief summary
-  description: string;           // Human-readable details
-  prompt: string;                // Instructions for assigned agent
+  id: string; // task_YYYYMMDD_random
+  title: string; // Brief summary
+  description: string; // Human-readable details
+  prompt: string; // Instructions for assigned agent
   status: 'pending' | 'in_progress' | 'completed' | 'blocked';
   priority: 'high' | 'medium' | 'low';
-  assignedTo?: string;           // ThreadId, "sessionId:human", or "new:provider/model"
-  createdBy: string;             // ThreadId of creator or "sessionId:human"
-  sessionId: string;             // Session this task belongs to
+  assignedTo?: string; // ThreadId, "sessionId:human", or "new:provider/model"
+  createdBy: string; // ThreadId of creator or "sessionId:human"
+  sessionId: string; // Session this task belongs to
   createdAt: Date;
   updatedAt: Date;
   notes: TaskNote[];
@@ -167,14 +194,14 @@ export interface Task {
 
 export interface TaskNote {
   id: string;
-  author: string;                // ThreadId of note author or "sessionId:human"
+  author: string; // ThreadId of note author or "sessionId:human"
   content: string;
   timestamp: Date;
 }
 
 export interface TaskContext {
-  actor: string;                 // Who is performing the action
-  isHuman?: boolean;            // Quick check for human vs agent
+  actor: string; // Who is performing the action
+  isHuman?: boolean; // Quick check for human vs agent
 }
 
 export interface CreateTaskRequest {
@@ -202,9 +229,17 @@ export interface TaskSummary {
 ```
 
 2. **Create TaskManager** (`src/tasks/task-manager.ts`):
+
 ```typescript
 import { DatabasePersistence } from '../persistence/database.js';
-import { Task, TaskNote, CreateTaskRequest, TaskFilters, TaskContext, TaskSummary } from './types.js';
+import {
+  Task,
+  TaskNote,
+  CreateTaskRequest,
+  TaskFilters,
+  TaskContext,
+  TaskSummary,
+} from './types.js';
 
 export class TaskManager {
   constructor(
@@ -212,7 +247,10 @@ export class TaskManager {
     private persistence: DatabasePersistence
   ) {}
 
-  async createTask(request: CreateTaskRequest, context: TaskContext): Promise<Task> {
+  async createTask(
+    request: CreateTaskRequest,
+    context: TaskContext
+  ): Promise<Task> {
     // Validate request
     // Generate task ID
     // Set creator and session context
@@ -232,7 +270,11 @@ export class TaskManager {
     // Return task with notes
   }
 
-  async updateTask(taskId: string, updates: Partial<Task>, context: TaskContext): Promise<Task> {
+  async updateTask(
+    taskId: string,
+    updates: Partial<Task>,
+    context: TaskContext
+  ): Promise<Task> {
     // Load existing task
     // Verify permissions and session ownership
     // Apply updates
@@ -240,7 +282,11 @@ export class TaskManager {
     // Return updated task
   }
 
-  async addNote(taskId: string, content: string, context: TaskContext): Promise<TaskNote> {
+  async addNote(
+    taskId: string,
+    content: string,
+    context: TaskContext
+  ): Promise<TaskNote> {
     // Create note
     // Save to database
     // Update task timestamp
@@ -262,6 +308,7 @@ export class TaskManager {
 2. **Write tests first** (`src/tasks/__tests__/task-manager.test.ts`):
 
 **TDD Step 1: Write failing tests**
+
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TaskManager } from '../task-manager.js';
@@ -290,7 +337,7 @@ describe('TaskManager', () => {
         title: 'Test Task',
         description: 'Test description',
         prompt: 'Test prompt',
-        priority: 'medium' as const
+        priority: 'medium' as const,
       };
       const context = { threadId: 'lace_20250714_abc123.1' };
 
@@ -329,6 +376,7 @@ describe('TaskManager', () => {
 ```
 
 **TDD Step 2: Verify tests fail**
+
 ```bash
 npm test src/tasks/__tests__/task-manager.test.ts
 # Should fail because TaskManager doesn't exist yet
@@ -337,23 +385,31 @@ npm test src/tasks/__tests__/task-manager.test.ts
 3. **Implement TaskManager** following TDD:
 
 **TDD Step 3: Implement minimal code to pass tests**
+
 ```typescript
 // src/tasks/task-manager.ts
 export class TaskManager {
   constructor(private persistence: DatabasePersistence) {}
 
-  async createTask(request: CreateTaskRequest, context: TaskContext): Promise<Task> {
+  async createTask(
+    request: CreateTaskRequest,
+    context: TaskContext
+  ): Promise<Task> {
     // Implement ONLY enough to make tests pass
     // Don't add extra features not covered by tests
   }
 
-  async getTasksForSession(sessionId: string, filters?: TaskFilters): Promise<Task[]> {
+  async getTasksForSession(
+    sessionId: string,
+    filters?: TaskFilters
+  ): Promise<Task[]> {
     // Implement based on test requirements
   }
 }
 ```
 
 3. **Update SessionService** (`packages/web/lib/server/session-service.ts`):
+
 ```typescript
 import { TaskManager } from '../../../../src/tasks/task-manager.js';
 
@@ -374,6 +430,7 @@ export class SessionService {
 ```
 
 **Testing**:
+
 ```bash
 # Test tool integration
 npm test src/tools/implementations/task-manager/__tests__/
@@ -395,6 +452,7 @@ npm test packages/web/lib/server/__tests__/session-service.test.ts
 **Objective**: Create REST endpoints for task CRUD operations
 
 **Files to Create**:
+
 - `packages/web/app/api/tasks/route.ts` - List/Create tasks
 - `packages/web/app/api/tasks/[taskId]/route.ts` - Get/Update/Delete task
 - `packages/web/app/api/tasks/[taskId]/notes/route.ts` - Add notes
@@ -402,9 +460,11 @@ npm test packages/web/lib/server/__tests__/session-service.test.ts
 
 **Implementation**:
 
-1. **Write API tests first** (`packages/web/app/api/tasks/__tests__/route.test.ts`):
+1. **Write API tests first**
+   (`packages/web/app/api/tasks/__tests__/route.test.ts`):
 
 **TDD Step 1: Write failing tests**
+
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -447,13 +507,13 @@ describe('Task API', () => {
           title: 'Test Task',
           description: 'Test description',
           prompt: 'Test prompt',
-          priority: 'medium'
-        })
+          priority: 'medium',
+        }),
       });
 
       const response = await POST(request);
       expect(response.status).toBe(201);
-      
+
       const task = await response.json();
       expect(task.title).toBe('Test Task');
     });
@@ -461,7 +521,7 @@ describe('Task API', () => {
     it('should validate required fields', async () => {
       const request = new NextRequest('http://localhost/api/tasks', {
         method: 'POST',
-        body: JSON.stringify({})
+        body: JSON.stringify({}),
       });
 
       const response = await POST(request);
@@ -472,6 +532,7 @@ describe('Task API', () => {
 ```
 
 **TDD Step 2: Verify tests fail**
+
 ```bash
 npm test packages/web/app/api/tasks/__tests__/route.test.ts
 # Should fail - route doesn't exist yet
@@ -480,6 +541,7 @@ npm test packages/web/app/api/tasks/__tests__/route.test.ts
 2. **Implement API routes** (`packages/web/app/api/tasks/route.ts`):
 
 **TDD Step 3: Implement minimal code to pass tests**
+
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
@@ -491,7 +553,7 @@ const CreateTaskSchema = z.object({
   prompt: z.string().min(1),
   priority: z.enum(['high', 'medium', 'low']).default('medium'),
   assignedTo: z.string().optional(),
-  sessionId: z.string()
+  sessionId: z.string(),
 });
 
 export async function GET(request: NextRequest) {
@@ -502,7 +564,10 @@ export async function GET(request: NextRequest) {
     const assignedTo = searchParams.get('assignedTo');
 
     if (!sessionId) {
-      return NextResponse.json({ error: 'sessionId required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'sessionId required' },
+        { status: 400 }
+      );
     }
 
     const sessionService = getSessionService();
@@ -510,13 +575,16 @@ export async function GET(request: NextRequest) {
 
     const tasks = await taskManager.getTasks({
       status: status as any,
-      assignedTo
+      assignedTo,
     });
 
     return NextResponse.json({ tasks });
   } catch (error) {
     console.error('Failed to list tasks:', error);
-    return NextResponse.json({ error: 'Failed to list tasks' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to list tasks' },
+      { status: 500 }
+    );
   }
 }
 
@@ -530,7 +598,7 @@ export async function POST(request: NextRequest) {
 
     const task = await taskManager.createTask(data, {
       actor: `${data.sessionId}:human`,
-      isHuman: true
+      isHuman: true,
     });
 
     return NextResponse.json(task, { status: 201 });
@@ -539,25 +607,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.errors }, { status: 400 });
     }
     console.error('Failed to create task:', error);
-    return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to create task' },
+      { status: 500 }
+    );
   }
 }
 ```
 
 **TDD Step 4: Verify tests pass**
+
 ```bash
 npm test packages/web/app/api/tasks/__tests__/route.test.ts
 # Should pass now
 ```
 
 **TDD Step 5: Lint and type check**
+
 ```bash
 npm run lint
 npm run build
 # Fix any issues before proceeding
 ```
 
-3. **Implement task detail routes** (`packages/web/app/api/tasks/[taskId]/route.ts`):
+3. **Implement task detail routes**
+   (`packages/web/app/api/tasks/[taskId]/route.ts`):
+
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
@@ -570,7 +645,9 @@ export async function GET(
     const sessionService = getSessionService();
     const taskService = sessionService.getTaskService();
 
-    const task = await taskService.getTaskById(params.taskId, { isHuman: true });
+    const task = await taskService.getTaskById(params.taskId, {
+      isHuman: true,
+    });
 
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
@@ -589,16 +666,21 @@ export async function PUT(
 ) {
   try {
     const updates = await request.json();
-    
+
     const sessionService = getSessionService();
     const taskService = sessionService.getTaskService();
 
-    const task = await taskService.updateTask(params.taskId, updates, { isHuman: true });
+    const task = await taskService.updateTask(params.taskId, updates, {
+      isHuman: true,
+    });
 
     return NextResponse.json(task);
   } catch (error) {
     console.error('Failed to update task:', error);
-    return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to update task' },
+      { status: 500 }
+    );
   }
 }
 
@@ -615,12 +697,16 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Failed to delete task:', error);
-    return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to delete task' },
+      { status: 500 }
+    );
   }
 }
 ```
 
 **Testing**:
+
 ```bash
 # Test API routes
 npm test packages/web/app/api/tasks/__tests__/
@@ -641,13 +727,18 @@ curl -X POST "http://localhost:3000/api/tasks" \
 **Objective**: Add convenience endpoints for session-specific task operations
 
 **Files to Create**:
+
 - `packages/web/app/api/sessions/[sessionId]/tasks/route.ts` - Session tasks
-- `packages/web/app/api/sessions/[sessionId]/tasks/summary/route.ts` - Task summary
-- `packages/web/app/api/sessions/[sessionId]/tasks/__tests__/route.test.ts` - Tests
+- `packages/web/app/api/sessions/[sessionId]/tasks/summary/route.ts` - Task
+  summary
+- `packages/web/app/api/sessions/[sessionId]/tasks/__tests__/route.test.ts` -
+  Tests
 
 **Implementation**:
 
-1. **Session tasks endpoint** (`packages/web/app/api/sessions/[sessionId]/tasks/route.ts`):
+1. **Session tasks endpoint**
+   (`packages/web/app/api/sessions/[sessionId]/tasks/route.ts`):
+
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
@@ -666,13 +757,16 @@ export async function GET(
 
     const tasks = await taskService.getTasksForSession(params.sessionId, {
       status: status as any,
-      assignedTo
+      assignedTo,
     });
 
     return NextResponse.json({ tasks });
   } catch (error) {
     console.error('Failed to get session tasks:', error);
-    return NextResponse.json({ error: 'Failed to get session tasks' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to get session tasks' },
+      { status: 500 }
+    );
   }
 }
 
@@ -682,25 +776,30 @@ export async function POST(
 ) {
   try {
     const body = await request.json();
-    
+
     const sessionService = getSessionService();
     const taskService = sessionService.getTaskService();
 
     const task = await taskService.createTask(body, {
       threadId: params.sessionId,
       parentThreadId: params.sessionId,
-      isHuman: true
+      isHuman: true,
     });
 
     return NextResponse.json(task, { status: 201 });
   } catch (error) {
     console.error('Failed to create session task:', error);
-    return NextResponse.json({ error: 'Failed to create session task' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to create session task' },
+      { status: 500 }
+    );
   }
 }
 ```
 
-2. **Task summary endpoint** (`packages/web/app/api/sessions/[sessionId]/tasks/summary/route.ts`):
+2. **Task summary endpoint**
+   (`packages/web/app/api/sessions/[sessionId]/tasks/summary/route.ts`):
+
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionService } from '@/lib/server/session-service';
@@ -718,12 +817,16 @@ export async function GET(
     return NextResponse.json(summary);
   } catch (error) {
     console.error('Failed to get task summary:', error);
-    return NextResponse.json({ error: 'Failed to get task summary' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to get task summary' },
+      { status: 500 }
+    );
   }
 }
 ```
 
 **Testing**:
+
 ```bash
 # Test session-specific endpoints
 npm test packages/web/app/api/sessions/__tests__/
@@ -738,21 +841,24 @@ curl -X GET "http://localhost:3000/api/sessions/lace_20250714_abc123/tasks/summa
 ## Phase 3: React Hooks and Client Library (COMPLETED)
 
 ## Status Update
+
 - Phase 1: COMPLETED ✅
-- Phase 2: COMPLETED ✅ 
+- Phase 2: COMPLETED ✅
 - Phase 3: COMPLETED ✅
 - Phase 4: READY TO START
 - Phase 5: TODO
 
 All tests passing (1961/1966), TypeScript compilation clean, linting clean.
 
-This phase focuses on creating the client-side infrastructure that will power the UI components.
+This phase focuses on creating the client-side infrastructure that will power
+the UI components.
 
 ### Task 3.1: Create Task API Client (Status: Complete ✅)
 
 **Objective**: Create client-side API for task management operations
 
 **Files Created**:
+
 - `packages/web/lib/client/task-api.ts` - API client
 - `packages/web/lib/client/__tests__/task-api.test.ts` - API client tests
 
@@ -761,14 +867,21 @@ This phase focuses on creating the client-side infrastructure that will power th
 **Objective**: Create React hook for task management operations
 
 **Files Created**:
+
 - `packages/web/hooks/useTaskManager.ts` - Main hook
 - `packages/web/hooks/__tests__/useTaskManager.test.tsx` - Hook tests
 
 **Implementation**:
 
 1. **API client** (`packages/web/lib/client/task-api.ts`):
+
 ```typescript
-import { Task, TaskNote, CreateTaskRequest, TaskFilters } from '../types/tasks.js';
+import {
+  Task,
+  TaskNote,
+  CreateTaskRequest,
+  TaskFilters,
+} from '../types/tasks.js';
 
 export class TaskAPIClient {
   private baseUrl: string;
@@ -795,7 +908,7 @@ export class TaskAPIClient {
     const response = await fetch(`${this.baseUrl}/api/tasks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...task, sessionId })
+      body: JSON.stringify({ ...task, sessionId }),
     });
 
     if (!response.ok) {
@@ -809,7 +922,7 @@ export class TaskAPIClient {
     const response = await fetch(`${this.baseUrl}/api/tasks/${taskId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates)
+      body: JSON.stringify(updates),
     });
 
     if (!response.ok) {
@@ -821,7 +934,7 @@ export class TaskAPIClient {
 
   async deleteTask(taskId: string): Promise<void> {
     const response = await fetch(`${this.baseUrl}/api/tasks/${taskId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
     });
 
     if (!response.ok) {
@@ -833,7 +946,7 @@ export class TaskAPIClient {
     const response = await fetch(`${this.baseUrl}/api/tasks/${taskId}/notes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content })
+      body: JSON.stringify({ content }),
     });
 
     if (!response.ok) {
@@ -844,7 +957,9 @@ export class TaskAPIClient {
   }
 
   async getTaskSummary(sessionId: string): Promise<TaskSummary> {
-    const response = await fetch(`${this.baseUrl}/api/sessions/${sessionId}/tasks/summary`);
+    const response = await fetch(
+      `${this.baseUrl}/api/sessions/${sessionId}/tasks/summary`
+    );
     if (!response.ok) {
       throw new Error('Failed to get task summary');
     }
@@ -855,6 +970,7 @@ export class TaskAPIClient {
 ```
 
 2. **Write hook tests** (`packages/web/hooks/__tests__/useTaskManager.test.ts`):
+
 ```typescript
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -870,13 +986,11 @@ describe('useTaskManager', () => {
   });
 
   it('should load tasks on mount', async () => {
-    const mockTasks = [
-      { id: 'task1', title: 'Test Task', status: 'pending' }
-    ];
+    const mockTasks = [{ id: 'task1', title: 'Test Task', status: 'pending' }];
 
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ tasks: mockTasks })
+      json: async () => ({ tasks: mockTasks }),
     });
 
     const { result } = renderHook(() => useTaskManager('session1'));
@@ -884,7 +998,7 @@ describe('useTaskManager', () => {
     expect(result.current.loading).toBe(true);
 
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     expect(result.current.loading).toBe(false);
@@ -897,11 +1011,11 @@ describe('useTaskManager', () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ tasks: [] })
+        json: async () => ({ tasks: [] }),
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => newTask
+        json: async () => newTask,
       });
 
     const { result } = renderHook(() => useTaskManager('session1'));
@@ -911,7 +1025,7 @@ describe('useTaskManager', () => {
         title: 'New Task',
         description: 'Test',
         prompt: 'Test prompt',
-        priority: 'medium'
+        priority: 'medium',
       });
     });
 
@@ -923,8 +1037,8 @@ describe('useTaskManager', () => {
         description: 'Test',
         prompt: 'Test prompt',
         priority: 'medium',
-        sessionId: 'session1'
-      })
+        sessionId: 'session1',
+      }),
     });
   });
 
@@ -934,7 +1048,7 @@ describe('useTaskManager', () => {
     const { result } = renderHook(() => useTaskManager('session1'));
 
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     expect(result.current.error).toBe('Failed to fetch tasks');
@@ -943,9 +1057,16 @@ describe('useTaskManager', () => {
 ```
 
 3. **Implement hook** (`packages/web/hooks/useTaskManager.ts`):
+
 ```typescript
 import { useState, useEffect, useCallback } from 'react';
-import { Task, TaskNote, CreateTaskRequest, TaskFilters, TaskSummary } from '../types/tasks.js';
+import {
+  Task,
+  TaskNote,
+  CreateTaskRequest,
+  TaskFilters,
+  TaskSummary,
+} from '../types/tasks.js';
 import { TaskAPIClient } from '../lib/client/task-api.js';
 
 export function useTaskManager(sessionId: string) {
@@ -956,18 +1077,21 @@ export function useTaskManager(sessionId: string) {
 
   const apiClient = new TaskAPIClient();
 
-  const loadTasks = useCallback(async (filters?: TaskFilters) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const newTasks = await apiClient.listTasks(sessionId, filters);
-      setTasks(newTasks);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
-    } finally {
-      setLoading(false);
-    }
-  }, [sessionId]);
+  const loadTasks = useCallback(
+    async (filters?: TaskFilters) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const newTasks = await apiClient.listTasks(sessionId, filters);
+        setTasks(newTasks);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [sessionId]
+  );
 
   const loadSummary = useCallback(async () => {
     try {
@@ -978,51 +1102,60 @@ export function useTaskManager(sessionId: string) {
     }
   }, [sessionId]);
 
-  const createTask = useCallback(async (task: CreateTaskRequest) => {
-    try {
-      const newTask = await apiClient.createTask(sessionId, task);
-      setTasks(prev => [...prev, newTask]);
-      await loadSummary();
-      return newTask;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create task');
-      throw err;
-    }
-  }, [sessionId, loadSummary]);
+  const createTask = useCallback(
+    async (task: CreateTaskRequest) => {
+      try {
+        const newTask = await apiClient.createTask(sessionId, task);
+        setTasks((prev) => [...prev, newTask]);
+        await loadSummary();
+        return newTask;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to create task');
+        throw err;
+      }
+    },
+    [sessionId, loadSummary]
+  );
 
-  const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
-    try {
-      const updatedTask = await apiClient.updateTask(taskId, updates);
-      setTasks(prev => prev.map(task => 
-        task.id === taskId ? updatedTask : task
-      ));
-      await loadSummary();
-      return updatedTask;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update task');
-      throw err;
-    }
-  }, [loadSummary]);
+  const updateTask = useCallback(
+    async (taskId: string, updates: Partial<Task>) => {
+      try {
+        const updatedTask = await apiClient.updateTask(taskId, updates);
+        setTasks((prev) =>
+          prev.map((task) => (task.id === taskId ? updatedTask : task))
+        );
+        await loadSummary();
+        return updatedTask;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to update task');
+        throw err;
+      }
+    },
+    [loadSummary]
+  );
 
-  const deleteTask = useCallback(async (taskId: string) => {
-    try {
-      await apiClient.deleteTask(taskId);
-      setTasks(prev => prev.filter(task => task.id !== taskId));
-      await loadSummary();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete task');
-      throw err;
-    }
-  }, [loadSummary]);
+  const deleteTask = useCallback(
+    async (taskId: string) => {
+      try {
+        await apiClient.deleteTask(taskId);
+        setTasks((prev) => prev.filter((task) => task.id !== taskId));
+        await loadSummary();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to delete task');
+        throw err;
+      }
+    },
+    [loadSummary]
+  );
 
   const addNote = useCallback(async (taskId: string, content: string) => {
     try {
       const note = await apiClient.addNote(taskId, content);
-      setTasks(prev => prev.map(task => 
-        task.id === taskId 
-          ? { ...task, notes: [...task.notes, note] }
-          : task
-      ));
+      setTasks((prev) =>
+        prev.map((task) =>
+          task.id === taskId ? { ...task, notes: [...task.notes, note] } : task
+        )
+      );
       return note;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add note');
@@ -1046,12 +1179,13 @@ export function useTaskManager(sessionId: string) {
     deleteTask,
     addNote,
     refreshTasks: loadTasks,
-    refreshSummary: loadSummary
+    refreshSummary: loadSummary,
   };
 }
 ```
 
 **Testing**:
+
 ```bash
 # Test hook
 npm test packages/web/hooks/__tests__/useTaskManager.test.ts
@@ -1067,6 +1201,7 @@ npm test packages/web/lib/client/__tests__/task-api.test.ts
 **Objective**: Integrate task updates with existing SSE system
 
 **Files to Modify**:
+
 - `packages/web/lib/sse-manager.ts` - Add task events
 - `packages/web/hooks/useTaskManager.ts` - Subscribe to events
 - `packages/web/hooks/useSSEStream.ts` - Handle task events
@@ -1074,6 +1209,7 @@ npm test packages/web/lib/client/__tests__/task-api.test.ts
 **Implementation**:
 
 1. **Add task events to SSE** (`packages/web/lib/sse-manager.ts`):
+
 ```typescript
 export interface TaskEvent {
   type: 'TASK_CREATED' | 'TASK_UPDATED' | 'TASK_DELETED' | 'TASK_NOTE_ADDED';
@@ -1089,7 +1225,7 @@ export class SSEManager {
   broadcastTaskEvent(sessionId: string, event: TaskEvent): void {
     const eventData = {
       type: 'task_event',
-      data: event
+      data: event,
     };
 
     this.broadcast(sessionId, eventData);
@@ -1098,6 +1234,7 @@ export class SSEManager {
 ```
 
 2. **Update TaskService to emit events** (`src/services/task-service.ts`):
+
 ```typescript
 import { SSEManager } from '../interfaces/web/lib/sse-manager.js';
 
@@ -1107,7 +1244,10 @@ export class TaskService {
     private sseManager?: SSEManager
   ) {}
 
-  async createTask(request: CreateTaskRequest, context: ServiceContext): Promise<Task> {
+  async createTask(
+    request: CreateTaskRequest,
+    context: ServiceContext
+  ): Promise<Task> {
     // ... existing creation logic ...
 
     // Emit SSE event
@@ -1116,14 +1256,18 @@ export class TaskService {
         type: 'TASK_CREATED',
         taskId: task.id,
         task,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
 
     return task;
   }
 
-  async updateTask(taskId: string, updates: Partial<Task>, context: ServiceContext): Promise<Task> {
+  async updateTask(
+    taskId: string,
+    updates: Partial<Task>,
+    context: ServiceContext
+  ): Promise<Task> {
     // ... existing update logic ...
 
     // Emit SSE event
@@ -1132,7 +1276,7 @@ export class TaskService {
         type: 'TASK_UPDATED',
         taskId: task.id,
         task,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
 
@@ -1141,7 +1285,9 @@ export class TaskService {
 }
 ```
 
-3. **Update hook to handle SSE events** (`packages/web/hooks/useTaskManager.ts`):
+3. **Update hook to handle SSE events**
+   (`packages/web/hooks/useTaskManager.ts`):
+
 ```typescript
 import { useSSEStream } from './useSSEStream.js';
 
@@ -1153,41 +1299,47 @@ export function useTaskManager(sessionId: string) {
     onEvent: (event) => {
       if (event.type === 'task_event') {
         const taskEvent = event.data as TaskEvent;
-        
+
         switch (taskEvent.type) {
           case 'TASK_CREATED':
             if (taskEvent.task) {
-              setTasks(prev => [...prev, taskEvent.task]);
+              setTasks((prev) => [...prev, taskEvent.task]);
             }
             break;
-            
+
           case 'TASK_UPDATED':
             if (taskEvent.task) {
-              setTasks(prev => prev.map(task => 
-                task.id === taskEvent.taskId ? taskEvent.task : task
-              ));
+              setTasks((prev) =>
+                prev.map((task) =>
+                  task.id === taskEvent.taskId ? taskEvent.task : task
+                )
+              );
             }
             break;
-            
+
           case 'TASK_DELETED':
-            setTasks(prev => prev.filter(task => task.id !== taskEvent.taskId));
+            setTasks((prev) =>
+              prev.filter((task) => task.id !== taskEvent.taskId)
+            );
             break;
-            
+
           case 'TASK_NOTE_ADDED':
             if (taskEvent.note) {
-              setTasks(prev => prev.map(task => 
-                task.id === taskEvent.taskId 
-                  ? { ...task, notes: [...task.notes, taskEvent.note] }
-                  : task
-              ));
+              setTasks((prev) =>
+                prev.map((task) =>
+                  task.id === taskEvent.taskId
+                    ? { ...task, notes: [...task.notes, taskEvent.note] }
+                    : task
+                )
+              );
             }
             break;
         }
-        
+
         // Refresh summary on any task change
         loadSummary();
       }
-    }
+    },
   });
 
   // ... rest of hook implementation ...
@@ -1195,6 +1347,7 @@ export function useTaskManager(sessionId: string) {
 ```
 
 **Testing**:
+
 ```bash
 # Test SSE integration
 npm test packages/web/hooks/__tests__/useTaskManager.test.ts
@@ -1212,15 +1365,18 @@ npm test packages/web/hooks/__tests__/useTaskManager.test.ts
 **Objective**: Create reusable task list component
 
 **Files to Create**:
+
 - `packages/web/components/TaskList.tsx` - Main component
 - `packages/web/components/TaskListItem.tsx` - Individual task item
 - `packages/web/components/__tests__/TaskList.test.tsx` - Component tests
 
 **Implementation**:
 
-1. **Write component tests first** (`packages/web/components/__tests__/TaskList.test.tsx`):
+1. **Write component tests first**
+   (`packages/web/components/__tests__/TaskList.test.tsx`):
 
 **TDD Step 1: Write failing tests**
+
 ```typescript
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
@@ -1246,7 +1402,7 @@ const mockTasks = [
 describe('TaskList', () => {
   it('should render tasks', () => {
     render(<TaskList tasks={mockTasks} onTaskClick={vi.fn()} />);
-    
+
     expect(screen.getByText('Complete feature')).toBeInTheDocument();
     expect(screen.getByText('Implement new feature')).toBeInTheDocument();
     expect(screen.getByText('HIGH')).toBeInTheDocument();
@@ -1255,7 +1411,7 @@ describe('TaskList', () => {
   it('should handle task click', () => {
     const onTaskClick = vi.fn();
     render(<TaskList tasks={mockTasks} onTaskClick={onTaskClick} />);
-    
+
     fireEvent.click(screen.getByText('Complete feature'));
     expect(onTaskClick).toHaveBeenCalledWith(mockTasks[0]);
   });
@@ -1265,22 +1421,23 @@ describe('TaskList', () => {
       ...mockTasks,
       { ...mockTasks[0], id: 'task2', status: 'completed' as const }
     ];
-    
+
     render(<TaskList tasks={allTasks} statusFilter="pending" onTaskClick={vi.fn()} />);
-    
+
     expect(screen.getByText('Complete feature')).toBeInTheDocument();
     expect(screen.queryByText('task2')).not.toBeInTheDocument();
   });
 
   it('should show empty state', () => {
     render(<TaskList tasks={[]} onTaskClick={vi.fn()} />);
-    
+
     expect(screen.getByText('No tasks found')).toBeInTheDocument();
   });
 });
 ```
 
 2. **Implement TaskListItem** (`packages/web/components/TaskListItem.tsx`):
+
 ```typescript
 import { Task } from '../types/tasks.js';
 
@@ -1334,11 +1491,11 @@ export function TaskListItem({ task, onClick, onStatusChange }: TaskListItemProp
               {task.priority.toUpperCase()}
             </span>
           </div>
-          
+
           {task.description && (
             <p className="text-sm text-gray-600 mb-2">{task.description}</p>
           )}
-          
+
           <div className="flex items-center gap-4 text-xs text-gray-500">
             <span>Assigned to: {formatAssignee(task.assignedTo)}</span>
             <span>Created: {formatDate(task.createdAt)}</span>
@@ -1347,7 +1504,7 @@ export function TaskListItem({ task, onClick, onStatusChange }: TaskListItemProp
             )}
           </div>
         </div>
-        
+
         {onStatusChange && (
           <select
             value={task.status}
@@ -1370,6 +1527,7 @@ export function TaskListItem({ task, onClick, onStatusChange }: TaskListItemProp
 ```
 
 3. **Implement TaskList** (`packages/web/components/TaskList.tsx`):
+
 ```typescript
 import { Task } from '../types/tasks.js';
 import { TaskListItem } from './TaskListItem.js';
@@ -1405,7 +1563,7 @@ export function TaskList({
     const priorityOrder = { high: 3, medium: 2, low: 1 };
     const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority];
     if (priorityDiff !== 0) return priorityDiff;
-    
+
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
@@ -1452,6 +1610,7 @@ export function TaskList({
 ```
 
 **Testing**:
+
 ```bash
 # Test components
 npm test packages/web/components/__tests__/TaskList.test.tsx
@@ -1468,6 +1627,7 @@ npm run web:dev
 **Objective**: Create modal for viewing and editing task details
 
 **Files to Create**:
+
 - `packages/web/components/TaskDetailModal.tsx` - Modal component
 - `packages/web/components/TaskNotes.tsx` - Notes section
 - `packages/web/components/__tests__/TaskDetailModal.test.tsx` - Tests
@@ -1475,6 +1635,7 @@ npm run web:dev
 **Implementation**:
 
 1. **Task Notes Component** (`packages/web/components/TaskNotes.tsx`):
+
 ```typescript
 import { useState } from 'react';
 import { TaskNote } from '../types/tasks.js';
@@ -1518,7 +1679,7 @@ export function TaskNotes({ notes, onAddNote, loading }: TaskNotesProps) {
   return (
     <div className="space-y-4">
       <h3 className="font-medium text-gray-900">Notes</h3>
-      
+
       {/* Notes list */}
       <div className="space-y-3 max-h-60 overflow-y-auto">
         {notes.length === 0 ? (
@@ -1568,6 +1729,7 @@ export function TaskNotes({ notes, onAddNote, loading }: TaskNotesProps) {
 ```
 
 2. **Task Detail Modal** (`packages/web/components/TaskDetailModal.tsx`):
+
 ```typescript
 import { useState } from 'react';
 import { Task } from '../types/tasks.js';
@@ -1821,7 +1983,7 @@ export function TaskDetailModal({
                 </button>
               )}
             </div>
-            
+
             <div className="flex gap-2">
               {editing ? (
                 <>
@@ -1858,6 +2020,7 @@ export function TaskDetailModal({
 ```
 
 **Testing**:
+
 ```bash
 # Test modal components
 npm test packages/web/components/__tests__/TaskDetailModal.test.tsx
@@ -1874,6 +2037,7 @@ npm run web:dev
 **Objective**: Create main dashboard component for task management
 
 **Files to Create**:
+
 - `packages/web/components/TaskDashboard.tsx` - Main dashboard
 - `packages/web/components/TaskSummary.tsx` - Summary widget
 - `packages/web/components/TaskFilters.tsx` - Filtering controls
@@ -1882,6 +2046,7 @@ npm run web:dev
 **Implementation**:
 
 1. **Task Summary Widget** (`packages/web/components/TaskSummary.tsx`):
+
 ```typescript
 import { TaskSummary as TaskSummaryType } from '../types/tasks.js';
 
@@ -1924,7 +2089,7 @@ export function TaskSummary({ summary, loading }: TaskSummaryProps) {
   return (
     <div className="bg-white rounded-lg border p-4">
       <h3 className="text-lg font-medium text-gray-900 mb-4">Task Summary</h3>
-      
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statusCounts.map(({ label, count, color }) => (
           <div key={label} className={`p-3 rounded-lg ${color}`}>
@@ -1933,7 +2098,7 @@ export function TaskSummary({ summary, loading }: TaskSummaryProps) {
           </div>
         ))}
       </div>
-      
+
       <div className="mt-4 text-sm text-gray-500">
         Total: {summary.total} tasks
       </div>
@@ -1943,6 +2108,7 @@ export function TaskSummary({ summary, loading }: TaskSummaryProps) {
 ```
 
 2. **Task Filters** (`packages/web/components/TaskFilters.tsx`):
+
 ```typescript
 import { Task } from '../types/tasks.js';
 
@@ -2025,6 +2191,7 @@ export function TaskFilters({
 ```
 
 3. **Task Dashboard** (`packages/web/components/TaskDashboard.tsx`):
+
 ```typescript
 import { useState } from 'react';
 import { Task } from '../types/tasks.js';
@@ -2180,6 +2347,7 @@ export function TaskDashboard({ sessionId }: TaskDashboardProps) {
 ```
 
 **Testing**:
+
 ```bash
 # Test dashboard
 npm test packages/web/components/__tests__/TaskDashboard.test.tsx
@@ -2197,12 +2365,14 @@ npm run web:dev
 **Objective**: Integrate task dashboard into existing web UI
 
 **Files to Modify**:
+
 - `packages/web/app/page.tsx` - Add task dashboard tab
 - `packages/web/components/SessionDisplay.tsx` - Add task tab (if exists)
 
 **Implementation**:
 
 1. **Update main page** (`packages/web/app/page.tsx`):
+
 ```typescript
 import { useState } from 'react';
 import { TaskDashboard } from './components/TaskDashboard.js';
@@ -2259,7 +2429,7 @@ export default function Home() {
                     {/* ... existing conversation UI ... */}
                   </div>
                 )}
-                
+
                 {activeTab === 'tasks' && (
                   <TaskDashboard sessionId={currentSession} />
                 )}
@@ -2274,6 +2444,7 @@ export default function Home() {
 ```
 
 2. **Add task notification in conversation** (optional enhancement):
+
 ```typescript
 // In conversation display, show task-related events
 const formatTaskEvent = (event: any) => {
@@ -2295,6 +2466,7 @@ const formatTaskEvent = (event: any) => {
 ```
 
 **Testing**:
+
 ```bash
 # Test integration
 npm run web:dev
@@ -2312,15 +2484,22 @@ npm run web:dev
 **Objective**: Ensure all TypeScript types are properly defined
 
 **Files to Create/Modify**:
+
 - `packages/web/types/tasks.ts` - Task type definitions
 - `packages/web/types/api.ts` - API type definitions
 
 **Implementation**:
 
 1. **Task types** (`packages/web/types/tasks.ts`):
+
 ```typescript
 // Re-export types from core, add web-specific types
-export type { Task, TaskNote, CreateTaskRequest, TaskFilters } from '../../../../src/tools/implementations/task-manager/types.js';
+export type {
+  Task,
+  TaskNote,
+  CreateTaskRequest,
+  TaskFilters,
+} from '../../../../src/tools/implementations/task-manager/types.js';
 
 export interface TaskSummary {
   total: number;
@@ -2350,16 +2529,25 @@ export interface TaskCreateResponse {
 ```
 
 2. **Update API types** (`packages/web/types/api.ts`):
+
 ```typescript
 // Add to existing API types
 export interface SessionEvent {
   // ... existing events ...
-  type: 'USER_MESSAGE' | 'AGENT_MESSAGE' | 'TOOL_CALL' | 'TOOL_RESULT' | 'THINKING' | 'SYSTEM_MESSAGE' | 'task_event';
+  type:
+    | 'USER_MESSAGE'
+    | 'AGENT_MESSAGE'
+    | 'TOOL_CALL'
+    | 'TOOL_RESULT'
+    | 'THINKING'
+    | 'SYSTEM_MESSAGE'
+    | 'task_event';
   data: any;
 }
 ```
 
 **Testing**:
+
 ```bash
 # Test type compilation
 npm run build
@@ -2377,11 +2565,15 @@ npx tsc --noEmit
 **Objective**: Test complete task management workflow
 
 **Files to Create**:
-- `packages/web/__tests__/integration/task-management.test.ts` - Full workflow tests
+
+- `packages/web/__tests__/integration/task-management.test.ts` - Full workflow
+  tests
 
 **Implementation**:
 
-1. **Integration tests** (`packages/web/__tests__/integration/task-management.test.ts`):
+1. **Integration tests**
+   (`packages/web/__tests__/integration/task-management.test.ts`):
+
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createMockSessionService } from '../test-utils.js';
@@ -2408,48 +2600,64 @@ describe('Task Management Integration', () => {
     const agentId = `${sessionId}.1`;
 
     // Create task
-    const task = await taskService.createTask({
-      title: 'Test Feature',
-      description: 'Implement test feature',
-      prompt: 'Please implement a test feature with proper error handling',
-      priority: 'high',
-      assignedTo: agentId
-    }, {
-      threadId: agentId,
-      parentThreadId: sessionId,
-      isHuman: false
-    });
+    const task = await taskService.createTask(
+      {
+        title: 'Test Feature',
+        description: 'Implement test feature',
+        prompt: 'Please implement a test feature with proper error handling',
+        priority: 'high',
+        assignedTo: agentId,
+      },
+      {
+        threadId: agentId,
+        parentThreadId: sessionId,
+        isHuman: false,
+      }
+    );
 
     expect(task.id).toMatch(/^task_\d{8}_[a-z0-9]{6}$/);
     expect(task.status).toBe('pending');
     expect(task.assignedTo).toBe(agentId);
 
     // Update task status
-    const updatedTask = await taskService.updateTask(task.id, {
-      status: 'in_progress'
-    }, {
-      threadId: agentId,
-      isHuman: false
-    });
+    const updatedTask = await taskService.updateTask(
+      task.id,
+      {
+        status: 'in_progress',
+      },
+      {
+        threadId: agentId,
+        isHuman: false,
+      }
+    );
 
     expect(updatedTask.status).toBe('in_progress');
 
     // Add note
-    const note = await taskService.addNote(task.id, 'Started working on this task', agentId, {
-      threadId: agentId,
-      isHuman: false
-    });
+    const note = await taskService.addNote(
+      task.id,
+      'Started working on this task',
+      agentId,
+      {
+        threadId: agentId,
+        isHuman: false,
+      }
+    );
 
     expect(note.author).toBe(agentId);
     expect(note.content).toBe('Started working on this task');
 
     // Complete task
-    const completedTask = await taskService.updateTask(task.id, {
-      status: 'completed'
-    }, {
-      threadId: agentId,
-      isHuman: false
-    });
+    const completedTask = await taskService.updateTask(
+      task.id,
+      {
+        status: 'completed',
+      },
+      {
+        threadId: agentId,
+        isHuman: false,
+      }
+    );
 
     expect(completedTask.status).toBe('completed');
 
@@ -2465,32 +2673,39 @@ describe('Task Management Integration', () => {
     const agent2Id = `${sessionId}.2`;
 
     // Create task assigned to agent1
-    const task = await taskService.createTask({
-      title: 'Multi-agent Task',
-      description: 'Task that gets reassigned',
-      prompt: 'Work on this task',
-      priority: 'medium',
-      assignedTo: agent1Id
-    }, {
-      threadId: agent1Id,
-      parentThreadId: sessionId,
-      isHuman: false
-    });
+    const task = await taskService.createTask(
+      {
+        title: 'Multi-agent Task',
+        description: 'Task that gets reassigned',
+        prompt: 'Work on this task',
+        priority: 'medium',
+        assignedTo: agent1Id,
+      },
+      {
+        threadId: agent1Id,
+        parentThreadId: sessionId,
+        isHuman: false,
+      }
+    );
 
     // Reassign to agent2
-    const reassignedTask = await taskService.updateTask(task.id, {
-      assignedTo: agent2Id
-    }, {
-      threadId: agent1Id,
-      isHuman: false
-    });
+    const reassignedTask = await taskService.updateTask(
+      task.id,
+      {
+        assignedTo: agent2Id,
+      },
+      {
+        threadId: agent1Id,
+        isHuman: false,
+      }
+    );
 
     expect(reassignedTask.assignedTo).toBe(agent2Id);
 
     // Both agents should see the task
     const agent1Tasks = await taskService.getTasksForAgent(agent1Id);
     const agent2Tasks = await taskService.getTasksForAgent(agent2Id);
-    
+
     expect(agent1Tasks).toHaveLength(0); // No longer assigned
     expect(agent2Tasks).toHaveLength(1); // Now assigned
   });
@@ -2500,29 +2715,36 @@ describe('Task Management Integration', () => {
     const humanId = sessionId;
 
     // Create task with new agent spec
-    const task = await taskService.createTask({
-      title: 'New Agent Task',
-      description: 'Task for new agent',
-      prompt: 'Create new agent and work on this',
-      priority: 'high',
-      assignedTo: 'new:anthropic/claude-3-sonnet'
-    }, {
-      threadId: humanId,
-      parentThreadId: sessionId,
-      isHuman: true
-    });
+    const task = await taskService.createTask(
+      {
+        title: 'New Agent Task',
+        description: 'Task for new agent',
+        prompt: 'Create new agent and work on this',
+        priority: 'high',
+        assignedTo: 'new:anthropic/claude-3-sonnet',
+      },
+      {
+        threadId: humanId,
+        parentThreadId: sessionId,
+        isHuman: true,
+      }
+    );
 
     expect(task.assignedTo).toBe('new:anthropic/claude-3-sonnet');
     expect(task.status).toBe('pending');
 
     // Simulate agent spawning (would be done by agent system)
     const spawnedAgentId = `${sessionId}.1`;
-    const updatedTask = await taskService.updateTask(task.id, {
-      assignedTo: spawnedAgentId
-    }, {
-      threadId: humanId,
-      isHuman: true
-    });
+    const updatedTask = await taskService.updateTask(
+      task.id,
+      {
+        assignedTo: spawnedAgentId,
+      },
+      {
+        threadId: humanId,
+        isHuman: true,
+      }
+    );
 
     expect(updatedTask.assignedTo).toBe(spawnedAgentId);
   });
@@ -2530,6 +2752,7 @@ describe('Task Management Integration', () => {
 ```
 
 **Testing**:
+
 ```bash
 # Run integration tests
 npm test packages/web/__tests__/integration/task-management.test.ts
@@ -2545,23 +2768,28 @@ npm test packages/web
 **Objective**: Document the task management system
 
 **Files to Create**:
+
 - `docs/features/task-management.md` - Feature documentation
 - `packages/web/README.md` - Update with task management info
 
 **Implementation**:
 
 1. **Feature documentation** (`docs/features/task-management.md`):
+
 ```markdown
 # Task Management System
 
 ## Overview
 
-The task management system provides a human-visible interface for managing tasks across AI agents. It enables humans to create, assign, monitor, and coordinate tasks within a session.
+The task management system provides a human-visible interface for managing tasks
+across AI agents. It enables humans to create, assign, monitor, and coordinate
+tasks within a session.
 
 ## Features
 
 - **Task CRUD Operations**: Create, read, update, delete tasks
-- **Multi-agent Assignment**: Assign tasks to specific agents or request new agents
+- **Multi-agent Assignment**: Assign tasks to specific agents or request new
+  agents
 - **Real-time Updates**: Live updates via Server-Sent Events
 - **Task Notes**: Communication channel between humans and agents
 - **Task Filtering**: Filter by status, priority, assignee
@@ -2591,14 +2819,13 @@ The task management system provides a human-visible interface for managing tasks
    - Error handling and loading states
 
 ### Data Flow
+```
 
-```
-Human UI → API Endpoints → Session.getTaskManager() → TaskManager → Database
-                                                         ↓
-Agent Tools → Session.getTaskManager() → TaskManager → Database
-                                                         ↓
-SSE Events → React Components → UI Updates
-```
+Human UI → API Endpoints → Session.getTaskManager() → TaskManager → Database ↓
+Agent Tools → Session.getTaskManager() → TaskManager → Database ↓ SSE Events →
+React Components → UI Updates
+
+````
 
 ## Usage
 
@@ -2624,13 +2851,15 @@ await createTask({
   prompt: "Detailed instructions for agent",
   priority: "high"
 });
-```
+````
 
 ### Agent Assignment
 
 Tasks can be assigned to:
+
 - **Existing agents**: Use full thread ID (e.g., `lace_20250714_abc123.1`)
-- **New agents**: Use specification format (e.g., `new:anthropic/claude-3-sonnet`)
+- **New agents**: Use specification format (e.g.,
+  `new:anthropic/claude-3-sonnet`)
 
 ### Task States
 
@@ -2642,6 +2871,7 @@ Tasks can be assigned to:
 ### Real-time Updates
 
 The system broadcasts task events via SSE:
+
 - `TASK_CREATED`: New task created
 - `TASK_UPDATED`: Task properties changed
 - `TASK_DELETED`: Task removed
@@ -2650,6 +2880,7 @@ The system broadcasts task events via SSE:
 ## Testing
 
 ### Unit Tests
+
 ```bash
 # Test core service
 npm test src/services/__tests__/task-service.test.ts
@@ -2662,12 +2893,14 @@ npm test packages/web/components/__tests__/
 ```
 
 ### Integration Tests
+
 ```bash
 # Test full workflow
 npm test packages/web/__tests__/integration/task-management.test.ts
 ```
 
 ### Manual Testing
+
 ```bash
 # Start web server
 npm run web:dev
@@ -2680,6 +2913,7 @@ npm run web:dev
 ## Configuration
 
 No additional configuration required. The system uses:
+
 - Existing SQLite database for persistence
 - Existing SSE infrastructure for real-time updates
 - Existing session management for scoping
@@ -2692,7 +2926,8 @@ No additional configuration required. The system uses:
 - Task search and full-text indexing
 - Task analytics and reporting
 - Task export/import functionality
-```
+
+````
 
 **Commit**: `docs: add comprehensive task management documentation`
 
@@ -2737,15 +2972,17 @@ npm test
 
 # Run web-specific tests
 npm test packages/web
-```
+````
 
 2. **Database Migration**
+
 ```bash
 # Migrations are automatic via TaskService
 # Database tables created on first use
 ```
 
 3. **Start Application**
+
 ```bash
 # Development
 npm run web:dev
@@ -2757,7 +2994,8 @@ npm run web:start
 
 ## Summary
 
-This implementation provides a complete human-visible task management system that:
+This implementation provides a complete human-visible task management system
+that:
 
 1. **Lifts the task manager to core service** - Shared by both agents and humans
 2. **Provides comprehensive web APIs** - REST endpoints for all operations
@@ -2765,7 +3003,9 @@ This implementation provides a complete human-visible task management system tha
 4. **Maintains agent compatibility** - Existing agent tools continue to work
 5. **Follows best practices** - TDD, frequent commits, YAGNI principles
 
-The system enables humans to effectively coordinate multi-agent workflows while preserving the core principle that agents communicate through tasks, not direct messaging.
+The system enables humans to effectively coordinate multi-agent workflows while
+preserving the core principle that agents communicate through tasks, not direct
+messaging.
 
 ## Implementation Status
 
@@ -2774,8 +3014,10 @@ The system enables humans to effectively coordinate multi-agent workflows while 
 1. **Phase 1: Core Task System** - TaskManager service with session scoping
 2. **Phase 2: Web API Endpoints** - REST APIs for CRUD operations
 3. **Phase 3: React Hooks and Client** - useTaskManager hook and TaskAPIClient
-4. **Phase 4: UI Components** - Full suite of React components (TaskList, TaskDetailModal, etc.)
-5. **Phase 5: Integration with Web UI** - Task management tab in main application
+4. **Phase 4: UI Components** - Full suite of React components (TaskList,
+   TaskDetailModal, etc.)
+5. **Phase 5: Integration with Web UI** - Task management tab in main
+   application
 
 ### 🚧 Remaining Work
 

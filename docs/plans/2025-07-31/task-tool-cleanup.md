@@ -2,16 +2,21 @@
 
 ## Problem Statement
 
-Task tool renderers in the web UI are showing raw task IDs instead of meaningful information like task titles. The issue is that task tools return plain text messages, but the UI expects structured metadata containing complete Task objects.
+Task tool renderers in the web UI are showing raw task IDs instead of meaningful
+information like task titles. The issue is that task tools return plain text
+messages, but the UI expects structured metadata containing complete Task
+objects.
 
 ## Architecture Overview
 
 ### Task Tool Data Flow
+
 ```
 Task Tool → ToolResult with Task Metadata → Event System → Timeline Renderer → Rich UI Display
 ```
 
-**Key Principle:** Task tools capture complete Task state at event-time in structured metadata, enabling rich UI displays without additional API calls.
+**Key Principle:** Task tools capture complete Task state at event-time in
+structured metadata, enabling rich UI displays without additional API calls.
 
 ### Key Components
 
@@ -36,12 +41,14 @@ Task Tool → ToolResult with Task Metadata → Event System → Timeline Render
 ### Prerequisites
 
 **Required Reading:**
+
 - `src/tools/implementations/task-manager/types.ts` - Task interface definition
 - `src/tools/tool.ts` - Base Tool class and ToolResult interface
 - `packages/web/components/timeline/tool/types.ts` - ToolRenderer interface
 - `CLAUDE.md` - Project coding standards and test requirements
 
 **Key Rules:**
+
 - NEVER use `any` types - use proper TypeScript interfaces
 - NEVER mock the functionality under test - use real codepaths
 - Follow TDD: write failing test first, implement minimal code to pass
@@ -53,26 +60,31 @@ Task Tool → ToolResult with Task Metadata → Event System → Timeline Render
 **Goal:** TaskCreateTool returns complete Task object in metadata
 
 **Files to modify:**
+
 - `src/tools/implementations/task-manager/tools.ts` (TaskCreateTool class)
 - `src/tools/implementations/task-manager/tools.test.ts` (add/update tests)
 
 **Implementation:**
 
 1. **Write failing test first:**
+
 ```typescript
 // In tools.test.ts
 it('should return complete Task object in result metadata', async () => {
   const tool = new TaskCreateTool();
-  const result = await tool.execute({
-    title: 'Test Task',
-    description: 'Test description',
-    prompt: 'Test prompt',
-    priority: 'high' as const
-  }, mockContext);
-  
+  const result = await tool.execute(
+    {
+      title: 'Test Task',
+      description: 'Test description',
+      prompt: 'Test prompt',
+      priority: 'high' as const,
+    },
+    mockContext
+  );
+
   expect(result.metadata).toBeDefined();
   expect(result.metadata.task).toBeDefined();
-  
+
   const task = result.metadata.task as Task;
   expect(task.id).toMatch(/^task_\d{8}_[a-z0-9]{6}$/);
   expect(task.title).toBe('Test Task');
@@ -85,11 +97,12 @@ it('should return complete Task object in result metadata', async () => {
 2. **Run test to see it fail:** `npm test -- tools.test.ts`
 
 3. **Implement minimal fix in TaskCreateTool.executeValidated():**
+
 ```typescript
 // After task creation, before return
 const taskMetadata = {
   task: task, // Complete Task object
-  operation: 'create' as const
+  operation: 'create' as const,
 };
 
 return this.createResult(message, taskMetadata);
@@ -100,6 +113,7 @@ return this.createResult(message, taskMetadata);
 5. **Commit:** "feat: add Task metadata to TaskCreateTool result"
 
 **Testing:**
+
 - Unit test: `npm test -- tools.test.ts`
 - Integration test: Create a task via CLI and verify metadata flows through
 
@@ -108,38 +122,49 @@ return this.createResult(message, taskMetadata);
 **Goal:** TaskUpdateTool returns complete Task object plus change tracking
 
 **Files to modify:**
+
 - `src/tools/implementations/task-manager/tools.ts` (TaskUpdateTool class)
 - `src/tools/implementations/task-manager/tools.test.ts`
 
 **Implementation:**
 
 1. **Write failing test:**
+
 ```typescript
 it('should return Task metadata with change tracking for updates', async () => {
   // First create a task
   const createTool = new TaskCreateTool();
-  const createResult = await createTool.execute({
-    title: 'Original Title',
-    prompt: 'test',
-    priority: 'medium' as const
-  }, mockContext);
-  
+  const createResult = await createTool.execute(
+    {
+      title: 'Original Title',
+      prompt: 'test',
+      priority: 'medium' as const,
+    },
+    mockContext
+  );
+
   const taskId = (createResult.metadata.task as Task).id;
-  
+
   // Then update it
   const updateTool = new TaskUpdateTool();
-  const result = await updateTool.execute({
-    taskId: taskId,
-    status: 'in_progress' as const,
-    priority: 'high' as const
-  }, mockContext);
-  
+  const result = await updateTool.execute(
+    {
+      taskId: taskId,
+      status: 'in_progress' as const,
+      priority: 'high' as const,
+    },
+    mockContext
+  );
+
   expect(result.metadata.task).toBeDefined();
   expect(result.metadata.changes).toBeDefined();
-  
+
   const task = result.metadata.task as Task;
-  const changes = result.metadata.changes as Record<string, {from: unknown, to: unknown}>;
-  
+  const changes = result.metadata.changes as Record<
+    string,
+    { from: unknown; to: unknown }
+  >;
+
   expect(task.status).toBe('in_progress');
   expect(task.priority).toBe('high');
   expect(changes.status.from).toBe('pending');
@@ -152,9 +177,10 @@ it('should return Task metadata with change tracking for updates', async () => {
 2. **Run test to see it fail**
 
 3. **Implement in TaskUpdateTool.executeValidated():**
+
 ```typescript
 // Load existing task BEFORE making changes
-const existingTask = this.getTaskManager 
+const existingTask = this.getTaskManager
   ? await taskManager.getTask(args.taskId, taskContext)
   : persistence.loadTask(args.taskId);
 
@@ -163,7 +189,7 @@ if (!existingTask) {
 }
 
 // Track what's changing
-const changes: Record<string, {from: unknown, to: unknown}> = {};
+const changes: Record<string, { from: unknown; to: unknown }> = {};
 if (args.status && args.status !== existingTask.status) {
   changes.status = { from: existingTask.status, to: args.status };
 }
@@ -173,13 +199,17 @@ if (args.priority && args.priority !== existingTask.priority) {
 // ... handle other fields
 
 // Apply the update
-const updatedTask = await taskManager.updateTask(args.taskId, updates, taskContext);
+const updatedTask = await taskManager.updateTask(
+  args.taskId,
+  updates,
+  taskContext
+);
 
 // Return with metadata
 const metadata = {
   task: updatedTask,
   changes: Object.keys(changes).length > 0 ? changes : undefined,
-  operation: 'update' as const
+  operation: 'update' as const,
 };
 
 return this.createResult(message, metadata);
@@ -194,35 +224,46 @@ return this.createResult(message, metadata);
 **Goal:** TaskCompleteTool returns Task object with status change tracking
 
 **Files to modify:**
+
 - `src/tools/implementations/task-manager/tools.ts` (TaskCompleteTool class)
 - `src/tools/implementations/task-manager/tools.test.ts`
 
 **Implementation:**
 
 1. **Write failing test:**
+
 ```typescript
 it('should return Task metadata with status change for completion', async () => {
   // Create task in pending state
   const createTool = new TaskCreateTool();
-  const createResult = await createTool.execute({
-    title: 'Task to Complete',
-    prompt: 'test'
-  }, mockContext);
-  
+  const createResult = await createTool.execute(
+    {
+      title: 'Task to Complete',
+      prompt: 'test',
+    },
+    mockContext
+  );
+
   const taskId = (createResult.metadata.task as Task).id;
-  
+
   // Complete it
   const completeTool = new TaskCompleteTool();
-  const result = await completeTool.execute({
-    id: taskId
-  }, mockContext);
-  
+  const result = await completeTool.execute(
+    {
+      id: taskId,
+    },
+    mockContext
+  );
+
   expect(result.metadata.task).toBeDefined();
   expect(result.metadata.changes).toBeDefined();
-  
+
   const task = result.metadata.task as Task;
-  const changes = result.metadata.changes as Record<string, {from: unknown, to: unknown}>;
-  
+  const changes = result.metadata.changes as Record<
+    string,
+    { from: unknown; to: unknown }
+  >;
+
   expect(task.status).toBe('completed');
   expect(changes.status.from).toBe('pending');
   expect(changes.status.to).toBe('completed');
@@ -237,6 +278,7 @@ it('should return Task metadata with status change for completion', async () => 
 **Goal:** TaskAddNoteTool returns Task object with updated notes
 
 **Files to modify:**
+
 - `src/tools/implementations/task-manager/tools.ts` (TaskAddNoteTool class)
 - `src/tools/implementations/task-manager/tools.test.ts`
 
@@ -251,6 +293,7 @@ it('should return Task metadata with status change for completion', async () => 
 **Goal:** TaskViewTool returns complete Task object
 
 **Files to modify:**
+
 - `src/tools/implementations/task-manager/tools.ts` (TaskViewTool class)
 - `src/tools/implementations/task-manager/tools.test.ts`
 
@@ -265,32 +308,37 @@ it('should return Task metadata with status change for completion', async () => 
 **Goal:** TaskListTool returns array of complete Task objects
 
 **Files to modify:**
+
 - `src/tools/implementations/task-manager/tools.ts` (TaskListTool class)
 - `src/tools/implementations/task-manager/tools.test.ts`
 
 **Implementation:**
 
 1. **Write failing test:**
+
 ```typescript
 it('should return complete Task objects in metadata', async () => {
   // Create a few tasks first
   const createTool = new TaskCreateTool();
-  await createTool.execute({title: 'Task 1', prompt: 'test'}, mockContext);
-  await createTool.execute({title: 'Task 2', prompt: 'test'}, mockContext);
-  
+  await createTool.execute({ title: 'Task 1', prompt: 'test' }, mockContext);
+  await createTool.execute({ title: 'Task 2', prompt: 'test' }, mockContext);
+
   const listTool = new TaskListTool();
-  const result = await listTool.execute({
-    filter: 'all' as const
-  }, mockContext);
-  
+  const result = await listTool.execute(
+    {
+      filter: 'all' as const,
+    },
+    mockContext
+  );
+
   expect(result.metadata.tasks).toBeDefined();
   expect(Array.isArray(result.metadata.tasks)).toBe(true);
-  
+
   const tasks = result.metadata.tasks as Task[];
   expect(tasks.length).toBeGreaterThan(0);
-  
+
   // Verify each task has complete Task interface
-  tasks.forEach(task => {
+  tasks.forEach((task) => {
     expect(task.id).toBeDefined();
     expect(task.title).toBeDefined();
     expect(task.status).toBeDefined();
@@ -300,12 +348,13 @@ it('should return complete Task objects in metadata', async () => {
 ```
 
 2. **Implement metadata return:**
+
 ```typescript
 const metadata = {
   tasks: tasks, // Array of complete Task objects
   totalCount: tasks.length,
   filter: args.filter,
-  operation: 'list' as const
+  operation: 'list' as const,
 };
 
 return this.createResult(headerText, metadata);
@@ -318,22 +367,24 @@ return this.createResult(headerText, metadata);
 **Goal:** Task renderers use structured metadata instead of parsing text
 
 **Files to modify:**
+
 - `packages/web/components/timeline/tool/task.tsx` (all task renderers)
 - `packages/web/components/timeline/tool/task.test.ts`
 
 **Implementation:**
 
 1. **Update TaskCompleteRenderer:**
+
 ```typescript
 renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.ReactNode => {
   if (result.isError) {
     // ... error handling
   }
-  
+
   // Use structured metadata
   const task = result.metadata?.task as Task | undefined;
   const changes = result.metadata?.changes as Record<string, {from: unknown, to: unknown}> | undefined;
-  
+
   if (task) {
     return (
       <div className="p-3">
@@ -346,12 +397,13 @@ renderResult: (result: ToolResult, metadata?: ToolAggregatedEventData): React.Re
       </div>
     );
   }
-  
+
   return <div></div>;
 },
 ```
 
 2. **Update TaskUpdateRenderer to show changes:**
+
 ```typescript
 if (task && changes) {
   const changeMessages: string[] = [];
@@ -362,7 +414,7 @@ if (task && changes) {
     changeMessages.push(`priority: ${changes.priority.from} → ${changes.priority.to}`);
   }
   // ... other changes
-  
+
   return (
     <div className="p-3">
       <div className="flex items-center gap-2 text-sm text-primary">
@@ -380,6 +432,7 @@ if (task && changes) {
 3. **Update all other renderers similarly**
 
 4. **Write/update renderer tests:**
+
 ```typescript
 test('should display task title from metadata', () => {
   const mockResult: ToolResult = {
@@ -391,10 +444,10 @@ test('should display task title from metadata', () => {
         title: 'Fix authentication bug',
         status: 'completed',
         // ... other Task fields
-      } as Task
-    }
+      } as Task,
+    },
   };
-  
+
   const resultNode = taskRenderers.task_complete.renderResult?.(mockResult);
   // Test that it shows "Fix authentication bug completed"
 });
@@ -409,36 +462,38 @@ test('should display task title from metadata', () => {
 **Goal:** Verify complete data flow from tool execution to UI display
 
 **Files to check:**
+
 - End-to-end flow test
 - Manual testing via web UI
 
 **Testing Process:**
 
 1. **Create integration test:**
+
 ```typescript
 // In a new integration test file
 it('should show meaningful task updates in timeline', async () => {
   // Create task
   const createResult = await executeTaskTool('task_add', {
     title: 'Integration Test Task',
-    prompt: 'test'
+    prompt: 'test',
   });
-  
+
   const taskId = createResult.metadata?.task?.id;
   expect(taskId).toBeDefined();
-  
+
   // Update task
   const updateResult = await executeTaskTool('task_update', {
     taskId: taskId,
     status: 'in_progress',
-    priority: 'high'
+    priority: 'high',
   });
-  
+
   // Verify metadata structure
   expect(updateResult.metadata?.task?.title).toBe('Integration Test Task');
   expect(updateResult.metadata?.changes?.status).toEqual({
     from: 'pending',
-    to: 'in_progress'
+    to: 'in_progress',
   });
 });
 ```
@@ -458,6 +513,7 @@ it('should show meaningful task updates in timeline', async () => {
 **Goal:** Remove dead code, update documentation
 
 **Files to modify:**
+
 - Remove any unused parsing logic from renderers
 - Update type definitions if needed
 - Add code comments explaining metadata structure
@@ -472,16 +528,19 @@ it('should show meaningful task updates in timeline', async () => {
 ## Testing Strategy
 
 ### Unit Tests
+
 - Each task tool has comprehensive tests for metadata structure
 - Each renderer has tests for displaying metadata correctly
 - Focus on edge cases: missing metadata, malformed data, errors
 
-### Integration Tests  
+### Integration Tests
+
 - Test complete flow from tool execution to UI rendering
 - Verify metadata flows through event system correctly
 - Test with real TaskManager vs fallback persistence
 
 ### Manual Testing
+
 - Use web UI to perform various task operations
 - Verify meaningful messages appear in timeline
 - Test error cases (task not found, invalid operations)
@@ -490,7 +549,8 @@ it('should show meaningful task updates in timeline', async () => {
 
 1. **Task timeline entries show meaningful information:**
    - "Fix authentication bug completed" instead of "task_20250730_yk2p41"
-   - "User dashboard updated (status: pending → in_progress)" with change details
+   - "User dashboard updated (status: pending → in_progress)" with change
+     details
 
 2. **All task tools return structured metadata:**
    - Complete Task objects in `result.metadata.task`
@@ -511,21 +571,25 @@ it('should show meaningful task updates in timeline', async () => {
 
 **Goal:** Eliminate duplicate type definitions between core and web packages
 
-**Problem:** The web package has duplicate type definitions in `@/types/api` that shadow core types from `~/tasks/types`, `~/threads/types`, etc. This creates maintenance burden and potential drift between definitions.
+**Problem:** The web package has duplicate type definitions in `@/types/api`
+that shadow core types from `~/tasks/types`, `~/threads/types`, etc. This
+creates maintenance burden and potential drift between definitions.
 
 **Files to modify:**
+
 - `packages/web/types/api.ts` - Remove duplicate types, re-export from core
-- `packages/web/lib/core-types-import.ts` - Add client-safe core type imports  
+- `packages/web/lib/core-types-import.ts` - Add client-safe core type imports
 - All web components importing shadowed types - Update imports
 
 **Implementation:**
 
 1. **Audit type duplication:**
    - Task, TaskNote, TaskStatus, TaskPriority (duplicated from `~/tasks/types`)
-   - ThreadId, AssigneeId (duplicated from `~/threads/types`) 
+   - ThreadId, AssigneeId (duplicated from `~/threads/types`)
    - ToolResult (duplicated from `~/tools/types`)
 
 2. **Update core-types-import.ts to include client-safe types:**
+
 ```typescript
 // Add to packages/web/lib/core-types-import.ts
 export type { Task, TaskNote, TaskStatus, TaskPriority } from '~/tasks/types';
@@ -534,9 +598,15 @@ export type { ToolResult } from '~/tools/types';
 ```
 
 3. **Update api.ts to re-export instead of duplicate:**
+
 ```typescript
 // Remove duplicate definitions, add re-exports
-export type { Task, TaskNote, TaskStatus, TaskPriority } from '@/lib/core-types-import';
+export type {
+  Task,
+  TaskNote,
+  TaskStatus,
+  TaskPriority,
+} from '@/lib/core-types-import';
 export type { ThreadId, AssigneeId } from '@/lib/core-types-import';
 ```
 
@@ -545,6 +615,7 @@ export type { ThreadId, AssigneeId } from '@/lib/core-types-import';
 5. **Verify no build/type errors**
 
 **Testing:**
+
 - Full TypeScript compilation
 - All existing tests pass
 - No runtime behavior changes
@@ -560,24 +631,33 @@ export type { ThreadId, AssigneeId } from '@/lib/core-types-import';
 ### What Was Actually Implemented
 
 #### The Real Problem
-The issue wasn't in the task tools - they were already returning proper metadata. The problem was a **critical event format inconsistency** between real-time and persistence paths:
+
+The issue wasn't in the task tools - they were already returning proper
+metadata. The problem was a **critical event format inconsistency** between
+real-time and persistence paths:
 
 **Real-time events (session-service.ts):**
+
 ```typescript
 // BROKEN FORMAT
 data: { toolName: 'task_add', result: toolResult }
 ```
 
 **Persistence events (ThreadManager):**
-```typescript  
+
+```typescript
 // CORRECT FORMAT
-data: toolResult  // Direct ToolResult object
+data: toolResult; // Direct ToolResult object
 ```
 
-This format mismatch caused `timeline-converter.ts` to lose metadata during real-time processing, while page reloads worked correctly because they used the persistence format.
+This format mismatch caused `timeline-converter.ts` to lose metadata during
+real-time processing, while page reloads worked correctly because they used the
+persistence format.
 
 #### Root Cause Solution
+
 **Fixed session-service.ts event format consistency:**
+
 ```typescript
 // packages/web/lib/server/session-service.ts
 agent.on('tool_call_complete', ({ result }) => {
@@ -600,7 +680,8 @@ agent.on('tool_call_complete', ({ result }) => {
    - Graceful fallback for missing metadata
 
 2. **Comprehensive Integration Testing:**
-   - `task-metadata-realtime-integration.test.ts` - Tests event format consistency
+   - `task-metadata-realtime-integration.test.ts` - Tests event format
+     consistency
    - 674 total tests passing including full integration coverage
    - Type safety throughout with zero `any` usage
 
@@ -612,22 +693,30 @@ agent.on('tool_call_complete', ({ result }) => {
 ### Files Modified
 
 #### Core Architecture
-- `packages/web/lib/server/session-service.ts` - **Critical fix**: Event format consistency
+
+- `packages/web/lib/server/session-service.ts` - **Critical fix**: Event format
+  consistency
 - `packages/web/lib/timeline-converter.ts` - Enhanced metadata handling
 
-#### UI Components  
-- `packages/web/components/timeline/tool/task.tsx` - Rich renderers with design system
+#### UI Components
+
+- `packages/web/components/timeline/tool/task.tsx` - Rich renderers with design
+  system
 - `packages/web/components/timeline/tool/types.ts` - Enhanced renderer interface
 
 #### Testing
-- `packages/web/lib/task-metadata-realtime-integration.test.ts` - Integration tests
+
+- `packages/web/lib/task-metadata-realtime-integration.test.ts` - Integration
+  tests
 - `packages/web/components/timeline/tool/task.test.ts` - Updated unit tests
-- `packages/web/components/timeline/tool/task-integration.test.ts` - Fixed integration tests
+- `packages/web/components/timeline/tool/task-integration.test.ts` - Fixed
+  integration tests
 
 ### Test Results
+
 ```
 ✅ 674 tests passing (2 skipped)
-✅ Zero ESLint warnings  
+✅ Zero ESLint warnings
 ✅ Full TypeScript strict mode compliance
 ✅ Integration tests verify real-time = persistence behavior
 ```
@@ -635,11 +724,14 @@ agent.on('tool_call_complete', ({ result }) => {
 ### User Experience Improvement
 
 **Before (Broken):**
+
 - Real-time: "Tool executed, no output returned"
-- After reload: "Remove unused build artifacts from _build directory"
+- After reload: "Remove unused build artifacts from \_build directory"
 
 **After (Fixed):**
-- Real-time: Rich task completion card with title, completion message, and metadata
+
+- Real-time: Rich task completion card with title, completion message, and
+  metadata
 - After reload: Identical rich display
 - Consistent UX in both scenarios
 
@@ -656,7 +748,7 @@ agent.on('tool_call_complete', ({ result }) => {
    - Comprehensive error handling and fallback testing
 
 3. **UI Component Integration:**
-   - Task renderers handle both metadata and fallback scenarios  
+   - Task renderers handle both metadata and fallback scenarios
    - Design system component integration
    - Responsive display of task information
 
@@ -686,9 +778,11 @@ agent.on('tool_call_complete', ({ result }) => {
 ## Rollback Plan
 
 If issues arise:
+
 1. Revert specific commits: `git revert <commit-hash>`
 2. Task renderers have graceful fallback to text parsing (already implemented)
-3. Event format inconsistency is the main risk - monitor session-service.ts changes
+3. Event format inconsistency is the main risk - monitor session-service.ts
+   changes
 4. Integration tests will catch any regression in event format consistency
 
 The implementation maintains backwards compatibility and graceful degradation.

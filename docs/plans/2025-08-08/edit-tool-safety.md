@@ -2,15 +2,22 @@
 
 ## Problem Statement
 
-Currently, file modification tools (file-write, file-insert, file-edit) can accidentally overwrite or modify existing files without the agent having read them first. This poses a risk of unintended data loss, especially with less capable models that might not remember to read files before modifying them.
+Currently, file modification tools (file-write, file-insert, file-edit) can
+accidentally overwrite or modify existing files without the agent having read
+them first. This poses a risk of unintended data loss, especially with less
+capable models that might not remember to read files before modifying them.
 
-This mirrors a safety feature in Claude Code where the Write tool enforces that files must be read before they can be overwritten.
+This mirrors a safety feature in Claude Code where the Write tool enforces that
+files must be read before they can be overwritten.
 
 ## Solution Overview
 
 Implement a read-before-write protection system that:
-1. Tracks which files have been read in the current conversation (since last compaction)
-2. Prevents write/insert/edit operations on existing files that haven't been read
+
+1. Tracks which files have been read in the current conversation (since last
+   compaction)
+2. Prevents write/insert/edit operations on existing files that haven't been
+   read
 3. Provides clear error messages guiding agents to read files first
 4. Works correctly across agent recreations in the web context
 
@@ -19,12 +26,14 @@ Implement a read-before-write protection system that:
 ### Where to Track Read Files
 
 **Option Chosen: Query Thread History**
+
 - The thread's event history is the source of truth
 - Query it to find successful `file_read` tool calls
 - No state to maintain, works across agent recreations
 - Automatically cleared on compaction (desired behavior)
 
 **Rejected Alternatives:**
+
 - Agent instance state: Lost on recreation in web context
 - Session level: Too persistent, wrong scope (multiple agents per session)
 - Static/global: Would be shared across all agents (incorrect)
@@ -33,31 +42,36 @@ Implement a read-before-write protection system that:
 ### API Design
 
 **Option Chosen: Agent Reference in ToolContext**
+
 - Add `agent?: Agent` to ToolContext
 - Agent provides `hasFileBeenRead(path: string): boolean` method
 - Tools check via `context.agent?.hasFileBeenRead()`
 - Clean, extensible, follows existing patterns
 
 **Rejected Alternatives:**
+
 - Function in context: `getReadFiles?: () => Set<string>` - less discoverable
 - Direct ThreadManager access: Too much power for tools
 - Separate FileTracker service: Unnecessary abstraction
 
 ### ToolContext Simplification
 
-While implementing this feature, we identified that ToolContext has several unused/redundant fields:
+While implementing this feature, we identified that ToolContext has several
+unused/redundant fields:
+
 - `parentThreadId` - Never used by any tool
-- `sessionId` - Never used by any tool  
+- `sessionId` - Never used by any tool
 - `projectId` - Never used by any tool
 - `session` - Can be accessed via `agent.getFullSession()`
 - `threadId` - Can be accessed via `agent.threadId`
 
 **Simplified ToolContext:**
+
 ```typescript
 export interface ToolContext {
-  workingDirectory?: string;  // Used by file tools and bash
-  toolTempDir?: string;       // Used by bash for output files
-  agent?: Agent;              // Central access point for everything else
+  workingDirectory?: string; // Used by file tools and bash
+  toolTempDir?: string; // Used by bash for output files
+  agent?: Agent; // Central access point for everything else
 }
 ```
 
@@ -78,8 +92,8 @@ export interface ToolContext {
    - **Delegate tool** (`src/tools/implementations/delegate.ts`)
      - Change `context?.threadId` → `context.agent?.threadId`
      - Change `context?.session` → `await context.agent?.getFullSession()`
-   
-   - **Task management tools** (`src/tools/implementations/task-manager/tools.ts`)
+   - **Task management tools**
+     (`src/tools/implementations/task-manager/tools.ts`)
      - Update all 6 tools (Create, Query, Complete, Update, Delete, Note)
      - Change `context?.threadId` → `context.agent?.threadId`
      - Change `context?.session` → `await context.agent?.getFullSession()`
@@ -87,21 +101,22 @@ export interface ToolContext {
 ### Phase 2: File Read Tracking
 
 1. **Add `hasFileBeenRead` method to Agent** (`src/agents/agent.ts`)
+
    ```typescript
    public hasFileBeenRead(filePath: string): boolean {
      const events = this._threadManager.getEvents(this._threadId);
-     
+
      for (let i = 0; i < events.length; i++) {
        const event = events[i];
-       
+
        if (event.type === 'TOOL_CALL' && event.data.name === 'file_read') {
          const toolCallId = event.data.id;
          const path = event.data.arguments['path'] as string;
-         
+
          // Look for corresponding successful TOOL_RESULT
          for (let j = i + 1; j < events.length; j++) {
            const resultEvent = events[j];
-           if (resultEvent.type === 'TOOL_RESULT' && 
+           if (resultEvent.type === 'TOOL_RESULT' &&
                resultEvent.data.id === toolCallId) {
              if (!resultEvent.data.isError && path === filePath) {
                return true;
@@ -116,25 +131,27 @@ export interface ToolContext {
    ```
 
 2. **Update file-write tool** (`src/tools/implementations/file-write.ts`)
+
    ```typescript
    // In executeValidated, after resolving path
    if (existsSync(resolvedPath) && context.agent) {
      if (!context.agent.hasFileBeenRead(resolvedPath)) {
        return this.createError(
          `File ${args.path} exists but hasn't been read in this conversation. ` +
-         `Use file_read to examine the current contents before overwriting.`
+           `Use file_read to examine the current contents before overwriting.`
        );
      }
    }
    ```
 
 3. **Update file-insert tool** (`src/tools/implementations/file-insert.ts`)
+
    ```typescript
    // In executeValidated, after stat(resolvedPath)
    if (context.agent && !context.agent.hasFileBeenRead(resolvedPath)) {
      return this.createError(
        `File ${args.path} hasn't been read in this conversation. ` +
-       `Use file_read to examine the current contents before inserting.`
+         `Use file_read to examine the current contents before inserting.`
      );
    }
    ```
@@ -145,7 +162,7 @@ export interface ToolContext {
    if (context.agent && !context.agent.hasFileBeenRead(resolvedPath)) {
      return this.createError(
        `File ${args.path} hasn't been read in this conversation. ` +
-       `Use file_read to examine the current contents before editing.`
+         `Use file_read to examine the current contents before editing.`
      );
    }
    ```
@@ -175,11 +192,15 @@ export interface ToolContext {
 ## Migration Notes
 
 ### Breaking Changes
-- Tools that directly access `context.threadId` will need to use `context.agent?.threadId`
-- Tools that directly access `context.session` will need to use `await context.agent?.getFullSession()`
+
+- Tools that directly access `context.threadId` will need to use
+  `context.agent?.threadId`
+- Tools that directly access `context.session` will need to use
+  `await context.agent?.getFullSession()`
 - Custom tools outside the codebase may need updates
 
 ### Backward Compatibility
+
 - All ToolContext fields are optional, so missing fields won't cause crashes
 - Tools already check for undefined values (e.g., `context?.threadId`)
 - The agent field is optional, so tools without it will continue to work
@@ -200,7 +221,8 @@ export interface ToolContext {
 
 ## Future Enhancements
 
-1. **Performance optimization**: Could maintain a read file index in thread metadata
+1. **Performance optimization**: Could maintain a read file index in thread
+   metadata
 2. **Partial reads**: Could track line ranges read, not just files
 3. **Read timestamp**: Could expire reads after certain time
 4. **Directory reads**: Could consider file-list as reading directory contents

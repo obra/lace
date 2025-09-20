@@ -2,13 +2,15 @@
 
 ## Architecture Overview
 
-The OpenRouter Dynamic Provider replaces static JSON catalogs with real-time API-fetched model data, providing access to 300+ constantly-changing AI models with sophisticated filtering and caching.
+The OpenRouter Dynamic Provider replaces static JSON catalogs with real-time
+API-fetched model data, providing access to 300+ constantly-changing AI models
+with sophisticated filtering and caching.
 
 ### Core Components
 
 ```
 OpenRouterDynamicProvider (Main orchestrator)
-├── OpenRouterClient (API communication)  
+├── OpenRouterClient (API communication)
 ├── CatalogCacheManager (Local caching with staleness)
 ├── ModelFilterService (Configuration-based filtering)
 └── Utility functions (Provider extraction, pricing conversion)
@@ -68,8 +70,10 @@ const response = await client.fetchModels('sk-or-v1-...');
 ```
 
 **Response Structure**: Validated with `OpenRouterResponseSchema`
+
 - `data[]`: Array of model objects
-- Each model has: `id`, `name`, `context_length`, `pricing`, `supported_parameters`
+- Each model has: `id`, `name`, `context_length`, `pricing`,
+  `supported_parameters`
 
 ### Cache Management
 
@@ -106,8 +110,8 @@ const filtered = filter.filterModels(models, {
   filters: {
     requiredParameters: ['tools'],
     maxPromptCostPerMillion: 10.0,
-    minContextLength: 32000
-  }
+    minContextLength: 32000,
+  },
 });
 
 const grouped = filter.groupByProvider(filtered);
@@ -154,14 +158,14 @@ npx vitest --run src/providers/openrouter/filter-service.test.ts -t "performance
 
 ```typescript
 interface ModelConfig {
-  enableNewModels: boolean;        // Default: true
-  disabledModels: string[];        // Model IDs to exclude
-  disabledProviders: string[];     // Provider names to exclude
+  enableNewModels: boolean; // Default: true
+  disabledModels: string[]; // Model IDs to exclude
+  disabledProviders: string[]; // Provider names to exclude
   filters?: {
-    requiredParameters?: string[];           // ['tools', 'vision', etc.]
-    maxPromptCostPerMillion?: number;        // Cost limit for input
-    maxCompletionCostPerMillion?: number;    // Cost limit for output  
-    minContextLength?: number;               // Minimum context window
+    requiredParameters?: string[]; // ['tools', 'vision', etc.]
+    maxPromptCostPerMillion?: number; // Cost limit for input
+    maxCompletionCostPerMillion?: number; // Cost limit for output
+    minContextLength?: number; // Minimum context window
   };
 }
 ```
@@ -194,10 +198,12 @@ Add new filter options to `ModelConfigSchema` in `types.ts`:
 ```typescript
 export const ModelConfigSchema = z.object({
   // existing fields...
-  filters: z.object({
-    // existing filters...
-    newFilter: z.string().optional(),
-  }).optional(),
+  filters: z
+    .object({
+      // existing filters...
+      newFilter: z.string().optional(),
+    })
+    .optional(),
 });
 ```
 
@@ -236,7 +242,7 @@ Add test cases to `filter-service.test.ts`:
 ```typescript
 it('should filter by new criteria', () => {
   const filtered = service.filterModels(models, {
-    filters: { newFilter: 'value' }
+    filters: { newFilter: 'value' },
   });
   expect(filtered).toHaveLength(expectedCount);
 });
@@ -309,7 +315,9 @@ const catalog = await registry.getCatalogProvider('openrouter');
 // Instance configuration includes model filtering
 const instance = {
   catalogProviderId: 'openrouter',
-  modelConfig: { /* filtering config */ }
+  modelConfig: {
+    /* filtering config */
+  },
 };
 ```
 
@@ -331,8 +339,9 @@ LACE_LOG_LEVEL=debug npm run dev
 ```
 
 **Debug Events**:
+
 - `catalog.cache.saved` - Cache write operations
-- `catalog.cache.miss` - Cache lookup failures  
+- `catalog.cache.miss` - Cache lookup failures
 - `catalog.using_cache` - Cache hit confirmations
 - `catalog.refreshed` - Fresh API data fetched
 - `models.filtered` - Filter operation results
@@ -373,4 +382,6 @@ npx vitest --run src/providers/openrouter/filter-service.test.ts -t "performance
 
 ---
 
-*This implementation provides a robust, performant, and user-friendly interface to OpenRouter's dynamic model catalog while maintaining backward compatibility with Lace's existing provider system.*
+_This implementation provides a robust, performant, and user-friendly interface
+to OpenRouter's dynamic model catalog while maintaining backward compatibility
+with Lace's existing provider system._

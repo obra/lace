@@ -2,11 +2,16 @@
 
 ## Core Decisions
 
-1. **One Event Type**: All events use a single `LaceEvent` type (renamed from ThreadEvent)
-2. **Optional threadId**: Thread events have `threadId`, system/task/project events don't
-3. **Persistence Logic**: Events with `threadId` can be persisted (unless marked transient), events without `threadId` are always transient
-4. **ThreadManager Stays**: Keeps its name and role, handles both thread events and pass-through for non-thread events
-5. **No Factories/Options**: Direct object creation with TypeScript ensuring correctness
+1. **One Event Type**: All events use a single `LaceEvent` type (renamed from
+   ThreadEvent)
+2. **Optional threadId**: Thread events have `threadId`, system/task/project
+   events don't
+3. **Persistence Logic**: Events with `threadId` can be persisted (unless marked
+   transient), events without `threadId` are always transient
+4. **ThreadManager Stays**: Keeps its name and role, handles both thread events
+   and pass-through for non-thread events
+5. **No Factories/Options**: Direct object creation with TypeScript ensuring
+   correctness
 
 ## The New Event Type
 
@@ -18,23 +23,23 @@ export interface LaceEvent {
   type: LaceEventType;
   timestamp: Date;
   data: LaceEventData;
-  
+
   // Thread events have threadId
   threadId?: string;
-  
-  // Routing/context  
+
+  // Routing/context
   context?: {
     sessionId?: string;
     projectId?: string;
     taskId?: string;
     agentId?: string;
   };
-  
+
   // Transient flag (some event types are always transient)
   transient?: boolean;
 }
 
-export type LaceEventType = 
+export type LaceEventType =
   // Thread events (persisted if threadId present)
   | 'USER_MESSAGE'
   | 'AGENT_MESSAGE'
@@ -46,14 +51,14 @@ export type LaceEventType =
   | 'SYSTEM_PROMPT'
   | 'USER_SYSTEM_PROMPT'
   | 'COMPACTION'
-  
+
   // Always transient (even with threadId)
   | 'AGENT_TOKEN'
   | 'AGENT_STREAMING'
   | 'AGENT_STATE_CHANGE'
   | 'COMPACTION_START'
   | 'COMPACTION_COMPLETE'
-  
+
   // Non-thread events (no threadId, always transient)
   | 'TASK_CREATED'
   | 'TASK_UPDATED'
@@ -75,27 +80,27 @@ class ThreadManager {
     // Fill in defaults
     if (!event.id) event.id = generateEventId();
     if (!event.timestamp) event.timestamp = new Date();
-    
+
     // Non-thread events pass through
     if (!event.threadId) {
       return event; // Caller will broadcast
     }
-    
+
     // Thread events
     const thread = this.getThread(event.threadId);
     if (!thread) {
       throw new Error(`Thread ${event.threadId} not found`);
     }
-    
+
     // Determine if transient (by type or flag)
     const isTransient = event.transient || isTransientType(event.type);
-    
+
     if (isTransient) {
       thread.events.push(event);
       thread.updatedAt = new Date();
       return event;
     }
-    
+
     // Persist non-transient thread events
     return this._persistence.transaction(() => {
       const wasSaved = this._persistence.saveEvent(event);
@@ -112,10 +117,10 @@ class ThreadManager {
 function isTransientType(type: LaceEventType): boolean {
   return [
     'AGENT_TOKEN',
-    'AGENT_STREAMING', 
+    'AGENT_STREAMING',
     'AGENT_STATE_CHANGE',
     'COMPACTION_START',
-    'COMPACTION_COMPLETE'
+    'COMPACTION_COMPLETE',
   ].includes(type);
 }
 ```
@@ -123,68 +128,79 @@ function isTransientType(type: LaceEventType): boolean {
 ## Implementation Steps
 
 ### Phase 1: Update Types (COMPLETED)
+
 - ✅ Extended ThreadEvent with transient events
 - ✅ Added transient and context fields
 - ✅ Updated ThreadManager.addEvent to handle transient flag
 
 ### Phase 2: Rename and Refactor
+
 1. Rename `ThreadEvent` → `LaceEvent` everywhere
 2. Move types from `src/threads/types.ts` to `src/events/types.ts`
-3. Add non-thread event types (TASK_*, PROJECT_*, etc.)
+3. Add non-thread event types (TASK*\*, PROJECT*\*, etc.)
 4. Update ThreadManager.addEvent to handle non-thread events
 
 ### Phase 3: Update All Event Creators
+
 Replace all 114 calls from:
+
 ```typescript
-threadManager.addEvent(threadId, 'USER_MESSAGE', content)
+threadManager.addEvent(threadId, 'USER_MESSAGE', content);
 ```
 
 To:
+
 ```typescript
 threadManager.addEvent({
   type: 'USER_MESSAGE',
   threadId,
-  data: content
-})
+  data: content,
+});
 ```
 
 For transient events:
+
 ```typescript
 threadManager.addEvent({
   type: 'AGENT_TOKEN',
   threadId,
   data: { token },
-  transient: true  // Or rely on isTransientType()
-})
+  transient: true, // Or rely on isTransientType()
+});
 ```
 
 For non-thread events:
+
 ```typescript
 threadManager.addEvent({
   type: 'TASK_CREATED',
   data: taskData,
-  context: { projectId, taskId }
+  context: { projectId, taskId },
   // No threadId - always transient
-})
+});
 ```
 
 ### Phase 4: Delete StreamEvent
+
 1. Delete `src/stream-events/` directory
 2. Update session-service to create LaceEvents directly
 3. Update EventStreamManager to broadcast LaceEvents
 4. Remove all StreamEvent wrapping/unwrapping
 
 ### Phase 5: Update Frontend
+
 1. Change `SessionEvent` to alias `LaceEvent`
 2. Fix token usage access (data.tokenUsage not data.data.tokenUsage)
 3. Update all hooks to expect LaceEvent
 
 ### Phase 6: Delete Timeline Converter
+
 1. Create direct timeline renderer that consumes LaceEvent
 2. Delete `packages/web/lib/timeline-converter.ts` (344 lines)
 3. Update Timeline component to render events directly
 
 ### Phase 7: Clean Up
+
 1. Search and fix any remaining `data.data` patterns
 2. Remove any StreamEvent references
 3. Update imports

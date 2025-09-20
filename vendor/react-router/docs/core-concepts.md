@@ -1,10 +1,12 @@
 # Core Concepts
 
-Essential mental models and patterns for working with React Router 7 Framework Mode.
+Essential mental models and patterns for working with React Router 7 Framework
+Mode.
 
 ## Route Modules - The Foundation
 
-Every route in React Router 7 is a **Route Module** - a TypeScript/JavaScript file that can export specific functions and components:
+Every route in React Router 7 is a **Route Module** - a TypeScript/JavaScript
+file that can export specific functions and components:
 
 ```typescript
 // app/products/$productId.tsx
@@ -63,17 +65,19 @@ export interface ComponentProps {
 Import these types using the `"+types/filename"` convention:
 
 ```typescript
-import { Route } from "./+types/products.$productId";
+import { Route } from './+types/products.$productId';
 ```
 
 ## Data Flow Architecture
 
 ### Server-First Pattern
+
 1. **Server Loader** runs on the server during SSR or when navigating
 2. **Client Loader** (optional) runs on the client after hydration/navigation
 3. **Component** renders with combined data
 
 ### Action Flow
+
 1. **Form submission** triggers server action
 2. **Server Action** processes the mutation
 3. **Client Action** (optional) handles optimistic updates
@@ -121,11 +125,13 @@ export default function ContactForm() {
 ## State Management Strategy
 
 ### URL as Source of Truth
-- **Route params**: `/products/$id` 
+
+- **Route params**: `/products/$id`
 - **Search params**: `/products?category=electronics&page=2`
 - **Route data**: Loaded via loaders, cached automatically
 
 ### Local State for UI Only
+
 - Form input states
 - Modal open/closed
 - Temporary UI states
@@ -136,7 +142,7 @@ const [searchParams] = useSearchParams();
 const category = searchParams.get('category');
 const page = parseInt(searchParams.get('page') || '1');
 
-// Good: UI-only local state  
+// Good: UI-only local state
 const [isModalOpen, setIsModalOpen] = useState(false);
 
 // Avoid: Important app state in local state
@@ -171,6 +177,7 @@ export default function App() {
 ## Error Handling Patterns
 
 ### Route-Level Error Boundaries
+
 ```typescript
 export function ErrorBoundary({ error }: { error: Error }) {
   return (
@@ -183,6 +190,7 @@ export function ErrorBoundary({ error }: { error: Error }) {
 ```
 
 ### Global Error Handling
+
 ```typescript
 // app/root.tsx
 export function ErrorBoundary() {
@@ -200,9 +208,11 @@ export function ErrorBoundary() {
 ## Code Splitting & Performance
 
 ### Automatic Route Splitting
+
 Routes are automatically split into separate chunks for optimal loading.
 
 ### Manual Component Splitting
+
 ```typescript
 import { lazy } from "react";
 
@@ -220,13 +230,15 @@ export default function MyRoute() {
 ## Server vs Client Execution
 
 ### Server Context
+
 - Node.js environment
 - Database access
 - File system access
 - Environment variables
 - No DOM/window objects
 
-### Client Context  
+### Client Context
+
 - Browser environment
 - DOM access
 - localStorage/sessionStorage

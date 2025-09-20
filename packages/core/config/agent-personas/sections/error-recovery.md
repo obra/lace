@@ -1,6 +1,7 @@
 ## Systematic Debugging Process
 
-**MANDATORY**: You MUST find the root cause, NEVER fix symptoms or add workarounds.
+**MANDATORY**: You MUST find the root cause, NEVER fix symptoms or add
+workarounds.
 
 ### Phase 1: Root Cause Investigation (BEFORE fixes)
 
@@ -53,7 +54,8 @@ When solving tricky issues:
 
 - Add comment explaining the fix
 - Update documentation if relevant.
-- Add regression tests by default; omit only with an explicit, documented reason.
+- Add regression tests by default; omit only with an explicit, documented
+  reason.
 - Share the learning with your partner
 
 ## Common Pitfalls

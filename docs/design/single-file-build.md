@@ -1,10 +1,13 @@
 # Single-File Executable Build System
 
-This document describes Lace's single-file executable build system that packages the entire Next.js web interface into a self-contained binary for easy distribution and deployment.
+This document describes Lace's single-file executable build system that packages
+the entire Next.js web interface into a self-contained binary for easy
+distribution and deployment.
 
 ## Overview
 
 The single-file build creates a Bun-compiled executable that contains:
+
 - Complete Next.js standalone build (optimized for production)
 - All runtime dependencies (including native modules)
 - Custom server with enhanced UX features
@@ -14,6 +17,7 @@ The single-file build creates a Bun-compiled executable that contains:
 ## Architecture
 
 ### Build Process Flow
+
 ```
 1. Next.js Standalone Build → packages/web/.next/standalone/
 2. ZIP Creation → lace-standalone.zip
@@ -23,15 +27,18 @@ The single-file build creates a Bun-compiled executable that contains:
 ### Key Components
 
 **Next.js Configuration** (`packages/web/next.config.ts`)
+
 - Configures `outputFileTracingIncludes` with required dependencies
 - Sets `outputFileTracingRoot` to project root for proper path resolution
 
 **Custom Server** (`packages/web/server-custom.ts`)
+
 - Enhanced wrapper around Next.js `startServer`
 - Automatic port detection (finds available port starting from 31337)
 - Working directory management for standalone builds
 
 **Build Scripts**
+
 - `build`: Next.js build (Turbopack); use BUILD_STANDALONE=true for standalone
 - `build:standalone`: Shorthand for standalone build
 - `scripts/build-simple.ts`: ZIP creation and Bun compilation orchestration
@@ -67,11 +74,11 @@ bun run build
 ### Runtime Behavior
 
 1. **Extraction**: Executable extracts standalone build to temporary directory
-2. **Setup**: Changes working directory to standalone root for proper module resolution
+2. **Setup**: Changes working directory to standalone root for proper module
+   resolution
 3. **Port Detection**: Finds available port starting from requested port
 4. **Server Start**: Launches Next.js server with enhanced features
 5. **Readiness Logging**: Logs the URL when the server is ready
-
 
 ## Build Artifacts
 
@@ -82,6 +89,7 @@ bun run build
 - `packages/web/.next/`: Next.js build artifacts
 
 ### ZIP Structure
+
 ```
 standalone/
 ├── packages/web/           # Next.js app
@@ -98,17 +106,20 @@ standalone/
 ### Common Issues
 
 **Missing Dependencies**
+
 - Check Next.js build output for included dependencies
 - Verify required packages are included in the build
 - Look for module resolution errors in build logs
 
 **Module Resolution Failures**
+
 - Ensure server changes working directory to standalone root
-- Check that dependencies are at `node_modules/...` not `packages/web/node_modules/...`
+- Check that dependencies are at `node_modules/...` not
+  `packages/web/node_modules/...`
 - Verify `outputFileTracingRoot` is set correctly
 
-
 **Build Failures**
+
 - Clear all caches: `rm -rf build packages/web/.next packages/web/server.js`
 - Check TypeScript compilation errors
 - Verify Bun is properly installed and updated
@@ -145,7 +156,7 @@ The build system includes fixes for Bun SQLite compatibility:
 
 ```typescript
 // Fixed: Bun SQLite API differs from better-sqlite3
-this.db.exec('PRAGMA journal_mode = WAL');  // ✅ Works in both
+this.db.exec('PRAGMA journal_mode = WAL'); // ✅ Works in both
 // this.db.pragma('journal_mode = WAL');    // ❌ better-sqlite3 only
 ```
 
@@ -158,7 +169,6 @@ Critical for proper module resolution in standalone builds:
 const standaloneRoot = path.resolve(__dirname, '../..');
 process.chdir(standaloneRoot);
 ```
-
 
 ## Security Considerations
 

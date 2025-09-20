@@ -2,17 +2,22 @@
 
 ## Overview
 
-This plan outlines the redesign of the terminal interface message display system to support specialized event components and hierarchical subagent conversations. The goal is to move from the current flat message display to a rich, structured event-based rendering system.
+This plan outlines the redesign of the terminal interface message display system
+to support specialized event components and hierarchical subagent conversations.
+The goal is to move from the current flat message display to a rich, structured
+event-based rendering system.
 
 ## Current Architecture Issues
 
 ### Flattened Event Display
+
 - Thread events (TOOL_CALL, TOOL_RESULT) are converted to simple text messages
 - Structured data is lost in the conversion to UIMessage
 - No specialized rendering for different event types
 - Tool calls and results display as generic "🔧 Running: toolName" messages
 
 ### No Subagent Support
+
 - Current architecture assumes linear conversation flow
 - No visual hierarchy for agent delegation
 - Subagent conversations would be indistinguishable from main conversation
@@ -21,10 +26,14 @@ This plan outlines the redesign of the terminal interface message display system
 
 ### Core Design Principles
 
-1. **Direct Event Rendering**: Map thread events directly to specialized Ink components
-2. **Hierarchical Display**: Support nested conversation contexts for subagent delegation
-3. **Structured Data Preservation**: Maintain rich event data throughout the rendering pipeline
-4. **Extensible Component System**: Easy to add new event types and display modes
+1. **Direct Event Rendering**: Map thread events directly to specialized Ink
+   components
+2. **Hierarchical Display**: Support nested conversation contexts for subagent
+   delegation
+3. **Structured Data Preservation**: Maintain rich event data throughout the
+   rendering pipeline
+4. **Extensible Component System**: Easy to add new event types and display
+   modes
 
 ### Event Type Extensions
 
@@ -32,8 +41,9 @@ This plan outlines the redesign of the terminal interface message display system
 interface ThreadEvent {
   id: string;
   threadId: string;
-  parentEventId?: string;    // NEW: Links to parent event for nesting
-  agentContext?: {           // NEW: Agent hierarchy tracking
+  parentEventId?: string; // NEW: Links to parent event for nesting
+  agentContext?: {
+    // NEW: Agent hierarchy tracking
     agentId: string;
     parentAgentId?: string;
     depth: number;
@@ -44,8 +54,13 @@ interface ThreadEvent {
 }
 
 // NEW: Subagent delegation event
-type EventType = 'USER_MESSAGE' | 'AGENT_MESSAGE' | 'TOOL_CALL' | 'TOOL_RESULT' | 
-                 'LOCAL_SYSTEM_MESSAGE' | 'SUBAGENT_DELEGATION';
+type EventType =
+  | 'USER_MESSAGE'
+  | 'AGENT_MESSAGE'
+  | 'TOOL_CALL'
+  | 'TOOL_RESULT'
+  | 'LOCAL_SYSTEM_MESSAGE'
+  | 'SUBAGENT_DELEGATION';
 
 interface SubagentDelegationData {
   parentAgentId: string;
@@ -66,7 +81,7 @@ Create new component system in `src/interfaces/terminal/components/events/`:
 ```
 src/interfaces/terminal/components/events/
 ├── EventDisplay.tsx          # Main event router component
-├── ToolCallDisplay.tsx       # Rich tool call visualization  
+├── ToolCallDisplay.tsx       # Rich tool call visualization
 ├── ToolResultDisplay.tsx     # Rich tool result visualization
 ├── UserMessageDisplay.tsx    # User message component
 ├── AgentMessageDisplay.tsx   # Agent message component
@@ -82,7 +97,7 @@ import { Box } from 'ink';
 
 const eventComponentMap = {
   'TOOL_CALL': ToolCallDisplay,
-  'TOOL_RESULT': ToolResultDisplay, 
+  'TOOL_RESULT': ToolResultDisplay,
   'USER_MESSAGE': UserMessageDisplay,
   'AGENT_MESSAGE': AgentMessageDisplay,
   'LOCAL_SYSTEM_MESSAGE': SystemMessageDisplay,
@@ -96,7 +111,7 @@ interface EventDisplayProps {
 
 export function EventDisplay({ event, isStreaming }: EventDisplayProps) {
   const Component = eventComponentMap[event.type];
-  
+
   return (
     <Box flexDirection="column">
       <Component event={event} isStreaming={isStreaming} />
@@ -119,7 +134,7 @@ interface ToolCallDisplayProps {
 
 export function ToolCallDisplay({ event }: ToolCallDisplayProps) {
   const { toolName, input, callId } = event.data;
-  
+
   return (
     <Box flexDirection="column" marginY={1}>
       <Box>
@@ -127,8 +142,8 @@ export function ToolCallDisplay({ event }: ToolCallDisplayProps) {
         <Text color="yellow" bold>{toolName}</Text>
         <Text color="gray"> #{callId.slice(-6)}</Text>
       </Box>
-      
-      <CollapsibleBox 
+
+      <CollapsibleBox
         label="Input Parameters"
         defaultExpanded={false}
         maxHeight={10}
@@ -139,7 +154,7 @@ export function ToolCallDisplay({ event }: ToolCallDisplayProps) {
   );
 }
 
-// ToolResultDisplay.tsx  
+// ToolResultDisplay.tsx
 import { Box, Text } from 'ink';
 
 interface ToolResultDisplayProps {
@@ -150,14 +165,14 @@ export function ToolResultDisplay({ event }: ToolResultDisplayProps) {
   const { callId, output, success, error } = event.data;
   const color = success ? 'green' : 'red';
   const icon = success ? '✅' : '❌';
-  
+
   return (
     <Box flexDirection="column" marginY={1}>
       <Box>
         <Text color={color}>{icon} Tool Result </Text>
         <Text color="gray">#{callId.slice(-6)}</Text>
       </Box>
-      
+
       <Box marginLeft={2}>
         {success ? (
           <Text wrap="wrap">{output}</Text>
@@ -191,7 +206,7 @@ interface ConversationDisplayProps {
 
 export function ConversationDisplay({ events }: ConversationDisplayProps) {
   const conversationTree = buildConversationTree(events);
-  
+
   return (
     <Box flexDirection="column">
       {conversationTree.map(node => (
@@ -216,13 +231,13 @@ interface ConversationNodeProps {
 export function ConversationNode({ node }: ConversationNodeProps) {
   const isSubagent = node.agentContext?.parentAgentId;
   const depth = node.agentContext?.depth || 0;
-  
+
   return (
     <Box flexDirection="column" marginLeft={depth * 2}>
       {isSubagent && (
         <SubagentHeader agentContext={node.agentContext} />
       )}
-      
+
       <CollapsibleBox
         defaultExpanded={!isSubagent}
         label={isSubagent ? `Subagent: ${node.agentContext.agentId}` : undefined}
@@ -235,7 +250,7 @@ export function ConversationNode({ node }: ConversationNodeProps) {
           ))}
         </Box>
       </CollapsibleBox>
-      
+
       {/* Render child conversations */}
       {node.children.map(child => (
         <ConversationNode key={child.id} node={child} />
@@ -268,22 +283,22 @@ interface CollapsibleBoxProps {
   borderColor?: string;
 }
 
-export function CollapsibleBox({ 
-  children, 
-  label, 
+export function CollapsibleBox({
+  children,
+  label,
   defaultExpanded = true,
   maxHeight,
   borderStyle = 'single',
   borderColor = 'gray'
 }: CollapsibleBoxProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-  
+
   useInput((input, key) => {
     if (key.return && label) {
       setIsExpanded(!isExpanded);
     }
   });
-  
+
   return (
     <Box flexDirection="column">
       {label && (
@@ -294,9 +309,9 @@ export function CollapsibleBox({
           <Text color="gray"> (press Enter to toggle)</Text>
         </Box>
       )}
-      
+
       {isExpanded && (
-        <Box 
+        <Box
           borderStyle={borderStyle}
           borderColor={borderColor}
           flexDirection="column"
@@ -328,7 +343,7 @@ export function CodeBlock({ content, language = 'json', maxLines }: CodeBlockPro
   const lines = highlighted.split('\n');
   const displayLines = maxLines ? lines.slice(0, maxLines) : lines;
   const truncated = maxLines && lines.length > maxLines;
-  
+
   return (
     <Box flexDirection="column" marginLeft={1}>
       {displayLines.map((line, i) => (
@@ -347,13 +362,16 @@ export function CodeBlock({ content, language = 'json', maxLines }: CodeBlockPro
 ### Terminal Interface Changes
 
 1. **Remove UIMessage conversion**: Skip the current event→UIMessage flattening
-2. **Direct event rendering**: Pass ThreadEvent array directly to ConversationDisplay
+2. **Direct event rendering**: Pass ThreadEvent array directly to
+   ConversationDisplay
 3. **Event listener updates**: Modify event handlers to preserve structured data
-4. **Streaming support**: Ensure streaming cursors work with new component structure
+4. **Streaming support**: Ensure streaming cursors work with new component
+   structure
 
 ### Thread Manager Extensions
 
-1. **Conversation tree building**: Add utility to construct hierarchical event trees
+1. **Conversation tree building**: Add utility to construct hierarchical event
+   trees
 2. **Agent context tracking**: Store agent hierarchy in events
 3. **Subagent event handling**: Support delegation events and subthread linking
 
@@ -362,7 +380,7 @@ export function CodeBlock({ content, language = 'json', maxLines }: CodeBlockPro
 ### Ink-Specific Adaptations
 
 - Use Ink's `Box` and `Text` components instead of HTML/CSS
-- Leverage `useInput` hook for interactive collapsible sections  
+- Leverage `useInput` hook for interactive collapsible sections
 - Consider terminal width constraints for layout
 - Use Ink's color system for syntax highlighting
 
@@ -382,16 +400,19 @@ export function CodeBlock({ content, language = 'json', maxLines }: CodeBlockPro
 ## Testing Strategy
 
 ### Component Testing
+
 - Unit tests for each specialized event component
 - Visual regression tests using Ink's test utilities
 - Interaction testing for collapsible elements
 
-### Integration Testing  
+### Integration Testing
+
 - End-to-end tests with real conversation flows
 - Subagent delegation scenarios
 - Tool call/result pairing validation
 
 ### Edge Cases
+
 - Very deep subagent nesting
 - Large tool outputs and inputs
 - Malformed event data handling
@@ -400,9 +421,12 @@ export function CodeBlock({ content, language = 'json', maxLines }: CodeBlockPro
 ## Migration Timeline
 
 1. **Week 1**: Implement core EventDisplay infrastructure and basic components
-2. **Week 2**: Add specialized ToolCall/ToolResult components with collapsible content
+2. **Week 2**: Add specialized ToolCall/ToolResult components with collapsible
+   content
 3. **Week 3**: Implement hierarchical conversation display for subagents
 4. **Week 4**: Integration, testing, and refinement
 5. **Week 5**: Migration from old system and cleanup
 
-This architecture provides a solid foundation for rich terminal-based conversation display while supporting the advanced features like subagent delegation that distinguish Lace from simpler AI assistants.
+This architecture provides a solid foundation for rich terminal-based
+conversation display while supporting the advanced features like subagent
+delegation that distinguish Lace from simpler AI assistants.

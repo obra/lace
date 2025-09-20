@@ -9,10 +9,18 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist/**/*', 'packages/**/*', 'docs/**/*', 'vitest.config.ts', 'knip.config.ts', 'scripts/**/*', 'production-build.test.ts'],
+    ignores: [
+      'dist/**/*',
+      'packages/**/*',
+      'docs/**/*',
+      'vitest.config.ts',
+      'knip.config.ts',
+      'scripts/**/*',
+      'production-build.test.ts',
+    ],
   },
   js.configs.recommended,
-  ...tseslint.configs.recommendedTypeChecked.map(config => ({
+  ...tseslint.configs.recommendedTypeChecked.map((config) => ({
     ...config,
     files: ['**/*.ts', '**/*.tsx'],
     ignores: ['dist/**/*', 'packages/**/*'],
@@ -31,53 +39,76 @@ export default [
     plugins: {
       prettier,
       'no-relative-import-paths': noRelativeImportPaths,
-      'import': importPlugin,
+      import: importPlugin,
     },
     settings: {
       'import/resolver': {
         typescript: {
           project: './tsconfig.json',
-          alwaysTryTypes: true
-        }
-      }
+          alwaysTryTypes: true,
+        },
+      },
     },
     rules: {
-      'import/extensions': ['error', 'ignorePackages', {
-        'js': 'never',
-        'mjs': 'never', 
-        'jsx': 'never',
-        'ts': 'never',
-        'tsx': 'never'
-      }],
+      'import/extensions': [
+        'error',
+        'ignorePackages',
+        {
+          js: 'never',
+          mjs: 'never',
+          jsx: 'never',
+          ts: 'never',
+          tsx: 'never',
+        },
+      ],
       ...prettierConfig.rules,
       'prettier/prettier': 'error',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unsafe-assignment': 'error',
       'no-console': ['error', { allow: ['warn', 'error'] }],
       'no-relative-import-paths/no-relative-import-paths': [
         'error',
-        { allowSameFolder: false, rootDir: 'src', prefix: '~' }
+        { allowSameFolder: false, rootDir: 'src', prefix: '~' },
       ],
-      'no-restricted-imports': ['error', {
-        patterns: [
-          {
-            group: ['../*'],
-            message: 'Use ~ alias instead of relative parent imports'
-          }
-        ]
-      }],
-      'no-restricted-globals': ['error', {
-        name: 'location',
-        message: 'Use Next.js router.push() instead of window.location for navigation in React components'
-      }],
-      'no-restricted-properties': ['error', {
-        object: 'window',
-        property: 'location',
-        message: 'Use Next.js router.push() instead of window.location for navigation in React components'
-      }],
-      'no-var': 'error'
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['../*'],
+              message: 'Use ~ alias instead of relative parent imports',
+            },
+          ],
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'location',
+          message:
+            'Use Next.js router.push() instead of window.location for navigation in React components',
+        },
+      ],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'window',
+          property: 'location',
+          message:
+            'Use Next.js router.push() instead of window.location for navigation in React components',
+        },
+      ],
+      'no-var': 'error',
     },
   },
   {
@@ -89,25 +120,29 @@ export default [
       globals: globals.node,
     },
     plugins: {
-      'import': importPlugin,
+      import: importPlugin,
     },
     settings: {
       'import/resolver': {
         typescript: {
           project: './tsconfig.json',
-          alwaysTryTypes: true
-        }
-      }
+          alwaysTryTypes: true,
+        },
+      },
     },
     rules: {
-      'import/extensions': ['error', 'ignorePackages', {
-        'js': 'never',
-        'mjs': 'never', 
-        'jsx': 'never',
-        'ts': 'never',
-        'tsx': 'never'
-      }],
-      'no-var': 'error'
+      'import/extensions': [
+        'error',
+        'ignorePackages',
+        {
+          js: 'never',
+          mjs: 'never',
+          jsx: 'never',
+          ts: 'never',
+          tsx: 'never',
+        },
+      ],
+      'no-var': 'error',
     },
   },
   {

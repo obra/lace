@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { 
-  isNewAgentSpec, 
-  parseNewAgentSpec, 
-  createNewAgentSpec,
-  asNewAgentSpec 
-} from './types';
+import { isNewAgentSpec, parseNewAgentSpec, createNewAgentSpec, asNewAgentSpec } from './types';
 
 describe('NewAgentSpec', () => {
   describe('isNewAgentSpec', () => {
@@ -42,23 +37,23 @@ describe('NewAgentSpec', () => {
     it('parses valid specs correctly', () => {
       const spec = asNewAgentSpec('new:coding-agent:anthropic/claude-3-sonnet');
       const parsed = parseNewAgentSpec(spec);
-      
+
       expect(parsed.persona).toBe('coding-agent');
-      expect(parsed.provider).toBe('anthropic'); 
+      expect(parsed.provider).toBe('anthropic');
       expect(parsed.model).toBe('claude-3-sonnet');
     });
 
     it('handles complex model names', () => {
       const spec = asNewAgentSpec('new:lace:openai/gpt-4-turbo-preview');
       const parsed = parseNewAgentSpec(spec);
-      
+
       expect(parsed.model).toBe('gpt-4-turbo-preview');
     });
 
     it('handles special characters in all parts', () => {
       const spec = asNewAgentSpec('new:my-custom-agent:provider-x/model_v2.1-beta');
       const parsed = parseNewAgentSpec(spec);
-      
+
       expect(parsed.persona).toBe('my-custom-agent');
       expect(parsed.provider).toBe('provider-x');
       expect(parsed.model).toBe('model_v2.1-beta');
@@ -79,7 +74,9 @@ describe('NewAgentSpec', () => {
       ];
 
       for (const invalidSpec of invalidSpecs) {
-        expect(() => parseNewAgentSpec(asNewAgentSpec(invalidSpec))).toThrow(/Invalid NewAgentSpec format/);
+        expect(() => parseNewAgentSpec(asNewAgentSpec(invalidSpec))).toThrow(
+          /Invalid NewAgentSpec format/
+        );
       }
     });
   });
@@ -100,7 +97,7 @@ describe('NewAgentSpec', () => {
     it('creates parsable specs', () => {
       const spec = createNewAgentSpec('helper-agent', 'openai', 'gpt-4-turbo');
       const parsed = parseNewAgentSpec(spec);
-      
+
       expect(parsed.persona).toBe('helper-agent');
       expect(parsed.provider).toBe('openai');
       expect(parsed.model).toBe('gpt-4-turbo');
@@ -110,10 +107,10 @@ describe('NewAgentSpec', () => {
       const originalPersona = 'coding-assistant';
       const originalProvider = 'anthropic';
       const originalModel = 'claude-3-sonnet';
-      
+
       const spec = createNewAgentSpec(originalPersona, originalProvider, originalModel);
       const parsed = parseNewAgentSpec(spec);
-      
+
       expect(parsed.persona).toBe(originalPersona);
       expect(parsed.provider).toBe(originalProvider);
       expect(parsed.model).toBe(originalModel);
@@ -135,11 +132,11 @@ describe('NewAgentSpec', () => {
   describe('integration with real use cases', () => {
     it('supports common persona names', () => {
       const personas = ['lace', 'coding-agent', 'helper-agent', 'data-analyst', 'devops-assistant'];
-      
+
       for (const persona of personas) {
         const spec = createNewAgentSpec(persona, 'anthropic', 'claude-3-sonnet');
         expect(isNewAgentSpec(spec)).toBe(true);
-        
+
         const parsed = parseNewAgentSpec(spec);
         expect(parsed.persona).toBe(persona);
       }
@@ -158,7 +155,7 @@ describe('NewAgentSpec', () => {
       for (const { provider, model } of combinations) {
         const spec = createNewAgentSpec('lace', provider, model);
         expect(isNewAgentSpec(spec)).toBe(true);
-        
+
         const parsed = parseNewAgentSpec(spec);
         expect(parsed.provider).toBe(provider);
         expect(parsed.model).toBe(model);
@@ -181,7 +178,7 @@ describe('NewAgentSpec', () => {
 
     it('provides clear error messages for migration', () => {
       const oldFormat = asNewAgentSpec('new:anthropic/claude-3-sonnet');
-      
+
       expect(() => parseNewAgentSpec(oldFormat)).toThrow(
         'Invalid NewAgentSpec format: new:anthropic/claude-3-sonnet. Expected format: new:persona:provider/model'
       );

@@ -2,15 +2,19 @@
 
 ## Overview
 
-This guide outlines the proper use of our DaisyUI-based design system. Following these principles ensures visual consistency, maintainability, and professional UX throughout the Lace web interface.
+This guide outlines the proper use of our DaisyUI-based design system. Following
+these principles ensures visual consistency, maintainability, and professional
+UX throughout the Lace web interface.
 
 ## Core Design Principles
 
 ### 1. Design Elements vs UI Elements
 
-**Critical Distinction**: Not all colors should be theme-based. Understand the difference:
+**Critical Distinction**: Not all colors should be theme-based. Understand the
+difference:
 
 #### Design Elements (Brand/Identity)
+
 - **Purpose**: Visual branding, aesthetic appeal, marketing identity
 - **Behavior**: Remain consistent across themes to maintain brand recognition
 - **Color Approach**: Hardcoded brand colors are acceptable and often required
@@ -22,11 +26,13 @@ This guide outlines the proper use of our DaisyUI-based design system. Following
 <button className="bg-gradient-to-r from-emerald-600 to-cyan-500">Download Lace</button>
 ```
 
-#### UI Elements (Functional/Interactive) 
+#### UI Elements (Functional/Interactive)
+
 - **Purpose**: User interaction, system feedback, navigation, status indication
 - **Behavior**: Must adapt to themes for accessibility and user preference
 - **Color Approach**: Always use semantic theme colors
-- **Examples**: Selection states, status indicators, form validation, navigation highlights
+- **Examples**: Selection states, status indicators, form validation, navigation
+  highlights
 
 ```tsx
 // CORRECT: UI/functional elements - theme-aware
@@ -35,9 +41,13 @@ This guide outlines the proper use of our DaisyUI-based design system. Following
 ```
 
 #### Decision Questions
+
 Ask yourself:
-1. **Does it represent the Lace brand identity?** → Design element (hardcoded OK)
-2. **Does it indicate system state or user interaction?** → UI element (theme-based required)
+
+1. **Does it represent the Lace brand identity?** → Design element (hardcoded
+   OK)
+2. **Does it indicate system state or user interaction?** → UI element
+   (theme-based required)
 3. **Should it look identical in marketing materials?** → Design element
 4. **Does the user interact with it functionally?** → UI element
 
@@ -70,24 +80,24 @@ Use the same color for the same type of interaction across all components:
 
 ### Semantic Colors
 
-| Color | Usage | Example |
-|-------|-------|---------|
-| `primary` | Brand identity, main CTAs, selection states | Primary buttons, active tabs, selected items |
-| `secondary` | Supporting brand elements, secondary actions | Secondary buttons, sub-navigation |
-| `accent` | Decorative highlights, tertiary actions | Badges, small accents, decorative elements |
-| `success` | Positive feedback, completion states | Success messages, completed items |
-| `warning` | Caution, attention needed | Warning messages, pending states |
-| `error` | Problems, destructive actions | Error messages, delete buttons |
-| `info` | Neutral information | Info messages, tooltips |
+| Color       | Usage                                        | Example                                      |
+| ----------- | -------------------------------------------- | -------------------------------------------- |
+| `primary`   | Brand identity, main CTAs, selection states  | Primary buttons, active tabs, selected items |
+| `secondary` | Supporting brand elements, secondary actions | Secondary buttons, sub-navigation            |
+| `accent`    | Decorative highlights, tertiary actions      | Badges, small accents, decorative elements   |
+| `success`   | Positive feedback, completion states         | Success messages, completed items            |
+| `warning`   | Caution, attention needed                    | Warning messages, pending states             |
+| `error`     | Problems, destructive actions                | Error messages, delete buttons               |
+| `info`      | Neutral information                          | Info messages, tooltips                      |
 
 ### Base Colors
 
-| Color | Usage |
-|-------|-------|
-| `base-100` | Main background |
-| `base-200` | Card/section backgrounds |
-| `base-300` | Borders, dividers |
-| `base-content` | Primary text |
+| Color          | Usage                    |
+| -------------- | ------------------------ |
+| `base-100`     | Main background          |
+| `base-200`     | Card/section backgrounds |
+| `base-300`     | Borders, dividers        |
+| `base-content` | Primary text             |
 
 ### Content Colors
 
@@ -109,6 +119,7 @@ Always pair colors with their content variants for proper contrast:
 **Three distinct color categories with different rules:**
 
 #### Agent Colors (AI Identity)
+
 Use custom agent properties for AI agent representation:
 
 ```tsx
@@ -122,6 +133,7 @@ Use custom agent properties for AI agent representation:
 ```
 
 #### User Colors (User Identity)
+
 Use user CSS custom properties for user-related elements:
 
 ```tsx
@@ -130,13 +142,14 @@ Use user CSS custom properties for user-related elements:
 <div className="bg-[rgb(var(--user-primary))]/20 text-[rgb(var(--user-primary))]">User Message</div>
 <button className="text-[rgb(var(--user-primary))] hover:bg-[rgb(var(--user-primary))]/10">User Action</button>
 
-// WRONG: Hardcoded colors for user elements  
+// WRONG: Hardcoded colors for user elements
 <div className="bg-teal-600">User Avatar</div>
 // WRONG: Using UI colors for user elements
 <div className="bg-primary">User Avatar</div>
 ```
 
 #### UI Colors (System/Interface)
+
 Use semantic theme colors for all interface elements:
 
 ```tsx
@@ -149,13 +162,15 @@ Use semantic theme colors for all interface elements:
 ```
 
 #### When to Use Which:
+
 - **Agent Colors**: AI avatar, agent identity, agent-specific elements
-- **User Colors**: User avatar, user messages, user-specific elements  
+- **User Colors**: User avatar, user messages, user-specific elements
 - **UI/Theme Colors**: Selection states, status indicators, navigation, forms
 
 Available custom properties:
+
 - `--agent-claude`: Claude-specific brand color
-- `--agent-gpt4`: GPT-4-specific brand color  
+- `--agent-gpt4`: GPT-4-specific brand color
 - `--agent-gemini`: Gemini-specific brand color
 - `--user-primary`: User identity color (themeable)
 
@@ -300,7 +315,7 @@ Use semantic colors for gradients:
 <TabA className={active ? "border-primary" : ""}>
 <TabB className={active ? "border-accent" : ""}>
 
-// CORRECT: Consistent selection states  
+// CORRECT: Consistent selection states
 <TabA className={active ? "border-primary" : ""}>
 <TabB className={active ? "border-primary" : ""}>
 ```
@@ -309,27 +324,29 @@ Use semantic colors for gradients:
 
 **"What color should I use for..."**
 
-| Component Type | Color Choice | Example |
-|---|---|---|
-| **AI Agent Avatar** | Agent CSS properties | `bg-[rgb(var(--agent-claude))]` |
-| **User Avatar** | User theme color | `bg-[rgb(var(--user-primary))] text-white` |
-| **Active Tab** | Primary | `border-primary text-primary` |
-| **Selected Item** | Primary | `border-primary ring-primary/20` |
-| **Success Status** | Success semantic | `bg-success text-success-content` |
-| **Error Message** | Error semantic | `bg-error text-error-content` |
-| **Warning Alert** | Warning semantic | `bg-warning text-warning-content` |
-| **Info Badge** | Info semantic | `bg-info text-info-content` |
-| **Brand CTA** | Emerald gradient (hardcoded OK) | `bg-gradient-to-r from-emerald-500 to-cyan-400` |
-| **Priority High** | Error | `text-error` |
-| **Priority Medium** | Warning | `text-warning` |
-| **Priority Low** | Success | `text-success` |
+| Component Type      | Color Choice                    | Example                                         |
+| ------------------- | ------------------------------- | ----------------------------------------------- |
+| **AI Agent Avatar** | Agent CSS properties            | `bg-[rgb(var(--agent-claude))]`                 |
+| **User Avatar**     | User theme color                | `bg-[rgb(var(--user-primary))] text-white`      |
+| **Active Tab**      | Primary                         | `border-primary text-primary`                   |
+| **Selected Item**   | Primary                         | `border-primary ring-primary/20`                |
+| **Success Status**  | Success semantic                | `bg-success text-success-content`               |
+| **Error Message**   | Error semantic                  | `bg-error text-error-content`                   |
+| **Warning Alert**   | Warning semantic                | `bg-warning text-warning-content`               |
+| **Info Badge**      | Info semantic                   | `bg-info text-info-content`                     |
+| **Brand CTA**       | Emerald gradient (hardcoded OK) | `bg-gradient-to-r from-emerald-500 to-cyan-400` |
+| **Priority High**   | Error                           | `text-error`                                    |
+| **Priority Medium** | Warning                         | `text-warning`                                  |
+| **Priority Low**    | Success                         | `text-success`                                  |
 
 ## Implementation Checklist
 
 ### For New Components:
+
 - [ ] **Identify element type**: Design element, UI element, Agent, or User?
 - [ ] **Choose appropriate colors**: Use Quick Reference table above
-- [ ] **Ensure consistency**: All similar interactions use same color (e.g., all selections use `primary`)
+- [ ] **Ensure consistency**: All similar interactions use same color (e.g., all
+      selections use `primary`)
 - [ ] **Pair colors properly**: Background colors with matching content colors
 - [ ] **Use Tailwind spacing**: Consistent spacing scale (p-4, mb-6, gap-3)
 - [ ] **Follow typography hierarchy**: Proper heading and text scales
@@ -337,10 +354,14 @@ Use semantic colors for gradients:
 - [ ] **Check accessibility**: Ensure proper contrast ratios
 
 ### For Cleaning Up Existing Components:
-- [ ] **Identify hardcoded colors**: Look for `bg-blue-500`, `text-red-600`, etc.
+
+- [ ] **Identify hardcoded colors**: Look for `bg-blue-500`, `text-red-600`,
+      etc.
 - [ ] **Determine intent**: Is this design, UI, agent, or user related?
-- [ ] **Replace appropriately**: Use Quick Reference table for correct replacement
-- [ ] **Maintain visual hierarchy**: Don't change the visual meaning, just the color source
+- [ ] **Replace appropriately**: Use Quick Reference table for correct
+      replacement
+- [ ] **Maintain visual hierarchy**: Don't change the visual meaning, just the
+      color source
 - [ ] **Test functionality**: Ensure interactive states still work correctly
 
 ## Theme Customization
@@ -366,4 +387,5 @@ Our themes define:
 - **Component Examples**: Check existing components for patterns
 - **New Patterns**: Discuss with the team before implementing
 
-Remember: Consistency is more important than personal preference. When in doubt, follow existing patterns and use semantic colors appropriately.
+Remember: Consistency is more important than personal preference. When in doubt,
+follow existing patterns and use semantic colors appropriately.

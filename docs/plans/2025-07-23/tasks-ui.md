@@ -2,30 +2,42 @@
 
 ## Overview
 
-This plan integrates the existing task management system with the web interface by:
-1. **Kanban Modal Integration**: Wire existing `TaskBoardModal` to session interface
+This plan integrates the existing task management system with the web interface
+by:
+
+1. **Kanban Modal Integration**: Wire existing `TaskBoardModal` to session
+   interface
 2. **Sidebar Task List**: Add read-only task overview to session sidebar
 3. **Real-time Updates**: Connect task views to live data via existing hooks
 
-**Target**: Full task management integration with session interface using existing components and RESTful API.
+**Target**: Full task management integration with session interface using
+existing components and RESTful API.
 
 ## Prerequisites & Context
 
 ### Codebase Knowledge Required
-- **Event-Sourcing Architecture**: All data flows through immutable event sequences
-- **Project → Session → Agent Hierarchy**: Tasks belong to sessions within projects
-- **Sidebar Pattern**: Uses `SidebarSection` components for collapsible navigation
-- **Task System**: RESTful API at `/api/projects/[projectId]/sessions/[sessionId]/tasks/*`
+
+- **Event-Sourcing Architecture**: All data flows through immutable event
+  sequences
+- **Project → Session → Agent Hierarchy**: Tasks belong to sessions within
+  projects
+- **Sidebar Pattern**: Uses `SidebarSection` components for collapsible
+  navigation
+- **Task System**: RESTful API at
+  `/api/projects/[projectId]/sessions/[sessionId]/tasks/*`
 - **Real-time Updates**: SSE streams via `useTaskStream` hook
 
 ### Key Files to Understand Before Starting
+
 1. `docs/design/tasks.md` - Complete task system architecture
 2. `packages/web/components/modals/TaskBoardModal.tsx` - Existing kanban board
-3. `packages/web/components/pages/LaceApp.tsx` - Main app component with session management
+3. `packages/web/components/pages/LaceApp.tsx` - Main app component with session
+   management
 4. `packages/web/hooks/useTaskManager.ts` - Task data management hook
 5. `packages/web/components/layout/Sidebar.tsx` - Sidebar component pattern
 
 ### Task Data Model
+
 ```typescript
 interface Task {
   id: string;
@@ -35,8 +47,8 @@ interface Task {
   status: 'pending' | 'in_progress' | 'blocked' | 'completed';
   priority: 'high' | 'medium' | 'low';
   assignedTo?: string; // ThreadId or 'human'
-  createdBy: string;   // ThreadId
-  threadId: string;    // Session ThreadId
+  createdBy: string; // ThreadId
+  threadId: string; // Session ThreadId
   createdAt: Date;
   updatedAt: Date;
   notes: TaskNote[];
@@ -44,6 +56,7 @@ interface Task {
 ```
 
 ### Development Rules
+
 - **NEVER use `any` types** - Use `unknown` with type guards instead
 - **NEVER mock functionality under test** - Use real code paths with real data
 - **TypeScript Strict Mode** - All code must pass strict compilation
@@ -52,25 +65,32 @@ interface Task {
 - **DRY/YAGNI** - Don't build features we don't need yet
 
 ### Testing Philosophy
+
 - **Unit Tests**: Individual component behavior with real dependencies
 - **Integration Tests**: Cross-component interactions with real API calls
 - **Component Tests**: React components with real hooks and data
-- **No Mocked Business Logic**: Only mock external services (network, filesystem when necessary)
+- **No Mocked Business Logic**: Only mock external services (network, filesystem
+  when necessary)
 
 ## Implementation Tasks
 
 ### Phase 1: TaskBoardModal Refactoring & Integration ✅ COMPLETED
 
 #### Task 1.1: Extract demo data from TaskBoardModal component ✅ COMPLETED
-**Problem**: TaskBoardModal has hardcoded column definitions that should be configurable
-**Files to modify**:
+
+**Problem**: TaskBoardModal has hardcoded column definitions that should be
+configurable **Files to modify**:
+
 - `packages/web/components/modals/TaskBoardModal.tsx` ✅
 - `packages/web/components/modals/TaskBoardModal.stories.tsx` ✅
 
-**Status**: COMPLETED - TaskBoardModal now accepts optional `columns` prop with sensible defaults
+**Status**: COMPLETED - TaskBoardModal now accepts optional `columns` prop with
+sensible defaults
 
 **Test-First Approach**:
+
 1. **Write failing component test**:
+
 ```typescript
 // packages/web/components/modals/__tests__/TaskBoardModal.test.tsx
 import { render, screen } from '@testing-library/react';
@@ -137,7 +157,7 @@ describe('TaskBoardModal', () => {
 
   it('should handle task status updates via drag and drop', async () => {
     const mockTaskUpdate = jest.fn();
-    
+
     render(
       <TaskBoardModal
         isOpen={true}
@@ -151,7 +171,7 @@ describe('TaskBoardModal', () => {
     // Test drag and drop functionality with real DOM events
     const taskCard = screen.getByText('Test Task').closest('[draggable="true"]');
     const inProgressColumn = screen.getByText('In Progress').closest('[data-testid="task-column"]');
-    
+
     expect(taskCard).toBeInTheDocument();
     expect(inProgressColumn).toBeInTheDocument();
 
@@ -163,12 +183,15 @@ describe('TaskBoardModal', () => {
 ```
 
 2. **Run test to confirm it fails**:
+
 ```bash
 npm test -- packages/web/components/modals/__tests__/TaskBoardModal.test.tsx
 ```
 
 **Implementation**:
+
 1. **Update TaskBoardModal interface**:
+
 ```typescript
 // packages/web/components/modals/TaskBoardModal.tsx
 interface TaskColumn {
@@ -225,7 +248,7 @@ export function TaskBoardModal({
 }: TaskBoardModalProps) {
   // Replace hardcoded taskColumns with the columns prop
   // Rest of component implementation stays the same
-  
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Task Board" size="full" className="h-[90vh]">
       {/* ... existing implementation but use columns prop instead of hardcoded taskColumns ... */}
@@ -235,6 +258,7 @@ export function TaskBoardModal({
 ```
 
 2. **Move demo data to stories**:
+
 ```typescript
 // packages/web/components/modals/TaskBoardModal.stories.tsx
 // Move the existing taskColumns definition from the main component to here
@@ -243,7 +267,8 @@ const DEMO_TASK_COLUMNS: TaskColumn[] = [
     id: 'todo',
     title: 'To Do',
     status: 'pending',
-    color: 'bg-blue-100 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800',
+    color:
+      'bg-blue-100 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800',
   },
   // ... rest of demo columns
 ];
@@ -262,20 +287,27 @@ export const Default: Story = {
 ```
 
 3. **Run tests to ensure they pass**:
+
 ```bash
 npm test -- packages/web/components/modals/__tests__/TaskBoardModal.test.tsx
 ```
 
-**Commit checkpoint**: "refactor: make TaskBoardModal columns configurable, move demo data to stories" ✅
+**Commit checkpoint**: "refactor: make TaskBoardModal columns configurable, move
+demo data to stories" ✅
 
 #### Task 1.2: Add task management button to session toolbar ✅ COMPLETED
+
 **Files to modify**:
+
 - `packages/web/components/pages/LaceApp.tsx` ✅
 
-**Status**: COMPLETED - Tasks button integrated into session toolbar with full TaskBoardModal workflow
+**Status**: COMPLETED - Tasks button integrated into session toolbar with full
+TaskBoardModal workflow
 
 **Test-First Approach**:
+
 1. **Write integration test**:
+
 ```typescript
 // packages/web/components/pages/__tests__/LaceApp-tasks.test.tsx
 import { render, screen, waitFor } from '@testing-library/react';
@@ -324,12 +356,12 @@ describe('LaceApp Task Integration', () => {
       if (url.includes('/api/sessions')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ 
-            session: { 
-              id: 'test-session', 
+          json: () => Promise.resolve({
+            session: {
+              id: 'test-session',
               name: 'Test Session',
-              agents: [] 
-            } 
+              agents: []
+            }
           }),
         });
       }
@@ -387,12 +419,15 @@ describe('LaceApp Task Integration', () => {
 ```
 
 2. **Run test to confirm it fails**:
+
 ```bash
 npm test -- packages/web/components/pages/__tests__/LaceApp-tasks.test.tsx
 ```
 
 **Implementation**:
+
 1. **Add state and imports to LaceApp**:
+
 ```typescript
 // packages/web/components/pages/LaceApp.tsx
 // Add to imports
@@ -404,11 +439,14 @@ import { useTaskManager } from '@/hooks/useTaskManager';
 const [showTaskBoard, setShowTaskBoard] = useState(false);
 
 // Add task manager hook (when project and session are selected)
-const taskManager = selectedProject && selectedSession ? 
-  useTaskManager(selectedProject, selectedSession) : null;
+const taskManager =
+  selectedProject && selectedSession
+    ? useTaskManager(selectedProject, selectedSession)
+    : null;
 ```
 
 2. **Add Tasks button to top bar** (around line 628-640):
+
 ```typescript
 // In the top bar section, after the title
 <motion.div className="flex items-center gap-3">
@@ -421,7 +459,7 @@ const taskManager = selectedProject && selectedSession ?
   </motion.button>
   <div className="flex items-center gap-2">
     <h1 className="font-semibold text-base-content truncate">
-      {selectedAgent && selectedSessionDetails?.agents ? 
+      {selectedAgent && selectedSessionDetails?.agents ?
         (() => {
           const currentAgent = selectedSessionDetails.agents.find(a => a.threadId === selectedAgent);
           return currentAgent ? `${currentAgent.name} - ${currentAgent.model}` : (selectedProject ? currentProject.name : 'Select a Project');
@@ -429,7 +467,7 @@ const taskManager = selectedProject && selectedSession ?
         (selectedProject ? currentProject.name : 'Select a Project')
       }
     </h1>
-    
+
     {/* Add Tasks button when session is selected */}
     {selectedSession && (
       <button
@@ -445,13 +483,14 @@ const taskManager = selectedProject && selectedSession ?
 ```
 
 3. **Add task event handlers** (around line 285):
+
 ```typescript
 // Add after existing handlers
 const handleTaskUpdate = async (task: Task) => {
   if (!taskManager) return;
-  
+
   try {
-    await taskManager.updateTask(task.id, { 
+    await taskManager.updateTask(task.id, {
       status: task.status,
       title: task.title,
       description: task.description,
@@ -465,7 +504,7 @@ const handleTaskUpdate = async (task: Task) => {
 
 const handleTaskCreate = async (taskData: Omit<Task, 'id'>) => {
   if (!taskManager) return;
-  
+
   try {
     await taskManager.createTask({
       title: taskData.title,
@@ -481,6 +520,7 @@ const handleTaskCreate = async (taskData: Omit<Task, 'id'>) => {
 ```
 
 4. **Add TaskBoardModal rendering** (after line 730, with other modals):
+
 ```typescript
 {/* Task Board Modal */}
 {showTaskBoard && selectedProject && selectedSession && taskManager && (
@@ -495,51 +535,63 @@ const handleTaskCreate = async (taskData: Omit<Task, 'id'>) => {
 ```
 
 5. **Run tests to ensure they pass**:
+
 ```bash
 npm test -- packages/web/components/pages/__tests__/LaceApp-tasks.test.tsx
 ```
 
 **Testing the implementation**:
+
 1. **Manual testing**:
-   - Run `npm run dev` 
+   - Run `npm run dev`
    - Navigate to a project and session
    - Verify "Tasks" button appears in top bar
    - Click button and verify modal opens
    - Test task creation and updates in modal
 
 2. **Integration testing**:
+
 ```bash
 npm test -- packages/web/components/pages
 ```
 
-**Commit checkpoint**: "feat: add Tasks button to session toolbar with TaskBoardModal integration" ✅
+**Commit checkpoint**: "feat: add Tasks button to session toolbar with
+TaskBoardModal integration" ✅
 
 ## Current Implementation Status
 
 ### ✅ Phase 1 COMPLETED (All Tasks)
+
 - **Task 1.1**: TaskBoardModal columns configurable ✅
 - **Task 1.2**: Tasks button integration ✅
 
 ### ✅ Phase 2 COMPLETED (All Tasks)
+
 - **Task 2.1**: TaskListSidebar component with task grouping ✅
-- **Task 2.2**: TaskSidebarItem component with priority indicators ✅  
+- **Task 2.2**: TaskSidebarItem component with priority indicators ✅
 - **Task 2.3**: LaceApp sidebar integration (desktop + mobile) ✅
 
-All tests passing, comprehensive integration complete, real-time task updates working.
+All tests passing, comprehensive integration complete, real-time task updates
+working.
 
 ### 🔄 Next Phase Available
 
 ### Phase 3: Polish & Enhancement
 
 #### Task 2.1: Create TaskListSidebar component ✅ COMPLETED
+
 **Files created**:
+
 - `packages/web/components/tasks/TaskListSidebar.tsx` ✅
 - `packages/web/components/tasks/__tests__/TaskListSidebar.test.tsx` ✅
 
-**Status**: COMPLETED - TaskListSidebar component with task grouping, status-based filtering, and comprehensive test coverage
+**Status**: COMPLETED - TaskListSidebar component with task grouping,
+status-based filtering, and comprehensive test coverage
 
 **Test-First Approach**:
+
 1. **Write component test**:
+
 ```typescript
 // packages/web/components/tasks/__tests__/TaskListSidebar.test.tsx
 import { render, screen, waitFor } from '@testing-library/react';
@@ -685,11 +737,13 @@ describe('TaskListSidebar', () => {
 ```
 
 2. **Run test to confirm it fails**:
+
 ```bash
 npm test -- packages/web/components/tasks/__tests__/TaskListSidebar.test.tsx
 ```
 
 **Implementation**:
+
 ```typescript
 // packages/web/components/tasks/TaskListSidebar.tsx
 // ABOUTME: Sidebar task list component for session task overview
@@ -712,14 +766,14 @@ interface TaskListSidebarProps {
   onOpenTaskBoard?: () => void;
 }
 
-export function TaskListSidebar({ 
-  projectId, 
-  sessionId, 
-  onTaskClick, 
-  onOpenTaskBoard 
+export function TaskListSidebar({
+  projectId,
+  sessionId,
+  onTaskClick,
+  onOpenTaskBoard
 }: TaskListSidebarProps) {
   const { tasks, isLoading } = useTaskManager(projectId, sessionId);
-  
+
   const tasksByStatus = useMemo(() => ({
     pending: tasks.filter(t => t.status === 'pending'),
     in_progress: tasks.filter(t => t.status === 'in_progress'),
@@ -738,9 +792,9 @@ export function TaskListSidebar({
   return (
     <div className="space-y-2">
       {/* Quick Actions */}
-      <SidebarButton 
-        onClick={onOpenTaskBoard} 
-        variant="primary" 
+      <SidebarButton
+        onClick={onOpenTaskBoard}
+        variant="primary"
         size="sm"
       >
         <FontAwesomeIcon icon={faTasks} className="w-4 h-4" />
@@ -759,10 +813,10 @@ export function TaskListSidebar({
             In Progress
           </div>
           {tasksByStatus.in_progress.slice(0, 3).map(task => (
-            <TaskSidebarItem 
-              key={task.id} 
-              task={task} 
-              onClick={() => onTaskClick?.(task.id)} 
+            <TaskSidebarItem
+              key={task.id}
+              task={task}
+              onClick={() => onTaskClick?.(task.id)}
             />
           ))}
         </div>
@@ -775,10 +829,10 @@ export function TaskListSidebar({
             Pending
           </div>
           {tasksByStatus.pending.slice(0, 2).map(task => (
-            <TaskSidebarItem 
-              key={task.id} 
-              task={task} 
-              onClick={() => onTaskClick?.(task.id)} 
+            <TaskSidebarItem
+              key={task.id}
+              task={task}
+              onClick={() => onTaskClick?.(task.id)}
             />
           ))}
         </div>
@@ -791,10 +845,10 @@ export function TaskListSidebar({
             Blocked
           </div>
           {tasksByStatus.blocked.slice(0, 1).map(task => (
-            <TaskSidebarItem 
-              key={task.id} 
-              task={task} 
-              onClick={() => onTaskClick?.(task.id)} 
+            <TaskSidebarItem
+              key={task.id}
+              task={task}
+              onClick={() => onTaskClick?.(task.id)}
             />
           ))}
         </div>
@@ -802,9 +856,9 @@ export function TaskListSidebar({
 
       {/* View All Link */}
       {tasks.length > 5 && (
-        <SidebarButton 
-          onClick={onOpenTaskBoard} 
-          variant="ghost" 
+        <SidebarButton
+          onClick={onOpenTaskBoard}
+          variant="ghost"
           size="sm"
         >
           View all {tasks.length} tasks
@@ -817,9 +871,9 @@ export function TaskListSidebar({
           <div className="text-xs text-base-content/40">
             No tasks yet
           </div>
-          <SidebarButton 
-            onClick={onOpenTaskBoard} 
-            variant="ghost" 
+          <SidebarButton
+            onClick={onOpenTaskBoard}
+            variant="ghost"
             size="sm"
             className="mt-2"
           >
@@ -833,20 +887,27 @@ export function TaskListSidebar({
 ```
 
 3. **Run tests to ensure they pass**:
+
 ```bash
 npm test -- packages/web/components/tasks/__tests__/TaskListSidebar.test.tsx
 ```
 
-**Commit checkpoint**: "feat: create TaskListSidebar component with task grouping and actions" ✅
+**Commit checkpoint**: "feat: create TaskListSidebar component with task
+grouping and actions" ✅
 
 #### Task 2.2: Create TaskSidebarItem component ✅ COMPLETED
+
 **Files created**:
+
 - `packages/web/components/tasks/TaskSidebarItem.tsx` ✅
 
-**Status**: COMPLETED - TaskSidebarItem with priority indicators and status dots (tests covered in TaskListSidebar suite)
+**Status**: COMPLETED - TaskSidebarItem with priority indicators and status dots
+(tests covered in TaskListSidebar suite)
 
 **Test-First Approach**:
+
 1. **Write component test**:
+
 ```typescript
 // packages/web/components/tasks/__tests__/TaskSidebarItem.test.tsx
 import { render, screen } from '@testing-library/react';
@@ -877,7 +938,7 @@ describe('TaskSidebarItem', () => {
 
   it('should show correct priority color for high priority', () => {
     render(<TaskSidebarItem task={mockTask} />);
-    
+
     const priorityDot = screen.getByRole('presentation'); // The priority indicator
     expect(priorityDot).toHaveClass('text-red-500'); // High priority = red
   });
@@ -904,7 +965,7 @@ describe('TaskSidebarItem', () => {
     const user = userEvent.setup();
 
     render(<TaskSidebarItem task={mockTask} onClick={mockOnClick} />);
-    
+
     await user.click(screen.getByText('Test Task'));
     expect(mockOnClick).toHaveBeenCalled();
   });
@@ -927,11 +988,13 @@ describe('TaskSidebarItem', () => {
 ```
 
 2. **Run test to confirm it fails**:
+
 ```bash
 npm test -- packages/web/components/tasks/__tests__/TaskSidebarItem.test.tsx
 ```
 
 **Implementation**:
+
 ```typescript
 // packages/web/components/tasks/TaskSidebarItem.tsx
 // ABOUTME: Individual task item for sidebar display
@@ -951,7 +1014,7 @@ interface TaskSidebarItemProps {
 export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
   const priorityColor = {
     high: 'text-red-500',
-    medium: 'text-yellow-500', 
+    medium: 'text-yellow-500',
     low: 'text-green-500'
   }[task.priority];
 
@@ -962,7 +1025,7 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
   };
 
   return (
-    <div 
+    <div
       className="px-2 py-1 hover:bg-base-200 rounded cursor-pointer group transition-colors"
       onClick={onClick}
       role="button"
@@ -976,12 +1039,12 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
     >
       <div className="flex items-start gap-2">
         {/* Priority Indicator */}
-        <div 
+        <div
           className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${priorityColor}`}
           role="presentation"
           aria-label={`${task.priority} priority`}
         />
-        
+
         <div className="flex-1 min-w-0">
           <div className="text-xs font-medium text-base-content truncate">
             {task.title}
@@ -990,7 +1053,7 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
             {getAssignmentText(task.assignedTo)}
           </div>
         </div>
-        
+
         <StatusDot status={task.status} size="sm" />
       </div>
     </div>
@@ -999,6 +1062,7 @@ export function TaskSidebarItem({ task, onClick }: TaskSidebarItemProps) {
 ```
 
 3. **Create StatusDot component if it doesn't exist**:
+
 ```typescript
 // packages/web/components/ui/StatusDot.tsx
 // ABOUTME: Status indicator dot component for task and agent states
@@ -1032,7 +1096,7 @@ export function StatusDot({ status, size = 'md', className = '' }: StatusDotProp
   };
 
   return (
-    <div 
+    <div
       className={`rounded-full flex-shrink-0 ${sizeClasses[size]} ${statusClasses[status]} ${className}`}
       role="presentation"
       aria-label={`Status: ${status.replace('_', ' ')}`}
@@ -1042,21 +1106,28 @@ export function StatusDot({ status, size = 'md', className = '' }: StatusDotProp
 ```
 
 4. **Run tests to ensure they pass**:
+
 ```bash
 npm test -- packages/web/components/tasks/__tests__/TaskSidebarItem.test.tsx
 ```
 
-**Commit checkpoint**: "feat: create TaskSidebarItem with priority indicators and StatusDot component" ✅
+**Commit checkpoint**: "feat: create TaskSidebarItem with priority indicators
+and StatusDot component" ✅
 
 #### Task 2.3: Integrate TaskListSidebar into LaceApp ✅ COMPLETED
+
 **Files modified**:
+
 - `packages/web/components/pages/LaceApp.tsx` ✅
 - `packages/web/components/pages/__tests__/LaceApp-tasks.test.tsx` ✅
 
-**Status**: COMPLETED - Full integration into both desktop and mobile sidebars with comprehensive test coverage
+**Status**: COMPLETED - Full integration into both desktop and mobile sidebars
+with comprehensive test coverage
 
 **Test-First Approach**:
+
 1. **Update existing LaceApp test**:
+
 ```typescript
 // packages/web/components/pages/__tests__/LaceApp-tasks.test.tsx
 // Add to existing test file
@@ -1110,12 +1181,15 @@ describe('LaceApp Task Sidebar Integration', () => {
 ```
 
 2. **Run test to confirm it fails**:
+
 ```bash
 npm test -- packages/web/components/pages/__tests__/LaceApp-tasks.test.tsx
 ```
 
 **Implementation**:
+
 1. **Add import to LaceApp**:
+
 ```typescript
 // packages/web/components/pages/LaceApp.tsx
 // Add to imports
@@ -1123,12 +1197,13 @@ import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 ```
 
 2. **Add Tasks section to desktop sidebar** (around line 556-612):
+
 ```typescript
 // In the desktop sidebar, after the Agent Selection section
 {/* Tasks Section - Show when session is selected */}
 {selectedSessionDetails && selectedProject && selectedSession && (
-  <SidebarSection 
-    title="Tasks" 
+  <SidebarSection
+    title="Tasks"
     icon={faTasks}
     defaultCollapsed={false}
   >
@@ -1146,12 +1221,13 @@ import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 ```
 
 3. **Add Tasks section to mobile sidebar** (around line 442-504):
+
 ```typescript
-// In the mobile sidebar, after the Agent Selection section  
+// In the mobile sidebar, after the Agent Selection section
 {/* Tasks Section - Show when session is selected */}
 {selectedSessionDetails && selectedProject && selectedSession && (
-  <SidebarSection 
-    title="Tasks" 
+  <SidebarSection
+    title="Tasks"
     icon={faTasks}
     defaultCollapsed={false}
     collapsible={false}
@@ -1173,11 +1249,13 @@ import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 ```
 
 4. **Run tests to ensure they pass**:
+
 ```bash
 npm test -- packages/web/components/pages/__tests__/LaceApp-tasks.test.tsx
 ```
 
 **Testing the implementation**:
+
 1. **Manual testing**:
    - Run `npm run dev`
    - Navigate to a project and session
@@ -1187,22 +1265,28 @@ npm test -- packages/web/components/pages/__tests__/LaceApp-tasks.test.tsx
    - Test "Open Kanban Board" button from sidebar
 
 2. **Integration testing**:
+
 ```bash
 npm test -- packages/web/components/pages
 npm test -- packages/web/components/tasks
 ```
 
-**Commit checkpoint**: "feat: integrate TaskListSidebar into session interface with real-time updates" ✅
+**Commit checkpoint**: "feat: integrate TaskListSidebar into session interface
+with real-time updates" ✅
 
 ## Phase 2 Implementation Summary
 
 ### What Was Built
-- **TaskListSidebar Component**: Task overview with status-based grouping (In Progress, Pending, Blocked)
-- **TaskSidebarItem Component**: Individual task display with priority/status indicators
+
+- **TaskListSidebar Component**: Task overview with status-based grouping (In
+  Progress, Pending, Blocked)
+- **TaskSidebarItem Component**: Individual task display with priority/status
+  indicators
 - **Full LaceApp Integration**: Added to both desktop and mobile sidebars
 - **Comprehensive Testing**: 13 total tests (9 component + 4 integration)
 
 ### Key Features Delivered
+
 - Task grouping with limits per section (3 in-progress, 2 pending, 1 blocked)
 - Real-time task count in section header (e.g., "Tasks (3)")
 - Priority indicators (red/yellow/green dots) and assignment status
@@ -1214,31 +1298,35 @@ npm test -- packages/web/components/tasks
 ### ✅ Phase 3 COMPLETED: Polish & Enhancement
 
 #### ✅ Task 3.1: Add task creation shortcut to sidebar (COMPLETED)
+
 **Files modified**:
+
 - `packages/web/components/tasks/TaskListSidebar.tsx` ✅
 - `packages/web/components/pages/LaceApp.tsx` ✅
 - `packages/web/components/tasks/__tests__/TaskListSidebar.test.tsx` ✅
 
-**Enhancement**: Added "+" button next to Kanban Board button for quick task creation ✅
+**Enhancement**: Added "+" button next to Kanban Board button for quick task
+creation ✅
 
 **Implementation**:
+
 ```typescript
 // Update TaskListSidebar to include a quick create button
 <div className="space-y-2">
   {/* Quick Actions - Enhanced */}
   <div className="flex gap-1">
-    <SidebarButton 
-      onClick={onOpenTaskBoard} 
-      variant="primary" 
+    <SidebarButton
+      onClick={onOpenTaskBoard}
+      variant="primary"
       size="sm"
       className="flex-1"
     >
       <FontAwesomeIcon icon={faTasks} className="w-4 h-4" />
       Open Board
     </SidebarButton>
-    <SidebarButton 
-      onClick={onCreateTask} 
-      variant="ghost" 
+    <SidebarButton
+      onClick={onCreateTask}
+      variant="ghost"
       size="sm"
       className="px-2"
       title="Create new task"
@@ -1246,22 +1334,26 @@ npm test -- packages/web/components/tasks
       <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
     </SidebarButton>
   </div>
-  
+
   {/* Rest of component remains the same */}
 </div>
 ```
 
 #### ✅ Task 3.2: Add real-time task count to sidebar header (COMPLETED)
+
 **Files modified**:
+
 - `packages/web/components/pages/LaceApp.tsx` ✅
 
-**Enhancement**: Show task count in Tasks section header ✅ (Already implemented)
+**Enhancement**: Show task count in Tasks section header ✅ (Already
+implemented)
 
 **Implementation**:
+
 ```typescript
 // Update the SidebarSection title to include count
 {selectedSessionDetails && selectedProject && selectedSession && (
-  <SidebarSection 
+  <SidebarSection
     title={`Tasks${taskManager?.tasks.length ? ` (${taskManager.tasks.length})` : ''}`}
     icon={faTasks}
     defaultCollapsed={false}
@@ -1279,40 +1371,50 @@ npm test -- packages/web/components/tasks
 ```
 
 #### Task 3.3: Add keyboard shortcuts (SKIPPED)
+
 **Files to modify**:
+
 - `packages/web/components/pages/LaceApp.tsx`
 
-**Enhancement**: Add keyboard shortcut (Cmd/Ctrl + T) to open task board (Skipped - not implemented this phase)
+**Enhancement**: Add keyboard shortcut (Cmd/Ctrl + T) to open task board
+(Skipped - not implemented this phase)
 
 #### ✅ Task 3.4: Add task search/filter functionality (COMPLETED - Added)
+
 **Files modified**:
+
 - `packages/web/components/tasks/TaskListSidebar.tsx` ✅
 - `packages/web/components/tasks/__tests__/TaskListSidebar.test.tsx` ✅
 
-**Enhancement**: Added search input with real-time filtering by task title and description ✅
+**Enhancement**: Added search input with real-time filtering by task title and
+description ✅
 
 ### ✅ Phase 3 Implementation Summary
 
 **Completed Features**:
-- ✅ Quick task creation button in sidebar (opens task board)  
+
+- ✅ Quick task creation button in sidebar (opens task board)
 - ✅ Real-time task count in sidebar header (already existed)
 - ✅ Task search/filter functionality with empty state handling
 - ✅ Enhanced user experience with streamlined task management
 
 **Skipped Features**:
+
 - Keyboard shortcuts (Cmd/Ctrl + T) - deferred for future enhancement
 - Drag-and-drop reordering - marked as low priority, future enhancement
 
 **Test Coverage**: All implemented features have comprehensive test coverage
 **Status**: Phase 3 core functionality complete and production-ready
 
-**Commit checkpoints**: 
+**Commit checkpoints**:
+
 - "feat: add quick task creation button to sidebar"
 - "feat: add task search functionality to sidebar"
 
 ## Testing Commands
 
 ### Run specific test suites
+
 ```bash
 # Component tests
 npm test -- packages/web/components/tasks --verbose
@@ -1320,7 +1422,7 @@ npm test -- packages/web/components/tasks --verbose
 # Page integration tests
 npm test -- packages/web/components/pages --verbose
 
-# Hook tests  
+# Hook tests
 npm test -- packages/web/hooks --verbose
 
 # All task-related tests
@@ -1331,6 +1433,7 @@ npm run test:e2e
 ```
 
 ### Verify TypeScript compilation
+
 ```bash
 # Compile entire project
 npm run build
@@ -1340,12 +1443,14 @@ npx tsc --noEmit
 ```
 
 ### Run linting
+
 ```bash
 npm run lint
 npm run lint:fix
 ```
 
 ### Manual testing checklist
+
 - [x] Tasks button appears when session selected ✅
 - [x] Tasks button opens kanban modal ✅
 - [x] Kanban modal shows real tasks ✅
@@ -1361,6 +1466,7 @@ npm run lint:fix
 ## Common TypeScript Patterns for This Implementation
 
 ### Type Guards Instead of `any`
+
 ```typescript
 // WRONG - never use any
 function processTaskData(data: any) {
@@ -1371,12 +1477,13 @@ function processTaskData(data: any) {
 function isTaskArray(data: unknown): data is Task[] {
   return (
     Array.isArray(data) &&
-    data.every(item => 
-      typeof item === 'object' &&
-      item !== null &&
-      'id' in item &&
-      'title' in item &&
-      'status' in item
+    data.every(
+      (item) =>
+        typeof item === 'object' &&
+        item !== null &&
+        'id' in item &&
+        'title' in item &&
+        'status' in item
     )
   );
 }
@@ -1390,6 +1497,7 @@ function processTaskData(data: unknown): Task[] {
 ```
 
 ### Proper Error Handling
+
 ```typescript
 // WRONG - catching unknown as any
 try {
@@ -1402,12 +1510,14 @@ try {
 try {
   await taskManager.createTask(taskData);
 } catch (error: unknown) {
-  const message = error instanceof Error ? error.message : 'Unknown error occurred';
+  const message =
+    error instanceof Error ? error.message : 'Unknown error occurred';
   console.error('Failed to create task:', message);
 }
 ```
 
 ### Component Props with Proper Types
+
 ```typescript
 // WRONG - loose typing
 interface TaskComponentProps {
@@ -1424,6 +1534,7 @@ interface TaskComponentProps {
 ```
 
 ### Hook Usage with Proper Dependencies
+
 ```typescript
 // WRONG - missing dependencies
 useEffect(() => {
@@ -1445,19 +1556,21 @@ useEffect(() => {
 ### Common Issues
 
 **Issue**: "Cannot find module '@/components/tasks/TaskListSidebar'"
-**Solution**: Ensure import paths use `@/` prefix, check `tsconfig.json` path mapping
+**Solution**: Ensure import paths use `@/` prefix, check `tsconfig.json` path
+mapping
 
 **Issue**: "TaskBoardModal doesn't accept columns prop"  
-**Solution**: Verify the component interface was updated correctly, check TypeScript compilation
+**Solution**: Verify the component interface was updated correctly, check
+TypeScript compilation
 
-**Issue**: "useTaskManager hook returns undefined"
-**Solution**: Ensure projectId and sessionId are valid, check network requests in browser DevTools
+**Issue**: "useTaskManager hook returns undefined" **Solution**: Ensure
+projectId and sessionId are valid, check network requests in browser DevTools
 
-**Issue**: "Tasks don't appear in real-time"
-**Solution**: Verify SSE connection in Network tab, check `useTaskStream` is properly connected
+**Issue**: "Tasks don't appear in real-time" **Solution**: Verify SSE connection
+in Network tab, check `useTaskStream` is properly connected
 
-**Issue**: "Sidebar doesn't show Tasks section"
-**Solution**: Ensure selectedProject, selectedSession, and selectedSessionDetails are all set
+**Issue**: "Sidebar doesn't show Tasks section" **Solution**: Ensure
+selectedProject, selectedSession, and selectedSessionDetails are all set
 
 ### Development Workflow
 
@@ -1484,6 +1597,7 @@ useEffect(() => {
 ## Success Criteria
 
 ### Functional Requirements
+
 - [x] TaskBoardModal integrated with session interface ✅
 - [x] Tasks button appears in session toolbar ✅
 - [x] Kanban board shows real task data ✅
@@ -1494,6 +1608,7 @@ useEffect(() => {
 - [x] All existing functionality preserved ✅
 
 ### Quality Requirements
+
 - [x] 100% test coverage on new components ✅ (Phases 1 & 2)
 - [x] All tests use real dependencies where possible ✅
 - [x] No TypeScript compilation errors ✅
@@ -1502,11 +1617,14 @@ useEffect(() => {
 - [x] Documentation updated to match implementation ✅
 
 ### Timeline Estimate
+
 - **Phase 1**: ✅ COMPLETED (TaskBoardModal integration)
 - **Phase 2**: ✅ COMPLETED (Sidebar task list)
 - **Phase 3**: 1-2 days (Polish and enhancements) - Ready to begin
 
-**Implementation Status**: Phases 1 & 2 COMPLETED ahead of schedule with comprehensive testing
-**Remaining**: 1-2 days for Phase 3 optional enhancements
+**Implementation Status**: Phases 1 & 2 COMPLETED ahead of schedule with
+comprehensive testing **Remaining**: 1-2 days for Phase 3 optional enhancements
 
-This plan assumes working in small, testable increments with frequent commits and constant verification. Each task builds on the previous one and can be validated independently through both automated tests and manual verification.
+This plan assumes working in small, testable increments with frequent commits
+and constant verification. Each task builds on the previous one and can be
+validated independently through both automated tests and manual verification.

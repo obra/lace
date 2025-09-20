@@ -2,11 +2,12 @@
 
 ## YAGNI Implementation
 
-Just expand DelegationBox in place when Enter is pressed. No new components, no mode switching, no position tracking.
+Just expand DelegationBox in place when Enter is pressed. No new components, no
+mode switching, no position tracking.
 
 ## User Experience
 
-1. User navigates to a collapsed DelegationBox 
+1. User navigates to a collapsed DelegationBox
 2. User presses **Enter** → DelegationBox expands and gains focus
 3. Arrow keys navigate within the expanded delegate timeline
 4. User presses **Escape** → focus returns to main timeline navigation
@@ -18,6 +19,7 @@ That's it.
 ### Minimal Changes Required
 
 **DelegationBox.tsx**
+
 ```typescript
 // Add keyboard handler
 useKeyboardShortcut('Enter', () => {
@@ -28,7 +30,8 @@ useKeyboardShortcut('Enter', () => {
 });
 ```
 
-**TimelineDisplay.tsx** 
+**TimelineDisplay.tsx**
+
 ```typescript
 // When TimelineDisplay inside DelegationBox has focus:
 useKeyboardShortcut('Escape', () => {
@@ -42,7 +45,7 @@ useKeyboardShortcut('Escape', () => {
 ## What This Gives Us
 
 - ✅ Enter expands delegate content with focus
-- ✅ Escape returns to main navigation  
+- ✅ Escape returns to main navigation
 - ✅ Uses existing expand/collapse UI
 - ✅ Zero new components
 - ✅ Zero state management complexity
@@ -52,7 +55,7 @@ useKeyboardShortcut('Escape', () => {
 
 - ❌ Full-screen delegate view
 - ❌ Breadcrumbs
-- ❌ Position restoration  
+- ❌ Position restoration
 - ❌ Nested delegate navigation
 - ❌ Transition animations
 

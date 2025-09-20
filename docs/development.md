@@ -1,6 +1,7 @@
 # Development Guide
 
-This guide covers the development workflow for Lace, including Docker setup and other non-obvious development patterns.
+This guide covers the development workflow for Lace, including Docker setup and
+other non-obvious development patterns.
 
 ## Docker Development Environment
 
@@ -23,10 +24,14 @@ npm start
 
 ### What the Docker Setup Provides
 
-- **Isolated node_modules**: The container uses a Docker volume for `node_modules`, so it won't conflict with your host checkout
-- **LMStudio connectivity**: Port 1234 is forwarded to connect to LMStudio running on your host machine
-- **Persistent development**: Source code is mounted for live editing, but build artifacts stay in the container
-- **Build toolchain**: Includes TypeScript, build-essential, Python for native modules, and development tools
+- **Isolated node_modules**: The container uses a Docker volume for
+  `node_modules`, so it won't conflict with your host checkout
+- **LMStudio connectivity**: Port 1234 is forwarded to connect to LMStudio
+  running on your host machine
+- **Persistent development**: Source code is mounted for live editing, but build
+  artifacts stay in the container
+- **Build toolchain**: Includes TypeScript, build-essential, Python for native
+  modules, and development tools
 
 ### Docker Commands
 
@@ -34,7 +39,7 @@ npm start
 # Start the development environment
 docker-compose up -d
 
-# Get a shell in the running container  
+# Get a shell in the running container
 docker-compose exec lace-dev bash
 
 # Stop the development environment
@@ -73,7 +78,8 @@ npm run format
 
 ### Testing Requirements
 
-Lace follows a strict testing policy - ALL projects MUST have unit tests, integration tests, AND end-to-end tests. Follow TDD:
+Lace follows a strict testing policy - ALL projects MUST have unit tests,
+integration tests, AND end-to-end tests. Follow TDD:
 
 1. Write a failing test
 2. Run the test to confirm it fails
@@ -83,6 +89,7 @@ Lace follows a strict testing policy - ALL projects MUST have unit tests, integr
 ### Pre-commit Hooks
 
 The project has pre-commit hooks that automatically run:
+
 - ESLint checking and auto-fix
 - Prettier formatting
 - Related tests
@@ -114,6 +121,7 @@ import { TimelineEntry } from '../../../ui/TimelineEntry.js';
 ```
 
 Benefits:
+
 - **Readable**: Clear what module you're importing
 - **Refactor-safe**: Imports don't break when moving files
 - **Consistent**: All imports follow the same pattern
@@ -125,12 +133,14 @@ The `~` prefix maps to `src/` via TypeScript path mapping in `tsconfig.json`.
 
 - **Event-sourcing**: All conversations are immutable event sequences
 - **Stateless operation**: Any component can rebuild state from events
-- **Provider abstraction**: Clean separation between generic and provider-specific formats
+- **Provider abstraction**: Clean separation between generic and
+  provider-specific formats
 - **YAGNI**: Don't add features we don't need right now
 
 ### LMStudio Integration
 
 When running in Docker, Lace can connect to LMStudio on your host machine:
+
 - LMStudio should be running on host port 1234
 - The container forwards this port automatically
 - Use `host.docker.internal` as the hostname when configuring connections
@@ -161,6 +171,7 @@ When running in Docker, Lace can connect to LMStudio on your host machine:
 ### Provider Development
 
 All providers must implement the base provider interface and handle:
+
 - Format conversion between generic and provider-specific APIs
 - Streaming support where available
 - Error handling and graceful degradation

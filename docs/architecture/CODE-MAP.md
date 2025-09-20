@@ -2,16 +2,16 @@
 
 ## 🎯 Quick Reference
 
-| What You Need | Actual Location | Key Files |
-|--------------|----------------|-----------|
-| Main agent engine | `src/agents/` | `agent.ts` (1000+ lines) |
-| Tool implementations | `src/tools/implementations/` | `bash.ts`, `file-*.ts`, `delegate.ts` |
-| Event types | `src/threads/` | `types.ts` (all LaceEvent types) |
-| Database operations | `src/persistence/` | `database.ts` (SQLite wrapper) |
-| AI providers | `src/providers/` | `base-provider.ts`, individual providers |
-| Session management | `src/sessions/` | `session.ts` (creates agents) |
-| Web API routes | `packages/web/app/api/` | `*/route.ts` files |
-| Token management | `src/token-management/` | Token counting and limits |
+| What You Need        | Actual Location              | Key Files                                |
+| -------------------- | ---------------------------- | ---------------------------------------- |
+| Main agent engine    | `src/agents/`                | `agent.ts` (1000+ lines)                 |
+| Tool implementations | `src/tools/implementations/` | `bash.ts`, `file-*.ts`, `delegate.ts`    |
+| Event types          | `src/threads/`               | `types.ts` (all LaceEvent types)         |
+| Database operations  | `src/persistence/`           | `database.ts` (SQLite wrapper)           |
+| AI providers         | `src/providers/`             | `base-provider.ts`, individual providers |
+| Session management   | `src/sessions/`              | `session.ts` (creates agents)            |
+| Web API routes       | `packages/web/app/api/`      | `*/route.ts` files                       |
+| Token management     | `src/token-management/`      | Token counting and limits                |
 
 ## 📂 Actual Source Structure (`src/`)
 
@@ -160,21 +160,29 @@ packages/web/
 ## 🔍 Key Files to Understand
 
 ### Core Engine
-- `src/agents/agent.ts` - The heart of the system. State machine, event emission, message processing.
-- `src/threads/types.ts` - All event types and helpers (isTransientEventType, etc.)
+
+- `src/agents/agent.ts` - The heart of the system. State machine, event
+  emission, message processing.
+- `src/threads/types.ts` - All event types and helpers (isTransientEventType,
+  etc.)
 - `src/persistence/database.ts` - Database schema and operations
 
 ### Tools
+
 - `src/tools/tool.ts` - Base class all tools extend
 - `src/tools/executor.ts` - Handles tool execution and approval
 - `src/tools/implementations/*.ts` - Individual tool implementations
 
 ### Sessions and Configuration
+
 - `src/sessions/session.ts` - Creates and manages agents
-- Look for `Session.initializeTools()` method (lines 845-867) to see tool registration
+- Look for `Session.initializeTools()` method (lines 845-867) to see tool
+  registration
 
 ### Web API
-- `packages/web/app/api/agents/[agentId]/message/route.ts` - How messages are sent
+
+- `packages/web/app/api/agents/[agentId]/message/route.ts` - How messages are
+  sent
 - `packages/web/app/api/events/stream/route.ts` - SSE streaming
 
 ## 📍 Import Patterns
@@ -215,13 +223,13 @@ grep -r "new.*Tool()" src/sessions/
 
 ## 🔧 Configuration Files
 
-| File | Purpose |
-|------|---------|
-| `tsconfig.json` | TypeScript config, path aliases (~/) |
-| `vitest.config.ts` | Test configuration |
-| `packages/web/next.config.js` | Next.js configuration |
-| `.env` | Environment variables |
-| `CLAUDE.md` | AI agent instructions |
+| File                          | Purpose                              |
+| ----------------------------- | ------------------------------------ |
+| `tsconfig.json`               | TypeScript config, path aliases (~/) |
+| `vitest.config.ts`            | Test configuration                   |
+| `packages/web/next.config.js` | Next.js configuration                |
+| `.env`                        | Environment variables                |
+| `CLAUDE.md`                   | AI agent instructions                |
 
 ## 🚀 Entry Points
 
@@ -231,13 +239,13 @@ grep -r "new.*Tool()" src/sessions/
 
 ## 📝 Where to Add New Things
 
-| Adding | Location | Notes |
-|--------|----------|-------|
-| New tool | `src/tools/implementations/` | Extend Tool class, use Zod schema |
-| Tool registration | `src/sessions/session.ts` | In `initializeTools()` method |
-| New event type | `src/threads/types.ts` | Add to EVENT_TYPES array |
-| API endpoint | `packages/web/app/api/` | Create route.ts |
-| Database table | `src/persistence/database.ts` | Update schema in `initializeSchema()` |
+| Adding            | Location                      | Notes                                 |
+| ----------------- | ----------------------------- | ------------------------------------- |
+| New tool          | `src/tools/implementations/`  | Extend Tool class, use Zod schema     |
+| Tool registration | `src/sessions/session.ts`     | In `initializeTools()` method         |
+| New event type    | `src/threads/types.ts`        | Add to EVENT_TYPES array              |
+| API endpoint      | `packages/web/app/api/`       | Create route.ts                       |
+| Database table    | `src/persistence/database.ts` | Update schema in `initializeSchema()` |
 
 ## ⚠️ Critical Files
 

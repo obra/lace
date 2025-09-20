@@ -1,28 +1,32 @@
 # Unified Event Architecture - Iterative Migration Plan
 
 ## Overview
-Migrate from 4 event systems to 1 by extending ThreadEvent to handle all cases, removing wrappers, and eliminating converters.
+
+Migrate from 4 event systems to 1 by extending ThreadEvent to handle all cases,
+removing wrappers, and eliminating converters.
 
 ## Phase 1: Extend ThreadEvent Type (Keep Everything Working)
 
 ### Step 1.1: Add New Event Types to Union
+
 **File:** `src/threads/types.ts`
 
 ```typescript
 // ADD these to the ThreadEventType union:
-export type ThreadEventType = 
+export type ThreadEventType =
   // ... existing types ...
-  | 'AGENT_TOKEN'           // Streaming token chunks
-  | 'AGENT_STREAMING'        // Aggregated streaming content  
-  | 'AGENT_STATE_CHANGE'     // Agent state updates
-  | 'CONNECTION_ERROR'       // Network/connection issues
-  | 'CONNECTION_SUCCESS'     // Connection restored
-  | 'TASK_UPDATE'           // Task status changes
-  | 'TASK_CREATED'          // New task
-  | 'TASK_COMPLETED';       // Task done
+  | 'AGENT_TOKEN' // Streaming token chunks
+  | 'AGENT_STREAMING' // Aggregated streaming content
+  | 'AGENT_STATE_CHANGE' // Agent state updates
+  | 'CONNECTION_ERROR' // Network/connection issues
+  | 'CONNECTION_SUCCESS' // Connection restored
+  | 'TASK_UPDATE' // Task status changes
+  | 'TASK_CREATED' // New task
+  | 'TASK_COMPLETED'; // Task done
 ```
 
 ### Step 1.2: Add Transient and Context Fields
+
 **File:** `src/threads/types.ts`
 
 ```typescript
@@ -31,9 +35,9 @@ export interface BaseThreadEvent {
   id: string;
   threadId: string;
   timestamp: Date;
-  
+
   // ADD these new fields:
-  transient?: boolean;  // If true, don't persist to DB
+  transient?: boolean; // If true, don't persist to DB
   context?: {
     sessionId?: string;
     projectId?: string;
@@ -44,6 +48,7 @@ export interface BaseThreadEvent {
 ```
 
 ### Step 1.3: Add Data Types for New Events
+
 **File:** `src/threads/types.ts`
 
 ```typescript
@@ -90,11 +95,12 @@ export type ThreadEvent =
   | (BaseThreadEvent & {
       type: 'AGENT_STATE_CHANGE';
       data: AgentStateChangeData;
-    })
-  // ... etc for other new types
+    });
+// ... etc for other new types
 ```
 
 ### Step 1.4: Update ThreadManager to Handle Transient Flag
+
 **File:** `src/threads/thread-manager.ts`
 
 ```typescript
@@ -104,10 +110,10 @@ async addEvent(event: ThreadEvent): Promise<void> {
   if (!event.transient) {
     await this.persistence.addEvent(event);
   }
-  
+
   // Always emit for real-time updates
   this.emit('event', event);
-  
+
   // If it has context, also emit scoped events
   if (event.context?.sessionId) {
     this.emit(`session:${event.context.sessionId}:event`, event);
@@ -116,6 +122,7 @@ async addEvent(event: ThreadEvent): Promise<void> {
 ```
 
 ### Step 1.5: Run Tests
+
 ```bash
 npm run test:unit src/threads
 ```
@@ -125,17 +132,20 @@ npm run test:unit src/threads
 ## Phase 2: Create Compatibility Layer (Parallel Running)
 
 ### Step 2.1: Create Adapter for StreamEvent → ThreadEvent
+
 **File:** `src/events/stream-adapter.ts` (NEW)
 
 ```typescript
 import type { StreamEvent } from '../stream-events/types';
 import type { ThreadEvent } from '../threads/types';
 
-export function streamEventToThreadEvent(streamEvent: StreamEvent): ThreadEvent | null {
+export function streamEventToThreadEvent(
+  streamEvent: StreamEvent
+): ThreadEvent | null {
   // Handle session events (the most common)
   if (streamEvent.eventType === 'session' && streamEvent.data) {
     const sessionData = streamEvent.data as any;
-    
+
     // Extract the actual event from the wrapper
     if (sessionData.type && sessionData.data) {
       return {
@@ -149,11 +159,11 @@ export function streamEventToThreadEvent(streamEvent: StreamEvent): ThreadEvent 
           sessionId: streamEvent.scope?.sessionId,
           projectId: streamEvent.scope?.projectId,
           taskId: streamEvent.scope?.taskId,
-        }
+        },
       };
     }
   }
-  
+
   // Handle task events
   if (streamEvent.eventType === 'task') {
     return {
@@ -166,20 +176,26 @@ export function streamEventToThreadEvent(streamEvent: StreamEvent): ThreadEvent 
       context: {
         taskId: streamEvent.scope?.taskId,
         sessionId: streamEvent.scope?.sessionId,
-      }
+      },
     };
   }
-  
+
   return null;
 }
 
 function isTransientEventType(type: string): boolean {
-  return ['AGENT_TOKEN', 'AGENT_STREAMING', 'AGENT_STATE_CHANGE', 
-          'CONNECTION_ERROR', 'CONNECTION_SUCCESS'].includes(type);
+  return [
+    'AGENT_TOKEN',
+    'AGENT_STREAMING',
+    'AGENT_STATE_CHANGE',
+    'CONNECTION_ERROR',
+    'CONNECTION_SUCCESS',
+  ].includes(type);
 }
 ```
 
 ### Step 2.2: Update EventStreamManager to Support Both
+
 **File:** `src/sessions/event-stream-manager.ts` (or wherever it is)
 
 ```typescript
@@ -200,6 +216,7 @@ broadcast(event: StreamEvent): void {
 ```
 
 ### Step 2.3: Test Adapter
+
 **File:** `src/events/stream-adapter.test.ts` (NEW)
 
 ```typescript
@@ -215,16 +232,16 @@ describe('streamEventToThreadEvent', () => {
         threadId: 'thread-1',
         data: {
           content: 'Hello',
-          tokenUsage: { prompt: 10, completion: 20 }
-        }
-      }
+          tokenUsage: { prompt: 10, completion: 20 },
+        },
+      },
     };
-    
+
     const threadEvent = streamEventToThreadEvent(streamEvent);
-    
+
     expect(threadEvent?.data).toEqual({
       content: 'Hello',
-      tokenUsage: { prompt: 10, completion: 20 }
+      tokenUsage: { prompt: 10, completion: 20 },
     });
     // Not nested!
     expect(threadEvent?.data.data).toBeUndefined();
@@ -235,6 +252,7 @@ describe('streamEventToThreadEvent', () => {
 ## Phase 3: Update Session Service (Stop Creating StreamEvents)
 
 ### Step 3.1: Change Agent Message Broadcasting
+
 **File:** `src/sessions/session-service.ts`
 
 ```typescript
@@ -268,9 +286,11 @@ private handleAgentMessage(agentId: string, data: any) {
 ```
 
 ### Step 3.2: Update All Event Emissions
+
 **File:** `src/sessions/session-service.ts`
 
 For each event type being created:
+
 - USER_MESSAGE
 - TOOL_CALL
 - TOOL_RESULT
@@ -283,6 +303,7 @@ For each event type being created:
 Change from StreamEvent creation to direct ThreadEvent.
 
 ### Step 3.3: Test Session Service
+
 ```bash
 npm run test:unit src/sessions
 ```
@@ -290,6 +311,7 @@ npm run test:unit src/sessions
 ## Phase 4: Update Frontend to Consume ThreadEvent
 
 ### Step 4.1: Alias SessionEvent to ThreadEvent
+
 **File:** `packages/web/types/web-sse.ts`
 
 ```typescript
@@ -303,6 +325,7 @@ export type SessionEvent = ThreadEvent;
 ```
 
 ### Step 4.2: Fix Token Usage Hook
+
 **File:** `packages/web/hooks/useAgentTokenUsage.ts`
 
 ```typescript
@@ -316,6 +339,7 @@ if (event.type === 'AGENT_MESSAGE' && event.data?.tokenUsage) {
 ```
 
 ### Step 4.3: Update useEventStream Hook
+
 **File:** `packages/web/hooks/useEventStream.ts`
 
 ```typescript
@@ -332,6 +356,7 @@ export interface UseEventStreamOptions {
 ```
 
 ### Step 4.4: Test Frontend Hooks
+
 ```bash
 cd packages/web
 npm run test:unit
@@ -340,6 +365,7 @@ npm run test:unit
 ## Phase 5: Delete Timeline Converter
 
 ### Step 5.1: Create Direct Timeline Renderer
+
 **File:** `packages/web/components/timeline-direct.tsx` (NEW)
 
 ```typescript
@@ -347,10 +373,10 @@ import type { ThreadEvent } from '@/../../src/threads/types';
 
 export function TimelineDirect({ events }: { events: ThreadEvent[] }) {
   // Filter out events we don't show in timeline
-  const visibleEvents = events.filter(e => 
+  const visibleEvents = events.filter(e =>
     !e.transient || e.type === 'AGENT_STREAMING'
   );
-  
+
   return (
     <div className="timeline">
       {visibleEvents.map(event => (
@@ -368,7 +394,7 @@ function TimelineEventRenderer({ event }: { event: ThreadEvent }) {
           <div className="content">{event.data}</div>
         </div>
       );
-      
+
     case 'AGENT_MESSAGE':
       return (
         <div className="timeline-entry agent">
@@ -380,7 +406,7 @@ function TimelineEventRenderer({ event }: { event: ThreadEvent }) {
           )}
         </div>
       );
-      
+
     case 'TOOL_CALL':
       return (
         <div className="timeline-entry tool">
@@ -388,21 +414,21 @@ function TimelineEventRenderer({ event }: { event: ThreadEvent }) {
           <pre>{JSON.stringify(event.data.input, null, 2)}</pre>
         </div>
       );
-      
+
     case 'TOOL_RESULT':
       return (
         <div className="timeline-entry tool-result">
           <pre>{event.data.output}</pre>
         </div>
       );
-      
+
     case 'AGENT_STREAMING':
       return (
         <div className="timeline-entry streaming">
           <div className="content">{event.data.content}</div>
         </div>
       );
-      
+
     default:
       return null;
   }
@@ -410,7 +436,9 @@ function TimelineEventRenderer({ event }: { event: ThreadEvent }) {
 ```
 
 ### Step 5.2: Replace Timeline Component Usage
-**File:** `packages/web/app/sessions/[sessionId]/components/session-view.tsx` (or similar)
+
+**File:** `packages/web/app/sessions/[sessionId]/components/session-view.tsx`
+(or similar)
 
 ```typescript
 // FIND:
@@ -427,6 +455,7 @@ import { TimelineDirect } from '@/components/timeline-direct';
 ```
 
 ### Step 5.3: Delete Old Timeline Files
+
 ```bash
 rm packages/web/lib/timeline-converter.ts
 rm packages/web/lib/timeline-converter.test.ts
@@ -434,6 +463,7 @@ rm packages/web/types/web-events.ts  # TimelineEntry type
 ```
 
 ### Step 5.4: Test Timeline Rendering
+
 ```bash
 cd packages/web
 npm run dev
@@ -443,6 +473,7 @@ npm run dev
 ## Phase 6: Clean Up StreamEvent
 
 ### Step 6.1: Remove StreamEvent Usage
+
 **File:** `src/sessions/session.ts`
 
 ```typescript
@@ -452,11 +483,13 @@ npm run dev
 ```
 
 ### Step 6.2: Delete StreamEvent Files
+
 ```bash
 rm -rf src/stream-events/
 ```
 
 ### Step 6.3: Update Imports
+
 ```bash
 # Find all references to stream-events
 grep -r "stream-events" src/ packages/
@@ -465,6 +498,7 @@ grep -r "stream-events" src/ packages/
 ```
 
 ### Step 6.4: Remove Adapter
+
 ```bash
 rm src/events/stream-adapter.ts
 rm src/events/stream-adapter.test.ts
@@ -473,6 +507,7 @@ rm src/events/stream-adapter.test.ts
 ## Phase 7: Final Validation
 
 ### Step 7.1: Run All Tests
+
 ```bash
 npm run test:run
 cd packages/web && npm run test:run
@@ -480,6 +515,7 @@ cd ../.. && npm run test:e2e
 ```
 
 ### Step 7.2: Manual Testing Checklist
+
 - [ ] User can send messages
 - [ ] Agent responses appear
 - [ ] Token usage updates correctly
@@ -491,6 +527,7 @@ cd ../.. && npm run test:e2e
 - [ ] No data.data references in code
 
 ### Step 7.3: Code Cleanup
+
 ```bash
 # Search for any remaining data.data patterns
 grep -r "data\.data" src/ packages/
@@ -503,6 +540,7 @@ grep -r "timeline-converter" src/ packages/
 ```
 
 ### Step 7.4: Update Documentation
+
 **File:** `docs/design/event-architecture.md`
 
 Document the new simplified architecture.
@@ -522,7 +560,7 @@ Each phase is independently revertible:
 
 - ✅ No more `data.data.tokenUsage` - direct access works
 - ✅ StreamEvent deleted (~200 lines)
-- ✅ timeline-converter.ts deleted (344 lines)  
+- ✅ timeline-converter.ts deleted (344 lines)
 - ✅ Single event type (ThreadEvent) used everywhere
 - ✅ All tests passing
 - ✅ Manual testing confirms functionality

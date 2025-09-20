@@ -2,7 +2,8 @@
 
 ## Problem
 
-The AnthropicProvider ignores the `baseURL` config parameter from provider instances, just like OpenAI did.
+The AnthropicProvider ignores the `baseURL` config parameter from provider
+instances, just like OpenAI did.
 
 ## Current Code (lines 36-39):
 

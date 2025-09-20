@@ -1,23 +1,29 @@
 # Enhanced Task Manager Implementation Specification
 
 ## Overview
-Upgrade the existing task manager tool to support multi-agent workflows. Add fields for agent assignment, detailed prompts, timestamped notes, and better tracking.
+
+Upgrade the existing task manager tool to support multi-agent workflows. Add
+fields for agent assignment, detailed prompts, timestamped notes, and better
+tracking.
 
 ## Background for Engineers
 
 ### Current Task Manager
+
 - Location: `src/tools/implementations/task-manager.ts`
 - Simple todo list with description, status, priority
 - No concept of assignment or ownership
 - Single global task list
 
 ### What We're Building
+
 - Tasks can be assigned to specific agents (using thread IDs)
 - Separate description (summary) from prompt (detailed instructions)
 - Threaded notes for agent communication
 - Tasks scoped to parent threads (which serve as sessions)
 
 ### Key Files to Understand
+
 - `src/tools/implementations/task-manager.ts` - Current implementation
 - `src/tools/tool.ts` - Base Tool class using Zod schemas
 - `src/tools/types.ts` - Tool type definitions
@@ -32,6 +38,7 @@ Upgrade the existing task manager tool to support multi-agent workflows. Add fie
 File: `src/threads/types.ts`
 
 Add branded types for type safety:
+
 ```typescript
 // Branded type for thread IDs
 export type ThreadId = string & { readonly __brand: 'ThreadId' };
@@ -61,7 +68,10 @@ export function isNewAgentSpec(value: string): value is NewAgentSpec {
   return /^new:([^\/]+)\/(.+)$/.test(value);
 }
 
-export function createNewAgentSpec(provider: string, model: string): NewAgentSpec {
+export function createNewAgentSpec(
+  provider: string,
+  model: string
+): NewAgentSpec {
   return `new:${provider}/${model}` as NewAgentSpec;
 }
 
@@ -74,6 +84,7 @@ export function isAssigneeId(value: string): value is AssigneeId {
 ```
 
 Tests:
+
 - Test thread ID validation (valid formats)
 - Test thread ID rejection (invalid formats)
 - Test hierarchical thread IDs (with dots)
@@ -85,12 +96,14 @@ Tests:
 **Task 0.2: Update existing code to use ThreadId type**
 
 Update thread manager and related code to use the new types:
+
 - `ThreadManager.generateThreadId()` should return `ThreadId`
 - `Thread.id` should be `ThreadId`
 - `ThreadEvent.threadId` should be `ThreadId`
 - Update method signatures throughout
 
-This is a larger refactoring that should be done carefully to maintain backward compatibility.
+This is a larger refactoring that should be done carefully to maintain backward
+compatibility.
 
 **Commit**: "refactor: use ThreadId branded type throughout codebase"
 
@@ -101,6 +114,7 @@ This is a larger refactoring that should be done carefully to maintain backward 
 File: `src/tools/implementations/task-manager.ts`
 
 Current:
+
 ```typescript
 interface Task {
   id: string;
@@ -111,19 +125,20 @@ interface Task {
 ```
 
 New:
+
 ```typescript
 import { ThreadId, AssigneeId } from '../../threads/types.js';
 
 interface Task {
   id: string;
-  title: string;              // Brief summary
-  description: string;        // Human-readable details
-  prompt: string;            // Detailed instructions for assigned agent
+  title: string; // Brief summary
+  description: string; // Human-readable details
+  prompt: string; // Detailed instructions for assigned agent
   status: 'pending' | 'in_progress' | 'completed' | 'blocked';
   priority: 'high' | 'medium' | 'low';
-  assignedTo?: AssigneeId;   // ThreadId or NewAgentSpec
-  createdBy: ThreadId;       // Full hierarchical thread ID of creating agent
-  threadId: ThreadId;        // Parent thread ID only (e.g., "lace_20250703_abc123") 
+  assignedTo?: AssigneeId; // ThreadId or NewAgentSpec
+  createdBy: ThreadId; // Full hierarchical thread ID of creating agent
+  threadId: ThreadId; // Parent thread ID only (e.g., "lace_20250703_abc123")
   createdAt: Date;
   updatedAt: Date;
   notes: TaskNote[];
@@ -131,13 +146,14 @@ interface Task {
 
 interface TaskNote {
   id: string;
-  author: ThreadId;          // Full hierarchical thread ID of author
+  author: ThreadId; // Full hierarchical thread ID of author
   content: string;
   timestamp: Date;
 }
 ```
 
 Write tests first:
+
 - Test task creation with new fields
 - Test backwards compatibility (missing fields)
 - Test note addition
@@ -155,17 +171,18 @@ File: `src/tools/implementations/task-manager/persistence.ts` (new)
 ```typescript
 export class TaskPersistence {
   constructor(private dbPath: string) {}
-  
-  saveTask(task: Task): void
-  loadTask(taskId: string): Task | null
-  loadTasksByThread(threadId: string): Task[]
-  loadTasksByAssignee(assignee: string): Task[]
-  updateTask(taskId: string, updates: Partial<Task>): void
-  addNote(taskId: string, note: Omit<TaskNote, 'id'>): void
+
+  saveTask(task: Task): void;
+  loadTask(taskId: string): Task | null;
+  loadTasksByThread(threadId: string): Task[];
+  loadTasksByAssignee(assignee: string): Task[];
+  updateTask(taskId: string, updates: Partial<Task>): void;
+  addNote(taskId: string, note: Omit<TaskNote, 'id'>): void;
 }
 ```
 
 Schema:
+
 ```sql
 CREATE TABLE tasks (
   id TEXT PRIMARY KEY,
@@ -198,6 +215,7 @@ CREATE INDEX idx_task_notes_task_id ON task_notes(task_id);
 ```
 
 Tests:
+
 - Test CRUD operations
 - Test session filtering
 - Test assignee filtering
@@ -212,19 +230,24 @@ Tests:
 File: `src/tools/implementations/task-manager.ts`
 
 Update Zod schema:
+
 ```typescript
 const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(1000).optional(),
   prompt: z.string().min(1),
   priority: z.enum(['high', 'medium', 'low']).default('medium'),
-  assignedTo: z.string().optional().describe('Thread ID or "new:provider/model"'),
+  assignedTo: z
+    .string()
+    .optional()
+    .describe('Thread ID or "new:provider/model"'),
 });
 ```
 
 Update execute method to handle new fields.
 
 Tests:
+
 - Test validation of required fields
 - Test optional fields
 - Test session scoping
@@ -234,6 +257,7 @@ Tests:
 **Task 3.2: Add new task query tools**
 
 Add new methods to TaskManager:
+
 - `listMyTasks()` - Tasks assigned to current agent
 - `listThreadTasks()` - All tasks in current thread
 - `addNote(taskId, note)` - Add note to task
@@ -241,6 +265,7 @@ Add new methods to TaskManager:
 - `reassignTask(taskId, newAssignee)` - Reassign task
 
 Each needs:
+
 - Zod schema
 - Implementation
 - Tests
@@ -261,7 +286,7 @@ import { ThreadId } from '../threads/types.js';
 export interface ToolContext {
   threadId?: ThreadId;
   // Add for multi-agent support:
-  parentThreadId?: ThreadId;    // Parent thread (session)
+  parentThreadId?: ThreadId; // Parent thread (session)
 }
 ```
 
@@ -273,7 +298,9 @@ File: `src/agents/agent.ts` (update existing tool execution)
 // In tool execution method
 const context: ToolContext = {
   threadId: this._getActiveThreadId(),
-  parentThreadId: this._threadManager.getCanonicalId(this._threadId).split('.')[0],
+  parentThreadId: this._threadManager
+    .getCanonicalId(this._threadId)
+    .split('.')[0],
 };
 ```
 
@@ -317,12 +344,13 @@ protected async executeValidated(args: CreateTaskArgs, context?: ToolContext): P
     updatedAt: new Date(),
     notes: [],
   };
-  
+
   // Save
 }
 ```
 
 Tests:
+
 - Test context propagation
 - Test task scoping by thread
 
@@ -338,22 +366,28 @@ File: `src/tools/implementations/task-manager/formatter.ts` (new)
 import { ThreadId, AssigneeId } from '../../../threads/types.js';
 
 export class TaskFormatter {
-  static formatTaskList(tasks: Task[], options?: {
-    showAssignee?: boolean;
-    showNotes?: boolean;
-    groupBy?: 'status' | 'assignee' | 'priority';
-    threadMetadata?: Map<ThreadId, { displayName?: string }>;
-  }): string
-  
-  static formatTask(task: Task, detailed?: boolean): string
-  
+  static formatTaskList(
+    tasks: Task[],
+    options?: {
+      showAssignee?: boolean;
+      showNotes?: boolean;
+      groupBy?: 'status' | 'assignee' | 'priority';
+      threadMetadata?: Map<ThreadId, { displayName?: string }>;
+    }
+  ): string;
+
+  static formatTask(task: Task, detailed?: boolean): string;
+
   // Helper to show thread ID or display name
-  private static formatAssignee(assignee: AssigneeId, metadata?: Map<ThreadId, { displayName?: string }>): string {
+  private static formatAssignee(
+    assignee: AssigneeId,
+    metadata?: Map<ThreadId, { displayName?: string }>
+  ): string {
     // Handle "new:provider/model" format
     if (assignee.startsWith('new:')) {
       return assignee;
     }
-    
+
     const threadId = assignee as ThreadId;
     const displayName = metadata?.get(threadId)?.displayName;
     return displayName || threadId.split('.').pop() || threadId;
@@ -364,6 +398,7 @@ export class TaskFormatter {
 Output should be readable in CLI context.
 
 Tests:
+
 - Test various grouping options
 - Test note formatting
 - Test empty list handling
@@ -381,42 +416,47 @@ Add validation and documentation:
 ```typescript
 // Assignment format validation
 const ASSIGNMENT_PATTERNS = {
-  THREAD_ID: /^lace_\d{8}_[a-z0-9]{6}(\.\d+)*$/,  // Thread IDs
-  NEW_AGENT: /^new:([^\/]+)\/(.+)$/,               // new:provider/model
+  THREAD_ID: /^lace_\d{8}_[a-z0-9]{6}(\.\d+)*$/, // Thread IDs
+  NEW_AGENT: /^new:([^\/]+)\/(.+)$/, // new:provider/model
 };
 
-function validateAssignment(assignedTo: string): { 
-  type: 'thread' | 'new_agent'; 
-  provider?: string; 
+function validateAssignment(assignedTo: string): {
+  type: 'thread' | 'new_agent';
+  provider?: string;
   model?: string;
 } {
   if (ASSIGNMENT_PATTERNS.THREAD_ID.test(assignedTo)) {
     return { type: 'thread' };
   }
-  
+
   const match = assignedTo.match(ASSIGNMENT_PATTERNS.NEW_AGENT);
   if (match) {
-    return { 
+    return {
       type: 'new_agent',
       provider: match[1],
-      model: match[2]
+      model: match[2],
     };
   }
-  
+
   throw new Error(`Invalid assignment format: ${assignedTo}`);
 }
 ```
 
 **Assignment Formats**:
-- Thread ID (e.g., `"lace_20250703_abc123.1"`) - Direct assignment to existing agent
-- `"new:provider/model"` (e.g., `"new:anthropic/claude-3-haiku"`) - Request new agent creation
+
+- Thread ID (e.g., `"lace_20250703_abc123.1"`) - Direct assignment to existing
+  agent
+- `"new:provider/model"` (e.g., `"new:anthropic/claude-3-haiku"`) - Request new
+  agent creation
 
 **Important**: Tasks with `"new:"` assignments:
+
 - Remain in `"pending"` status until agent is created
 - Cannot transition to `"in_progress"` without real thread ID
 - The agent spawning system will update `assignedTo` with actual thread ID
 
 Tests:
+
 - Test thread ID validation
 - Test new agent format parsing
 - Test invalid format rejection
@@ -432,10 +472,10 @@ File: `src/tools/implementations/task-manager/persistence.ts`
 ```typescript
 constructor(private dbPath: string) {
   this.db = new Database(dbPath);
-  
+
   // Enable WAL mode for better concurrency
   this.db.pragma('journal_mode = WAL');
-  
+
   // Set busy timeout (5 seconds)
   this.db.pragma('busy_timeout = 5000');
 }
@@ -465,13 +505,13 @@ private withRetry<T>(operation: () => T, maxRetries = 3): T {
 async saveTask(task: Task): Promise<void> {
   return this.withRetry(() => {
     const stmt = this.db.prepare(`
-      INSERT INTO tasks (id, title, description, prompt, status, priority, 
+      INSERT INTO tasks (id, title, description, prompt, status, priority,
                         assigned_to, created_by, thread_id, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    stmt.run(task.id, task.title, task.description, task.prompt, 
-             task.status, task.priority, task.assignedTo, 
-             task.createdBy, task.threadId, task.createdAt.toISOString(), 
+    stmt.run(task.id, task.title, task.description, task.prompt,
+             task.status, task.priority, task.assignedTo,
+             task.createdBy, task.threadId, task.createdAt.toISOString(),
              task.updatedAt.toISOString());
   });
 }
@@ -484,12 +524,15 @@ async saveTask(task: Task): Promise<void> {
 **Task 10.1: Document SQLite performance characteristics**
 
 better-sqlite3 is synchronous by design and optimized for performance:
+
 - Simple queries complete in microseconds
 - WAL mode prevents reader/writer blocking
 - Prepared statements are cached internally
 - The async wrappers are for API consistency, not for actual async I/O
 
-For the task manager's workload (CRUD operations on hundreds of tasks), synchronous SQLite is appropriate. If scale becomes an issue later, consider:
+For the task manager's workload (CRUD operations on hundreds of tasks),
+synchronous SQLite is appropriate. If scale becomes an issue later, consider:
+
 - Batching write operations
 - Read-only replicas
 - But don't over-engineer now (YAGNI)
@@ -503,12 +546,14 @@ For the task manager's workload (CRUD operations on hundreds of tasks), synchron
 File: `src/tools/implementations/__tests__/task-manager-integration.test.ts`
 
 Test scenarios:
+
 1. Multi-agent task workflow
 2. Task assignment and reassignment
 3. Note-based communication
 4. Thread isolation
 5. Concurrent task updates
-6. "new:provider/model" format validation (not spawning - that's handled by agent system)
+6. "new:provider/model" format validation (not spawning - that's handled by
+   agent system)
 
 **Task 11.2: Update documentation**
 
@@ -519,12 +564,14 @@ Test scenarios:
 ## Migration Strategy
 
 ### Database Setup
+
 ```sql
 -- Create tables if they don't exist
 -- The persistence layer should run this on initialization
 ```
 
 ### No Migration Needed
+
 - In-memory tasks don't persist across restarts
 - New task system starts fresh with proper schema
 - Old task data is inherently temporary
@@ -532,6 +579,7 @@ Test scenarios:
 ## Testing Checklist
 
 ### Unit Tests
+
 - [ ] Task CRUD operations
 - [ ] Note management
 - [ ] Query filtering
@@ -539,6 +587,7 @@ Test scenarios:
 - [ ] Context handling
 
 ### Integration Tests
+
 - [ ] Multi-agent workflows
 - [ ] Thread isolation (no task bleed between parent threads)
 - [ ] Persistence reliability
@@ -547,6 +596,7 @@ Test scenarios:
 - [ ] Event emission verification
 
 ### Manual Testing
+
 1. Create tasks without assignment
 2. Assign task to existing thread ID
 3. Assign task with "new:anthropic/claude-3-haiku" format
@@ -559,12 +609,14 @@ Test scenarios:
 ## Common Pitfalls
 
 ### For React Developers New to Node.js
+
 - No React here - this is backend TypeScript
 - Zod schemas provide runtime validation (like PropTypes)
 - SQLite operations are synchronous but wrapped in async for consistency
 - Tools return strings, not JSX
 
 ### For Developers New to AI Agents
+
 - Agents identified by thread IDs (e.g., "lace_20250703_abc123.1")
 - Parent threads serve as sessions
 - Tasks are the primary communication method
@@ -572,11 +624,13 @@ Test scenarios:
 - Thread IDs are hierarchical: parent.child.grandchild
 
 ## Dependencies
+
 - better-sqlite3 (already in project)
 - zod (already in project)
 - No new dependencies needed
 
 ## Performance Considerations
+
 - Indexes already defined in schema (thread_id, assigned_to, status)
 - Lazy load notes (only when requested)
 - Limit task history queries (default last 100)
@@ -584,6 +638,7 @@ Test scenarios:
 - WAL mode enables concurrent reads
 
 ## Rollout Plan
+
 1. Deploy with backwards compatibility
 2. Migrate existing tasks
 3. Update agents to use new fields

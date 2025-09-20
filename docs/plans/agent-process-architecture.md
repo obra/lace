@@ -2,25 +2,29 @@
 
 ## Decision: One Process Per Session
 
-After analyzing the requirements, **one process per session** is the optimal architecture.
+After analyzing the requirements, **one process per session** is the optimal
+architecture.
 
 ## Why Per-Session?
 
 ### Key Requirements
-1. **Tools need project-specific CWD**: Each project has its own working directory
-2. **Tools need project environment**: Environment variables are project-scoped  
-3. **Agents share task queue**: Multiple agents in a session coordinate via tasks
+
+1. **Tools need project-specific CWD**: Each project has its own working
+   directory
+2. **Tools need project environment**: Environment variables are project-scoped
+3. **Agents share task queue**: Multiple agents in a session coordinate via
+   tasks
 4. **Typical load**: ~12 concurrent sessions
 5. **Failure isolation**: One session shouldn't crash others
 
 ### Process Model Comparison
 
-| Model | Pros | Cons | Verdict |
-|-------|------|------|---------|
-| **One process for all** | Simple event loop | One crash kills everything | ❌ Too risky |
-| **Per project** | Project isolation | Multiple sessions per project collide | ❌ Wrong boundary |
-| **Per session** ✅ | Natural work boundary, shared project context | ~12 processes | ✅ **Best fit** |
-| **Per agent** | Maximum isolation | Too many processes, no task sharing | ❌ Over-engineered |
+| Model                   | Pros                                          | Cons                                  | Verdict            |
+| ----------------------- | --------------------------------------------- | ------------------------------------- | ------------------ |
+| **One process for all** | Simple event loop                             | One crash kills everything            | ❌ Too risky       |
+| **Per project**         | Project isolation                             | Multiple sessions per project collide | ❌ Wrong boundary  |
+| **Per session** ✅      | Natural work boundary, shared project context | ~12 processes                         | ✅ **Best fit**    |
+| **Per agent**           | Maximum isolation                             | Too many processes, no task sharing   | ❌ Over-engineered |
 
 ## Architecture Design
 
@@ -55,12 +59,13 @@ After analyzing the requirements, **one process per session** is the optimal arc
 ### Phase 1: Session Process Infrastructure
 
 1. **Create SessionProcess class**
+
    ```typescript
    class SessionProcess {
      private process: ChildProcess;
      private agents: Map<ThreadId, Agent>;
      private taskManager: TaskManager;
-     
+
      constructor(
        sessionId: ThreadId,
        projectPath: string,
@@ -69,7 +74,7 @@ After analyzing the requirements, **one process per session** is the optimal arc
        // Fork process with project-specific CWD and env
        this.process = fork('./session-worker.ts', [], {
          cwd: projectPath,
-         env: { ...process.env, ...projectEnv }
+         env: { ...process.env, ...projectEnv },
        });
      }
    }
@@ -82,9 +87,9 @@ After analyzing the requirements, **one process per session** is the optimal arc
 
 3. **IPC Protocol**
    ```typescript
-   type SessionMessage = 
-     | { type: 'spawn-agent', name: string, model: string }
-     | { type: 'send-message', agentId: string, content: string }
+   type SessionMessage =
+     | { type: 'spawn-agent'; name: string; model: string }
+     | { type: 'send-message'; agentId: string; content: string }
      | { type: 'get-status' }
      | { type: 'shutdown' };
    ```
@@ -98,9 +103,9 @@ After analyzing the requirements, **one process per session** is the optimal arc
 
 2. **Message Flow**
    ```
-   Agent.emit('token') 
+   Agent.emit('token')
      → SessionProcess captures
-     → IPC to main process  
+     → IPC to main process
      → SSEManager.broadcast()
      → Client receives
    ```
@@ -130,7 +135,7 @@ After analyzing the requirements, **one process per session** is the optimal arc
    - Session crashes don't affect others
    - Clean process boundaries
 
-2. **Resource Efficiency**  
+2. **Resource Efficiency**
    - ~12 processes is manageable
    - Shared resources within session
    - No over-fragmentation
@@ -149,7 +154,7 @@ After analyzing the requirements, **one process per session** is the optimal arc
 
 1. **Keep single-process mode working** (current state)
 2. **Add session process option** behind flag
-3. **Test with single session** 
+3. **Test with single session**
 4. **Enable for all sessions**
 5. **Remove single-process code** (eventually)
 
@@ -162,7 +167,7 @@ After analyzing the requirements, **one process per session** is the optimal arc
 ## Next Steps
 
 1. Implement basic SessionProcess class
-2. Create session-worker.ts entry point  
+2. Create session-worker.ts entry point
 3. Add IPC message handling
 4. Test with single session
 5. Add event forwarding

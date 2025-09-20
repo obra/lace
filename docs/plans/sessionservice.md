@@ -2,23 +2,31 @@
 
 ## Context
 
-The SessionService was over-engineered by duplicating functionality that already exists in the core Session class. This plan removes duplication incrementally while maintaining working functionality.
+The SessionService was over-engineered by duplicating functionality that already
+exists in the core Session class. This plan removes duplication incrementally
+while maintaining working functionality.
 
 ### Background for Engineers New to Lace
 
 **Lace Architecture Overview:**
-- **Core Classes** (in `src/`): `Session`, `Project`, `Agent` - handle business logic and data persistence
+
+- **Core Classes** (in `src/`): `Session`, `Project`, `Agent` - handle business
+  logic and data persistence
 - **Web Package** (in `packages/web/`): Next.js web interface with API routes
-- **Service Layer** (in `packages/web/lib/server/`): Web-specific adapters for core classes
+- **Service Layer** (in `packages/web/lib/server/`): Web-specific adapters for
+  core classes
 
 **Key Concepts:**
+
 - **Session**: A conversation context that can contain multiple agents
-- **Agent**: AI assistant that executes tools and responds to messages  
-- **ThreadId**: Unique identifier for sessions and agents (agents have format `sessionId.agentId`)
+- **Agent**: AI assistant that executes tools and responds to messages
+- **ThreadId**: Unique identifier for sessions and agents (agents have format
+  `sessionId.agentId`)
 - **Project**: Configuration container that sessions belong to
 - **Tool Approval**: User approval workflow for agent tool execution
 
 **File Structure:**
+
 ```
 packages/web/
 ├── app/api/                     # Next.js API routes
@@ -27,12 +35,13 @@ packages/web/
 └── lib/server/core-types.ts     # Type imports for API routes
 ```
 
-**Current Problem:**
-SessionService duplicates methods that already exist in core Session class, creating confusion and maintenance burden.
+**Current Problem:** SessionService duplicates methods that already exist in
+core Session class, creating confusion and maintenance burden.
 
 ## Principles
 
-- **TDD**: Test-Driven Development - write failing tests first, then minimal implementation
+- **TDD**: Test-Driven Development - write failing tests first, then minimal
+  implementation
 - **YAGNI**: Don't create abstractions we don't need
 - **DRY**: Remove duplication as we find it
 - **Incremental**: One small change per commit
@@ -41,20 +50,24 @@ SessionService duplicates methods that already exist in core Session class, crea
 ## TDD Process for Every Task
 
 **Strict TDD Workflow:**
+
 1. **Red**: Write a failing test that describes the desired behavior
 2. **Green**: Write minimal code to make the test pass
 3. **Refactor**: Clean up code while keeping tests green
 4. **Commit**: One cycle per commit
 
-**No Exceptions**: Never write implementation code before writing a failing test.
+**No Exceptions**: Never write implementation code before writing a failing
+test.
 
 ## Testing Strategy
 
 **Test Files Location:**
+
 - API routes: `app/api/[route]/__tests__/route.test.ts`
 - Services: `lib/server/__tests__/[service].test.ts`
 
 **Testing Commands:**
+
 ```bash
 # Run specific test file during TDD
 npm test -- --testPathPattern="session-service.test.ts"
@@ -74,52 +87,68 @@ npm test -- --testPathPattern="api/sessions.*route.test.ts"
 ### ✅ Completed Tasks (Parallelized)
 
 **Track 2: Agent Utilities for Tool Approval**
+
 - ✅ **Task 5**: Create agent utilities for tool approval
-  - Created `packages/web/lib/server/agent-utils.ts` with `setupAgentApprovals()` utility
+  - Created `packages/web/lib/server/agent-utils.ts` with
+    `setupAgentApprovals()` utility
   - Added TDD tests for agent approval setup functionality
-  - Commit: `4d6082e5` - "refactor: create agent utilities for tool approval (Task 5)"
+  - Commit: `4d6082e5` - "refactor: create agent utilities for tool approval
+    (Task 5)"
 
-- ✅ **Task 6**: Remove agent methods from SessionService  
-  - Removed `setupApprovalCallback`, `spawnAgent`, `getAgent` methods from SessionService
-  - Updated agents route to use `session.spawnAgent()` directly with `setupAgentApprovals()` utility
-  - Updated thread message route to get agents through session instead of service
-  - Replaced all `setupApprovalCallback` calls with `setupAgentApprovals()` utility
-  - Commit: `6f3f4167` - "refactor: remove agent methods from SessionService (Task 6)"
+- ✅ **Task 6**: Remove agent methods from SessionService
+  - Removed `setupApprovalCallback`, `spawnAgent`, `getAgent` methods from
+    SessionService
+  - Updated agents route to use `session.spawnAgent()` directly with
+    `setupAgentApprovals()` utility
+  - Updated thread message route to get agents through session instead of
+    service
+  - Replaced all `setupApprovalCallback` calls with `setupAgentApprovals()`
+    utility
+  - Commit: `6f3f4167` - "refactor: remove agent methods from SessionService
+    (Task 6)"
 
-**Track 3: Provider Routes - Direct Usage**  
-- ✅ **Task 8**: Provider routes already using `ProviderRegistry.createWithAutoDiscovery()` directly
+**Track 3: Provider Routes - Direct Usage**
+
+- ✅ **Task 8**: Provider routes already using
+  `ProviderRegistry.createWithAutoDiscovery()` directly
   - No changes needed - routes already follow desired pattern
   - All tests passing
 
 **Track 4: Project Routes - Direct Usage**
-- ✅ **Task 7**: Project routes already using `Project` class directly  
-  - Routes use `Project.getById()`, `Project.getAll()`, `Project.create()` directly
-  - No changes needed - routes already follow desired pattern  
+
+- ✅ **Task 7**: Project routes already using `Project` class directly
+  - Routes use `Project.getById()`, `Project.getAll()`, `Project.create()`
+    directly
+  - No changes needed - routes already follow desired pattern
   - All tests passing
 
 ### 🔄 Remaining Tasks (Sequential - Merge Conflicts)
 
-**Phase 1**: Remove duplicate SessionService methods that conflict on shared session routes
+**Phase 1**: Remove duplicate SessionService methods that conflict on shared
+session routes
 
 ## Phase 1: Remove Duplicate SessionService Methods
 
-### Task 1: Remove getProjectForSession() Method  
+### Task 1: Remove getProjectForSession() Method
 
 **Status**: ⏳ PENDING  
-**Goal**: Delete `getProjectForSession()` and update routes to call `Project.getById()` directly
+**Goal**: Delete `getProjectForSession()` and update routes to call
+`Project.getById()` directly
 
-**Background**: The core `Session` class already has `getProjectId()` method and `Project.getById()` is the standard way to get projects.
+**Background**: The core `Session` class already has `getProjectId()` method and
+`Project.getById()` is the standard way to get projects.
 
 #### Step 1: TDD - Write Failing Test for Direct Usage
 
 **File**: `packages/web/lib/server/__tests__/session-service.test.ts`
 
 **Red Phase - Write failing test:**
+
 ```typescript
 describe('SessionService after getProjectForSession removal', () => {
   it('should not have getProjectForSession method', () => {
     const sessionService = new SessionService();
-    
+
     // This test should FAIL initially because method still exists
     expect(sessionService.getProjectForSession).toBeUndefined();
   });
@@ -127,6 +156,7 @@ describe('SessionService after getProjectForSession removal', () => {
 ```
 
 **Run test - should FAIL:**
+
 ```bash
 npm test -- --testPathPattern="session-service.test.ts"
 # Should fail because getProjectForSession still exists
@@ -145,9 +175,11 @@ For each route found, write TDD test for direct usage.
 
 **Example - If configuration route uses getProjectForSession:**
 
-**File**: `packages/web/app/api/sessions/[sessionId]/configuration/__tests__/route.test.ts`
+**File**:
+`packages/web/app/api/sessions/[sessionId]/configuration/__tests__/route.test.ts`
 
 **Red Phase - Write failing test for direct approach:**
+
 ```typescript
 import { GET, PUT } from '../route';
 import { Session, Project } from '@/lib/server/lace-imports';
@@ -169,9 +201,9 @@ describe('Configuration Route - Direct Core Class Usage', () => {
 
   it('should get project using Project.getById() directly', async () => {
     // Arrange
-    const mockSessionData = { 
+    const mockSessionData = {
       projectId: 'test-project-id',
-      configuration: { tool: 'policy' }
+      configuration: { tool: 'policy' },
     };
     const mockProject = {
       getConfiguration: jest.fn().mockReturnValue({ projectConfig: true }),
@@ -189,7 +221,7 @@ describe('Configuration Route - Direct Core Class Usage', () => {
     // Assert - This should FAIL initially because route still uses SessionService
     expect(Project.getById).toHaveBeenCalledWith('test-project-id');
     expect(mockProject.getConfiguration).toHaveBeenCalled();
-    
+
     const data = await response.json();
     expect(data.configuration).toBeDefined();
   });
@@ -197,6 +229,7 @@ describe('Configuration Route - Direct Core Class Usage', () => {
 ```
 
 **Run test - should FAIL:**
+
 ```bash
 npm test -- --testPathPattern="configuration.*route.test.ts"
 # Should fail because route still uses SessionService.getProjectForSession
@@ -207,11 +240,15 @@ npm test -- --testPathPattern="configuration.*route.test.ts"
 **File**: `packages/web/app/api/sessions/[sessionId]/configuration/route.ts`
 
 **Minimal code to make test pass:**
+
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
 import { Session, Project } from '@/lib/server/lace-imports';
 
-export async function GET(request: NextRequest, { params }: { params: { sessionId: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { sessionId: string } }
+) {
   try {
     // Get session data directly
     const sessionData = Session.getSession(params.sessionId);
@@ -227,7 +264,7 @@ export async function GET(request: NextRequest, { params }: { params: { sessionI
 
     const projectConfig = project.getConfiguration();
     const sessionConfig = sessionData.configuration || {};
-    
+
     // Merge configurations (minimal implementation)
     const configuration = {
       ...projectConfig,
@@ -241,7 +278,12 @@ export async function GET(request: NextRequest, { params }: { params: { sessionI
     return NextResponse.json({ configuration });
   } catch (error: unknown) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch configuration' },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to fetch configuration',
+      },
       { status: 500 }
     );
   }
@@ -249,6 +291,7 @@ export async function GET(request: NextRequest, { params }: { params: { sessionI
 ```
 
 **Run test - should PASS:**
+
 ```bash
 npm test -- --testPathPattern="configuration.*route.test.ts"
 # Should pass now
@@ -259,12 +302,14 @@ npm test -- --testPathPattern="configuration.*route.test.ts"
 **File**: `packages/web/lib/server/session-service.ts`
 
 **Remove the method to make SessionService test pass:**
+
 ```typescript
 // DELETE this method entirely:
 // async getProjectForSession(sessionId: ThreadId): Promise<Project | null> { ... }
 ```
 
 **Run SessionService test - should PASS:**
+
 ```bash
 npm test -- --testPathPattern="session-service.test.ts"
 # Should pass because method is now undefined
@@ -273,11 +318,13 @@ npm test -- --testPathPattern="session-service.test.ts"
 #### Step 6: Refactor Phase - Clean Up
 
 **Remove related test cases for deleted method:**
+
 ```typescript
 // DELETE test cases that tested getProjectForSession method
 ```
 
 **Run all tests:**
+
 ```bash
 npm test
 # All tests should pass
@@ -290,7 +337,7 @@ git add -A
 git commit -m "refactor: remove getProjectForSession() - use Project.getById() directly
 
 - Remove getProjectForSession() method from SessionService
-- Update configuration route to use Project.getById() directly  
+- Update configuration route to use Project.getById() directly
 - Update tests to mock Project class instead of SessionService
 - TDD: wrote failing tests first, minimal implementation to pass"
 ```
@@ -298,18 +345,20 @@ git commit -m "refactor: remove getProjectForSession() - use Project.getById() d
 ### Task 2: Remove getEffectiveConfiguration() Method
 
 **Status**: ⏳ PENDING  
-**Goal**: Delete `getEffectiveConfiguration()` and use core Session method directly
+**Goal**: Delete `getEffectiveConfiguration()` and use core Session method
+directly
 
 #### Step 1: TDD - Write Failing Test
 
 **File**: `packages/web/lib/server/__tests__/session-service.test.ts`
 
 **Red Phase:**
+
 ```typescript
 describe('SessionService after getEffectiveConfiguration removal', () => {
   it('should not have getEffectiveConfiguration method', () => {
     const sessionService = new SessionService();
-    
+
     // This should FAIL initially
     expect(sessionService.getEffectiveConfiguration).toBeUndefined();
   });
@@ -317,6 +366,7 @@ describe('SessionService after getEffectiveConfiguration removal', () => {
 ```
 
 **Run test - should FAIL:**
+
 ```bash
 npm test -- --testPathPattern="session-service.test.ts"
 ```
@@ -329,9 +379,11 @@ grep -r "sessionService.getEffectiveConfiguration" packages/web/app/api/
 
 #### Step 3: TDD - Update Route Tests for Direct Usage
 
-**For each route found, write failing test that expects Session.getEffectiveConfiguration() to be called:**
+**For each route found, write failing test that expects
+Session.getEffectiveConfiguration() to be called:**
 
 **Red Phase:**
+
 ```typescript
 it('should call session.getEffectiveConfiguration() directly', async () => {
   // Arrange
@@ -350,7 +402,9 @@ it('should call session.getEffectiveConfiguration() directly', async () => {
 
   // Assert - This should FAIL initially
   expect(mockSession.getEffectiveConfiguration).toHaveBeenCalled();
-  expect(mockSessionService.getSession).toHaveBeenCalledWith(mockParams.sessionId);
+  expect(mockSessionService.getSession).toHaveBeenCalledWith(
+    mockParams.sessionId
+  );
 });
 ```
 
@@ -359,11 +413,15 @@ it('should call session.getEffectiveConfiguration() directly', async () => {
 #### Step 4: Green Phase - Update Route
 
 **Minimal code to make test pass:**
+
 ```typescript
-export async function GET(request: NextRequest, { params }: { params: { sessionId: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { sessionId: string } }
+) {
   const sessionService = getSessionService();
   const session = await sessionService.getSession(params.sessionId);
-  
+
   if (!session) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 });
   }
@@ -378,6 +436,7 @@ export async function GET(request: NextRequest, { params }: { params: { sessionI
 #### Step 5: Green Phase - Remove Method from SessionService
 
 **Delete the method:**
+
 ```typescript
 // DELETE this method:
 // async getEffectiveConfiguration(sessionId: ThreadId): Promise<...> { ... }
@@ -404,6 +463,7 @@ git commit -m "refactor: remove getEffectiveConfiguration() - use Session method
 #### Step 1: TDD - Write Failing Test
 
 **Red Phase:**
+
 ```typescript
 it('should not have updateSessionConfiguration method', () => {
   const sessionService = new SessionService();
@@ -420,6 +480,7 @@ grep -r "updateSessionConfiguration" packages/web/app/api/
 ```
 
 **Red Phase - Route test:**
+
 ```typescript
 it('should call session.updateConfiguration() directly', async () => {
   const mockSession = {
@@ -430,7 +491,9 @@ it('should call session.updateConfiguration() directly', async () => {
   };
 
   // This should FAIL initially
-  expect(mockSession.updateConfiguration).toHaveBeenCalledWith(mockConfigUpdates);
+  expect(mockSession.updateConfiguration).toHaveBeenCalledWith(
+    mockConfigUpdates
+  );
 });
 ```
 
@@ -439,11 +502,14 @@ it('should call session.updateConfiguration() directly', async () => {
 #### Step 3: Green Phase - Update Route
 
 ```typescript
-export async function PUT(request: NextRequest, { params }: { params: { sessionId: string } }) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { sessionId: string } }
+) {
   const body = await request.json();
   const sessionService = getSessionService();
   const session = await sessionService.getSession(params.sessionId);
-  
+
   if (!session) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 });
   }
@@ -474,6 +540,7 @@ git commit -m "refactor: remove updateSessionConfiguration() - use Session.updat
 #### Step 1: TDD - Write Failing Test
 
 **Red Phase:**
+
 ```typescript
 it('should not have getSessionData method', () => {
   const sessionService = new SessionService();
@@ -488,6 +555,7 @@ grep -r "getSessionData" packages/web/app/api/
 ```
 
 **Red Phase - Route test:**
+
 ```typescript
 it('should call Session.getSession() directly', async () => {
   // Mock Session static method
@@ -506,9 +574,12 @@ it('should call Session.getSession() directly', async () => {
 ```typescript
 import { Session } from '@/lib/server/lace-imports';
 
-export async function GET(request: NextRequest, { params }: { params: { sessionId: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { sessionId: string } }
+) {
   const sessionData = Session.getSession(params.sessionId);
-  
+
   if (!sessionData) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 });
   }
@@ -541,6 +612,7 @@ git commit -m "refactor: remove getSessionData() - use Session.getSession() dire
 **File**: `packages/web/lib/server/__tests__/agent-utils.test.ts`
 
 **Red Phase:**
+
 ```typescript
 import { setupAgentApprovals } from '../agent-utils';
 import { Agent } from '@/lib/server/lace-imports';
@@ -556,7 +628,10 @@ describe('Agent Utilities', () => {
     // This should FAIL because file doesn't exist yet
     setupAgentApprovals(mockAgent as unknown as Agent, sessionId);
 
-    expect(mockAgent.on).toHaveBeenCalledWith('approval_request', expect.any(Function));
+    expect(mockAgent.on).toHaveBeenCalledWith(
+      'approval_request',
+      expect.any(Function)
+    );
   });
 });
 ```
@@ -577,7 +652,7 @@ import { getApprovalManager } from './approval-manager';
 
 export function setupAgentApprovals(agent: Agent, sessionId: ThreadId): void {
   const approvalManager = getApprovalManager();
-  
+
   agent.on('approval_request', async ({ toolName, input, callback }) => {
     try {
       const decision = await approvalManager.requestApproval(
@@ -587,7 +662,7 @@ export function setupAgentApprovals(agent: Agent, sessionId: ThreadId): void {
         'Tool execution request',
         undefined, // annotations
         input,
-        false, // isReadOnly
+        false // isReadOnly
       );
       callback(decision);
     } catch (error) {
@@ -602,6 +677,7 @@ export function setupAgentApprovals(agent: Agent, sessionId: ThreadId): void {
 #### Step 3: TDD - Test Moving Logic from SessionService
 
 **Red Phase - Test that SessionService doesn't have approval setup:**
+
 ```typescript
 it('should not have setupApprovalCallback method', () => {
   const sessionService = new SessionService();
@@ -635,6 +711,7 @@ git commit -m "refactor: move tool approval from SessionService to agent utiliti
 #### Step 1: TDD - Write Failing Tests
 
 **Red Phase:**
+
 ```typescript
 describe('SessionService after agent method removal', () => {
   it('should not have spawnAgent method', () => {
@@ -658,15 +735,20 @@ grep -r "sessionService.spawnAgent\|sessionService.getAgent" packages/web/app/ap
 #### Step 3: TDD - Update Route Tests
 
 **Red Phase - Test direct session usage:**
+
 ```typescript
 it('should spawn agent using session.spawnAgent() directly', async () => {
   const mockAgent = { threadId: 'agent-id' };
   const mockSession = {
     spawnAgent: jest.fn().mockReturnValue(mockAgent),
   };
-  
+
   // This should FAIL initially
-  expect(mockSession.spawnAgent).toHaveBeenCalledWith('agent-name', 'provider', 'model');
+  expect(mockSession.spawnAgent).toHaveBeenCalledWith(
+    'agent-name',
+    'provider',
+    'model'
+  );
 });
 ```
 
@@ -675,14 +757,17 @@ it('should spawn agent using session.spawnAgent() directly', async () => {
 ```typescript
 import { setupAgentApprovals } from '@/lib/server/agent-utils';
 
-export async function POST(request: NextRequest, { params }: { params: { sessionId: string } }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { sessionId: string } }
+) {
   const body = await request.json();
   const sessionService = getSessionService();
   const session = await sessionService.getSession(params.sessionId);
-  
+
   const agent = session.spawnAgent(body.name, body.provider, body.model);
   setupAgentApprovals(agent, params.sessionId);
-  
+
   return NextResponse.json({ agent: { threadId: agent.threadId } });
 }
 ```
@@ -716,9 +801,11 @@ ls packages/web/app/api/projects/[projectId]/
 
 #### Step 2: TDD - Write Failing Test for Direct Project Usage
 
-**File**: `packages/web/app/api/projects/[projectId]/configuration/__tests__/route.test.ts`
+**File**:
+`packages/web/app/api/projects/[projectId]/configuration/__tests__/route.test.ts`
 
 **Red Phase:**
+
 ```typescript
 import { GET } from '../route';
 import { Project } from '@/lib/server/lace-imports';
@@ -756,9 +843,12 @@ describe('Project Configuration Route - Direct Usage', () => {
 import { NextRequest, NextResponse } from 'next/server';
 import { Project } from '@/lib/server/lace-imports';
 
-export async function GET(request: NextRequest, { params }: { params: { projectId: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { projectId: string } }
+) {
   const project = Project.getById(params.projectId);
-  
+
   if (!project) {
     return NextResponse.json({ error: 'Project not found' }, { status: 404 });
   }
@@ -782,6 +872,7 @@ git commit -m "refactor: project configuration route - use Project.getById() dir
 #### Step 5: Repeat for Each Project Route
 
 **Apply same TDD process to:**
+
 - `packages/web/app/api/projects/route.ts`
 - `packages/web/app/api/projects/[projectId]/route.ts`
 - `packages/web/app/api/projects/[projectId]/environment/route.ts`
@@ -796,6 +887,7 @@ git commit -m "refactor: project configuration route - use Project.getById() dir
 **File**: `packages/web/app/api/providers/__tests__/route.test.ts`
 
 **Red Phase:**
+
 ```typescript
 import { GET } from '../route';
 import { ProviderRegistry } from '@/lib/server/lace-imports';
@@ -811,7 +903,9 @@ describe('Providers Route - Direct Usage', () => {
     const mockRegistry = {
       getAvailableProviders: jest.fn().mockReturnValue([]),
     };
-    (ProviderRegistry.createWithAutoDiscovery as jest.Mock).mockReturnValue(mockRegistry);
+    (ProviderRegistry.createWithAutoDiscovery as jest.Mock).mockReturnValue(
+      mockRegistry
+    );
 
     const response = await GET();
 
@@ -840,7 +934,7 @@ export async function GET() {
 ```bash
 git commit -m "refactor: providers route - use ProviderRegistry directly
 
-- Remove service layer dependency  
+- Remove service layer dependency
 - TDD: failing test first"
 ```
 
@@ -851,17 +945,18 @@ git commit -m "refactor: providers route - use ProviderRegistry directly
 #### Step 1: TDD - Write Test for Final Interface
 
 **Red Phase:**
+
 ```typescript
 describe('SessionService Final Interface', () => {
   it('should only have essential web-specific methods', () => {
     const sessionService = new SessionService();
-    
+
     // Should have these methods (web-specific value)
     expect(typeof sessionService.getSession).toBe('function');
     expect(typeof sessionService.createSession).toBe('function');
     expect(typeof sessionService.listSessions).toBe('function');
     expect(typeof sessionService.clearSessionCache).toBe('function');
-    
+
     // Should NOT have these methods (duplicated core functionality)
     expect(sessionService.getProjectForSession).toBeUndefined();
     expect(sessionService.getEffectiveConfiguration).toBeUndefined();
@@ -881,15 +976,16 @@ describe('SessionService Final Interface', () => {
 **File**: `packages/web/lib/server/session-service.ts`
 
 **Add documentation:**
+
 ```typescript
 /**
  * SessionService - Web-specific session management
- * 
+ *
  * Responsibilities:
  * - Session caching for performance
  * - Session lifecycle with web setup
  * - Session metadata management
- * 
+ *
  * NOT responsible for:
  * - Business logic (use core Session class)
  * - Agent operations (use session.spawnAgent() + agent utilities)
@@ -915,26 +1011,31 @@ git commit -m "docs: document final SessionService responsibilities
 **After each task:**
 
 1. **Run specific test:**
+
 ```bash
 npm test -- --testPathPattern="[test-file-name]"
 ```
 
 2. **Run all tests:**
+
 ```bash
 npm test
 ```
 
 3. **Check TypeScript:**
+
 ```bash
 npm run typecheck
 ```
 
 4. **Check linting:**
+
 ```bash
 npm run lint
 ```
 
 5. **Build verification:**
+
 ```bash
 npm run build
 ```
@@ -968,7 +1069,8 @@ npm run build
 
 1. **All tests pass** throughout the process
 2. **Zero duplicate methods** in SessionService
-3. **Clear domain boundaries** - sessions/agents/projects have distinct responsibilities
+3. **Clear domain boundaries** - sessions/agents/projects have distinct
+   responsibilities
 4. **TDD compliance** - every change was driven by a failing test first
 5. **No functionality regression** - all existing features still work
 6. **Smaller codebase** - eliminated unnecessary abstraction layers

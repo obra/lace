@@ -7,7 +7,10 @@
 
 ## Overview
 
-This plan addresses the chaotic type organization in `packages/web/` where types are duplicated, shadowed, and imported through multiple circuitous paths. The core `src/` types are well-organized, but the web package has created a maze of redundant type definitions and confusing import strategies.
+This plan addresses the chaotic type organization in `packages/web/` where types
+are duplicated, shadowed, and imported through multiple circuitous paths. The
+core `src/` types are well-organized, but the web package has created a maze of
+redundant type definitions and confusing import strategies.
 
 ## Problem Summary
 
@@ -29,59 +32,71 @@ This plan addresses the chaotic type organization in `packages/web/` where types
 ## Prerequisites & Context
 
 ### Our Codebase Architecture
+
 - **Core (`src/`)**: Main business logic, uses `~/*` path aliases
-- **Web Package (`packages/web/`)**: Next.js web interface, uses `@/*` path aliases
+- **Web Package (`packages/web/`)**: Next.js web interface, uses `@/*` path
+  aliases
 - **Event-Sourcing**: All state changes go through immutable events
 - **Type Safety**: Strict TypeScript, zero `any` types allowed
 - **Testing**: TDD approach, real codepaths over mocks
 
 ### Key Type Concepts
+
 - **ThreadId**: Branded string type (`lace_YYYYMMDD_randomId` format)
 - **Events**: Discriminated unions for type safety
 - **Tools**: Schema-based validation with Zod
 - **Client/Server Boundary**: Types must respect Next.js boundaries
 
 ### TypeScript Rules
+
 - **Never use `any`** - Use `unknown` with type guards instead
 - **Branded types** - Use `string & { __brand: 'Type' }` for IDs
 - **Discriminated unions** - Use `type` field for event type safety
 - **Type guards** - Write `is` functions for runtime type checking
 
 ### Testing Rules
+
 - **TDD**: Write failing test first, implement to pass
 - **Real codepaths**: Never mock the functionality under test
 - **Co-location**: Test files next to source files (`file.ts` → `file.test.ts`)
 - **Type safety**: Tests must be fully typed, no `any`
 - **MANDATORY VERIFICATION**: Run tests and linting before AND after EVERY task
-- **Zero tolerance**: If any test fails or linting errors exist, STOP and fix before proceeding
+- **Zero tolerance**: If any test fails or linting errors exist, STOP and fix
+  before proceeding
 
 ## CRITICAL: Task Verification Template
 
 **BEFORE starting ANY task:**
+
 ```bash
 # Verify clean starting state
 npm test
 npm run lint
 npm run build
 ```
+
 **All commands must pass with zero errors/warnings before proceeding.**
 
 **AFTER completing ANY task:**
+
 ```bash
 # Verify changes don't break anything
 npm test
-npm run lint  
+npm run lint
 npm run build
 ```
+
 **All commands must pass with zero errors/warnings before committing.**
 
 **If ANY command fails:**
+
 1. STOP immediately - do not proceed to next task
 2. Fix all errors and warnings
 3. Re-run verification commands
 4. Only proceed when everything passes
 
 ## TASK FORMAT: Every task below follows this pattern:
+
 1. **BEFORE**: Run verification commands (test, lint, build)
 2. Implement the task changes
 3. **AFTER**: Run verification commands (test, lint, build)
@@ -92,6 +107,7 @@ npm run build
 ### Phase 1: Audit and Prepare (Day 1)
 
 #### Task 1.1: Create backup branch and setup
+
 **Files**: Git operations
 
 **BEFORE**: Run verification template commands above ⬆️
@@ -107,13 +123,15 @@ git status
 **AFTER**: Run verification template commands above ⬆️
 
 #### Task 1.2: Document current import usage
-**Files**: `docs/type-audit.md` (create)
-**Purpose**: Catalog all current type imports before changes
+
+**Files**: `docs/type-audit.md` (create) **Purpose**: Catalog all current type
+imports before changes
+
 ```bash
 # Search for all ThreadId imports
 grep -r "ThreadId" packages/web --include="*.ts" --include="*.tsx" > docs/type-audit.md
 
-# Search for all ApprovalDecision imports  
+# Search for all ApprovalDecision imports
 grep -r "ApprovalDecision" packages/web --include="*.ts" --include="*.tsx" >> docs/type-audit.md
 
 # Search for core type imports
@@ -121,8 +139,10 @@ grep -r "from '@/lib/.*core" packages/web --include="*.ts" --include="*.tsx" >> 
 ```
 
 #### Task 1.3: Create test to verify no regressions
-**Files**: `packages/web/lib/type-integrity.test.ts` (create)
-**Purpose**: Ensure all type exports work correctly throughout cleanup
+
+**Files**: `packages/web/lib/type-integrity.test.ts` (create) **Purpose**:
+Ensure all type exports work correctly throughout cleanup
+
 ```typescript
 // ABOUTME: Integration test ensuring type imports work correctly
 // ABOUTME: Prevents regressions during type cleanup refactoring
@@ -134,84 +154,69 @@ describe('Type Integrity', () => {
   it('should import ThreadId from all current paths', () => {
     // Import from each current path
     const imports = [
-      () => import('@/types/api').then(m => m.ThreadId),
-      () => import('@/lib/server/core-types').then(m => m.ThreadId),
-      () => import('@/lib/server/lace-imports').then(m => m.ThreadId),
-      () => import('@/lib/core-types-import').then(m => m.ThreadId)
+      () => import('@/types/api').then((m) => m.ThreadId),
+      () => import('@/lib/server/core-types').then((m) => m.ThreadId),
+      () => import('@/lib/server/lace-imports').then((m) => m.ThreadId),
+      () => import('@/lib/core-types-import').then((m) => m.ThreadId),
     ];
-    
+
     // Verify all imports resolve
     expect(imports).toHaveLength(4);
   });
 
   it('should import ApprovalDecision from all current paths', () => {
     const imports = [
-      () => import('@/types/api').then(m => m.ApprovalDecision),
-      () => import('@/lib/server/core-types').then(m => m.ApprovalDecision)
+      () => import('@/types/api').then((m) => m.ApprovalDecision),
+      () => import('@/lib/server/core-types').then((m) => m.ApprovalDecision),
     ];
-    
+
     expect(imports).toHaveLength(2);
   });
 });
 ```
 
-**BEFORE**: Run verification template commands above ⬆️
-**AFTER**: Run verification template commands above ⬆️
-**Expected**: Test passes, documenting current state
-**Commit**: `test: add type integrity test for cleanup safety`
+**BEFORE**: Run verification template commands above ⬆️ **AFTER**: Run
+verification template commands above ⬆️ **Expected**: Test passes, documenting
+current state **Commit**: `test: add type integrity test for cleanup safety`
 
 ### Phase 2: Create New Import Structure (Day 1-2)
 
 #### Task 2.1: Create unified core types file
-**Files**: `packages/web/lib/core.ts` (create)
-**Purpose**: Single source for all core type imports
+
+**Files**: `packages/web/lib/core.ts` (create) **Purpose**: Single source for
+all core type imports
+
 ```typescript
 // ABOUTME: Unified core type imports for web package
 // ABOUTME: Single source of truth for all core types, replaces multiple import files
 
 // Re-export all core types that web package needs
-export type { 
-  ThreadId, 
-  AssigneeId, 
+export type {
+  ThreadId,
+  AssigneeId,
   EventType,
   ThreadEvent,
-  Thread
+  Thread,
 } from '~/threads/types';
 
 export type {
   ToolCall,
   ToolResult,
   ToolContext,
-  ToolAnnotations
+  ToolAnnotations,
 } from '~/tools/types';
 
-export type {
-  Task,
-  TaskNote,
-  TaskStatus,
-  TaskPriority
-} from '~/tasks/types';
+export type { Task, TaskNote, TaskStatus, TaskPriority } from '~/tasks/types';
 
-export type {
-  AgentState
-} from '~/agents/agent';
+export type { AgentState } from '~/agents/agent';
 
-export type {
-  ProviderInfo,
-  ModelInfo
-} from '~/providers/base-provider';
+export type { ProviderInfo, ModelInfo } from '~/providers/base-provider';
 
-export { 
-  ApprovalDecision 
-} from '~/tools/types';
+export { ApprovalDecision } from '~/tools/types';
 
-export type {
-  ProjectInfo
-} from '~/projects/project';
+export type { ProjectInfo } from '~/projects/project';
 
-export type {
-  SessionInfo
-} from '~/sessions/session';
+export type { SessionInfo } from '~/sessions/session';
 
 // Re-export utility functions
 export {
@@ -220,11 +225,12 @@ export {
   isThreadId,
   asNewAgentSpec,
   createNewAgentSpec,
-  EVENT_TYPES
+  EVENT_TYPES,
 } from '~/threads/types';
 ```
 
 **Test**: Create `packages/web/lib/core.test.ts`
+
 ```typescript
 // ABOUTME: Test unified core type imports
 // ABOUTME: Ensures all expected types and functions are exported correctly
@@ -237,7 +243,7 @@ describe('Core Type Imports', () => {
   it('should export ThreadId type correctly', () => {
     const validId = 'lace_20250731_abc123';
     expect(isThreadId(validId)).toBe(true);
-    
+
     const threadId: ThreadId = asThreadId(validId);
     expect(threadId).toBe(validId);
   });
@@ -258,48 +264,50 @@ describe('Core Type Imports', () => {
     // This test verifies the type exists by using it
     const task: Partial<Task> = {
       title: 'Test task',
-      status: 'pending'
+      status: 'pending',
     };
     expect(task.title).toBe('Test task');
   });
 });
 ```
 
-**BEFORE/AFTER**: Run verification commands ⬆️
-**Expected**: All imports work correctly, zero test/lint/build failures
-**Commit**: `feat: add unified core type imports`
+**BEFORE/AFTER**: Run verification commands ⬆️ **Expected**: All imports work
+correctly, zero test/lint/build failures **Commit**:
+`feat: add unified core type imports`
 
-#### Task 2.2: Create web request/response types file  
-**Files**: `packages/web/types/web.ts` (create)
-**Purpose**: ONLY types that don't exist in core - requests, web-specific contracts
+#### Task 2.2: Create web request/response types file
+
+**Files**: `packages/web/types/web.ts` (create) **Purpose**: ONLY types that
+don't exist in core - requests, web-specific contracts
+
 ```typescript
 // ABOUTME: Web-specific request/response types that don't exist in core
 // ABOUTME: Uses core types for data models, defines web request contracts from schemas
 
 import { z } from 'zod';
-import { 
+import {
   MessageRequestSchema,
   CreateTaskRequestSchema,
   UpdateTaskRequestSchema,
   CreateSessionRequestSchema,
   SpawnAgentRequestSchema,
-  ToolCallIdSchema
+  ToolCallIdSchema,
 } from '@/lib/validation/schemas';
 
 // Use core types for API responses - no duplication
 export type { SessionInfo as Session } from '@/lib/core';
 
-// Re-export core types 
-export type { 
-  ThreadId, 
-  AssigneeId, 
+// Re-export core types
+export type {
+  ThreadId,
+  AssigneeId,
   AgentState,
-  Task, 
-  TaskNote, 
-  TaskStatus, 
+  Task,
+  TaskNote,
+  TaskStatus,
   TaskPriority,
   ApprovalDecision,
-  ToolResult
+  ToolResult,
 } from '@/lib/core';
 
 // Request types (inferred from validation schemas) - ONLY PLACE THESE EXIST
@@ -365,15 +373,22 @@ export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 
 // Type guards
 export function isApiError(response: unknown): response is ApiErrorResponse {
-  return typeof response === 'object' && response !== null && 'error' in response;
+  return (
+    typeof response === 'object' && response !== null && 'error' in response
+  );
 }
 
-export function isApiSuccess<T>(response: unknown): response is ApiSuccessResponse<T> {
-  return typeof response === 'object' && response !== null && !('error' in response);
+export function isApiSuccess<T>(
+  response: unknown
+): response is ApiSuccessResponse<T> {
+  return (
+    typeof response === 'object' && response !== null && !('error' in response)
+  );
 }
 ```
 
 **Test**: Create `packages/web/types/web.test.ts`
+
 ```typescript
 // ABOUTME: Test web-specific type definitions
 // ABOUTME: Verifies API types and type guards work correctly
@@ -388,9 +403,9 @@ describe('Web Types', () => {
     const session: Session = {
       id: asThreadId('lace_20250731_test123'),
       name: 'Test Session',
-      createdAt: '2025-07-31T10:00:00Z'
+      createdAt: '2025-07-31T10:00:00Z',
     };
-    
+
     expect(session.name).toBe('Test Session');
     expect(session.id).toBe('lace_20250731_test123');
   });
@@ -398,7 +413,7 @@ describe('Web Types', () => {
   it('should validate API error responses', () => {
     const errorResponse = { error: 'Something went wrong' };
     const successResponse = { data: { result: 'success' } };
-    
+
     expect(isApiError(errorResponse)).toBe(true);
     expect(isApiError(successResponse)).toBe(false);
     expect(isApiSuccess(successResponse)).toBe(true);
@@ -407,20 +422,22 @@ describe('Web Types', () => {
 
   it('should create valid MessageRequest', () => {
     const request: MessageRequest = {
-      message: 'Hello world'
+      message: 'Hello world',
     };
-    
+
     expect(request.message).toBe('Hello world');
   });
 });
 ```
 
-**Test**: `npm test web.test.ts`
-**Commit**: `feat: add clean web-specific types`
+**Test**: `npm test web.test.ts` **Commit**:
+`feat: add clean web-specific types`
 
 #### Task 2.3: Create combined events file
-**Files**: `packages/web/types/events.ts` (create)
-**Purpose**: All event-related types in one place
+
+**Files**: `packages/web/types/events.ts` (create) **Purpose**: All
+event-related types in one place
+
 ```typescript
 // ABOUTME: Combined event type definitions for web interface
 // ABOUTME: Consolidates events and event constants into single file
@@ -500,7 +517,7 @@ export type SessionEvent =
   | {
       type: 'AGENT_STREAMING';
       threadId: ThreadId;
-      timestamp: Date;  
+      timestamp: Date;
       data: { content: string };
     };
 
@@ -515,17 +532,18 @@ export function isPersistedEvent(type: SessionEventType): type is EventType {
 ```
 
 **Test**: Create `packages/web/types/events.test.ts`
+
 ```typescript
 // ABOUTME: Test event type definitions and utilities
 // ABOUTME: Ensures event types are correctly structured and utilities work
 
 import { describe, it, expect } from 'vitest';
-import { 
-  EVENT_TYPES, 
-  UI_EVENT_TYPES, 
-  getAllEventTypes, 
+import {
+  EVENT_TYPES,
+  UI_EVENT_TYPES,
+  getAllEventTypes,
   isPersistedEvent,
-  type SessionEvent 
+  type SessionEvent,
 } from './events';
 import { asThreadId } from '@/lib/core';
 
@@ -558,39 +576,42 @@ describe('Event Types', () => {
       type: 'USER_MESSAGE',
       threadId: asThreadId('lace_20250731_test123'),
       timestamp: new Date(),
-      data: { content: 'Hello' }
+      data: { content: 'Hello' },
     };
-    
+
     expect(event.type).toBe('USER_MESSAGE');
     expect(event.data.content).toBe('Hello');
   });
 });
 ```
 
-**Test**: `npm test events.test.ts`
-**Commit**: `feat: consolidate event types into single file`
+**Test**: `npm test events.test.ts` **Commit**:
+`feat: consolidate event types into single file`
 
 ### Phase 3: Update Import Structure (Day 2-3)
 
 #### Task 3.1: Replace duplicate ApprovalDecision
-**Files**: `packages/web/types/api.ts` (modify)
-**Purpose**: Remove duplicate ApprovalDecision definition
+
+**Files**: `packages/web/types/api.ts` (modify) **Purpose**: Remove duplicate
+ApprovalDecision definition
 
 First, write test to capture current behavior:
+
 ```bash
 # Create test that verifies ApprovalDecision works
 npm test -- --grep "ApprovalDecision"
 ```
 
 Then modify `packages/web/types/api.ts`:
+
 ```typescript
 // Remove these lines (14-21):
 // export const ApprovalDecision = {
 //   ALLOW_ONCE: 'allow_once',
-//   ALLOW_SESSION: 'allow_session', 
+//   ALLOW_SESSION: 'allow_session',
 //   DENY: 'deny',
 // } as const;
-// 
+//
 // export type ApprovalDecision = (typeof ApprovalDecision)[keyof typeof ApprovalDecision];
 
 // Replace with import:
@@ -598,16 +619,18 @@ import type { ApprovalDecision } from '@/lib/core';
 export type { ApprovalDecision };
 ```
 
-**BEFORE/AFTER**: Run verification commands ⬆️
-**CRITICAL**: This changes existing types - verify no imports break
-**Expected**: All tests pass, no breaking changes, zero lint errors
-**Commit**: `refactor: remove duplicate ApprovalDecision, use core import`
+**BEFORE/AFTER**: Run verification commands ⬆️ **CRITICAL**: This changes
+existing types - verify no imports break **Expected**: All tests pass, no
+breaking changes, zero lint errors **Commit**:
+`refactor: remove duplicate ApprovalDecision, use core import`
 
 #### Task 3.2: Fix ThreadId type shadowing in schemas
-**Files**: `packages/web/lib/validation/schemas.ts` (modify)
-**Purpose**: Remove type exports from schemas file - schemas are for validation only
+
+**Files**: `packages/web/lib/validation/schemas.ts` (modify) **Purpose**: Remove
+type exports from schemas file - schemas are for validation only
 
 **Current problematic code (lines 84-90):**
+
 ```typescript
 // Remove these type exports - they shadow core types and belong in web types
 export type ThreadId = z.infer<typeof ThreadIdSchema>;
@@ -620,20 +643,24 @@ export type SpawnAgentRequest = z.infer<typeof SpawnAgentRequestSchema>;
 ```
 
 **Replace with:**
+
 ```typescript
 // This file only exports schemas for validation, not types
 // Types are inferred in @/types/web from these schemas
 ```
 
-**CRITICAL**: Don't change the schemas themselves, only remove the type exports. The schemas are used for validation and type inference happens in the web types file.
+**CRITICAL**: Don't change the schemas themselves, only remove the type exports.
+The schemas are used for validation and type inference happens in the web types
+file.
 
-**BEFORE/AFTER**: Run verification commands ⬆️
-**Expected**: Schema validation still works, but no type shadowing
-**Commit**: `fix: remove type exports from schemas, eliminate shadowing`
+**BEFORE/AFTER**: Run verification commands ⬆️ **Expected**: Schema validation
+still works, but no type shadowing **Commit**:
+`fix: remove type exports from schemas, eliminate shadowing`
 
 #### Task 3.2.1: Fix broken imports after removing schema type exports
-**Files**: All files importing request types from schemas
-**Purpose**: Update imports to use web types instead of schemas
+
+**Files**: All files importing request types from schemas **Purpose**: Update
+imports to use web types instead of schemas
 
 **CRITICAL**: Task 3.2 will break imports. Find and fix them immediately:
 
@@ -643,6 +670,7 @@ grep -r "import.*MessageRequest\|CreateTaskRequest\|CreateSessionRequest.*from.*
 ```
 
 For each file found, update imports:
+
 ```typescript
 // OLD (now broken):
 import type { MessageRequest } from '@/lib/validation/schemas';
@@ -651,16 +679,17 @@ import type { MessageRequest } from '@/lib/validation/schemas';
 import type { MessageRequest } from '@/types/web';
 ```
 
-**BEFORE/AFTER**: Run verification commands ⬆️
-**CRITICAL**: All imports must be fixed or build will fail
-**Expected**: No import errors, all types resolve correctly
-**Commit**: `fix: update request type imports to use web types`
+**BEFORE/AFTER**: Run verification commands ⬆️ **CRITICAL**: All imports must be
+fixed or build will fail **Expected**: No import errors, all types resolve
+correctly **Commit**: `fix: update request type imports to use web types`
 
 #### Task 3.3: Update validation to use core functions
+
 **Files**: `packages/web/lib/validation/thread-id-validation.ts` (modify)
 **Purpose**: Use core validation instead of duplicated logic
 
 Replace entire file content:
+
 ```typescript
 // ABOUTME: ThreadId validation using core functions
 // ABOUTME: Wrapper around core validation for web package convenience
@@ -672,21 +701,24 @@ export const isValidThreadId = isThreadId;
 export const asValidThreadId = asThreadId;
 ```
 
-**Test**: `npm test thread-id-validation.test.ts`
-**Expected**: Validation works identically to before
-**Commit**: `refactor: use core ThreadId validation functions`
+**Test**: `npm test thread-id-validation.test.ts` **Expected**: Validation works
+identically to before **Commit**:
+`refactor: use core ThreadId validation functions`
 
 #### Task 3.4: Migrate files to new import structure (Batch 1)
-**Files**: All files importing from `@/lib/server/core-types`
-**Purpose**: Switch to unified `@/lib/core` imports
+
+**Files**: All files importing from `@/lib/server/core-types` **Purpose**:
+Switch to unified `@/lib/core` imports
 
 Create script to help with migration:
+
 ```bash
 # Find all files using old import
 grep -r "@/lib/server/core-types" packages/web --include="*.ts" --include="*.tsx" -l
 ```
 
 For each file found, replace:
+
 ```typescript
 // Old:
 import { ThreadId, AgentState } from '@/lib/server/core-types';
@@ -695,23 +727,27 @@ import { ThreadId, AgentState } from '@/lib/server/core-types';
 import type { ThreadId, AgentState } from '@/lib/core';
 ```
 
-**Important**: Update imports in small batches (5-10 files), test after each batch
+**Important**: Update imports in small batches (5-10 files), test after each
+batch
 
 Example files to update:
+
 - `packages/web/hooks/useSSEStream.ts`
 - `packages/web/hooks/useHashRouter.ts`
 - `packages/web/app/api/sessions/[sessionId]/route.ts`
 
-**BEFORE/AFTER EACH BATCH**: Run verification commands ⬆️
-**CRITICAL**: Test after EVERY batch - don't accumulate changes
-**Expected**: Zero failures after each batch
-**Commit**: After each batch: `refactor: migrate [file names] to @/lib/core imports`
+**BEFORE/AFTER EACH BATCH**: Run verification commands ⬆️ **CRITICAL**: Test
+after EVERY batch - don't accumulate changes **Expected**: Zero failures after
+each batch **Commit**: After each batch:
+`refactor: migrate [file names] to @/lib/core imports`
 
 #### Task 3.5: Migrate files to new import structure (Batch 2)
-**Files**: All files importing from `@/types/api`
-**Purpose**: Switch to `@/types/web` for web-specific types
+
+**Files**: All files importing from `@/types/api` **Purpose**: Switch to
+`@/types/web` for web-specific types
 
 Replace:
+
 ```typescript
 // Old:
 import type { Session, Agent, ThreadId } from '@/types/api';
@@ -722,19 +758,22 @@ import type { ThreadId } from '@/lib/core';
 ```
 
 Example files:
+
 - `packages/web/components/pages/LaceApp.tsx`
 - `packages/web/hooks/useSessionAPI.ts`
 - `packages/web/lib/timeline-converter.ts`
 
-**Test**: After each batch: `npm test && npm run build`
-**Commit**: After each batch: `refactor: migrate [file names] to new type imports`
+**Test**: After each batch: `npm test && npm run build` **Commit**: After each
+batch: `refactor: migrate [file names] to new type imports`
 
 ### Phase 4: Clean Up Old Files (Day 3)
 
 #### Task 4.1: Remove redundant import files
+
 **Files**: Delete old import files after migration is complete
 
 Before deletion, verify no references remain:
+
 ```bash
 # Check each file has no remaining imports
 grep -r "@/lib/server/core-types" packages/web --include="*.ts" --include="*.tsx"
@@ -743,28 +782,31 @@ grep -r "@/types/api" packages/web --include="*.ts" --include="*.tsx"
 ```
 
 If searches return no results, delete files:
+
 - `packages/web/lib/server/core-types.ts`
-- `packages/web/lib/core-types-import.ts`  
+- `packages/web/lib/core-types-import.ts`
 - `packages/web/types/api.ts`
 - `packages/web/types/events-constants.ts`
 
 Keep:
+
 - `packages/web/lib/server/lace-imports.ts` (needed for business logic classes)
 
-**Test**: `npm test && npm run build`
-**Expected**: No import errors, all tests pass
-**Commit**: `cleanup: remove redundant type import files`
+**Test**: `npm test && npm run build` **Expected**: No import errors, all tests
+pass **Commit**: `cleanup: remove redundant type import files`
 
 #### Task 4.1.1: Audit server-only boundary enforcement
-**Files**: All client components and hooks
-**Purpose**: Ensure no business logic classes leak to client-side code
+
+**Files**: All client components and hooks **Purpose**: Ensure no business logic
+classes leak to client-side code
 
 Verify client components only import types, not classes:
+
 ```bash
 # Check client components don't import business logic classes
 grep -r "Agent\|ThreadManager\|ToolExecutor\|Session\|Project" packages/web/components --include="*.tsx" -A 1 -B 1
 
-# Check hooks don't import business logic classes  
+# Check hooks don't import business logic classes
 grep -r "Agent\|ThreadManager\|ToolExecutor\|Session\|Project" packages/web/hooks --include="*.ts" -A 1 -B 1
 
 # These should only be imports like:
@@ -774,18 +816,20 @@ grep -r "Agent\|ThreadManager\|ToolExecutor\|Session\|Project" packages/web/hook
 ```
 
 Fix any violations by:
+
 1. Change to type-only imports: `import type { Agent } from '@/types/web'`
 2. Move business logic to API routes or server components
 
-**Test**: `npm run build`
-**Expected**: No server-only imports in client code
+**Test**: `npm run build` **Expected**: No server-only imports in client code
 **Commit**: `fix: enforce server-only boundary for business logic classes`
 
 #### Task 4.2: Update main types index
-**Files**: `packages/web/types/index.ts` (modify)
-**Purpose**: Update to use new file structure
+
+**Files**: `packages/web/types/index.ts` (modify) **Purpose**: Update to use new
+file structure
 
 Replace content:
+
 ```typescript
 // ABOUTME: Main types index for web package
 // ABOUTME: Re-exports all type definitions from organized modules
@@ -813,13 +857,15 @@ export type {
 } from './design-system';
 ```
 
-**Test**: `npm test`
-**Commit**: `refactor: update types index for new structure`
+**Test**: `npm test` **Commit**:
+`refactor: update types index for new structure`
 
 ### Phase 5: Testing and Validation (Day 4)
 
 #### Task 5.1: Run comprehensive tests
+
 **Commands**:
+
 ```bash
 # Full test suite
 npm test
@@ -837,38 +883,33 @@ npm run test:e2e
 **Expected**: All tests pass, no TypeScript errors, successful build
 
 #### Task 5.2: Update type integrity test
-**Files**: `packages/web/lib/type-integrity.test.ts` (modify)
-**Purpose**: Verify new import structure works
+
+**Files**: `packages/web/lib/type-integrity.test.ts` (modify) **Purpose**:
+Verify new import structure works
 
 Replace test content:
+
 ```typescript
 // ABOUTME: Integration test ensuring new type structure works correctly
 // ABOUTME: Validates unified import strategy and no regressions
 
 import { describe, it, expect } from 'vitest';
-import type { 
-  ThreadId, 
-  ApprovalDecision, 
+import type {
+  ThreadId,
+  ApprovalDecision,
   Task,
   AgentState,
-  ToolResult 
+  ToolResult,
 } from '@/lib/core';
-import type { 
-  Session, 
-  Agent, 
-  MessageRequest 
-} from '@/types/web';
-import type { 
-  SessionEvent,
-  SessionEventType 
-} from '@/types/events';
+import type { Session, Agent, MessageRequest } from '@/types/web';
+import type { SessionEvent, SessionEventType } from '@/types/events';
 import { isThreadId, asThreadId } from '@/lib/core';
 
 describe('Type Integrity - New Structure', () => {
   it('should import all core types correctly', () => {
     const threadId: ThreadId = asThreadId('lace_20250731_test123');
     expect(isThreadId(threadId)).toBe(true);
-    
+
     const decision: ApprovalDecision = 'allow_once';
     expect(decision).toBe('allow_once');
   });
@@ -877,9 +918,9 @@ describe('Type Integrity - New Structure', () => {
     const session: Session = {
       id: asThreadId('lace_20250731_test123'),
       name: 'Test',
-      createdAt: '2025-07-31T10:00:00Z'
+      createdAt: '2025-07-31T10:00:00Z',
     };
-    
+
     expect(session.name).toBe('Test');
   });
 
@@ -888,17 +929,19 @@ describe('Type Integrity - New Structure', () => {
       type: 'USER_MESSAGE',
       threadId: asThreadId('lace_20250731_test123'),
       timestamp: new Date(),
-      data: { content: 'Hello' }
+      data: { content: 'Hello' },
     };
-    
+
     expect(event.type).toBe('USER_MESSAGE');
   });
 
   it('should have no type conflicts or shadowing', () => {
     // This test will fail to compile if there are type conflicts
     const threadId1: ThreadId = asThreadId('lace_20250731_test1');
-    const threadId2: import('@/lib/core').ThreadId = asThreadId('lace_20250731_test2');
-    
+    const threadId2: import('@/lib/core').ThreadId = asThreadId(
+      'lace_20250731_test2'
+    );
+
     // These should be the same type
     const same: typeof threadId1 = threadId2;
     expect(same).toBe(threadId2);
@@ -906,11 +949,11 @@ describe('Type Integrity - New Structure', () => {
 });
 ```
 
-**Test**: `npm test type-integrity.test.ts`
-**Expected**: All type imports work correctly
-**Commit**: `test: update type integrity test for new structure`
+**Test**: `npm test type-integrity.test.ts` **Expected**: All type imports work
+correctly **Commit**: `test: update type integrity test for new structure`
 
 #### Task 5.3: Manual verification checklist
+
 **Purpose**: Ensure web app still functions correctly
 
 1. **Start development server**: `npm run dev`
@@ -932,7 +975,9 @@ describe('Type Integrity - New Structure', () => {
 **Expected**: All functionality works as before, no runtime errors
 
 #### Task 5.4: Performance check
+
 **Commands**:
+
 ```bash
 # Check bundle sizes haven't increased significantly
 npm run build
@@ -949,10 +994,13 @@ time npm run build
 ### Phase 6: Documentation (Day 4)
 
 #### Task 6.1: Update type system documentation
-**Files**: `docs/design/types-and-validation.md` (already created)
-**Purpose**: Document the cleaned-up type organization and import conventions
 
-This documentation file already exists and describes the end state architecture. Review and update if needed after implementation to ensure it matches the actual implementation.
+**Files**: `docs/design/types-and-validation.md` (already created) **Purpose**:
+Document the cleaned-up type organization and import conventions
+
+This documentation file already exists and describes the end state architecture.
+Review and update if needed after implementation to ensure it matches the actual
+implementation.
 
 **Test**: Manual review - documentation accurately reflects new structure
 **Commit**: `docs: update type system architecture documentation`
@@ -975,10 +1023,12 @@ Before marking complete, verify:
 
 If issues arise during implementation:
 
-1. **Revert to backup branch**: `git checkout main && git branch -D f/type-cleanup`
+1. **Revert to backup branch**:
+   `git checkout main && git branch -D f/type-cleanup`
 2. **Identify specific problem**: Check failing tests and TypeScript errors
 3. **Fix individual issue**: Address one problem at a time
-4. **Alternative approach**: If structural issues, consider smaller incremental changes
+4. **Alternative approach**: If structural issues, consider smaller incremental
+   changes
 
 ## Post-Implementation
 
@@ -991,11 +1041,16 @@ After successful completion:
 
 ## Notes for Implementation
 
-- **MANDATORY TESTING**: Run `npm test && npm run lint && npm run build` before AND after EVERY task
-- **Zero tolerance policy**: If ANY command fails, STOP and fix before proceeding
-- **Commit frequently**: After each task completion, but only when all verifications pass
-- **Test incrementally**: Don't accumulate changes without testing - verify each small change
+- **MANDATORY TESTING**: Run `npm test && npm run lint && npm run build` before
+  AND after EVERY task
+- **Zero tolerance policy**: If ANY command fails, STOP and fix before
+  proceeding
+- **Commit frequently**: After each task completion, but only when all
+  verifications pass
+- **Test incrementally**: Don't accumulate changes without testing - verify each
+  small change
 - **Check TypeScript errors carefully**: Strict mode catches type issues early
 - **Use type assertions sparingly**: Prefer type guards over `as` casting
 - **Document any deviations**: If implementation differs from plan, document why
-- **When stuck**: If tests fail repeatedly, consider smaller incremental changes or ask for help
+- **When stuck**: If tests fail repeatedly, consider smaller incremental changes
+  or ask for help

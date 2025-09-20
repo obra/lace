@@ -1,7 +1,7 @@
 # ABOUTME: Docker Compose configuration for Lace development environment
 # ABOUTME: Isolated node_modules and LMStudio port forwarding
 
-version: '3.8'
+version: "3.8"
 
 services:
   lace-dev:

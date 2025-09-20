@@ -3,39 +3,49 @@
 ## Implementation Status
 
 ✅ **Task 1 COMPLETED**: Update Session Date Formatting (commit: ead5f412)
+
 - Changed from 'Session 7/24/2025, 2:30:00 PM' to 'Thursday, Jul 24'
 - Added comprehensive unit tests with date mocking
 - Maintains backward compatibility
 
 ✅ **Task 2 COMPLETED**: Upgrade Default Model to Sonnet 4 (commit: aa59e7d0)
+
 - Changed from claude-3-haiku-20240307 to claude-sonnet-4-20250514
 - Added unit tests for default model selection through public API
 - Maintains existing OpenAI default (gpt-4)
 
 ✅ **Task 3 COMPLETED**: Add Auto-naming for Project Creation (commit: 687a41d8)
+
 - Auto-generate project name from directory basename when name is empty
 - Handle trailing slashes and Unix paths
 - Update API schema to make project name optional
 - Add comprehensive unit tests for path handling
 
 ✅ **Task 4 COMPLETED**: Add Default Agent Name "Lace" (commit: 14762636)
+
 - Auto-generate agent name 'Lace' when name is empty or whitespace
 - Update API schema to make agent name optional
 - Add unit tests for name handling and whitespace trimming
 
-🚧 **Task 5 IN PROGRESS**: Auto-open Project Creation Modal
-🔲 **Task 6 PENDING**: Create Simplified Project Creation Flow  
+🚧 **Task 5 IN PROGRESS**: Auto-open Project Creation Modal 🔲 **Task 6
+PENDING**: Create Simplified Project Creation Flow  
 🔲 **Task 7 PENDING**: Implement Full Onboarding Chain
 
 ## Overview
 
-This plan implements a streamlined onboarding flow for the web UI that automatically guides users from "no projects" to chatting with an AI agent in minimal steps. The approach pushes intelligent defaults deep into the library code while keeping UI logic thin.
+This plan implements a streamlined onboarding flow for the web UI that
+automatically guides users from "no projects" to chatting with an AI agent in
+minimal steps. The approach pushes intelligent defaults deep into the library
+code while keeping UI logic thin.
 
 ## Current State vs Target State
 
-**Current Flow:** User sees empty state → clicks create project → fills complex form → manually creates session → manually creates agent → finally chats
+**Current Flow:** User sees empty state → clicks create project → fills complex
+form → manually creates session → manually creates agent → finally chats
 
-**Target Flow:** User with no projects → auto-opens simplified project modal → picks directory → auto-names project → auto-creates session → auto-creates "Lace" agent → auto-opens chat
+**Target Flow:** User with no projects → auto-opens simplified project modal →
+picks directory → auto-names project → auto-creates session → auto-creates
+"Lace" agent → auto-opens chat
 
 ## Architecture Principles
 
@@ -51,14 +61,17 @@ This plan implements a streamlined onboarding flow for the web UI that automatic
 ### Task 1: Update Session Date Formatting
 
 **Files to modify:**
+
 - `src/sessions/session.ts` (lines 613-615)
 - `src/sessions/session.test.ts` (new test file)
 
-**Objective:** Change session auto-naming from "Session 7/24/2025, 2:30:00 PM" to "Thursday, Jul 24"
+**Objective:** Change session auto-naming from "Session 7/24/2025, 2:30:00 PM"
+to "Thursday, Jul 24"
 
 **Implementation:**
 
 1. **Write failing test first:**
+
 ```typescript
 // src/sessions/session.test.ts (new file)
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -80,17 +93,17 @@ describe('Session', () => {
         projectId: 'test-project-id',
         // name omitted to trigger auto-generation
       });
-      
+
       expect(session.getName()).toBe('Thursday, Jul 24');
     });
 
     it('should handle different dates correctly', () => {
       vi.setSystemTime(new Date('2025-12-31T10:00:00Z'));
-      
+
       const session = Session.create({
         projectId: 'test-project-id',
       });
-      
+
       expect(session.getName()).toBe('Wednesday, Dec 31');
     });
   });
@@ -98,11 +111,13 @@ describe('Session', () => {
 ```
 
 2. **Run test to confirm it fails:**
+
 ```bash
 npm run test:unit -- src/sessions/session.test.ts
 ```
 
 3. **Implement minimal code to pass:**
+
 ```typescript
 // In src/sessions/session.ts, replace lines 613-615:
 private static generateSessionName(): string {
@@ -115,11 +130,13 @@ private static generateSessionName(): string {
 ```
 
 4. **Run test to confirm it passes:**
+
 ```bash
 npm run test:unit -- src/sessions/session.test.ts
 ```
 
 5. **Commit:**
+
 ```bash
 git add src/sessions/session.ts src/sessions/session.test.ts
 git commit -m "feat: improve session date formatting to human-readable format
@@ -130,6 +147,7 @@ git commit -m "feat: improve session date formatting to human-readable format
 ```
 
 **Testing notes:**
+
 - Use `vi.setSystemTime()` for predictable date testing
 - Test multiple dates to ensure format consistency
 - No mocking of Session.create() - use real implementation
@@ -137,14 +155,17 @@ git commit -m "feat: improve session date formatting to human-readable format
 ### Task 2: Upgrade Default Model to Sonnet 4
 
 **Files to modify:**
+
 - `src/sessions/session.ts` (line 610)
 - `src/sessions/session.test.ts` (add test cases)
 
-**Objective:** Change default Anthropic model from haiku to claude-sonnet-4-20250514
+**Objective:** Change default Anthropic model from haiku to
+claude-sonnet-4-20250514
 
 **Implementation:**
 
 1. **Write failing test first:**
+
 ```typescript
 // Add to src/sessions/session.test.ts:
 describe('getDefaultModel', () => {
@@ -162,12 +183,12 @@ describe('getDefaultModel', () => {
   it('should create session with upgraded default model', () => {
     // Mock environment to ensure anthropic is detected
     vi.stubEnv('ANTHROPIC_KEY', 'test-key');
-    
+
     const session = Session.create({
       projectId: 'test-project-id',
       // provider/model omitted to trigger defaults
     });
-    
+
     const agents = session.getAgents();
     expect(agents[0]?.model).toBe('claude-sonnet-4-20250514');
   });
@@ -175,11 +196,13 @@ describe('getDefaultModel', () => {
 ```
 
 2. **Run test to confirm it fails:**
+
 ```bash
 npm run test:unit -- src/sessions/session.test.ts
 ```
 
 3. **Implement minimal code to pass:**
+
 ```typescript
 // In src/sessions/session.ts, replace line 610:
 private static getDefaultModel(provider: string): string {
@@ -188,11 +211,13 @@ private static getDefaultModel(provider: string): string {
 ```
 
 4. **Run test to confirm it passes:**
+
 ```bash
 npm run test:unit -- src/sessions/session.test.ts
 ```
 
 5. **Commit:**
+
 ```bash
 git add src/sessions/session.ts src/sessions/session.test.ts
 git commit -m "feat: upgrade default Anthropic model to Sonnet 4
@@ -203,6 +228,7 @@ git commit -m "feat: upgrade default Anthropic model to Sonnet 4
 ```
 
 **Testing notes:**
+
 - Use `vi.stubEnv()` to control environment variable detection
 - Test both anthropic and openai defaults
 - Use real Session.create() to verify end-to-end model selection
@@ -210,6 +236,7 @@ git commit -m "feat: upgrade default Anthropic model to Sonnet 4
 ### Task 3: Add Auto-naming for Project Creation
 
 **Files to modify:**
+
 - `src/projects/project.ts` (lines 37-42)
 - `src/projects/project.test.ts` (new test file)
 - `packages/web/app/api/projects/route.ts` (lines 8-13)
@@ -219,6 +246,7 @@ git commit -m "feat: upgrade default Anthropic model to Sonnet 4
 **Implementation:**
 
 1. **Write failing test first:**
+
 ```typescript
 // src/projects/project.test.ts (new file)
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -230,14 +258,14 @@ describe('Project', () => {
     // Clean up test data
     const persistence = getPersistence();
     const projects = persistence.loadAllProjects();
-    projects.forEach(p => persistence.deleteProject(p.id));
+    projects.forEach((p) => persistence.deleteProject(p.id));
   });
 
   afterEach(() => {
     // Clean up test data
     const persistence = getPersistence();
     const projects = persistence.loadAllProjects();
-    projects.forEach(p => persistence.deleteProject(p.id));
+    projects.forEach((p) => persistence.deleteProject(p.id));
   });
 
   describe('create', () => {
@@ -264,11 +292,7 @@ describe('Project', () => {
     });
 
     it('should handle root directory', () => {
-      const project = Project.create(
-        '',
-        '/',
-        'Test description'
-      );
+      const project = Project.create('', '/', 'Test description');
 
       const info = project.getInfo();
       expect(info?.name).toBe('root');
@@ -300,11 +324,13 @@ describe('Project', () => {
 ```
 
 2. **Run test to confirm it fails:**
+
 ```bash
 npm run test:unit -- src/projects/project.test.ts
 ```
 
 3. **Implement minimal code to pass:**
+
 ```typescript
 // Add import at top of src/projects/project.ts:
 import { basename } from 'path';
@@ -343,6 +369,7 @@ private static generateNameFromDirectory(workingDirectory: string): string {
 ```
 
 4. **Update API schema to make name optional:**
+
 ```typescript
 // In packages/web/app/api/projects/route.ts, replace lines 8-13:
 const CreateProjectSchema = z.object({
@@ -362,11 +389,13 @@ const project = Project.create(
 ```
 
 5. **Run test to confirm it passes:**
+
 ```bash
 npm run test:unit -- src/projects/project.test.ts
 ```
 
 6. **Commit:**
+
 ```bash
 git add src/projects/project.ts src/projects/project.test.ts packages/web/app/api/projects/route.ts
 git commit -m "feat: add auto-naming for projects from directory basename
@@ -378,6 +407,7 @@ git commit -m "feat: add auto-naming for projects from directory basename
 ```
 
 **Testing notes:**
+
 - Test cross-platform paths (Unix and Windows)
 - Use real persistence layer, clean up in beforeEach/afterEach
 - No mocking of Project.create() - test the real implementation
@@ -385,6 +415,7 @@ git commit -m "feat: add auto-naming for projects from directory basename
 ### Task 4: Add Default Agent Name "Lace"
 
 **Files to modify:**
+
 - `src/sessions/session.ts` (lines 466-497)
 - `src/sessions/session.test.ts` (add test cases)
 - `packages/web/app/api/sessions/[sessionId]/agents/route.ts` (update schema)
@@ -394,6 +425,7 @@ git commit -m "feat: add auto-naming for projects from directory basename
 **Implementation:**
 
 1. **Write failing test first:**
+
 ```typescript
 // Add to src/sessions/session.test.ts:
 describe('spawnAgent', () => {
@@ -405,7 +437,7 @@ describe('spawnAgent', () => {
     const agent = session.spawnAgent(''); // Empty name to trigger default
 
     const agents = session.getAgents();
-    const spawnedAgent = agents.find(a => a.threadId === agent.threadId);
+    const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
     expect(spawnedAgent?.name).toBe('Lace');
   });
 
@@ -417,7 +449,7 @@ describe('spawnAgent', () => {
     const agent = session.spawnAgent('Custom Agent Name');
 
     const agents = session.getAgents();
-    const spawnedAgent = agents.find(a => a.threadId === agent.threadId);
+    const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
     expect(spawnedAgent?.name).toBe('Custom Agent Name');
   });
 
@@ -429,18 +461,20 @@ describe('spawnAgent', () => {
     const agent = session.spawnAgent('   '); // Whitespace-only
 
     const agents = session.getAgents();
-    const spawnedAgent = agents.find(a => a.threadId === agent.threadId);
+    const spawnedAgent = agents.find((a) => a.threadId === agent.threadId);
     expect(spawnedAgent?.name).toBe('Lace');
   });
 });
 ```
 
 2. **Run test to confirm it fails:**
+
 ```bash
 npm run test:unit -- src/sessions/session.test.ts
 ```
 
 3. **Implement minimal code to pass:**
+
 ```typescript
 // In src/sessions/session.ts, replace lines 466-467:
 spawnAgent(name: string, provider?: string, model?: string): Agent {
@@ -462,6 +496,7 @@ spawnAgent(name: string, provider?: string, model?: string): Agent {
 ```
 
 4. **Update API schema:**
+
 ```typescript
 // In packages/web/app/api/sessions/[sessionId]/agents/route.ts:
 // Find the CreateAgentSchema and make name optional:
@@ -480,11 +515,13 @@ const agents = session.spawnAgent(
 ```
 
 5. **Run test to confirm it passes:**
+
 ```bash
 npm run test:unit -- src/sessions/session.test.ts
 ```
 
 6. **Commit:**
+
 ```bash
 git add src/sessions/session.ts src/sessions/session.test.ts packages/web/app/api/sessions/[sessionId]/agents/route.ts
 git commit -m "feat: add default agent name 'Lace'
@@ -495,6 +532,7 @@ git commit -m "feat: add default agent name 'Lace'
 ```
 
 **Testing notes:**
+
 - Test empty string, whitespace, and null cases
 - Use real Session.create() and spawnAgent() methods
 - Verify metadata is correctly set
@@ -502,6 +540,7 @@ git commit -m "feat: add default agent name 'Lace'
 ### Task 5: Auto-open Project Creation Modal
 
 **Files to modify:**
+
 - `packages/web/components/pages/LaceApp.tsx` (lines 699-706)
 - `packages/web/components/pages/LaceApp.test.tsx` (new test file)
 
@@ -510,6 +549,7 @@ git commit -m "feat: add default agent name 'Lace'
 **Implementation:**
 
 1. **Write failing test first:**
+
 ```typescript
 // packages/web/components/pages/LaceApp.test.tsx (new file)
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -545,7 +585,7 @@ global.fetch = vi.fn();
 describe('LaceApp', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Mock API responses
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       if (url === '/api/projects') {
@@ -584,15 +624,15 @@ describe('LaceApp', () => {
       if (url === '/api/projects') {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ 
-            projects: [{ 
-              id: '1', 
+          json: () => Promise.resolve({
+            projects: [{
+              id: '1',
               name: 'Test Project',
               workingDirectory: '/test',
               isArchived: false,
               createdAt: new Date(),
               lastUsedAt: new Date()
-            }] 
+            }]
           }),
         });
       }
@@ -624,11 +664,13 @@ describe('LaceApp', () => {
 ```
 
 2. **Run test to confirm it fails:**
+
 ```bash
 npm run test:unit -- packages/web/components/pages/LaceApp.test.tsx
 ```
 
 3. **Add state for auto-opening modal:**
+
 ```typescript
 // In packages/web/components/pages/LaceApp.tsx, add after line 67:
 const [autoOpenCreateProject, setAutoOpenCreateProject] = useState(false);
@@ -655,6 +697,7 @@ useEffect(() => {
 ```
 
 4. **Update ProjectSelectorPanel props:**
+
 ```typescript
 // In the ProjectSelectorPanel component call (around line 709), add:
 <ProjectSelectorPanel
@@ -671,6 +714,7 @@ useEffect(() => {
 ```
 
 5. **Update ProjectSelectorPanel to handle auto-open:**
+
 ```typescript
 // In packages/web/components/config/ProjectSelectorPanel.tsx:
 // Add to interface (line 11):
@@ -697,11 +741,13 @@ useEffect(() => {
 ```
 
 6. **Run test to confirm it passes:**
+
 ```bash
 npm run test:unit -- packages/web/components/pages/LaceApp.test.tsx
 ```
 
 7. **Commit:**
+
 ```bash
 git add packages/web/components/pages/LaceApp.tsx packages/web/components/pages/LaceApp.test.tsx packages/web/components/config/ProjectSelectorPanel.tsx
 git commit -m "feat: auto-open project creation modal when no projects exist
@@ -713,6 +759,7 @@ git commit -m "feat: auto-open project creation modal when no projects exist
 ```
 
 **Testing notes:**
+
 - Mock fetch API responses for different scenarios
 - Mock React hooks that aren't under test
 - Test both empty and populated project states
@@ -721,14 +768,18 @@ git commit -m "feat: auto-open project creation modal when no projects exist
 ### Task 6: Create Simplified Project Creation Flow
 
 **Files to modify:**
-- `packages/web/components/config/ProjectSelectorPanel.tsx` (add simplified mode)
+
+- `packages/web/components/config/ProjectSelectorPanel.tsx` (add simplified
+  mode)
 - `packages/web/components/config/ProjectSelectorPanel.test.tsx` (new test file)
 
-**Objective:** Add simplified project creation mode showing only directory field with auto-naming
+**Objective:** Add simplified project creation mode showing only directory field
+with auto-naming
 
 **Implementation:**
 
 1. **Write failing test first:**
+
 ```typescript
 // packages/web/components/config/ProjectSelectorPanel.test.tsx (new file)
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -755,7 +806,7 @@ global.fetch = vi.fn();
 describe('ProjectSelectorPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ project: { id: '1', name: 'Test' } }),
@@ -764,8 +815,8 @@ describe('ProjectSelectorPanel', () => {
 
   it('should show simplified creation form in auto-open mode', async () => {
     render(
-      <ProjectSelectorPanel 
-        {...mockProps} 
+      <ProjectSelectorPanel
+        {...mockProps}
         autoOpenCreate={true}
         onAutoCreateHandled={vi.fn()}
       />
@@ -777,7 +828,7 @@ describe('ProjectSelectorPanel', () => {
 
     expect(screen.getByText('Choose your project directory')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('/path/to/your/project')).toBeInTheDocument();
-    
+
     // Should not show advanced options in simplified mode
     expect(screen.queryByText('Default Provider')).not.toBeInTheDocument();
     expect(screen.queryByText('Tool Access Policies')).not.toBeInTheDocument();
@@ -785,8 +836,8 @@ describe('ProjectSelectorPanel', () => {
 
   it('should auto-populate project name from directory', async () => {
     render(
-      <ProjectSelectorPanel 
-        {...mockProps} 
+      <ProjectSelectorPanel
+        {...mockProps}
         autoOpenCreate={true}
         onAutoCreateHandled={vi.fn()}
       />
@@ -806,8 +857,8 @@ describe('ProjectSelectorPanel', () => {
 
   it('should show advanced options toggle', async () => {
     render(
-      <ProjectSelectorPanel 
-        {...mockProps} 
+      <ProjectSelectorPanel
+        {...mockProps}
         autoOpenCreate={true}
         onAutoCreateHandled={vi.fn()}
       />
@@ -827,11 +878,13 @@ describe('ProjectSelectorPanel', () => {
 ```
 
 2. **Run test to confirm it fails:**
+
 ```bash
 npm run test:unit -- packages/web/components/config/ProjectSelectorPanel.test.tsx
 ```
 
 3. **Implement simplified modal mode:**
+
 ```typescript
 // In packages/web/components/config/ProjectSelectorPanel.tsx:
 // Add state for simplified mode (after line 78):
@@ -841,7 +894,7 @@ const isSimplifiedMode = autoOpenCreate && !showAdvancedOptions;
 // Add function to auto-populate name from directory (after line 376):
 const handleCreateDirectoryChange = (directory: string) => {
   setCreateWorkingDirectory(directory);
-  
+
   // Auto-populate project name from directory basename if in simplified mode
   if (isSimplifiedMode) {
     const baseName = directory.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || '';
@@ -967,11 +1020,13 @@ const handleCreateDirectoryChange = (directory: string) => {
 ```
 
 4. **Run test to confirm it passes:**
+
 ```bash
 npm run test:unit -- packages/web/components/config/ProjectSelectorPanel.test.tsx
 ```
 
 5. **Commit:**
+
 ```bash
 git add packages/web/components/config/ProjectSelectorPanel.tsx packages/web/components/config/ProjectSelectorPanel.test.tsx
 git commit -m "feat: add simplified project creation mode for onboarding
@@ -983,6 +1038,7 @@ git commit -m "feat: add simplified project creation mode for onboarding
 ```
 
 **Testing notes:**
+
 - Test directory path parsing with different formats
 - Test auto-name population on directory change
 - Test advanced options toggle functionality
@@ -991,14 +1047,18 @@ git commit -m "feat: add simplified project creation mode for onboarding
 ### Task 7: Implement Full Onboarding Chain
 
 **Files to modify:**
-- `packages/web/components/config/ProjectSelectorPanel.tsx` (modify handleCreateProject)
+
+- `packages/web/components/config/ProjectSelectorPanel.tsx` (modify
+  handleCreateProject)
 - `packages/web/components/pages/LaceApp.tsx` (add onboarding state)
 
-**Objective:** After project creation, auto-create session and Lace agent, then navigate to chat
+**Objective:** After project creation, auto-create session and Lace agent, then
+navigate to chat
 
 **Implementation:**
 
 1. **Write failing integration test:**
+
 ```typescript
 // packages/web/components/pages/LaceApp.integration.test.tsx (new file)
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -1013,7 +1073,7 @@ vi.mock('@/hooks/useHashRouter', () => {
     setSession: vi.fn(),
     setAgent: vi.fn(),
   };
-  
+
   return {
     useHashRouter: () => ({
       project: null,
@@ -1039,7 +1099,7 @@ vi.mock('@/hooks/useSessionEvents', () => ({
 describe('LaceApp Onboarding Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Mock API responses for full onboarding flow
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string, options?: RequestInit) => {
       if (url === '/api/projects' && options?.method === 'GET') {
@@ -1048,41 +1108,41 @@ describe('LaceApp Onboarding Integration', () => {
           json: () => Promise.resolve({ projects: [] }),
         });
       }
-      
+
       if (url === '/api/projects' && options?.method === 'POST') {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ 
-            project: { id: 'project-1', name: 'test-project', workingDirectory: '/test' } 
+          json: () => Promise.resolve({
+            project: { id: 'project-1', name: 'test-project', workingDirectory: '/test' }
           }),
         });
       }
-      
+
       if (url.includes('/sessions') && options?.method === 'POST') {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ 
-            session: { id: 'session-1', name: 'Thursday, Jul 24' } 
+          json: () => Promise.resolve({
+            session: { id: 'session-1', name: 'Thursday, Jul 24' }
           }),
         });
       }
-      
+
       if (url.includes('/agents') && options?.method === 'POST') {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ 
-            agent: { threadId: 'agent-1', name: 'Lace' } 
+          json: () => Promise.resolve({
+            agent: { threadId: 'agent-1', name: 'Lace' }
           }),
         });
       }
-      
+
       if (url === '/api/providers') {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({ providers: [] }),
         });
       }
-      
+
       return Promise.reject(new Error(`Unhandled URL: ${url}`));
     });
   });
@@ -1127,11 +1187,13 @@ describe('LaceApp Onboarding Integration', () => {
 ```
 
 2. **Run test to confirm it fails:**
+
 ```bash
 npm run test:unit -- packages/web/components/pages/LaceApp.integration.test.tsx
 ```
 
 3. **Implement onboarding chain in ProjectSelectorPanel:**
+
 ```typescript
 // In packages/web/components/config/ProjectSelectorPanel.tsx:
 // Add interface for onboarding completion callback (after line 16):
@@ -1219,6 +1281,7 @@ const handleCreateProject = async (e: React.FormEvent) => {
 ```
 
 4. **Update LaceApp to handle onboarding completion:**
+
 ```typescript
 // In packages/web/components/pages/LaceApp.tsx:
 // Add onboarding completion handler (after line 318):
@@ -1227,7 +1290,7 @@ const handleOnboardingComplete = (projectId: string, sessionId: string, agentId:
   setSelectedProject(projectId);
   setSelectedSession(sessionId as ThreadId);
   setSelectedAgent(agentId as ThreadId);
-  
+
   // Clear auto-open state
   setAutoOpenCreateProject(false);
 };
@@ -1240,11 +1303,13 @@ const handleOnboardingComplete = (projectId: string, sessionId: string, agentId:
 ```
 
 5. **Run test to confirm it passes:**
+
 ```bash
 npm run test:unit -- packages/web/components/pages/LaceApp.integration.test.tsx
 ```
 
 6. **Commit:**
+
 ```bash
 git add packages/web/components/config/ProjectSelectorPanel.tsx packages/web/components/pages/LaceApp.tsx packages/web/components/pages/LaceApp.integration.test.tsx
 git commit -m "feat: implement complete onboarding chain
@@ -1256,6 +1321,7 @@ git commit -m "feat: implement complete onboarding chain
 ```
 
 **Testing notes:**
+
 - Test the complete chain: project → session → agent → chat
 - Mock all API calls in sequence
 - Verify navigation state changes occur
@@ -1264,6 +1330,7 @@ git commit -m "feat: implement complete onboarding chain
 ## Testing Instructions
 
 ### Running Tests
+
 ```bash
 # Run all unit tests
 npm run test:unit
@@ -1281,14 +1348,20 @@ npm run test:coverage
 ```
 
 ### Manual Testing
-1. **Clear all projects**: Delete contents of `~/.lace/lace.db` or use fresh environment
+
+1. **Clear all projects**: Delete contents of `~/.lace/lace.db` or use fresh
+   environment
 2. **Start web UI**: `npm start` then navigate to web interface
 3. **Verify auto-open**: Project creation modal should open automatically
-4. **Test directory input**: Enter `/path/to/test-project` and verify name auto-populates to "test-project"
-5. **Submit form**: Click "Get Started" and verify navigation to chat with "Lace" agent
-6. **Test with existing projects**: Create project manually, restart, verify modal doesn't auto-open
+4. **Test directory input**: Enter `/path/to/test-project` and verify name
+   auto-populates to "test-project"
+5. **Submit form**: Click "Get Started" and verify navigation to chat with
+   "Lace" agent
+6. **Test with existing projects**: Create project manually, restart, verify
+   modal doesn't auto-open
 
 ### Code Quality Checks
+
 ```bash
 # Lint and type check
 npm run lint
@@ -1304,17 +1377,21 @@ npm run pre-commit
 ## Key Principles Enforced
 
 1. **No `any` types** - All code uses proper TypeScript typing
-2. **No mocking under test** - Test real implementations, mock only external dependencies
+2. **No mocking under test** - Test real implementations, mock only external
+   dependencies
 3. **TDD approach** - Write failing tests first, implement minimal code to pass
 4. **Frequent commits** - Each task results in a focused, working commit
-5. **Real codepaths** - Use actual Session.create(), Project.create(), etc. in tests
-6. **YAGNI compliance** - Only implement what's needed for this specific onboarding flow
+5. **Real codepaths** - Use actual Session.create(), Project.create(), etc. in
+   tests
+6. **YAGNI compliance** - Only implement what's needed for this specific
+   onboarding flow
 
 ## Success Criteria
 
 - [ ] User with no projects automatically sees simplified project creation modal
 - [x] Directory input auto-populates project name from basename ✅
-- [x] Session created with human-readable date name (e.g., "Thursday, Jul 24") ✅
+- [x] Session created with human-readable date name (e.g., "Thursday, Jul 24")
+      ✅
 - [x] Agent created with name "Lace" and claude-sonnet-4-20250514 model ✅
 - [ ] User lands directly in chat interface with Lace ready to help
 - [x] All unit and integration tests pass ✅
@@ -1322,4 +1399,6 @@ npm run pre-commit
 - [x] ESLint passes with no violations ✅
 - [x] Existing functionality remains unchanged ✅
 
-This plan provides a complete, test-driven implementation that pushes intelligent defaults into the library layer while maintaining clean separation of concerns and comprehensive test coverage.
+This plan provides a complete, test-driven implementation that pushes
+intelligent defaults into the library layer while maintaining clean separation
+of concerns and comprehensive test coverage.

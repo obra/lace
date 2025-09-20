@@ -21,7 +21,8 @@
 
 1. **Understand**: Read error, check recent changes, reproduce if possible
 2. **Analyze**: Form hypothesis, find similar working code, identify differences
-3. **Fix**: Write failing test FIRST, implement minimal fix, verify all tests pass
+3. **Fix**: Write failing test FIRST, implement minimal fix, verify all tests
+   pass
 
 ## Feature Implementation
 
@@ -32,7 +33,8 @@
 ## Refactoring
 
 1. **Prepare**: Ensure test coverage, establish baseline, commit working state
-2. **Refactor**: One change type at a time, test after each change, commit frequently
+2. **Refactor**: One change type at a time, test after each change, commit
+   frequently
 3. **Verify**: Compare behavior, check performance, ensure improvement
 
 ## Code Exploration

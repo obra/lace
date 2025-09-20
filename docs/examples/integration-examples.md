@@ -4,18 +4,22 @@ Real-world examples of integrating helper agents into Lace's various systems.
 
 ## Memory System Integration
 
-The memory system uses infrastructure helpers to analyze conversation patterns and generate insights.
+The memory system uses infrastructure helpers to analyze conversation patterns
+and generate insights.
 
 ```typescript
 // packages/core/src/memory/conversation-analyzer.ts
 import { InfrastructureHelper } from '~/helpers';
 
 export class ConversationAnalyzer {
-  async analyzeUserPatterns(userId: string, conversationHistory: string[]): Promise<UserInsights> {
+  async analyzeUserPatterns(
+    userId: string,
+    conversationHistory: string[]
+  ): Promise<UserInsights> {
     const helper = new InfrastructureHelper({
       model: 'smart', // Pattern analysis needs sophisticated reasoning
-      tools: ['ripgrep-search', 'file-read'], 
-      workingDirectory: this.getUserLogDirectory(userId)
+      tools: ['ripgrep-search', 'file-read'],
+      workingDirectory: this.getUserLogDirectory(userId),
     });
 
     const result = await helper.execute(`
@@ -53,24 +57,24 @@ export class WebAwareAgent extends Agent {
    */
   protected async processUserMessage(message: string): Promise<void> {
     const urls = this.extractUrls(message);
-    
+
     if (urls.length > 0) {
       // Use session helper for web content processing
       const webHelper = new SessionHelper({
         model: 'fast',
-        parentAgent: this
+        parentAgent: this,
       });
 
       const urlSummaries = await Promise.allSettled(
-        urls.map(url => 
-          webHelper.execute(`Fetch and summarize: ${url}`)
-        )
+        urls.map((url) => webHelper.execute(`Fetch and summarize: ${url}`))
       );
 
       // Add summaries as context
       const webContext = urlSummaries
-        .filter((result): result is PromiseFulfilledResult<any> => 
-          result.status === 'fulfilled')
+        .filter(
+          (result): result is PromiseFulfilledResult<any> =>
+            result.status === 'fulfilled'
+        )
         .map((result, i) => `${urls[i]}: ${result.value.content}`)
         .join('\n\n');
 
@@ -91,7 +95,8 @@ export class WebAwareAgent extends Agent {
 
 ## Task Management Integration
 
-The task system uses infrastructure helpers for intelligent task creation and analysis.
+The task system uses infrastructure helpers for intelligent task creation and
+analysis.
 
 ```typescript
 // packages/core/src/tasks/smart-task-creator.ts
@@ -102,13 +107,13 @@ export class SmartTaskCreator {
   constructor(private taskManager: TaskManager) {}
 
   async createTasksFromNaturalLanguage(
-    userRequest: string, 
+    userRequest: string,
     projectContext?: string
   ): Promise<string[]> {
     const helper = new InfrastructureHelper({
       model: 'fast', // Task breakdown is straightforward
       tools: ['task-create', 'file-read'], // Can read project files for context
-      workingDirectory: projectContext
+      workingDirectory: projectContext,
     });
 
     const result = await helper.execute(`
@@ -126,14 +131,17 @@ export class SmartTaskCreator {
 
     // Parse task creation results
     const taskIds = this.extractTaskIds(result.toolResults);
-    
+
     return taskIds;
   }
 
   private extractTaskIds(toolResults: any[]): string[] {
     return toolResults
-      .filter(result => result.toolName === 'task-create' && result.status === 'completed')
-      .map(result => result.metadata?.taskId)
+      .filter(
+        (result) =>
+          result.toolName === 'task-create' && result.status === 'completed'
+      )
+      .map((result) => result.metadata?.taskId)
       .filter(Boolean);
   }
 }
@@ -141,7 +149,8 @@ export class SmartTaskCreator {
 
 ## Error Analysis System
 
-Infrastructure helpers can analyze system logs and provide intelligent error diagnosis.
+Infrastructure helpers can analyze system logs and provide intelligent error
+diagnosis.
 
 ```typescript
 // packages/core/src/diagnostics/error-analyzer.ts
@@ -150,9 +159,9 @@ import { InfrastructureHelper } from '~/helpers';
 export class SystemDiagnostics {
   async analyzeSystemHealth(logDirectory: string): Promise<HealthReport> {
     const helper = new InfrastructureHelper({
-      model: 'smart', // Error analysis requires sophisticated reasoning  
+      model: 'smart', // Error analysis requires sophisticated reasoning
       tools: ['file-list', 'file-read', 'ripgrep-search'],
-      workingDirectory: logDirectory
+      workingDirectory: logDirectory,
     });
 
     const result = await helper.execute(`
@@ -173,18 +182,18 @@ export class SystemDiagnostics {
       warnings: this.extractWarnings(result.content),
       recommendations: this.extractRecommendations(result.content),
       analysisTimestamp: new Date(),
-      tokensUsed: result.tokenUsage?.totalTokens || 0
+      tokensUsed: result.tokenUsage?.totalTokens || 0,
     };
   }
 
   async investigateSpecificError(
-    errorMessage: string, 
+    errorMessage: string,
     logDirectory: string
   ): Promise<ErrorInvestigation> {
     const helper = new InfrastructureHelper({
       model: 'smart',
       tools: ['ripgrep-search', 'file-read'],
-      workingDirectory: logDirectory
+      workingDirectory: logDirectory,
     });
 
     const result = await helper.execute(`
@@ -202,17 +211,23 @@ export class SystemDiagnostics {
       occurrenceCount: this.countOccurrences(result.toolResults),
       rootCauseAnalysis: result.content,
       suggestedFixes: this.extractSuggestedFixes(result.content),
-      relatedErrors: this.findRelatedErrors(result.content)
+      relatedErrors: this.findRelatedErrors(result.content),
     };
   }
 
-  private assessOverallHealth(content: string): 'healthy' | 'degraded' | 'critical' {
-    if (content.toLowerCase().includes('critical') || 
-        content.toLowerCase().includes('system failure')) {
+  private assessOverallHealth(
+    content: string
+  ): 'healthy' | 'degraded' | 'critical' {
+    if (
+      content.toLowerCase().includes('critical') ||
+      content.toLowerCase().includes('system failure')
+    ) {
       return 'critical';
     }
-    if (content.toLowerCase().includes('warning') || 
-        content.toLowerCase().includes('degraded')) {
+    if (
+      content.toLowerCase().includes('warning') ||
+      content.toLowerCase().includes('degraded')
+    ) {
       return 'degraded';
     }
     return 'healthy';
@@ -256,31 +271,30 @@ export class AnalyzeCommand {
     model?: 'fast' | 'smart';
   }): Promise<void> {
     const helperId = `cli-analysis-${Date.now()}`;
-    
+
     try {
       const helper = this.registry.createInfrastructureHelper(helperId, {
         model: options.model || 'smart',
         tools: this.getToolsForAnalysis(options.type),
-        workingDirectory: options.path
+        workingDirectory: options.path,
       });
 
       console.log(`🔍 Starting ${options.type} analysis...`);
       console.log(`📁 Working directory: ${options.path}`);
 
-      const result = await helper.execute(
-        this.getAnalysisPrompt(options.type)
-      );
+      const result = await helper.execute(this.getAnalysisPrompt(options.type));
 
       // Display results
       this.displayResults(result.content, result.tokenUsage);
-      
-      if (result.toolResults.some(r => r.status === 'failed')) {
+
+      if (result.toolResults.some((r) => r.status === 'failed')) {
         console.warn('⚠️  Some analysis steps encountered issues:');
         result.toolResults
-          .filter(r => r.status === 'failed')
-          .forEach(r => console.warn(`  - ${r.content[0]?.text || 'Unknown error'}`));
+          .filter((r) => r.status === 'failed')
+          .forEach((r) =>
+            console.warn(`  - ${r.content[0]?.text || 'Unknown error'}`)
+          );
       }
-
     } finally {
       this.registry.removeHelper(helperId);
     }
@@ -290,7 +304,7 @@ export class AnalyzeCommand {
     const toolMap = {
       logs: ['file-list', 'file-read', 'ripgrep-search'],
       performance: ['file-read', 'ripgrep-search'],
-      memory: ['file-list', 'file-read', 'ripgrep-search']
+      memory: ['file-list', 'file-read', 'ripgrep-search'],
     };
     return toolMap[type as keyof typeof toolMap] || ['file-read'];
   }
@@ -298,17 +312,22 @@ export class AnalyzeCommand {
   private getAnalysisPrompt(type: string): string {
     const prompts = {
       logs: 'Analyze log files for errors, warnings, and patterns. Provide actionable insights.',
-      performance: 'Analyze performance metrics and identify bottlenecks or optimization opportunities.',
-      memory: 'Analyze memory usage patterns and identify potential memory leaks or inefficiencies.'
+      performance:
+        'Analyze performance metrics and identify bottlenecks or optimization opportunities.',
+      memory:
+        'Analyze memory usage patterns and identify potential memory leaks or inefficiencies.',
     };
-    return prompts[type as keyof typeof prompts] || 'Perform general analysis of files.';
+    return (
+      prompts[type as keyof typeof prompts] ||
+      'Perform general analysis of files.'
+    );
   }
 
   private displayResults(content: string, tokenUsage?: any): void {
     console.log('\n📊 Analysis Results:');
     console.log('='.repeat(50));
     console.log(content);
-    
+
     if (tokenUsage) {
       console.log('\n📈 Resource Usage:');
       console.log(`   Tokens used: ${tokenUsage.totalTokens}`);
@@ -332,17 +351,17 @@ export class AnalysisService {
    * Analyze uploaded files using helper agents
    */
   async analyzeUploadedFiles(
-    files: File[], 
+    files: File[],
     analysisType: 'code' | 'data' | 'logs'
   ): Promise<AnalysisResult> {
     // Save files to temp directory
     const tempDir = await this.saveTempFiles(files);
-    
+
     try {
       const helper = new InfrastructureHelper({
         model: 'smart',
         tools: ['file-list', 'file-read', 'ripgrep-search'],
-        workingDirectory: tempDir
+        workingDirectory: tempDir,
       });
 
       const result = await helper.execute(`
@@ -358,16 +377,15 @@ export class AnalysisService {
         analysis: result.content,
         filesAnalyzed: files.length,
         toolsUsed: result.toolCalls.length,
-        tokensUsed: result.tokenUsage?.totalTokens || 0
+        tokensUsed: result.tokenUsage?.totalTokens || 0,
       };
-
     } catch (error) {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Analysis failed',
         filesAnalyzed: 0,
         toolsUsed: 0,
-        tokensUsed: 0
+        tokensUsed: 0,
       };
     } finally {
       // Clean up temp files
@@ -378,10 +396,13 @@ export class AnalysisService {
   private getAnalysisInstructions(type: string): string {
     const instructions = {
       code: 'Review code quality, identify potential bugs, suggest improvements',
-      data: 'Analyze data patterns, identify anomalies, provide statistical insights', 
-      logs: 'Find error patterns, categorize issues, recommend fixes'
+      data: 'Analyze data patterns, identify anomalies, provide statistical insights',
+      logs: 'Find error patterns, categorize issues, recommend fixes',
     };
-    return instructions[type as keyof typeof instructions] || 'Perform general analysis';
+    return (
+      instructions[type as keyof typeof instructions] ||
+      'Perform general analysis'
+    );
   }
 
   private async saveTempFiles(files: File[]): Promise<string> {
@@ -437,7 +458,7 @@ describe('ConversationAnalyzer Integration', () => {
 
   it('should handle missing log directory gracefully', async () => {
     const nonExistentUser = 'non-existent-user';
-    
+
     await expect(
       analyzer.analyzeUserPatterns(nonExistentUser, [])
     ).rejects.toThrow('User log directory not found');
@@ -459,7 +480,7 @@ async function setupTestData(): Promise<string> {
 export class HelperPerformanceManager {
   private static readonly MAX_CONCURRENT_HELPERS = 5;
   private static readonly HELPER_TIMEOUT = 60000; // 1 minute
-  
+
   private activeHelpers = new Map<string, { helper: any; startTime: number }>();
   private helperQueue: Array<() => Promise<void>> = [];
 
@@ -480,7 +501,7 @@ export class HelperPerformanceManager {
       // Execute with timeout
       const result = await Promise.race([
         helper.execute(task),
-        this.createTimeout(HelperPerformanceManager.HELPER_TIMEOUT)
+        this.createTimeout(HelperPerformanceManager.HELPER_TIMEOUT),
       ]);
 
       return result as T;
@@ -491,18 +512,22 @@ export class HelperPerformanceManager {
   }
 
   private async waitForAvailableSlot(): Promise<void> {
-    if (this.activeHelpers.size < HelperPerformanceManager.MAX_CONCURRENT_HELPERS) {
+    if (
+      this.activeHelpers.size < HelperPerformanceManager.MAX_CONCURRENT_HELPERS
+    ) {
       return;
     }
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       this.helperQueue.push(async () => resolve());
     });
   }
 
   private processQueue(): void {
-    if (this.helperQueue.length > 0 && 
-        this.activeHelpers.size < HelperPerformanceManager.MAX_CONCURRENT_HELPERS) {
+    if (
+      this.helperQueue.length > 0 &&
+      this.activeHelpers.size < HelperPerformanceManager.MAX_CONCURRENT_HELPERS
+    ) {
       const next = this.helperQueue.shift();
       if (next) void next();
     }

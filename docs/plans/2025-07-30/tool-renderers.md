@@ -1,17 +1,24 @@
 # Tool Renderer System Implementation Plan
 
 **Date**: 2025-07-30  
-**Objective**: Create a modular tool renderer system that allows per-tool customization of display logic while maintaining DRY principles and type safety.
+**Objective**: Create a modular tool renderer system that allows per-tool
+customization of display logic while maintaining DRY principles and type safety.
 
 ## Overview
 
-Currently, all tool display logic is hardcoded in `ToolCallDisplay.tsx`. This plan creates a system where each tool type can customize its display behavior (summary, result rendering, error detection) while falling back to sensible defaults.
+Currently, all tool display logic is hardcoded in `ToolCallDisplay.tsx`. This
+plan creates a system where each tool type can customize its display behavior
+(summary, result rendering, error detection) while falling back to sensible
+defaults.
 
 ## Architecture Summary
 
-- **ToolCallDisplay**: Main container with rich UI (header, icons, status). Dispatches to tool renderers for customizable parts.
-- **Tool renderers**: Simple objects with optional methods for customizing display behavior.
-- **Fallback system**: ToolCallDisplay provides default implementations for all methods.
+- **ToolCallDisplay**: Main container with rich UI (header, icons, status).
+  Dispatches to tool renderers for customizable parts.
+- **Tool renderers**: Simple objects with optional methods for customizing
+  display behavior.
+- **Fallback system**: ToolCallDisplay provides default implementations for all
+  methods.
 - **No interfaces/classes**: Use plain objects and optional method calls.
 
 ## Key Principles
@@ -20,7 +27,8 @@ Currently, all tool display logic is hardcoded in `ToolCallDisplay.tsx`. This pl
 - **DRY**: Extract current hardcoded logic into reusable defaults
 - **TDD**: Write failing tests first, implement minimal code to pass
 - **Type Safety**: Never use `any` types - use proper TypeScript typing
-- **Real Code Paths**: Never mock functionality under test - use real business logic
+- **Real Code Paths**: Never mock functionality under test - use real business
+  logic
 - **Frequent Commits**: Commit after each small working increment
 
 ## Prerequisites
@@ -28,13 +36,16 @@ Currently, all tool display logic is hardcoded in `ToolCallDisplay.tsx`. This pl
 ### Files You'll Need to Understand
 
 1. **Current Implementation**: `packages/web/components/ui/ToolCallDisplay.tsx`
-   - Study the existing logic for tool summaries, error detection, result formatting
+   - Study the existing logic for tool summaries, error detection, result
+     formatting
    - Note the `createToolSummary`, `isErrorResult`, `formatToolResult` functions
    - Understand the `ExpandableResult` component
 
 2. **Tool Types**: `src/tools/types.ts`
-   - Understand the `ToolResult` interface: `{ content: ContentBlock[]; isError: boolean; id?: string }`
-   - Understand `ContentBlock`: `{ type: string; text?: string; data?: string; uri?: string }`
+   - Understand the `ToolResult` interface:
+     `{ content: ContentBlock[]; isError: boolean; id?: string }`
+   - Understand `ContentBlock`:
+     `{ type: string; text?: string; data?: string; uri?: string }`
 
 3. **Test Patterns**: Look at existing tests in `packages/web/components/ui/`
    - See how components are tested with real data
@@ -49,9 +60,11 @@ Currently, all tool display logic is hardcoded in `ToolCallDisplay.tsx`. This pl
 
 ### Testing Guidelines
 
-- **No mocking business logic** - always use real ToolResult objects, real arguments
+- **No mocking business logic** - always use real ToolResult objects, real
+  arguments
 - **Factory functions** - create helper functions to generate test data
-- **Test behavior, not implementation** - test what the user sees, not internal method calls
+- **Test behavior, not implementation** - test what the user sees, not internal
+  method calls
 - **Comprehensive coverage** - test all code paths, error cases, edge cases
 
 ## Implementation Tasks
@@ -61,6 +74,7 @@ Currently, all tool display logic is hardcoded in `ToolCallDisplay.tsx`. This pl
 **Objective**: Create the basic file structure and TypeScript interfaces.
 
 **Files to create**:
+
 - `packages/web/components/timeline/tool/types.ts`
 - `packages/web/components/timeline/tool/index.ts`
 
@@ -116,6 +130,7 @@ export type { ToolRenderer, ToolResult } from './types';
 ```
 
 **Testing**:
+
 - Create `packages/web/components/timeline/tool/index.test.ts`
 - Test that `getToolRenderer('unknown')` returns empty object
 - Test that registry lookup is case-insensitive
@@ -126,13 +141,15 @@ export type { ToolRenderer, ToolResult } from './types';
 
 ### Task 2: Extract Default Implementations from ToolCallDisplay
 
-**Objective**: Extract the existing hardcoded logic into reusable default functions that can serve as fallbacks.
+**Objective**: Extract the existing hardcoded logic into reusable default
+functions that can serve as fallbacks.
 
 **File to modify**: `packages/web/components/ui/ToolCallDisplay.tsx`
 
 **Step 2.1**: Extract tool summary logic
 
-Find the existing `createToolSummary` function and extract it to a standalone function:
+Find the existing `createToolSummary` function and extract it to a standalone
+function:
 
 ```typescript
 // Add near the top of the file, after imports
@@ -147,7 +164,11 @@ function createDefaultToolSummary(toolName: string, args: unknown): string {
 Extract the existing `isErrorResult` function:
 
 ```typescript
-function isDefaultError(result: { content: Array<{ text?: string }>; isError?: boolean; id?: string }): boolean {
+function isDefaultError(result: {
+  content: Array<{ text?: string }>;
+  isError?: boolean;
+  id?: string;
+}): boolean {
   // Move the existing isErrorResult logic here
   return Boolean(result?.isError);
 }
@@ -158,7 +179,11 @@ function isDefaultError(result: { content: Array<{ text?: string }>; isError?: b
 Extract the existing result formatting:
 
 ```typescript
-function createDefaultResultRenderer(result: { content: Array<{ text?: string }>; isError?: boolean; id?: string }): React.ReactNode {
+function createDefaultResultRenderer(result: {
+  content: Array<{ text?: string }>;
+  isError?: boolean;
+  id?: string;
+}): React.ReactNode {
   // Move the existing ExpandableResult component logic here
   // Return the JSX that renders the result content
 }
@@ -176,16 +201,19 @@ const resultContent = createDefaultResultRenderer(result!);
 ```
 
 **Testing**:
+
 - Run existing tests to ensure no regressions
 - All existing functionality should work exactly the same
 
-**Commit**: "refactor: extract default tool display logic into standalone functions"
+**Commit**: "refactor: extract default tool display logic into standalone
+functions"
 
 ---
 
 ### Task 3: Integrate Tool Renderer System
 
-**Objective**: Modify ToolCallDisplay to use the tool renderer system with fallbacks to the default implementations.
+**Objective**: Modify ToolCallDisplay to use the tool renderer system with
+fallbacks to the default implementations.
 
 **File to modify**: `packages/web/components/ui/ToolCallDisplay.tsx`
 
@@ -211,17 +239,25 @@ export function ToolCallDisplay({
   className = '',
 }: ToolCallDisplayProps) {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
-  
+
   // Get the custom renderer for this tool type
   const renderer = getToolRenderer(tool);
-  
+
   const toolIcon = renderer.getIcon?.() ?? getToolIcon(tool);
-  const hasResult = result?.content?.some(block => block.text?.trim());
-  const isError = hasResult && (renderer.isError?.(result!) ?? isDefaultError(result!));
+  const hasResult = result?.content?.some((block) => block.text?.trim());
+  const isError =
+    hasResult && (renderer.isError?.(result!) ?? isDefaultError(result!));
   const args = metadata?.arguments;
-  const hasArgs = args && typeof args === 'object' && args !== null && Object.keys(args).length > 0;
-  const toolSummary = renderer.getSummary?.(args) ?? createDefaultToolSummary(tool, args);
-  const resultContent = hasResult ? (renderer.renderResult?.(result!) ?? createDefaultResultRenderer(result!)) : null;
+  const hasArgs =
+    args &&
+    typeof args === 'object' &&
+    args !== null &&
+    Object.keys(args).length > 0;
+  const toolSummary =
+    renderer.getSummary?.(args) ?? createDefaultToolSummary(tool, args);
+  const resultContent = hasResult
+    ? (renderer.renderResult?.(result!) ?? createDefaultResultRenderer(result!))
+    : null;
 
   // Rest of the component stays the same...
 }
@@ -245,6 +281,7 @@ In the JSX, replace the old result rendering with the new resultContent:
 ```
 
 **Testing**:
+
 - Run existing tests to ensure no regressions
 - Verify that tools without custom renderers still work exactly as before
 - Test that `getToolRenderer('bash')` returns empty object and uses fallbacks
@@ -255,7 +292,8 @@ In the JSX, replace the old result rendering with the new resultContent:
 
 ### Task 4: Create Bash Tool Renderer
 
-**Objective**: Create a specialized renderer for bash tool with custom summary and terminal-style result display.
+**Objective**: Create a specialized renderer for bash tool with custom summary
+and terminal-style result display.
 
 **File to create**: `packages/web/components/timeline/tool/bash.tsx`
 
@@ -315,7 +353,7 @@ describe('Bash Tool Renderer', () => {
     it('should render stdout in terminal style', () => {
       const result = createBashResult('Hello World', '', 0);
       const rendered = bashRenderer.renderResult!(result);
-      
+
       render(<div>{rendered}</div>);
       expect(screen.getByText('Hello World')).toBeInTheDocument();
     });
@@ -323,7 +361,7 @@ describe('Bash Tool Renderer', () => {
     it('should render stderr with error styling', () => {
       const result = createBashResult('', 'Command failed', 1);
       const rendered = bashRenderer.renderResult!(result);
-      
+
       render(<div>{rendered}</div>);
       expect(screen.getByText('Command failed')).toBeInTheDocument();
       // Should have error styling
@@ -332,7 +370,7 @@ describe('Bash Tool Renderer', () => {
     it('should handle no output gracefully', () => {
       const result = createBashResult('', '', 0);
       const rendered = bashRenderer.renderResult!(result);
-      
+
       render(<div>{rendered}</div>);
       expect(screen.getByText(/no output|completed/i)).toBeInTheDocument();
     });
@@ -352,23 +390,23 @@ import { useState } from 'react';
 import type { ToolRenderer, ToolResult } from './types';
 
 // Terminal output component for expandable stdout/stderr
-function TerminalOutput({ 
-  content, 
+function TerminalOutput({
+  content,
   isError = false,
-  label 
-}: { 
-  content: string; 
+  label
+}: {
+  content: string;
   isError?: boolean;
   label?: string;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  
+
   if (!content.trim()) return null;
-  
+
   const lines = content.split('\n');
   const shouldShowExpand = lines.length > 8;
   const displayContent = isExpanded ? content : lines.slice(0, 8).join('\n');
-  
+
   return (
     <div className="mb-3 last:mb-0">
       {label && (
@@ -379,8 +417,8 @@ function TerminalOutput({
         </div>
       )}
       <div className={`rounded border font-mono text-sm ${
-        isError 
-          ? 'bg-red-50 border-red-200 text-red-800' 
+        isError
+          ? 'bg-red-50 border-red-200 text-red-800'
           : 'bg-gray-50 border-gray-200 text-gray-800'
       }`}>
         <pre className="p-3 whitespace-pre-wrap break-words overflow-x-auto">
@@ -427,10 +465,10 @@ const bashRenderer: ToolRenderer = {
         .map((block) => block.text ?? '')
         .join('');
 
-      const bashResult = JSON.parse(textContent) as { 
-        stdout?: string; 
-        stderr?: string; 
-        exitCode?: number; 
+      const bashResult = JSON.parse(textContent) as {
+        stdout?: string;
+        stderr?: string;
+        exitCode?: number;
       };
 
       // Error if non-zero exit code or stderr present
@@ -447,10 +485,10 @@ const bashRenderer: ToolRenderer = {
       .join('');
 
     try {
-      const bashResult = JSON.parse(textContent) as { 
-        stdout?: string; 
-        stderr?: string; 
-        exitCode?: number; 
+      const bashResult = JSON.parse(textContent) as {
+        stdout?: string;
+        stderr?: string;
+        exitCode?: number;
       };
 
       const hasStdout = bashResult.stdout?.trim();
@@ -470,8 +508,8 @@ const bashRenderer: ToolRenderer = {
             <TerminalOutput content={bashResult.stdout!} />
           )}
           {hasStderr && (
-            <TerminalOutput 
-              content={bashResult.stderr!} 
+            <TerminalOutput
+              content={bashResult.stderr!}
               isError={true}
               label="stderr"
             />
@@ -518,6 +556,7 @@ const toolRenderers: Record<string, ToolRenderer> = {
 ```
 
 **Testing**:
+
 - Run the tests: `npm test bash.test.tsx`
 - All tests should pass
 - Test integration by using a bash tool in the UI
@@ -554,7 +593,7 @@ function createBashToolResult(stdout: string, stderr = '', exitCode = 0) {
 describe('ToolCallDisplay Integration', () => {
   it('should use default renderer for unknown tools', () => {
     const result = createToolResult('Some output');
-    
+
     render(
       <ToolCallDisplay
         tool="unknown_tool"
@@ -570,7 +609,7 @@ describe('ToolCallDisplay Integration', () => {
 
   it('should use bash renderer for bash tools', () => {
     const result = createBashToolResult('Hello World');
-    
+
     render(
       <ToolCallDisplay
         tool="bash"
@@ -587,7 +626,7 @@ describe('ToolCallDisplay Integration', () => {
 
   it('should handle bash errors correctly', () => {
     const result = createBashToolResult('', 'Command failed', 1);
-    
+
     render(
       <ToolCallDisplay
         tool="bash"
@@ -605,7 +644,7 @@ describe('ToolCallDisplay Integration', () => {
   it('should fall back to defaults when renderer methods are missing', () => {
     // Test that partial renderer implementations work
     const result = createToolResult('Some output');
-    
+
     render(
       <ToolCallDisplay
         tool="bash"
@@ -626,7 +665,7 @@ describe('ToolCallDisplay Integration', () => {
 Test these scenarios in the browser:
 
 1. **Bash tool with stdout only**: Should show terminal-style output
-2. **Bash tool with stderr**: Should show red error styling  
+2. **Bash tool with stderr**: Should show red error styling
 3. **Bash tool with no output**: Should show "Command completed with no output"
 4. **Unknown tool**: Should use default rendering
 5. **Error states**: Should show correct error indicators
@@ -636,6 +675,7 @@ Test these scenarios in the browser:
 **Step 5.3**: Fix any bugs found
 
 Common issues to watch for:
+
 - TypeScript errors (no `any` types allowed)
 - Missing null/undefined checks
 - CSS styling issues
@@ -643,6 +683,7 @@ Common issues to watch for:
 - Performance issues with large outputs
 
 **Testing**:
+
 - All integration tests pass
 - Manual testing scenarios work
 - No console errors or warnings
@@ -653,15 +694,17 @@ Common issues to watch for:
 
 ### Task 6: Clean Up Old Code
 
-**Objective**: Remove the old hardcoded logic that has been replaced by the renderer system.
+**Objective**: Remove the old hardcoded logic that has been replaced by the
+renderer system.
 
 **Files to modify**: `packages/web/components/ui/ToolCallDisplay.tsx`
 
 **Step 6.1**: Remove unused functions
 
 Remove these functions that are now replaced:
+
 - Old `createToolSummary` (replaced by `createDefaultToolSummary`)
-- Old `isErrorResult` (replaced by `isDefaultError`) 
+- Old `isErrorResult` (replaced by `isDefaultError`)
 - Old `formatToolResult` (replaced by `createDefaultResultRenderer`)
 - Old `ExpandableResult` component (moved to default renderer)
 
@@ -672,11 +715,13 @@ Remove any imports that are no longer needed after cleanup.
 **Step 6.3**: Update variable names for clarity
 
 Rename the extracted functions to be clearer:
+
 - `createDefaultToolSummary` → `getDefaultSummary`
 - `isDefaultError` → `getDefaultErrorStatus`
 - `createDefaultResultRenderer` → `getDefaultResultContent`
 
 **Testing**:
+
 - All existing tests still pass
 - No unused code warnings
 - Bundle size should be similar or smaller
@@ -693,17 +738,20 @@ Rename the extracted functions to be clearer:
 
 Create `packages/web/components/timeline/tool/README.md`:
 
-```markdown
+````markdown
 # Tool Renderer System
 
 This system allows customizing how different tool types are displayed in the UI.
 
 ## How It Works
 
-1. `ToolCallDisplay` is the main container with all the rich UI (header, status, etc.)
-2. For customizable parts, it looks up a tool renderer using `getToolRenderer(toolName)`
+1. `ToolCallDisplay` is the main container with all the rich UI (header, status,
+   etc.)
+2. For customizable parts, it looks up a tool renderer using
+   `getToolRenderer(toolName)`
 3. Tool renderers are simple objects with optional methods
-4. If a renderer doesn't implement a method, ToolCallDisplay uses sensible defaults
+4. If a renderer doesn't implement a method, ToolCallDisplay uses sensible
+   defaults
 
 ## Adding a New Tool Renderer
 
@@ -717,18 +765,19 @@ const myToolRenderer: ToolRenderer = {
   getSummary: (args: unknown) => {
     // Return custom summary string
   },
-  
+
   renderResult: (result: ToolResult) => {
     // Return custom JSX for result display
   },
-  
+
   isError: (result: ToolResult) => {
     // Return boolean for error detection
-  }
+  },
 };
 
 export default myToolRenderer;
 ```
+````
 
 3. Register it in `index.ts`:
 
@@ -749,7 +798,8 @@ const toolRenderers: Record<string, ToolRenderer> = {
 - `getIcon()`: Custom FontAwesome icon
 
 All methods are optional - implement only what you need to customize.
-```
+
+````
 
 **Step 7.2**: Add JSDoc comments
 
@@ -810,7 +860,7 @@ export function createToolResult(content: string, isError = false): ToolResult {
 export function createBashResult(stdout: string, stderr = '', exitCode = 0): ToolResult {
   return createToolResult(JSON.stringify({ stdout, stderr, exitCode }));
 }
-```
+````
 
 ### Test Coverage Requirements
 

@@ -45,4 +45,3 @@ Found N+1 query issue. Adding eager loading:
   old='User.findAll()'
   new='User.findAll({ include: [Post, Comment] })']
 ```
-

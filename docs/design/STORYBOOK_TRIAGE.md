@@ -5,10 +5,11 @@ Total stories found: **73 stories**
 ## Migration Classification
 
 ### 🟢 KEEP (11 stories) - Migrate to Ladle
-*Highly reusable primitives that benefit from interactive story development*
+
+_Highly reusable primitives that benefit from interactive story development_
 
 - `packages/web/components/ui/Badge.stories.tsx` - Core primitive
-- `packages/web/components/ui/Modal.stories.tsx` - Core primitive  
+- `packages/web/components/ui/Modal.stories.tsx` - Core primitive
 - `packages/web/components/ui/CodeBlock.stories.tsx` - Core primitive
 - `packages/web/components/ui/Avatar.stories.tsx` - Core primitive
 - `packages/web/components/ui/StatusDot.stories.tsx` - Core primitive
@@ -20,9 +21,12 @@ Total stories found: **73 stories**
 - `packages/web/components/ui/Carousel.stories.tsx` - Core primitive
 
 ### 🟡 CONVERT (52 stories) - MDX + /play + tests
-*Mid-use components that benefit from usage examples but don't need full story coverage*
+
+_Mid-use components that benefit from usage examples but don't need full story
+coverage_
 
 #### UI Components (35)
+
 - `packages/web/components/ui/TokenUsageDisplay.stories.tsx`
 - `packages/web/components/ui/DirectoryField.stories.tsx`
 - `packages/web/components/ui/FileAttachment.stories.tsx`
@@ -62,6 +66,7 @@ Total stories found: **73 stories**
 - `packages/web/components/ui/OnboardingActions.stories.tsx`
 
 #### Feature Components (17)
+
 - `packages/web/components/settings/panels/UISettingsPanel.stories.tsx`
 - `packages/web/components/chat/EnhancedChatInput.stories.tsx`
 - `packages/web/components/layout/__stories__/MobileSidebar.stories.tsx`
@@ -81,25 +86,37 @@ Total stories found: **73 stories**
 - `packages/web/components/organisms/GoogleDocChatMessage.stories.tsx`
 
 ### 🔴 PARK (10 stories) - Archive for now
-*Complex/page-level components or legacy components with minimal current use*
 
-- `packages/web/components/timeline/AnimatedTimelineView.stories.tsx` - Complex animated component
-- `packages/web/components/timeline/AnimatedTypingIndicator.stories.tsx` - Complex animated component
-- `packages/web/components/timeline/UnknownEventEntry.stories.tsx` - Edge case component
-- `packages/web/components/timeline/AnimatedTimelineMessage.stories.tsx` - Complex animated component  
-- `packages/web/components/timeline/TimelineView.stories.tsx` - Complex page-level component
-- `packages/web/components/timeline/TimelineMessage.stories.tsx` - Complex feature component
-- `packages/web/components/timeline/TypingIndicator.stories.tsx` - Complex animated component
-- `packages/web/components/timeline/IntegrationEntry.stories.tsx` - Complex feature component
-- `packages/web/components/pages/ChatInterface.stories.tsx` - Page-level component
+_Complex/page-level components or legacy components with minimal current use_
+
+- `packages/web/components/timeline/AnimatedTimelineView.stories.tsx` - Complex
+  animated component
+- `packages/web/components/timeline/AnimatedTypingIndicator.stories.tsx` -
+  Complex animated component
+- `packages/web/components/timeline/UnknownEventEntry.stories.tsx` - Edge case
+  component
+- `packages/web/components/timeline/AnimatedTimelineMessage.stories.tsx` -
+  Complex animated component
+- `packages/web/components/timeline/TimelineView.stories.tsx` - Complex
+  page-level component
+- `packages/web/components/timeline/TimelineMessage.stories.tsx` - Complex
+  feature component
+- `packages/web/components/timeline/TypingIndicator.stories.tsx` - Complex
+  animated component
+- `packages/web/components/timeline/IntegrationEntry.stories.tsx` - Complex
+  feature component
+- `packages/web/components/pages/ChatInterface.stories.tsx` - Page-level
+  component
 - `packages/web/components/pages/LaceApp.stories.tsx` - App-level component
-- `packages/web/components/pages/AnimatedLaceApp.stories.tsx` - Complex app-level component
-- `packages/web/components/organisms/onboarding/OnboardingWizard.stories.tsx` - Complex multi-step component
+- `packages/web/components/pages/AnimatedLaceApp.stories.tsx` - Complex
+  app-level component
+- `packages/web/components/organisms/onboarding/OnboardingWizard.stories.tsx` -
+  Complex multi-step component
 
 ## Next Steps
 
 1. **Install Ladle**: `npm install -D @ladle/react`
-2. **Configure Ladle**: Create `ladle.config.mjs` 
+2. **Configure Ladle**: Create `ladle.config.mjs`
 3. **Migrate KEEP stories**: Convert to CSF3 format for Ladle
 4. **Create /play page**: Setup playground for CONVERT components
 5. **Create MDX templates**: Document component usage

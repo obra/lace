@@ -1,6 +1,8 @@
 # Comprehensive Tool System Guide
 
-This document is the definitive guide for implementing, maintaining, and extending tools in Lace's schema-based tool system. It covers everything from basic implementation to advanced UI rendering and maintenance strategies.
+This document is the definitive guide for implementing, maintaining, and
+extending tools in Lace's schema-based tool system. It covers everything from
+basic implementation to advanced UI rendering and maintenance strategies.
 
 ## Table of Contents
 
@@ -20,7 +22,7 @@ This document is the definitive guide for implementing, maintaining, and extendi
 Lace uses a schema-based tool architecture with Zod validation that provides:
 
 - **70%+ code reduction** through automatic parameter validation
-- **Full type safety** with schema inference  
+- **Full type safety** with schema inference
 - **Automatic JSON schema generation** for AI providers
 - **Consistent error handling** with helpful recovery messages
 - **Model-agnostic interface** supporting all AI providers
@@ -31,7 +33,7 @@ Lace uses a schema-based tool architecture with Zod validation that provides:
 ```
 src/tools/
 ├── tool.ts                   # Abstract Tool base class
-├── types.ts                  # Tool interfaces and types  
+├── types.ts                  # Tool interfaces and types
 ├── executor.ts               # Tool execution and registration
 ├── schemas/                  # Common schema patterns
 │   ├── common.ts            # Reusable Zod schemas
@@ -108,9 +110,9 @@ All tools extend the abstract `Tool` class from `src/tools/tool.ts`:
 
 ```typescript
 export abstract class Tool {
-  abstract name: string;        // Unique identifier (snake_case)
+  abstract name: string; // Unique identifier (snake_case)
   abstract description: string; // Human-readable description for AI
-  abstract schema: ZodType;     // Zod validation schema
+  abstract schema: ZodType; // Zod validation schema
 }
 ```
 
@@ -147,7 +149,7 @@ protected async executeValidated(args: z.infer<typeof schema>): Promise<ToolResu
   try {
     const content = await readFile(args.path, 'utf-8');
     const stats = await stat(args.path);
-    
+
     return this.createResult(content, {
       fileSize: stats.size,
       encoding: 'utf-8',
@@ -176,7 +178,7 @@ protected async executeValidated(args: z.infer<typeof schema>): Promise<ToolResu
       cwd: args.workingDirectory,
       timeout: 30000,
     });
-    
+
     return this.createResult({
       stdout: stdout || '',
       stderr: stderr || '',
@@ -199,11 +201,11 @@ protected async executeValidated(args: z.infer<typeof schema>): Promise<ToolResu
 ```typescript
 protected async executeValidated(args: z.infer<typeof schema>): Promise<ToolResult> {
   const results = await performSearch(args.pattern, args.path);
-  
+
   if (results.length === 0) {
     return this.createResult('No matches found');
   }
-  
+
   // Result limiting with clear feedback
   if (results.length > args.maxResults) {
     const truncated = results.slice(0, args.maxResults);
@@ -212,7 +214,7 @@ protected async executeValidated(args: z.infer<typeof schema>): Promise<ToolResu
       `${formatted}\n\nResults limited to ${args.maxResults}. ${results.length - args.maxResults} additional matches found.`
     );
   }
-  
+
   return this.createResult(formatResults(results), {
     totalResults: results.length,
     searchPattern: args.pattern,
@@ -228,8 +230,8 @@ Add hints for the tool execution system:
 export class ReadOnlyTool extends Tool {
   get annotations(): ToolAnnotations {
     return {
-      readOnlyHint: true,      // Safe for auto-approval
-      idempotentHint: true,    // Same input = same output
+      readOnlyHint: true, // Safe for auto-approval
+      idempotentHint: true, // Same input = same output
     };
   }
 }
@@ -237,8 +239,8 @@ export class ReadOnlyTool extends Tool {
 export class DestructiveTool extends Tool {
   get annotations(): ToolAnnotations {
     return {
-      destructiveHint: true,   // Requires user approval
-      idempotentHint: false,   // May have side effects
+      destructiveHint: true, // Requires user approval
+      idempotentHint: false, // May have side effects
     };
   }
 }
@@ -246,7 +248,10 @@ export class DestructiveTool extends Tool {
 
 ## Tool Metadata Architecture
 
-Tools capture structured domain data at event-time in metadata, enabling rich timeline displays without requiring additional API calls during rendering. This architecture applies to all tools that manipulate domain entities (tasks, files, configurations, etc.).
+Tools capture structured domain data at event-time in metadata, enabling rich
+timeline displays without requiring additional API calls during rendering. This
+architecture applies to all tools that manipulate domain entities (tasks, files,
+configurations, etc.).
 
 ### Metadata Data Flow
 
@@ -258,14 +263,15 @@ Tool Execution → ToolResult with Metadata → SessionEvent → TimelineEntry �
 
 #### Single Entity Operations
 
-For tools that operate on individual domain entities (create, update, delete, view):
+For tools that operate on individual domain entities (create, update, delete,
+view):
 
 ```typescript
 interface EntityOperationMetadata<T> {
-  entity: T;  // Complete entity object at event time
-  changes?: Record<string, { from: unknown; to: unknown }>;  // What changed for updates
+  entity: T; // Complete entity object at event time
+  changes?: Record<string, { from: unknown; to: unknown }>; // What changed for updates
   operation: 'create' | 'update' | 'delete' | 'view';
-  entityType: string;  // e.g., 'task', 'file', 'config'
+  entityType: string; // e.g., 'task', 'file', 'config'
 }
 ```
 
@@ -275,9 +281,9 @@ For tools that operate on collections (list, search, filter):
 
 ```typescript
 interface CollectionOperationMetadata<T> {
-  entities: T[];  // Array of complete entity objects
+  entities: T[]; // Array of complete entity objects
   totalCount?: number;
-  filter?: unknown;  // Filter criteria used
+  filter?: unknown; // Filter criteria used
   operation: 'list' | 'search' | 'filter';
   entityType: string;
 }
@@ -285,14 +291,15 @@ interface CollectionOperationMetadata<T> {
 
 #### Action Operations
 
-For tools that perform actions without returning entities (execute, process, analyze):
+For tools that perform actions without returning entities (execute, process,
+analyze):
 
 ```typescript
 interface ActionOperationMetadata {
-  operation: string;  // Specific action performed
-  inputs?: unknown;   // Key inputs that affected the action
-  outputs?: unknown;  // Structured outputs if applicable
-  context?: unknown;  // Relevant context for display
+  operation: string; // Specific action performed
+  inputs?: unknown; // Key inputs that affected the action
+  outputs?: unknown; // Structured outputs if applicable
+  context?: unknown; // Relevant context for display
 }
 ```
 
@@ -300,19 +307,20 @@ interface ActionOperationMetadata {
 
 #### Task Tools
 
-Task tools demonstrate the full metadata architecture with complete domain objects and change tracking:
+Task tools demonstrate the full metadata architecture with complete domain
+objects and change tracking:
 
 ```typescript
 interface TaskEventMetadata {
-  task: Task;  // Complete Task object from types.ts at event time
+  task: Task; // Complete Task object from types.ts at event time
   changes?: Record<string, { from: unknown; to: unknown }>;
   operation: 'create' | 'update' | 'complete' | 'view' | 'add_note';
 }
 
 interface TaskListEventMetadata {
-  tasks: Task[];  // Array of complete Task objects
+  tasks: Task[]; // Array of complete Task objects
   totalCount?: number;
-  filter: string;  // Filter criteria used
+  filter: string; // Filter criteria used
   operation: 'list';
 }
 
@@ -322,8 +330,8 @@ interface Task {
   title: string;
   description: string;
   prompt: string;
-  status: TaskStatus;  // 'pending' | 'in_progress' | 'completed' | 'blocked'
-  priority: TaskPriority;  // 'high' | 'medium' | 'low'
+  status: TaskStatus; // 'pending' | 'in_progress' | 'completed' | 'blocked'
+  priority: TaskPriority; // 'high' | 'medium' | 'low'
   assignedTo?: AssigneeId;
   createdBy: ThreadId;
   threadId: ThreadId;
@@ -342,7 +350,7 @@ interface FileEventMetadata {
     name: string;
     size?: number;
     lastModified?: Date;
-    content?: string;  // For small files
+    content?: string; // For small files
   };
   changes?: Record<string, { from: unknown; to: unknown }>;
   operation: 'read' | 'write' | 'edit' | 'delete' | 'create';
@@ -381,15 +389,18 @@ interface SystemEventMetadata {
 
 ```typescript
 class TaskUpdateTool extends Tool {
-  protected async executeValidated(args: TaskUpdateArgs, context: ToolContext): Promise<ToolResult> {
+  protected async executeValidated(
+    args: TaskUpdateArgs,
+    context: ToolContext
+  ): Promise<ToolResult> {
     // 1. Load existing task to capture "before" state
     const existingTask = await this.loadTask(args.taskId);
     if (!existingTask) {
       return this.createError(`Task ${args.taskId} not found`);
     }
-    
+
     // 2. Track what's changing
-    const changes: Record<string, {from: unknown, to: unknown}> = {};
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
     if (args.status && args.status !== existingTask.status) {
       changes.status = { from: existingTask.status, to: args.status };
     }
@@ -399,27 +410,27 @@ class TaskUpdateTool extends Tool {
     if (args.assignTo && args.assignTo !== existingTask.assignedTo) {
       changes.assignedTo = { from: existingTask.assignedTo, to: args.assignTo };
     }
-    
+
     // 3. Apply updates
     const updates: Partial<Task> = {};
     if (args.status) updates.status = args.status;
     if (args.priority) updates.priority = args.priority;
     if (args.assignTo) updates.assignedTo = args.assignTo as AssigneeId;
-    
+
     const updatedTask = await this.updateTask(args.taskId, updates);
-    
+
     // 4. Return with complete metadata
     const metadata = {
-      task: updatedTask,  // Complete Task object
+      task: updatedTask, // Complete Task object
       changes: Object.keys(changes).length > 0 ? changes : undefined,
-      operation: 'update' as const
+      operation: 'update' as const,
     };
-    
-    const updateMessages = Object.keys(changes).map(field => 
-      `${field}: ${changes[field].from} → ${changes[field].to}`
+
+    const updateMessages = Object.keys(changes).map(
+      (field) => `${field}: ${changes[field].from} → ${changes[field].to}`
     );
     const humanMessage = `Updated task ${updatedTask.title}: ${updateMessages.join(', ')}`;
-    
+
     return this.createResult(humanMessage, metadata);
   }
 }
@@ -429,20 +440,24 @@ class TaskUpdateTool extends Tool {
 
 ```typescript
 class TaskListTool extends Tool {
-  protected async executeValidated(args: TaskListArgs, context: ToolContext): Promise<ToolResult> {
+  protected async executeValidated(
+    args: TaskListArgs,
+    context: ToolContext
+  ): Promise<ToolResult> {
     // 1. Execute query with filtering
     let tasks: Task[] = [];
-    
+
     const parentThreadId = context.parentThreadId || context.threadId;
     const persistence = getPersistence();
-    
+
     switch (args.filter) {
       case 'mine':
         tasks = persistence.loadTasksByAssignee(context.threadId);
         break;
       case 'created':
-        tasks = persistence.loadTasksByThread(parentThreadId)
-          .filter(t => t.createdBy === context.threadId);
+        tasks = persistence
+          .loadTasksByThread(parentThreadId)
+          .filter((t) => t.createdBy === context.threadId);
         break;
       case 'thread':
         tasks = persistence.loadTasksByThread(parentThreadId);
@@ -451,36 +466,38 @@ class TaskListTool extends Tool {
         const assignedToMe = persistence.loadTasksByAssignee(context.threadId);
         const inThread = persistence.loadTasksByThread(parentThreadId);
         const taskMap = new Map<string, Task>();
-        [...assignedToMe, ...inThread].forEach(t => taskMap.set(t.id, t));
+        [...assignedToMe, ...inThread].forEach((t) => taskMap.set(t.id, t));
         tasks = Array.from(taskMap.values());
         break;
     }
-    
+
     // 2. Apply additional filtering
     if (!args.includeCompleted) {
-      tasks = tasks.filter(t => t.status !== 'completed');
+      tasks = tasks.filter((t) => t.status !== 'completed');
     }
-    
+
     // 3. Sort by priority and creation date
     const priorityOrder = { high: 0, medium: 1, low: 2 };
     tasks.sort((a, b) => {
-      const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      const priorityDiff =
+        priorityOrder[a.priority] - priorityOrder[b.priority];
       if (priorityDiff !== 0) return priorityDiff;
       return b.createdAt.getTime() - a.createdAt.getTime();
     });
-    
+
     // 4. Return with complete metadata
     const metadata = {
-      tasks: tasks,  // Array of complete Task objects
+      tasks: tasks, // Array of complete Task objects
       totalCount: tasks.length,
       filter: args.filter,
-      operation: 'list' as const
+      operation: 'list' as const,
     };
-    
-    const humanMessage = tasks.length === 0 
-      ? 'No tasks found'
-      : `Tasks (${args.filter}): ${tasks.length} found\n\n${formatTaskList(tasks)}`;
-    
+
+    const humanMessage =
+      tasks.length === 0
+        ? 'No tasks found'
+        : `Tasks (${args.filter}): ${tasks.length} found\n\n${formatTaskList(tasks)}`;
+
     return this.createResult(humanMessage, metadata);
   }
 }
@@ -490,21 +507,24 @@ class TaskListTool extends Tool {
 
 ```typescript
 class ActionTool extends Tool {
-  protected async executeValidated(args: ActionArgs, context: ToolContext): Promise<ToolResult> {
+  protected async executeValidated(
+    args: ActionArgs,
+    context: ToolContext
+  ): Promise<ToolResult> {
     // 1. Capture relevant inputs
     const inputs = this.extractRelevantInputs(args);
-    
+
     // 2. Execute action
     const result = await this.performAction(args);
-    
+
     // 3. Return with action metadata
     const metadata = {
       operation: this.actionName,
       inputs: inputs,
       outputs: this.extractRelevantOutputs(result),
-      context: this.getDisplayContext(args, result)
+      context: this.getDisplayContext(args, result),
     };
-    
+
     return this.createResult(humanMessage, metadata);
   }
 }
@@ -513,21 +533,25 @@ class ActionTool extends Tool {
 ### Key Principles
 
 #### 1. Event-Time Snapshots
+
 - Metadata captures entity state at the moment of the event
 - Historical accuracy: "what did the entity look like when this happened?"
 - No API calls needed during timeline rendering
 
 #### 2. Complete State Capture
+
 - Always include complete domain objects, not partial data
 - UI can access any field needed: `entity.title`, `entity.status`, etc.
 - Consistent with existing domain interface definitions
 
 #### 3. Change Tracking
+
 - For update operations, record both old and new values
 - Enables rich displays: "Status changed from pending to in_progress"
 - Only include changes that actually occurred
 
 #### 4. Performance Optimization
+
 - Timeline rendering is synchronous with cached metadata
 - Avoids N+1 query problems (no API calls per timeline entry)
 - Event store contains all data needed for display
@@ -535,30 +559,37 @@ class ActionTool extends Tool {
 ### Benefits
 
 #### Rich UI Displays
-- Meaningful names instead of IDs: "Fix authentication bug" vs "task_20250730_yk2p41"
-- Change details: "Priority changed from low to high", "File modified: 42 lines added"
+
+- Meaningful names instead of IDs: "Fix authentication bug" vs
+  "task_20250730_yk2p41"
+- Change details: "Priority changed from low to high", "File modified: 42 lines
+  added"
 - Complete context without additional lookups
 - Consistent display patterns across all tool types
 
 #### Performance
+
 - No API calls during timeline rendering
 - Fast, synchronous display of historical data
 - Scalable to timelines with hundreds of events
 - Eliminates N+1 query problems
 
 #### Historical Accuracy
+
 - Shows entity state at event time, not current state
 - Preserves context even if entities are later modified or deleted
 - Complete audit trail of all changes
 - Event-time snapshots for reliable historical views
 
 #### Type Safety
+
 - Uses existing domain interfaces consistently
 - No `any` types or text parsing required
 - Full TypeScript support throughout data flow
 - Compile-time validation of metadata structures
 
 #### Maintainability
+
 - Consistent patterns across all tool types
 - Clear separation between tool logic and UI concerns
 - Reusable renderer patterns
@@ -567,16 +598,19 @@ class ActionTool extends Tool {
 ### Tool Migration Strategy
 
 #### Phase 1: Core Entity Tools
+
 1. **Task tools** - Already partially implemented
 2. **File tools** - High usage, big impact on UX
 3. **System tools** - Bash commands, environment changes
 
 #### Phase 2: Secondary Tools
+
 4. **Search tools** - Grep, find operations
 5. **Configuration tools** - Settings, preferences
 6. **Analysis tools** - Code analysis, diagnostics
 
 #### Phase 3: Specialized Tools
+
 7. **Integration tools** - External service calls
 8. **Workflow tools** - Multi-step operations
 9. **Utility tools** - Helper operations
@@ -584,6 +618,7 @@ class ActionTool extends Tool {
 #### Migration Checklist
 
 For each tool:
+
 - [ ] Identify what entities/data the tool operates on
 - [ ] Choose appropriate metadata pattern (Entity/Collection/Action)
 - [ ] Implement metadata in tool's `executeValidated` method
@@ -595,18 +630,21 @@ For each tool:
 ### Migration Considerations
 
 #### Backward Compatibility
+
 - Existing timeline entries without metadata continue to work
 - Renderers fall back to text parsing for old events
 - Gradual migration as new events include metadata
 - No breaking changes to existing tool APIs
 
 #### Event Store Impact
+
 - Metadata increases event size but provides significant value
 - Event-time snapshots prevent data loss from entity deletions
 - Consider event pruning strategies for long-term storage
 - Monitor event store growth and performance
 
 #### Performance Monitoring
+
 - Timeline rendering performance with metadata
 - Memory usage patterns
 - Event storage growth rates
@@ -619,19 +657,19 @@ For each tool:
 Import reusable patterns from `src/tools/schemas/common.ts`:
 
 ```typescript
-import { 
-  NonEmptyString,  // z.string().min(1, 'Cannot be empty')
-  FilePath,        // Auto-resolves to absolute path
-  LineNumber,      // Positive integer validation
-  MaxResults,      // Integer 1-1000 with default 100
-  FilePattern,     // Non-empty string for glob patterns
+import {
+  NonEmptyString, // z.string().min(1, 'Cannot be empty')
+  FilePath, // Auto-resolves to absolute path
+  LineNumber, // Positive integer validation
+  MaxResults, // Integer 1-1000 with default 100
+  FilePattern, // Non-empty string for glob patterns
 } from '../schemas/common.js';
 
 const toolSchema = z.object({
-  path: FilePath,              // /absolute/path/to/file
-  content: NonEmptyString,     // Rejects empty strings
-  line: LineNumber,            // Positive integers only
-  maxResults: MaxResults,      // 1-1000, defaults to 100
+  path: FilePath, // /absolute/path/to/file
+  content: NonEmptyString, // Rejects empty strings
+  line: LineNumber, // Positive integers only
+  maxResults: MaxResults, // 1-1000, defaults to 100
 });
 ```
 
@@ -645,63 +683,68 @@ const rangeSchema = z
     startLine: LineNumber,
     endLine: LineNumber,
   })
-  .refine(
-    data => data.endLine >= data.startLine,
-    {
-      message: 'endLine must be >= startLine',
-      path: ['endLine'],
-    }
-  );
+  .refine((data) => data.endLine >= data.startLine, {
+    message: 'endLine must be >= startLine',
+    path: ['endLine'],
+  });
 ```
 
 #### Conditional Validation
 
 ```typescript
-const searchSchema = z.object({
-  pattern: NonEmptyString,
-  useRegex: z.boolean().default(false),
-  caseSensitive: z.boolean().default(false),
-}).refine(
-  data => {
-    if (data.useRegex) {
-      try {
-        new RegExp(data.pattern);
-        return true;
-      } catch {
-        return false;
+const searchSchema = z
+  .object({
+    pattern: NonEmptyString,
+    useRegex: z.boolean().default(false),
+    caseSensitive: z.boolean().default(false),
+  })
+  .refine(
+    (data) => {
+      if (data.useRegex) {
+        try {
+          new RegExp(data.pattern);
+          return true;
+        } catch {
+          return false;
+        }
       }
+      return true;
+    },
+    {
+      message: 'Invalid regex pattern',
+      path: ['pattern'],
     }
-    return true;
-  },
-  {
-    message: 'Invalid regex pattern',
-    path: ['pattern'],
-  }
-);
+  );
 ```
 
 #### Transform and Normalize
 
 ```typescript
 const fileSchema = z.object({
-  path: z.string().transform(path => resolve(path)), // Auto-resolve
-  content: z.string().transform(s => s.trim()),      // Auto-trim
-  lines: z.array(z.string()).transform(arr => 
-    arr.filter(line => line.trim() !== '')           // Remove empty lines
+  path: z.string().transform((path) => resolve(path)), // Auto-resolve
+  content: z.string().transform((s) => s.trim()), // Auto-trim
+  lines: z.array(z.string()).transform(
+    (arr) => arr.filter((line) => line.trim() !== '') // Remove empty lines
   ),
 });
 ```
 
 ### Schema Documentation
 
-Use `.describe()` for parameter documentation that appears in AI tool descriptions:
+Use `.describe()` for parameter documentation that appears in AI tool
+descriptions:
 
 ```typescript
 const schema = z.object({
   query: NonEmptyString.describe('Search pattern or regular expression'),
-  path: FilePath.describe('Directory to search (defaults to current directory)'),
+  path: FilePath.describe(
+    'Directory to search (defaults to current directory)'
+  ),
   maxResults: MaxResults.describe('Maximum number of results to return'),
-  includeHidden: z.boolean().default(false).describe('Include hidden files in search'),
+  includeHidden: z
+    .boolean()
+    .default(false)
+    .describe('Include hidden files in search'),
 });
 ```
 
@@ -714,18 +757,27 @@ const ModelFormat = z.string().refine(
     const parts = value.split(':');
     if (parts.length !== 2) return false;
     const [provider, model] = parts;
-    return ['anthropic', 'lmstudio', 'ollama'].includes(provider) && model.length > 0;
+    return (
+      ['anthropic', 'lmstudio', 'ollama'].includes(provider) && model.length > 0
+    );
   },
   {
-    message: 'Model must be in format "provider:model" (e.g., "anthropic:claude-3-5-haiku-latest")',
+    message:
+      'Model must be in format "provider:model" (e.g., "anthropic:claude-3-5-haiku-latest")',
   }
 );
 
 const delegateSchema = z.object({
-  title: NonEmptyString.describe('Short active voice sentence describing the task'),
+  title: NonEmptyString.describe(
+    'Short active voice sentence describing the task'
+  ),
   prompt: NonEmptyString.describe('Complete instructions for the subagent'),
-  expected_response: NonEmptyString.describe('Description of expected format/content'),
-  model: ModelFormat.default('anthropic:claude-3-5-haiku-latest').describe('Provider and model'),
+  expected_response: NonEmptyString.describe(
+    'Description of expected format/content'
+  ),
+  model: ModelFormat.default('anthropic:claude-3-5-haiku-latest').describe(
+    'Provider and model'
+  ),
 });
 ```
 
@@ -733,7 +785,9 @@ const delegateSchema = z.object({
 
 ### Overview
 
-The ToolExecutor is the central hub for tool management and execution in Lace. Each Agent has its own ToolExecutor instance that manages tool registration, execution, and approval workflows.
+The ToolExecutor is the central hub for tool management and execution in Lace.
+Each Agent has its own ToolExecutor instance that manages tool registration,
+execution, and approval workflows.
 
 ### Architecture Pattern
 
@@ -763,7 +817,7 @@ private static initializeTools(toolExecutor: ToolExecutor, taskManager: TaskMana
     // ... other tools
   ];
   toolExecutor.registerTools(nonTaskTools);
-  
+
   // Register task tools with TaskManager injection
   const taskTools = createTaskManagerTools(() => taskManager);
   toolExecutor.registerTools(taskTools);
@@ -772,11 +826,14 @@ private static initializeTools(toolExecutor: ToolExecutor, taskManager: TaskMana
 
 #### Task Manager Tools Factory
 
-Task-related tools require access to the session's TaskManager for proper integration:
+Task-related tools require access to the session's TaskManager for proper
+integration:
 
 ```typescript
 // src/tools/implementations/task-manager/index.ts
-export function createTaskManagerTools(getTaskManager: () => TaskManager): Tool[] {
+export function createTaskManagerTools(
+  getTaskManager: () => TaskManager
+): Tool[] {
   const tools = [
     new TaskCreateTool(),
     new TaskListTool(),
@@ -785,12 +842,12 @@ export function createTaskManagerTools(getTaskManager: () => TaskManager): Tool[
     new TaskViewTool(),
     new TaskCompleteTool(),
   ];
-  
+
   // Inject TaskManager getter into each tool
-  tools.forEach(tool => {
+  tools.forEach((tool) => {
     (tool as any).getTaskManager = getTaskManager;
   });
-  
+
   return tools;
 }
 ```
@@ -826,13 +883,14 @@ Tools receive context about the execution environment:
 
 ```typescript
 interface ToolContext {
-  threadId?: ThreadId;          // Current thread
-  parentThreadId?: ThreadId;    // Parent thread for delegation
-  workingDirectory?: string;    // File operation context
+  threadId?: ThreadId; // Current thread
+  parentThreadId?: ThreadId; // Parent thread for delegation
+  workingDirectory?: string; // File operation context
 }
 ```
 
 This context enables:
+
 - Thread-scoped task management
 - Proper file operation contexts
 - Multi-agent coordination
@@ -841,15 +899,23 @@ This context enables:
 ### Session vs Thread Isolation
 
 #### Session-Level Sharing (Collaborative)
+
 Within a single session, threads share:
+
 - TaskManager instance
 - Tool execution context
 - Session-scoped data
 
 ```typescript
 // Two threads in same session see each other's tasks
-const thread1Context = { threadId: 'session1.thread1', parentThreadId: 'session1' };
-const thread2Context = { threadId: 'session1.thread2', parentThreadId: 'session1' };
+const thread1Context = {
+  threadId: 'session1.thread1',
+  parentThreadId: 'session1',
+};
+const thread2Context = {
+  threadId: 'session1.thread2',
+  parentThreadId: 'session1',
+};
 
 // Both can see tasks created by either thread
 await taskListTool.execute({ filter: 'thread' }, thread1Context); // Shows all session tasks
@@ -857,15 +923,23 @@ await taskListTool.execute({ filter: 'thread' }, thread2Context); // Shows all s
 ```
 
 #### Session-Level Isolation (Boundaries)
+
 Different sessions are completely isolated:
+
 - Separate TaskManager instances
 - Separate tool executors
 - No cross-session data access
 
 ```typescript
 // Tasks from session1 never appear in session2
-const session1Tasks = await session1TaskList.execute({ filter: 'thread' }, session1Context);
-const session2Tasks = await session2TaskList.execute({ filter: 'thread' }, session2Context);
+const session1Tasks = await session1TaskList.execute(
+  { filter: 'thread' },
+  session1Context
+);
+const session2Tasks = await session2TaskList.execute(
+  { filter: 'thread' },
+  session2Context
+);
 // These lists will never intersect
 ```
 
@@ -876,11 +950,13 @@ const session2Tasks = await session2TaskList.execute({ filter: 'thread' }, sessi
 #### Unit Tests vs Integration Tests
 
 **Unit Tests**: Test individual tool behavior in isolation
+
 - Direct tool instantiation is acceptable
 - Mock external dependencies
 - Focus on schema validation and business logic
 
 **Integration Tests**: Test tools within the full system context
+
 - Use Session/Agent/ToolExecutor pattern
 - Real dependency injection
 - Test actual system behavior
@@ -891,11 +967,11 @@ const session2Tasks = await session2TaskList.execute({ filter: 'thread' }, sessi
 // Unit test - tests tool logic in isolation
 describe('BashTool Unit Tests', () => {
   let tool: BashTool;
-  
+
   beforeEach(() => {
     tool = new BashTool(); // Direct instantiation OK for unit tests
   });
-  
+
   it('should validate command parameter', async () => {
     const result = await tool.execute({ command: '' });
     expect(result.isError).toBe(true);
@@ -912,7 +988,7 @@ describe('Task Manager Integration Tests', () => {
   let project: Project;
   let createTool: TaskCreateTool;
   let listTool: TaskListTool;
-  
+
   beforeEach(() => {
     // Create real session with proper dependencies
     project = Project.create('Test Project', '/tmp/test');
@@ -922,28 +998,31 @@ describe('Task Manager Integration Tests', () => {
       model: 'claude-sonnet-4-20250514',
       projectId: project.getId(),
     });
-    
+
     // Get tools from session's toolExecutor (proper dependency injection)
     const agent = session.getAgent(session.getId());
     const toolExecutor = agent!.toolExecutor;
     createTool = toolExecutor.getTool('task_add') as TaskCreateTool;
     listTool = toolExecutor.getTool('task_list') as TaskListTool;
   });
-  
+
   afterEach(() => {
     session?.destroy(); // Cleanup
   });
-  
+
   it('should create and list tasks with proper context', async () => {
     const context = { threadId: session.getId() };
-    
+
     // Create task using properly injected tool
-    await createTool.execute({
-      title: 'Test Task',
-      prompt: 'Do something',
-      priority: 'high'
-    }, context);
-    
+    await createTool.execute(
+      {
+        title: 'Test Task',
+        prompt: 'Do something',
+        priority: 'high',
+      },
+      context
+    );
+
     // List tasks - should see the created task
     const result = await listTool.execute({ filter: 'thread' }, context);
     expect(result.content[0].text).toContain('Test Task');
@@ -956,10 +1035,17 @@ describe('Task Manager Integration Tests', () => {
 ```typescript
 // Create mock provider to avoid real API calls
 class MockProvider extends BaseMockProvider {
-  get providerName(): string { return 'mock'; }
-  get defaultModel(): string { return 'mock-model'; }
-  
-  createResponse(_messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+  get providerName(): string {
+    return 'mock';
+  }
+  get defaultModel(): string {
+    return 'mock-model';
+  }
+
+  createResponse(
+    _messages: ProviderMessage[],
+    _tools: Tool[]
+  ): Promise<ProviderResponse> {
     return Promise.resolve({
       content: 'Mock response',
       usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
@@ -970,14 +1056,16 @@ class MockProvider extends BaseMockProvider {
 
 beforeEach(() => {
   mockProvider = new MockProvider();
-  
+
   // Mock the ProviderRegistry
   vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(
     () => mockProvider
   );
-  
+
   // Session creation will use mocked provider
-  session = Session.create({ /* ... */ });
+  session = Session.create({
+    /* ... */
+  });
 });
 ```
 
@@ -1022,7 +1110,7 @@ describe('MyTool with schema validation', () => {
   describe('Input validation', () => {
     it('should reject invalid parameters', async () => {
       const result = await tool.execute({ message: '' }); // Empty string
-      
+
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
       expect(result.content[0].text).toContain('Cannot be empty');
@@ -1030,14 +1118,14 @@ describe('MyTool with schema validation', () => {
 
     it('should accept valid parameters', async () => {
       const result = await tool.execute({ message: 'hello', count: 3 });
-      
+
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('hellohellohello');
     });
 
     it('should use default values', async () => {
       const result = await tool.execute({ message: 'test' });
-      
+
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('test'); // count defaults to 1
     });
@@ -1045,21 +1133,21 @@ describe('MyTool with schema validation', () => {
 
   describe('Functionality', () => {
     it('should process messages correctly', async () => {
-      const result = await tool.execute({ 
-        message: 'hello', 
-        count: 2 
+      const result = await tool.execute({
+        message: 'hello',
+        count: 2,
       });
-      
+
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('hellohello');
     });
 
     it('should handle edge cases', async () => {
-      const result = await tool.execute({ 
-        message: '🎉', 
-        count: 3 
+      const result = await tool.execute({
+        message: '🎉',
+        count: 3,
       });
-      
+
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toBe('🎉🎉🎉');
     });
@@ -1067,11 +1155,11 @@ describe('MyTool with schema validation', () => {
 
   describe('Error handling', () => {
     it('should handle boundary conditions', async () => {
-      const result = await tool.execute({ 
-        message: 'test', 
-        count: 101 // Exceeds max
+      const result = await tool.execute({
+        message: 'test',
+        count: 101, // Exceeds max
       });
-      
+
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Validation failed');
     });
@@ -1083,8 +1171,10 @@ describe('MyTool with schema validation', () => {
 
 1. **Test tool metadata**: Verify name, description, schema structure
 2. **Test validation**: Both success and failure cases for all parameters
-3. **Test business logic**: Core functionality with various inputs and edge cases
-4. **Use temp directories**: For file operations, create isolated test environments
+3. **Test business logic**: Core functionality with various inputs and edge
+   cases
+4. **Use temp directories**: For file operations, create isolated test
+   environments
 5. **Test error cases**: Ensure error messages are helpful for AI recovery
 6. **Test defaults**: Verify optional parameters use correct defaults
 7. **Test boundary conditions**: Min/max values, empty inputs, large inputs
@@ -1092,19 +1182,23 @@ describe('MyTool with schema validation', () => {
 ### Test Categories
 
 #### Unit Tests
+
 - Individual tool behavior
 - Schema validation
 - Output formatting
 - Error handling
 
 #### Integration Tests
+
 - Tool execution within conversation flow
 - Tool approval workflows
 - Cross-tool interactions
 - Provider compatibility
 
 #### Manual Testing
+
 After implementation:
+
 1. Start interactive mode: `npm start`
 2. Ask AI to use the tool with various parameters
 3. Verify error messages are helpful and actionable
@@ -1112,11 +1206,13 @@ After implementation:
 
 ## Tool Renderers (UI)
 
-Lace supports specialized tool renderers that provide custom UI for specific tools, replacing generic JSON display with tool-optimized interfaces.
+Lace supports specialized tool renderers that provide custom UI for specific
+tools, replacing generic JSON display with tool-optimized interfaces.
 
 ### Dynamic Discovery System
 
-**File**: `src/interfaces/terminal/components/events/tool-renderers/getToolRenderer.ts`
+**File**:
+`src/interfaces/terminal/components/events/tool-renderers/getToolRenderer.ts`
 
 The system uses naming conventions to automatically discover tool renderers:
 
@@ -1128,8 +1224,10 @@ The system uses naming conventions to automatically discover tool renderers:
 ```
 
 **Key Features:**
+
 - **Async Loading**: Uses ES module dynamic imports for on-demand loading
-- **Graceful Fallback**: Returns `null` if renderer not found, triggers generic renderer
+- **Graceful Fallback**: Returns `null` if renderer not found, triggers generic
+  renderer
 - **Error Resilience**: Catches import failures and falls back gracefully
 - **Compiled Output**: Looks for `.js` files in compiled `dist/` directory
 
@@ -1164,8 +1262,12 @@ export function BashToolRenderer({ item, isSelected, onToggle }: Props) {
   // ...
 }
 
-// ❌ Incorrect  
-export default function BashToolRenderer({ item, isSelected, onToggle }: Props) {
+// ❌ Incorrect
+export default function BashToolRenderer({
+  item,
+  isSelected,
+  onToggle,
+}: Props) {
   // ...
 }
 ```
@@ -1174,7 +1276,8 @@ export default function BashToolRenderer({ item, isSelected, onToggle }: Props) 
 
 #### TimelineEntryCollapsibleBox
 
-All tool renderers should use `TimelineEntryCollapsibleBox` for consistent behavior:
+All tool renderers should use `TimelineEntryCollapsibleBox` for consistent
+behavior:
 
 ```typescript
 import { TimelineEntryCollapsibleBox } from '../../ui/TimelineEntryCollapsibleBox.js';
@@ -1229,11 +1332,11 @@ export function BashToolRenderer({ item, isSelected, onToggle }: ToolRendererPro
   const command = item.call.arguments?.command as string;
   const result = item.result;
   const output = result ? parseBashResult(result) : null;
-  
+
   const toolSuccess = result ? !result.isError : true;
   const operationSuccess = output ? output.exitCode === 0 : true;
   const success = toolSuccess && operationSuccess;
-  
+
   const { isExpanded, onExpand, onCollapse } = useTimelineItemExpansion(
     isSelected,
     (expanded) => onToggle?.()
@@ -1305,7 +1408,7 @@ function OutputPreview({ text, maxLines }: { text: string; maxLines: number }) {
   const lines = text.split('\n');
   const truncated = lines.length > maxLines;
   const displayLines = truncated ? lines.slice(0, maxLines) : lines;
-  
+
   return (
     <Box flexDirection="column">
       <Text>{displayLines.join('\n')}</Text>
@@ -1319,7 +1422,8 @@ function OutputPreview({ text, maxLines }: { text: string; maxLines: number }) {
 
 ### Adding a New Tool Renderer
 
-1. **Create the renderer**: `src/interfaces/terminal/components/events/tool-renderers/YourToolRenderer.tsx`
+1. **Create the renderer**:
+   `src/interfaces/terminal/components/events/tool-renderers/YourToolRenderer.tsx`
 2. **Follow naming convention**: Tool name `your-tool` → `YourToolRenderer`
 3. **Implement required interface**: Match `ToolRendererProps`
 4. **Use TimelineEntryCollapsibleBox**: For consistent UI
@@ -1330,27 +1434,32 @@ function OutputPreview({ text, maxLines }: { text: string; maxLines: number }) {
 ### Renderer Best Practices
 
 #### Performance
+
 - **Lazy Loading**: Renderers are loaded on-demand
 - **Error Boundaries**: Failed renderers don't crash the UI
 - **Graceful Degradation**: Always falls back to generic renderer
 
 #### User Experience
+
 - **Consistent Patterns**: Use established UI components and patterns
 - **Visual Feedback**: Clear success/error states with colors and icons
 - **Progressive Disclosure**: Show summary when collapsed, details when expanded
 - **Contextual Information**: Preserve important context in all views
 
 #### Layout Guidelines
+
 - **No extra marginLeft in compactSummary**: Content should align naturally
 - **Use marginTop for spacing**: Separate sections vertically
 - **Consistent depth**: All tool renderers should have same indentation level
-- **React Fragment for labels**: Use `React.Fragment` for inline elements, not `Box`
+- **React Fragment for labels**: Use `React.Fragment` for inline elements, not
+  `Box`
 
 ## File Editing Tools Guide
 
 ### Available File Tools
 
 #### 1. `file_edit` - Search and Replace
+
 - **Purpose**: Replace exact text matches in files
 - **Key requirement**: Text must match exactly (including whitespace)
 - **Use case**: Modifying existing code, changing implementations
@@ -1358,13 +1467,14 @@ function OutputPreview({ text, maxLines }: { text: string; maxLines: number }) {
 ```typescript
 // Usage example
 await tool.execute({
-  path: "src/main.js",
-  old_text: "function oldName() {\n  return 42;\n}",
-  new_text: "function newName() {\n  return 100;\n}"
+  path: 'src/main.js',
+  old_text: 'function oldName() {\n  return 42;\n}',
+  new_text: 'function newName() {\n  return 100;\n}',
 });
 ```
 
-#### 2. `file_insert` - Add Content  
+#### 2. `file_insert` - Add Content
+
 - **Purpose**: Insert new content at specific lines or append to files
 - **Key feature**: Preserves existing content
 - **Use case**: Adding new functions, imports, or sections
@@ -1372,24 +1482,26 @@ await tool.execute({
 ```typescript
 // Insert at specific line
 await tool.execute({
-  path: "src/main.js", 
+  path: 'src/main.js',
   content: "import { helper } from './utils.js';",
-  line: 3
+  line: 3,
 });
 
 // Append to end (omit line parameter)
 await tool.execute({
-  path: "src/main.js",
-  content: "\nexport { newFunction };"
+  path: 'src/main.js',
+  content: '\nexport { newFunction };',
 });
 ```
 
 #### 3. `file_read` - View Content
+
 - **Purpose**: Read file contents with optional line ranges
 - **Use case**: Inspecting code before editing
 
 #### 4. `file_write` - Create/Overwrite
-- **Purpose**: Create new files or completely overwrite existing ones  
+
+- **Purpose**: Create new files or completely overwrite existing ones
 - **Use case**: Creating new files from scratch
 
 ### File Editing Workflow
@@ -1427,14 +1539,16 @@ When editing files, follow this workflow:
 #### Common Patterns
 
 ##### Refactoring a function
+
 ```javascript
 // 1. Read the file
-// 2. Replace function signature  
+// 2. Replace function signature
 // 3. Replace function body
 // 4. Update call sites
 ```
 
 ##### Adding a new feature
+
 ```javascript
 // 1. Insert imports at top
 // 2. Insert new function in appropriate section
@@ -1442,6 +1556,7 @@ When editing files, follow this workflow:
 ```
 
 ##### Fixing bugs
+
 ```javascript
 // 1. Read to find exact buggy code
 // 2. Replace with fixed version
@@ -1453,33 +1568,36 @@ When editing files, follow this workflow:
 The tools provide specific error messages to guide LLMs:
 
 1. **No matches found**: Guides to check exact text matching
-2. **Multiple matches**: Suggests adding more context  
+2. **Multiple matches**: Suggests adding more context
 3. **Line out of bounds**: Provides file length information
 4. **Invalid input**: Clear parameter requirements
 
 ### Schema Implementations
 
 #### File Edit Schema
+
 ```typescript
-const fileEditSchema = z.object({
-  path: FilePath,
-  old_text: NonEmptyString.describe('Exact text to replace'),
-  new_text: z.string().describe('Replacement text'),
-}).refine(
-  data => data.old_text !== data.new_text,
-  {
+const fileEditSchema = z
+  .object({
+    path: FilePath,
+    old_text: NonEmptyString.describe('Exact text to replace'),
+    new_text: z.string().describe('Replacement text'),
+  })
+  .refine((data) => data.old_text !== data.new_text, {
     message: 'old_text and new_text must be different',
     path: ['new_text'],
-  }
-);
+  });
 ```
 
 #### File Insert Schema
+
 ```typescript
 const fileInsertSchema = z.object({
   path: FilePath,
   content: NonEmptyString.describe('Content to insert'),
-  line: LineNumber.optional().describe('Line number to insert after (1-based). Omit to append to end'),
+  line: LineNumber.optional().describe(
+    'Line number to insert after (1-based). Omit to append to end'
+  ),
 });
 ```
 
@@ -1492,7 +1610,7 @@ Tools are automatically registered in the main application initialization:
 ```typescript
 // src/tools/executor.ts
 import { ToolExecutor } from './executor.js';
-import { 
+import {
   FileReadTool,
   FileWriteTool,
   FileEditTool,
@@ -1503,7 +1621,7 @@ import {
 
 export function createToolExecutor(): ToolExecutor {
   const executor = new ToolExecutor();
-  
+
   // Register all tools
   executor.registerTool(new FileReadTool());
   executor.registerTool(new FileWriteTool());
@@ -1511,7 +1629,7 @@ export function createToolExecutor(): ToolExecutor {
   executor.registerTool(new FileInsertTool());
   executor.registerTool(new BashTool());
   // ... register other tools
-  
+
   return executor;
 }
 ```
@@ -1521,11 +1639,12 @@ export function createToolExecutor(): ToolExecutor {
 Tools work with any provider that supports tool calling:
 
 - **Anthropic**: Native tool support
-- **LMStudio**: Via OpenAI-compatible API  
+- **LMStudio**: Via OpenAI-compatible API
 - **Ollama**: With tool calling models
 - **OpenAI**: Direct compatibility
 
-The Agent class handles conversion between generic ToolResult format and provider-specific APIs.
+The Agent class handles conversion between generic ToolResult format and
+provider-specific APIs.
 
 ### Environment Setup
 
@@ -1551,7 +1670,8 @@ npm start           # Interactive mode
 3. **Deterministic Output**: Same input produces same output
 4. **Helpful Errors**: Every error should guide toward solution
 5. **Type Safety**: Leverage Zod's type inference, avoid `any` types
-6. **Performance**: Use result limiting and progress indication for expensive operations
+6. **Performance**: Use result limiting and progress indication for expensive
+   operations
 
 ### Schema Design
 
@@ -1561,13 +1681,14 @@ const goodSchema = z.object({
   // Clear, descriptive names
   searchPattern: NonEmptyString.describe('Text or regex to search for'),
   targetDirectory: FilePath.describe('Directory to search in'),
-  
+
   // Sensible defaults
   maxResults: z.number().int().min(1).max(1000).default(100),
   caseSensitive: z.boolean().default(false),
-  
+
   // Clear validation with helpful messages
-  includeExtensions: z.array(z.string().regex(/^\.\w+$/, 'Must start with dot'))
+  includeExtensions: z
+    .array(z.string().regex(/^\.\w+$/, 'Must start with dot'))
     .optional()
     .describe('File extensions to include (e.g., [".js", ".ts"])'),
 });
@@ -1577,11 +1698,11 @@ const badSchema = z.object({
   // Unclear names
   q: z.string(),
   dir: z.string(),
-  
+
   // No defaults or descriptions
   max: z.number(),
   case: z.boolean(),
-  
+
   // Vague validation
   exts: z.array(z.string()).optional(),
 });
@@ -1593,13 +1714,14 @@ const badSchema = z.object({
 // ✅ Helpful error messages
 if (error.code === 'ENOENT') {
   const suggestions = await findSimilarPaths(args.path);
-  const suggestionText = suggestions.length > 0
-    ? `\nSimilar files found: ${suggestions.join(', ')}`
-    : '\nCheck the file path and try again.';
+  const suggestionText =
+    suggestions.length > 0
+      ? `\nSimilar files found: ${suggestions.join(', ')}`
+      : '\nCheck the file path and try again.';
   return this.createError(`File not found: ${args.path}${suggestionText}`);
 }
 
-// ❌ Unhelpful error messages  
+// ❌ Unhelpful error messages
 if (error.code === 'ENOENT') {
   return this.createError('File not found');
 }
@@ -1609,21 +1731,26 @@ if (error.code === 'ENOENT') {
 
 ```typescript
 // ✅ Use base class helpers
-return this.createResult({
-  filesProcessed: files.length,
-  totalSize: totalBytes,
-  errors: errorList,
-}, {
-  duration: Date.now() - startTime,
-  cacheHit: fromCache,
-});
+return this.createResult(
+  {
+    filesProcessed: files.length,
+    totalSize: totalBytes,
+    errors: errorList,
+  },
+  {
+    duration: Date.now() - startTime,
+    cacheHit: fromCache,
+  }
+);
 
 // ❌ Manual result construction
 return {
-  content: [{ 
-    type: 'text', 
-    text: JSON.stringify({ files: files.length }) 
-  }],
+  content: [
+    {
+      type: 'text',
+      text: JSON.stringify({ files: files.length }),
+    },
+  ],
   isError: false,
 };
 ```
@@ -1636,19 +1763,19 @@ describe('FileSearchTool', () => {
   describe('Tool metadata', () => {
     // Test name, description, schema structure
   });
-  
+
   describe('Input validation', () => {
     // Test all validation rules, defaults, edge cases
   });
-  
+
   describe('Functionality', () => {
     // Test core business logic with various inputs
   });
-  
+
   describe('Error handling', () => {
     // Test all error conditions, recovery guidance
   });
-  
+
   describe('Integration', () => {
     // Test with real file systems, edge cases
   });
@@ -1712,6 +1839,7 @@ protected async executeValidated(
 ### Common Issues
 
 #### Tool Not Loading
+
 ```bash
 # Check tool is exported
 grep -r "YourTool" src/tools/implementations/index.ts
@@ -1724,6 +1852,7 @@ npm run build
 ```
 
 #### Validation Errors
+
 ```typescript
 // Debug schema issues
 const result = schema.safeParse(testInput);
@@ -1733,6 +1862,7 @@ if (!result.success) {
 ```
 
 #### TypeScript Errors
+
 ```bash
 # Common fixes
 npm run lint:fix       # Auto-fix linting issues
@@ -1743,6 +1873,7 @@ npm run build          # Check TypeScript compilation
 ### Performance Issues
 
 #### Large File Operations
+
 ```typescript
 // ✅ Stream large files
 const stream = createReadStream(args.path);
@@ -1750,7 +1881,9 @@ const chunks = [];
 for await (const chunk of stream) {
   chunks.push(chunk);
   if (chunks.length > MAX_CHUNKS) {
-    return this.createError(`File too large: ${args.path}. Use line ranges to read portions.`);
+    return this.createError(
+      `File too large: ${args.path}. Use line ranges to read portions.`
+    );
   }
 }
 
@@ -1758,8 +1891,8 @@ for await (const chunk of stream) {
 if (results.length > args.maxResults) {
   const truncated = results.slice(0, args.maxResults);
   return this.createResult(
-    formatResults(truncated) + 
-    `\n\nResults limited to ${args.maxResults}. ${results.length - args.maxResults} additional matches found.`
+    formatResults(truncated) +
+      `\n\nResults limited to ${args.maxResults}. ${results.length - args.maxResults} additional matches found.`
   );
 }
 ```
@@ -1767,10 +1900,14 @@ if (results.length > args.maxResults) {
 ### Testing Issues
 
 #### Flaky Tests
+
 ```typescript
 // ✅ Use deterministic temp directories
 beforeEach(async () => {
-  testDir = join(tmpdir(), `lace-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  testDir = join(
+    tmpdir(),
+    `lace-test-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
   await mkdir(testDir, { recursive: true });
 });
 
@@ -1781,14 +1918,17 @@ afterEach(async () => {
 ```
 
 #### Mock Tool Issues
+
 ```typescript
 // ✅ Proper mock tool implementation
 class MockTool extends Tool {
   name = 'mock_tool';
   description = 'Mock tool for testing';
   schema = z.object({ input: z.string() });
-  
-  protected async executeValidated(args: z.infer<typeof this.schema>): Promise<ToolResult> {
+
+  protected async executeValidated(
+    args: z.infer<typeof this.schema>
+  ): Promise<ToolResult> {
     return this.createResult(`Processed: ${args.input}`);
   }
 }
@@ -1812,16 +1952,16 @@ protected async executeValidated(args: z.infer<typeof schema>): Promise<ToolResu
     args: args,
     timestamp: new Date().toISOString(),
   });
-  
+
   try {
     const result = await performOperation(args);
-    
+
     logger.info('Tool execution completed', {
       toolName: this.name,
       success: true,
       resultSize: JSON.stringify(result).length,
     });
-    
+
     return this.createResult(result);
   } catch (error) {
     logger.error('Tool execution failed', {
@@ -1829,7 +1969,7 @@ protected async executeValidated(args: z.infer<typeof schema>): Promise<ToolResu
       error: error.message,
       stack: error.stack,
     });
-    
+
     throw error;
   }
 }
@@ -1845,11 +1985,14 @@ If you encounter issues:
 4. **Check logs**: Review debug output for clues
 5. **Test incrementally**: Build up functionality step by step
 
-Remember: The goal is clean, maintainable code that behaves predictably and provides helpful feedback to both developers and AI agents.
+Remember: The goal is clean, maintainable code that behaves predictably and
+provides helpful feedback to both developers and AI agents.
 
 ## Tool Approval System
 
-The Lace tool approval system uses a hybrid callback-event architecture that allows different interfaces (CLI, web) to handle tool approvals while maintaining a consistent core execution flow.
+The Lace tool approval system uses a hybrid callback-event architecture that
+allows different interfaces (CLI, web) to handle tool approvals while
+maintaining a consistent core execution flow.
 
 ### Architecture Overview
 
@@ -1861,9 +2004,13 @@ The Lace tool approval system uses a hybrid callback-event architecture that all
    - Calls the callback before executing any tool that requires approval
 
 2. **ApprovalCallback Interface** (`src/tools/types.ts`)
+
    ```typescript
    interface ApprovalCallback {
-     requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision>;
+     requestApproval(
+       toolName: string,
+       input: unknown
+     ): Promise<ApprovalDecision>;
    }
    ```
 
@@ -1879,7 +2026,8 @@ The Lace tool approval system uses a hybrid callback-event architecture that all
 
 ### Event Flow Architecture
 
-The system uses a "round-trip" event pattern to maintain loose coupling between interfaces:
+The system uses a "round-trip" event pattern to maintain loose coupling between
+interfaces:
 
 ```
 Tool Execution Request
@@ -1902,22 +2050,28 @@ ToolExecutor continues/aborts execution
 ### CLI Implementation
 
 **Approval Callback Setup:**
+
 ```typescript
 // src/app.ts
-const policyCallback = createGlobalPolicyCallback(cli, options, agent.toolExecutor);
+const policyCallback = createGlobalPolicyCallback(
+  cli,
+  options,
+  agent.toolExecutor
+);
 agent.toolExecutor.setApprovalCallback(policyCallback);
 ```
 
 **Policy Callback Implementation:**
+
 ```typescript
 // interfaces/terminal/approval.ts
 async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
   const tool = this.toolExecutor.getTool(toolName);
   const isReadOnly = tool?.annotations?.readOnlyHint === true;
-  
+
   return new Promise<ApprovalDecision>((resolve) => {
     const requestId = `${toolName}-${Date.now()}`;
-    
+
     // Emit event for terminal interface to handle
     this.agent.emit('approval_request', {
       toolName, input, isReadOnly, requestId, resolve
@@ -1929,52 +2083,73 @@ async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecisio
 ### Web Implementation
 
 **Approval Callback Setup:**
+
 ```typescript
 // lib/server/agent-utils.ts
 export function setupAgentApprovals(agent: Agent, sessionId: ThreadId): void {
   const approvalCallback = {
-    async requestApproval(toolName: string, input: unknown): Promise<ApprovalDecision> {
+    async requestApproval(
+      toolName: string,
+      input: unknown
+    ): Promise<ApprovalDecision> {
       const tool = agent.toolExecutor?.getTool(toolName);
       const isReadOnly = tool?.annotations?.readOnlyHint === true;
-      
+
       return new Promise<ApprovalDecision>((resolve) => {
         const requestId = `${toolName}-${Date.now()}`;
-        
+
         // Emit event for SessionService to handle
         agent.emit('approval_request', {
-          toolName, input, isReadOnly, requestId, resolve
+          toolName,
+          input,
+          isReadOnly,
+          requestId,
+          resolve,
         });
       });
-    }
+    },
   };
-  
+
   agent.toolExecutor.setApprovalCallback(approvalCallback);
 }
 ```
 
 **Event Handler:**
+
 ```typescript
 // lib/server/session-service.ts
-agent.on('approval_request', async ({toolName, input, isReadOnly, requestId, resolve}) => {
-  try {
-    const decision = await approvalManager.requestApproval(
-      agentId, sessionId, toolName, description, annotations, input, isReadOnly
-    );
-    resolve(decision);
-  } catch (error) {
-    resolve(ApprovalDecision.DENY);
+agent.on(
+  'approval_request',
+  async ({ toolName, input, isReadOnly, requestId, resolve }) => {
+    try {
+      const decision = await approvalManager.requestApproval(
+        agentId,
+        sessionId,
+        toolName,
+        description,
+        annotations,
+        input,
+        isReadOnly
+      );
+      resolve(decision);
+    } catch (error) {
+      resolve(ApprovalDecision.DENY);
+    }
   }
-});
+);
 ```
 
 ### Web Frontend Approval Flow
 
 #### Server-Side (ApprovalManager)
 
-1. **Request Creation**: `ApprovalManager.requestApproval()` creates a pending approval
-2. **SSE Broadcast**: Sends `TOOL_APPROVAL_REQUEST` event to frontend via Server-Sent Events
+1. **Request Creation**: `ApprovalManager.requestApproval()` creates a pending
+   approval
+2. **SSE Broadcast**: Sends `TOOL_APPROVAL_REQUEST` event to frontend via
+   Server-Sent Events
 3. **Promise Wait**: Returns a promise that waits for user decision
-4. **Resolution**: `ApprovalManager.resolveApproval()` resolves the promise when decision is made
+4. **Resolution**: `ApprovalManager.resolveApproval()` resolves the promise when
+   decision is made
 
 #### Client-Side (React)
 
@@ -1991,10 +2166,10 @@ agent.on('approval_request', async ({toolName, input, isReadOnly, requestId, res
 export async function POST(request: NextRequest, { params }) {
   const { requestId } = await params;
   const { decision } = await request.json();
-  
+
   const approvalManager = getApprovalManager();
   approvalManager.resolveApproval(requestId, decision);
-  
+
   return NextResponse.json({ success: true });
 }
 ```
@@ -2002,45 +2177,59 @@ export async function POST(request: NextRequest, { params }) {
 ### Key Design Principles
 
 #### 1. Interface Independence
-Each interface (CLI, web) implements its own approval handling while using the same core callback mechanism.
 
-#### 2. Event-Driven Loose Coupling  
-The ApprovalCallback emits events rather than directly handling approvals, allowing different interfaces to implement their own approval UI.
+Each interface (CLI, web) implements its own approval handling while using the
+same core callback mechanism.
+
+#### 2. Event-Driven Loose Coupling
+
+The ApprovalCallback emits events rather than directly handling approvals,
+allowing different interfaces to implement their own approval UI.
 
 #### 3. Consistent Promise-Based Flow
-All approval callbacks return promises that resolve with ApprovalDecision, ensuring predictable async behavior.
+
+All approval callbacks return promises that resolve with ApprovalDecision,
+ensuring predictable async behavior.
 
 #### 4. Session-Aware Approvals
-Approval decisions can be cached per session (ALLOW_SESSION) to avoid repeated prompts for the same tool.
+
+Approval decisions can be cached per session (ALLOW_SESSION) to avoid repeated
+prompts for the same tool.
 
 ### Common Issues
 
 #### Missing Approval Callback
-**Error**: "Tool execution requires approval but no approval callback is configured"
-**Cause**: `agent.toolExecutor.setApprovalCallback()` was never called
-**Fix**: Ensure `setupAgentApprovals()` is called when creating agents
+
+**Error**: "Tool execution requires approval but no approval callback is
+configured" **Cause**: `agent.toolExecutor.setApprovalCallback()` was never
+called **Fix**: Ensure `setupAgentApprovals()` is called when creating agents
 
 #### Events Not Emitted
-**Problem**: approval_request event handlers never trigger
-**Cause**: ApprovalCallback bypasses event system and handles approval directly
-**Fix**: ApprovalCallback should emit events, not handle approvals
+
+**Problem**: approval_request event handlers never trigger **Cause**:
+ApprovalCallback bypasses event system and handles approval directly **Fix**:
+ApprovalCallback should emit events, not handle approvals
 
 #### Timeout Issues
-**Problem**: Approval promises never resolve
-**Cause**: Frontend SSE listeners not connected or API endpoints not working
-**Fix**: Verify SSE connection and `/api/approvals/[requestId]` endpoint
+
+**Problem**: Approval promises never resolve **Cause**: Frontend SSE listeners
+not connected or API endpoints not working **Fix**: Verify SSE connection and
+`/api/approvals/[requestId]` endpoint
 
 ### Security Considerations
 
 1. **Tool Classification**: Tools are classified as read-only or destructive
-2. **User Confirmation**: All destructive operations require explicit user approval
+2. **User Confirmation**: All destructive operations require explicit user
+   approval
 3. **Session Isolation**: Approval decisions are scoped to individual sessions
-4. **Timeout Protection**: Approvals auto-deny after timeout to prevent hanging processes
+4. **Timeout Protection**: Approvals auto-deny after timeout to prevent hanging
+   processes
 5. **Audit Trail**: All approval decisions are logged for security auditing
 
 ## Tool Temp Directory Usage
 
-Tools can store large outputs and intermediate files using the temp directory system, which provides session-scoped temporary storage for tool execution.
+Tools can store large outputs and intermediate files using the temp directory
+system, which provides session-scoped temporary storage for tool execution.
 
 ### Getting Temp Directories
 
@@ -2076,8 +2265,10 @@ const paths = this.getOutputFilePaths(toolCallId, context);
 
 ### Best Practices
 
-1. **Large Output Management**: Store full output in temp files, return summaries to model
-2. **File Naming**: Use standard names (stdout.txt, stderr.txt, combined.txt) for consistency
+1. **Large Output Management**: Store full output in temp files, return
+   summaries to model
+2. **File Naming**: Use standard names (stdout.txt, stderr.txt, combined.txt)
+   for consistency
 3. **Error Handling**: Always create temp directories even if command fails
 4. **Memory Usage**: Stream output to files, don't buffer everything in memory
 5. **Audit Trail**: Full output is preserved for debugging and analysis
@@ -2085,6 +2276,7 @@ const paths = this.getOutputFilePaths(toolCallId, context);
 ### Example: Bash Tool Implementation
 
 The bash tool demonstrates proper large output handling:
+
 - Streams output to temp files during execution
 - Returns head+tail preview to model (first 100 + last 50 lines)
 - Includes truncation statistics and file references
@@ -2115,7 +2307,8 @@ The bash tool demonstrates proper large output handling:
 - **Creation**: Directories are created on-demand when tools request them
 - **Persistence**: Temp directories persist for the entire server runtime
 - **Stability**: Same tool call ID always returns same directory path
-- **Cleanup**: Automatic cleanup when server process ends (via OS temp directory cleanup)
+- **Cleanup**: Automatic cleanup when server process ends (via OS temp directory
+  cleanup)
 
 ### Usage in Tool Implementation
 
@@ -2127,18 +2320,22 @@ export class MyLargeOutputTool extends Tool {
   ): Promise<ToolResult> {
     // Generate unique tool call ID (or receive from executor)
     const toolCallId = this.generateToolCallId();
-    
+
     // Get temp file paths
     const outputPaths = this.getOutputFilePaths(toolCallId, context);
-    
+
     // Stream output to files while processing
     const stdoutStream = createWriteStream(outputPaths.stdout);
     const stderrStream = createWriteStream(outputPaths.stderr);
-    
+
     try {
       // Process with streaming...
-      const result = await this.processWithStreaming(args, stdoutStream, stderrStream);
-      
+      const result = await this.processWithStreaming(
+        args,
+        stdoutStream,
+        stderrStream
+      );
+
       // Return summary with temp file references
       return this.createResult({
         summary: this.createSummary(result),

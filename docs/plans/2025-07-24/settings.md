@@ -2,28 +2,37 @@
 
 ## Overview
 
-This plan implements a comprehensive settings UI to replace the current theme selector embedded in the sidebar footer. The goal is to create a proper settings modal with multiple sections while following YAGNI principles and TDD methodology.
+This plan implements a comprehensive settings UI to replace the current theme
+selector embedded in the sidebar footer. The goal is to create a proper settings
+modal with multiple sections while following YAGNI principles and TDD
+methodology.
 
 ## Prerequisites & Context
 
 ### Codebase Knowledge Required
+
 - **Framework**: React 18 with TypeScript 5.6+ in strict mode
 - **Styling**: DaisyUI + Tailwind CSS with 9 predefined themes
 - **Import Style**: Use `@/` path aliases, omit file extensions
-- **File Headers**: All files must start with `// ABOUTME:` comments explaining purpose
+- **File Headers**: All files must start with `// ABOUTME:` comments explaining
+  purpose
 
 ### Critical TypeScript Rules
+
 - **NEVER use `any` type** - Use `unknown` with type guards instead
 - **Strict mode required** - All code must pass TypeScript strict compilation
 - **Type safety first** - Prefer explicit typing over inference when unclear
 
 ### Testing Philosophy
+
 - **TDD Required**: Write failing tests first, then implement
 - **NEVER mock functionality under test** - Use real codepaths
 - **Real data/APIs only** - No mocks in integration/e2e tests
-- **Test file location**: Co-located with source (e.g., `component.test.tsx` next to `component.tsx`)
+- **Test file location**: Co-located with source (e.g., `component.test.tsx`
+  next to `component.tsx`)
 
 ### Development Workflow
+
 - **Frequent commits** - Commit after each working feature/test
 - **Pre-commit hooks** - Linting, formatting, tests run automatically
 - **Never skip hooks** - Pre-commit hooks cannot be bypassed
@@ -31,6 +40,7 @@ This plan implements a comprehensive settings UI to replace the current theme se
 ## Current State Analysis
 
 ### Files to Understand
+
 1. **packages/web/components/layout/Sidebar.tsx** (lines 102-104)
    - Contains ThemeSelector in footer
    - Has unused settings button (line 56)
@@ -53,16 +63,20 @@ This plan implements a comprehensive settings UI to replace the current theme se
 **Objective**: Establish foundational components for settings UI
 
 **Files to Create**:
+
 - `packages/web/components/settings/SettingsModal.tsx`
 - `packages/web/components/settings/SettingsTabs.tsx`
 - `packages/web/components/settings/SettingsPanel.tsx`
 - `packages/web/components/settings/SettingField.tsx`
 
 **Files to Update**:
+
 - `packages/web/components/settings/index.ts` (create barrel export)
 
 **TDD Steps**:
+
 1. **Write failing test** for SettingsModal:
+
    ```typescript
    // packages/web/components/settings/SettingsModal.test.tsx
    import { render, screen } from '@testing-library/react';
@@ -84,6 +98,7 @@ This plan implements a comprehensive settings UI to replace the current theme se
 
 2. **Run test** - should fail with module not found
 3. **Implement SettingsModal**:
+
    ```typescript
    // packages/web/components/settings/SettingsModal.tsx
    // ABOUTME: Main settings modal container with backdrop and close functionality
@@ -104,11 +119,11 @@ This plan implements a comprehensive settings UI to replace the current theme se
 
      return (
        <div className="fixed inset-0 z-50 flex items-center justify-center">
-         <div 
+         <div
            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
            onClick={onClose}
          />
-         <div 
+         <div
            role="dialog"
            className="relative bg-base-100 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden"
          >
@@ -133,26 +148,33 @@ This plan implements a comprehensive settings UI to replace the current theme se
 4. **Run test** - should now pass
 5. **Commit**: "feat: add base SettingsModal component with tests"
 
-**Repeat TDD cycle** for SettingsTabs, SettingsPanel, and SettingField components.
+**Repeat TDD cycle** for SettingsTabs, SettingsPanel, and SettingField
+components.
 
 **Testing Commands**:
+
 ```bash
 npm test -- --watch packages/web/components/settings/
 npm run test:coverage -- packages/web/components/settings/
 ```
 
 **Acceptance Criteria**:
+
 - [x] All components render correctly
 - [x] Modal opens/closes properly
 - [x] TypeScript compilation passes
 - [x] Tests achieve >90% coverage (33 tests passing)
 - [x] Accessibility attributes present (role, aria-labels)
 
-**✅ COMPLETED**: Base settings components implemented with comprehensive TDD approach:
-- SettingsModal: Main modal with backdrop, keyboard navigation (Escape), accessibility
+**✅ COMPLETED**: Base settings components implemented with comprehensive TDD
+approach:
+
+- SettingsModal: Main modal with backdrop, keyboard navigation (Escape),
+  accessibility
 - SettingsTabs: Tab navigation with full keyboard support (arrows, Enter/Space)
 - SettingsPanel: Base panel with title, description, icon support
-- SettingField: Field wrapper with horizontal/vertical layouts, required indicators
+- SettingField: Field wrapper with horizontal/vertical layouts, required
+  indicators
 - Complete Storybook stories for SettingsModal demonstrating usage patterns
 - Barrel export index.ts for clean imports
 - Integration tests verify all components work together
@@ -162,14 +184,19 @@ npm run test:coverage -- packages/web/components/settings/
 **Objective**: Move theme selector from sidebar to proper settings location
 
 **Files to Create**:
+
 - `packages/web/components/settings/panels/UISettingsPanel.tsx`
 - `packages/web/components/settings/panels/UISettingsPanel.test.tsx`
 
 **Files to Update**:
-- `packages/web/components/ui/ThemeSelector.tsx` (minor props adjustment if needed)
+
+- `packages/web/components/ui/ThemeSelector.tsx` (minor props adjustment if
+  needed)
 
 **TDD Steps**:
+
 1. **Write failing test**:
+
    ```typescript
    // packages/web/components/settings/panels/UISettingsPanel.test.tsx
    import { render, screen, fireEvent } from '@testing-library/react';
@@ -186,7 +213,7 @@ npm run test:coverage -- packages/web/components/settings/
      it('calls onThemeChange when theme selected', () => {
        const mockOnThemeChange = jest.fn();
        render(<UISettingsPanel onThemeChange={mockOnThemeChange} />);
-       
+
        fireEvent.click(screen.getByText('light'));
        expect(mockOnThemeChange).toHaveBeenCalledWith('light');
      });
@@ -194,6 +221,7 @@ npm run test:coverage -- packages/web/components/settings/
    ```
 
 2. **Implement UISettingsPanel**:
+
    ```typescript
    // packages/web/components/settings/panels/UISettingsPanel.tsx
    // ABOUTME: UI-specific settings panel containing theme selector and display preferences
@@ -218,7 +246,7 @@ npm run test:coverage -- packages/web/components/settings/
            label="Theme"
            description="Choose your preferred color theme"
          >
-           <ThemeSelector 
+           <ThemeSelector
              currentTheme={currentTheme}
              onThemeChange={onThemeChange}
            />
@@ -229,6 +257,7 @@ npm run test:coverage -- packages/web/components/settings/
    ```
 
 **Testing Strategy**:
+
 - Test theme selection functionality
 - Test theme persistence (localStorage interaction)
 - Test visual theme application (DOM attribute changes)
@@ -237,35 +266,42 @@ npm run test:coverage -- packages/web/components/settings/
 **Commit**: "feat: add UISettingsPanel with theme selector"
 
 **✅ COMPLETED**: UISettingsPanel successfully implemented with TDD approach:
-- UISettingsPanel component integrating ThemeSelector within SettingsPanel structure
+
+- UISettingsPanel component integrating ThemeSelector within SettingsPanel
+  structure
 - 7 comprehensive tests covering theme selection, integration, and UI behavior
-- Storybook stories showcasing various usage patterns (Default, LightTheme, ColorfulThemes, InModal, Interactive, AllThemes)
+- Storybook stories showcasing various usage patterns (Default, LightTheme,
+  ColorfulThemes, InModal, Interactive, AllThemes)
 - Barrel export updated to include UISettingsPanel
 - Fixed ThemeSelector React import issue for proper test execution
 - All tests passing (40 total across settings components)
 
 ### Task 3: Update Sidebar to Remove Theme Selector ✅
 
-**Objective**: Clean up sidebar by removing embedded theme selector and connecting settings button
+**Objective**: Clean up sidebar by removing embedded theme selector and
+connecting settings button
 
 **Files to Update**:
+
 - `packages/web/components/layout/Sidebar.tsx`
 - `packages/web/components/layout/Sidebar.test.tsx` (if exists)
 
 **TDD Steps**:
+
 1. **Write test for settings button functionality**:
+
    ```typescript
    // Add to existing Sidebar.test.tsx or create new
    it('calls onSettingsClick when settings button clicked', () => {
      const mockOnSettingsClick = jest.fn();
      render(
-       <Sidebar 
-         isOpen={true} 
-         onToggle={() => {}} 
+       <Sidebar
+         isOpen={true}
+         onToggle={() => {}}
          onSettingsClick={mockOnSettingsClick}
        />
      );
-     
+
      fireEvent.click(screen.getByTitle('Settings'));
      expect(mockOnSettingsClick).toHaveBeenCalled();
    });
@@ -295,19 +331,24 @@ npm run test:coverage -- packages/web/components/settings/
    ```
 
 **Regression Testing**:
+
 - Verify sidebar still opens/closes correctly
 - Verify settings button is clickable and visible
 - Verify no theme selector visible in sidebar
 - Check collapsed sidebar state works
 
-**Commit**: "refactor: remove theme selector from sidebar, add settings button handler"
+**Commit**: "refactor: remove theme selector from sidebar, add settings button
+handler"
 
 **✅ COMPLETED**: Sidebar successfully updated with TDD approach:
+
 - Removed `currentTheme` and `onThemeChange` props from SidebarProps interface
 - Added optional `onSettingsClick` prop for settings button handling
 - Removed ThemeSelector component from footer (lines 102-104)
-- Added settings button with onClick handler in both collapsed and expanded states
-- Created comprehensive test suite with 9 tests covering settings button, theme removal, and regression testing
+- Added settings button with onClick handler in both collapsed and expanded
+  states
+- Created comprehensive test suite with 9 tests covering settings button, theme
+  removal, and regression testing
 - All tests passing with no regressions - sidebar functionality preserved
 - Removed unused ThemeSelector import for clean dependencies
 
@@ -316,13 +357,17 @@ npm run test:coverage -- packages/web/components/settings/
 **Objective**: Connect all pieces and demonstrate working settings modal
 
 **Files to Create**:
+
 - `packages/web/components/settings/SettingsContainer.tsx` (state management)
 
 **Files to Update**:
+
 - Parent component that uses Sidebar (likely a page component)
 
 **TDD Steps**:
+
 1. **Write integration test**:
+
    ```typescript
    // packages/web/components/settings/SettingsContainer.test.tsx
    import { render, screen, fireEvent } from '@testing-library/react';
@@ -331,7 +376,7 @@ npm run test:coverage -- packages/web/components/settings/
    describe('SettingsContainer', () => {
      it('opens settings modal when triggered', () => {
        const { getByTestId } = render(<SettingsContainer />);
-       
+
        fireEvent.click(getByTestId('settings-trigger'));
        expect(screen.getByRole('dialog')).toBeInTheDocument();
        expect(screen.getByText('Settings')).toBeInTheDocument();
@@ -339,10 +384,10 @@ npm run test:coverage -- packages/web/components/settings/
 
      it('changes theme when selected in settings', () => {
        const { getByTestId } = render(<SettingsContainer />);
-       
+
        fireEvent.click(getByTestId('settings-trigger'));
        fireEvent.click(screen.getByText('light'));
-       
+
        // Verify theme applied to document
        expect(document.documentElement.getAttribute('data-theme')).toBe('light');
      });
@@ -350,6 +395,7 @@ npm run test:coverage -- packages/web/components/settings/
    ```
 
 2. **Implement SettingsContainer**:
+
    ```typescript
    // packages/web/components/settings/SettingsContainer.tsx
    // ABOUTME: Container component managing settings modal state and theme persistence
@@ -388,10 +434,10 @@ npm run test:coverage -- packages/web/components/settings/
      return (
        <>
          {children({ onOpenSettings: handleOpenSettings })}
-         
+
          <SettingsModal isOpen={isOpen} onClose={handleCloseSettings}>
            <SettingsTabs defaultTab="ui">
-             <UISettingsPanel 
+             <UISettingsPanel
                currentTheme={currentTheme}
                onThemeChange={handleThemeChange}
              />
@@ -403,19 +449,23 @@ npm run test:coverage -- packages/web/components/settings/
    ```
 
 **Integration Testing**:
+
 - Test complete flow: button click → modal open → theme change → persistence
 - Test modal close functionality
 - Test theme persistence across page reloads
 - Test accessibility with screen readers
 
 **Performance Testing**:
+
 - Verify modal doesn't cause layout shifts
 - Check theme change performance
 - Ensure no memory leaks from event listeners
 
 **Commit**: "feat: complete settings flow with theme selector integration"
 
-**✅ COMPLETED**: Complete settings flow successfully implemented with TDD approach:
+**✅ COMPLETED**: Complete settings flow successfully implemented with TDD
+approach:
+
 - SettingsContainer component with render prop pattern for flexible integration
 - State management for modal open/close and theme persistence
 - Integration with SettingsModal, SettingsTabs, and UISettingsPanel
@@ -428,20 +478,23 @@ npm run test:coverage -- packages/web/components/settings/
 
 ### Task 5: Add User Settings Panel (Future Extension)
 
-**Note**: This task shows the pattern for extending settings. Implement only if explicitly requested.
+**Note**: This task shows the pattern for extending settings. Implement only if
+explicitly requested.
 
 **Files to Create**:
+
 - `packages/web/components/settings/panels/UserSettingsPanel.tsx`
 - `packages/web/components/ui/TextAreaField.tsx`
 
 **TDD Example**:
+
 ```typescript
 // Future user settings test
 it('saves user name to localStorage', () => {
   render(<UserSettingsPanel />);
   fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'John Doe' } });
   fireEvent.click(screen.getByText('Save'));
-  
+
   expect(localStorage.getItem('userName')).toBe('John Doe');
 });
 ```
@@ -449,21 +502,25 @@ it('saves user name to localStorage', () => {
 ## Testing Strategy
 
 ### Unit Tests
+
 - **Component rendering** - All components render without crashing
 - **Props handling** - Components accept and use props correctly
 - **Event handling** - Click handlers and callbacks work
 - **State management** - Local state updates correctly
 
-### Integration Tests  
+### Integration Tests
+
 - **Theme persistence** - Theme selections saved to localStorage
 - **Modal interactions** - Opening, closing, tab switching
 - **Real component composition** - Settings panels work together
 
 ### E2E Tests (Optional)
+
 - **Complete user journey** - Open settings → change theme → verify application
 - **Accessibility** - Keyboard navigation, screen reader compatibility
 
 ### Test Commands
+
 ```bash
 # Run all settings tests
 npm test -- packages/web/components/settings/
@@ -510,12 +567,14 @@ packages/web/components/
 ## Common Pitfalls & Solutions
 
 ### TypeScript Issues
+
 - **Problem**: `any` type usage
 - **Solution**: Use `unknown` and type guards
+
   ```typescript
   // Bad
   const data: any = JSON.parse(response);
-  
+
   // Good
   const data: unknown = JSON.parse(response);
   if (typeof data === 'object' && data !== null && 'theme' in data) {
@@ -524,23 +583,27 @@ packages/web/components/
   ```
 
 ### Testing Anti-Patterns
+
 - **Problem**: Mocking components under test
 - **Solution**: Use real components, mock external dependencies only
+
   ```typescript
   // Bad - mocking the component we're testing
   jest.mock('./ThemeSelector');
-  
+
   // Good - testing real component
   import { ThemeSelector } from './ThemeSelector';
   render(<ThemeSelector currentTheme="dark" />);
   ```
 
 ### State Management Issues
+
 - **Problem**: Props drilling or complex state
 - **Solution**: Use container pattern for state management
 - **Keep components pure** - Settings panels should be stateless
 
 ### Modal Accessibility
+
 - **Must include**: `role="dialog"`, focus management, escape key handling
 - **Test with**: Tab navigation, screen readers
 - **Reference**: Existing SessionConfigPanel for patterns
@@ -548,6 +611,7 @@ packages/web/components/
 ## Definition of Done
 
 ### For Each Task
+
 - [ ] TDD cycle completed (test → implement → refactor)
 - [ ] TypeScript compilation passes with no errors
 - [ ] All tests pass with >90% coverage
@@ -556,6 +620,7 @@ packages/web/components/
 - [ ] Code reviewed and committed
 
 ### For Complete Feature
+
 - [ ] Theme selector moved from sidebar to settings
 - [ ] Settings modal opens/closes correctly
 - [ ] Theme changes persist across sessions
@@ -570,7 +635,7 @@ packages/web/components/
 npm run dev                    # Start development server
 npm run storybook             # View components in Storybook
 
-# Testing  
+# Testing
 npm test                      # Run tests in watch mode
 npm run test:run              # Run tests once
 npm run test:coverage         # Coverage report
@@ -587,4 +652,5 @@ git add .                     # Stage changes
 git commit -m "feat: ..."     # Commit with conventional message
 ```
 
-Remember: Follow TDD religiously, commit frequently, never use `any` types, and never mock the functionality under test.
+Remember: Follow TDD religiously, commit frequently, never use `any` types, and
+never mock the functionality under test.

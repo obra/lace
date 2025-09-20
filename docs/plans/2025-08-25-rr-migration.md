@@ -2,15 +2,17 @@
 
 **Date:** 2025-08-25  
 **Author:** Claude Code  
-**Status:** In Progress - Phase 1 Complete  
+**Status:** In Progress - Phase 1 Complete
 
 ## Overview
 
-Migrate Lace web interface from Next.js to React Router v7 Framework Mode to address performance and architectural issues.
+Migrate Lace web interface from Next.js to React Router v7 Framework Mode to
+address performance and architectural issues.
 
 ## Problem Statement
 
 ### Next.js Issues
+
 - **Webpack dev mode**: Extremely slow startup (~30+ seconds)
 - **Turbopack**: Breaks on WASM modules (explicitly disabled)
 - **Single-file bundling**: Fights against Bun executable bundling
@@ -18,6 +20,7 @@ Migrate Lace web interface from Next.js to React Router v7 Framework Mode to add
 - **Development experience**: Slow HMR and recompilation cycles
 
 ### Lace Requirements
+
 - Single-process Node.js webserver (not serverless)
 - React-based frontend with TypeScript
 - ~50+ Express-like API routes
@@ -30,6 +33,7 @@ Migrate Lace web interface from Next.js to React Router v7 Framework Mode to add
 ## Solution: React Router v7 Framework Mode
 
 ### Why React Router v7 Framework Mode
+
 - **File-based routing** - Same patterns as Next.js App Router
 - **SPA mode** - No SSR complexity, pure client-side
 - **Vite integration** - Fast development with ~3 second startup
@@ -46,28 +50,36 @@ Migrate Lace web interface from Next.js to React Router v7 Framework Mode to add
 **Status:** ✅ COMPLETE
 
 #### 1.1 Dependencies
-- ✅ Remove Next.js dependencies (`next`, `@sentry/nextjs`, `eslint-config-next`)
-- ✅ Install React Router v7 (`react-router@7`, `react-router-dom@7`, `@react-router/dev@7`, etc.)
+
+- ✅ Remove Next.js dependencies (`next`, `@sentry/nextjs`,
+  `eslint-config-next`)
+- ✅ Install React Router v7 (`react-router@7`, `react-router-dom@7`,
+  `@react-router/dev@7`, etc.)
 - ✅ Install Vite and React plugin
 
 #### 1.2 Configuration
+
 - ✅ Create `vite.config.ts` with SPA mode and path aliases
 - ✅ Create `app/root.tsx` for root component
 - ✅ Create `app/routes.ts` for route configuration
 - ✅ Update package.json scripts to use `react-router dev/build/serve`
 
 #### 1.3 Basic Routes
-- ✅ Convert frontend routes: home, docs, play, font-test, speech-demo, sentry-test
+
+- ✅ Convert frontend routes: home, docs, play, font-test, speech-demo,
+  sentry-test
 - ✅ Convert nested project routes with param mapping
 - ✅ Setup basic API routes: health, events/stream, threads message
 
-#### 1.4 Navigation Updates  
+#### 1.4 Navigation Updates
+
 - ✅ Convert `next/navigation` imports to `react-router`
 - ✅ Update `useRouter()` → `useNavigate()`
 - ✅ Update `Link` imports from `next/link` to `react-router`
 - ✅ Remove `server-only` imports that cause client/server boundary issues
 
 #### 1.5 Verification
+
 - ✅ Dev server starts (~3 seconds vs Next.js 30+ seconds)
 - ✅ API routes work (`/api/health` returns JSON)
 - ✅ Frontend renders (home page with sidebar, projects section)
@@ -79,15 +91,20 @@ Migrate Lace web interface from Next.js to React Router v7 Framework Mode to add
 **Status:** 🔄 IN PROGRESS
 
 #### 2.1 Git History Preservation Strategy
+
 **Problem:** Initial conversion created new files, losing git history
 
 **Solution:** For each API route:
+
 1. `git mv app/api/[path]/route.ts app/routes/api.[route-name].ts`
-2. `mv app/routes/api.[route-name].tsx app/routes/api.[route-name].ts` (overwrite with converted content)
+2. `mv app/routes/api.[route-name].tsx app/routes/api.[route-name].ts`
+   (overwrite with converted content)
 3. Update `app/routes.ts` to reference `.ts` extension
 
 #### 2.2 Conversion Pattern
+
 **Next.js Pattern:**
+
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -101,19 +118,23 @@ export async function POST(request: NextRequest, { params }) {
 ```
 
 **React Router v7 Pattern:**
+
 ```typescript
 import type { Route } from './+types/api.routename';
 
-export async function loader({ request, params }: Route.LoaderArgs) { // GET
+export async function loader({ request, params }: Route.LoaderArgs) {
+  // GET
   return Response.json(data);
 }
 
-export async function action({ request, params }: Route.ActionArgs) { // POST/PUT/DELETE
+export async function action({ request, params }: Route.ActionArgs) {
+  // POST/PUT/DELETE
   return Response.json(data);
 }
 ```
 
 #### 2.3 Route Mapping
+
 ```
 app/api/health/route.ts → app/routes/api.health.ts ✅
 app/api/events/stream/route.ts → app/routes/api.events.stream.ts ✅
@@ -154,9 +175,11 @@ app/api/tunnel/route.ts → app/routes/api.tunnel.ts
 ```
 
 #### 2.4 Current Status
+
 **✅ Completed Routes:**
+
 - api.health.ts
-- api.events.stream.ts  
+- api.events.stream.ts
 - api.sentry-test.ts
 - api.agents.$agentId.history.ts
 - api.agents.$agentId.message.ts
@@ -164,6 +187,7 @@ app/api/tunnel/route.ts → app/routes/api.tunnel.ts
 - api.tunnel.ts
 
 **🔄 Remaining .tsx Files to Convert:**
+
 - api.agents.$agentId.tsx
 - api.debug.console.tsx
 - api.filesystem.list.tsx
@@ -186,6 +210,7 @@ app/api/tunnel/route.ts → app/routes/api.tunnel.ts
 ### Phase 3: Testing & Validation (Days 6-7)
 
 #### 3.1 Functional Testing
+
 - [ ] All API endpoints respond correctly
 - [ ] SSE streams work (`/api/events/stream`)
 - [ ] Deep linking works (refresh on nested routes)
@@ -194,6 +219,7 @@ app/api/tunnel/route.ts → app/routes/api.tunnel.ts
 - [ ] Error handling and validation
 
 #### 3.2 Integration Testing
+
 - [ ] Run existing test suite
 - [ ] Playwright E2E tests pass
 - [ ] Tool approval flows work
@@ -202,12 +228,14 @@ app/api/tunnel/route.ts → app/routes/api.tunnel.ts
 ### Phase 4: Production & Deployment (Days 8-10)
 
 #### 4.1 Build System
+
 - [ ] Configure production build (`react-router build`)
 - [ ] Test Bun single-file executable bundling
 - [ ] Verify all assets and static files
 - [ ] Performance testing vs Next.js baseline
 
 #### 4.2 Deployment
+
 - [ ] Update deployment scripts
 - [ ] Test production server startup
 - [ ] Verify all environment configurations
@@ -216,6 +244,7 @@ app/api/tunnel/route.ts → app/routes/api.tunnel.ts
 ## File Structure Changes
 
 ### Before (Next.js)
+
 ```
 packages/web/
 ├── app/
@@ -233,10 +262,11 @@ packages/web/
 ```
 
 ### After (React Router v7)
+
 ```
 packages/web/
 ├── app/
-│   ├── root.tsx                       # Root component  
+│   ├── root.tsx                       # Root component
 │   ├── routes.ts                      # Route configuration
 │   └── routes/                        # All routes
 │       ├── _index.tsx                 # Home page
@@ -251,18 +281,21 @@ packages/web/
 ## Benefits Achieved
 
 ### Development Experience
+
 - **Startup time**: ~3 seconds (vs Next.js 30+ seconds) - **10x improvement**
 - **Hot reload**: Instant (vs slow webpack recompilation)
 - **Build time**: Significantly faster production builds
 - **Bundle size**: Smaller client bundles without Next.js overhead
 
 ### Architecture Simplification
+
 - **Single framework**: React Router v7 handles both frontend and API
 - **Unified routing**: File-based routing for both pages and API endpoints
 - **Reduced complexity**: No more Next.js/webpack configuration overhead
 - **Better Bun compatibility**: Seamless single-file executable generation
 
 ### Functionality Preservation
+
 - **File-based routing**: Same patterns developers are used to
 - **API routes**: All endpoints work with same business logic
 - **SSE streaming**: Enhanced support via standard Web APIs
@@ -272,6 +305,7 @@ packages/web/
 ## Technical Implementation Notes
 
 ### Vite Configuration
+
 ```typescript
 // vite.config.ts
 export default defineConfig({
@@ -282,14 +316,15 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "~": path.resolve(__dirname, "../core/src"),
-      "@": path.resolve(__dirname, "."),
+      '~': path.resolve(__dirname, '../core/src'),
+      '@': path.resolve(__dirname, '.'),
     },
   },
 });
 ```
 
 ### API Route Example
+
 ```typescript
 // app/routes/api.health.ts
 export async function loader() {
@@ -303,14 +338,15 @@ export async function loader() {
 ```
 
 ### SSE Implementation
+
 ```typescript
-// app/routes/api.events.stream.ts  
+// app/routes/api.events.stream.ts
 export async function loader({ request }: Route.LoaderArgs) {
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       const manager = EventStreamManager.getInstance();
       const connectionId = manager.addConnection(controller, {});
-      
+
       request.signal?.addEventListener('abort', () => {
         manager.removeConnection(connectionId);
       });
@@ -330,24 +366,31 @@ export async function loader({ request }: Route.LoaderArgs) {
 ## Migration Challenges & Solutions
 
 ### Challenge 1: Server-Only Imports
+
 **Problem:** Next.js `server-only` package conflicts with client-side rendering
 **Solution:** Remove `import 'server-only'` statements from server modules
 
-### Challenge 2: Navigation Hook Compatibility  
+### Challenge 2: Navigation Hook Compatibility
+
 **Problem:** `useRouter` from `next/navigation` doesn't exist in React Router
-**Solution:** Convert to `useNavigate`, `useParams`, `useLocation` from `react-router`
+**Solution:** Convert to `useNavigate`, `useParams`, `useLocation` from
+`react-router`
 
 ### Challenge 3: Git History Preservation
+
 **Problem:** Creating new files loses git blame/history for API routes
-**Solution:** Use `git mv` to move original files, then overwrite with converted content
+**Solution:** Use `git mv` to move original files, then overwrite with converted
+content
 
 ### Challenge 4: Route Configuration
-**Problem:** React Router v7 requires explicit route configuration
-**Solution:** File-based routing with `app/routes.ts` configuration file
+
+**Problem:** React Router v7 requires explicit route configuration **Solution:**
+File-based routing with `app/routes.ts` configuration file
 
 ## Validation Criteria
 
 ### ✅ Phase 1 Success Criteria (ACHIEVED)
+
 - [x] Dev server starts in <5 seconds
 - [x] API endpoint responds (`/api/health`)
 - [x] Frontend page renders with sidebar and navigation
@@ -355,6 +398,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 - [x] Basic routing works (home page accessible)
 
 ### 🔄 Phase 2 Success Criteria (IN PROGRESS)
+
 - [ ] All ~32 API routes converted and functional
 - [ ] SSE streaming works end-to-end
 - [ ] Deep linking works (can refresh on any route)
@@ -362,12 +406,14 @@ export async function loader({ request }: Route.LoaderArgs) {
 - [ ] Error boundaries and error handling work
 
 ### ⏳ Phase 3 Success Criteria (PENDING)
+
 - [ ] All existing tests pass
 - [ ] Playwright E2E tests pass
 - [ ] Performance improvement verified
 - [ ] No functionality regressions
 
 ### ⏳ Phase 4 Success Criteria (PENDING)
+
 - [ ] Production build succeeds
 - [ ] Bun single-file executable works
 - [ ] Deployment process updated
@@ -376,12 +422,14 @@ export async function loader({ request }: Route.LoaderArgs) {
 ## Rollback Plan
 
 **If migration fails:**
+
 ```bash
 git checkout main
 npm run dev  # Back to Next.js
 ```
 
 **Risk Level:** Low
+
 - Migration on separate branch
 - Original Next.js code preserved
 - No changes to backend/core logic
@@ -390,11 +438,13 @@ npm run dev  # Back to Next.js
 ## Performance Expectations
 
 ### Development
+
 - **Startup**: 3 seconds (vs 30+ with Next.js)
 - **HMR**: Instant (vs slow webpack rebuilds)
 - **Build**: 2-3x faster production builds
 
-### Production  
+### Production
+
 - **Bundle size**: Smaller without Next.js overhead
 - **Runtime performance**: Comparable or better
 - **Single-file executable**: Seamless Bun bundling
@@ -402,29 +452,37 @@ npm run dev  # Back to Next.js
 ## Implementation Details
 
 ### File Naming Conventions
+
 - Frontend routes: `.tsx` extension (contain JSX)
 - API routes: `.ts` extension (pure TypeScript)
 - Dynamic parameters: `$param` instead of `[param]`
 - Path separators: `.` instead of `/`
 
 ### Route Configuration
+
 All routes explicitly defined in `app/routes.ts`:
+
 ```typescript
 export default [
   // Frontend routes
-  index("routes/_index.tsx"),
-  route("project/:projectId", "routes/project.$projectId.tsx", [
-    route("session/:sessionId", "routes/project.$projectId.session.$sessionId.tsx"),
+  index('routes/_index.tsx'),
+  route('project/:projectId', 'routes/project.$projectId.tsx', [
+    route(
+      'session/:sessionId',
+      'routes/project.$projectId.session.$sessionId.tsx'
+    ),
   ]),
-  
-  // API routes  
-  route("api/health", "routes/api.health.ts"),
-  route("api/events/stream", "routes/api.events.stream.ts"),
+
+  // API routes
+  route('api/health', 'routes/api.health.ts'),
+  route('api/events/stream', 'routes/api.events.stream.ts'),
 ] satisfies RouteConfig;
 ```
 
 ### Type Safety
+
 React Router v7 generates TypeScript types for each route:
+
 ```typescript
 // Auto-generated: app/routes/+types/api.projects.$projectId.ts
 export interface LoaderArgs {
@@ -436,6 +494,7 @@ export interface LoaderArgs {
 ## Current Status Summary
 
 **✅ WORKING:**
+
 - React Router v7 dev server running on localhost:5173
 - Basic frontend rendering with sidebar and navigation
 - API endpoints functional (`/api/health` tested)
@@ -443,10 +502,12 @@ export interface LoaderArgs {
 - Navigation hooks converted and working
 
 **🔄 IN PROGRESS:**
+
 - Converting remaining ~20 API routes with proper git history preservation
 - Fixing .tsx → .ts extension consistency for API routes
 
 **⏳ TODO:**
+
 - Complete API route conversion
 - Test SSE streaming end-to-end
 - Validate all application functionality
@@ -454,10 +515,13 @@ export interface LoaderArgs {
 
 ## Conclusion
 
-The React Router v7 Framework Mode migration is proving highly successful. The foundation is solid with immediate development experience improvements (~10x faster startup). The architecture is cleaner and more aligned with Lace's single-process requirements.
+The React Router v7 Framework Mode migration is proving highly successful. The
+foundation is solid with immediate development experience improvements (~10x
+faster startup). The architecture is cleaner and more aligned with Lace's
+single-process requirements.
 
-The remaining work is primarily mechanical conversion of API routes while preserving git history. No fundamental architectural challenges remain.
+The remaining work is primarily mechanical conversion of API routes while
+preserving git history. No fundamental architectural challenges remain.
 
-**Expected completion:** 1-2 weeks total
-**Risk assessment:** Low (incremental, reversible)
-**Recommendation:** Continue with full migration
+**Expected completion:** 1-2 weeks total **Risk assessment:** Low (incremental,
+reversible) **Recommendation:** Continue with full migration

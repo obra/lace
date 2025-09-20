@@ -2,48 +2,63 @@
 
 ## Overview
 
-This plan implements a file browser for the Lace web UI that allows users to browse and view files within their session's working directory. The file browser appears in the sidebar and includes tree navigation, search, and file viewing capabilities.
+This plan implements a file browser for the Lace web UI that allows users to
+browse and view files within their session's working directory. The file browser
+appears in the sidebar and includes tree navigation, search, and file viewing
+capabilities.
 
 **Key Requirements:**
-- Session-scoped file access (security: files only within session's workingDirectory)
-- Tree-based directory navigation 
+
+- Session-scoped file access (security: files only within session's
+  workingDirectory)
+- Tree-based directory navigation
 - File search functionality
 - Modal file viewer with syntax highlighting
 - Leverage existing UI components and patterns
-- Test-driven development with real filesystem operations (no mocking core functionality)
+- Test-driven development with real filesystem operations (no mocking core
+  functionality)
 - Frequent commits after each working increment
 
 ## Prerequisites
 
 ### Understanding the Codebase
+
 Before starting, read these files to understand existing patterns:
 
 **UI Component Architecture:**
-- `packages/web/app/play/page.tsx` - Complete component catalog 
+
+- `packages/web/app/play/page.tsx` - Complete component catalog
 - `packages/web/components/ui/index.ts` - Available UI components
 - `packages/web/components/layout/Sidebar.tsx` - Sidebar system
 - `packages/web/components/ui/Modal.tsx` - Modal patterns
 
 **File System Integration:**
+
 - `packages/web/components/ui/DirectoryField.tsx` - Directory browsing patterns
 - `packages/web/types/filesystem.ts` - Existing file system types
 - `packages/web/app/api/filesystem/list/route.ts` - Directory listing API
 
 **Session Architecture:**
-- `packages/web/types/api.ts` - Session configuration (look for `SessionConfiguration.workingDirectory`)
+
+- `packages/web/types/api.ts` - Session configuration (look for
+  `SessionConfiguration.workingDirectory`)
 - `packages/web/lib/server/session-service.ts` - Session management
 - `packages/web/components/providers/SessionProvider.tsx` - Session state
 
 **Syntax Highlighting:**
-- `packages/web/components/files/FileDiffViewer.tsx` - Existing highlight.js integration
+
+- `packages/web/components/files/FileDiffViewer.tsx` - Existing highlight.js
+  integration
 
 ### TypeScript Rules
+
 - **Never use `any` type** - use `unknown` with type guards instead
 - **Always type function parameters and return types explicitly**
 - **Use `z.infer<>` for Zod schema types**
 - **Import types with `import type`**
 
 ### Testing Rules
+
 - **Test-Driven Development**: Write failing tests first, then implement
 - **No mocking core functionality**: Use real filesystem operations
 - **Mock only external dependencies**: APIs, databases, etc.
@@ -58,9 +73,11 @@ Before starting, read these files to understand existing patterns:
 **Goal**: Define TypeScript interfaces for session-scoped file operations
 
 **Files to create:**
+
 - `packages/web/types/session-files.ts`
 
 **Files to reference:**
+
 - `packages/web/types/filesystem.ts` - Study existing patterns
 - `packages/web/types/api.ts` - Study API response patterns
 
@@ -127,8 +144,7 @@ export const GetSessionFileRequestSchema = z.object({
 });
 ```
 
-**Testing:**
-Create `packages/web/types/session-files.test.ts`:
+**Testing:** Create `packages/web/types/session-files.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest';
@@ -175,6 +191,7 @@ describe('Session File Types', () => {
 ```
 
 **How to test:**
+
 ```bash
 cd packages/web
 npm run test:run types/session-files.test.ts
@@ -186,13 +203,17 @@ npm run test:run types/session-files.test.ts
 
 ## Task 2: Create Session Directory Listing API
 
-**Goal**: API endpoint to list files in a session's working directory with path traversal protection
+**Goal**: API endpoint to list files in a session's working directory with path
+traversal protection
 
 **Files to create:**
+
 - `packages/web/app/api/sessions/[sessionId]/files/route.ts`
 
 **Files to reference:**
-- `packages/web/app/api/filesystem/list/route.ts` - Study directory listing patterns
+
+- `packages/web/app/api/filesystem/list/route.ts` - Study directory listing
+  patterns
 - `packages/web/lib/server/session-service.ts` - Study session access patterns
 - `packages/web/lib/serialization.ts` - Study response serialization
 - `packages/web/lib/server/api-utils.ts` - Study error handling
@@ -204,83 +225,112 @@ npm run test:run types/session-files.test.ts
 import { NextRequest } from 'next/server';
 import { promises as fs } from 'fs';
 import { join, resolve, relative, dirname } from 'path';
-import { createSuperjsonResponse, createErrorResponse } from '@/lib/server/api-utils';
+import {
+  createSuperjsonResponse,
+  createErrorResponse,
+} from '@/lib/server/api-utils';
 import { SessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
-import { 
+import {
   ListSessionDirectoryRequestSchema,
   type SessionDirectoryResponse,
-  type SessionFileEntry 
+  type SessionFileEntry,
 } from '@/types/session-files';
 
-export async function GET(request: NextRequest, { params }: { params: { sessionId: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { sessionId: string } }
+) {
   try {
     const { searchParams } = new URL(request.url);
     const rawPath = searchParams.get('path') || '';
-    
+
     // Validate request
-    const { path: requestedPath } = ListSessionDirectoryRequestSchema.parse({ path: rawPath });
-    
+    const { path: requestedPath } = ListSessionDirectoryRequestSchema.parse({
+      path: rawPath,
+    });
+
     // Get session and working directory
     const sessionService = new SessionService();
-    const session = await sessionService.getSession(asThreadId(params.sessionId));
-    
+    const session = await sessionService.getSession(
+      asThreadId(params.sessionId)
+    );
+
     if (!session) {
-      return createErrorResponse('Session not found', 404, { code: 'SESSION_NOT_FOUND' });
-    }
-    
-    const sessionConfig = session.getConfiguration();
-    const workingDirectory = sessionConfig?.workingDirectory;
-    
-    if (!workingDirectory) {
-      return createErrorResponse('Session has no working directory configured', 400, { 
-        code: 'NO_WORKING_DIRECTORY' 
+      return createErrorResponse('Session not found', 404, {
+        code: 'SESSION_NOT_FOUND',
       });
     }
-    
+
+    const sessionConfig = session.getConfiguration();
+    const workingDirectory = sessionConfig?.workingDirectory;
+
+    if (!workingDirectory) {
+      return createErrorResponse(
+        'Session has no working directory configured',
+        400,
+        {
+          code: 'NO_WORKING_DIRECTORY',
+        }
+      );
+    }
+
     // Security: Resolve paths and prevent traversal outside working directory
     const absoluteWorkingDir = resolve(workingDirectory);
     const absoluteRequestedPath = resolve(absoluteWorkingDir, requestedPath);
     const relativePath = relative(absoluteWorkingDir, absoluteRequestedPath);
-    
+
     // Prevent path traversal attacks
-    if (relativePath.startsWith('..') || resolve(absoluteWorkingDir, relativePath) !== absoluteRequestedPath) {
-      return createErrorResponse('Path access denied', 403, { code: 'PATH_ACCESS_DENIED' });
+    if (
+      relativePath.startsWith('..') ||
+      resolve(absoluteWorkingDir, relativePath) !== absoluteRequestedPath
+    ) {
+      return createErrorResponse('Path access denied', 403, {
+        code: 'PATH_ACCESS_DENIED',
+      });
     }
-    
+
     // Check if directory exists and is accessible
     try {
       const stats = await fs.stat(absoluteRequestedPath);
       if (!stats.isDirectory()) {
-        return createErrorResponse('Path is not a directory', 400, { code: 'NOT_A_DIRECTORY' });
+        return createErrorResponse('Path is not a directory', 400, {
+          code: 'NOT_A_DIRECTORY',
+        });
       }
     } catch (error) {
       if (error instanceof Error && 'code' in error) {
         if (error.code === 'ENOENT') {
-          return createErrorResponse('Directory not found', 404, { code: 'DIRECTORY_NOT_FOUND' });
+          return createErrorResponse('Directory not found', 404, {
+            code: 'DIRECTORY_NOT_FOUND',
+          });
         }
         if (error.code === 'EACCES') {
-          return createErrorResponse('Permission denied', 403, { code: 'PERMISSION_DENIED' });
+          return createErrorResponse('Permission denied', 403, {
+            code: 'PERMISSION_DENIED',
+          });
         }
       }
       throw error; // Re-throw unexpected errors
     }
-    
+
     // Read directory contents
-    const dirents = await fs.readdir(absoluteRequestedPath, { withFileTypes: true });
+    const dirents = await fs.readdir(absoluteRequestedPath, {
+      withFileTypes: true,
+    });
     const entries: SessionFileEntry[] = [];
-    
+
     for (const dirent of dirents) {
       try {
         const entryPath = join(absoluteRequestedPath, dirent.name);
         const entryStats = await fs.stat(entryPath);
-        
+
         // Check if readable
         await fs.access(entryPath, fs.constants.R_OK);
-        
+
         // Calculate relative path from working directory
         const relativeEntryPath = relative(absoluteWorkingDir, entryPath);
-        
+
         entries.push({
           name: dirent.name,
           path: relativeEntryPath,
@@ -294,7 +344,7 @@ export async function GET(request: NextRequest, { params }: { params: { sessionI
         continue;
       }
     }
-    
+
     // Sort: directories first, then alphabetically
     entries.sort((a, b) => {
       if (a.type !== b.type) {
@@ -302,15 +352,14 @@ export async function GET(request: NextRequest, { params }: { params: { sessionI
       }
       return a.name.localeCompare(b.name);
     });
-    
+
     const response: SessionDirectoryResponse = {
       workingDirectory: absoluteWorkingDir,
       currentPath: relativePath,
       entries,
     };
-    
+
     return createSuperjsonResponse(response);
-    
   } catch (error) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to list directory',
@@ -321,8 +370,8 @@ export async function GET(request: NextRequest, { params }: { params: { sessionI
 }
 ```
 
-**Testing:**
-Create `packages/web/app/api/sessions/[sessionId]/files/route.test.ts`:
+**Testing:** Create
+`packages/web/app/api/sessions/[sessionId]/files/route.test.ts`:
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -342,14 +391,17 @@ describe('/api/sessions/[sessionId]/files', () => {
     // Create temporary test directory with real filesystem
     testDir = join(tmpdir(), `lace-test-${Date.now()}`);
     await fs.mkdir(testDir, { recursive: true });
-    
+
     // Create test files and directories
     await fs.mkdir(join(testDir, 'src'));
     await fs.writeFile(join(testDir, 'package.json'), '{"name": "test"}');
-    await fs.writeFile(join(testDir, 'src', 'index.ts'), 'console.log("hello");');
-    
+    await fs.writeFile(
+      join(testDir, 'src', 'index.ts'),
+      'console.log("hello");'
+    );
+
     testSessionId = 'test-session-123';
-    
+
     // Mock session service to return our test directory
     // Note: This would require dependency injection in real implementation
     // For now, document that this test needs session mocking setup
@@ -368,26 +420,32 @@ describe('/api/sessions/[sessionId]/files', () => {
     const request = new NextRequest(
       `http://localhost/api/sessions/${testSessionId}/files`
     );
-    
+
     // TODO: Mock SessionService.getSession() to return session with workingDirectory: testDir
     // This requires setting up dependency injection for SessionService
-    
-    const response = await GET(request, { params: { sessionId: testSessionId } });
-    
+
+    const response = await GET(request, {
+      params: { sessionId: testSessionId },
+    });
+
     expect(response.status).toBe(200);
     const data = await parseResponse<SessionDirectoryResponse>(response);
     expect(data.entries).toHaveLength(2); // src directory + package.json
-    expect(data.entries.find(e => e.name === 'src')?.type).toBe('directory');
-    expect(data.entries.find(e => e.name === 'package.json')?.type).toBe('file');
+    expect(data.entries.find((e) => e.name === 'src')?.type).toBe('directory');
+    expect(data.entries.find((e) => e.name === 'package.json')?.type).toBe(
+      'file'
+    );
   });
 
   it('should prevent path traversal attacks', async () => {
     const request = new NextRequest(
       `http://localhost/api/sessions/${testSessionId}/files?path=../../../etc`
     );
-    
-    const response = await GET(request, { params: { sessionId: testSessionId } });
-    
+
+    const response = await GET(request, {
+      params: { sessionId: testSessionId },
+    });
+
     expect(response.status).toBe(403);
     const data = await parseResponse<{ error: string; code: string }>(response);
     expect(data.code).toBe('PATH_ACCESS_DENIED');
@@ -397,9 +455,11 @@ describe('/api/sessions/[sessionId]/files', () => {
     const request = new NextRequest(
       'http://localhost/api/sessions/invalid-session/files'
     );
-    
-    const response = await GET(request, { params: { sessionId: 'invalid-session' } });
-    
+
+    const response = await GET(request, {
+      params: { sessionId: 'invalid-session' },
+    });
+
     expect(response.status).toBe(404);
     const data = await parseResponse<{ error: string; code: string }>(response);
     expect(data.code).toBe('SESSION_NOT_FOUND');
@@ -407,29 +467,36 @@ describe('/api/sessions/[sessionId]/files', () => {
 });
 ```
 
-**Testing Notes:**
-The test requires mocking the SessionService. Since we avoid mocking core functionality, this test demonstrates the integration points but may need dependency injection setup to run properly.
+**Testing Notes:** The test requires mocking the SessionService. Since we avoid
+mocking core functionality, this test demonstrates the integration points but
+may need dependency injection setup to run properly.
 
 **How to test:**
+
 ```bash
 cd packages/web
 npm run test:run app/api/sessions/[sessionId]/files/route.test.ts
 ```
 
-**Commit message**: "feat: add session-scoped directory listing API with path traversal protection"
+**Commit message**: "feat: add session-scoped directory listing API with path
+traversal protection"
 
 ---
 
 ## Task 3: Create Session File Content API
 
-**Goal**: API endpoint to retrieve file content from within a session's working directory
+**Goal**: API endpoint to retrieve file content from within a session's working
+directory
 
 **Files to create:**
+
 - `packages/web/app/api/sessions/[sessionId]/files/[...path]/route.ts`
 
 **Files to reference:**
+
 - Previous task's route for session validation patterns
-- `packages/web/components/files/FileDiffViewer.tsx` - See how files are handled for syntax highlighting
+- `packages/web/components/files/FileDiffViewer.tsx` - See how files are handled
+  for syntax highlighting
 
 **Implementation:**
 
@@ -438,12 +505,15 @@ npm run test:run app/api/sessions/[sessionId]/files/route.test.ts
 import { NextRequest } from 'next/server';
 import { promises as fs } from 'fs';
 import { resolve, relative, extname } from 'path';
-import { createSuperjsonResponse, createErrorResponse } from '@/lib/server/api-utils';
+import {
+  createSuperjsonResponse,
+  createErrorResponse,
+} from '@/lib/server/api-utils';
 import { SessionService } from '@/lib/server/session-service';
 import { asThreadId } from '@/types/core';
-import { 
+import {
   GetSessionFileRequestSchema,
-  type SessionFileContentResponse 
+  type SessionFileContentResponse,
 } from '@/types/session-files';
 
 // Simple MIME type detection based on file extension
@@ -477,91 +547,121 @@ function isTextFile(mimeType: string): boolean {
   return mimeType.startsWith('text/') || mimeType === 'application/json';
 }
 
-export async function GET(request: NextRequest, { params }: { params: { sessionId: string, path: string[] } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { sessionId: string; path: string[] } }
+) {
   try {
     const filePath = params.path.join('/');
-    
+
     // Validate request
-    const { path: requestedPath } = GetSessionFileRequestSchema.parse({ path: filePath });
-    
+    const { path: requestedPath } = GetSessionFileRequestSchema.parse({
+      path: filePath,
+    });
+
     // Get session and working directory
     const sessionService = new SessionService();
-    const session = await sessionService.getSession(asThreadId(params.sessionId));
-    
+    const session = await sessionService.getSession(
+      asThreadId(params.sessionId)
+    );
+
     if (!session) {
-      return createErrorResponse('Session not found', 404, { code: 'SESSION_NOT_FOUND' });
-    }
-    
-    const sessionConfig = session.getConfiguration();
-    const workingDirectory = sessionConfig?.workingDirectory;
-    
-    if (!workingDirectory) {
-      return createErrorResponse('Session has no working directory configured', 400, { 
-        code: 'NO_WORKING_DIRECTORY' 
+      return createErrorResponse('Session not found', 404, {
+        code: 'SESSION_NOT_FOUND',
       });
     }
-    
+
+    const sessionConfig = session.getConfiguration();
+    const workingDirectory = sessionConfig?.workingDirectory;
+
+    if (!workingDirectory) {
+      return createErrorResponse(
+        'Session has no working directory configured',
+        400,
+        {
+          code: 'NO_WORKING_DIRECTORY',
+        }
+      );
+    }
+
     // Security: Resolve paths and prevent traversal outside working directory
     const absoluteWorkingDir = resolve(workingDirectory);
     const absoluteFilePath = resolve(absoluteWorkingDir, requestedPath);
     const relativePath = relative(absoluteWorkingDir, absoluteFilePath);
-    
+
     // Prevent path traversal attacks
-    if (relativePath.startsWith('..') || resolve(absoluteWorkingDir, relativePath) !== absoluteFilePath) {
-      return createErrorResponse('Path access denied', 403, { code: 'PATH_ACCESS_DENIED' });
+    if (
+      relativePath.startsWith('..') ||
+      resolve(absoluteWorkingDir, relativePath) !== absoluteFilePath
+    ) {
+      return createErrorResponse('Path access denied', 403, {
+        code: 'PATH_ACCESS_DENIED',
+      });
     }
-    
+
     // Check if file exists and is accessible
     let stats;
     try {
       stats = await fs.stat(absoluteFilePath);
       if (stats.isDirectory()) {
-        return createErrorResponse('Path is a directory, not a file', 400, { code: 'PATH_IS_DIRECTORY' });
+        return createErrorResponse('Path is a directory, not a file', 400, {
+          code: 'PATH_IS_DIRECTORY',
+        });
       }
     } catch (error) {
       if (error instanceof Error && 'code' in error) {
         if (error.code === 'ENOENT') {
-          return createErrorResponse('File not found', 404, { code: 'FILE_NOT_FOUND' });
+          return createErrorResponse('File not found', 404, {
+            code: 'FILE_NOT_FOUND',
+          });
         }
         if (error.code === 'EACCES') {
-          return createErrorResponse('Permission denied', 403, { code: 'PERMISSION_DENIED' });
+          return createErrorResponse('Permission denied', 403, {
+            code: 'PERMISSION_DENIED',
+          });
         }
       }
       throw error;
     }
-    
+
     // Check file size - limit to 1MB for text files
     const MAX_FILE_SIZE = 1024 * 1024; // 1MB
     if (stats.size > MAX_FILE_SIZE) {
-      return createErrorResponse('File too large to display', 413, { 
+      return createErrorResponse('File too large to display', 413, {
         code: 'FILE_TOO_LARGE',
-        details: { maxSize: MAX_FILE_SIZE, actualSize: stats.size }
+        details: { maxSize: MAX_FILE_SIZE, actualSize: stats.size },
       });
     }
-    
+
     // Determine MIME type and encoding
     const mimeType = getMimeType(absoluteFilePath);
     const isText = isTextFile(mimeType);
-    
+
     if (!isText) {
-      return createErrorResponse('Binary files are not supported', 415, { 
+      return createErrorResponse('Binary files are not supported', 415, {
         code: 'UNSUPPORTED_FILE_TYPE',
-        details: { mimeType }
+        details: { mimeType },
       });
     }
-    
+
     // Read file content
     let content: string;
     try {
       await fs.access(absoluteFilePath, fs.constants.R_OK);
       content = await fs.readFile(absoluteFilePath, 'utf8');
     } catch (error) {
-      if (error instanceof Error && 'code' in error && error.code === 'EACCES') {
-        return createErrorResponse('Permission denied', 403, { code: 'PERMISSION_DENIED' });
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'EACCES'
+      ) {
+        return createErrorResponse('Permission denied', 403, {
+          code: 'PERMISSION_DENIED',
+        });
       }
       throw error;
     }
-    
+
     const response: SessionFileContentResponse = {
       path: relativePath,
       content,
@@ -569,9 +669,8 @@ export async function GET(request: NextRequest, { params }: { params: { sessionI
       encoding: 'utf8',
       size: stats.size,
     };
-    
+
     return createSuperjsonResponse(response);
-    
   } catch (error) {
     return createErrorResponse(
       error instanceof Error ? error.message : 'Failed to read file',
@@ -582,8 +681,8 @@ export async function GET(request: NextRequest, { params }: { params: { sessionI
 }
 ```
 
-**Testing:**
-Create `packages/web/app/api/sessions/[sessionId]/files/[...path]/route.test.ts`:
+**Testing:** Create
+`packages/web/app/api/sessions/[sessionId]/files/[...path]/route.test.ts`:
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -602,11 +701,14 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
   beforeEach(async () => {
     testDir = join(tmpdir(), `lace-test-${Date.now()}`);
     await fs.mkdir(testDir, { recursive: true });
-    
+
     // Create test files
     await fs.writeFile(join(testDir, 'test.ts'), 'const hello = "world";');
-    await fs.writeFile(join(testDir, 'large-file.txt'), 'x'.repeat(2 * 1024 * 1024)); // 2MB
-    
+    await fs.writeFile(
+      join(testDir, 'large-file.txt'),
+      'x'.repeat(2 * 1024 * 1024)
+    ); // 2MB
+
     testSessionId = 'test-session-123';
   });
 
@@ -622,13 +724,13 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
     const request = new NextRequest(
       `http://localhost/api/sessions/${testSessionId}/files/test.ts`
     );
-    
+
     // TODO: Mock SessionService as in previous task
-    
-    const response = await GET(request, { 
-      params: { sessionId: testSessionId, path: ['test.ts'] } 
+
+    const response = await GET(request, {
+      params: { sessionId: testSessionId, path: ['test.ts'] },
     });
-    
+
     expect(response.status).toBe(200);
     const data = await parseResponse<SessionFileContentResponse>(response);
     expect(data.content).toBe('const hello = "world";');
@@ -640,11 +742,11 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
     const request = new NextRequest(
       `http://localhost/api/sessions/${testSessionId}/files/large-file.txt`
     );
-    
-    const response = await GET(request, { 
-      params: { sessionId: testSessionId, path: ['large-file.txt'] } 
+
+    const response = await GET(request, {
+      params: { sessionId: testSessionId, path: ['large-file.txt'] },
     });
-    
+
     expect(response.status).toBe(413);
     const data = await parseResponse<{ error: string; code: string }>(response);
     expect(data.code).toBe('FILE_TOO_LARGE');
@@ -654,11 +756,14 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
     const request = new NextRequest(
       `http://localhost/api/sessions/${testSessionId}/files/../../../etc/passwd`
     );
-    
-    const response = await GET(request, { 
-      params: { sessionId: testSessionId, path: ['..', '..', '..', 'etc', 'passwd'] } 
+
+    const response = await GET(request, {
+      params: {
+        sessionId: testSessionId,
+        path: ['..', '..', '..', 'etc', 'passwd'],
+      },
     });
-    
+
     expect(response.status).toBe(403);
     const data = await parseResponse<{ error: string; code: string }>(response);
     expect(data.code).toBe('PATH_ACCESS_DENIED');
@@ -667,25 +772,31 @@ describe('/api/sessions/[sessionId]/files/[...path]', () => {
 ```
 
 **How to test:**
+
 ```bash
 cd packages/web
 npm run test:run app/api/sessions/[sessionId]/files/[...path]/route.test.ts
 ```
 
-**Commit message**: "feat: add session file content API with size limits and MIME type detection"
+**Commit message**: "feat: add session file content API with size limits and
+MIME type detection"
 
 ---
 
 ## Task 4: Create File Tree Component
 
-**Goal**: Reusable component for displaying session file tree with expand/collapse
+**Goal**: Reusable component for displaying session file tree with
+expand/collapse
 
 **Files to create:**
+
 - `packages/web/components/files/SessionFileTree.tsx`
 - `packages/web/components/files/SessionFileTree.test.tsx`
 
 **Files to reference:**
-- `packages/web/components/ui/DirectoryField.tsx` - Study tree-like navigation patterns
+
+- `packages/web/components/ui/DirectoryField.tsx` - Study tree-like navigation
+  patterns
 - `packages/web/lib/fontawesome.ts` - Available icons
 - `packages/web/components/ui/index.ts` - Available UI components
 
@@ -697,13 +808,13 @@ npm run test:run app/api/sessions/[sessionId]/files/[...path]/route.test.ts
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faFolder, 
-  faFolderOpen, 
-  faFile, 
-  faChevronRight, 
+import {
+  faFolder,
+  faFolderOpen,
+  faFile,
+  faChevronRight,
   faChevronDown,
-  faSpinner 
+  faSpinner
 } from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
 import type { SessionDirectoryResponse, SessionFileEntry } from '@/types/session-files';
@@ -734,13 +845,13 @@ interface FileTreeItemProps {
 function getFileIcon(fileName: string, isDirectory: boolean, isExpanded: boolean = false): React.ReactNode {
   if (isDirectory) {
     return (
-      <FontAwesomeIcon 
-        icon={isExpanded ? faFolderOpen : faFolder} 
+      <FontAwesomeIcon
+        icon={isExpanded ? faFolderOpen : faFolder}
         className="w-4 h-4 text-blue-500"
       />
     );
   }
-  
+
   // Simple file icon - could be enhanced with file type detection
   return <FontAwesomeIcon icon={faFile} className="w-4 h-4 text-gray-500" />;
 }
@@ -748,11 +859,11 @@ function getFileIcon(fileName: string, isDirectory: boolean, isExpanded: boolean
 // Highlight search term in text
 function highlightSearchTerm(text: string, searchTerm: string): React.ReactNode {
   if (!searchTerm || searchTerm.length < 2) return text;
-  
+
   const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
   const parts = text.split(regex);
-  
-  return parts.map((part, index) => 
+
+  return parts.map((part, index) =>
     regex.test(part) ? (
       <mark key={index} className="bg-yellow-200 text-yellow-900 px-0.5 rounded">
         {part}
@@ -810,15 +921,15 @@ function FileTreeItem({
           </div>
         )}
         {node.type === 'file' && <div className="w-4" />}
-        
+
         {/* File/folder icon */}
         {getFileIcon(node.name, node.type === 'directory', node.isExpanded)}
-        
+
         {/* File/folder name */}
         <span className="text-sm truncate flex-1">
           {highlightSearchTerm(node.name, searchTerm || '')}
         </span>
-        
+
         {/* File size for files */}
         {node.type === 'file' && node.size && (
           <span className="text-xs text-gray-400">
@@ -826,7 +937,7 @@ function FileTreeItem({
           </span>
         )}
       </div>
-      
+
       {/* Render children if directory is expanded */}
       {node.type === 'directory' && node.isExpanded && node.children && (
         <div>
@@ -872,10 +983,10 @@ export function SessionFileTree({
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const url = `/api/sessions/${sessionId}/files${path ? `?path=${encodeURIComponent(path)}` : ''}`;
       const response = await api.get<SessionDirectoryResponse>(url);
-      
+
       if (path === '') {
         // Loading root directory
         const rootNodes: FileTreeNode[] = response.entries.map(entry => ({
@@ -1029,8 +1140,7 @@ export function SessionFileTree({
 }
 ```
 
-**Testing:**
-Create `packages/web/components/files/SessionFileTree.test.tsx`:
+**Testing:** Create `packages/web/components/files/SessionFileTree.test.tsx`:
 
 ```typescript
 import React from 'react';
@@ -1227,12 +1337,14 @@ describe('SessionFileTree', () => {
 ```
 
 **How to test:**
+
 ```bash
 cd packages/web
 npm run test:run components/files/SessionFileTree.test.tsx
 ```
 
-**Commit message**: "feat: add SessionFileTree component with expand/collapse and search filtering"
+**Commit message**: "feat: add SessionFileTree component with expand/collapse
+and search filtering"
 
 ---
 
@@ -1241,12 +1353,15 @@ npm run test:run components/files/SessionFileTree.test.tsx
 **Goal**: Modal component for displaying file content with syntax highlighting
 
 **Files to create:**
+
 - `packages/web/components/modals/FileViewerModal.tsx`
 - `packages/web/components/modals/FileViewerModal.test.tsx`
 
 **Files to reference:**
+
 - `packages/web/components/ui/Modal.tsx` - Modal structure and props
-- `packages/web/components/files/FileDiffViewer.tsx` - Syntax highlighting patterns
+- `packages/web/components/files/FileDiffViewer.tsx` - Syntax highlighting
+  patterns
 - `packages/web/lib/fontawesome.ts` - Available icons for actions
 
 **Implementation:**
@@ -1257,12 +1372,12 @@ npm run test:run components/files/SessionFileTree.test.tsx
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faFile, 
-  faDownload, 
-  faExternalLinkAlt, 
+import {
+  faFile,
+  faDownload,
+  faExternalLinkAlt,
   faCopy,
-  faSpinner 
+  faSpinner
 } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { api } from '@/lib/api-client';
@@ -1302,7 +1417,7 @@ function FileViewerHeader({
           <div className="text-sm text-gray-500">{filePath}</div>
         </div>
       </div>
-      
+
       <div className="flex items-center gap-2">
         <button
           onClick={onCopy}
@@ -1311,7 +1426,7 @@ function FileViewerHeader({
         >
           <FontAwesomeIcon icon={faCopy} className="w-4 h-4" />
         </button>
-        
+
         <button
           onClick={onDownload}
           className="btn btn-ghost btn-sm"
@@ -1319,7 +1434,7 @@ function FileViewerHeader({
         >
           <FontAwesomeIcon icon={faDownload} className="w-4 h-4" />
         </button>
-        
+
         <button
           onClick={onPopOut}
           className="btn btn-ghost btn-sm"
@@ -1342,18 +1457,18 @@ interface FileContentProps {
 
 function FileContent({ fileContent, isLoading, error }: FileContentProps) {
   const [highlightedContent, setHighlightedContent] = useState<string>('');
-  
+
   // Syntax highlighting effect
   useEffect(() => {
     if (!fileContent?.content) {
       setHighlightedContent('');
       return;
     }
-    
+
     try {
       // Let highlight.js auto-detect the language
       const highlighted = hljs.highlightAuto(fileContent.content).value;
-      
+
       // Sanitize the highlighted HTML
       const sanitized = DOMPurify.sanitize(highlighted);
       setHighlightedContent(sanitized);
@@ -1401,7 +1516,7 @@ function FileContent({ fileContent, isLoading, error }: FileContentProps) {
           <span>{formatFileSize(fileContent.size)}</span>
         </div>
       </div>
-      
+
       {/* Code content with syntax highlighting */}
       <div className="p-4">
         <pre className="text-sm font-mono leading-relaxed">
@@ -1446,7 +1561,7 @@ export function FileViewerModal({
     const loadFileContent = async () => {
       setIsLoading(true);
       setError(null);
-      
+
       try {
         const encodedPath = filePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
         const response = await api.get<SessionFileContentResponse>(
@@ -1467,7 +1582,7 @@ export function FileViewerModal({
   // Action handlers
   const handleDownload = () => {
     if (!fileContent) return;
-    
+
     const blob = new Blob([fileContent.content], { type: fileContent.mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1481,7 +1596,7 @@ export function FileViewerModal({
 
   const handleCopy = async () => {
     if (!fileContent) return;
-    
+
     try {
       await navigator.clipboard.writeText(fileContent.content);
       // Could add toast notification here
@@ -1494,13 +1609,13 @@ export function FileViewerModal({
     const popoutUrl = new URL('/file-viewer', window.location.origin);
     popoutUrl.searchParams.set('session', sessionId);
     popoutUrl.searchParams.set('file', filePath);
-    
+
     const popoutWindow = window.open(
       popoutUrl.toString(),
       'file-viewer',
       'width=1200,height=800,location=no,menubar=no,toolbar=no,status=no,resizable=yes,scrollbars=yes'
     );
-    
+
     if (popoutWindow) {
       popoutWindow.focus();
     }
@@ -1531,8 +1646,7 @@ export function FileViewerModal({
 }
 ```
 
-**Testing:**
-Create `packages/web/components/modals/FileViewerModal.test.tsx`:
+**Testing:** Create `packages/web/components/modals/FileViewerModal.test.tsx`:
 
 ```typescript
 import React from 'react';
@@ -1665,7 +1779,7 @@ describe('FileViewerModal', () => {
     // Mock URL and DOM manipulation for download
     global.URL.createObjectURL = vi.fn().mockReturnValue('blob:test-url');
     global.URL.revokeObjectURL = vi.fn();
-    
+
     const mockLink = {
       href: '',
       download: '',
@@ -1686,7 +1800,7 @@ describe('FileViewerModal', () => {
     expect(createElementSpy).toHaveBeenCalledWith('a');
     expect(mockLink.download).toBe('test.ts');
     expect(mockLink.click).toHaveBeenCalled();
-    
+
     createElementSpy.mockRestore();
     appendChildSpy.mockRestore();
     removeChildSpy.mockRestore();
@@ -1720,19 +1834,21 @@ describe('FileViewerModal', () => {
       expect.stringContaining('width=1200,height=800')
     );
     expect(mockPopoutWindow.focus).toHaveBeenCalled();
-    
+
     openSpy.mockRestore();
   });
 });
 ```
 
 **How to test:**
+
 ```bash
 cd packages/web
 npm run test:run components/modals/FileViewerModal.test.tsx
 ```
 
-**Commit message**: "feat: add FileViewerModal with syntax highlighting and file actions"
+**Commit message**: "feat: add FileViewerModal with syntax highlighting and file
+actions"
 
 ---
 
@@ -1741,14 +1857,18 @@ npm run test:run components/modals/FileViewerModal.test.tsx
 **Goal**: Integrate file tree into existing sidebar as a collapsible section
 
 **Files to create:**
+
 - `packages/web/components/sidebar/FileBrowserSection.tsx`
 - `packages/web/components/sidebar/FileBrowserSection.test.tsx`
 
 **Files to modify:**
+
 - `packages/web/components/sidebar/SidebarContent.tsx`
 
 **Files to reference:**
-- `packages/web/components/sidebar/SessionSection.tsx` - Study existing sidebar section patterns
+
+- `packages/web/components/sidebar/SessionSection.tsx` - Study existing sidebar
+  section patterns
 - `packages/web/components/layout/Sidebar.tsx` - Study SidebarSection usage
 
 **Implementation:**
@@ -1864,8 +1984,8 @@ export function FileBrowserSection({
 }
 ```
 
-**Testing:**
-Create `packages/web/components/sidebar/FileBrowserSection.test.tsx`:
+**Testing:** Create
+`packages/web/components/sidebar/FileBrowserSection.test.tsx`:
 
 ```typescript
 import React from 'react';
@@ -1994,12 +2114,14 @@ import { FileBrowserSection } from './FileBrowserSection';
 ```
 
 **How to test:**
+
 ```bash
 cd packages/web
 npm run test:run components/sidebar/FileBrowserSection.test.tsx
 ```
 
-**Commit message**: "feat: add FileBrowserSection to sidebar with search and file tree integration"
+**Commit message**: "feat: add FileBrowserSection to sidebar with search and
+file tree integration"
 
 ---
 
@@ -2008,10 +2130,13 @@ npm run test:run components/sidebar/FileBrowserSection.test.tsx
 **Goal**: Create a standalone page for pop-out file viewing
 
 **Files to create:**
+
 - `packages/web/app/file-viewer/page.tsx`
 
 **Files to reference:**
-- `packages/web/app/project/[projectId]/session/[sessionId]/page.tsx` - Study page structure
+
+- `packages/web/app/project/[projectId]/session/[sessionId]/page.tsx` - Study
+  page structure
 - Components created in previous tasks for file viewing logic
 
 **Implementation:**
@@ -2023,12 +2148,12 @@ npm run test:run components/sidebar/FileBrowserSection.test.tsx
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faFile, 
-  faDownload, 
-  faCopy, 
+import {
+  faFile,
+  faDownload,
+  faCopy,
   faSpinner,
-  faExclamationTriangle 
+  faExclamationTriangle
 } from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
 import type { SessionFileContentResponse } from '@/types/session-files';
@@ -2064,7 +2189,7 @@ function FileViewerContent({ sessionId, filePath }: FileViewerContentProps) {
     const loadFileContent = async () => {
       setIsLoading(true);
       setError(null);
-      
+
       try {
         const encodedPath = filePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
         const response = await api.get<SessionFileContentResponse>(
@@ -2092,7 +2217,7 @@ function FileViewerContent({ sessionId, filePath }: FileViewerContentProps) {
     try {
       // Let highlight.js auto-detect the language
       const highlighted = hljs.highlightAuto(fileContent.content).value;
-      
+
       const sanitized = DOMPurify.sanitize(highlighted);
       setHighlightedContent(sanitized);
     } catch (err) {
@@ -2103,7 +2228,7 @@ function FileViewerContent({ sessionId, filePath }: FileViewerContentProps) {
 
   const handleDownload = () => {
     if (!fileContent) return;
-    
+
     const blob = new Blob([fileContent.content], { type: fileContent.mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -2117,7 +2242,7 @@ function FileViewerContent({ sessionId, filePath }: FileViewerContentProps) {
 
   const handleCopy = async () => {
     if (!fileContent) return;
-    
+
     try {
       await navigator.clipboard.writeText(fileContent.content);
       // Simple feedback - could be enhanced with toast
@@ -2188,12 +2313,12 @@ function FileViewerContent({ sessionId, filePath }: FileViewerContentProps) {
               <div className="text-sm text-base-content/60">{filePath}</div>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <div className="text-sm text-base-content/60">
               {fileContent.mimeType} • {formatFileSize(fileContent.size)}
             </div>
-            
+
             <button
               id="copy-button"
               onClick={handleCopy}
@@ -2203,7 +2328,7 @@ function FileViewerContent({ sessionId, filePath }: FileViewerContentProps) {
               <FontAwesomeIcon icon={faCopy} className="w-4 h-4 mr-2" />
               Copy
             </button>
-            
+
             <button
               onClick={handleDownload}
               className="btn btn-primary btn-sm"
@@ -2268,31 +2393,37 @@ export default function FileViewerPageWrapper() {
 ```
 
 **How to test manually:**
+
 1. Open a session in Lace
 2. Click a file in the file browser sidebar
 3. In the file viewer modal, click the "Open in new window" button
 4. Verify the standalone viewer opens with the file content
 
 **How to test with automated tests:**
+
 ```bash
 cd packages/web
 # This page can be tested with Playwright end-to-end tests
 npx playwright test file-viewer
 ```
 
-**Commit message**: "feat: add standalone file viewer page for pop-out functionality"
+**Commit message**: "feat: add standalone file viewer page for pop-out
+functionality"
 
 ---
 
 ## Task 8: Integration Testing and Documentation
 
-**Goal**: End-to-end testing and documentation for the complete file browser feature
+**Goal**: End-to-end testing and documentation for the complete file browser
+feature
 
 **Files to create:**
+
 - `packages/web/e2e/file-browser.e2e.ts`
 - `docs/features/file-browser.md`
 
 **Files to modify:**
+
 - `packages/web/components/ui/index.ts` (add new component exports)
 
 **Implementation:**
@@ -2326,22 +2457,37 @@ test.describe('File Browser E2E Tests', () => {
     await fs.mkdir(testProjectDir, { recursive: true });
     await fs.mkdir(join(testProjectDir, 'src'));
     await fs.mkdir(join(testProjectDir, 'src', 'components'));
-    
+
     // Create test files
-    await fs.writeFile(join(testProjectDir, 'package.json'), JSON.stringify({
-      name: 'test-project',
-      version: '1.0.0'
-    }, null, 2));
-    
-    await fs.writeFile(join(testProjectDir, 'README.md'), '# Test Project\n\nThis is a test.');
-    
-    await fs.writeFile(join(testProjectDir, 'src', 'index.ts'), `
+    await fs.writeFile(
+      join(testProjectDir, 'package.json'),
+      JSON.stringify(
+        {
+          name: 'test-project',
+          version: '1.0.0',
+        },
+        null,
+        2
+      )
+    );
+
+    await fs.writeFile(
+      join(testProjectDir, 'README.md'),
+      '# Test Project\n\nThis is a test.'
+    );
+
+    await fs.writeFile(
+      join(testProjectDir, 'src', 'index.ts'),
+      `
 export function hello(name: string): string {
   return \`Hello, \${name}!\`;
 }
-`.trim());
+`.trim()
+    );
 
-    await fs.writeFile(join(testProjectDir, 'src', 'components', 'Button.tsx'), `
+    await fs.writeFile(
+      join(testProjectDir, 'src', 'components', 'Button.tsx'),
+      `
 import React from 'react';
 
 interface ButtonProps {
@@ -2356,7 +2502,8 @@ export function Button({ children, onClick }: ButtonProps) {
     </button>
   );
 }
-`.trim());
+`.trim()
+    );
 
     await page.goto('/');
   });
@@ -2384,7 +2531,7 @@ export function Button({ children, onClick }: ButtonProps) {
     // Verify file browser section appears in sidebar
     await expect(page.getByText('Files')).toBeVisible();
     await expect(page.getByPlaceholderText('Search files...')).toBeVisible();
-    
+
     // Verify initial files are loaded
     await expect(page.getByText('package.json')).toBeVisible();
     await expect(page.getByText('README.md')).toBeVisible();
@@ -2416,7 +2563,9 @@ export function Button({ children, onClick }: ButtonProps) {
     await expect(page.getByText('Button.tsx')).toBeVisible();
   });
 
-  test('should open file viewer modal when clicking files', async ({ page }) => {
+  test('should open file viewer modal when clicking files', async ({
+    page,
+  }) => {
     // Setup project
     await page.getByRole('button', { name: /new project/i }).click();
     await page.getByLabel(/project name/i).fill('Test Project');
@@ -2484,15 +2633,19 @@ export function Button({ children, onClick }: ButtonProps) {
     // Listen for new window
     const [popupPage] = await Promise.all([
       page.context().waitForEvent('page'),
-      page.getByTitle('Open in new window').click()
+      page.getByTitle('Open in new window').click(),
     ]);
 
     // Verify popup content
     await popupPage.waitForLoadState();
     await expect(popupPage.getByText('README.md')).toBeVisible();
     await expect(popupPage.getByText('# Test Project')).toBeVisible();
-    await expect(popupPage.getByRole('button', { name: /copy/i })).toBeVisible();
-    await expect(popupPage.getByRole('button', { name: /download/i })).toBeVisible();
+    await expect(
+      popupPage.getByRole('button', { name: /copy/i })
+    ).toBeVisible();
+    await expect(
+      popupPage.getByRole('button', { name: /download/i })
+    ).toBeVisible();
 
     await popupPage.close();
   });
@@ -2514,7 +2667,7 @@ export function Button({ children, onClick }: ButtonProps) {
     // Listen for download
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByTitle('Download file').click()
+      page.getByTitle('Download file').click(),
     ]);
 
     // Verify download
@@ -2538,7 +2691,7 @@ export function Button({ children, onClick }: ButtonProps) {
     // Verify syntax highlighting is applied
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByText('text/typescript')).toBeVisible();
-    
+
     // Look for syntax highlighted code (specific classes depend on highlight.js theme)
     const codeBlock = page.locator('code.hljs');
     await expect(codeBlock).toBeVisible();
@@ -2548,39 +2701,51 @@ export function Button({ children, onClick }: ButtonProps) {
 
 Create feature documentation:
 
-```markdown
+````markdown
 <!-- docs/features/file-browser.md -->
+
 # File Browser Feature
 
 ## Overview
 
-The File Browser feature allows users to browse, search, and view files within their session's working directory directly from the Lace web interface. The feature provides a familiar file explorer experience integrated into the sidebar, with support for syntax highlighting and pop-out viewing.
+The File Browser feature allows users to browse, search, and view files within
+their session's working directory directly from the Lace web interface. The
+feature provides a familiar file explorer experience integrated into the
+sidebar, with support for syntax highlighting and pop-out viewing.
 
 ## Components
 
 ### FileBrowserSection
+
 Located in the sidebar, provides the main file browsing interface:
+
 - Collapsible section header
 - Search input for filtering files
 - File tree with expand/collapse functionality
 - Displays session working directory name
 
-### SessionFileTree  
+### SessionFileTree
+
 Recursive tree component for displaying file hierarchy:
+
 - Lazy loading of directory contents
 - File type icons (folders, files)
 - Search term highlighting
 - Click to select files, double-click to expand directories
 
 ### FileViewerModal
+
 Modal for viewing file content:
+
 - Syntax highlighting via highlight.js
 - File metadata display (type, size)
 - Copy, download, and pop-out actions
 - Support for text files up to 1MB
 
 ### Standalone File Viewer
+
 Chromeless window for dedicated file viewing:
+
 - Full-screen file content display
 - Same actions as modal viewer
 - Accessible via `/file-viewer?session=X&file=Y`
@@ -2588,13 +2753,17 @@ Chromeless window for dedicated file viewing:
 ## API Endpoints
 
 ### GET /api/sessions/[sessionId]/files
+
 Lists files and directories in session's working directory
+
 - Query parameter: `path` (optional, defaults to root)
 - Returns: Array of file entries with metadata
 - Security: Prevents path traversal outside working directory
 
 ### GET /api/sessions/[sessionId]/files/[...path]
+
 Retrieves content of a specific file
+
 - Path parameters: Session ID and file path segments
 - Returns: File content with metadata and MIME type
 - Limits: 1MB max file size, text files only
@@ -2603,17 +2772,20 @@ Retrieves content of a specific file
 ## Security Model
 
 ### Session Isolation
+
 - All file operations are scoped to the session's `workingDirectory`
 - Path traversal attacks (e.g., `../../../etc/passwd`) are prevented
 - Each session can only access its own files
 
 ### File Access Controls
+
 - Only readable files are displayed
 - File permissions are checked before serving content
 - Binary files are rejected with appropriate error messages
 - Large files (>1MB) are rejected to prevent memory issues
 
 ### Content Sanitization
+
 - All file content is sanitized through DOMPurify
 - Syntax highlighting is applied safely to prevent XSS
 - File names and paths are properly escaped
@@ -2621,6 +2793,7 @@ Retrieves content of a specific file
 ## Usage
 
 ### Basic File Browsing
+
 1. Open a session in Lace
 2. Ensure session has a working directory configured
 3. "Files" section appears in sidebar
@@ -2628,12 +2801,14 @@ Retrieves content of a specific file
 5. Click directories to expand/collapse
 
 ### File Search
+
 1. Type in the search box within the Files section
 2. File tree automatically filters to matching names
 3. Search is case-insensitive partial matching
 4. Clear search to show all files
 
 ### File Viewing
+
 1. Click any file in the tree
 2. File Viewer modal opens with content
 3. Syntax highlighting applied automatically
@@ -2642,6 +2817,7 @@ Retrieves content of a specific file
 6. Use pop-out button to open in dedicated window
 
 ### Pop-out Window
+
 1. Click pop-out button in File Viewer modal
 2. New chromeless window opens with file content
 3. Window is resizable and scrollable
@@ -2650,6 +2826,7 @@ Retrieves content of a specific file
 ## Configuration
 
 ### Session Setup
+
 The file browser requires a session with a configured `workingDirectory`:
 
 ```typescript
@@ -2658,9 +2835,14 @@ const sessionConfig: SessionConfiguration = {
   // ... other config
 };
 ```
+````
 
 ### File Type Support
-All text files up to 1MB are supported for viewing. Syntax highlighting is provided by highlight.js auto-detection, which supports 190+ languages including:
+
+All text files up to 1MB are supported for viewing. Syntax highlighting is
+provided by highlight.js auto-detection, which supports 190+ languages
+including:
+
 - JavaScript/TypeScript, Python, Java, Go, Rust, C/C++
 - HTML, CSS, JSON, YAML, Markdown, SQL
 - And many more - highlight.js automatically detects the language
@@ -2668,19 +2850,22 @@ All text files up to 1MB are supported for viewing. Syntax highlighting is provi
 ## Testing
 
 ### Unit Tests
+
 ```bash
 npm run test:run components/files/SessionFileTree.test.tsx
-npm run test:run components/modals/FileViewerModal.test.tsx  
+npm run test:run components/modals/FileViewerModal.test.tsx
 npm run test:run components/sidebar/FileBrowserSection.test.tsx
 ```
 
 ### API Tests
+
 ```bash
 npm run test:run app/api/sessions/[sessionId]/files/route.test.ts
 npm run test:run app/api/sessions/[sessionId]/files/[...path]/route.test.ts
 ```
 
 ### End-to-End Tests
+
 ```bash
 npx playwright test file-browser.e2e.ts
 ```
@@ -2688,6 +2873,7 @@ npx playwright test file-browser.e2e.ts
 ## Future Enhancements
 
 ### Planned Features
+
 - File editing capabilities
 - Image preview for supported formats
 - PDF viewing
@@ -2696,6 +2882,7 @@ npx playwright test file-browser.e2e.ts
 - Minimap for large files
 
 ### Performance Optimizations
+
 - Virtual scrolling for large directories
 - File content caching
 - Debounced search
@@ -2706,18 +2893,22 @@ npx playwright test file-browser.e2e.ts
 ### Common Issues
 
 **Files section not visible**
+
 - Verify session has `workingDirectory` configured
 - Check file permissions on working directory
 
 **"Permission denied" errors**
+
 - Verify Lace has read access to working directory
 - Check that files are not locked by other processes
 
 **"File too large" errors**
+
 - Current limit is 1MB for text files
 - Use download functionality for larger files
 
 **Syntax highlighting not working**
+
 - Check browser console for highlight.js errors
 - Ensure highlight.js theme CSS is loaded
 - Verify file contains text content (not binary)
@@ -2725,20 +2916,24 @@ npx playwright test file-browser.e2e.ts
 ### Debugging
 
 Enable debug logging:
+
 ```bash
 LACE_LOG_LEVEL=debug npm run dev
 ```
 
-Check browser console for client-side errors and network requests to file API endpoints.
-```
+Check browser console for client-side errors and network requests to file API
+endpoints.
+
+````
 
 **How to test:**
 ```bash
-cd packages/web  
+cd packages/web
 npx playwright test e2e/file-browser.e2e.ts
-```
+````
 
-**Commit message**: "feat: add comprehensive E2E tests and documentation for file browser feature"
+**Commit message**: "feat: add comprehensive E2E tests and documentation for
+file browser feature"
 
 ---
 
@@ -2747,29 +2942,34 @@ npx playwright test e2e/file-browser.e2e.ts
 ### Verification Steps
 
 1. **API Security**: Verify path traversal protection works
+
 ```bash
 curl "http://localhost:3000/api/sessions/test-session/files?path=../../../etc"
 # Should return 403 error
 ```
 
 2. **Component Integration**: All components render without TypeScript errors
+
 ```bash
 npm run type-check
 ```
 
 3. **Test Coverage**: All tests pass
+
 ```bash
 npm run test:run
 ```
 
 4. **Linting**: Code follows project standards
+
 ```bash
 npm run lint
 ```
 
 5. **Manual Testing**: File browser works in actual session
+
 - Create project with working directory
-- Start session 
+- Start session
 - Verify Files section appears
 - Test file browsing, search, and viewing
 
@@ -2787,15 +2987,22 @@ npm run lint
 - Content sanitization prevents XSS
 - Binary files rejected appropriately
 
-**Final commit message**: "feat: complete session-level file browser with tree navigation, search, and secure file viewing"
+**Final commit message**: "feat: complete session-level file browser with tree
+navigation, search, and secure file viewing"
 
 ## Summary
 
-This implementation plan provides a comprehensive, secure, and well-tested file browser feature for Lace. It leverages existing UI components, follows established patterns, and maintains strict session-level security isolation. The feature supports tree navigation, search, syntax-highlighted viewing, and pop-out windows while preventing security vulnerabilities through proper path validation and content sanitization.
+This implementation plan provides a comprehensive, secure, and well-tested file
+browser feature for Lace. It leverages existing UI components, follows
+established patterns, and maintains strict session-level security isolation. The
+feature supports tree navigation, search, syntax-highlighted viewing, and
+pop-out windows while preventing security vulnerabilities through proper path
+validation and content sanitization.
 
 Key principles followed:
+
 - **YAGNI**: Essential features only (tree, search, view)
-- **DRY**: Reuses existing components and patterns  
+- **DRY**: Reuses existing components and patterns
 - **TDD**: Tests written before implementation
 - **Security**: Session isolation and path traversal protection
 - **TypeScript**: Strict typing without `any` types

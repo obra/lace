@@ -1,14 +1,20 @@
 # Entity Caching Implementation Plan
 
-**Problem**: Session and Project classes have a database query anti-pattern where they load data from the database multiple times within milliseconds, causing performance issues in single-process mode.
+**Problem**: Session and Project classes have a database query anti-pattern
+where they load data from the database multiple times within milliseconds,
+causing performance issues in single-process mode.
 
-**Root Cause**: These classes load their data from the database during construction but immediately discard it, then reload the same data every time metadata is needed.
+**Root Cause**: These classes load their data from the database during
+construction but immediately discard it, then reload the same data every time
+metadata is needed.
 
-**Solution**: Implement proper caching patterns similar to ThreadManager, where data is loaded once and cached in the object.
+**Solution**: Implement proper caching patterns similar to ThreadManager, where
+data is loaded once and cached in the object.
 
 ## Background Context
 
 ### Current Anti-Pattern
+
 ```typescript
 // BAD: Session.getById() pattern
 static async getById(sessionId: ThreadId): Promise<Session | null> {
@@ -25,12 +31,13 @@ getInfo(): SessionInfo | null {
 ```
 
 ### Good Pattern (ThreadManager)
+
 ```typescript
-// GOOD: ThreadManager.getThread() pattern  
+// GOOD: ThreadManager.getThread() pattern
 getThread(threadId: string): Thread | undefined {
   const cached = cache.get(threadId); // ✅ Check cache first
   if (cached) return cached;
-  
+
   const thread = persistence.loadThread(threadId); // 📊 Database query only if needed
   cache.set(threadId, thread); // ✅ Cache the result
   return thread;
@@ -40,17 +47,23 @@ getThread(threadId: string): Thread | undefined {
 ## Architecture Rules
 
 ### Code Quality Standards
-- **Never use `any` types** - Use proper TypeScript types with generics and utility types
-- **No mocking functionality under test** - Use real code paths, only mock external dependencies
-- **TDD Required** - Write failing test first, implement minimal code to pass, refactor
+
+- **Never use `any` types** - Use proper TypeScript types with generics and
+  utility types
+- **No mocking functionality under test** - Use real code paths, only mock
+  external dependencies
+- **TDD Required** - Write failing test first, implement minimal code to pass,
+  refactor
 - **YAGNI** - Only implement what's needed for the current task
 - **DRY** - Don't repeat yourself, extract common patterns
 - **Frequent commits** - Commit after each working test/implementation pair
 
 ### Testing Standards
+
 - Tests must use real database operations, not mocks
 - Each test should set up its own data and clean up after itself
-- Test files should be co-located with source files (e.g., `session.ts` → `session.test.ts`)
+- Test files should be co-located with source files (e.g., `session.ts` →
+  `session.test.ts`)
 - Use factory functions to create test data, not inline object literals
 - Verify both positive and negative test cases
 
@@ -59,10 +72,12 @@ getThread(threadId: string): Thread | undefined {
 ### Task 1: Add SessionData Caching to Session Class
 
 **Files to modify:**
+
 - `src/sessions/session.ts` (main implementation)
 - `src/sessions/session.test.ts` (tests)
 
-**Goal**: Store SessionData as private field to eliminate repeated database queries.
+**Goal**: Store SessionData as private field to eliminate repeated database
+queries.
 
 #### Step 1.1: Write failing tests for cached SessionData access
 
@@ -77,19 +92,19 @@ describe('Session data caching', () => {
     const session = Session.create({
       name: 'Test Session',
       projectId: testProjectId,
-      configuration: { testKey: 'testValue' }
+      configuration: { testKey: 'testValue' },
     });
-    
+
     // Spy on database calls to count them
     const persistence = getPersistence();
     const loadSessionSpy = vi.spyOn(persistence, 'loadSession');
-    
+
     // Act: Call methods that need SessionData multiple times
     const info1 = session.getInfo();
     const info2 = session.getInfo();
     const projectId1 = session.getProjectId();
     const projectId2 = session.getProjectId();
-    
+
     // Assert: Database should only be called once (during creation)
     // After creation, all data should come from cache
     expect(loadSessionSpy).toHaveBeenCalledTimes(0); // No additional calls
@@ -102,16 +117,16 @@ describe('Session data caching', () => {
     const session = Session.create({
       name: 'Original Name',
       projectId: testProjectId,
-      configuration: {}
+      configuration: {},
     });
-    
+
     // Simulate external update to session name in database
     const persistence = getPersistence();
     persistence.updateSession(session.getId(), { name: 'Updated Name' });
-    
+
     // The cached data should still show old name
     expect(session.getInfo()?.name).toBe('Original Name');
-    
+
     // After refresh, should show new name
     session.refreshFromDatabase();
     expect(session.getInfo()?.name).toBe('Updated Name');
@@ -120,6 +135,7 @@ describe('Session data caching', () => {
 ```
 
 **Run test to confirm it fails**:
+
 ```bash
 npm test src/sessions/session.test.ts
 ```
@@ -134,7 +150,7 @@ npm test src/sessions/session.test.ts
 export class Session {
   private static _sessionRegistry = new Map<ThreadId, Session>();
   private _sessionData: SessionData; // 👈 NEW: Cache the session data
-  
+
   private _sessionAgent: Agent;
   private _sessionId: ThreadId;
   // ... existing fields
@@ -143,14 +159,14 @@ export class Session {
 2. Modify constructor to accept and cache SessionData:
 
 ```typescript
-constructor(sessionData: SessionData, options: { 
+constructor(sessionData: SessionData, options: {
   threadManager?: ThreadManager;
   toolExecutor?: ToolExecutor;
 } = {}) {
   this._sessionData = sessionData; // 👈 NEW: Store the data
   this._sessionId = sessionData.id as ThreadId;
   this._projectId = sessionData.projectId;
-  
+
   // ... rest of existing constructor logic
 }
 ```
@@ -215,10 +231,10 @@ updateConfiguration(updates: Partial<SessionConfiguration>): void {
 
   // Update database
   Session.updateSession(this._sessionId, { configuration: newConfig });
-  
+
   // 👈 NEW: Update cached data
-  this._sessionData = { 
-    ...this._sessionData, 
+  this._sessionData = {
+    ...this._sessionData,
     configuration: newConfig,
     updatedAt: new Date()
   };
@@ -226,11 +242,13 @@ updateConfiguration(updates: Partial<SessionConfiguration>): void {
 ```
 
 **Run tests to confirm they pass**:
+
 ```bash
 npm test src/sessions/session.test.ts
 ```
 
 **Commit your work**:
+
 ```bash
 git add src/sessions/session.ts src/sessions/session.test.ts
 git commit -m "feat: add SessionData caching to eliminate duplicate database queries
@@ -245,10 +263,12 @@ git commit -m "feat: add SessionData caching to eliminate duplicate database que
 ### Task 2: Optimize Session.getSession() to Check Registry First
 
 **Files to modify:**
+
 - `src/sessions/session.ts` (main implementation)
 - `src/sessions/session.test.ts` (tests)
 
-**Goal**: Make `Session.getSession()` check the in-memory registry before hitting the database.
+**Goal**: Make `Session.getSession()` check the in-memory registry before
+hitting the database.
 
 #### Step 2.1: Write failing test for registry optimization
 
@@ -261,18 +281,18 @@ describe('Session.getSession registry optimization', () => {
     const session = Session.create({
       name: 'Active Session',
       projectId: testProjectId,
-      configuration: { cached: true }
+      configuration: { cached: true },
     });
-    
+
     const sessionId = session.getId();
-    
+
     // Spy on database to ensure it's not called
     const persistence = getPersistence();
     const loadSessionSpy = vi.spyOn(persistence, 'loadSession');
-    
+
     // Act: Call static getSession method
     const sessionData = Session.getSession(sessionId);
-    
+
     // Assert: Should get data without database call
     expect(sessionData).toBeTruthy();
     expect(sessionData?.name).toBe('Active Session');
@@ -291,18 +311,18 @@ describe('Session.getSession registry optimization', () => {
       configuration: {},
       status: 'active',
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
-    
+
     const persistence = getPersistence();
     persistence.saveSession(directSessionData);
-    
+
     // Spy on database to verify it gets called
     const loadSessionSpy = vi.spyOn(persistence, 'loadSession');
-    
+
     // Act: Call getSession for session not in registry
     const sessionData = Session.getSession(sessionId);
-    
+
     // Assert: Should load from database
     expect(sessionData).toBeTruthy();
     expect(sessionData?.name).toBe('Database Only Session');
@@ -312,6 +332,7 @@ describe('Session.getSession registry optimization', () => {
 ```
 
 **Run test to confirm it fails**:
+
 ```bash
 npm test src/sessions/session.test.ts -t "Session.getSession registry optimization"
 ```
@@ -353,11 +374,13 @@ static getSession(sessionId: string): SessionData | null {
 ```
 
 **Run tests to confirm they pass**:
+
 ```bash
 npm test src/sessions/session.test.ts
 ```
 
 **Commit your work**:
+
 ```bash
 git add src/sessions/session.ts src/sessions/session.test.ts
 git commit -m "perf: optimize Session.getSession() to check registry before database
@@ -372,10 +395,12 @@ git commit -m "perf: optimize Session.getSession() to check registry before data
 ### Task 3: Apply Same Caching Pattern to Project Class
 
 **Files to modify:**
-- `src/projects/project.ts` (main implementation) 
+
+- `src/projects/project.ts` (main implementation)
 - `src/projects/project.test.ts` (tests)
 
-**Goal**: Store ProjectData as private field to eliminate repeated database queries, following the same pattern as Session.
+**Goal**: Store ProjectData as private field to eliminate repeated database
+queries, following the same pattern as Session.
 
 #### Step 3.1: Write failing tests for Project data caching
 
@@ -395,24 +420,24 @@ describe('Project data caching', () => {
       configuration: { testSetting: 'value' },
       isArchived: false,
       createdAt: new Date(),
-      lastUsedAt: new Date()
+      lastUsedAt: new Date(),
     };
-    
+
     const persistence = getPersistence();
     persistence.saveProject(projectData);
-    
+
     // Spy on database calls
     const loadProjectSpy = vi.spyOn(persistence, 'loadProject');
-    
+
     // Act: Load project and call methods that need ProjectData
     const project = Project.getById('test-project-cache');
     expect(project).toBeTruthy();
-    
+
     const info1 = project!.getInfo();
     const info2 = project!.getInfo();
     const name1 = project!.getName();
     const name2 = project!.getName();
-    
+
     // Assert: Database should only be called once (in getById)
     expect(loadProjectSpy).toHaveBeenCalledTimes(1);
     expect(info1).toEqual(info2);
@@ -424,21 +449,21 @@ describe('Project data caching', () => {
     // Create project
     const project = Project.create(
       'Original Name',
-      'Original description', 
+      'Original description',
       '/tmp/original',
       {}
     );
-    
+
     // Simulate external update in database
     const persistence = getPersistence();
-    persistence.updateProject(project.getId(), { 
+    persistence.updateProject(project.getId(), {
       name: 'Updated Name',
-      description: 'Updated description'
+      description: 'Updated description',
     });
-    
+
     // Cached data should show old values
     expect(project.getName()).toBe('Original Name');
-    
+
     // After refresh, should show new values
     project.refreshFromDatabase();
     expect(project.getName()).toBe('Updated Name');
@@ -448,6 +473,7 @@ describe('Project data caching', () => {
 ```
 
 **Run test to confirm it fails**:
+
 ```bash
 npm test src/projects/project.test.ts -t "Project data caching"
 ```
@@ -542,10 +568,10 @@ refreshFromDatabase(): void {
 updateProject(updates: Partial<ProjectData>): void {
   const persistence = getPersistence();
   persistence.updateProject(this._id, updates);
-  
+
   // 👈 NEW: Update cached data
-  this._projectData = { 
-    ...this._projectData, 
+  this._projectData = {
+    ...this._projectData,
     ...updates,
     lastUsedAt: new Date() // Always update last used when modifying
   };
@@ -553,11 +579,13 @@ updateProject(updates: Partial<ProjectData>): void {
 ```
 
 **Run tests to confirm they pass**:
+
 ```bash
 npm test src/projects/project.test.ts
 ```
 
 **Commit your work**:
+
 ```bash
 git add src/projects/project.ts src/projects/project.test.ts
 git commit -m "feat: add ProjectData caching to eliminate duplicate database queries
@@ -573,10 +601,13 @@ git commit -m "feat: add ProjectData caching to eliminate duplicate database que
 ### Task 4: Update API Routes to Use Optimized Methods
 
 **Files to modify:**
-- `packages/web/app/api/sessions/[sessionId]/route.ts`
-- Any other API routes that call both Session object methods and Session.getSession()
 
-**Goal**: Eliminate redundant database calls in API routes by using cached data from Session objects.
+- `packages/web/app/api/sessions/[sessionId]/route.ts`
+- Any other API routes that call both Session object methods and
+  Session.getSession()
+
+**Goal**: Eliminate redundant database calls in API routes by using cached data
+from Session objects.
 
 #### Step 4.1: Identify and fix redundant Session data access
 
@@ -630,38 +661,40 @@ it('should minimize database queries when updating session', async () => {
   const session = Session.create({
     name: 'Test Session',
     projectId: testProjectId,
-    configuration: {}
+    configuration: {},
   });
-  
+
   const sessionId = session.getId();
-  
+
   // Spy on database calls
   const persistence = getPersistence();
   const loadSessionSpy = vi.spyOn(persistence, 'loadSession');
-  
+
   // Act: Make PATCH request to update session
   const response = await PATCH(
     new NextRequest('http://localhost:3000', {
       method: 'PATCH',
-      body: JSON.stringify({ name: 'Updated Name' })
+      body: JSON.stringify({ name: 'Updated Name' }),
     }),
     { params: Promise.resolve({ sessionId }) }
   );
-  
+
   // Assert: Should succeed with minimal database calls
   expect(response.status).toBe(200);
-  
+
   // Database should only be called for the explicit refresh, not redundant queries
   expect(loadSessionSpy).toHaveBeenCalledTimes(1);
 });
 ```
 
 **Run test to confirm optimization works**:
+
 ```bash
 npm test packages/web/app/api/sessions/[sessionId]/route.test.ts
 ```
 
 **Commit your work**:
+
 ```bash
 git add packages/web/app/api/sessions/[sessionId]/route.ts packages/web/app/api/sessions/[sessionId]/route.test.ts
 git commit -m "perf: eliminate redundant database queries in session API routes
@@ -675,8 +708,9 @@ git commit -m "perf: eliminate redundant database queries in session API routes
 ### Task 5: Update Documentation
 
 **Files to modify:**
+
 - `src/sessions/session.ts` (JSDoc comments)
-- `src/projects/project.ts` (JSDoc comments) 
+- `src/projects/project.ts` (JSDoc comments)
 - `docs/architecture/caching.md` (new file)
 
 **Goal**: Document the caching behavior for future developers.
@@ -690,14 +724,14 @@ Add documentation to key methods:
 ```typescript
 /**
  * Get a Session instance by ID, using registry cache when possible.
- * 
+ *
  * This method implements a two-tier lookup strategy:
  * 1. Check in-memory session registry first (fastest)
  * 2. Fall back to database query if not in registry
- * 
+ *
  * The returned Session object caches its SessionData internally,
  * eliminating the need for repeated database queries.
- * 
+ *
  * @param sessionId - The unique session identifier
  * @returns Session instance or null if not found
  */
@@ -707,11 +741,11 @@ static async getById(sessionId: ThreadId): Promise<Session | null> {
 
 /**
  * Get SessionData for a session, checking registry before database.
- * 
+ *
  * This method is optimized to avoid database queries when the session
  * is already loaded in memory. Use this instead of direct database
  * queries for better performance.
- * 
+ *
  * @param sessionId - The unique session identifier
  * @returns SessionData or null if not found
  */
@@ -721,7 +755,7 @@ static getSession(sessionId: string): SessionData | null {
 
 /**
  * Force refresh of cached SessionData from database.
- * 
+ *
  * Use this method when you know the session data has been modified
  * externally and you need to update the cache. Normal operations
  * that modify data through this Session instance will automatically
@@ -736,10 +770,11 @@ refreshFromDatabase(): void {
 
 **File**: `docs/architecture/caching.md`
 
-```markdown
+````markdown
 # Caching Architecture
 
-This document describes the caching patterns used in Lace to minimize database queries and improve performance.
+This document describes the caching patterns used in Lace to minimize database
+queries and improve performance.
 
 ## Overview
 
@@ -756,6 +791,7 @@ Lace uses a multi-tier caching strategy for entity objects:
 **Registry**: `Session._sessionRegistry` - Maps ThreadId → Session instance
 
 **Pattern**:
+
 ```typescript
 // 1. Check registry first
 const existingSession = Session._sessionRegistry.get(sessionId);
@@ -768,15 +804,18 @@ const session = new Session(sessionData); // Cache data internally
 // 3. Store in registry
 Session._sessionRegistry.set(sessionId, session);
 ```
+````
 
 **Benefits**:
+
 - ✅ Eliminates repeated `Session.getSession()` database calls
 - ✅ Session methods use cached data instead of database queries
 - ✅ Registry provides fast lookup for active sessions
 
 ### Project Caching
 
-**Pattern**: Similar to Session but without registry (Projects are shorter-lived)
+**Pattern**: Similar to Session but without registry (Projects are
+shorter-lived)
 
 ```typescript
 // Load once and cache internally
@@ -790,7 +829,8 @@ project.getName(); // No database query
 
 ### ThreadManager Caching (Reference Implementation)
 
-ThreadManager demonstrates good caching patterns that Session and Project now follow:
+ThreadManager demonstrates good caching patterns that Session and Project now
+follow:
 
 ```typescript
 // Check process-local cache first
@@ -806,7 +846,9 @@ return thread;
 ## Cache Invalidation
 
 ### Automatic Updates
-When data is modified through the cached object, the cache is automatically updated:
+
+When data is modified through the cached object, the cache is automatically
+updated:
 
 ```typescript
 session.updateConfiguration(updates);
@@ -814,6 +856,7 @@ session.updateConfiguration(updates);
 ```
 
 ### Manual Refresh
+
 For external updates, manually refresh the cache:
 
 ```typescript
@@ -824,6 +867,7 @@ project.refreshFromDatabase(); // Reload from database
 ## Performance Impact
 
 **Before Optimization**:
+
 ```
 Multiple Session.getInfo() calls:
 - Call 1: Load SessionData from database
@@ -832,10 +876,11 @@ Multiple Session.getInfo() calls:
 ```
 
 **After Optimization**:
+
 ```
 Multiple Session.getInfo() calls:
 - Call 1: Use cached SessionData (loaded during construction)
-- Call 2: Use cached SessionData  
+- Call 2: Use cached SessionData
 - Call 3: Use cached SessionData
 ```
 
@@ -844,6 +889,7 @@ Multiple Session.getInfo() calls:
 ## Implementation Guidelines
 
 ### For New Entity Classes
+
 1. Store the data object as a private field
 2. Load data once in constructor/factory method
 3. Use cached data in all getter methods
@@ -851,16 +897,19 @@ Multiple Session.getInfo() calls:
 5. Provide refresh method for external updates
 
 ### For Database Queries
+
 - Always check cache/registry before database
 - Cache the result after loading
 - Only query database when absolutely necessary
 
 ### Testing Caching
+
 - Spy on database methods to count calls
 - Verify cache hits vs misses
 - Test cache invalidation scenarios
 - Use real database operations, not mocks
-```
+
+````
 
 **Commit your work**:
 ```bash
@@ -872,17 +921,19 @@ git commit -m "docs: add comprehensive caching documentation and JSDoc comments
 - Create caching architecture documentation for future developers
 - Document cache invalidation patterns and performance impact
 - Provide implementation guidelines for new entity classes"
-```
+````
 
 ## Testing Strategy
 
 ### Unit Tests
+
 - Test cache hits vs database misses
 - Verify data consistency between cache and database
 - Test cache invalidation scenarios
 - Verify error handling when database is unavailable
 
-### Integration Tests  
+### Integration Tests
+
 - Test API routes with optimized caching
 - Measure database query counts in realistic scenarios
 - Verify performance improvements in end-to-end flows
@@ -890,16 +941,19 @@ git commit -m "docs: add comprehensive caching documentation and JSDoc comments
 ## Rollout Plan
 
 1. **Phase 1**: Implement Session caching (Tasks 1-2)
-2. **Phase 2**: Implement Project caching (Task 3) 
+2. **Phase 2**: Implement Project caching (Task 3)
 3. **Phase 3**: Update API routes (Task 4)
 4. **Phase 4**: Documentation and knowledge transfer (Task 5)
 
-Each phase should be fully tested and committed before proceeding to the next phase.
+Each phase should be fully tested and committed before proceeding to the next
+phase.
 
 ## Success Criteria
 
-- [ ] Zero duplicate database queries for Session metadata when session is in registry
-- [ ] Zero duplicate database queries for Project metadata when project is cached
+- [ ] Zero duplicate database queries for Session metadata when session is in
+      registry
+- [ ] Zero duplicate database queries for Project metadata when project is
+      cached
 - [ ] All existing tests pass without modification
 - [ ] API response times improve (measurable via logging)
 - [ ] Memory usage remains stable (no memory leaks from caching)
@@ -908,11 +962,13 @@ Each phase should be fully tested and committed before proceeding to the next ph
 ## Risk Mitigation
 
 ### Memory Leaks
+
 - Ensure objects are removed from registries when destroyed
 - Monitor registry sizes in production
 - Implement registry cleanup for inactive sessions
 
-### Cache Inconsistency  
+### Cache Inconsistency
+
 - Always update cache when modifying data through object methods
 - Provide explicit refresh methods for external updates
 - Test cache invalidation scenarios thoroughly

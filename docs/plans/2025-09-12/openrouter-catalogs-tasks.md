@@ -3,6 +3,7 @@
 ## Prerequisites
 
 Before starting, ensure you have:
+
 - Node.js and npm installed
 - Access to the Lace codebase
 - An OpenRouter API key for testing (get one at https://openrouter.ai)
@@ -11,6 +12,7 @@ Before starting, ensure you have:
 ## Development Workflow
 
 For EVERY task:
+
 1. Write failing tests FIRST
 2. Implement minimal code to pass tests
 3. Refactor if needed
@@ -33,11 +35,15 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 ### Phase 1: Data Models and Types (2-3 hours)
 
 #### Task 1.1: Extend Provider Instance Types
+
 **Files to modify:**
+
 - `packages/core/src/providers/catalog/types.ts`
 
 **What to do:**
+
 1. Write test file: `packages/core/src/providers/catalog/types.test.ts`
+
    ```typescript
    import { describe, it, expect } from 'vitest';
    import { ProviderInstanceSchema } from './types';
@@ -55,9 +61,9 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
              requiredParameters: ['tools'],
              maxPromptCostPerMillion: 5.0,
              maxCompletionCostPerMillion: 10.0,
-             minContextLength: 32000
-           }
-         }
+             minContextLength: 32000,
+           },
+         },
        };
        const result = ProviderInstanceSchema.safeParse(config);
        expect(result.success).toBe(true);
@@ -66,7 +72,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
      it('should work without modelConfig (backward compat)', () => {
        const config = {
          displayName: 'Test',
-         catalogProviderId: 'anthropic'
+         catalogProviderId: 'anthropic',
        };
        const result = ProviderInstanceSchema.safeParse(config);
        expect(result.success).toBe(true);
@@ -75,18 +81,21 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```
 
 2. Add to `types.ts`:
+
    ```typescript
    // Model configuration schema
    export const ModelConfigSchema = z.object({
      enableNewModels: z.boolean().default(true),
      disabledModels: z.array(z.string()).default([]),
      disabledProviders: z.array(z.string()).default([]),
-     filters: z.object({
-       requiredParameters: z.array(z.string()).optional(),
-       maxPromptCostPerMillion: z.number().positive().optional(),
-       maxCompletionCostPerMillion: z.number().positive().optional(),
-       minContextLength: z.number().int().positive().optional(),
-     }).optional(),
+     filters: z
+       .object({
+         requiredParameters: z.array(z.string()).optional(),
+         maxPromptCostPerMillion: z.number().positive().optional(),
+         maxCompletionCostPerMillion: z.number().positive().optional(),
+         minContextLength: z.number().int().positive().optional(),
+       })
+       .optional(),
    });
 
    // Update ProviderInstanceSchema
@@ -102,16 +111,22 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    export type ModelConfig = z.infer<typeof ModelConfigSchema>;
    ```
 
-3. Run tests: `npx vitest --run packages/core/src/providers/catalog/types.test.ts`
-4. Commit: `git commit -m "feat: add modelConfig schema to ProviderInstance type"`
+3. Run tests:
+   `npx vitest --run packages/core/src/providers/catalog/types.test.ts`
+4. Commit:
+   `git commit -m "feat: add modelConfig schema to ProviderInstance type"`
 
 #### Task 1.2: Define OpenRouter Response Types
+
 **Files to create:**
+
 - `packages/core/src/providers/openrouter/types.ts`
 - `packages/core/src/providers/openrouter/types.test.ts`
 
 **What to do:**
+
 1. Create test file first:
+
    ```typescript
    import { describe, it, expect } from 'vitest';
    import { OpenRouterModelSchema, OpenRouterResponseSchema } from './types';
@@ -124,7 +139,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
          context_length: 128000,
          pricing: { prompt: '0.0000025', completion: '0.00001' },
          supported_parameters: ['tools', 'temperature'],
-         architecture: { modality: 'text->text' }
+         architecture: { modality: 'text->text' },
        };
        const result = OpenRouterModelSchema.safeParse(model);
        expect(result.success).toBe(true);
@@ -133,6 +148,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```
 
 2. Create types file:
+
    ```typescript
    import { z } from 'zod';
 
@@ -148,16 +164,20 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
        image: z.string().optional(),
      }),
      supported_parameters: z.array(z.string()).optional(),
-     architecture: z.object({
-       modality: z.string(),
-       tokenizer: z.string().optional(),
-       instruct_type: z.string().nullable().optional(),
-     }).optional(),
-     top_provider: z.object({
-       context_length: z.number().optional(),
-       max_completion_tokens: z.number().nullable().optional(),
-       is_moderated: z.boolean().optional(),
-     }).optional(),
+     architecture: z
+       .object({
+         modality: z.string(),
+         tokenizer: z.string().optional(),
+         instruct_type: z.string().nullable().optional(),
+       })
+       .optional(),
+     top_provider: z
+       .object({
+         context_length: z.number().optional(),
+         max_completion_tokens: z.number().nullable().optional(),
+         is_moderated: z.boolean().optional(),
+       })
+       .optional(),
      per_request_limits: z.any().nullable().optional(),
    });
 
@@ -174,12 +194,16 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 ### Phase 2: API Client and Caching (3-4 hours)
 
 #### Task 2.1: Capture Real OpenRouter API Response
+
 **Files to create:**
+
 - `packages/core/src/providers/openrouter/fixtures/models-response.json`
 - `packages/core/src/providers/openrouter/capture-fixtures.ts`
 
 **What to do:**
+
 1. First, capture the real API response (run this once):
+
    ```typescript
    // capture-fixtures.ts
    import * as fs from 'fs';
@@ -187,30 +211,30 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 
    async function captureOpenRouterResponse() {
      console.log('Fetching OpenRouter models (no API key needed)...');
-     
+
      const response = await fetch('https://openrouter.ai/api/v1/models');
      if (!response.ok) {
        throw new Error(`Failed: ${response.status}`);
      }
-     
+
      const data = await response.json();
-     
+
      // Save to fixtures
      const fixturesDir = path.join(import.meta.dir, 'fixtures');
      await fs.promises.mkdir(fixturesDir, { recursive: true });
-     
+
      await fs.promises.writeFile(
        path.join(fixturesDir, 'models-response.json'),
        JSON.stringify(data, null, 2)
      );
-     
+
      console.log(`Captured ${data.data.length} models`);
-     
+
      // Also save a smaller test fixture with just a few models
      const testFixture = {
-       data: data.data.slice(0, 10) // First 10 models for tests
+       data: data.data.slice(0, 10), // First 10 models for tests
      };
-     
+
      await fs.promises.writeFile(
        path.join(fixturesDir, 'models-response-test.json'),
        JSON.stringify(testFixture, null, 2)
@@ -224,6 +248,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```
 
 2. Run to capture real data:
+
    ```bash
    npx tsx packages/core/src/providers/openrouter/capture-fixtures.ts
    ```
@@ -235,12 +260,16 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```
 
 #### Task 2.2: Create OpenRouter API Client with Real Data Tests
+
 **Files to create:**
+
 - `packages/core/src/providers/openrouter/client.ts`
 - `packages/core/src/providers/openrouter/client.test.ts`
 
 **What to do:**
+
 1. Write test using real fixture data:
+
    ```typescript
    import { describe, it, expect, beforeEach, afterEach } from 'vitest';
    import { OpenRouterClient } from './client';
@@ -252,7 +281,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
          // Mock fetch to return our fixture data
          global.fetch = vi.fn().mockResolvedValue({
            ok: true,
-           json: async () => fixtureData
+           json: async () => fixtureData,
          });
        });
 
@@ -263,9 +292,9 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
        it('should parse real OpenRouter response correctly', async () => {
          const client = new OpenRouterClient();
          const result = await client.fetchModels();
-         
+
          expect(result.data).toHaveLength(10);
-         
+
          // Test actual structure from real data
          const firstModel = result.data[0];
          expect(firstModel).toHaveProperty('id');
@@ -279,11 +308,11 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
        it('should work without API key', async () => {
          const client = new OpenRouterClient();
          const result = await client.fetchModels(); // No API key
-         
+
          expect(fetch).toHaveBeenCalledWith(
            'https://openrouter.ai/api/v1/models',
            expect.objectContaining({
-             headers: {} // No auth header
+             headers: {}, // No auth header
            })
          );
          expect(result.data.length).toBeGreaterThan(0);
@@ -292,11 +321,11 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
        it('should include API key when provided', async () => {
          const client = new OpenRouterClient();
          await client.fetchModels('test-api-key');
-         
+
          expect(fetch).toHaveBeenCalledWith(
            'https://openrouter.ai/api/v1/models',
            expect.objectContaining({
-             headers: { 'Authorization': 'Bearer test-api-key' }
+             headers: { Authorization: 'Bearer test-api-key' },
            })
          );
        });
@@ -308,10 +337,10 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
          async () => {
            // This test actually hits the API
            vi.restoreAllMocks(); // Use real fetch
-           
+
            const client = new OpenRouterClient();
            const result = await client.fetchModels();
-           
+
            expect(result.data.length).toBeGreaterThan(100);
            expect(result.data[0]).toHaveProperty('id');
            expect(result.data[0]).toHaveProperty('pricing');
@@ -323,6 +352,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```
 
 2. Implement client:
+
    ```typescript
    import { OpenRouterResponse, OpenRouterResponseSchema } from './types';
    import { logger } from '~/utils/logger';
@@ -337,7 +367,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
        }
 
        const response = await fetch(`${this.baseUrl}/models`, { headers });
-       
+
        if (!response.ok) {
          throw new Error(`OpenRouter API error: ${response.status}`);
        }
@@ -351,12 +381,16 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 3. Run tests and commit
 
 #### Task 2.2: Implement Cache Manager
+
 **Files to create:**
+
 - `packages/core/src/providers/openrouter/cache-manager.ts`
 - `packages/core/src/providers/openrouter/cache-manager.test.ts`
 
 **What to do:**
+
 1. Test file (using temp directory):
+
    ```typescript
    import { describe, it, expect, beforeEach, afterEach } from 'vitest';
    import { CatalogCacheManager } from './cache-manager';
@@ -383,18 +417,18 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
            fetchedAt: new Date().toISOString(),
            version: '1.0',
            modelCount: 2,
-           source: 'test'
+           source: 'test',
          },
          provider: {
            name: 'Test',
            id: 'test',
-           models: []
-         }
+           models: [],
+         },
        };
 
        await manager.save('test-instance', catalog);
        const loaded = await manager.load('test-instance');
-       
+
        expect(loaded).toEqual(catalog);
      });
 
@@ -404,14 +438,14 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
            fetchedAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(), // 25 hours ago
            version: '1.0',
            modelCount: 1,
-           source: 'test'
+           source: 'test',
          },
-         provider: { name: 'Test', id: 'test', models: [] }
+         provider: { name: 'Test', id: 'test', models: [] },
        };
 
        await manager.save('test-instance', oldCatalog);
        const isStale = await manager.isStale('test-instance');
-       
+
        expect(isStale).toBe(true);
      });
 
@@ -423,6 +457,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```
 
 2. Implementation:
+
    ```typescript
    import * as fs from 'fs';
    import * as path from 'path';
@@ -454,7 +489,10 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
        await fs.promises.mkdir(this.cacheDir, { recursive: true });
        const filePath = this.getCachePath(instanceId);
        await fs.promises.writeFile(filePath, JSON.stringify(catalog, null, 2));
-       logger.info('catalog.cache.saved', { instanceId, modelCount: catalog._meta.modelCount });
+       logger.info('catalog.cache.saved', {
+         instanceId,
+         modelCount: catalog._meta.modelCount,
+       });
      }
 
      async load(instanceId: string): Promise<CachedCatalog | null> {
@@ -487,12 +525,16 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 ### Phase 3: Model Filtering Logic (2-3 hours)
 
 #### Task 3.1: Extract Provider from Model ID
+
 **Files to create:**
+
 - `packages/core/src/providers/openrouter/utils.ts`
 - `packages/core/src/providers/openrouter/utils.test.ts`
 
 **What to do:**
+
 1. Test file:
+
    ```typescript
    import { describe, it, expect } from 'vitest';
    import { extractProvider, convertPricing } from './utils';
@@ -524,6 +566,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```
 
 2. Implementation:
+
    ```typescript
    export function extractProvider(modelId: string): string {
      const parts = modelId.split('/');
@@ -545,12 +588,16 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 3. Run tests and commit
 
 #### Task 3.2: Implement Model Filter Service
+
 **Files to create:**
+
 - `packages/core/src/providers/openrouter/filter-service.ts`
 - `packages/core/src/providers/openrouter/filter-service.test.ts`
 
 **What to do:**
+
 1. Comprehensive test file:
+
    ```typescript
    import { describe, it, expect } from 'vitest';
    import { ModelFilterService } from './filter-service';
@@ -558,13 +605,15 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    import type { ModelConfig } from '../catalog/types';
 
    describe('ModelFilterService', () => {
-     const createModel = (overrides: Partial<OpenRouterModel> = {}): OpenRouterModel => ({
+     const createModel = (
+       overrides: Partial<OpenRouterModel> = {}
+     ): OpenRouterModel => ({
        id: 'openai/gpt-4',
        name: 'GPT-4',
        context_length: 8192,
        pricing: { prompt: '0.00003', completion: '0.00006' },
        supported_parameters: ['tools', 'temperature'],
-       ...overrides
+       ...overrides,
      });
 
      it('should filter by disabled providers', () => {
@@ -572,9 +621,9 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
        const models = [
          createModel({ id: 'openai/gpt-4' }),
          createModel({ id: 'anthropic/claude' }),
-         createModel({ id: 'google/gemini' })
+         createModel({ id: 'google/gemini' }),
        ];
-       
+
        const config: ModelConfig = {
          enableNewModels: true,
          disabledProviders: ['google'],
@@ -583,16 +632,16 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 
        const filtered = service.filterModels(models, config);
        expect(filtered).toHaveLength(2);
-       expect(filtered.map(m => m.id)).not.toContain('google/gemini');
+       expect(filtered.map((m) => m.id)).not.toContain('google/gemini');
      });
 
      it('should filter by disabled models', () => {
        const service = new ModelFilterService();
        const models = [
          createModel({ id: 'openai/gpt-4' }),
-         createModel({ id: 'openai/gpt-3.5' })
+         createModel({ id: 'openai/gpt-3.5' }),
        ];
-       
+
        const config: ModelConfig = {
          enableNewModels: true,
          disabledModels: ['openai/gpt-3.5'],
@@ -610,14 +659,14 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
          createModel({ supported_parameters: ['tools', 'temperature'] }),
          createModel({ supported_parameters: ['temperature'] }),
        ];
-       
+
        const config: ModelConfig = {
          enableNewModels: true,
          disabledModels: [],
          disabledProviders: [],
          filters: {
-           requiredParameters: ['tools']
-         }
+           requiredParameters: ['tools'],
+         },
        };
 
        const filtered = service.filterModels(models, config);
@@ -627,17 +676,19 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
      it('should filter by max prompt cost', () => {
        const service = new ModelFilterService();
        const models = [
-         createModel({ pricing: { prompt: '0.000003', completion: '0.000006' } }), // $3/M
-         createModel({ pricing: { prompt: '0.00001', completion: '0.00002' } })   // $10/M
+         createModel({
+           pricing: { prompt: '0.000003', completion: '0.000006' },
+         }), // $3/M
+         createModel({ pricing: { prompt: '0.00001', completion: '0.00002' } }), // $10/M
        ];
-       
+
        const config: ModelConfig = {
          enableNewModels: true,
          disabledModels: [],
          disabledProviders: [],
          filters: {
-           maxPromptCostPerMillion: 5.0
-         }
+           maxPromptCostPerMillion: 5.0,
+         },
        };
 
        const filtered = service.filterModels(models, config);
@@ -648,16 +699,16 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
        const service = new ModelFilterService();
        const models = [
          createModel({ context_length: 4096 }),
-         createModel({ context_length: 128000 })
+         createModel({ context_length: 128000 }),
        ];
-       
+
        const config: ModelConfig = {
          enableNewModels: true,
          disabledModels: [],
          disabledProviders: [],
          filters: {
-           minContextLength: 32000
-         }
+           minContextLength: 32000,
+         },
        };
 
        const filtered = service.filterModels(models, config);
@@ -668,6 +719,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```
 
 2. Implementation:
+
    ```typescript
    import type { OpenRouterModel } from './types';
    import type { ModelConfig } from '../catalog/types';
@@ -675,10 +727,13 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    import { logger } from '~/utils/logger';
 
    export class ModelFilterService {
-     filterModels(models: OpenRouterModel[], config: ModelConfig): OpenRouterModel[] {
+     filterModels(
+       models: OpenRouterModel[],
+       config: ModelConfig
+     ): OpenRouterModel[] {
        const startCount = models.length;
-       
-       const filtered = models.filter(model => {
+
+       const filtered = models.filter((model) => {
          // Check disabled providers
          const provider = extractProvider(model.id);
          if (config.disabledProviders?.includes(provider)) {
@@ -696,7 +751,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 
            // Required parameters check
            if (filters.requiredParameters?.length) {
-             const hasAll = filters.requiredParameters.every(param =>
+             const hasAll = filters.requiredParameters.every((param) =>
                model.supported_parameters?.includes(param)
              );
              if (!hasAll) return false;
@@ -725,16 +780,18 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
        logger.debug('models.filtered', {
          original: startCount,
          filtered: filtered.length,
-         removed: startCount - filtered.length
+         removed: startCount - filtered.length,
        });
 
        return filtered;
      }
 
      // Group models by provider
-     groupByProvider(models: OpenRouterModel[]): Map<string, OpenRouterModel[]> {
+     groupByProvider(
+       models: OpenRouterModel[]
+     ): Map<string, OpenRouterModel[]> {
        const groups = new Map<string, OpenRouterModel[]>();
-       
+
        for (const model of models) {
          const provider = extractProvider(model.id);
          const group = groups.get(provider) ?? [];
@@ -752,12 +809,16 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 ### Phase 4: Integration with Existing System (3-4 hours)
 
 #### Task 4.1: Create Dynamic Catalog Provider
+
 **Files to create:**
+
 - `packages/core/src/providers/openrouter/dynamic-provider.ts`
 - `packages/core/src/providers/openrouter/dynamic-provider.test.ts`
 
 **What to do:**
+
 1. Test file (with mocks):
+
    ```typescript
    import { describe, it, expect, vi, beforeEach } from 'vitest';
    import { OpenRouterDynamicProvider } from './dynamic-provider';
@@ -779,37 +840,37 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
              name: 'GPT-4',
              context_length: 8192,
              pricing: { prompt: '0.00003', completion: '0.00006' },
-             supported_parameters: ['tools']
-           }
-         ]
+             supported_parameters: ['tools'],
+           },
+         ],
        };
 
        (global.fetch as any).mockResolvedValueOnce({
          ok: true,
-         json: async () => mockResponse
+         json: async () => mockResponse,
        });
 
        const provider = new OpenRouterDynamicProvider('test-instance');
        const catalog = await provider.getCatalog('test-api-key');
-       
+
        expect(catalog.models).toHaveLength(1);
        expect(fetch).toHaveBeenCalled();
      });
 
      it('should use cache when fresh', async () => {
        const provider = new OpenRouterDynamicProvider('test-instance');
-       
+
        // First call - fetches from API
        (global.fetch as any).mockResolvedValueOnce({
          ok: true,
-         json: async () => ({ data: [] })
+         json: async () => ({ data: [] }),
        });
        await provider.getCatalog('test-api-key');
-       
+
        // Second call - should use cache
        vi.clearAllMocks();
        await provider.getCatalog('test-api-key');
-       
+
        expect(fetch).not.toHaveBeenCalled();
      });
 
@@ -821,33 +882,36 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
              name: 'GPT-4',
              context_length: 8192,
              pricing: { prompt: '0.00003', completion: '0.00006' },
-             supported_parameters: ['tools']
+             supported_parameters: ['tools'],
            },
            {
              id: 'google/gemini',
              name: 'Gemini',
              context_length: 32000,
              pricing: { prompt: '0.000001', completion: '0.000002' },
-             supported_parameters: []
-           }
-         ]
+             supported_parameters: [],
+           },
+         ],
        };
 
        (global.fetch as any).mockResolvedValueOnce({
          ok: true,
-         json: async () => mockResponse
+         json: async () => mockResponse,
        });
 
        const config = {
          enableNewModels: true,
          disabledProviders: ['google'],
          disabledModels: [],
-         filters: {}
+         filters: {},
        };
 
        const provider = new OpenRouterDynamicProvider('test-instance');
-       const catalog = await provider.getCatalogWithConfig('test-api-key', config);
-       
+       const catalog = await provider.getCatalogWithConfig(
+         'test-api-key',
+         config
+       );
+
        expect(catalog.models).toHaveLength(1);
        expect(catalog.models[0].id).toBe('openai/gpt-4');
      });
@@ -855,6 +919,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```
 
 2. Implementation:
+
    ```typescript
    import { OpenRouterClient } from './client';
    import { CatalogCacheManager } from './cache-manager';
@@ -895,28 +960,33 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
              fetchedAt: new Date().toISOString(),
              version: '1.0',
              modelCount: response.data.length,
-             source: 'https://openrouter.ai/api/v1/models'
+             source: 'https://openrouter.ai/api/v1/models',
            },
            provider: {
              name: 'OpenRouter',
              id: 'openrouter',
-             models: response.data
-           }
+             models: response.data,
+           },
          };
 
          await this.cacheManager.save(this.instanceId, catalog);
-         logger.info('catalog.refreshed', { 
+         logger.info('catalog.refreshed', {
            instanceId: this.instanceId,
-           modelCount: response.data.length 
+           modelCount: response.data.length,
          });
 
          return this.transformToCatalogProvider(catalog.provider);
        } catch (error) {
-         logger.error('catalog.fetch_failed', { instanceId: this.instanceId, error });
-         
+         logger.error('catalog.fetch_failed', {
+           instanceId: this.instanceId,
+           error,
+         });
+
          // Fall back to cache if available
          if (cached) {
-           logger.warn('catalog.using_stale_cache', { instanceId: this.instanceId });
+           logger.warn('catalog.using_stale_cache', {
+             instanceId: this.instanceId,
+           });
            return this.transformToCatalogProvider(cached.provider);
          }
 
@@ -929,7 +999,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
        config: ModelConfig
      ): Promise<CatalogProvider> {
        const catalog = await this.getCatalog(apiKey);
-       
+
        // Apply filters
        const filtered = this.filterService.filterModels(
          catalog.models as any,
@@ -938,7 +1008,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 
        return {
          ...catalog,
-         models: this.transformModels(filtered)
+         models: this.transformModels(filtered),
        };
      }
 
@@ -950,19 +1020,23 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
          api_endpoint: 'https://openrouter.ai/api/v1',
          default_large_model_id: 'anthropic/claude-3.5-sonnet',
          default_small_model_id: 'anthropic/claude-3.5-haiku',
-         models: this.transformModels(provider.models)
+         models: this.transformModels(provider.models),
        };
      }
 
      private transformModels(openRouterModels: any[]): any[] {
-       return openRouterModels.map(model => ({
+       return openRouterModels.map((model) => ({
          id: model.id,
          name: model.name || model.id,
          cost_per_1m_in: parseFloat(model.pricing.prompt) * 1000000,
          cost_per_1m_out: parseFloat(model.pricing.completion) * 1000000,
          context_window: model.context_length,
-         default_max_tokens: Math.min(4096, Math.floor(model.context_length / 4)),
-         supports_attachments: model.supported_parameters?.includes('vision') ?? false,
+         default_max_tokens: Math.min(
+           4096,
+           Math.floor(model.context_length / 4)
+         ),
+         supports_attachments:
+           model.supported_parameters?.includes('vision') ?? false,
          can_reason: model.supported_parameters?.includes('reasoning') ?? false,
        }));
      }
@@ -972,22 +1046,27 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 3. Run tests and commit
 
 #### Task 4.2: Update Provider Registry
+
 **Files to modify:**
+
 - `packages/core/src/providers/registry.ts`
 
 **What to do:**
+
 1. Add test to existing registry test file:
+
    ```typescript
    it('should support dynamic catalog for openrouter', async () => {
      const registry = ProviderRegistry.getInstance();
      const provider = await registry.getCatalogProvider('openrouter');
-     
+
      expect(provider).toBeDefined();
      expect(provider.id).toBe('openrouter');
    });
    ```
 
 2. Modify registry (find the getCatalogProviders method):
+
    ```typescript
    import { OpenRouterDynamicProvider } from './openrouter/dynamic-provider';
 
@@ -998,11 +1077,11 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
        const instances = this.instanceManager.loadInstancesSync();
        const openRouterInstance = Object.entries(instances.instances)
          .find(([_, inst]) => inst.catalogProviderId === 'openrouter');
-       
+
        if (openRouterInstance) {
          const [instanceId, instance] = openRouterInstance;
          const credential = this.instanceManager.loadCredential(instanceId);
-         
+
          if (credential?.apiKey) {
            const provider = new OpenRouterDynamicProvider(instanceId);
            const config = instance.modelConfig ?? {
@@ -1010,7 +1089,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
              disabledModels: [],
              disabledProviders: []
            };
-           
+
            try {
              return await provider.getCatalogWithConfig(credential.apiKey, config);
            } catch (error) {
@@ -1031,12 +1110,16 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 ### Phase 5: Web UI Components (4-5 hours)
 
 #### Task 5.1: Create Model Filter Bar Component
+
 **Files to create:**
+
 - `packages/web/components/providers/ModelFilterBar.tsx`
 - `packages/web/components/providers/ModelFilterBar.test.tsx`
 
 **What to do:**
+
 1. Test file (using React Testing Library):
+
    ```typescript
    import { describe, it, expect, vi } from 'vitest';
    import { render, screen, fireEvent } from '@testing-library/react';
@@ -1054,7 +1137,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 
      it('should render capability checkboxes', () => {
        render(<ModelFilterBar {...defaultProps} />);
-       
+
        expect(screen.getByLabelText('Tools')).toBeInTheDocument();
        expect(screen.getByLabelText('Vision')).toBeInTheDocument();
        expect(screen.getByLabelText('Reasoning')).toBeInTheDocument();
@@ -1063,9 +1146,9 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
      it('should call onChange when capability is toggled', () => {
        const onChange = vi.fn();
        render(<ModelFilterBar {...defaultProps} onChange={onChange} />);
-       
+
        fireEvent.click(screen.getByLabelText('Tools'));
-       
+
        expect(onChange).toHaveBeenCalledWith({
          requiredParameters: ['tools'],
          minContextLength: undefined,
@@ -1076,10 +1159,10 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
      it('should update context filter', () => {
        const onChange = vi.fn();
        render(<ModelFilterBar {...defaultProps} onChange={onChange} />);
-       
+
        const select = screen.getByLabelText('Context Size');
        fireEvent.change(select, { target: { value: '32000' } });
-       
+
        expect(onChange).toHaveBeenCalledWith({
          requiredParameters: [],
          minContextLength: 32000,
@@ -1090,6 +1173,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```
 
 2. Component implementation:
+
    ```tsx
    'use client';
 
@@ -1119,8 +1203,8 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
        const current = filters.requiredParameters ?? [];
        const updated = checked
          ? [...current, capability]
-         : current.filter(c => c !== capability);
-       
+         : current.filter((c) => c !== capability);
+
        onChange({ ...filters, requiredParameters: updated });
      };
 
@@ -1150,8 +1234,12 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
                    <input
                      type="checkbox"
                      className="checkbox checkbox-xs"
-                     checked={filters.requiredParameters?.includes(cap.id) ?? false}
-                     onChange={(e) => handleCapabilityChange(cap.id, e.target.checked)}
+                     checked={
+                       filters.requiredParameters?.includes(cap.id) ?? false
+                     }
+                     onChange={(e) =>
+                       handleCapabilityChange(cap.id, e.target.checked)
+                     }
                      aria-label={cap.label}
                    />
                    <span className="text-xs">{cap.label}</span>
@@ -1196,12 +1284,16 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 3. Run tests and commit
 
 #### Task 5.2: Create Provider Model Group Component
+
 **Files to create:**
+
 - `packages/web/components/providers/ProviderModelGroup.tsx`
 - `packages/web/components/providers/ProviderModelGroup.test.tsx`
 
 **What to do:**
+
 1. Test file:
+
    ```typescript
    import { describe, it, expect, vi } from 'vitest';
    import { render, screen, fireEvent } from '@testing-library/react';
@@ -1243,29 +1335,29 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
      it('should call onToggleProvider when provider checkbox clicked', () => {
        const onToggleProvider = vi.fn();
        render(<ProviderModelGroup {...defaultProps} onToggleProvider={onToggleProvider} />);
-       
+
        const checkbox = screen.getByRole('checkbox', { name: /OpenAI provider toggle/i });
        fireEvent.click(checkbox);
-       
+
        expect(onToggleProvider).toHaveBeenCalledWith('OpenAI', expect.any(Boolean));
      });
 
      it('should expand/collapse on click', () => {
        render(<ProviderModelGroup {...defaultProps} />);
-       
+
        const header = screen.getByText('OpenAI');
        expect(screen.queryByText('GPT-4')).not.toBeInTheDocument();
-       
+
        fireEvent.click(header.closest('.collapse-title')!);
        expect(screen.getByText('GPT-4')).toBeInTheDocument();
      });
 
      it('should format context size correctly', () => {
        render(<ProviderModelGroup {...defaultProps} />);
-       
+
        const header = screen.getByText('OpenAI');
        fireEvent.click(header.closest('.collapse-title')!);
-       
+
        expect(screen.getByText(/8k context/)).toBeInTheDocument();
        expect(screen.getByText(/4k context/)).toBeInTheDocument();
      });
@@ -1273,6 +1365,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```
 
 2. Component:
+
    ```tsx
    'use client';
 
@@ -1304,8 +1397,10 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
      onToggleModel,
    }: ProviderModelGroupProps) {
      const [isExpanded, setIsExpanded] = useState(false);
-     
-     const enabledCount = models.filter(m => enabledModels.includes(m.id)).length;
+
+     const enabledCount = models.filter((m) =>
+       enabledModels.includes(m.id)
+     ).length;
      const isProviderEnabled = enabledCount > 0;
 
      const formatContext = (tokens: number): string => {
@@ -1331,8 +1426,8 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 
      return (
        <div className="collapse collapse-arrow bg-base-200">
-         <input 
-           type="checkbox" 
+         <input
+           type="checkbox"
            checked={isExpanded}
            onChange={(e) => setIsExpanded(e.target.checked)}
          />
@@ -1352,15 +1447,17 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
                />
                <span className="font-semibold">{providerName}</span>
              </div>
-             <span className="text-sm">{enabledCount}/{models.length} enabled</span>
+             <span className="text-sm">
+               {enabledCount}/{models.length} enabled
+             </span>
            </div>
          </div>
          <div className="collapse-content">
            <div className="space-y-2 pt-2">
-             {models.map(model => {
+             {models.map((model) => {
                const isEnabled = enabledModels.includes(model.id);
                const badges = getCapabilityBadges(model);
-               
+
                return (
                  <label
                    key={model.id}
@@ -1379,18 +1476,23 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
                        <div>
                          <span className="font-medium">{model.name}</span>
                          {model.cost_per_1m_in === 0 && (
-                           <span className="badge badge-xs badge-success ml-2">FREE</span>
+                           <span className="badge badge-xs badge-success ml-2">
+                             FREE
+                           </span>
                          )}
                          <div className="text-xs opacity-70 mt-1">
-                           {formatContext(model.context_window)} context • 
-                           {formatPrice(model.cost_per_1m_in)} input / 
+                           {formatContext(model.context_window)} context •
+                           {formatPrice(model.cost_per_1m_in)} input /
                            {formatPrice(model.cost_per_1m_out)} output per 1M
                          </div>
                        </div>
                        {badges.length > 0 && (
                          <div className="flex gap-1">
-                           {badges.map(badge => (
-                             <span key={badge} className="badge badge-xs badge-primary">
+                           {badges.map((badge) => (
+                             <span
+                               key={badge}
+                               className="badge badge-xs badge-primary"
+                             >
                                {badge}
                              </span>
                            ))}
@@ -1411,16 +1513,21 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 3. Run tests and commit
 
 #### Task 5.3: Add Model Management State to Provider Card
+
 **Files to modify:**
+
 - `packages/web/components/providers/ProviderCatalogCard.tsx`
 
 **What to do:**
+
 1. First, examine the existing ProviderCatalogCard to understand its structure:
+
    ```bash
    cat packages/web/components/providers/ProviderCatalogCard.tsx
    ```
 
 2. Add imports at the top:
+
    ```typescript
    import { ModelFilterBar } from './ModelFilterBar';
    import { ProviderModelGroup } from './ProviderModelGroup';
@@ -1428,6 +1535,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```
 
 3. Add state management inside the component:
+
    ```typescript
    export function ProviderCatalogCard({ provider, instance }: Props) {
      // Add these new state variables
@@ -1437,7 +1545,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
        disabledProviders: instance.modelConfig?.disabledProviders ?? [],
        filters: instance.modelConfig?.filters ?? {},
      });
-     
+
      const [filteredModels, setFilteredModels] = useState(provider.models);
      const [searchQuery, setSearchQuery] = useState('');
      const [isRefreshing, setIsRefreshing] = useState(false);
@@ -1445,7 +1553,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
      // Group models by provider
      const modelsByProvider = useMemo(() => {
        const groups = new Map<string, typeof provider.models>();
-       filteredModels.forEach(model => {
+       filteredModels.forEach((model) => {
          const providerName = model.id.split('/')[0] || 'unknown';
          const group = groups.get(providerName) || [];
          group.push(model);
@@ -1459,6 +1567,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```
 
 4. Write test for the state management:
+
    ```typescript
    it('should initialize model config from instance', () => {
      const instance = {
@@ -1469,92 +1578,105 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
          filters: { requiredParameters: ['tools'] }
        }
      };
-     
+
      render(<ProviderCatalogCard provider={mockProvider} instance={instance} />);
      // Verify initial state is set correctly
    });
    ```
 
-5. Commit: `git commit -m "feat: add model management state to ProviderCatalogCard"`
+5. Commit:
+   `git commit -m "feat: add model management state to ProviderCatalogCard"`
 
 #### Task 5.4: Add Search and Filter UI to Provider Card
+
 **Files to modify:**
+
 - `packages/web/components/providers/ProviderCatalogCard.tsx`
 
 **What to do:**
-1. Add the search bar and filter bar JSX (inside the card body, after the header):
+
+1. Add the search bar and filter bar JSX (inside the card body, after the
+   header):
+
    ```tsx
-   {/* Only show for OpenRouter instances */}
-   {provider.id === 'openrouter' && (
-     <>
-       {/* Search Bar */}
-       <div className="mb-3">
-         <input
-           type="text"
-           placeholder="Search models..."
-           className="input input-bordered w-full"
-           value={searchQuery}
-           onChange={(e) => setSearchQuery(e.target.value)}
+   {
+     /* Only show for OpenRouter instances */
+   }
+   {
+     provider.id === 'openrouter' && (
+       <>
+         {/* Search Bar */}
+         <div className="mb-3">
+           <input
+             type="text"
+             placeholder="Search models..."
+             className="input input-bordered w-full"
+             value={searchQuery}
+             onChange={(e) => setSearchQuery(e.target.value)}
+           />
+         </div>
+
+         {/* Filter Bar */}
+         <ModelFilterBar
+           filters={modelConfig.filters}
+           onChange={(filters) => {
+             setModelConfig((prev) => ({ ...prev, filters }));
+           }}
          />
-       </div>
 
-       {/* Filter Bar */}
-       <ModelFilterBar
-         filters={modelConfig.filters}
-         onChange={(filters) => {
-           setModelConfig(prev => ({ ...prev, filters }));
-         }}
-       />
-
-       {/* Refresh Status */}
-       <div className="flex justify-between items-center my-3">
-         <span className="text-sm opacity-70">
-           {provider.models.length} models available
-         </span>
-         <button
-           className="btn btn-circle btn-sm btn-primary"
-           onClick={handleRefresh}
-           disabled={isRefreshing}
-         >
-           {isRefreshing ? (
-             <span className="loading loading-spinner loading-xs"></span>
-           ) : (
-             <svg>...</svg> // Refresh icon
-           )}
-         </button>
-       </div>
-     </>
-   )}
+         {/* Refresh Status */}
+         <div className="flex justify-between items-center my-3">
+           <span className="text-sm opacity-70">
+             {provider.models.length} models available
+           </span>
+           <button
+             className="btn btn-circle btn-sm btn-primary"
+             onClick={handleRefresh}
+             disabled={isRefreshing}
+           >
+             {isRefreshing ? (
+               <span className="loading loading-spinner loading-xs"></span>
+             ) : (
+               <svg>...</svg> // Refresh icon
+             )}
+           </button>
+         </div>
+       </>
+     );
+   }
    ```
 
 2. Add search filtering logic:
+
    ```typescript
    useEffect(() => {
      let filtered = provider.models;
-     
+
      // Apply search
      if (searchQuery) {
-       filtered = filtered.filter(model => 
-         model.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-         model.name.toLowerCase().includes(searchQuery.toLowerCase())
+       filtered = filtered.filter(
+         (model) =>
+           model.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           model.name.toLowerCase().includes(searchQuery.toLowerCase())
        );
      }
-     
+
      // Apply config filters (you'll implement this)
      filtered = applyModelFilters(filtered, modelConfig);
-     
+
      setFilteredModels(filtered);
    }, [provider.models, searchQuery, modelConfig]);
    ```
 
 3. Test the search functionality:
+
    ```typescript
    it('should filter models by search query', async () => {
      render(<ProviderCatalogCard provider={mockProvider} instance={instance} />);
-     
+
      const searchInput = screen.getByPlaceholderText('Search models...');
      fireEvent.change(searchInput, { target: { value: 'gpt-4' } });
-     
+
      await waitFor(() => {
        expect(screen.queryByText('claude-3')).not.toBeInTheDocument();
        expect(screen.getByText('gpt-4')).toBeInTheDocument();
@@ -1565,51 +1687,62 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 4. Commit: `git commit -m "feat: add search and filter UI to provider card"`
 
 #### Task 5.5: Add Model Groups Display
+
 **Files to modify:**
+
 - `packages/web/components/providers/ProviderCatalogCard.tsx`
 
 **What to do:**
+
 1. Add the model groups display (after the filter bar):
+
    ```tsx
-   {/* Model Groups */}
-   {provider.id === 'openrouter' && (
-     <div className="space-y-2 mt-4">
-       {Array.from(modelsByProvider.entries()).map(([providerName, models]) => (
-         <ProviderModelGroup
-           key={providerName}
-           providerName={providerName}
-           models={models}
-           enabledModels={
-             models
-               .filter(m => !modelConfig.disabledModels.includes(m.id))
-               .map(m => m.id)
-           }
-           onToggleProvider={(provider, enabled) => {
-             handleToggleProvider(provider, enabled);
-           }}
-           onToggleModel={(modelId, enabled) => {
-             handleToggleModel(modelId, enabled);
-           }}
-         />
-       ))}
-     </div>
-   )}
+   {
+     /* Model Groups */
+   }
+   {
+     provider.id === 'openrouter' && (
+       <div className="space-y-2 mt-4">
+         {Array.from(modelsByProvider.entries()).map(
+           ([providerName, models]) => (
+             <ProviderModelGroup
+               key={providerName}
+               providerName={providerName}
+               models={models}
+               enabledModels={models
+                 .filter((m) => !modelConfig.disabledModels.includes(m.id))
+                 .map((m) => m.id)}
+               onToggleProvider={(provider, enabled) => {
+                 handleToggleProvider(provider, enabled);
+               }}
+               onToggleModel={(modelId, enabled) => {
+                 handleToggleModel(modelId, enabled);
+               }}
+             />
+           )
+         )}
+       </div>
+     );
+   }
    ```
 
 2. Implement toggle handlers:
+
    ```typescript
    const handleToggleProvider = (providerName: string, enabled: boolean) => {
-     setModelConfig(prev => {
+     setModelConfig((prev) => {
        const updated = { ...prev };
        if (enabled) {
          // Remove provider from disabled list
          updated.disabledProviders = prev.disabledProviders.filter(
-           p => p !== providerName
+           (p) => p !== providerName
          );
          // Remove all models from this provider from disabled list
-         const providerModels = Array.from(modelsByProvider.get(providerName) || []);
+         const providerModels = Array.from(
+           modelsByProvider.get(providerName) || []
+         );
          updated.disabledModels = prev.disabledModels.filter(
-           m => !providerModels.some(pm => pm.id === m)
+           (m) => !providerModels.some((pm) => pm.id === m)
          );
        } else {
          // Add provider to disabled list
@@ -1620,23 +1753,24 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    };
 
    const handleToggleModel = (modelId: string, enabled: boolean) => {
-     setModelConfig(prev => ({
+     setModelConfig((prev) => ({
        ...prev,
        disabledModels: enabled
-         ? prev.disabledModels.filter(m => m !== modelId)
-         : [...prev.disabledModels, modelId]
+         ? prev.disabledModels.filter((m) => m !== modelId)
+         : [...prev.disabledModels, modelId],
      }));
    };
    ```
 
 3. Test the toggle functionality:
+
    ```typescript
    it('should disable all models when provider is toggled off', async () => {
      render(<ProviderCatalogCard provider={mockOpenRouterProvider} instance={instance} />);
-     
+
      const providerCheckbox = screen.getByLabelText('OpenAI provider toggle');
      fireEvent.click(providerCheckbox);
-     
+
      await waitFor(() => {
        const config = getLastSavedConfig(); // Helper to get saved config
        expect(config.disabledProviders).toContain('openai');
@@ -1644,14 +1778,19 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    });
    ```
 
-4. Commit: `git commit -m "feat: add model groups display with toggle functionality"`
+4. Commit:
+   `git commit -m "feat: add model groups display with toggle functionality"`
 
 #### Task 5.6: Implement Refresh and Save Functionality
+
 **Files to modify:**
+
 - `packages/web/components/providers/ProviderCatalogCard.tsx`
 
 **What to do:**
+
 1. Add refresh handler:
+
    ```typescript
    const handleRefresh = async () => {
      setIsRefreshing(true);
@@ -1659,7 +1798,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
        const response = await fetch(`/api/providers/${instance.id}/refresh`, {
          method: 'POST',
        });
-       
+
        if (response.ok) {
          const updated = await response.json();
          // Update the provider data (you'll need to handle this via props/context)
@@ -1676,6 +1815,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```
 
 2. Add save configuration handler:
+
    ```typescript
    const handleSaveConfig = async () => {
      try {
@@ -1684,7 +1824,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
          headers: { 'Content-Type': 'application/json' },
          body: JSON.stringify({ modelConfig }),
        });
-       
+
        if (response.ok) {
          // Show success message
          toast?.success('Configuration saved');
@@ -1708,17 +1848,18 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```
 
 3. Test save functionality:
+
    ```typescript
    it('should auto-save configuration changes', async () => {
      const saveSpy = vi.fn();
      global.fetch = saveSpy;
-     
+
      render(<ProviderCatalogCard provider={mockProvider} instance={instance} />);
-     
+
      // Toggle a model
      const modelCheckbox = screen.getByLabelText('GPT-4 model toggle');
      fireEvent.click(modelCheckbox);
-     
+
      // Wait for debounce
      await waitFor(() => {
        expect(saveSpy).toHaveBeenCalledWith(
@@ -1737,11 +1878,15 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 ### Phase 6: Testing & Documentation (2-3 hours)
 
 #### Task 6.1: Integration Tests
+
 **Files to create:**
+
 - `packages/core/src/providers/openrouter/integration.test.ts`
 
 **What to do:**
+
 1. Create comprehensive integration test:
+
    ```typescript
    import { describe, it, expect, beforeEach, afterEach } from 'vitest';
    import { OpenRouterDynamicProvider } from './dynamic-provider';
@@ -1771,15 +1916,15 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
        }
 
        const provider = new OpenRouterDynamicProvider('test');
-       
+
        // First fetch
        const catalog1 = await provider.getCatalog(apiKey);
        expect(catalog1.models.length).toBeGreaterThan(100);
-       
+
        // Should use cache
        const catalog2 = await provider.getCatalog(apiKey);
        expect(catalog2).toEqual(catalog1);
-       
+
        // Apply filters
        const filtered = await provider.getCatalogWithConfig(apiKey, {
          enableNewModels: true,
@@ -1787,10 +1932,10 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
          disabledModels: [],
          filters: {
            requiredParameters: ['tools'],
-           maxPromptCostPerMillion: 10
-         }
+           maxPromptCostPerMillion: 10,
+         },
        });
-       
+
        expect(filtered.models.length).toBeLessThan(catalog1.models.length);
      });
    });
@@ -1800,52 +1945,65 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 3. Commit
 
 #### Task 6.2: Update Documentation
+
 **Files to create/modify:**
+
 - `docs/providers/openrouter.md`
 - `packages/core/src/providers/openrouter/README.md`
 
 **What to do:**
+
 1. Create user documentation:
+
    ```markdown
    # OpenRouter Dynamic Catalogs
 
    ## Overview
+
    OpenRouter provides access to 500+ AI models that change daily. Lace fetches
    the latest model catalog directly from OpenRouter's API.
 
    ## Setup
+
    1. Get an API key from https://openrouter.ai
    2. Configure your OpenRouter instance in Settings
    3. Models will refresh automatically daily
 
    ## Filtering Models
+
    Use the filter bar to:
+
    - Filter by capabilities (Tools, Vision, Reasoning)
    - Set minimum context window size
    - Set maximum price per million tokens
 
    ## Provider Management
+
    - Click provider checkbox to enable/disable all models
    - Individual models can be toggled on/off
    - Settings are saved per instance
 
    ## Troubleshooting
+
    - If models don't load, check your API key
    - Use Refresh button to manually update
    - Cache is stored in LACE_DIR/catalogs/
    ```
 
 2. Create developer README:
-   ```markdown
+
+   ````markdown
    # OpenRouter Dynamic Provider
 
    ## Architecture
+
    - `client.ts` - API communication
    - `cache-manager.ts` - Local caching
    - `filter-service.ts` - Model filtering
    - `dynamic-provider.ts` - Main integration
 
    ## Testing
+
    ```bash
    # Unit tests
    npm run test:unit src/providers/openrouter
@@ -1853,11 +2011,15 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    # Integration (needs API key)
    OPENROUTER_TEST_KEY=xxx npm run test:integration
    ```
+   ````
 
    ## Adding New Filters
    1. Add to ModelConfigSchema in types.ts
    2. Implement in filter-service.ts
    3. Add UI in ModelFilterBar.tsx
+
+   ```
+
    ```
 
 3. Commit
@@ -1865,33 +2027,40 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 ### Phase 7: Final Integration & Testing (2 hours)
 
 #### Task 7.1: Manual Testing Checklist
+
 Create `test-checklist.md`:
+
 ```markdown
 # OpenRouter Testing Checklist
 
 ## Setup
+
 - [ ] Fresh install
 - [ ] Add OpenRouter instance
 - [ ] Enter API key
 - [ ] Verify initial fetch works
 
 ## Filtering
+
 - [ ] Toggle each capability filter
 - [ ] Test context size filters
 - [ ] Test price filters
 - [ ] Verify counts update
 
 ## Provider Management
+
 - [ ] Toggle provider on/off
 - [ ] Toggle individual models
 - [ ] Verify settings persist
 
 ## Refresh
+
 - [ ] Manual refresh works
 - [ ] Stale cache warning appears
 - [ ] Fallback to cache on API error
 
 ## Edge Cases
+
 - [ ] Invalid API key handling
 - [ ] Network timeout
 - [ ] Empty results
@@ -1899,20 +2068,21 @@ Create `test-checklist.md`:
 ```
 
 #### Task 7.2: Performance Testing
+
 ```typescript
 // Performance test
 it('should handle 500+ models efficiently', () => {
   const models = Array.from({ length: 500 }, (_, i) => ({
     id: `provider-${i % 50}/model-${i}`,
     name: `Model ${i}`,
-    context_length: 4096 * (i % 10 + 1),
-    pricing: { prompt: '0.001', completion: '0.002' }
+    context_length: 4096 * ((i % 10) + 1),
+    pricing: { prompt: '0.001', completion: '0.002' },
   }));
 
   const start = performance.now();
   const filtered = filterService.filterModels(models, config);
   const duration = performance.now() - start;
-  
+
   expect(duration).toBeLessThan(100); // Should filter in <100ms
 });
 ```
@@ -1920,6 +2090,7 @@ it('should handle 500+ models efficiently', () => {
 ## Commit Message Format
 
 Use conventional commits:
+
 - `feat:` New feature
 - `fix:` Bug fix
 - `test:` Test additions
@@ -1928,6 +2099,7 @@ Use conventional commits:
 - `chore:` Maintenance
 
 Examples:
+
 ```
 feat: add OpenRouter dynamic catalog support
 test: add ModelFilterBar component tests
@@ -1946,6 +2118,7 @@ fix: handle API rate limiting correctly
 ## Final Checklist
 
 Before considering complete:
+
 - [ ] All tests passing
 - [ ] Linting passes
 - [ ] Documentation updated

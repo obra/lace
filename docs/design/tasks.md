@@ -2,15 +2,24 @@
 
 ## Overview
 
-The Lace task management system provides a shared coordination mechanism between human users and AI agents. It implements a centralized task queue that enables multi-agent workflows without direct agent-to-agent communication. All tasks are session-scoped, persisted in SQLite, and support real-time updates via Server-Sent Events (SSE).
+The Lace task management system provides a shared coordination mechanism between
+human users and AI agents. It implements a centralized task queue that enables
+multi-agent workflows without direct agent-to-agent communication. All tasks are
+session-scoped, persisted in SQLite, and support real-time updates via
+Server-Sent Events (SSE).
 
 ## Core Philosophy
 
-1. **Tasks as Communication Channel**: Agents don't message each other directly. Instead, they communicate through shared tasks.
-2. **Session Scoping**: All tasks belong to a session (parent thread), providing natural isolation.
-3. **Human-Agent Parity**: Both humans and agents can create, assign, and complete tasks through the same system.
-4. **Real-time Updates**: Changes propagate immediately to all connected clients via SSE.
-5. **Event-Driven Architecture**: Task operations emit events that drive UI updates and notifications.
+1. **Tasks as Communication Channel**: Agents don't message each other directly.
+   Instead, they communicate through shared tasks.
+2. **Session Scoping**: All tasks belong to a session (parent thread), providing
+   natural isolation.
+3. **Human-Agent Parity**: Both humans and agents can create, assign, and
+   complete tasks through the same system.
+4. **Real-time Updates**: Changes propagate immediately to all connected clients
+   via SSE.
+5. **Event-Driven Architecture**: Task operations emit events that drive UI
+   updates and notifications.
 
 ## Architecture
 
@@ -41,11 +50,13 @@ The Lace task management system provides a shared coordination mechanism between
 ### Data Flow
 
 1. **Task Creation**:
+
    ```
    Human/Agent → API/Tool → TaskManager → Database → Event Emission → SSE → UI Update
    ```
 
 2. **Task Updates**:
+
    ```
    Update Request → TaskManager → Validate → Database → Event Emission → SSE → UI Update
    ```
@@ -61,18 +72,18 @@ The Lace task management system provides a shared coordination mechanism between
 
 ```typescript
 interface Task {
-  id: string;                    // task_YYYYMMDD_random (e.g., task_20250716_abc123)
-  title: string;                 // Brief summary (required)
-  description: string;           // Human-readable details
-  prompt: string;                // Instructions for assigned agent (required)
+  id: string; // task_YYYYMMDD_random (e.g., task_20250716_abc123)
+  title: string; // Brief summary (required)
+  description: string; // Human-readable details
+  prompt: string; // Instructions for assigned agent (required)
   status: 'pending' | 'in_progress' | 'completed' | 'blocked';
   priority: 'high' | 'medium' | 'low';
-  assignedTo?: AssigneeId;       // ThreadId, "new:provider/model", or undefined
-  createdBy: ThreadId;           // Who created the task
-  threadId: ThreadId;            // Parent session ID
+  assignedTo?: AssigneeId; // ThreadId, "new:provider/model", or undefined
+  createdBy: ThreadId; // Who created the task
+  threadId: ThreadId; // Parent session ID
   createdAt: Date;
   updatedAt: Date;
-  notes: TaskNote[];             // Communication thread
+  notes: TaskNote[]; // Communication thread
 }
 ```
 
@@ -80,9 +91,9 @@ interface Task {
 
 ```typescript
 interface TaskNote {
-  id: string;                    // note_YYYYMMDD_random
-  author: ThreadId;              // Who wrote the note
-  content: string;               // Note text
+  id: string; // note_YYYYMMDD_random
+  author: ThreadId; // Who wrote the note
+  content: string; // Note text
   timestamp: Date;
 }
 ```
@@ -91,17 +102,19 @@ interface TaskNote {
 
 ```typescript
 interface TaskContext {
-  actor: string;                 // ThreadId of the actor
-  isHuman?: boolean;             // true for humans, false/undefined for agents
+  actor: string; // ThreadId of the actor
+  isHuman?: boolean; // true for humans, false/undefined for agents
 }
 ```
 
 ### Assignment Types
 
 Tasks can be assigned to:
+
 - **Specific Agent**: Full thread ID (e.g., `lace_20250716_abc123.1`)
 - **Human**: Represented as `"human"` in the UI, stored as session ID
-- **New Agent**: Specification format `new:provider/model` (e.g., `new:anthropic/claude-3-sonnet`)
+- **New Agent**: Specification format `new:provider/model` (e.g.,
+  `new:anthropic/claude-3-sonnet`)
 - **Unassigned**: `undefined` assignedTo field
 
 ## Core Components
@@ -109,13 +122,16 @@ Tasks can be assigned to:
 ### 1. TaskManager (`src/tasks/task-manager.ts`)
 
 Central task management service that:
+
 - Extends EventEmitter for real-time updates
 - Provides CRUD operations for tasks
 - Manages task notes
 - Enforces session scoping
-- Emits events: `task:created`, `task:updated`, `task:deleted`, `task:note_added`
+- Emits events: `task:created`, `task:updated`, `task:deleted`,
+  `task:note_added`
 
 Key methods:
+
 - `createTask(request, context)`: Create new task
 - `getTasks(filters?)`: List tasks with optional filtering
 - `getTaskById(taskId)`: Get specific task
@@ -127,6 +143,7 @@ Key methods:
 ### 2. Session Integration (`src/sessions/session.ts`)
 
 Each Session instance:
+
 - Creates its own TaskManager instance
 - Provides `getTaskManager()` method
 - Shares TaskManager between agent tools and web APIs
@@ -135,6 +152,7 @@ Each Session instance:
 ### 3. Agent Tools (`src/tools/implementations/task-manager/`)
 
 Six tools that agents use:
+
 - `TaskCreateTool`: Create new tasks
 - `TaskListTool`: List and filter tasks
 - `TaskCompleteTool`: Mark tasks as completed
@@ -147,6 +165,7 @@ All tools get TaskManager instance from the session context.
 ### 4. Web API Endpoints
 
 #### Task CRUD Operations
+
 - `GET /api/tasks?sessionId=xxx`: List tasks with filters
 - `POST /api/tasks`: Create new task
 - `GET /api/tasks/[taskId]?sessionId=xxx`: Get task details
@@ -154,22 +173,28 @@ All tools get TaskManager instance from the session context.
 - `DELETE /api/tasks/[taskId]?sessionId=xxx`: Delete task
 
 #### Task Notes
+
 - `POST /api/tasks/[taskId]/notes`: Add note to task
 
 #### Real-time Updates
+
 - `GET /api/tasks/stream?sessionId=xxx`: SSE endpoint for live updates
 
 ### 5. React Hooks
 
 #### useTaskManager (`packages/web/hooks/useTaskManager.ts`)
+
 Main hook for task operations:
+
 - Manages task state
 - Provides CRUD operations
 - Integrates with SSE for real-time updates
 - Handles loading and error states
 
 #### useTaskStream (`packages/web/hooks/useTaskStream.ts`)
+
 SSE integration hook:
+
 - Connects to task event stream
 - Provides callbacks for each event type
 - Manages EventSource lifecycle
@@ -190,6 +215,7 @@ SSE integration hook:
 ### Event Types
 
 1. **task:created**
+
    ```typescript
    {
      type: 'task:created',
@@ -200,6 +226,7 @@ SSE integration hook:
    ```
 
 2. **task:updated**
+
    ```typescript
    {
      type: 'task:updated',
@@ -210,6 +237,7 @@ SSE integration hook:
    ```
 
 3. **task:deleted**
+
    ```typescript
    {
      type: 'task:deleted',
@@ -243,6 +271,7 @@ SSE integration hook:
 ## Database Schema
 
 ### Tasks Table
+
 ```sql
 CREATE TABLE tasks (
   id TEXT PRIMARY KEY,
@@ -260,6 +289,7 @@ CREATE TABLE tasks (
 ```
 
 ### Task Notes Table
+
 ```sql
 CREATE TABLE task_notes (
   id TEXT PRIMARY KEY,
@@ -291,31 +321,34 @@ The system maintains consistency across multiple clients:
 ## Usage Patterns
 
 ### Creating a Task (Human)
+
 ```typescript
 // Via UI
 const { createTask } = useTaskManager(sessionId);
 await createTask({
-  title: "Implement authentication",
-  description: "Add user login functionality",
-  prompt: "Create a secure authentication system using JWT tokens",
-  priority: "high",
-  assignedTo: "lace_20250716_abc123.1"
+  title: 'Implement authentication',
+  description: 'Add user login functionality',
+  prompt: 'Create a secure authentication system using JWT tokens',
+  priority: 'high',
+  assignedTo: 'lace_20250716_abc123.1',
 });
 ```
 
 ### Creating a Task (Agent)
+
 ```yaml
 tools:
   - name: task-create
     arguments:
-      title: "Write unit tests"
-      description: "Add test coverage for auth module"
-      prompt: "Write comprehensive unit tests for all authentication functions"
-      priority: "medium"
-      assigned_to: "new:anthropic/claude-3-haiku"
+      title: 'Write unit tests'
+      description: 'Add test coverage for auth module'
+      prompt: 'Write comprehensive unit tests for all authentication functions'
+      priority: 'medium'
+      assigned_to: 'new:anthropic/claude-3-haiku'
 ```
 
 ### Multi-Agent Coordination
+
 ```
 1. Human creates task → assigns to PM agent
 2. PM agent breaks down task → creates subtasks
@@ -347,18 +380,21 @@ tools:
 ## Testing Strategy
 
 ### Unit Tests
+
 - TaskManager operations (`src/tasks/__tests__/task-manager.test.ts`)
 - API endpoints (`packages/web/app/api/tasks/__tests__/`)
 - React hooks (`packages/web/hooks/__tests__/`)
 - React components (`packages/web/components/__tests__/`)
 
 ### Integration Tests
+
 - Full task lifecycle
 - Multi-agent workflows
 - SSE event propagation
 - Session isolation
 
 ### E2E Tests
+
 - Create task → assign → update → complete flow
 - Real-time updates across multiple clients
 - Error handling and recovery
@@ -366,20 +402,29 @@ tools:
 ## Common Issues & Solutions
 
 ### Issue: Tasks not updating in real-time
-**Solution**: Check SSE connection in browser DevTools Network tab. Ensure session ID matches.
+
+**Solution**: Check SSE connection in browser DevTools Network tab. Ensure
+session ID matches.
 
 ### Issue: Task assignment to "new:provider/model" not spawning agent
-**Solution**: Agent spawning is handled by the agent system separately. The task remains assigned to the specification until an agent claims it.
+
+**Solution**: Agent spawning is handled by the agent system separately. The task
+remains assigned to the specification until an agent claims it.
 
 ### Issue: Deleted tasks reappearing
-**Solution**: Check for SSE reconnection causing full refresh. Ensure delete events are processed correctly.
+
+**Solution**: Check for SSE reconnection causing full refresh. Ensure delete
+events are processed correctly.
 
 ### Issue: Notes appearing out of order
-**Solution**: Notes are ordered by timestamp from database. Check system clock synchronization.
+
+**Solution**: Notes are ordered by timestamp from database. Check system clock
+synchronization.
 
 ## Code Examples
 
 ### Adding a Custom Task Filter
+
 ```typescript
 // In TaskManager
 getTasksByCustomFilter(predicate: (task: Task) => boolean): Task[] {
@@ -393,6 +438,7 @@ const urgentUnassigned = taskManager.getTasksByCustomFilter(
 ```
 
 ### Implementing Task Notifications
+
 ```typescript
 // In useTaskManager
 useEffect(() => {
@@ -401,13 +447,14 @@ useEffect(() => {
       showNotification(`New task assigned: ${event.task.title}`);
     }
   };
-  
+
   taskStream.on('task:updated', handleTaskAssigned);
   return () => taskStream.off('task:updated', handleTaskAssigned);
 }, [currentUserId]);
 ```
 
 ### Batch Task Updates
+
 ```typescript
 // In TaskManager
 async updateMultipleTasks(
@@ -425,4 +472,8 @@ async updateMultipleTasks(
 
 ## Conclusion
 
-The task management system successfully bridges human and agent collaboration by providing a shared, real-time workspace. Its event-driven architecture ensures consistency across all clients while maintaining clean separation between layers. The system's flexibility allows for future enhancements without breaking existing functionality.
+The task management system successfully bridges human and agent collaboration by
+providing a shared, real-time workspace. Its event-driven architecture ensures
+consistency across all clients while maintaining clean separation between
+layers. The system's flexibility allows for future enhancements without breaking
+existing functionality.

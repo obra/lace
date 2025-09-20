@@ -1,17 +1,23 @@
 # Testing Guide
 
-This document outlines testing patterns and best practices for the Lace codebase.
+This document outlines testing patterns and best practices for the Lace
+codebase.
 
 ## ⚠️ CRITICAL: Provider Instance Management in Tests
 
 ### Always Use `createTestProviderInstance()` for Test Isolation
 
-**Race Condition Warning**: Using `setupTestProviderInstances()` causes race conditions when tests run in parallel. This leads to "Provider instance not found" errors and flaky tests.
+**Race Condition Warning**: Using `setupTestProviderInstances()` causes race
+conditions when tests run in parallel. This leads to "Provider instance not
+found" errors and flaky tests.
 
 ### Correct Pattern ✅
 
 ```typescript
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 describe('My Test Suite', () => {
   let providerInstanceId: string;
@@ -26,10 +32,15 @@ describe('My Test Suite', () => {
     });
 
     // Use the instance in your test setup
-    const project = Project.create('Test Project', process.cwd(), 'Project for testing', {
-      providerInstanceId, // Direct usage
-      modelId: 'claude-3-5-haiku-20241022',
-    });
+    const project = Project.create(
+      'Test Project',
+      process.cwd(),
+      'Project for testing',
+      {
+        providerInstanceId, // Direct usage
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
   });
 
   afterEach(async () => {
@@ -43,7 +54,10 @@ describe('My Test Suite', () => {
 
 ```typescript
 // DON'T DO THIS - Creates shared instances that cause race conditions
-import { setupTestProviderInstances, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderInstances,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 describe('My Test Suite', () => {
   let testProviderInstances: {
@@ -55,14 +69,18 @@ describe('My Test Suite', () => {
   beforeEach(async () => {
     // This creates shared instances that can conflict when tests run in parallel
     testProviderInstances = await setupTestProviderInstances();
-    createdInstanceIds = [testProviderInstances.anthropicInstanceId, testProviderInstances.openaiInstanceId];
+    createdInstanceIds = [
+      testProviderInstances.anthropicInstanceId,
+      testProviderInstances.openaiInstanceId,
+    ];
   });
 });
 ```
 
 ### Why This Pattern Is Critical
 
-- **Test Isolation**: Each test gets its own provider instances, preventing conflicts
+- **Test Isolation**: Each test gets its own provider instances, preventing
+  conflicts
 - **Parallel Execution**: Tests can run in parallel without race conditions
 - **Reliability**: Eliminates "Provider instance not found" errors
 - **Debugging**: Easier to debug when tests don't interfere with each other
@@ -103,12 +121,19 @@ describe('Multi-Provider Test', () => {
 
 ### Core Tests (src/)
 
-For core Lace tests, use the unified setup that handles both temp LACE_DIR and persistence automatically:
+For core Lace tests, use the unified setup that handles both temp LACE_DIR and
+persistence automatically:
 
 ```typescript
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 describe('Core Integration Test', () => {
   const _tempLaceDir = setupCoreTest(); // Handles temp LACE_DIR + persistence automatically
@@ -142,8 +167,14 @@ For web package tests, use the web-specific setup:
 
 ```typescript
 import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '~/test-utils/provider-defaults';
-import { createTestProviderInstance, cleanupTestProviderInstances } from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
+import {
+  createTestProviderInstance,
+  cleanupTestProviderInstances,
+} from '~/test-utils/provider-instances';
 
 describe('Web Integration Test', () => {
   const _tempLaceDir = setupWebTest(); // Handles temp LACE_DIR + persistence automatically
@@ -168,7 +199,8 @@ describe('Web Integration Test', () => {
   });
 });
 ```
-```
+
+````
 
 ### Session and Project Creation
 
@@ -191,25 +223,27 @@ const session = await sessionService.createSession(
   'Test Session',
   project.getId()
 );
-```
+````
 
 ### Common Pitfalls
 
 #### 1. Shared State Between Tests
+
 - Always use individual provider instances
 - Clear caches with `Session.clearProviderCache()`
 
 #### 2. Cleanup Order
+
 ```typescript
 afterEach(async () => {
   // Stop services first
   await sessionService.stopAllAgents();
   sessionService.clearActiveSessions();
-  
+
   // Clean up test utilities
   cleanupTestProviderDefaults();
   await cleanupTestProviderInstances([providerInstanceId]);
-  
+
   // Clear mocks last
   vi.clearAllMocks();
   // Note: Persistence cleanup is handled automatically by setupCoreTest/setupWebTest
@@ -217,7 +251,9 @@ afterEach(async () => {
 ```
 
 #### 3. Environment Variables
+
 Always set required environment variables in test setup:
+
 ```typescript
 beforeEach(() => {
   process.env.ANTHROPIC_KEY = 'test-key';
@@ -227,17 +263,23 @@ beforeEach(() => {
 
 ### Debugging Provider Instance Errors
 
-If you see errors like "Failed to resolve provider instance" or "Provider instance not found":
+If you see errors like "Failed to resolve provider instance" or "Provider
+instance not found":
 
-1. **Check Pattern**: Verify you're using `createTestProviderInstance()` not `setupTestProviderInstances()`
-2. **Verify Creation**: Ensure the provider instance is created before being used
-3. **Check Setup**: Ensure you're using `setupCoreTest()` or `setupWebTest()` for proper test isolation
+1. **Check Pattern**: Verify you're using `createTestProviderInstance()` not
+   `setupTestProviderInstances()`
+2. **Verify Creation**: Ensure the provider instance is created before being
+   used
+3. **Check Setup**: Ensure you're using `setupCoreTest()` or `setupWebTest()`
+   for proper test isolation
 4. **Check Cleanup Order**: Ensure cleanup happens in the correct order
-5. **Test Isolation**: Run the failing test individually to check for shared state issues
+5. **Test Isolation**: Run the failing test individually to check for shared
+   state issues
 
 ### Key Benefits of New Test Setup
 
-- **Race Condition Prevention**: Database and provider instances use the same isolated temp directory
+- **Race Condition Prevention**: Database and provider instances use the same
+  isolated temp directory
 - **Simplified Setup**: One function call handles both LACE_DIR and persistence
 - **Automatic Cleanup**: Temp directories are cleaned up automatically
 - **No Manual DB Paths**: Persistence auto-initializes to the correct location
@@ -247,18 +289,24 @@ If you see errors like "Failed to resolve provider instance" or "Provider instan
 
 **Golden Rule**: Test what the system does, not how it does it.
 
-**Good**: "When I create a session with name 'My Session', it appears in the session list"  
-**Bad**: "When I call createSession(), it calls Session.create() with the right parameters"
+**Good**: "When I create a session with name 'My Session', it appears in the
+session list"  
+**Bad**: "When I call createSession(), it calls Session.create() with the right
+parameters"
 
 ## Strict Test Failure Philosophy
 
-**CRITICAL PRINCIPLE**: Tests must fail loudly and immediately when conditions are not met. Never mask failures with warnings, console logs, or soft assertions.
+**CRITICAL PRINCIPLE**: Tests must fail loudly and immediately when conditions
+are not met. Never mask failures with warnings, console logs, or soft
+assertions.
 
 ### Fail Fast, Fail Loud ⚡
 
-Tests should behave like smoke detectors - they must alarm immediately when something is wrong, not politely mention there might be a problem.
+Tests should behave like smoke detectors - they must alarm immediately when
+something is wrong, not politely mention there might be a problem.
 
 **✅ GOOD - Strict Assertions**:
+
 ```typescript
 // Test fails immediately if sessionData is undefined or malformed
 expect(sessionData).toBeDefined();
@@ -266,6 +314,7 @@ expect('tokenUsage' in sessionData).toBe(false);
 ```
 
 **❌ BAD - Warn and Continue**:
+
 ```typescript
 // This masks real failures and lets broken code pass
 if (sessionData) {
@@ -278,7 +327,7 @@ if (sessionData) {
 ### Why Strict Failure Matters
 
 1. **Prevents Silent Regressions**: Soft failures let bugs slip into production
-2. **Forces Real Fixes**: Developers must address root causes, not symptoms  
+2. **Forces Real Fixes**: Developers must address root causes, not symptoms
 3. **Maintains Code Quality**: Broken code can't masquerade as working code
 4. **Builds Confidence**: Passing tests guarantee system integrity
 5. **Speeds Debugging**: Clear failures point directly to problems
@@ -286,6 +335,7 @@ if (sessionData) {
 ### Common Anti-Patterns to Avoid
 
 #### 1. Conditional Assertions
+
 ```typescript
 // ❌ Don't do this - hides real issues
 if (result) {
@@ -300,8 +350,9 @@ expect(result.status).toBe('success');
 ```
 
 #### 2. Try-Catch Swallowing
+
 ```typescript
-// ❌ Don't do this - silences important failures  
+// ❌ Don't do this - silences important failures
 try {
   const data = await riskyOperation();
   expect(data.value).toBe(42);
@@ -319,18 +370,25 @@ await expect(riskyOperation()).rejects.toThrow('Expected error message');
 ```
 
 #### 3. Fallback Assertions
+
 ```typescript
 // ❌ Don't do this - accepts broken state as acceptable
-expect(actualValue === expectedValue || actualValue === fallbackValue).toBeTruthy();
+expect(
+  actualValue === expectedValue || actualValue === fallbackValue
+).toBeTruthy();
 
 // ✅ Do this - demands correct behavior
 expect(actualValue).toBe(expectedValue);
 ```
 
 #### 4. Optional Test Steps
+
 ```typescript
 // ❌ Don't do this - lets incomplete tests pass
-const optionalElement = await page.locator('#optional').isVisible().catch(() => false);
+const optionalElement = await page
+  .locator('#optional')
+  .isVisible()
+  .catch(() => false);
 if (optionalElement) {
   await expect(page.locator('#optional')).toHaveText('Expected text');
 }
@@ -342,13 +400,14 @@ await expect(page.locator('#optional')).toHaveText('Expected text');
 
 ### When Warnings Are Appropriate
 
-The **ONLY** acceptable use of warnings in tests is for documenting known limitations while working toward fixes:
+The **ONLY** acceptable use of warnings in tests is for documenting known
+limitations while working toward fixes:
 
 ```typescript
 // ✅ Acceptable - documents current broken state while working on fix
 test('documents current session loading behavior - TODO: fix in issue #123', async () => {
   const response = await sessionAPI.getSession(sessionId);
-  
+
   if (!response.data) {
     console.warn('BUG: Session API returns null data - tracked in issue #123');
     // Test documents the broken behavior
@@ -361,6 +420,7 @@ test('documents current session loading behavior - TODO: fix in issue #123', asy
 ```
 
 **Requirements for warning-based tests**:
+
 1. Must reference a specific issue/ticket being worked on
 2. Must have a concrete timeline for fixing
 3. Must still make meaningful assertions about current behavior
@@ -371,6 +431,7 @@ test('documents current session loading behavior - TODO: fix in issue #123', asy
 When you encounter warn-and-continue patterns:
 
 **STEP 1**: Investigate why the condition might fail
+
 ```typescript
 // Original soft failure
 if (sessionData) {
@@ -381,6 +442,7 @@ if (sessionData) {
 ```
 
 **STEP 2**: Add strict assertion and run tests
+
 ```typescript
 // Make it strict - will fail if there's a real issue
 expect(sessionData).toBeDefined();
@@ -392,8 +454,9 @@ expect('tokenUsage' in sessionData).toBe(false);
 ### Test Code Review Checklist
 
 When reviewing test code, reject any PR that contains:
+
 - [ ] `console.warn()` or `console.log()` instead of proper assertions
-- [ ] Conditional assertions that can be bypassed  
+- [ ] Conditional assertions that can be bypassed
 - [ ] Try-catch blocks that swallow test failures
 - [ ] Comments like "TODO: investigate" without failing the test
 - [ ] `expect(true).toBeTruthy()` as fallback assertions
@@ -401,15 +464,20 @@ When reviewing test code, reject any PR that contains:
 ### Integration with CI/CD
 
 Strict test failures are essential for CI/CD pipeline integrity:
+
 - **Green builds mean ready to deploy** - no exceptions
 - **Red builds block deployment** - no bypassing
 - **Flaky tests get fixed immediately** - no "ignore for now"
 
 ### Summary
 
-**Tests are guardians of code quality.** They must be uncompromising, strict, and intolerant of unexpected conditions. A test that lets broken code pass is worse than no test at all, because it provides false confidence while allowing bugs to reach production.
+**Tests are guardians of code quality.** They must be uncompromising, strict,
+and intolerant of unexpected conditions. A test that lets broken code pass is
+worse than no test at all, because it provides false confidence while allowing
+bugs to reach production.
 
-**Remember**: If your test isn't certain enough to fail the build, it's not providing real protection.
+**Remember**: If your test isn't certain enough to fail the build, it's not
+providing real protection.
 
 ## Code Standards
 
@@ -423,14 +491,17 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 ```
 
-**Never assume `expect` is globally available.** Missing this import causes TypeScript `@typescript-eslint/no-unsafe-call` errors.
+**Never assume `expect` is globally available.** Missing this import causes
+TypeScript `@typescript-eslint/no-unsafe-call` errors.
 
 #### Before Writing Any Test File:
+
 1. Check existing test files in the same directory for correct import patterns
 2. Copy the import block exactly from working test files
 3. Run `npm run lint` immediately after writing tests to catch import issues
 
 #### Test File Template:
+
 ```typescript
 // ABOUTME: Unit tests for [ComponentName] component
 // ABOUTME: Tests [brief description of what this tests]
@@ -450,21 +521,24 @@ describe('ComponentName', () => {
 ```
 
 ### TypeScript Requirements
+
 - **NEVER use `any` type** - Use `unknown` and type guards instead
-- **Always type test data** - Use factory functions with `Partial<T>` for fixtures
+- **Always type test data** - Use factory functions with `Partial<T>` for
+  fixtures
 - **Type your mocks** - Use `vi.mocked()` and interface types
 
 ```typescript
 // ❌ Bad
 const mockService: any = { create: vi.fn() };
 
-// ✅ Good  
+// ✅ Good
 const mockService: jest.Mocked<ServiceInterface> = {
-  create: vi.fn().mockResolvedValue(expectedResult)
+  create: vi.fn().mockResolvedValue(expectedResult),
 };
 ```
 
 ### Test Organization
+
 - **Colocated tests**: Place `feature.test.ts` next to `feature.ts`
 - **Descriptive names**: Test names should describe the behavior being tested
 - **Arrange-Act-Assert**: Clear separation of test phases
@@ -472,28 +546,31 @@ const mockService: jest.Mocked<ServiceInterface> = {
 ## What to Test vs What Not to Test
 
 ### ✅ Test These Behaviors
+
 - **User interactions**: Button clicks, form submissions, navigation
-- **State changes**: Data updates, loading states, error states  
+- **State changes**: Data updates, loading states, error states
 - **Integration points**: API calls return correct data, components communicate
 - **Error handling**: System responds correctly to failures
 - **Business logic**: Calculations, validations, transformations
 
 ### ❌ Don't Test These Details
+
 - **Implementation details**: Which methods get called internally
-- **Mock interactions**: Whether mocks were called with right parameters  
+- **Mock interactions**: Whether mocks were called with right parameters
 - **Framework internals**: React lifecycle, Next.js routing mechanics
 - **Third-party libraries**: Assume they work correctly
 
 ## Mock Usage Policy
 
 ### Essential Mocks (Allowed)
+
 These require documentation explaining why:
 
 ```typescript
 // ✅ External APIs - avoid network calls in tests
 vi.mock('~/utils/api-client');
 
-// ✅ File system - avoid disk I/O in tests  
+// ✅ File system - avoid disk I/O in tests
 vi.mock('fs/promises');
 
 // ✅ Time/randomness - need deterministic results
@@ -501,9 +578,10 @@ vi.mock('~/utils/date', () => ({ now: () => '2024-01-01T00:00:00Z' }));
 ```
 
 ### Prohibited Mocks
+
 ```typescript
 // ❌ Never mock your own business logic
-vi.mock('~/services/session-service'); 
+vi.mock('~/services/session-service');
 
 // ❌ Never mock the component you're testing
 vi.mock('~/components/TaskList');
@@ -513,7 +591,9 @@ vi.mock('~/persistence/database');
 ```
 
 ### Mock Documentation Template
+
 Every mock needs a comment:
+
 ```typescript
 // Mock file system operations to avoid disk I/O in tests
 // Tests focus on business logic, not file handling implementation
@@ -523,15 +603,16 @@ vi.mock('fs/promises', () => ({ ... }));
 ## Test Patterns by Component Type
 
 ### React Components
+
 Test user interactions and visual outcomes:
 
 ```typescript
 // ✅ Good - tests user behavior
 it('should show error when form submission fails', async () => {
   render(<TaskForm onSubmit={mockSubmitThatFails} />);
-  
+
   fireEvent.click(screen.getByText('Save'));
-  
+
   await waitFor(() => {
     expect(screen.getByText('Save failed')).toBeInTheDocument();
   });
@@ -541,14 +622,15 @@ it('should show error when form submission fails', async () => {
 it('should call onSubmit with form data', () => {
   const onSubmit = vi.fn();
   render(<TaskForm onSubmit={onSubmit} />);
-  
+
   fireEvent.click(screen.getByText('Save'));
-  
+
   expect(onSubmit).toHaveBeenCalledWith(expectedData);
 });
 ```
 
 ### API Routes (Next.js)
+
 Test actual HTTP responses:
 
 ```typescript
@@ -556,11 +638,11 @@ Test actual HTTP responses:
 it('should return 201 when creating valid session', async () => {
   const request = new NextRequest('http://localhost:3000/api/sessions', {
     method: 'POST',
-    body: JSON.stringify({ name: 'Test Session' })
+    body: JSON.stringify({ name: 'Test Session' }),
   });
 
   const response = await POST(request);
-  
+
   expect(response.status).toBe(201);
   const data = await response.json();
   expect(data.session.name).toBe('Test Session');
@@ -568,34 +650,36 @@ it('should return 201 when creating valid session', async () => {
 ```
 
 ### Services/Business Logic
+
 Test state changes and outputs:
 
 ```typescript
 // ✅ Good - tests actual behavior
 it('should persist session and return ID', () => {
   const service = new SessionService();
-  
+
   const sessionId = service.createSession({ name: 'My Session' });
   const retrieved = service.getSession(sessionId);
-  
+
   expect(retrieved.name).toBe('My Session');
 });
 ```
 
 ### Custom Hooks
+
 Test state management and effects:
 
 ```typescript
-// ✅ Good - tests hook state behavior  
+// ✅ Good - tests hook state behavior
 it('should set loading true during API call', async () => {
   const { result } = renderHook(() => useSessionAPI());
-  
+
   act(() => {
     void result.current.createSession({ name: 'Test' });
   });
-  
+
   expect(result.current.loading).toBe(true);
-  
+
   await waitFor(() => {
     expect(result.current.loading).toBe(false);
   });
@@ -605,6 +689,7 @@ it('should set loading true during API call', async () => {
 ## Test Data Management
 
 ### Factory Functions
+
 Create typed test data with factories:
 
 ```typescript
@@ -624,18 +709,19 @@ const highPriorityTask = createMockTask({ priority: 'high' });
 ```
 
 ### Database Testing
+
 The unified test setup handles database isolation automatically:
 
 ```typescript
 describe('Database Test', () => {
   const _tempLaceDir = setupCoreTest(); // Database auto-initializes to temp directory
-  
+
   beforeEach(async () => {
     // Database is already isolated and ready to use
     const persistence = getPersistence(); // Auto-initializes to ${LACE_DIR}/lace.db
     await seedTestData(persistence);
   });
-  
+
   // No manual cleanup needed - temp directory handles it
 });
 ```
@@ -643,11 +729,12 @@ describe('Database Test', () => {
 ## Running Tests
 
 ### Commands
+
 ```bash
 # Run all tests
 npm test
 
-# Run tests in watch mode  
+# Run tests in watch mode
 npm run test:watch
 
 # Run specific test file
@@ -658,6 +745,7 @@ npm run test:coverage
 ```
 
 ### Debugging Failed Tests
+
 1. **Read the error message** - it usually tells you exactly what's wrong
 2. **Check test data** - ensure your mock data matches expected types
 3. **Add debug output** - use `screen.debug()` for component tests
@@ -666,15 +754,17 @@ npm run test:coverage
 ## Common Mistakes to Avoid
 
 ### 1. Testing Mock Behavior
+
 ```typescript
 // ❌ Bad - only tests that mock works
 expect(mockFetch).toHaveBeenCalledWith('/api/sessions');
 
-// ✅ Good - tests actual result  
+// ✅ Good - tests actual result
 expect(result.current.sessions).toHaveLength(2);
 ```
 
-### 2. Over-Mocking  
+### 2. Over-Mocking
+
 ```typescript
 // ❌ Bad - mocks everything
 vi.mock('~/services/session-service');
@@ -686,6 +776,7 @@ vi.mock('~/utils/api-client'); // External dependency only
 ```
 
 ### 3. Implementation-Coupled Names
+
 ```typescript
 // ❌ Bad - tied to implementation
 it('should call updateSession with correct params', () => {});
@@ -695,6 +786,7 @@ it('should save changes when update button clicked', () => {});
 ```
 
 ### 4. Using `any` Types
+
 ```typescript
 // ❌ Bad - no type safety
 const mockData: any = { id: 1, name: 'test' };
@@ -706,6 +798,7 @@ const mockData: Task = createMockTask({ name: 'test' });
 ## Test File Organization
 
 ### File Structure
+
 ```
 src/
 ├── components/
@@ -716,7 +809,7 @@ src/
 ├── services/
 │   ├── session-service.ts
 │   ├── session-service.test.ts    # Service logic tests
-│   ├── task-service.ts  
+│   ├── task-service.ts
 │   └── task-service.test.ts
 └── app/api/
     ├── sessions/
@@ -728,13 +821,15 @@ src/
 ```
 
 ### Test Categories
+
 - **Unit tests**: Single component/function behavior
-- **Integration tests**: Multiple components working together  
+- **Integration tests**: Multiple components working together
 - **E2E tests**: Full user workflows (use Playwright)
 
 ## When You're Stuck
 
-1. **Ask yourself**: "What would the user see/experience if this worked correctly?"
+1. **Ask yourself**: "What would the user see/experience if this worked
+   correctly?"
 2. **Write the test first** - describe the behavior you want
 3. **Make it fail** - verify the test catches the problem
 4. **Implement just enough** - make the test pass
@@ -746,7 +841,8 @@ src/
 - Check `CLAUDE.md` for project-specific guidelines
 - Ask questions about business logic - don't guess
 
-Remember: **Good tests give you confidence to refactor. Bad tests break when you refactor.**
+Remember: **Good tests give you confidence to refactor. Bad tests break when you
+refactor.**
 
 ---
 
@@ -754,7 +850,9 @@ Remember: **Good tests give you confidence to refactor. Bad tests break when you
 
 ### Overview
 
-Testing terminal interfaces presents unique challenges due to the interaction between React components, Ink's rendering system, and terminal input/output handling.
+Testing terminal interfaces presents unique challenges due to the interaction
+between React components, Ink's rendering system, and terminal input/output
+handling.
 
 ### Testing Patterns
 
@@ -799,11 +897,11 @@ vi.mock('ink', async () => {
 
 it('should handle Tab key', async () => {
   renderInkComponent(<ShellInput autoFocus={true} />);
-  
+
   // Call handler directly with proper key object
   capturedInputHandler!('\t', { tab: true });
   await new Promise(resolve => setTimeout(resolve, 100));
-  
+
   // Test the result
   expect(lastFrame()).toContain('autocomplete items');
 });
@@ -811,7 +909,10 @@ it('should handle Tab key', async () => {
 
 ### Why stdin.write() Doesn't Work
 
-The issue is that Ink's input system in test environments doesn't properly connect mock stdin events to `useInput` handlers. The `renderInkComponent` helper creates a mock stdin that emits `'data'` events, but these don't flow through to `useInput` handlers like they do in real terminal environments.
+The issue is that Ink's input system in test environments doesn't properly
+connect mock stdin events to `useInput` handlers. The `renderInkComponent`
+helper creates a mock stdin that emits `'data'` events, but these don't flow
+through to `useInput` handlers like they do in real terminal environments.
 
 ### Key Object Format
 
@@ -842,17 +943,18 @@ it('should handle input when focused', () => {
 
 ### Async Operations
 
-Many terminal interactions involve async operations (file completion, API calls):
+Many terminal interactions involve async operations (file completion, API
+calls):
 
 ```typescript
 it('should handle async autocomplete', async () => {
   renderInkComponent(<ShellInput value="s" autoFocus={true} />);
-  
+
   capturedInputHandler('\t', { tab: true });
-  
+
   // Wait for async completion loading
   await new Promise(resolve => setTimeout(resolve, 100));
-  
+
   expect(lastFrame()).toContain('src/');
 });
 ```
@@ -866,30 +968,41 @@ it('should handle async autocomplete', async () => {
 
 ### Common Pitfalls
 
-- **Don't mock `renderInkComponent`** - it provides essential terminal environment simulation
-- **Don't test stdin events directly** - they don't connect to `useInput` in tests
-- **Don't forget async waits** - autocomplete, file operations, and rendering can be async
-- **Don't forget focus state** - many input handlers require `autoFocus={true}` or proper focus management
+- **Don't mock `renderInkComponent`** - it provides essential terminal
+  environment simulation
+- **Don't test stdin events directly** - they don't connect to `useInput` in
+  tests
+- **Don't forget async waits** - autocomplete, file operations, and rendering
+  can be async
+- **Don't forget focus state** - many input handlers require `autoFocus={true}`
+  or proper focus management
 
 ### Integration vs Unit Tests
 
 - **Unit tests**: Mock `useInput`, test individual component logic
-- **Integration tests**: Test full terminal interface with real command processing
+- **Integration tests**: Test full terminal interface with real command
+  processing
 - **E2E tests**: Test actual terminal interaction through CLI
 
-For complex input interactions like autocomplete, prefer the unit test approach with mocked `useInput` handlers for reliability and speed.
+For complex input interactions like autocomplete, prefer the unit test approach
+with mocked `useInput` handlers for reliability and speed.
 
 ## Interactive E2E Testing with node-pty
 
 ### Overview
 
-For true end-to-end testing of the terminal interface, Lace uses `node-pty` to spawn real pseudo-terminal processes and simulate actual user interactions. This approach tests the complete CLI experience including keyboard input, screen output, and command execution.
+For true end-to-end testing of the terminal interface, Lace uses `node-pty` to
+spawn real pseudo-terminal processes and simulate actual user interactions. This
+approach tests the complete CLI experience including keyboard input, screen
+output, and command execution.
 
-The testing infrastructure provides clean, reusable utilities that eliminate boilerplate and make E2E tests focused on the actual testing logic.
+The testing infrastructure provides clean, reusable utilities that eliminate
+boilerplate and make E2E tests focused on the actual testing logic.
 
 ### Setup
 
-Interactive E2E tests use shared utilities from `src/__tests__/helpers/terminal-e2e-helpers.ts`:
+Interactive E2E tests use shared utilities from
+`src/__tests__/helpers/terminal-e2e-helpers.ts`:
 
 ```typescript
 import { it, expect } from 'vitest';
@@ -915,22 +1028,28 @@ import {
  */
 
 import { it, expect } from 'vitest';
-import { describeE2E, createPTYSession, waitForReady, sendCommand, getOutput, closePTY } from './helpers/terminal-e2e-helpers.js';
+import {
+  describeE2E,
+  createPTYSession,
+  waitForReady,
+  sendCommand,
+  getOutput,
+  closePTY,
+} from './helpers/terminal-e2e-helpers.js';
 
 describeE2E('My Terminal Tests', () => {
   it.sequential('should handle user interaction', async () => {
     const session = await createPTYSession();
-    
+
     try {
       // Wait for application to be ready
       await waitForReady(session);
-      
+
       // Send commands and verify output
       await sendCommand(session, '/help');
-      
+
       const output = getOutput(session);
       expect(output).toContain('Available commands');
-      
     } finally {
       closePTY(session);
     }
@@ -941,24 +1060,30 @@ describeE2E('My Terminal Tests', () => {
 ### Available Utilities
 
 #### Session Management
+
 - `createPTYSession(provider?, timeout?)` - Create a new PTY session
 - `closePTY(session)` - Clean up PTY session
 - `getOutput(session)` - Get raw terminal output
 - `getCleanOutput(session)` - Get ANSI-stripped output
 
 #### Input Simulation
+
 - `sendCommand(session, command)` - Send command with proper Enter key
 - `waitForText(session, text, timeout?)` - Wait for specific text to appear
-- `waitForReady(session, timeout?)` - Wait for application to be ready for commands
+- `waitForReady(session, timeout?)` - Wait for application to be ready for
+  commands
 
 #### Environment Management
-- `describeE2E(name, testFn)` - Describe block with automatic environment setup/teardown
+
+- `describeE2E(name, testFn)` - Describe block with automatic environment
+  setup/teardown
 - `setupE2EEnvironment()` - Manual environment setup
 - `cleanupE2EEnvironment(env)` - Manual environment cleanup
 
 #### Constants
+
 - `POLLING_INTERVAL` - How often to check for text (50ms)
-- `DEFAULT_TIMEOUT` - Default timeout for operations (10s)  
+- `DEFAULT_TIMEOUT` - Default timeout for operations (10s)
 - `COMMAND_DELAY` - Delay between typing and Enter (100ms)
 - `PTY_SESSION_TIMEOUT` - Session creation timeout (30s)
 - `HELP_COMMAND_TIMEOUT` - Help command response timeout (15s)
@@ -968,47 +1093,56 @@ describeE2E('My Terminal Tests', () => {
 
 ```typescript
 describeE2E('PTY Terminal E2E Tests', () => {
-  it.sequential('should handle /help command', async () => {
-    const session = await createPTYSession();
-    
-    try {
-      // Wait for ready state
-      await waitForReady(session);
-      
-      // Send /help command
-      await sendCommand(session, '/help');
-      
-      // Wait for help output
-      await waitForText(session, 'Available commands', HELP_COMMAND_TIMEOUT);
-      
-      const output = getOutput(session);
-      expect(output).toContain('Available commands');
-      expect(output).toContain('/exit');
-      
-    } finally {
-      closePTY(session);
-    }
-  }, 30000);
+  it.sequential(
+    'should handle /help command',
+    async () => {
+      const session = await createPTYSession();
+
+      try {
+        // Wait for ready state
+        await waitForReady(session);
+
+        // Send /help command
+        await sendCommand(session, '/help');
+
+        // Wait for help output
+        await waitForText(session, 'Available commands', HELP_COMMAND_TIMEOUT);
+
+        const output = getOutput(session);
+        expect(output).toContain('Available commands');
+        expect(output).toContain('/exit');
+      } finally {
+        closePTY(session);
+      }
+    },
+    30000
+  );
 });
 ```
 
 ### Key Implementation Details
 
 #### 1. **Shared Utilities**
+
 The `terminal-e2e-helpers.ts` file provides all necessary utilities:
+
 - Eliminates boilerplate from test files
 - Provides consistent behavior across all E2E tests
 - Includes proper Enter key handling (Control+M)
 - Handles environment isolation automatically
 
 #### 2. **Environment Isolation**
+
 Each test gets its own isolated environment using `describeE2E()`:
+
 - Unique database path per test run
 - Automatic cleanup after tests
 - Proper environment variable management
 
 #### 3. **Timing and Synchronization**
+
 Use `waitForReady()` helper instead of manual waits:
+
 ```typescript
 // ✅ Correct - uses helper
 await waitForReady(session);
@@ -1016,11 +1150,13 @@ await waitForReady(session);
 // ❌ Avoid - manual timing
 await waitForText(session, 'Ready');
 await waitForText(session, '> ');
-await new Promise(resolve => setTimeout(resolve, 1000));
+await new Promise((resolve) => setTimeout(resolve, 1000));
 ```
 
 #### 4. **Clean Output Handling**
+
 Use appropriate output functions:
+
 ```typescript
 // Raw output (includes ANSI)
 const output = getOutput(session);
@@ -1030,7 +1166,9 @@ const cleanOutput = getCleanOutput(session);
 ```
 
 #### 5. **Configurable Timeouts**
+
 Use predefined constants for consistent timing:
+
 ```typescript
 // Use constants for predictable timeouts
 await waitForText(session, 'Available commands', HELP_COMMAND_TIMEOUT);
@@ -1040,10 +1178,12 @@ await waitForText(session, '4', AGENT_RESPONSE_TIMEOUT);
 ### Benefits of PTY Testing
 
 1. **Complete Integration**: Tests the actual CLI binary as users would run it
-2. **Real Terminal Environment**: Tests genuine terminal interactions including ANSI sequences
+2. **Real Terminal Environment**: Tests genuine terminal interactions including
+   ANSI sequences
 3. **Keyboard Event Handling**: Tests actual keyboard input processing
 4. **Screen Output Validation**: Validates what users actually see on screen
-5. **Command Processing**: Tests slash commands and agent interactions end-to-end
+5. **Command Processing**: Tests slash commands and agent interactions
+   end-to-end
 6. **Reusable Infrastructure**: Clean utilities reduce test complexity
 
 ### Best Practices
@@ -1066,7 +1206,8 @@ await waitForText(session, '4', AGENT_RESPONSE_TIMEOUT);
 
 ### Example Test Files
 
-See `src/__tests__/e2e-pty-terminal.test.ts` for complete examples of the clean PTY testing approach.
+See `src/__tests__/e2e-pty-terminal.test.ts` for complete examples of the clean
+PTY testing approach.
 
 ---
 
@@ -1074,16 +1215,24 @@ See `src/__tests__/e2e-pty-terminal.test.ts` for complete examples of the clean 
 
 ### Overview
 
-The Lace web interface uses a streamlined Playwright testing infrastructure focused on reliability and maintainability. This system provides robust testing of user workflows using a consistent manual setup pattern that ensures proper test lifecycle management.
+The Lace web interface uses a streamlined Playwright testing infrastructure
+focused on reliability and maintainability. This system provides robust testing
+of user workflows using a consistent manual setup pattern that ensures proper
+test lifecycle management.
 
 ### Key Features
 
-- **🚀 Parallel Execution**: Tests run in parallel with per-test server isolation
-- **🎯 Reliable Selectors**: Uses `data-testid` attributes instead of fragile CSS selectors  
-- **🔄 Real Functionality**: Tests actual application logic, mocks only external AI APIs
+- **🚀 Parallel Execution**: Tests run in parallel with per-test server
+  isolation
+- **🎯 Reliable Selectors**: Uses `data-testid` attributes instead of fragile
+  CSS selectors
+- **🔄 Real Functionality**: Tests actual application logic, mocks only external
+  AI APIs
 - **🌐 Browser Support**: Chromium-only for CI reliability
-- **📊 Streamlined Coverage**: 15 consolidated test files covering all major application areas
-- **🔧 Consistent Patterns**: Manual beforeEach/afterEach setup ensures proper test lifecycle
+- **📊 Streamlined Coverage**: 15 consolidated test files covering all major
+  application areas
+- **🔧 Consistent Patterns**: Manual beforeEach/afterEach setup ensures proper
+  test lifecycle
 
 ### Quick Start
 
@@ -1144,7 +1293,9 @@ test.describe('User Messaging Flow', () => {
     }
   });
 
-  test('complete flow: onboarding → project creation → first message', async ({ page }) => {
+  test('complete flow: onboarding → project creation → first message', async ({
+    page,
+  }) => {
     await setupAnthropicProvider(page);
 
     const projectPath = path.join(testEnv.tempDir, 'basic-journey-project');
@@ -1188,6 +1339,7 @@ packages/web/e2e/
 #### 2. Configuration
 
 **`playwright.config.ts`**: Optimized for parallel execution and CI reliability
+
 - **Parallel execution**: `fullyParallel: true`
 - **CI optimization**: Chromium-only in CI, WebKit for local development
 - **Worker isolation**: Each worker gets isolated database directory
@@ -1204,11 +1356,11 @@ import { createPageObjects } from './page-objects';
 
 test('example test', async ({ page }) => {
   const { projectSelector, chatInterface } = createPageObjects(page);
-  
+
   // ✅ Good - use page object methods
   await projectSelector.createProject('My Project', '/path/to/project');
   await chatInterface.sendMessage('Hello!');
-  
+
   // ❌ Bad - direct page interactions
   await page.click('[data-testid="new-project-button"]');
   await page.fill('[data-testid="message-input"]', 'Hello!');
@@ -1218,6 +1370,7 @@ test('example test', async ({ page }) => {
 #### Page Object APIs
 
 **ProjectSelector**:
+
 ```typescript
 // Navigation
 await projectSelector.clickNewProject();
@@ -1234,6 +1387,7 @@ await projectSelector.selectExistingProject(projectName);
 ```
 
 **ChatInterface**:
+
 ```typescript
 // Basic messaging
 await chatInterface.sendMessage('Hello, world!');
@@ -1253,7 +1407,8 @@ await expect(chatInterface.stopButton).toBeVisible();
 
 #### Worker-Scoped Database Isolation
 
-Each Playwright worker gets its own isolated `LACE_DIR` to prevent database conflicts:
+Each Playwright worker gets its own isolated `LACE_DIR` to prevent database
+conflicts:
 
 ```typescript
 import { withTempLaceDir } from './utils/withTempLaceDir';
@@ -1264,10 +1419,10 @@ test('isolated test', async ({ page }) => {
     // LACE_DIR environment variable automatically set
     // Database files isolated in worker-scoped directory
     // Automatic cleanup after test completion
-    
+
     const projectPath = path.join(tempDir, 'my-project');
     await fs.promises.mkdir(projectPath, { recursive: true });
-    
+
     // Test logic here...
   });
 });
@@ -1284,7 +1439,7 @@ test('custom isolation', async ({ page }) => {
   );
   const originalLaceDir = process.env.LACE_DIR;
   process.env.LACE_DIR = tempDir;
-  
+
   try {
     // Test logic here...
   } finally {
@@ -1294,7 +1449,7 @@ test('custom isolation', async ({ page }) => {
     } else {
       delete process.env.LACE_DIR;
     }
-    
+
     if (fs.existsSync(tempDir)) {
       await fs.promises.rm(tempDir, { recursive: true, force: true });
     }
@@ -1304,11 +1459,16 @@ test('custom isolation', async ({ page }) => {
 
 #### ⚠️ Critical Fix: Test Server LACE_DIR Isolation
 
-**Issue Discovered**: Individual test fixtures that set `LACE_DIR` don't work because the web server reads `LACE_DIR` once at startup. When individual tests try to change the environment variable, the already-running server continues using the original (personal) LACE_DIR.
+**Issue Discovered**: Individual test fixtures that set `LACE_DIR` don't work
+because the web server reads `LACE_DIR` once at startup. When individual tests
+try to change the environment variable, the already-running server continues
+using the original (personal) LACE_DIR.
 
-**Root Cause**: The test server script `scripts/start-test-server.js` wasn't setting an isolated `LACE_DIR` when spawning the server process.
+**Root Cause**: The test server script `scripts/start-test-server.js` wasn't
+setting an isolated `LACE_DIR` when spawning the server process.
 
-**Solution**: Modified the test server to create and use a temporary `LACE_DIR` at server startup:
+**Solution**: Modified the test server to create and use a temporary `LACE_DIR`
+at server startup:
 
 ```javascript
 // scripts/start-test-server.js
@@ -1317,41 +1477,49 @@ function startServer() {
   const tempLaceDir = mkdtempSync(join(tmpdir(), 'lace-e2e-server-'));
   console.log(`📁 Using temporary LACE_DIR: ${tempLaceDir}`);
 
-  const serverProcess = spawn('npx', ['tsx', serverFile, '--port', TEST_PORT_START.toString()], {
-    env: {
-      ...process.env,
-      LACE_DIR: tempLaceDir, // Set isolated LACE_DIR for the server
-      // ... other test environment variables
-    },
-  });
-  
+  const serverProcess = spawn(
+    'npx',
+    ['tsx', serverFile, '--port', TEST_PORT_START.toString()],
+    {
+      env: {
+        ...process.env,
+        LACE_DIR: tempLaceDir, // Set isolated LACE_DIR for the server
+        // ... other test environment variables
+      },
+    }
+  );
+
   // Cleanup temp directory on server shutdown
   function cleanup() {
     console.log(`🧹 Cleaning up temporary LACE_DIR: ${tempLaceDir}`);
     rmSync(tempLaceDir, { recursive: true, force: true });
   }
-  
+
   process.on('SIGTERM', cleanup);
   process.on('SIGINT', cleanup);
   process.on('exit', cleanup);
 }
 ```
 
-**Result**: 
+**Result**:
+
 - Tests now see a clean, empty LACE_DIR with no existing projects
-- UI shows "Create your first project" instead of user's personal projects  
+- UI shows "Create your first project" instead of user's personal projects
 - Complete isolation between test environment and user's workspace
 - All E2E tests now work reliably without accessing personal data
 
-**Key Lesson**: Server-level environment configuration must happen at server startup, not in individual test fixtures. Always verify that your test infrastructure provides true isolation from the user's environment.
+**Key Lesson**: Server-level environment configuration must happen at server
+startup, not in individual test fixtures. Always verify that your test
+infrastructure provides true isolation from the user's environment.
 
 ### API Mocking with MSW
 
 #### Setup
 
-MSW (Mock Service Worker) mocks external APIs only, while testing real application logic:
+MSW (Mock Service Worker) mocks external APIs only, while testing real
+application logic:
 
-```typescript
+````typescript
 import { test, expect } from './mocks/setup'; // Includes MSW setup
 import { HttpResponse } from './mocks/setup';
 
@@ -1366,7 +1534,7 @@ test('API interaction test', async ({ page, worker, http }) => {
       });
     })
   );
-  
+
   // Test your application's real logic
   await chatInterface.sendMessage('Test message');
   // Application makes real API call → MSW intercepts → returns mock response
@@ -1376,7 +1544,7 @@ test('API interaction test', async ({ page, worker, http }) => {
 
 **✅ Mock these (external dependencies)**:
 - Anthropic API calls
-- OpenAI API calls  
+- OpenAI API calls
 - File system APIs for directory browsing
 - External web requests
 
@@ -1401,9 +1569,10 @@ test('API interaction test', async ({ page, worker, http }) => {
 // Test
 await expect(page.getByTestId('send-button')).toBeVisible();
 await page.getByTestId('send-button').click();
-```
+````
 
 **❌ Avoid CSS selectors**:
+
 ```typescript
 // Brittle - breaks when styling changes
 await page.click('.btn.btn-primary.send-button');
@@ -1415,13 +1584,15 @@ await page.click('button:nth-child(2)');
 Core UI elements that tests depend on:
 
 **Project Management**:
+
 - `new-project-button` - Main "New Project" button
-- `project-path-input` - Directory input field  
+- `project-path-input` - Directory input field
 - `project-name-input` - Project name input (advanced mode)
 - `create-project-submit` - Final submit button
 - `project-timeframe-filter` - Time filter dropdown
 
 **Messaging Interface**:
+
 - `send-button` - Send message button (when not streaming)
 - `stop-button` - Stop response button (when streaming)
 - `message-input` - Main message input textarea
@@ -1431,6 +1602,7 @@ Core UI elements that tests depend on:
 When adding new UI elements that tests need to interact with:
 
 1. **Add data-testid attribute** to the element:
+
    ```typescript
    <button data-testid="my-new-button" onClick={handleClick}>
      My Button
@@ -1438,11 +1610,12 @@ When adding new UI elements that tests need to interact with:
    ```
 
 2. **Add to page object** if it's a common interaction:
+
    ```typescript
    get myNewButton(): Locator {
      return this.page.getByTestId('my-new-button');
    }
-   
+
    async clickMyNewButton(): Promise<void> {
      await this.myNewButton.click();
    }
@@ -1460,6 +1633,7 @@ When adding new UI elements that tests need to interact with:
 #### Test Structure Best Practices
 
 **1. Use Descriptive Test Names**
+
 ```typescript
 // ✅ Good - describes user behavior
 test('user can create project and send first message', async ({ page }) => {});
@@ -1469,26 +1643,27 @@ test('project creation API call succeeds', async ({ page }) => {});
 ```
 
 **2. Follow User Journey Patterns**
+
 ```typescript
 test('complete onboarding flow', async ({ page }) => {
   await withTempLaceDir(async (tempDir) => {
     const { projectSelector, chatInterface } = createPageObjects(page);
-    
+
     // Step 1: User lands on app
     await page.goto('/');
-    
+
     // Step 2: User sees project selection
     await expect(projectSelector.newProjectButton).toBeVisible();
-    
-    // Step 3: User creates project  
+
+    // Step 3: User creates project
     await projectSelector.createProject('My Project', projectPath);
-    
+
     // Step 4: User is in chat interface
     await chatInterface.waitForChatReady();
-    
+
     // Step 5: User sends message
     await chatInterface.sendMessage('Hello!');
-    
+
     // Step 6: User sees their message
     await expect(chatInterface.getMessage('Hello!')).toBeVisible();
   });
@@ -1496,11 +1671,12 @@ test('complete onboarding flow', async ({ page }) => {
 ```
 
 **3. Test Real User Workflows**
+
 ```typescript
 // ✅ Good - tests complete workflow
 test('user can manage multiple projects', async ({ page }) => {
   // Create first project
-  // Switch to second project  
+  // Switch to second project
   // Verify isolation between projects
   // Test project deletion/archival
 });
@@ -1516,13 +1692,15 @@ test('project API returns 201', async ({ page }) => {
 **Document current behavior** even when it's broken:
 
 ```typescript
-test('documents current behavior when invalid project path provided', async ({ page }) => {
+test('documents current behavior when invalid project path provided', async ({
+  page,
+}) => {
   await withTempLaceDir(async (tempDir) => {
     const { projectSelector } = createPageObjects(page);
-    
+
     await page.goto('/');
     await projectSelector.clickNewProject();
-    
+
     // Try invalid path
     try {
       await projectSelector.fillProjectForm('Test', '/nonexistent/path');
@@ -1531,11 +1709,11 @@ test('documents current behavior when invalid project path provided', async ({ p
     } catch (error) {
       console.log('Expected error with invalid path:', error.message);
     }
-    
+
     // Document what actually happens (pass/fail/error/redirect)
     const currentUrl = page.url();
     console.log('Current URL after invalid path:', currentUrl);
-    
+
     // Test passes regardless - we're documenting current behavior
     expect(true).toBeTruthy();
   });
@@ -1549,13 +1727,13 @@ test('documents current behavior when invalid project path provided', async ({ p
 ```
 e2e/
 ├── basic-user-journey.e2e.ts        # Happy path user flows
-├── basic-messaging.e2e.ts           # Core messaging functionality  
+├── basic-messaging.e2e.ts           # Core messaging functionality
 ├── project-persistence.e2e.ts       # Project and URL persistence
 ├── session-management.e2e.ts        # Session lifecycle
 ├── agent-management.e2e.ts          # Agent creation and switching
 ├── message-streaming.e2e.ts         # Real-time messaging
 ├── sse-reliability.e2e.ts           # Server-Sent Events
-├── tool-approval.e2e.ts             # Tool approval workflows  
+├── tool-approval.e2e.ts             # Tool approval workflows
 ├── error-handling.e2e.ts            # Error boundaries and recovery
 ├── task-management.e2e.ts           # Task CRUD operations
 ├── multi-agent-workflows.e2e.ts     # Multi-agent coordination
@@ -1567,12 +1745,14 @@ e2e/
 #### Test Categories
 
 **Core Functionality** (must pass):
+
 - Basic user journey
-- Project creation and persistence  
+- Project creation and persistence
 - Message sending and receiving
 - Data-testid verification
 
 **Advanced Features** (document current behavior):
+
 - Session management
 - Agent workflows
 - Tool approval
@@ -1580,6 +1760,7 @@ e2e/
 - Browser navigation
 
 **Infrastructure Tests** (validate setup):
+
 - MSW integration
 - Worker isolation
 - Page object functionality
@@ -1602,12 +1783,12 @@ test.describe('[Feature Name]', () => {
   test('[specific behavior description]', async ({ page }) => {
     await withTempLaceDir(async (tempDir) => {
       const { projectSelector, chatInterface } = createPageObjects(page);
-      
+
       // Test setup
       await page.goto('/');
-      
+
       // Test logic here...
-      
+
       // Always have meaningful assertions
       expect(actualResult).toBe(expectedResult);
     });
@@ -1637,17 +1818,20 @@ When testing functionality that doesn't exist or is broken:
 test('documents current task management capabilities', async ({ page }) => {
   await withTempLaceDir(async (tempDir) => {
     // Set up test environment
-    
+
     // Attempt to trigger task functionality
-    const taskUIVisible = await page.locator('[data-testid="task-list"]').isVisible().catch(() => false);
-    
+    const taskUIVisible = await page
+      .locator('[data-testid="task-list"]')
+      .isVisible()
+      .catch(() => false);
+
     if (taskUIVisible) {
       console.log('Task management UI is available');
       // Test the available functionality
     } else {
       console.log('Task management UI not yet implemented');
     }
-    
+
     // Test always passes - we're documenting current state
     expect(true).toBeTruthy();
   });
@@ -1706,6 +1890,7 @@ export class FeatureName {
 #### Page Object Guidelines
 
 **Do**:
+
 - ✅ Encapsulate complex UI interactions
 - ✅ Use `data-testid` for element selection
 - ✅ Provide workflow methods that combine multiple actions
@@ -1713,6 +1898,7 @@ export class FeatureName {
 - ✅ Handle wizard flows and multi-step processes
 
 **Don't**:
+
 - ❌ Include assertions in page object methods
 - ❌ Use CSS selectors or text-based selection
 - ❌ Make page objects test-specific
@@ -1725,6 +1911,7 @@ export class FeatureName {
 MSW mocks **external APIs only**, allowing us to test real application logic:
 
 **✅ Mock these external APIs**:
+
 ```typescript
 // mocks/handlers.ts
 export const handlers = [
@@ -1733,20 +1920,21 @@ export const handlers = [
     return HttpResponse.json({
       id: 'msg_123',
       type: 'message',
-      content: [{ type: 'text', text: 'Mocked response' }]
+      content: [{ type: 'text', text: 'Mocked response' }],
     });
   }),
-  
+
   // OpenAI API
   http.post('https://api.openai.com/v1/chat/completions', () => {
     return HttpResponse.json({
-      choices: [{ message: { content: 'Mocked response' } }]
+      choices: [{ message: { content: 'Mocked response' } }],
     });
   }),
 ];
 ```
 
 **❌ Don't mock internal APIs**:
+
 ```typescript
 // DON'T mock these - test real functionality
 // http.post('/api/threads/:id/message', ...)
@@ -1756,7 +1944,7 @@ export const handlers = [
 
 #### Using MSW in Tests
 
-```typescript
+````typescript
 import { test, expect } from './mocks/setup'; // Automatically includes MSW
 import { HttpResponse } from './mocks/setup';
 import { createPageObjects } from './page-objects';
@@ -1767,12 +1955,12 @@ test('external API integration', async ({ page, worker, http }) => {
   // Override default handlers for specific test
   await worker.use(
     http.post('https://api.anthropic.com/v1/messages', () => {
-      return HttpResponse.json({ 
-        content: [{ type: 'text', text: 'Custom test response' }] 
+      return HttpResponse.json({
+        content: [{ type: 'text', text: 'Custom test response' }]
       });
     })
   );
-  
+
   // Test application behavior with mocked external APIs
   await chatInterface.sendMessage('Test message');
   await expect(chatInterface.getMessage('Custom test response')).toBeVisible();
@@ -1787,9 +1975,9 @@ The web interface forwards browser console messages to the development server te
 ```bash
 # Browser console messages appear in server logs
 [CONSOLE-FORWARD] User clicked send button
-[CONSOLE-FORWARD] Message sent successfully  
+[CONSOLE-FORWARD] Message sent successfully
 [BROWSER] [ERROR] Failed to load sessions: Project not found
-```
+````
 
 #### Using Console Logs in Tests
 
@@ -1797,15 +1985,15 @@ The web interface forwards browser console messages to the development server te
 test('debug test with console logging', async ({ page }) => {
   // Monitor console messages
   const consoleMessages: string[] = [];
-  page.on('console', message => {
+  page.on('console', (message) => {
     consoleMessages.push(`${message.type()}: ${message.text()}`);
   });
-  
+
   // Your test logic...
-  
+
   // Analyze console output
   console.log('Browser console messages:', consoleMessages);
-  expect(consoleMessages.some(msg => msg.includes('success'))).toBeTruthy();
+  expect(consoleMessages.some((msg) => msg.includes('success'))).toBeTruthy();
 });
 ```
 
@@ -1814,6 +2002,7 @@ test('debug test with console logging', async ({ page }) => {
 #### Timing Best Practices
 
 **✅ Use element-based waiting**:
+
 ```typescript
 // Wait for elements to be ready
 await expect(element).toBeVisible();
@@ -1824,6 +2013,7 @@ await expect(page.getByText('Success')).toBeVisible();
 ```
 
 **❌ Avoid hardcoded timeouts**:
+
 ```typescript
 // Brittle and slow
 await page.waitForTimeout(3000);
@@ -1832,11 +2022,13 @@ await page.waitForTimeout(3000);
 #### Parallel Execution
 
 **Worker Isolation**: Each worker gets its own database directory
+
 - ✅ Tests can run in parallel safely
 - ✅ No shared state between workers
 - ✅ Automatic cleanup per worker
 
 **CI Configuration**:
+
 - **CI**: Chromium only, 4 workers for speed and reliability
 - **Local**: Chromium + WebKit, 2 workers for cross-browser testing
 
@@ -1855,16 +2047,19 @@ await page.waitForTimeout(3000);
 #### Common Issues and Solutions
 
 **"Element not found" errors**:
+
 - ✅ Check if `data-testid` attribute exists in component
 - ✅ Verify element is actually rendered (not conditionally hidden)
 - ✅ Use proper waiting: `await expect(element).toBeVisible()`
 
 **"Timeout" errors**:
+
 - ✅ Increase timeout for slow operations
 - ✅ Check if UI flow has changed (new steps/modals)
 - ✅ Verify page objects match current UI structure
 
 **"Element intercepted" errors**:
+
 - ✅ Check for modal overlays blocking interactions
 - ✅ Wait for animations to complete
 - ✅ Ensure proper element visibility before clicking
@@ -1872,6 +2067,7 @@ await page.waitForTimeout(3000);
 #### Browser-Specific Issues
 
 **WebKit timing differences**:
+
 - WebKit may be slower than Chromium for certain operations
 - Use longer timeouts for WebKit-specific issues
 - Consider CI runs only Chromium to avoid flakiness
@@ -1884,19 +2080,19 @@ await page.waitForTimeout(3000);
 test('message streaming behavior', async ({ page }) => {
   await withTempLaceDir(async (tempDir) => {
     const { projectSelector, chatInterface } = createPageObjects(page);
-    
+
     // Set up project
     await page.goto('/');
     await projectSelector.createProject('Streaming Test', projectPath);
     await chatInterface.waitForChatReady();
-    
+
     // Monitor for streaming state changes
     await chatInterface.sendMessage('Tell me a story');
-    
+
     // Verify interface shows streaming state
     await expect(chatInterface.stopButton).toBeVisible();
     await expect(page.getByText('Press ESC to interrupt')).toBeVisible();
-    
+
     // Wait for completion
     await chatInterface.waitForSendAvailable();
     await expect(chatInterface.sendButton).toBeVisible();
@@ -1914,10 +2110,10 @@ test('handles network failures gracefully', async ({ page, worker, http }) => {
       return HttpResponse.error();
     })
   );
-  
+
   // Test error handling
   await chatInterface.sendMessage('Test message');
-  
+
   // Verify graceful degradation
   await expect(page.getByText(/error|failed/i)).toBeVisible();
   await expect(chatInterface.messageInput).toBeEnabled(); // Can still interact
@@ -1932,13 +2128,13 @@ test('preserves state across browser navigation', async ({ page }) => {
     // Create project and send message
     await projectSelector.createProject('Nav Test', projectPath);
     await chatInterface.sendMessage('Test message');
-    
+
     const originalUrl = page.url();
-    
+
     // Test browser back/forward
     await page.goBack();
     await page.goForward();
-    
+
     // Verify state preserved
     await expect(page).toHaveURL(originalUrl);
     await expect(chatInterface.getMessage('Test message')).toBeVisible();
@@ -1951,7 +2147,7 @@ test('preserves state across browser navigation', async ({ page }) => {
 #### When UI Changes
 
 1. **Update data-testid attributes** if elements change
-2. **Update page objects** if interaction patterns change  
+2. **Update page objects** if interaction patterns change
 3. **Run test suite** to identify affected tests
 4. **Update test expectations** to match new behavior
 5. **Preserve failing tests** as documentation when appropriate
@@ -1995,18 +2191,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
-      
+
       - name: Install dependencies
         run: npm ci
-        
+
       - name: Install Playwright browsers
         run: npx playwright install chromium
-        
+
       - name: Run Playwright tests
         run: CI=true npm run test:playwright
         env:
           ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_KEY }}
-          
+
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: failure()
@@ -2018,6 +2214,7 @@ jobs:
 #### CI Optimization
 
 The configuration automatically optimizes for CI:
+
 - **Chromium only** in CI (reliable, fast)
 - **4 workers** for parallel execution
 - **Retries** on failure (2 retries in CI)
@@ -2026,6 +2223,7 @@ The configuration automatically optimizes for CI:
 ### Best Practices Summary
 
 #### DO:
+
 - ✅ Use `withTempLaceDir()` for database isolation
 - ✅ Use page objects for all UI interactions
 - ✅ Test complete user workflows
@@ -2035,6 +2233,7 @@ The configuration automatically optimizes for CI:
 - ✅ Follow TDD: write test, make it fail, implement, make it pass
 
 #### DON'T:
+
 - ❌ Mock internal application logic
 - ❌ Use CSS selectors for element selection
 - ❌ Test implementation details
@@ -2045,24 +2244,28 @@ The configuration automatically optimizes for CI:
 ### Troubleshooting Guide
 
 #### "Tests timing out"
+
 1. Check if UI has changed and page objects need updates
 2. Verify data-testid attributes exist on expected elements
 3. Look for modal overlays or loading states blocking interactions
 4. Check browser console for JavaScript errors
 
 #### "Elements not found"
+
 1. Verify data-testid attribute exists in component
 2. Check if element is conditionally rendered
 3. Ensure proper waiting with `await expect(element).toBeVisible()`
 4. Check if UI flow has new steps (wizard, modals, etc.)
 
 #### "Tests flaky in CI"
+
 1. Use `CI=true` to test Chromium-only behavior locally
 2. Check for race conditions in test setup/teardown
 3. Verify all tests use proper database isolation
 4. Look for hardcoded timeouts that need adjustment
 
 #### "Browser won't start"
+
 ```bash
 # Install browsers if missing
 npx playwright install
@@ -2096,9 +2299,11 @@ npm run test:playwright -- --config=playwright-fast.config.ts
 ### Getting Help
 
 - **Check existing tests** for patterns and examples
-- **Review page objects** to understand available interactions  
+- **Review page objects** to understand available interactions
 - **Read component source** to understand UI structure and data-testids
 - **Run single tests** to debug issues quickly
 - **Use Playwright trace viewer** for step-by-step debugging
 
-The Playwright infrastructure provides a solid foundation for reliable E2E testing. Focus on testing user behavior, use the provided abstractions, and document current system capabilities comprehensively.
+The Playwright infrastructure provides a solid foundation for reliable E2E
+testing. Focus on testing user behavior, use the provided abstractions, and
+document current system capabilities comprehensively.
