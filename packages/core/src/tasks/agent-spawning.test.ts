@@ -47,7 +47,7 @@ describe('Agent Spawning', () => {
       const taskRequest: CreateTaskRequest = {
         title: 'Test Task',
         prompt: 'Please complete this test task',
-        assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-3-sonnet'),
+        assignedTo: createNewAgentSpec('lace', 'anthropic:claude-3-sonnet'),
         priority: 'medium',
       };
 
@@ -65,7 +65,7 @@ describe('Agent Spawning', () => {
       );
 
       // Verify task assignment was updated to actual thread ID
-      expect(task.assignedTo).not.toBe('new:lace:anthropic/claude-3-sonnet');
+      expect(task.assignedTo).not.toBe('new:lace;anthropic:claude-3-sonnet');
       expect(task.assignedTo).toMatch(/^lace_20250726_test01\.\d+$/);
 
       // Verify task status was updated to in_progress
@@ -75,17 +75,17 @@ describe('Agent Spawning', () => {
     it('should handle multiple provider/model formats', async () => {
       const testCases = [
         {
-          assignedTo: createNewAgentSpec('lace', 'openai', 'gpt-4'),
+          assignedTo: createNewAgentSpec('lace', 'openai:gpt-4'),
           expectedProvider: 'openai',
           expectedModel: 'gpt-4',
         },
         {
-          assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-3-haiku'),
+          assignedTo: createNewAgentSpec('lace', 'anthropic:claude-3-haiku'),
           expectedProvider: 'anthropic',
           expectedModel: 'claude-3-haiku',
         },
         {
-          assignedTo: createNewAgentSpec('lace', 'lmstudio', 'local-model'),
+          assignedTo: createNewAgentSpec('lace', 'lmstudio:local-model'),
           expectedProvider: 'lmstudio',
           expectedModel: 'local-model',
         },
@@ -138,7 +138,7 @@ describe('Agent Spawning', () => {
       const taskRequest: CreateTaskRequest = {
         title: 'Test Task',
         prompt: 'This should fail',
-        assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-3-sonnet'),
+        assignedTo: createNewAgentSpec('lace', 'anthropic:claude-3-sonnet'),
       };
 
       await expect(taskManagerWithoutCallback.createTask(taskRequest, context)).rejects.toThrow(
@@ -153,7 +153,7 @@ describe('Agent Spawning', () => {
       const taskRequest: CreateTaskRequest = {
         title: 'Test Task',
         prompt: 'This will fail',
-        assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-3-sonnet'),
+        assignedTo: createNewAgentSpec('lace', 'anthropic:claude-3-sonnet'),
       };
 
       await expect(taskManager.createTask(taskRequest, context)).rejects.toThrow(
@@ -185,7 +185,7 @@ describe('Agent Spawning', () => {
       const taskRequest: CreateTaskRequest = {
         title: 'Event Test',
         prompt: 'Testing events',
-        assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-3-sonnet'),
+        assignedTo: createNewAgentSpec('lace', 'anthropic:claude-3-sonnet'),
       };
 
       await taskManager.createTask(taskRequest, context);
@@ -204,10 +204,10 @@ describe('Agent Spawning', () => {
   describe('NewAgentSpec Validation', () => {
     it('should validate NewAgentSpec format correctly', () => {
       const validSpecs = [
-        'new:lace:anthropic/claude-3-sonnet',
-        'new:lace:openai/gpt-4',
-        'new:lace:lmstudio/local-model',
-        'new:lace:provider/model-with-dashes',
+        'new:lace;anthropic:claude-3-sonnet',
+        'new:lace;openai:gpt-4',
+        'new:lace;lmstudio:local-model',
+        'new:lace;provider:model-with-dashes',
       ];
 
       validSpecs.forEach((spec) => {

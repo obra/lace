@@ -56,9 +56,9 @@ describe('ThreadId types', () => {
 describe('NewAgentSpec types', () => {
   describe('isNewAgentSpec', () => {
     it('should validate correct new agent specs', () => {
-      expect(isNewAgentSpec('new:lace:anthropic/claude-3-haiku')).toBe(true);
-      expect(isNewAgentSpec('new:coding-agent:openai/gpt-4')).toBe(true);
-      expect(isNewAgentSpec('new:helper:local/llama-2')).toBe(true);
+      expect(isNewAgentSpec('new:lace;anthropic:claude-3-haiku')).toBe(true);
+      expect(isNewAgentSpec('new:coding-agent;openai:gpt-4')).toBe(true);
+      expect(isNewAgentSpec('new:helper;local:llama-2')).toBe(true);
     });
 
     it('should reject invalid new agent specs', () => {
@@ -76,8 +76,8 @@ describe('NewAgentSpec types', () => {
 
   describe('createNewAgentSpec', () => {
     it('should create valid new agent specs', () => {
-      const spec = createNewAgentSpec('lace', 'anthropic', 'claude-3-haiku');
-      expect(spec).toBe('new:lace:anthropic/claude-3-haiku');
+      const spec = createNewAgentSpec('lace', 'anthropic:claude-3-haiku');
+      expect(spec).toBe('new:lace;anthropic:claude-3-haiku');
       // TypeScript should see this as NewAgentSpec type
       const _typeCheck: NewAgentSpec = spec;
     });
@@ -92,8 +92,8 @@ describe('AssigneeId types', () => {
     });
 
     it('should accept valid new agent specs', () => {
-      expect(isAssigneeId('new:lace:anthropic/claude-3-haiku')).toBe(true);
-      expect(isAssigneeId('new:coding-agent:openai/gpt-4')).toBe(true);
+      expect(isAssigneeId('new:lace;anthropic:claude-3-haiku')).toBe(true);
+      expect(isAssigneeId('new:coding-agent;openai:gpt-4')).toBe(true);
     });
 
     it('should reject invalid formats', () => {

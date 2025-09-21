@@ -5,6 +5,7 @@ import { EventEmitter } from 'events';
 import { DatabasePersistence } from '~/persistence/database';
 import { Task, CreateTaskRequest, TaskFilters, TaskContext, TaskSummary } from '~/tasks/types';
 import { ThreadId, AssigneeId, isNewAgentSpec, parseNewAgentSpec } from '~/threads/types';
+import { resolveModelSpec, type ModelResolutionContext } from '~/providers/provider-utils';
 import { logger } from '~/utils/logger';
 
 // Type for agent creation callback
@@ -17,6 +18,7 @@ export type AgentCreationCallback = (
 
 export class TaskManager extends EventEmitter {
   private instanceId: string;
+  private sessionConfig?: ModelResolutionContext;
 
   constructor(
     private sessionId: ThreadId,
@@ -26,6 +28,10 @@ export class TaskManager extends EventEmitter {
     super();
     this.instanceId = Math.random().toString(36).substring(2, 8);
     logger.debug('TaskManager created', { sessionId, instanceId: this.instanceId });
+  }
+
+  setSessionConfig(config: ModelResolutionContext): void {
+    this.sessionConfig = config;
   }
 
   setAgentCreationCallback(callback: AgentCreationCallback): void {
@@ -290,7 +296,7 @@ export class TaskManager extends EventEmitter {
   }
 
   /**
-   * Handle agent spawning for tasks assigned to "new:persona:provider/model"
+   * Handle agent spawning for tasks assigned to "new:persona[;modelSpec]"
    * Updates the task's assignedTo field with the actual agent thread ID
    */
   private async handleAgentSpawning(task: Task): Promise<void> {
@@ -302,13 +308,23 @@ export class TaskManager extends EventEmitter {
       throw new Error('Agent creation callback not provided - cannot spawn agents');
     }
 
-    // Parse "new:persona:provider/model" format using proper parser
+    // Parse the new agent spec
     const parsed = parseNewAgentSpec(task.assignedTo);
-    const { persona, provider, model } = parsed;
+
+    // Build resolution context from session config if available
+    const context: ModelResolutionContext | undefined = this.sessionConfig;
+
+    // Resolve the model specification
+    const { providerInstanceId, modelId } = resolveModelSpec(parsed.modelSpec, context);
 
     try {
-      // Create the agent and get its thread ID
-      const agentThreadId = await this.createAgent(persona, provider, model, task);
+      // Create the agent with resolved values
+      const agentThreadId = await this.createAgent(
+        parsed.persona,
+        providerInstanceId,
+        modelId,
+        task
+      );
 
       // Update the task assignment to the actual thread ID
       task.assignedTo = agentThreadId;
@@ -322,8 +338,8 @@ export class TaskManager extends EventEmitter {
         type: 'agent:spawned',
         taskId: task.id,
         agentThreadId,
-        provider,
-        model,
+        provider: providerInstanceId,
+        model: modelId,
         timestamp: new Date(),
       });
     } catch (error) {

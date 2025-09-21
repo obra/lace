@@ -32,7 +32,7 @@ describe('Task Agent Spawning with Personas', () => {
   });
 
   it('spawns agent with correct persona from NewAgentSpec', async () => {
-    const agentSpec = createNewAgentSpec('coding-agent', 'anthropic', 'claude-3-sonnet');
+    const agentSpec = createNewAgentSpec('coding-agent', 'anthropic:claude-3-sonnet');
 
     const _taskId = await taskManager.createTask(
       {
@@ -56,7 +56,7 @@ describe('Task Agent Spawning with Personas', () => {
   });
 
   it('spawns agent with helper-agent persona', async () => {
-    const agentSpec = createNewAgentSpec('helper-agent', 'openai', 'gpt-4');
+    const agentSpec = createNewAgentSpec('helper-agent', 'openai:gpt-4');
 
     await taskManager.createTask(
       {
@@ -79,7 +79,7 @@ describe('Task Agent Spawning with Personas', () => {
   });
 
   it('spawns agent with custom persona', async () => {
-    const agentSpec = createNewAgentSpec('my-custom-persona', 'lmstudio', 'custom-model');
+    const agentSpec = createNewAgentSpec('my-custom-persona', 'lmstudio:custom-model');
 
     await taskManager.createTask(
       {
@@ -151,7 +151,7 @@ describe('Task Agent Spawning with Personas', () => {
     const eventListener = vi.fn();
     taskManager.on('agent:spawned', eventListener);
 
-    const agentSpec = createNewAgentSpec('coding-agent', 'anthropic', 'claude-3-sonnet');
+    const agentSpec = createNewAgentSpec('coding-agent', 'anthropic:claude-3-sonnet');
 
     await taskManager.createTask(
       {
@@ -176,7 +176,7 @@ describe('Task Agent Spawning with Personas', () => {
     // Mock agent creator to fail
     mockAgentCreator.mockRejectedValue(new Error('Agent creation failed'));
 
-    const agentSpec = createNewAgentSpec('lace', 'anthropic', 'claude-3-sonnet');
+    const agentSpec = createNewAgentSpec('lace', 'anthropic:claude-3-sonnet');
 
     await expect(
       taskManager.createTask(

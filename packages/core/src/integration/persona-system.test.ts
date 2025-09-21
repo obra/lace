@@ -85,7 +85,7 @@ describe('Persona System Integration', () => {
       {
         title: 'Help me organize my files',
         prompt: 'I need help organizing my project files',
-        assignedTo: createNewAgentSpec('helper-agent', 'anthropic', 'claude-3-sonnet'),
+        assignedTo: createNewAgentSpec('helper-agent', 'anthropic:claude-3-sonnet'),
       },
       { actor: 'user' }
     );
@@ -101,7 +101,7 @@ describe('Persona System Integration', () => {
     );
 
     // Verify task assignment was updated to actual thread ID
-    expect(task.assignedTo).not.toBe('new:helper-agent:anthropic/claude-3-sonnet');
+    expect(task.assignedTo).not.toBe('new:helper-agent;anthropic:claude-3-sonnet');
     expect(task.status).toBe('in_progress');
   });
 
@@ -152,9 +152,9 @@ describe('Persona System Integration', () => {
 
   it('newagentspec parsing integrates correctly', () => {
     const specs = [
-      'new:lace:anthropic/claude-3-sonnet',
-      'new:coding-agent:openai/gpt-4',
-      'new:helper-agent:ollama/llama2',
+      'new:lace;anthropic:claude-3-sonnet',
+      'new:coding-agent;openai:gpt-4',
+      'new:helper-agent;ollama:llama2',
     ];
 
     for (const spec of specs) {
@@ -174,7 +174,7 @@ describe('Persona System Integration', () => {
   });
 
   it('old format is properly rejected', () => {
-    const oldFormats = ['new:anthropic/claude-3-sonnet', 'new:openai/gpt-4', 'new:ollama/llama2'];
+    const oldFormats = ['new:anthropic/claude-3-sonnet', 'new;openai:gpt-4', 'new:ollama/llama2'];
 
     for (const oldFormat of oldFormats) {
       const spec = oldFormat as any;
