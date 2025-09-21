@@ -123,16 +123,16 @@ describe('Task Agent Spawning with Personas', () => {
 
   it('handles different persona types correctly', async () => {
     const testCases = [
-      { persona: 'lace', provider: 'anthropic', model: 'claude-3-sonnet' },
-      { persona: 'coding-agent', provider: 'openai', model: 'gpt-4' },
-      { persona: 'helper-agent', provider: 'ollama', model: 'llama2' },
-      { persona: 'data-analyst', provider: 'anthropic', model: 'claude-3-haiku' },
+      { persona: 'lace', modelSpec: 'anthropic:claude-3-sonnet' },
+      { persona: 'coding-agent', modelSpec: 'openai:gpt-4' },
+      { persona: 'helper-agent', modelSpec: 'ollama:llama2' },
+      { persona: 'data-analyst', modelSpec: 'anthropic:claude-3-haiku' },
     ];
 
-    for (const { persona, provider, model } of testCases) {
+    for (const { persona, modelSpec } of testCases) {
       mockAgentCreator.mockClear();
 
-      const spec = createNewAgentSpec(persona, provider, model);
+      const spec = createNewAgentSpec(persona, modelSpec);
 
       await taskManager.createTask(
         {
@@ -143,6 +143,7 @@ describe('Task Agent Spawning with Personas', () => {
         context
       );
 
+      const [provider, model] = modelSpec.split(':');
       expect(mockAgentCreator).toHaveBeenCalledWith(persona, provider, model, expect.any(Object));
     }
   });

@@ -336,8 +336,7 @@ describe('Task Management Workflow Integration', () => {
               priority: 'high',
               assignedTo: createNewAgentSpec(
                 'lace',
-                providerInstanceId,
-                'claude-3-5-haiku-20241022'
+                `${providerInstanceId}:claude-3-5-haiku-20241022`
               ),
             },
           ],
@@ -363,7 +362,7 @@ describe('Task Management Workflow Integration', () => {
       const reassignResult = await taskUpdateTool.execute(
         {
           taskId: validDelegateTaskId,
-          assignTo: createNewAgentSpec('lace', providerInstanceId, 'claude-3-5-haiku-20241022'),
+          assignTo: createNewAgentSpec('lace', `${providerInstanceId}:claude-3-5-haiku-20241022`),
           status: 'in_progress',
         },
         context
@@ -515,8 +514,7 @@ describe('Task Management Workflow Integration', () => {
               priority: 'high',
               assignedTo: createNewAgentSpec(
                 'lace',
-                providerInstanceId,
-                'claude-3-5-haiku-20241022'
+                `${providerInstanceId}:claude-3-5-haiku-20241022`
               ),
             },
           ],

@@ -278,8 +278,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       // Create task assigned to a new agent spec
       const newAgentSpec = createNewAgentSpec(
         'lace',
-        providerInstanceId,
-        'claude-3-5-haiku-20241022'
+        `${providerInstanceId}:claude-3-5-haiku-20241022`
       );
       const createResult = await createTool.execute(
         {

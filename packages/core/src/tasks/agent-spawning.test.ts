@@ -118,7 +118,7 @@ describe('Agent Spawning', () => {
       const taskRequest: CreateTaskRequest = {
         title: 'Invalid Test',
         prompt: 'This should not spawn an agent',
-        assignedTo: asAssigneeId('new:invalid-format'), // Missing model - treated as regular assignment
+        assignedTo: asAssigneeId('invalid-format'), // Not a NewAgentSpec format - treated as regular assignment
       };
 
       const task = await taskManager.createTask(taskRequest, context);
@@ -127,7 +127,7 @@ describe('Agent Spawning', () => {
       expect(mockAgentCreator).not.toHaveBeenCalled();
 
       // Verify task assignment unchanged (treated as regular thread ID)
-      expect(task.assignedTo).toBe('new:invalid-format');
+      expect(task.assignedTo).toBe('invalid-format');
       expect(task.status).toBe('pending');
     });
 
@@ -220,12 +220,10 @@ describe('Agent Spawning', () => {
 
     it('should treat invalid NewAgentSpec formats as regular assignments', async () => {
       const invalidSpecs = [
-        'new:',
-        'new:provider',
-        'new:/model',
-        'new:provider/',
-        'new:anthropic/claude-3-sonnet', // Old format - now invalid
-        'new:openai/gpt-4', // Old format - now invalid
+        'new:', // Empty persona
+        'new', // Missing colon
+        'new:anthropic/claude-3-sonnet', // Old format with slash - now invalid
+        'new:openai/gpt-4', // Old format with slash - now invalid
         'invalid:provider/model',
         'provider/model',
       ];

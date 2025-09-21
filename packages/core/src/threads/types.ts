@@ -534,7 +534,8 @@ export type NewAgentSpec = string & { readonly __brand: 'NewAgentSpec' };
 
 export function isNewAgentSpec(value: string): value is NewAgentSpec {
   // Must start with "new:" followed by persona, optionally followed by ;modelSpec
-  return /^new:[^;]+(;.*)?$/.test(value);
+  // Persona cannot contain forward slashes (to reject old format)
+  return /^new:[^;/]+(;.*)?$/.test(value);
 }
 
 export function createNewAgentSpec(persona: string, modelSpec?: string): NewAgentSpec {
