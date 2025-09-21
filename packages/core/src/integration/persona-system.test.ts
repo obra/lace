@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Agent, AgentConfig } from '~/agents/agent';
 import { TaskManager, AgentCreationCallback } from '~/tasks/task-manager';
-import { createNewAgentSpec, asThreadId, isNewAgentSpec, parseNewAgentSpec } from '~/threads/types';
+import { createNewAgentSpec, asThreadId } from '~/threads/types';
 import { personaRegistry } from '~/config/persona-registry';
 import { PromptManager } from '~/config/prompt-manager';
 import { loadPromptConfig } from '~/config/prompts';

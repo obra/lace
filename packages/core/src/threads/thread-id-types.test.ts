@@ -2,15 +2,7 @@
 // ABOUTME: Ensures type safety for thread IDs and new agent specifications
 
 import { describe, it, expect } from 'vitest';
-import {
-  ThreadId,
-  isThreadId,
-  asThreadId,
-  NewAgentSpec,
-  isNewAgentSpec,
-  createNewAgentSpec,
-  isAssigneeId,
-} from '~/threads/types';
+import { ThreadId, isThreadId, asThreadId, isAssigneeId } from '~/threads/types';
 
 describe('ThreadId types', () => {
   describe('isThreadId', () => {
