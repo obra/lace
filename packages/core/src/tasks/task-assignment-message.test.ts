@@ -7,7 +7,6 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
-import { getPersistence } from '~/persistence/database';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
 import { Tool } from '~/tools/tool';
@@ -19,7 +18,6 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
-import { logger } from '~/utils/logger';
 
 // Enhanced mock provider that captures messages
 class MessageCapturingProvider extends BaseMockProvider {

@@ -233,8 +233,8 @@ export class Session {
     const sessionEffectiveConfig = session.getEffectiveConfiguration();
     if (sessionEffectiveConfig.providerInstanceId && sessionEffectiveConfig.modelId) {
       taskManager.setSessionConfig({
-        providerInstanceId: sessionEffectiveConfig.providerInstanceId as string,
-        modelId: sessionEffectiveConfig.modelId as string,
+        providerInstanceId: sessionEffectiveConfig.providerInstanceId,
+        modelId: sessionEffectiveConfig.modelId,
       });
     }
 
@@ -521,8 +521,8 @@ export class Session {
     const sessionEffectiveConfig = session.getEffectiveConfiguration();
     if (sessionEffectiveConfig.providerInstanceId && sessionEffectiveConfig.modelId) {
       taskManager.setSessionConfig({
-        providerInstanceId: sessionEffectiveConfig.providerInstanceId as string,
-        modelId: sessionEffectiveConfig.modelId as string,
+        providerInstanceId: sessionEffectiveConfig.providerInstanceId,
+        modelId: sessionEffectiveConfig.modelId,
       });
     }
 
