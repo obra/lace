@@ -229,6 +229,15 @@ export class Session {
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
 
+    // Set session configuration for model resolution
+    const sessionEffectiveConfig = session.getEffectiveConfiguration();
+    if (sessionEffectiveConfig.providerInstanceId && sessionEffectiveConfig.modelId) {
+      taskManager.setSessionConfig({
+        providerInstanceId: sessionEffectiveConfig.providerInstanceId as string,
+        modelId: sessionEffectiveConfig.modelId as string,
+      });
+    }
+
     // Set up agent creation callback for task-based agent spawning
     session.setupAgentCreationCallback();
 
@@ -507,6 +516,15 @@ export class Session {
 
     // Update the session's task manager to use the one we created
     session._taskManager = taskManager;
+
+    // Set session configuration for model resolution
+    const sessionEffectiveConfig = session.getEffectiveConfiguration();
+    if (sessionEffectiveConfig.providerInstanceId && sessionEffectiveConfig.modelId) {
+      taskManager.setSessionConfig({
+        providerInstanceId: sessionEffectiveConfig.providerInstanceId as string,
+        modelId: sessionEffectiveConfig.modelId as string,
+      });
+    }
 
     // Set up agent creation callback for task-based agent spawning
     session.setupAgentCreationCallback();

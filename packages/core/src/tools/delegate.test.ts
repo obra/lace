@@ -150,7 +150,7 @@ describe('DelegateTool', () => {
     );
 
     expect(result.status).not.toBe('completed');
-    expect(result.content[0].text).toContain('Invalid model format');
+    expect(result.content[0].text).toContain('Invalid model spec');
   });
 
   it('should collect all subagent responses', async () => {

@@ -9,23 +9,6 @@ import type { TaskManager } from '~/tasks/task-manager';
 import type { Task, TaskContext } from '~/tasks/types';
 import { createNewAgentSpec } from '~/threads/types';
 import { logger } from '~/utils/logger';
-import { parseProviderModel } from '~/providers/provider-utils';
-
-// Model format validation - requires provider instance ID
-const ModelFormat = z.string().refine(
-  (value) => {
-    try {
-      const { instanceId, modelId } = parseProviderModel(value);
-      return instanceId && modelId;
-    } catch {
-      return false;
-    }
-  },
-  {
-    message:
-      'Invalid model format. Use "providerInstanceId:model" (e.g., "pi_abc123:claude-3-5-haiku-20241022")',
-  }
-);
 
 const delegateSchema = z.object({
   title: NonEmptyString.describe(
@@ -35,9 +18,7 @@ const delegateSchema = z.object({
   expected_response: NonEmptyString.describe(
     'Description of the expected format/content of the response (guides the subagent)'
   ),
-  model: ModelFormat.describe(
-    'Provider instance ID and model in format "providerInstanceId:model" (e.g., "pi_abc123:claude-3-5-haiku-20241022")'
-  ),
+  model: z.string().describe('Model spec: "fast", "smart", or "instanceId:modelId"'),
 });
 
 export class DelegateTool extends Tool {
@@ -46,8 +27,14 @@ export class DelegateTool extends Tool {
 Ideal for research, data extraction, log analysis, or any focused task with clear outputs.
 The subagent starts fresh with only your instructions - no conversation history.
 
+Model options:
+- "fast" - Use the configured fast model (typically Haiku)
+- "smart" - Use the configured smart model (typically Sonnet or GPT-4)
+- "instanceId:modelId" - Use a specific provider and model
+
 Examples:
-- title: "Analyze test failures", prompt: "Review the test output and identify the root cause of failures", expected_response: "List of failing tests with specific error reasons", model: "anthropic:claude-3-5-haiku-20241022"
+- title: "Analyze test failures", prompt: "Review the test output and identify the root cause of failures", expected_response: "List of failing tests with specific error reasons", model: "fast"
+- title: "Complex research", prompt: "Research the implementation details", expected_response: "Detailed analysis", model: "smart"
 - title: "Search authentication logs", prompt: "grep through the application logs for authentication errors in the last hour", expected_response: "Timestamps and error messages for each auth failure", model: "anthropic:claude-3-5-haiku-20241022"  
 - title: "Complex code review", prompt: "Review this PR for architecture issues and suggest improvements", expected_response: "Detailed analysis with specific recommendations", model: "anthropic:claude-sonnet-4-20250514"`;
 
@@ -102,12 +89,10 @@ Examples:
       throw new Error('TaskManager is required for delegation');
     }
 
-    // Parse providerInstanceId:model format
-    const [providerInstanceId, modelName] = model.split(':');
-
     try {
-      // Create assignment spec using provider instance ID with default persona
-      const assigneeSpec = createNewAgentSpec('lace', providerInstanceId, modelName);
+      // Create assignment spec with the model specification
+      // Model can be: 'fast', 'smart', or 'instanceId:modelId'
+      const assigneeSpec = createNewAgentSpec('lace', model);
 
       logger.debug('DelegateTool: Creating task with agent spawning', {
         title,

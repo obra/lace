@@ -251,8 +251,7 @@ describe('Enhanced Task Manager Tools', () => {
     it('should create task with new agent assignment', async () => {
       const newAgentSpec = createNewAgentSpec(
         'lace',
-        providerInstanceId,
-        'claude-3-5-haiku-20241022'
+        `${providerInstanceId}:claude-3-5-haiku-20241022`
       );
 
       const result = await taskCreateTool.execute(
@@ -581,8 +580,7 @@ describe('Enhanced Task Manager Tools', () => {
     it('should assign to new agent spec', async () => {
       const newAgentSpec = createNewAgentSpec(
         'lace',
-        providerInstanceId,
-        'claude-3-5-haiku-20241022'
+        `${providerInstanceId}:claude-3-5-haiku-20241022`
       );
 
       const result = await taskUpdateTool.execute(
