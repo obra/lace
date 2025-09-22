@@ -54,17 +54,12 @@ Use your task_add_note tool to record progress and task_complete when done.`;
     return;
   }
 
-  // Handle task updates (existing completion logic)
+  // Handle task updates - but we can't detect what changed without previousTask
   if (event.type === 'task:updated') {
-    const { task, previousTask, context: taskContext } = event;
+    const { task, context: taskContext } = event;
 
-    // Only handle completion notifications for now
-    if (
-      task.status === 'completed' &&
-      previousTask &&
-      previousTask.status !== 'completed' &&
-      task.createdBy !== taskContext.actor
-    ) {
+    // For now, just notify on completion status (we'll fix this in Phase 2)
+    if (task.status === 'completed' && task.createdBy !== taskContext.actor) {
       const creatorAgent = context.getAgent(task.createdBy);
       if (creatorAgent) {
         const message = `Task '${task.id}' that you created has been completed by ${taskContext.actor}:
@@ -79,12 +74,13 @@ You can now review the results or create follow-up tasks.`;
   }
 }
 
-// Type for TaskManager events (this might need to be defined)
+// Type for TaskManager events - matches what TaskManager actually emits
 export interface TaskManagerEvent {
   type: 'task:updated' | 'task:created' | 'task:note_added';
   task: Task;
-  previousTask?: Task; // For updates only
   context: TaskContext;
+  timestamp: Date;
+  // Note: no previousTask - TaskManager doesn't provide this
 }
 
 // Re-export core types this utility needs
