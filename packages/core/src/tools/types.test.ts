@@ -106,7 +106,7 @@ describe('Tool Class with MCP Annotations', () => {
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
     });
   });
 });

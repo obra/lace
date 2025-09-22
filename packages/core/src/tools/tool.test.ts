@@ -50,13 +50,14 @@ describe('Tool with schema validation', () => {
     expect(result.content[0].text).toBe('Got: hello');
   });
 
-  it('returns validation errors for invalid parameters', async () => {
+  it('returns concise validation errors for invalid parameters', async () => {
     const tool = new TestTool();
     const result = await tool.execute({ optional: 123 }, { signal: new AbortController().signal }); // missing required field
 
     expect(result.status).toBe('failed');
-    expect(result.content[0].text).toContain('Validation failed');
-    expect(result.content[0].text).toContain('required');
+    expect(result.content[0].text).toBe(
+      'ValidationError: test_tool failed\nMissing required: required'
+    );
   });
 
   it('validates parameter types correctly', async () => {
@@ -67,8 +68,8 @@ describe('Tool with schema validation', () => {
     );
 
     expect(result.status).toBe('failed');
-    expect(result.content[0].text).toContain('Validation failed');
-    expect(result.content[0].text).toContain('optional');
+    expect(result.content[0].text).toContain('ValidationError: test_tool failed');
+    expect(result.content[0].text).toContain('optional: Expected number, got string');
   });
 
   it('rejects empty strings for required string fields', async () => {
@@ -76,7 +77,8 @@ describe('Tool with schema validation', () => {
     const result = await tool.execute({ required: '' }, { signal: new AbortController().signal });
 
     expect(result.status).toBe('failed');
-    expect(result.content[0].text).toContain('Validation failed');
+    expect(result.content[0].text).toContain('ValidationError: test_tool failed');
+    expect(result.content[0].text).toContain('required: String must contain at least 1 character');
   });
 
   it('generates JSON schema from Zod schema', () => {
@@ -90,13 +92,39 @@ describe('Tool with schema validation', () => {
     expect(jsonSchema.required).not.toContain('optional');
   });
 
-  it('provides helpful validation error messages', async () => {
+  it('provides concise error messages with type mismatches', async () => {
     const tool = new TestTool();
     const result = await tool.execute({ required: null }, { signal: new AbortController().signal });
 
     expect(result.status).toBe('failed');
-    expect(result.content[0].text).toContain('Validation failed');
-    expect(result.content[0].text).toContain('Check parameter types and values');
+    expect(result.content[0].text).toContain('ValidationError: test_tool failed');
+    expect(result.content[0].text).toContain('required: Expected string, got null');
+  });
+
+  it('handles unexpected parameters', async () => {
+    const tool = new TestTool();
+    const result = await tool.execute(
+      { required: 'hello', extra: 'param', another: 123 },
+      { signal: new AbortController().signal }
+    );
+
+    expect(result.status).toBe('completed'); // Zod strips unknown keys by default
+    expect(result.content[0].text).toBe('Got: hello');
+  });
+
+  it('handles multiple validation errors concisely', async () => {
+    const tool = new TestTool();
+    const result = await tool.execute(
+      { optional: 'not-a-number', extraField: 'unexpected' },
+      { signal: new AbortController().signal }
+    );
+
+    expect(result.status).toBe('failed');
+    const errorText = result.content[0].text;
+    expect(errorText).toContain('ValidationError: test_tool failed');
+    expect(errorText).toContain('Missing required: required');
+    // Zod strips unknown keys, so extraField won't show as unexpected
+    expect(errorText).toContain('optional: Expected number, got string');
   });
 });
 

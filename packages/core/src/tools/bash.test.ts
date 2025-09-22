@@ -65,7 +65,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
       );
 
       expect(result.status).not.toBe('completed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('Cannot be empty');
     });
 
@@ -76,14 +76,14 @@ Exit codes shown even for successful tool execution. Working directory persists 
       );
 
       expect(result.status).not.toBe('completed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
     });
 
     it('should reject missing command', async () => {
       const result = await bashTool.execute({}, { signal: new AbortController().signal });
 
       expect(result.status).not.toBe('completed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('Required');
     });
   });

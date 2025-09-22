@@ -257,10 +257,14 @@ describe('Delegation Integration Tests', () => {
 
     // Test delegation using the real DelegateTool with provider mocking
     const delegateInput = {
-      title: 'Code Analysis',
-      prompt: 'Analyze the project structure and identify key patterns',
-      expected_response: 'Brief summary of project structure',
-      model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
+      tasks: [
+        {
+          title: 'Code Analysis',
+          prompt: 'Analyze the project structure and identify key patterns',
+          expected_response: 'Brief summary of project structure',
+          assignedTo: `new:lace;${providerInstanceId}:claude-3-5-haiku-20241022`,
+        },
+      ],
     };
 
     const result = await delegateToolInstance.execute(delegateInput, {

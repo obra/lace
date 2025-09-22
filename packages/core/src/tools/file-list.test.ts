@@ -69,7 +69,7 @@ describe('FileListTool with schema validation', () => {
       const result = await tool.execute({ path: '' }, { signal: new AbortController().signal });
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('Path cannot be empty');
     });
 
@@ -83,7 +83,7 @@ describe('FileListTool with schema validation', () => {
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
     });
 
     it('should reject non-integer maxDepth', async () => {
@@ -96,7 +96,7 @@ describe('FileListTool with schema validation', () => {
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('Must be an integer');
     });
 
@@ -110,7 +110,7 @@ describe('FileListTool with schema validation', () => {
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
     });
 
     it('should accept valid parameters with defaults', async () => {
@@ -352,7 +352,7 @@ describe('FileListTool with schema validation', () => {
       const result = await tool.execute({ path: '' }, { signal: new AbortController().signal });
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
     });
 
     it('should handle directory not found error', async () => {
