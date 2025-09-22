@@ -290,6 +290,14 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
           case 'SESSION_UPDATED':
             currentOptions.onSessionUpdated?.(event);
             break;
+          case 'AGENT_SPAWNED':
+            {
+              // Agent spawned event - reload session to get updated agents list
+              const agentEvent = event.data as AgentEvent;
+              currentOptions.onAgentSpawned?.(agentEvent);
+              currentOptions.onAgentEvent?.(agentEvent);
+            }
+            break;
           // Add other event type cases as needed
         }
       } catch (error) {

@@ -84,15 +84,18 @@ export function AgentProvider({
     projectId: undefined, // Don't filter by project
     sessionId: sessionId || undefined,
     // No threadIds - we want session-level agent events
-    onAgentSpawned: useCallback(() => {
-      // Debounce rapid spawn events to coalesce into single refresh
-      if (debouncedReloadRef.current) {
-        clearTimeout(debouncedReloadRef.current);
-      }
-      debouncedReloadRef.current = setTimeout(() => {
-        void reloadSessionDetails();
-      }, 300);
-    }, [reloadSessionDetails]),
+    onAgentSpawned: useCallback(
+      (agentEvent) => {
+        // Debounce rapid spawn events to coalesce into single refresh
+        if (debouncedReloadRef.current) {
+          clearTimeout(debouncedReloadRef.current);
+        }
+        debouncedReloadRef.current = setTimeout(() => {
+          void reloadSessionDetails();
+        }, 300);
+      },
+      [reloadSessionDetails]
+    ),
     onSessionUpdated: useCallback(() => {
       // Reload session details when session name changes
       void reloadSessionDetails();
