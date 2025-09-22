@@ -30,28 +30,51 @@ export async function routeTaskNotifications(
   event: TaskManagerEvent,
   context: TaskNotificationContext
 ): Promise<void> {
-  if (event.type !== 'task:updated') {
-    return; // Only handle updates for now
+  // Handle task creation with assignment
+  if (event.type === 'task:created') {
+    const { task, context: taskContext } = event;
+
+    if (task.assignedTo && task.assignedTo !== taskContext.actor) {
+      const assigneeAgent = context.getAgent(task.assignedTo);
+      if (assigneeAgent) {
+        const message = `[LACE TASK SYSTEM] You have been assigned task '${task.id}':
+Title: "${task.title}"
+Created by: ${task.createdBy}
+Priority: ${task.priority}
+
+--- TASK DETAILS ---
+${task.prompt}
+--- END TASK DETAILS ---
+
+Use your task_add_note tool to record progress and task_complete when done.`;
+
+        await assigneeAgent.sendMessage(message);
+      }
+    }
+    return;
   }
 
-  const { task, previousTask, context: taskContext } = event;
+  // Handle task updates (existing completion logic)
+  if (event.type === 'task:updated') {
+    const { task, previousTask, context: taskContext } = event;
 
-  // Only handle completion notifications for now
-  if (
-    task.status === 'completed' &&
-    previousTask &&
-    previousTask.status !== 'completed' &&
-    task.createdBy !== taskContext.actor
-  ) {
-    const creatorAgent = context.getAgent(task.createdBy);
-    if (creatorAgent) {
-      const message = `Task '${task.id}' that you created has been completed by ${taskContext.actor}:
+    // Only handle completion notifications for now
+    if (
+      task.status === 'completed' &&
+      previousTask &&
+      previousTask.status !== 'completed' &&
+      task.createdBy !== taskContext.actor
+    ) {
+      const creatorAgent = context.getAgent(task.createdBy);
+      if (creatorAgent) {
+        const message = `Task '${task.id}' that you created has been completed by ${taskContext.actor}:
 Title: "${task.title}"
 Status: completed ✅
 
 You can now review the results or create follow-up tasks.`;
 
-      await creatorAgent.sendMessage(message);
+        await creatorAgent.sendMessage(message);
+      }
     }
   }
 }
