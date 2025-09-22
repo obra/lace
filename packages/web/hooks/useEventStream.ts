@@ -47,7 +47,7 @@ interface ProjectEvent {
   timestamp: Date;
 }
 
-interface AgentEvent {
+export interface AgentEvent {
   type: 'agent:spawned' | 'agent:started' | 'agent:stopped';
   taskId?: string;
   agentThreadId: string;

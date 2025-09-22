@@ -53,7 +53,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('path');
-      expect(result.content[0].text).toContain('Required');
+      expect(result.content[0].text).toContain('Missing required');
     });
 
     it('should reject empty path', async () => {
@@ -76,7 +76,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('content');
-      expect(result.content[0].text).toContain('Required');
+      expect(result.content[0].text).toContain('Missing required');
     });
 
     it('should reject non-string content', async () => {

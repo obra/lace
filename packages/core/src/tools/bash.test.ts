@@ -84,7 +84,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
 
       expect(result.status).not.toBe('completed');
       expect(result.content[0].text).toContain('ValidationError');
-      expect(result.content[0].text).toContain('Required');
+      expect(result.content[0].text).toContain('Missing required');
     });
   });
 

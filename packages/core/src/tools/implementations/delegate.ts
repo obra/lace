@@ -7,7 +7,6 @@ import { NonEmptyString } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 import type { TaskManager } from '~/tasks/task-manager';
 import type { Task, TaskContext } from '~/tasks/types';
-import { createNewAgentSpec } from '~/threads/types';
 import { logger } from '~/utils/logger';
 
 // Schema for bulk delegation - matches task_create format
@@ -65,7 +64,7 @@ Multiple delegations: delegate({ tasks: [
     title: "Analyze security vulnerabilities",
     prompt: "Review the codebase for potential security issues",
     expected_response: "List of vulnerabilities with severity and mitigation steps",
-    assignedTo: "new:security-analyst;smart"
+    assignedTo: "new:security-analyst;anthropic:claude-sonnet-4-20250514"
   }
 ]})`;
 

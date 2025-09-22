@@ -219,8 +219,8 @@ interface AgentSpawnedData {
   type: 'agent:spawned'; // For compatibility with existing handlers
   taskId?: string;
   agentThreadId: ThreadId;
-  provider: string;
-  model: string;
+  providerInstanceId: string;
+  modelId: string;
   context: {
     actor: string;
     isHuman: boolean;

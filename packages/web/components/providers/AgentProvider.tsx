@@ -13,7 +13,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import { useAgentManagement } from '@/hooks/useAgentManagement';
-import { useEventStream } from '@/hooks/useEventStream';
+import { useEventStream, type AgentEvent } from '@/hooks/useEventStream';
 import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import type { CreateAgentRequest } from '@/types/api';
@@ -85,7 +85,7 @@ export function AgentProvider({
     sessionId: sessionId || undefined,
     // No threadIds - we want session-level agent events
     onAgentSpawned: useCallback(
-      (agentEvent) => {
+      (agentEvent: AgentEvent) => {
         // Debounce rapid spawn events to coalesce into single refresh
         if (debouncedReloadRef.current) {
           clearTimeout(debouncedReloadRef.current);

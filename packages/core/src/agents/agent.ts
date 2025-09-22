@@ -855,24 +855,17 @@ export class Agent extends EventEmitter {
           errorMessage,
           errorStack: error instanceof Error ? error.stack : undefined,
           errorName: error instanceof Error ? error.name : undefined,
-          errorConstructor: error?.constructor?.name,
-          errorPrototype: Object.getPrototypeOf(error)?.constructor?.name,
+          errorConstructor: (error as { constructor?: { name?: string } })?.constructor?.name,
+          errorPrototype: error
+            ? (Object.getPrototypeOf(error) as { constructor?: { name?: string } })?.constructor
+                ?.name
+            : undefined,
           providerName: this.providerInstance?.providerName || 'missing',
           // Log all properties of the error object
           errorKeys: error ? Object.keys(error) : [],
           errorObject: JSON.stringify(error, null, 2),
           // Check for specific error properties that providers might set
-          errorCode: (error as any)?.code,
-          errorStatus: (error as any)?.status,
-          errorStatusCode: (error as any)?.statusCode,
-          errorResponse: (error as any)?.response,
-          errorData: (error as any)?.data,
-          errorDetails: (error as any)?.details,
-          errorType: (error as any)?.type,
-          errorParams: (error as any)?.params,
-          errorValidation: (error as any)?.validation,
-          errorToolName: (error as any)?.toolName,
-          errorToolCall: (error as any)?.toolCall,
+          ...this._extractErrorProperties(error),
         });
 
         // Check if this is a recoverable error that should be sent back to the model
@@ -1728,6 +1721,41 @@ export class Agent extends EventEmitter {
   }
 
   /**
+   * Safely extract error properties for logging without using any
+   */
+  private _extractErrorProperties(error: unknown): Record<string, unknown> {
+    if (!error || typeof error !== 'object') {
+      return {};
+    }
+
+    const result: Record<string, unknown> = {};
+    const errorObj = error as Record<string, unknown>;
+
+    // Common error properties to extract
+    const propertiesToCheck = [
+      'code',
+      'status',
+      'statusCode',
+      'response',
+      'data',
+      'details',
+      'type',
+      'params',
+      'validation',
+      'toolName',
+      'toolCall',
+    ];
+
+    for (const prop of propertiesToCheck) {
+      if (prop in errorObj) {
+        result[`error${prop.charAt(0).toUpperCase()}${prop.slice(1)}`] = errorObj[prop];
+      }
+    }
+
+    return result;
+  }
+
+  /**
    * Check if an error is recoverable by sending it back to the model
    * This includes tool validation errors and other 400-level errors that the model can correct
    */
@@ -1736,7 +1764,7 @@ export class Agent extends EventEmitter {
       return false;
     }
 
-    const errorObj = error as any;
+    const errorObj = error as Record<string, unknown>;
 
     // Check for OpenAI APIError structure
     // status: HTTP status code
@@ -1749,7 +1777,7 @@ export class Agent extends EventEmitter {
     }
 
     // Check by constructor name as fallback (for when instanceof isn't available)
-    const constructorName = errorObj.constructor?.name;
+    const constructorName = (errorObj.constructor as { name?: string })?.name;
     if (constructorName === 'BadRequestError') {
       return true;
     }

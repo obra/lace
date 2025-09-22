@@ -55,7 +55,7 @@ Follows redirects by default. Returns detailed error context for failures.`
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
-      expect(result.content[0].text).toContain('Required');
+      expect(result.content[0].text).toContain('Missing required');
     });
 
     it('should reject empty URL', async () => {

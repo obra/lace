@@ -13,7 +13,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import { useSessionManagement } from '@/hooks/useSessionManagement';
-import { useEventStream } from '@/hooks/useEventStream';
+import { useEventStream, type AgentEvent } from '@/hooks/useEventStream';
 import type { SessionInfo, ThreadId, LaceEvent } from '@/types/core';
 
 // Types for session context
@@ -102,7 +102,7 @@ export function SessionProvider({
       void reloadSessions();
     }, [reloadSessions]),
     onAgentSpawned: useCallback(
-      (agentEvent) => {
+      (agentEvent: AgentEvent) => {
         // When an agent is spawned, reload sessions to get updated agents list
         void reloadSessions();
       },

@@ -101,7 +101,7 @@ describe('FileReadTool', () => {
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
-      expect(result.content[0].text).toContain('path: Required');
+      expect(result.content[0].text).toContain('Missing required: path');
     });
 
     it('should handle empty path parameter', async () => {

@@ -166,8 +166,8 @@ describe('Task Agent Spawning with Personas', () => {
     expect(eventListener).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'agent:spawned',
-        provider: 'anthropic',
-        model: 'claude-3-sonnet',
+        providerInstanceId: 'anthropic',
+        modelId: 'claude-3-sonnet',
         agentThreadId: expect.stringMatching(/^lace_20250904_test01\.\d+$/) as string,
       })
     );

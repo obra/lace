@@ -1,33 +1,23 @@
 // ABOUTME: Tests for unified delegate tool API matching task_create format
-// ABOUTME: Verifies delegate accepts array format and NewAgentSpec assignTo parameter
+// ABOUTME: Verifies delegate accepts array format and NewAgentSpec assignedTo parameter
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { ToolContext } from '~/tools/types';
 import { Agent } from '~/agents/agent';
 import { Session } from '~/sessions/session';
 import { TaskManager } from '~/tasks/task-manager';
 import { asThreadId } from '~/threads/types';
-import { DatabasePersistence } from '~/persistence/database';
-import * as path from 'path';
-import * as os from 'os';
-import * as fs from 'fs';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 
 describe('Unified Delegate API', () => {
-  let tempDir: string;
-  let dbPath: string;
-  let persistence: DatabasePersistence;
+  const _tempLaceDir = setupCoreTest();
   let delegateTool: DelegateTool;
   let mockAgent: Agent;
   let mockSession: Session;
   let mockTaskManager: TaskManager;
 
   beforeEach(() => {
-    // Create temp directory for tests
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'delegate-unified-test-'));
-    dbPath = path.join(tempDir, 'test.db');
-    persistence = new DatabasePersistence(dbPath);
-
     // Create mock TaskManager
     mockTaskManager = {
       createTask: vi.fn().mockResolvedValue({
@@ -54,12 +44,6 @@ describe('Unified Delegate API', () => {
     delegateTool = new DelegateTool();
   });
 
-  afterEach(() => {
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
-  });
-
   it('accepts array format matching task_create', async () => {
     const args = {
       tasks: [
@@ -67,14 +51,13 @@ describe('Unified Delegate API', () => {
           title: 'Analyze test failures',
           prompt: 'Review the test output',
           expected_response: 'List of failing tests',
-          assignTo: 'new:lace;fast',
+          assignedTo: 'new:lace;fast',
         },
       ],
     };
 
     const context: ToolContext = {
       signal: new AbortController().signal,
-      workingDirectory: tempDir,
       agent: mockAgent,
     };
 
@@ -116,20 +99,19 @@ describe('Unified Delegate API', () => {
           title: 'Task 1',
           prompt: 'First task',
           expected_response: 'Response 1',
-          assignTo: 'new:lace;fast',
+          assignedTo: 'new:lace;fast',
         },
         {
           title: 'Task 2',
           prompt: 'Second task',
           expected_response: 'Response 2',
-          assignTo: 'new:analyst;smart',
+          assignedTo: 'new:analyst;smart',
         },
       ],
     };
 
     const context: ToolContext = {
       signal: new AbortController().signal,
-      workingDirectory: tempDir,
       agent: mockAgent,
     };
 
@@ -182,28 +164,27 @@ describe('Unified Delegate API', () => {
     expect(mockTaskManager.createTask).toHaveBeenCalledTimes(2);
   });
 
-  it('validates assignTo format', async () => {
+  it('validates assignedTo format', async () => {
     const args = {
       tasks: [
         {
           title: 'Invalid task',
           prompt: 'Test prompt',
           expected_response: 'Test response',
-          assignTo: 'invalid-format', // Not a NewAgentSpec
+          assignedTo: 'invalid-format', // Not a NewAgentSpec
         },
       ],
     };
 
     const context: ToolContext = {
       signal: new AbortController().signal,
-      workingDirectory: tempDir,
       agent: mockAgent,
     };
 
     const result = await delegateTool.execute(args, context);
 
     expect(result.status).toBe('failed');
-    expect(result.content[0].text).toContain('Invalid assignTo format');
+    expect(result.content[0].text).toContain('Invalid assignedTo format');
     expect(result.content[0].text).toContain('Must be "new:persona[;modelSpec]"');
   });
 
@@ -216,21 +197,20 @@ describe('Unified Delegate API', () => {
       'new:coding-agent;openai:gpt-4',
     ];
 
-    for (const assignTo of testCases) {
+    for (const assignedTo of testCases) {
       const args = {
         tasks: [
           {
-            title: `Test with ${assignTo}`,
+            title: `Test with ${assignedTo}`,
             prompt: 'Test prompt',
             expected_response: 'Test response',
-            assignTo,
+            assignedTo,
           },
         ],
       };
 
       const context: ToolContext = {
         signal: new AbortController().signal,
-        workingDirectory: tempDir,
         agent: mockAgent,
       };
 
@@ -256,7 +236,7 @@ describe('Unified Delegate API', () => {
       expect(result.status).toBe('completed');
       expect(mockTaskManager.createTask).toHaveBeenCalledWith(
         expect.objectContaining({
-          assignedTo: assignTo,
+          assignedTo: assignedTo,
         }),
         expect.any(Object)
       );

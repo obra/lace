@@ -177,7 +177,7 @@ export abstract class Tool {
     };
   }
 
-  private formatValidationError(error: ZodError, args?: unknown): ToolResult {
+  private formatValidationError(error: ZodError, _args?: unknown): ToolResult {
     const issues: string[] = [];
     const missingParams: string[] = [];
     const typeErrors: string[] = [];
@@ -197,8 +197,8 @@ export abstract class Tool {
         missingParams.push(path);
       } else if (issue.code === 'unrecognized_keys') {
         // Handle strict mode errors - Zod provides the unexpected keys
-        const keys = (issue as any).keys as string[];
-        unexpectedParams.push(...keys);
+        const zodIssue = issue as { keys: string[] };
+        unexpectedParams.push(...zodIssue.keys);
       } else {
         issues.push(`${path}: ${issue.message}`);
       }

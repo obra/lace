@@ -65,7 +65,7 @@ export class TaskManager extends EventEmitter {
 
     // Handle agent spawning if assigned to "new:persona:provider/model"
     if (task.assignedTo && isNewAgentSpec(task.assignedTo)) {
-      await this.handleAgentSpawning(task);
+      await this.handleAgentSpawning(task, context);
     }
 
     // Save to database
@@ -139,7 +139,7 @@ export class TaskManager extends EventEmitter {
 
     // Handle agent spawning if assignedTo is being updated to "new:persona:provider/model"
     if (updates.assignedTo && isNewAgentSpec(updates.assignedTo)) {
-      await this.handleAgentSpawning(updatedTask);
+      await this.handleAgentSpawning(updatedTask, context);
       // handleAgentSpawning modifies updatedTask.assignedTo to the spawned agent thread ID
       // Update our database with the final task state including the spawned agent assignment
       await this.persistence.updateTask(taskId, {
@@ -299,7 +299,7 @@ export class TaskManager extends EventEmitter {
    * Handle agent spawning for tasks assigned to "new:persona[;modelSpec]"
    * Updates the task's assignedTo field with the actual agent thread ID
    */
-  private async handleAgentSpawning(task: Task): Promise<void> {
+  private async handleAgentSpawning(task: Task, taskContext: TaskContext): Promise<void> {
     if (!task.assignedTo || !isNewAgentSpec(task.assignedTo)) {
       return;
     }
@@ -338,8 +338,12 @@ export class TaskManager extends EventEmitter {
         type: 'agent:spawned',
         taskId: task.id,
         agentThreadId,
-        provider: providerInstanceId,
-        model: modelId,
+        providerInstanceId: providerInstanceId,
+        modelId: modelId,
+        context: {
+          actor: taskContext.actor,
+          isHuman: taskContext.isHuman,
+        },
         timestamp: new Date(),
       });
     } catch (error) {

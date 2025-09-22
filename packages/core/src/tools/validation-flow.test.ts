@@ -1,7 +1,7 @@
 // ABOUTME: Integration tests for tool validation error flow to model
 // ABOUTME: Ensures validation errors create proper TOOL_RESULT events for model trajectory adjustment
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { z } from 'zod';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
@@ -89,7 +89,7 @@ describe('Tool Validation Flow to Model', () => {
       },
     };
 
-    const agent = new Agent(agentConfig);
+    const _agent = new Agent(agentConfig);
 
     // Try to execute tool with invalid parameters
     const invalidToolCall = {

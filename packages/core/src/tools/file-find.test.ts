@@ -75,7 +75,7 @@ describe('FileFindTool with schema validation', () => {
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('pattern');
-      expect(result.content[0].text).toContain('Required');
+      expect(result.content[0].text).toContain('Missing required');
     });
 
     it('should reject empty pattern', async () => {
@@ -123,7 +123,7 @@ describe('FileFindTool with schema validation', () => {
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
-      expect(result.content[0].text).toContain('Must be an integer');
+      expect(result.content[0].text).toContain('Expected integer, got float');
     });
 
     it('should reject excessive maxResults', async () => {

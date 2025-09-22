@@ -1,9 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import type {
-  TaskNotification,
-  TaskNotificationContext,
-  NotificationTarget,
-} from './task-notifications';
+import type { TaskNotification } from './task-notifications';
 import { routeTaskNotifications } from './task-notifications';
 import { asThreadId } from '~/threads/types';
 

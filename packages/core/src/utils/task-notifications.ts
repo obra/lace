@@ -2,7 +2,7 @@
 // ABOUTME: Defines interfaces and types used by notification utilities
 
 import type { ThreadId } from '~/threads/types';
-import type { Task, TaskNote, TaskContext } from '~/tasks/types';
+import type { Task, TaskContext } from '~/tasks/types';
 import type { Agent } from '~/agents/agent';
 
 export interface TaskNotification {
@@ -35,7 +35,7 @@ export async function routeTaskNotifications(
     const { task, context: taskContext } = event;
 
     if (task.assignedTo && task.assignedTo !== taskContext.actor) {
-      const assigneeAgent = context.getAgent(task.assignedTo);
+      const assigneeAgent = context.getAgent(task.assignedTo as ThreadId);
       if (assigneeAgent) {
         const message = `[LACE TASK SYSTEM] You have been assigned task '${task.id}':
 Title: "${task.title}"
@@ -60,7 +60,7 @@ Use your task_add_note tool to record progress and task_complete when done.`;
 
     // For now, just notify on completion status (we'll fix this in Phase 2)
     if (task.status === 'completed' && task.createdBy !== taskContext.actor) {
-      const creatorAgent = context.getAgent(task.createdBy);
+      const creatorAgent = context.getAgent(task.createdBy as ThreadId);
       if (creatorAgent) {
         const message = `Task '${task.id}' that you created has been completed by ${taskContext.actor}:
 Title: "${task.title}"
