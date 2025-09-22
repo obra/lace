@@ -163,6 +163,13 @@ describe('Task Notification Routing', () => {
       expect.stringContaining('[LACE TASK SYSTEM]')
     );
     expect(mockNewAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('assigned'));
+
+    // Verify old assignee was notified about reassignment
+    expect(mockGetAgent).toHaveBeenCalledWith(oldAssignee);
+    expect(mockOldAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('reassigned'));
+    expect(mockOldAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('no longer responsible')
+    );
   });
 
   it('should notify creator when assignee starts working', async () => {
@@ -427,5 +434,190 @@ describe('Task Notification Routing', () => {
     // Should not notify assignee when they created and assigned to themselves
     expect(mockGetAgent).not.toHaveBeenCalled();
     expect(mockAgent.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('should notify creator when significant note is added by assignee', async () => {
+    const mockAgent = {
+      sendMessage: vi.fn().mockResolvedValue(undefined),
+    };
+    const mockGetAgent = vi.fn().mockReturnValue(mockAgent);
+
+    const taskEvent = {
+      type: 'task:note_added' as const,
+      task: {
+        id: 'task_with_note',
+        title: 'Task With Progress Update',
+        status: 'in_progress' as const,
+        createdBy: creatorAgent,
+        assignedTo: assigneeAgent,
+        prompt: 'Complete this work',
+        priority: 'high' as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        notes: [
+          {
+            id: 'note_123',
+            author: assigneeAgent,
+            content:
+              'I have completed the initial analysis and found several issues that need to be addressed',
+            timestamp: new Date(),
+          },
+        ],
+      },
+      context: { actor: assigneeAgent },
+      timestamp: new Date(),
+    };
+
+    await routeTaskNotifications(taskEvent, {
+      getAgent: mockGetAgent,
+      sessionId,
+    });
+
+    // Verify creator was notified about the note
+    expect(mockGetAgent).toHaveBeenCalledWith(creatorAgent);
+    expect(mockAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('New note added'));
+    expect(mockAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('completed the initial analysis')
+    );
+  });
+
+  it('should not notify creator for trivial notes (<=50 chars)', async () => {
+    const mockAgent = {
+      sendMessage: vi.fn().mockResolvedValue(undefined),
+    };
+    const mockGetAgent = vi.fn().mockReturnValue(mockAgent);
+
+    const taskEvent = {
+      type: 'task:note_added' as const,
+      task: {
+        id: 'task_trivial_note',
+        title: 'Task With Short Note',
+        status: 'in_progress' as const,
+        createdBy: creatorAgent,
+        assignedTo: assigneeAgent,
+        prompt: 'Do work',
+        priority: 'medium' as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        notes: [
+          {
+            id: 'note_short',
+            author: assigneeAgent,
+            content: 'Started working on this',
+            timestamp: new Date(),
+          },
+        ],
+      },
+      context: { actor: assigneeAgent },
+      timestamp: new Date(),
+    };
+
+    await routeTaskNotifications(taskEvent, {
+      getAgent: mockGetAgent,
+      sessionId,
+    });
+
+    // Should not notify for short notes
+    expect(mockGetAgent).not.toHaveBeenCalled();
+    expect(mockAgent.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('should not notify creator when they add their own note', async () => {
+    const mockAgent = {
+      sendMessage: vi.fn().mockResolvedValue(undefined),
+    };
+    const mockGetAgent = vi.fn().mockReturnValue(mockAgent);
+
+    const taskEvent = {
+      type: 'task:note_added' as const,
+      task: {
+        id: 'task_self_note',
+        title: 'Task With Creator Note',
+        status: 'in_progress' as const,
+        createdBy: creatorAgent,
+        assignedTo: assigneeAgent,
+        prompt: 'Important task',
+        priority: 'high' as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        notes: [
+          {
+            id: 'note_creator',
+            author: creatorAgent,
+            content:
+              'I am adding this important note about the requirements that need to be considered',
+            timestamp: new Date(),
+          },
+        ],
+      },
+      context: { actor: creatorAgent },
+      timestamp: new Date(),
+    };
+
+    await routeTaskNotifications(taskEvent, {
+      getAgent: mockGetAgent,
+      sessionId,
+    });
+
+    // Should not notify creator about their own notes
+    expect(mockGetAgent).not.toHaveBeenCalled();
+    expect(mockAgent.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('should not notify old assignee when they initiated the reassignment', async () => {
+    const oldAssignee = asThreadId('lace_20250922_test01.3');
+    const mockNewAgent = {
+      sendMessage: vi.fn().mockResolvedValue(undefined),
+    };
+    const mockOldAgent = {
+      sendMessage: vi.fn().mockResolvedValue(undefined),
+    };
+    const mockGetAgent = vi.fn().mockImplementation((id) => {
+      if (id === assigneeAgent) return mockNewAgent;
+      if (id === oldAssignee) return mockOldAgent;
+      return null;
+    });
+
+    const taskEvent = {
+      type: 'task:updated' as const,
+      task: {
+        id: 'task_self_reassign',
+        title: 'Self Reassigned Task',
+        status: 'in_progress' as const,
+        createdBy: creatorAgent,
+        assignedTo: assigneeAgent,
+        prompt: 'Work to transfer',
+        priority: 'medium' as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        notes: [],
+      },
+      previousTask: {
+        id: 'task_self_reassign',
+        title: 'Self Reassigned Task',
+        status: 'in_progress' as const,
+        createdBy: creatorAgent,
+        assignedTo: oldAssignee,
+        prompt: 'Work to transfer',
+        priority: 'medium' as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        notes: [],
+      },
+      context: { actor: oldAssignee },
+      timestamp: new Date(),
+    };
+
+    await routeTaskNotifications(taskEvent, {
+      getAgent: mockGetAgent,
+      sessionId,
+    });
+
+    // New assignee should be notified
+    expect(mockGetAgent).toHaveBeenCalledWith(assigneeAgent);
+    expect(mockNewAgent.sendMessage).toHaveBeenCalled();
+
+    // Old assignee should NOT be notified when they initiated the reassignment
+    expect(mockOldAgent.sendMessage).not.toHaveBeenCalled();
   });
 });

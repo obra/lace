@@ -2,7 +2,7 @@
 // ABOUTME: Defines interfaces and types used by notification utilities
 
 import type { ThreadId } from '~/threads/types';
-import type { Task, TaskContext } from '~/tasks/types';
+import type { Task, TaskContext, TaskNote } from '~/tasks/types';
 import type { Agent } from '~/agents/agent';
 
 export interface TaskNotification {
@@ -90,87 +90,180 @@ function getStatusDescription(status: string): string {
   }
 }
 
+// Analysis functions to determine who should be notified
+function analyzeTaskEventForNotifications(
+  event: TaskManagerEvent,
+  previousTask?: Task
+): TaskNotification[] {
+  switch (event.type) {
+    case 'task:created':
+      return analyzeTaskCreation(event.task, event.context);
+    case 'task:updated':
+      return analyzeTaskUpdate(event.task, previousTask, event.context);
+    case 'task:note_added':
+      return analyzeNoteAdded(event.task, event.context);
+    default:
+      return [];
+  }
+}
+
+function analyzeTaskCreation(task: Task, context: TaskContext): TaskNotification[] {
+  const notifications: TaskNotification[] = [];
+
+  // Notify assignee if they didn't create the task
+  if (task.assignedTo && task.assignedTo !== context.actor) {
+    notifications.push({
+      threadId: task.assignedTo as ThreadId,
+      message: formatTaskAssignment(task),
+      notificationType: 'assignment',
+      taskId: task.id,
+      priority: 'immediate',
+    });
+  }
+
+  return notifications;
+}
+
+function analyzeTaskUpdate(
+  task: Task,
+  previousTask: Task | undefined,
+  context: TaskContext
+): TaskNotification[] {
+  const notifications: TaskNotification[] = [];
+
+  if (!previousTask) {
+    return notifications;
+  }
+
+  const statusChanged = previousTask.status !== task.status;
+  const assigneeChanged = previousTask.assignedTo !== task.assignedTo;
+
+  // Completion notification
+  if (statusChanged && task.status === 'completed' && task.createdBy !== context.actor) {
+    notifications.push({
+      threadId: task.createdBy as ThreadId,
+      message: formatCompletionNotification(task, context.actor as ThreadId),
+      notificationType: 'completion',
+      taskId: task.id,
+      priority: 'immediate',
+    });
+  }
+
+  // Status change notifications (in_progress, blocked)
+  if (statusChanged && task.createdBy !== context.actor) {
+    if (previousTask.status === 'pending' && task.status === 'in_progress') {
+      notifications.push({
+        threadId: task.createdBy as ThreadId,
+        message: formatStatusChangeNotification(task, 'in_progress', context.actor as ThreadId),
+        notificationType: 'status_change',
+        taskId: task.id,
+        priority: 'immediate',
+      });
+    } else if (task.status === 'blocked') {
+      notifications.push({
+        threadId: task.createdBy as ThreadId,
+        message: formatStatusChangeNotification(task, 'blocked', context.actor as ThreadId),
+        notificationType: 'status_change',
+        taskId: task.id,
+        priority: 'immediate',
+      });
+    }
+  }
+
+  // Reassignment notifications
+  if (assigneeChanged) {
+    // Notify new assignee if they didn't cause the change
+    if (task.assignedTo && task.assignedTo !== context.actor) {
+      notifications.push({
+        threadId: task.assignedTo as ThreadId,
+        message: formatTaskAssignment(task),
+        notificationType: 'assignment',
+        taskId: task.id,
+        priority: 'immediate',
+      });
+    }
+
+    // Notify old assignee about reassignment
+    if (previousTask.assignedTo && previousTask.assignedTo !== context.actor) {
+      notifications.push({
+        threadId: previousTask.assignedTo as ThreadId,
+        message: formatReassignmentNotification(task, previousTask.assignedTo as ThreadId),
+        notificationType: 'assignment',
+        taskId: task.id,
+        priority: 'background',
+      });
+    }
+  }
+
+  return notifications;
+}
+
+function analyzeNoteAdded(task: Task, context: TaskContext): TaskNotification[] {
+  const notifications: TaskNotification[] = [];
+
+  // Get the most recent note (assuming it's the one just added)
+  const latestNote = task.notes && task.notes.length > 0 ? task.notes[task.notes.length - 1] : null;
+
+  if (!latestNote) {
+    return notifications;
+  }
+
+  // Only notify for significant notes (>50 chars)
+  if (latestNote.content.length <= 50) {
+    return notifications;
+  }
+
+  // Don't notify creator if they added the note
+  if (task.createdBy === context.actor) {
+    return notifications;
+  }
+
+  notifications.push({
+    threadId: task.createdBy as ThreadId,
+    message: formatNoteNotification(task, latestNote, context.actor as ThreadId),
+    notificationType: 'note_added',
+    taskId: task.id,
+    priority: 'background',
+  });
+
+  return notifications;
+}
+
+// Additional formatting functions
+function formatReassignmentNotification(task: Task, oldAssignee: ThreadId): string {
+  return `Task '${task.id}' has been reassigned:
+Title: "${task.title}"
+New assignee: ${task.assignedTo || 'unassigned'}
+
+You are no longer responsible for this task.`;
+}
+
+function formatNoteNotification(task: Task, note: TaskNote, author: ThreadId): string {
+  return `New note added to task '${task.id}' by ${author}:
+Title: "${task.title}"
+
+--- NOTE ---
+${note.content}
+--- END NOTE ---
+
+Review the progress update above.`;
+}
+
 export async function routeTaskNotifications(
   event: TaskManagerEvent,
   context: TaskNotificationContext
 ): Promise<void> {
-  // Handle task creation with assignment
-  if (event.type === 'task:created') {
-    const { task, context: taskContext } = event;
+  // Analyze event to determine notifications
+  const notifications = analyzeTaskEventForNotifications(
+    event,
+    event.type === 'task:updated' ? event.previousTask : undefined
+  );
 
-    if (task.assignedTo && task.assignedTo !== taskContext.actor) {
-      const assigneeAgent = context.getAgent(task.assignedTo as ThreadId);
-      if (assigneeAgent) {
-        const message = formatTaskAssignment({ ...task, status: task.status || 'pending' } as Task);
-        await assigneeAgent.sendMessage(message);
-      }
-    }
-    return;
-  }
-
-  // Handle task updates with proper change detection
-  if (event.type === 'task:updated') {
-    const { task, previousTask, context: taskContext } = event;
-
-    // Skip if there's no previous task (can't detect changes)
-    if (!previousTask) {
-      return;
-    }
-
-    // Check if status actually changed
-    const statusChanged = previousTask.status !== task.status;
-
-    // Detect completion (status changed to completed)
-    if (statusChanged && task.status === 'completed' && task.createdBy !== taskContext.actor) {
-      const creatorAgent = context.getAgent(task.createdBy as ThreadId);
-      if (creatorAgent) {
-        const message = formatCompletionNotification(task, taskContext.actor as ThreadId);
-        await creatorAgent.sendMessage(message);
-      }
-    }
-
-    // Detect start of work (pending → in_progress)
-    if (
-      statusChanged &&
-      previousTask.status === 'pending' &&
-      task.status === 'in_progress' &&
-      task.createdBy !== taskContext.actor
-    ) {
-      const creatorAgent = context.getAgent(task.createdBy as ThreadId);
-      if (creatorAgent) {
-        const message = formatStatusChangeNotification(
-          task,
-          'in_progress',
-          taskContext.actor as ThreadId
-        );
-        await creatorAgent.sendMessage(message);
-      }
-    }
-
-    // Detect blocked status
-    if (statusChanged && task.status === 'blocked' && task.createdBy !== taskContext.actor) {
-      const creatorAgent = context.getAgent(task.createdBy as ThreadId);
-      if (creatorAgent) {
-        const message = formatStatusChangeNotification(
-          task,
-          'blocked',
-          taskContext.actor as ThreadId
-        );
-        await creatorAgent.sendMessage(message);
-      }
-    }
-
-    // Detect reassignment (assignedTo changed)
-    if (
-      previousTask.assignedTo !== task.assignedTo &&
-      task.assignedTo &&
-      task.assignedTo !== taskContext.actor
-    ) {
-      const newAssigneeAgent = context.getAgent(task.assignedTo as ThreadId);
-      if (newAssigneeAgent) {
-        const message = formatTaskAssignment(task);
-        await newAssigneeAgent.sendMessage(message);
-      }
+  // Send all notifications
+  for (const notification of notifications) {
+    const agent = context.getAgent(notification.threadId);
+    if (agent) {
+      await agent.sendMessage(notification.message);
     }
   }
 }

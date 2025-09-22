@@ -1361,6 +1361,7 @@ Use your task_add_note tool to record important notes as you work and your task_
   private setupTaskNotificationRouting(): void {
     this._taskManager.on('task:updated', this.handleTaskUpdate.bind(this));
     this._taskManager.on('task:created', this.handleTaskCreated.bind(this));
+    this._taskManager.on('task:note_added', this.handleTaskNoteAdded.bind(this));
   }
 
   private async handleTaskUpdate(event: TaskManagerEvent): Promise<void> {
@@ -1371,6 +1372,13 @@ Use your task_add_note tool to record important notes as you work and your task_
   }
 
   private async handleTaskCreated(event: TaskManagerEvent): Promise<void> {
+    await routeTaskNotifications(event, {
+      getAgent: (id: ThreadId) => this._agents.get(id) || null,
+      sessionId: this._sessionId,
+    });
+  }
+
+  private async handleTaskNoteAdded(event: TaskManagerEvent): Promise<void> {
     await routeTaskNotifications(event, {
       getAgent: (id: ThreadId) => this._agents.get(id) || null,
       sessionId: this._sessionId,
