@@ -847,13 +847,79 @@ export class Agent extends EventEmitter {
           return;
         }
 
-        logger.error('AGENT: Provider error', {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        // Log EVERYTHING about this error to understand its structure
+        logger.error('AGENT: Provider error - FULL DETAILS', {
           threadId: this._threadId,
-          errorMessage: error instanceof Error ? error.message : String(error),
+          errorMessage,
           errorStack: error instanceof Error ? error.stack : undefined,
+          errorName: error instanceof Error ? error.name : undefined,
+          errorConstructor: error?.constructor?.name,
+          errorPrototype: Object.getPrototypeOf(error)?.constructor?.name,
           providerName: this.providerInstance?.providerName || 'missing',
+          // Log all properties of the error object
+          errorKeys: error ? Object.keys(error) : [],
+          errorObject: JSON.stringify(error, null, 2),
+          // Check for specific error properties that providers might set
+          errorCode: (error as any)?.code,
+          errorStatus: (error as any)?.status,
+          errorStatusCode: (error as any)?.statusCode,
+          errorResponse: (error as any)?.response,
+          errorData: (error as any)?.data,
+          errorDetails: (error as any)?.details,
+          errorType: (error as any)?.type,
+          errorParams: (error as any)?.params,
+          errorValidation: (error as any)?.validation,
+          errorToolName: (error as any)?.toolName,
+          errorToolCall: (error as any)?.toolCall,
         });
 
+        // Check if this is a recoverable error that should be sent back to the model
+        const isRecoverableError = this._isRecoverableProviderError(error);
+
+        if (isRecoverableError) {
+          // For recoverable errors (like tool validation), continue the conversation
+          // by adding an AGENT_MESSAGE with the error so the model can correct itself
+          logger.info('AGENT: Recoverable provider error, continuing conversation', {
+            threadId: this._threadId,
+            errorMessage,
+          });
+
+          // Create an AGENT_MESSAGE event with the validation error
+          // This allows the model to see the error and correct its tool usage
+          const errorResponseContent = `I encountered a validation error when trying to use a tool:\n\n${errorMessage}\n\nI need to correct the parameters and try again.`;
+
+          this._addEventAndEmit({
+            type: 'AGENT_MESSAGE',
+            data: {
+              content: errorResponseContent,
+              // No token usage for error messages
+            },
+            context: { threadId: this._threadId },
+          });
+
+          // Complete the turn
+          this._completeTurn();
+
+          // Request the next turn to let the model correct itself
+          // Schedule for next tick to avoid deep recursion
+          setImmediate(() => {
+            if (this._state === 'idle' && !this._abortController?.signal.aborted) {
+              // Call _processConversation again to continue
+              this._processConversation().catch((requestError: unknown) => {
+                logger.error('AGENT: Failed to request correction after validation error', {
+                  threadId: this._threadId,
+                  error:
+                    requestError instanceof Error ? requestError.message : String(requestError),
+                });
+              });
+            }
+          });
+          return;
+        }
+
+        // For other provider errors, emit error and stop
         this._emitError(error, {
           phase: 'provider_response',
           threadId: this._threadId,
@@ -1659,6 +1725,36 @@ export class Agent extends EventEmitter {
         }
       }
     }
+  }
+
+  /**
+   * Check if an error is recoverable by sending it back to the model
+   * This includes tool validation errors and other 400-level errors that the model can correct
+   */
+  private _isRecoverableProviderError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    const errorObj = error as any;
+
+    // Check for OpenAI APIError structure
+    // status: HTTP status code
+    // code: Error code like 'invalid_request_error'
+    // error: Object with error details
+    if (typeof errorObj.status === 'number' && errorObj.status === 400) {
+      // Any 400 BadRequestError is potentially recoverable
+      // The model can see the error and adjust its approach
+      return true;
+    }
+
+    // Check by constructor name as fallback (for when instanceof isn't available)
+    const constructorName = errorObj.constructor?.name;
+    if (constructorName === 'BadRequestError') {
+      return true;
+    }
+
+    return false;
   }
 
   /**
