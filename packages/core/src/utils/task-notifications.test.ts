@@ -42,6 +42,18 @@ describe('Task Notification Routing', () => {
         updatedAt: new Date(),
         notes: [],
       },
+      previousTask: {
+        id: 'task_123',
+        title: 'Test Task',
+        status: 'in_progress' as const,
+        createdBy: creatorAgent,
+        assignedTo: assigneeAgent,
+        prompt: 'Do something important',
+        priority: 'medium' as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        notes: [],
+      },
       context: { actor: assigneeAgent },
       timestamp: new Date(),
     };

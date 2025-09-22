@@ -35,6 +35,8 @@ import { MCPServerManager } from '~/mcp/server-manager';
 import type { MCPServerConnection, MCPServerConfig } from '~/config/mcp-types';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
+import type { TaskManagerEvent } from '~/utils/task-notifications';
+import { routeTaskNotifications } from '~/utils/task-notifications';
 
 export interface SessionInfo {
   id: ThreadId;
@@ -69,6 +71,9 @@ export class Session {
 
     // Create session-scoped MCP server manager
     this._mcpServerManager = new MCPServerManager();
+
+    // Set up task notification routing
+    this.setupTaskNotificationRouting();
   }
 
   static create(options: {
@@ -1351,5 +1356,24 @@ Use your task_add_note tool to record important notes as you work and your task_
    */
   static getRegistrySize(): number {
     return Session._sessionRegistry.size;
+  }
+
+  private setupTaskNotificationRouting(): void {
+    this._taskManager.on('task:updated', this.handleTaskUpdate.bind(this));
+    this._taskManager.on('task:created', this.handleTaskCreated.bind(this));
+  }
+
+  private async handleTaskUpdate(event: TaskManagerEvent): Promise<void> {
+    await routeTaskNotifications(event, {
+      getAgent: (id: ThreadId) => this._agents.get(id) || null,
+      sessionId: this._sessionId,
+    });
+  }
+
+  private async handleTaskCreated(event: TaskManagerEvent): Promise<void> {
+    await routeTaskNotifications(event, {
+      getAgent: (id: ThreadId) => this._agents.get(id) || null,
+      sessionId: this._sessionId,
+    });
   }
 }
