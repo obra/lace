@@ -11,20 +11,24 @@ import { logger } from '~/utils/logger';
 import { TaskStatusSchema } from '~/tasks/task-status';
 
 // Simple schema that always takes an array of tasks
-const createTaskSchema = z.object({
-  tasks: z
-    .array(
-      z.object({
-        title: z.string().min(1).max(200),
-        description: z.string().max(1000).optional(),
-        prompt: z.string().min(1),
-        priority: z.enum(['high', 'medium', 'low'] as const).default('medium'),
-        assignedTo: z.string().optional().describe('Thread ID or "new:persona:provider/model"'),
-      })
-    )
-    .min(1, 'Must provide at least 1 task')
-    .max(20, 'Cannot create more than 20 tasks at once'),
-});
+const createTaskSchema = z
+  .object({
+    tasks: z
+      .array(
+        z
+          .object({
+            title: z.string().min(1).max(200),
+            description: z.string().max(1000).optional(),
+            prompt: z.string().min(1),
+            priority: z.enum(['high', 'medium', 'low'] as const).default('medium'),
+            assignedTo: z.string().optional().describe('Thread ID or "new:persona:provider/model"'),
+          })
+          .strict() // Reject unknown properties to match JSON schema
+      )
+      .min(1, 'Must provide at least 1 task')
+      .max(20, 'Cannot create more than 20 tasks at once'),
+  })
+  .strict(); // Reject unknown properties at root level too
 
 export class TaskCreateTool extends Tool {
   name = 'task_add';

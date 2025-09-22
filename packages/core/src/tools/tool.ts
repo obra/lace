@@ -53,7 +53,7 @@ export abstract class Tool {
       return await this.executeValidated(validated, context);
     } catch (error) {
       if (error instanceof ZodError) {
-        return this.formatValidationError(error);
+        return this.formatValidationError(error, args);
       }
       throw error;
     }
@@ -177,21 +177,56 @@ export abstract class Tool {
     };
   }
 
-  private formatValidationError(error: ZodError): ToolResult {
-    const issues = error.issues
-      .map((issue) => {
-        const path = issue.path.length > 0 ? issue.path.join('.') : 'root';
-        return `${path}: ${issue.message}`;
-      })
-      .join('; ');
+  private formatValidationError(error: ZodError, args?: unknown): ToolResult {
+    const issues: string[] = [];
+    const missingParams: string[] = [];
+    const typeErrors: string[] = [];
+    const unexpectedParams: string[] = [];
+
+    // Categorize errors
+    for (const issue of error.issues) {
+      const path = issue.path.join('.') || 'root';
+
+      if (issue.code === 'invalid_type') {
+        if (issue.received === 'undefined') {
+          missingParams.push(path);
+        } else {
+          typeErrors.push(`${path}: Expected ${issue.expected}, got ${issue.received}`);
+        }
+      } else if (issue.message === 'Required') {
+        missingParams.push(path);
+      } else if (issue.code === 'unrecognized_keys') {
+        // Handle strict mode errors - Zod provides the unexpected keys
+        const keys = (issue as any).keys as string[];
+        unexpectedParams.push(...keys);
+      } else {
+        issues.push(`${path}: ${issue.message}`);
+      }
+    }
+
+    // Build concise error message
+    const errorParts: string[] = [`ValidationError: ${this.name} failed`];
+
+    if (missingParams.length > 0) {
+      errorParts.push(`Missing required: ${missingParams.join(', ')}`);
+    }
+
+    if (unexpectedParams.length > 0) {
+      errorParts.push(`Unexpected parameters: ${unexpectedParams.join(', ')}`);
+    }
+
+    if (typeErrors.length > 0) {
+      errorParts.push(...typeErrors);
+    }
+
+    if (issues.length > 0) {
+      errorParts.push(...issues);
+    }
+
+    const text = errorParts.join('\n');
 
     return {
-      content: [
-        {
-          type: 'text',
-          text: `Validation failed: ${issues}. Check parameter types and values.`,
-        },
-      ],
+      content: [{ type: 'text', text }],
       status: 'failed',
     };
   }
