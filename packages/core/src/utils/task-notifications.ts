@@ -26,6 +26,70 @@ export type NotificationTarget =
   | 'assignee_unless_actor' // Notify assignee if they didn't cause the update
   | 'creator_unless_author'; // Notify creator if they didn't author the change
 
+// Message formatting functions
+function formatCompletionNotification(task: Task, completedBy: ThreadId): string {
+  return `Task '${task.id}' that you created has been completed by ${completedBy}:
+Title: "${task.title}"
+Status: completed ✅
+
+You can now review the results or create follow-up tasks.`;
+}
+
+function formatTaskAssignment(task: Task): string {
+  return `[LACE TASK SYSTEM] You have been assigned task '${task.id}':
+Title: "${task.title}"
+Created by: ${task.createdBy}
+Priority: ${task.priority}
+Status: ${task.status}
+
+--- TASK DETAILS ---
+${task.prompt}
+--- END TASK DETAILS ---
+
+Use your task_add_note tool to record progress and task_complete when done.`;
+}
+
+function formatStatusChangeNotification(
+  task: Task,
+  newStatus: string,
+  changedBy: ThreadId
+): string {
+  const statusEmoji = getStatusEmoji(newStatus);
+  const statusDescription = getStatusDescription(newStatus);
+
+  return `Task '${task.id}' that you created is now ${newStatus}${statusEmoji ? ' ' + statusEmoji : ''}:
+Title: "${task.title}"
+Changed by: ${changedBy}
+
+${statusDescription}`;
+}
+
+function getStatusEmoji(status: string): string {
+  switch (status) {
+    case 'completed':
+      return '✅';
+    case 'blocked':
+      return '⛔';
+    case 'in_progress':
+      return '🔄';
+    default:
+      return '';
+  }
+}
+
+function getStatusDescription(status: string): string {
+  switch (status) {
+    case 'in_progress':
+      return 'The assignee has started working on your task.';
+    case 'blocked':
+      return 'The assignee has encountered an issue that prevents progress.';
+    case 'completed':
+      return 'You can now review the results or create follow-up tasks.';
+    default:
+      return '';
+  }
+}
+
 export async function routeTaskNotifications(
   event: TaskManagerEvent,
   context: TaskNotificationContext
@@ -37,17 +101,7 @@ export async function routeTaskNotifications(
     if (task.assignedTo && task.assignedTo !== taskContext.actor) {
       const assigneeAgent = context.getAgent(task.assignedTo as ThreadId);
       if (assigneeAgent) {
-        const message = `[LACE TASK SYSTEM] You have been assigned task '${task.id}':
-Title: "${task.title}"
-Created by: ${task.createdBy}
-Priority: ${task.priority}
-
---- TASK DETAILS ---
-${task.prompt}
---- END TASK DETAILS ---
-
-Use your task_add_note tool to record progress and task_complete when done.`;
-
+        const message = formatTaskAssignment({ ...task, status: task.status || 'pending' } as Task);
         await assigneeAgent.sendMessage(message);
       }
     }
@@ -58,46 +112,63 @@ Use your task_add_note tool to record progress and task_complete when done.`;
   if (event.type === 'task:updated') {
     const { task, previousTask, context: taskContext } = event;
 
+    // Skip if there's no previous task (can't detect changes)
+    if (!previousTask) {
+      return;
+    }
+
+    // Check if status actually changed
+    const statusChanged = previousTask.status !== task.status;
+
     // Detect completion (status changed to completed)
+    if (statusChanged && task.status === 'completed' && task.createdBy !== taskContext.actor) {
+      const creatorAgent = context.getAgent(task.createdBy as ThreadId);
+      if (creatorAgent) {
+        const message = formatCompletionNotification(task, taskContext.actor as ThreadId);
+        await creatorAgent.sendMessage(message);
+      }
+    }
+
+    // Detect start of work (pending → in_progress)
     if (
-      previousTask &&
-      previousTask.status !== 'completed' &&
-      task.status === 'completed' &&
+      statusChanged &&
+      previousTask.status === 'pending' &&
+      task.status === 'in_progress' &&
       task.createdBy !== taskContext.actor
     ) {
       const creatorAgent = context.getAgent(task.createdBy as ThreadId);
       if (creatorAgent) {
-        const message = `Task '${task.id}' that you created has been completed by ${taskContext.actor}:
-Title: "${task.title}"
-Status: completed ✅
+        const message = formatStatusChangeNotification(
+          task,
+          'in_progress',
+          taskContext.actor as ThreadId
+        );
+        await creatorAgent.sendMessage(message);
+      }
+    }
 
-You can now review the results or create follow-up tasks.`;
-
+    // Detect blocked status
+    if (statusChanged && task.status === 'blocked' && task.createdBy !== taskContext.actor) {
+      const creatorAgent = context.getAgent(task.createdBy as ThreadId);
+      if (creatorAgent) {
+        const message = formatStatusChangeNotification(
+          task,
+          'blocked',
+          taskContext.actor as ThreadId
+        );
         await creatorAgent.sendMessage(message);
       }
     }
 
     // Detect reassignment (assignedTo changed)
     if (
-      previousTask &&
       previousTask.assignedTo !== task.assignedTo &&
       task.assignedTo &&
       task.assignedTo !== taskContext.actor
     ) {
       const newAssigneeAgent = context.getAgent(task.assignedTo as ThreadId);
       if (newAssigneeAgent) {
-        const message = `[LACE TASK SYSTEM] You have been assigned task '${task.id}':
-Title: "${task.title}"
-Created by: ${task.createdBy}
-Priority: ${task.priority}
-Status: ${task.status}
-
---- TASK DETAILS ---
-${task.prompt}
---- END TASK DETAILS ---
-
-Use your task_add_note tool to record progress and task_complete when done.`;
-
+        const message = formatTaskAssignment(task);
         await newAssigneeAgent.sendMessage(message);
       }
     }
