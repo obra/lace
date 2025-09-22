@@ -31,7 +31,7 @@ const createTaskSchema = z
   .strict(); // Reject unknown properties at root level too
 
 export class TaskCreateTool extends Tool {
-  name = 'task_add';
+  name = 'task_create';
   description = `Create tasks to track work - your primary planning tool.
 
 TASK SIZING STRATEGY:
@@ -60,19 +60,19 @@ COMMUNICATION PATTERNS:
 - Poor tasks create confusion, scope creep, and rework
 
 EXAMPLES:
-Single task: task_add({ tasks: [{
+Single task: task_create({ tasks: [{
   title: "Add failing test for bulk task creation", 
-  prompt: "Create test in bulk-tasks.test.ts that expects task_add to accept {tasks: []} format. Test should fail initially. Files: src/tools/implementations/task-manager/bulk-tasks.test.ts",
+  prompt: "Create test in bulk-tasks.test.ts that expects task_create to accept {tasks: []} format. Test should fail initially. Files: src/tools/implementations/task-manager/bulk-tasks.test.ts",
   priority: "high"
 }]})
 
-Investigation task: task_add({ tasks: [{
+Investigation task: task_create({ tasks: [{
   title: "Investigate auth timeout root cause",
   prompt: "Users report 5min logout instead of 30min. Debug token expiration, session storage, renewal logic. Output: specific root cause + recommended fix approach. Context: blocking beta release",
   priority: "high"
 }]})
 
-Bulk planning: task_add({ tasks: [
+Bulk planning: task_create({ tasks: [
   {title: "Write failing test for union schema", prompt: "Test that createTaskSchema accepts both single task and {tasks: array} formats"},
   {title: "Update schema to union type", prompt: "Change createTaskSchema to z.union([singleTaskSchema, bulkTasksSchema])"},  
   {title: "Implement bulk creation logic", prompt: "Handle both formats in executeValidated, validate all before creating any"},

@@ -755,7 +755,7 @@ const taskViewRenderer: ToolRenderer = {
  * Export all task renderers
  */
 export const taskRenderers = {
-  task_add: taskAddRenderer,
+  task_create: taskAddRenderer,
   task_list: taskListRenderer,
   task_complete: taskCompleteRenderer,
   task_update: taskUpdateRenderer,

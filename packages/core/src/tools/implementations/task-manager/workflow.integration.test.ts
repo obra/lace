@@ -168,7 +168,7 @@ describe('Task Management Workflow Integration', () => {
     // Get tools from session's agent
     const agent = session.getAgent(session.getId());
     const toolExecutor = agent!.toolExecutor;
-    taskCreateTool = toolExecutor.getTool('task_add') as TaskCreateTool;
+    taskCreateTool = toolExecutor.getTool('task_create') as TaskCreateTool;
     taskListTool = toolExecutor.getTool('task_list') as TaskListTool;
     taskCompleteTool = toolExecutor.getTool('task_complete') as TaskCompleteTool;
     taskUpdateTool = toolExecutor.getTool('task_update') as TaskUpdateTool;

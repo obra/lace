@@ -10,7 +10,7 @@ import type { Task, TaskContext } from '~/tasks/types';
 import { createNewAgentSpec } from '~/threads/types';
 import { logger } from '~/utils/logger';
 
-// Schema for bulk delegation - matches task_add format
+// Schema for bulk delegation - matches task_create format
 const delegateSchema = z
   .object({
     tasks: z
@@ -37,7 +37,7 @@ const delegateSchema = z
 
 export class DelegateTool extends Tool {
   name = 'delegate';
-  description = `Delegate tasks to subagents with specific models - same format as task_add.
+  description = `Delegate tasks to subagents with specific models - same format as task_create.
 Ideal for research, data extraction, log analysis, or any focused task with clear outputs.
 Each subagent starts fresh with only your instructions - no conversation history.
 

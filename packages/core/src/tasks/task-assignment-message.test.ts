@@ -268,15 +268,15 @@ describe('Task Assignment Message Sending', () => {
     expect(taskAssignmentMessage).toBeUndefined();
   });
 
-  it('should reject task_add with wrong parameter name (assignTo instead of assignedTo)', async () => {
+  it('should reject task_create with wrong parameter name (assignTo instead of assignedTo)', async () => {
     // Get the tool executor from session
     const agent = session.getAgent(session.getId());
     const toolExecutor = agent!.toolExecutor;
 
-    // Try to use task_add with wrong parameter name
+    // Try to use task_create with wrong parameter name
     const toolCall = {
       id: 'call_wrong_param',
-      name: 'task_add',
+      name: 'task_create',
       arguments: {
         tasks: [
           {
@@ -296,7 +296,7 @@ describe('Task Assignment Message Sending', () => {
 
     // Should get a validation error
     expect(result.status).toBe('failed');
-    expect(result.content[0].text).toContain('ValidationError: task_add failed');
+    expect(result.content[0].text).toContain('ValidationError: task_create failed');
     expect(result.content[0].text).toContain('Unexpected parameters: assignTo');
 
     // The agent should receive this as a TOOL_RESULT with failed status

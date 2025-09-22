@@ -142,7 +142,7 @@ describe('Delegation Integration Tests', () => {
           bash: 'allow',
           file_read: 'allow',
           file_write: 'allow',
-          task_add: 'allow',
+          task_create: 'allow',
           task_complete: 'allow',
         },
       },

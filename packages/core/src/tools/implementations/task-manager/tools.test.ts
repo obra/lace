@@ -130,7 +130,7 @@ describe('Enhanced Task Manager Tools', () => {
       new TaskAddNoteTool(),
       new TaskViewTool(),
     ];
-    taskCreateTool = tools.find((t) => t.name === 'task_add') as TaskCreateTool;
+    taskCreateTool = tools.find((t) => t.name === 'task_create') as TaskCreateTool;
     taskListTool = tools.find((t) => t.name === 'task_list') as TaskListTool;
     _taskCompleteTool = tools.find((t) => t.name === 'task_complete') as TaskCompleteTool;
     taskUpdateTool = tools.find((t) => t.name === 'task_update') as TaskUpdateTool;
@@ -183,7 +183,7 @@ describe('Enhanced Task Manager Tools', () => {
     it('should get TaskManager from context', async () => {
       expect(tools.length).toBe(6);
       expect(taskCreateTool).toBeDefined();
-      expect(taskCreateTool.name).toBe('task_add');
+      expect(taskCreateTool.name).toBe('task_create');
 
       // Test that tools can access TaskManager via agent
       expect(context.agent).toBeDefined();

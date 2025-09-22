@@ -238,7 +238,7 @@ export async function createDelegationTestSetup(options?: {
         file_edit: 'allow',
         file_list: 'allow',
         // Task management tools needed by delegate agents
-        task_add: 'allow',
+        task_create: 'allow',
         task_complete: 'allow',
         task_update: 'allow',
         task_add_note: 'allow',

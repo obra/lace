@@ -67,7 +67,7 @@ describe('Task Metadata Event Format', () => {
 
     // Incorrect wrapped format (the bug we fixed)
     const incorrectData = {
-      toolName: 'task_add',
+      toolName: 'task_create',
       result: toolResult, // Wrapped format - this was the bug
     };
 

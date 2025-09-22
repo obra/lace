@@ -14,7 +14,7 @@ import {
 
 describe('Task Tool Renderer Integration', () => {
   const taskTools = [
-    'task_add',
+    'task_create',
     'task_list',
     'task_complete',
     'task_update',
@@ -66,7 +66,7 @@ describe('Task Tool Renderer Integration', () => {
 
   describe('Task tool renderer icons', () => {
     test('should return correct icons for each tool', () => {
-      expect(getToolRenderer('task_add').getIcon?.()).toBe(faPlus);
+      expect(getToolRenderer('task_create').getIcon?.()).toBe(faPlus);
       expect(getToolRenderer('task_list').getIcon?.()).toBe(faClipboardList);
       expect(getToolRenderer('task_complete').getIcon?.()).toBe(faCheck);
       expect(getToolRenderer('task_update').getIcon?.()).toBe(faEdit);
@@ -77,7 +77,7 @@ describe('Task Tool Renderer Integration', () => {
 
   describe('Task tool renderer summaries', () => {
     test('should create meaningful summaries', () => {
-      expect(getToolRenderer('task_add').getSummary?.({ title: 'Test Task' })).toBe('Test Task');
+      expect(getToolRenderer('task_create').getSummary?.({ title: 'Test Task' })).toBe('Test Task');
 
       expect(getToolRenderer('task_list').getSummary?.({ filter: 'mine' })).toBe('List my tasks');
 

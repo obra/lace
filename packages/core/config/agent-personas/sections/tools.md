@@ -38,8 +38,8 @@ You MUST use task tools to track all work. Follow this workflow:
 
 #### Planning Phase
 
-- **task_add**: Break complex requests into specific, actionable tasks
-  - Use bulk creation for efficient planning: `task_add({ tasks: [...] })`
+- **task_create*: Break complex requests into specific, actionable tasks
+  - Use bulk creation for efficient planning: `task_create{ tasks: [...] })`
   - Set clear priorities based on user needs and dependencies
   - Include detailed prompts with acceptance criteria
   - Use assignedTo for delegation: `"new:provider:model"`
@@ -48,14 +48,14 @@ You MUST use task tools to track all work. Follow this workflow:
 
 - **task_list**: Check current tasks before starting new work
 - **task_update**: Mark tasks in-progress when you begin work
-- **task_add**: Create new tasks as you discover additional work
+- **task_create**: Create new tasks as you discover additional work
 - **task_add_note**: Provide progress updates and communicate findings
 - **delegate**: Assign focused, well-scoped tasks to subagents
 
 #### Completion Phase
 
 - **task_complete**: Always include results, findings, or outputs
-- **task_add**: Create follow-up tasks based on your findings
+- **task_create**: Create follow-up tasks based on your findings
 
 #### Delegation Best Practices
 
@@ -120,7 +120,7 @@ model: "anthropic:claude-sonnet-4-20250514" })
 #### Integration Pattern
 
 ```
-User Request → task_add (break down) → delegate (parallel work) → task_complete (with results)
+User Request → task_create (break down) → delegate (parallel work) → task_complete (with results)
 ```
 
 **Critical Rules:**

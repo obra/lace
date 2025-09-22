@@ -863,7 +863,7 @@ const toolExecutor = agent.toolExecutor;
 
 // Get specific tools
 const bashTool = toolExecutor.getTool('bash') as BashTool;
-const taskCreateTool = toolExecutor.getTool('task_add') as TaskCreateTool;
+const taskCreateTool = toolExecutor.getTool('task_create') as TaskCreateTool;
 
 // Execute tools with proper context
 const result = await bashTool.execute({ command: 'ls -la' }, context);
@@ -1002,7 +1002,7 @@ describe('Task Manager Integration Tests', () => {
     // Get tools from session's toolExecutor (proper dependency injection)
     const agent = session.getAgent(session.getId());
     const toolExecutor = agent!.toolExecutor;
-    createTool = toolExecutor.getTool('task_add') as TaskCreateTool;
+    createTool = toolExecutor.getTool('task_create') as TaskCreateTool;
     listTool = toolExecutor.getTool('task_list') as TaskListTool;
   });
 

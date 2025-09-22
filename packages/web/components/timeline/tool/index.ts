@@ -20,7 +20,7 @@ const toolRenderers: Record<string, ToolRenderer> = {
   shell: bashRenderer, // Handle shell commands as bash
 
   // Task management tools
-  task_add: taskRenderers.task_add,
+  task_create: taskRenderers.task_create,
   task_list: taskRenderers.task_list,
   task_complete: taskRenderers.task_complete,
   task_update: taskRenderers.task_update,

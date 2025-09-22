@@ -1,4 +1,4 @@
-// ABOUTME: Tests for unified delegate tool API matching task_add format
+// ABOUTME: Tests for unified delegate tool API matching task_create format
 // ABOUTME: Verifies delegate accepts array format and NewAgentSpec assignTo parameter
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -60,7 +60,7 @@ describe('Unified Delegate API', () => {
     }
   });
 
-  it('accepts array format matching task_add', async () => {
+  it('accepts array format matching task_create', async () => {
     const args = {
       tasks: [
         {

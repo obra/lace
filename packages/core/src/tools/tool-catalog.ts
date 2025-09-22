@@ -36,7 +36,7 @@ export class ToolCatalog {
       'file_find',
       'delegate',
       'url_fetch',
-      'task_add',
+      'task_create',
       'task_list',
       'task_complete',
       'task_update',
