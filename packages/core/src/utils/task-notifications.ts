@@ -26,6 +26,44 @@ export type NotificationTarget =
   | 'assignee_unless_actor' // Notify assignee if they didn't cause the update
   | 'creator_unless_author'; // Notify creator if they didn't author the change
 
+export async function routeTaskNotifications(
+  event: TaskManagerEvent,
+  context: TaskNotificationContext
+): Promise<void> {
+  if (event.type !== 'task:updated') {
+    return; // Only handle updates for now
+  }
+
+  const { task, previousTask, context: taskContext } = event;
+
+  // Only handle completion notifications for now
+  if (
+    task.status === 'completed' &&
+    previousTask &&
+    previousTask.status !== 'completed' &&
+    task.createdBy !== taskContext.actor
+  ) {
+    const creatorAgent = context.getAgent(task.createdBy);
+    if (creatorAgent) {
+      const message = `Task '${task.id}' that you created has been completed by ${taskContext.actor}:
+Title: "${task.title}"
+Status: completed ✅
+
+You can now review the results or create follow-up tasks.`;
+
+      await creatorAgent.sendMessage(message);
+    }
+  }
+}
+
+// Type for TaskManager events (this might need to be defined)
+export interface TaskManagerEvent {
+  type: 'task:updated' | 'task:created' | 'task:note_added';
+  task: Task;
+  previousTask?: Task; // For updates only
+  context: TaskContext;
+}
+
 // Re-export core types this utility needs
 export type { Task, TaskNote, TaskContext } from '~/tasks/types';
 export type { ThreadId } from '~/threads/types';
