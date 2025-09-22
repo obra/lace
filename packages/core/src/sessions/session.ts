@@ -67,6 +67,9 @@ export class Session {
     // Initialize TaskManager for this session
     this._taskManager = new TaskManager(this._sessionId, getPersistence());
 
+    // Set up task event forwarding to global event system
+    this.setupTaskEventForwarding();
+
     // Create session-scoped MCP server manager
     this._mcpServerManager = new MCPServerManager();
   }

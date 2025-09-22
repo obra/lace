@@ -291,7 +291,7 @@ describe('Enhanced Task Manager Tools', () => {
       const result = await taskCreateTool.execute(invalidInput, context);
 
       expect(result.status).toBe('failed');
-      expect(result.content?.[0]?.text).toContain('Validation failed');
+      expect(result.content?.[0]?.text).toContain('ValidationError');
     });
 
     it('should reject invalid assignee format', async () => {
@@ -543,7 +543,7 @@ describe('Enhanced Task Manager Tools', () => {
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content?.[0]?.text).toContain('Validation failed');
+      expect(result.content?.[0]?.text).toContain('ValidationError');
     });
 
     it('should handle non-existent task', async () => {
