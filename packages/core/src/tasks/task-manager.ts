@@ -164,7 +164,7 @@ export class TaskManager extends EventEmitter {
     this.emit('task:updated', {
       type: 'task:updated',
       task: updatedTask,
-      previousTask: task,
+      previousTask: existingTask,
       context,
       timestamp: new Date(),
     });
