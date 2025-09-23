@@ -1,3 +1,6 @@
+// ABOUTME: Unit tests for task notification routing system
+// ABOUTME: Tests notification logic for completion, assignment, status changes, and notes
+
 import { describe, it, expect, vi } from 'vitest';
 import type { TaskNotification } from './task-notifications';
 import { routeTaskNotifications } from './task-notifications';
@@ -65,9 +68,19 @@ describe('Task Notification Routing', () => {
 
     // Verify creator was notified
     expect(mockGetAgent).toHaveBeenCalledWith(creatorAgent);
-    expect(mockAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('completed'));
     expect(mockAgent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining(taskEvent.task.title)
+      expect.stringContaining('completed'),
+      expect.objectContaining({
+        queue: true,
+        metadata: expect.objectContaining({
+          source: 'task_notification',
+          priority: 'high',
+        }),
+      })
+    );
+    expect(mockAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining(taskEvent.task.title),
+      expect.any(Object)
     );
   });
 
@@ -103,9 +116,19 @@ describe('Task Notification Routing', () => {
     // Verify assignee was notified
     expect(mockGetAgent).toHaveBeenCalledWith(assigneeAgent);
     expect(mockAgent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('[LACE TASK SYSTEM]')
+      expect.stringContaining('[LACE TASK SYSTEM]'),
+      expect.objectContaining({
+        queue: true,
+        metadata: expect.objectContaining({
+          source: 'task_notification',
+          priority: 'high',
+        }),
+      })
     );
-    expect(mockAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('assigned'));
+    expect(mockAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('assigned'),
+      expect.any(Object)
+    );
   });
 
   it('should notify both old and new assignee when task is reassigned', async () => {
@@ -160,15 +183,35 @@ describe('Task Notification Routing', () => {
     // Verify new assignee was notified
     expect(mockGetAgent).toHaveBeenCalledWith(assigneeAgent);
     expect(mockNewAgent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('[LACE TASK SYSTEM]')
+      expect.stringContaining('[LACE TASK SYSTEM]'),
+      expect.objectContaining({
+        queue: true,
+        metadata: expect.objectContaining({
+          source: 'task_notification',
+          priority: 'high',
+        }),
+      })
     );
-    expect(mockNewAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('assigned'));
+    expect(mockNewAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('assigned'),
+      expect.any(Object)
+    );
 
     // Verify old assignee was notified about reassignment
     expect(mockGetAgent).toHaveBeenCalledWith(oldAssignee);
-    expect(mockOldAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('reassigned'));
     expect(mockOldAgent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('no longer responsible')
+      expect.stringContaining('reassigned'),
+      expect.objectContaining({
+        queue: true,
+        metadata: expect.objectContaining({
+          source: 'task_notification',
+          priority: 'normal',
+        }),
+      })
+    );
+    expect(mockOldAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('no longer responsible'),
+      expect.any(Object)
     );
   });
 
@@ -215,8 +258,20 @@ describe('Task Notification Routing', () => {
 
     // Verify creator was notified about progress
     expect(mockGetAgent).toHaveBeenCalledWith(creatorAgent);
-    expect(mockAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('in_progress'));
-    expect(mockAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Work Starting'));
+    expect(mockAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('in_progress'),
+      expect.objectContaining({
+        queue: true,
+        metadata: expect.objectContaining({
+          source: 'task_notification',
+          priority: 'high',
+        }),
+      })
+    );
+    expect(mockAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Work Starting'),
+      expect.any(Object)
+    );
   });
 
   it('should notify creator when task becomes blocked', async () => {
@@ -262,8 +317,20 @@ describe('Task Notification Routing', () => {
 
     // Verify creator was notified about blockage
     expect(mockGetAgent).toHaveBeenCalledWith(creatorAgent);
-    expect(mockAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('blocked'));
-    expect(mockAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Blocked Task'));
+    expect(mockAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('blocked'),
+      expect.objectContaining({
+        queue: true,
+        metadata: expect.objectContaining({
+          source: 'task_notification',
+          priority: 'high',
+        }),
+      })
+    );
+    expect(mockAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Blocked Task'),
+      expect.any(Object)
+    );
   });
 
   it('should not notify creator when they complete their own task', async () => {
@@ -475,13 +542,23 @@ describe('Task Notification Routing', () => {
 
     // Verify creator was notified about the note
     expect(mockGetAgent).toHaveBeenCalledWith(creatorAgent);
-    expect(mockAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('New note added'));
     expect(mockAgent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('completed the initial analysis')
+      expect.stringContaining('New note added'),
+      expect.objectContaining({
+        queue: true,
+        metadata: expect.objectContaining({
+          source: 'task_notification',
+          priority: 'normal',
+        }),
+      })
+    );
+    expect(mockAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('completed the initial analysis'),
+      expect.any(Object)
     );
   });
 
-  it('should not notify creator for trivial notes (<=50 chars)', async () => {
+  it('should notify creator for all notes from other agents (including short ones)', async () => {
     const mockAgent = {
       sendMessage: vi.fn().mockResolvedValue(undefined),
     };
@@ -490,7 +567,7 @@ describe('Task Notification Routing', () => {
     const taskEvent = {
       type: 'task:note_added' as const,
       task: {
-        id: 'task_trivial_note',
+        id: 'task_short_note',
         title: 'Task With Short Note',
         status: 'in_progress' as const,
         createdBy: creatorAgent,
@@ -517,9 +594,22 @@ describe('Task Notification Routing', () => {
       sessionId,
     });
 
-    // Should not notify for short notes
-    expect(mockGetAgent).not.toHaveBeenCalled();
-    expect(mockAgent.sendMessage).not.toHaveBeenCalled();
+    // Should notify for ALL notes from other agents, regardless of length
+    expect(mockGetAgent).toHaveBeenCalledWith(creatorAgent);
+    expect(mockAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('New note added'),
+      expect.objectContaining({
+        queue: true,
+        metadata: expect.objectContaining({
+          source: 'task_notification',
+          priority: 'normal',
+        }),
+      })
+    );
+    expect(mockAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Started working on this'),
+      expect.any(Object)
+    );
   });
 
   it('should not notify creator when they add their own note', async () => {

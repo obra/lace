@@ -75,7 +75,8 @@ src/
 ├── tasks/
 │   ├── task-manager.ts              # TaskManager class
 │   ├── types.ts                     # Task types
-│   └── task-status.ts               # Task status enum
+│   ├── task-status.ts               # Task status enum
+│   └── task-notification-integration.test.ts  # Task notification integration tests
 │
 ├── projects/
 │   ├── project.ts                   # Project class
@@ -84,6 +85,7 @@ src/
 ├── utils/
 │   ├── logger.ts                    # Logging utility
 │   ├── token-estimation.ts          # Estimate token counts
+│   ├── task-notifications.ts        # Task notification routing system
 │   └── test-utils.ts                # Test helpers
 │
 ├── config/

@@ -1360,6 +1360,18 @@ Use your task_add_note tool to record important notes as you work and your task_
     return Session._sessionRegistry.size;
   }
 
+  /**
+   * Sets up task notification routing system to automatically notify agents about task changes.
+   *
+   * When agents create tasks and other agents work on them, this system ensures the creator
+   * receives notifications about completion, status changes, and significant progress updates.
+   *
+   * Notifications are delivered via agent.sendMessage() and include:
+   * - Task completion when status changes to 'completed'
+   * - Status changes (pending → in_progress, * → blocked)
+   * - Task assignments and reassignments
+   * - All notes added by other agents
+   */
   private setupTaskNotificationRouting(): void {
     this._taskManager.on(
       'task:updated',
@@ -1375,6 +1387,7 @@ Use your task_add_note tool to record important notes as you work and your task_
     );
   }
 
+  /** Handles task update events and routes notifications to relevant agents */
   private async handleTaskUpdate(event: TaskManagerEvent): Promise<void> {
     await routeTaskNotifications(event, {
       getAgent: (id: ThreadId) => this._agents.get(id) || null,
@@ -1382,6 +1395,7 @@ Use your task_add_note tool to record important notes as you work and your task_
     });
   }
 
+  /** Handles task creation events and notifies assignees about new assignments */
   private async handleTaskCreated(event: TaskManagerEvent): Promise<void> {
     await routeTaskNotifications(event, {
       getAgent: (id: ThreadId) => this._agents.get(id) || null,
@@ -1389,6 +1403,7 @@ Use your task_add_note tool to record important notes as you work and your task_
     });
   }
 
+  /** Handles note addition events and notifies creators about all notes from other agents */
   private async handleTaskNoteAdded(event: TaskManagerEvent): Promise<void> {
     await routeTaskNotifications(event, {
       getAgent: (id: ThreadId) => this._agents.get(id) || null,

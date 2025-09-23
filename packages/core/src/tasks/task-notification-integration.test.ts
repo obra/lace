@@ -374,7 +374,7 @@ describe('Task Notification System - Real Integration', () => {
     expect(blockedNotification?.data).toContain('encountered an issue');
   });
 
-  it('should deliver note notifications for significant notes only', async () => {
+  it('should deliver note notifications for all notes from other agents', async () => {
     // Spawn agents within the same session
     const creatorAgent = await mainSession.spawnAgent(
       'task-creator',
@@ -415,10 +415,10 @@ describe('Task Notification System - Real Integration', () => {
 
     const initialEventCount = creatorAgent.getLaceEvents(creatorThreadId).length || 0;
 
-    // Add significant note (>50 chars)
-    const significantNote =
+    // Add longer note
+    const longerNote =
       'After researching multiple approaches, I recommend using GraphQL for the API layer due to its flexibility and strong typing support.';
-    await taskManager.addNote(task.id, significantNote, assigneeContext);
+    await taskManager.addNote(task.id, longerNote, assigneeContext);
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     // Verify creator received note notification
@@ -434,25 +434,25 @@ describe('Task Notification System - Real Integration', () => {
     );
 
     expect(noteNotification).toBeDefined();
-    expect(noteNotification?.data).toContain(significantNote);
+    expect(noteNotification?.data).toContain(longerNote);
 
-    // Add trivial note (<50 chars)
-    const preTriviaNoteCount = creatorAgent.getLaceEvents(creatorThreadId).length || 0;
+    // Add short note
+    const preShortNoteCount = creatorAgent.getLaceEvents(creatorThreadId).length || 0;
     await taskManager.addNote(task.id, 'Started', assigneeContext);
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    // Verify no notification for trivial note
-    const postTrivialEvents = creatorAgent.getLaceEvents(creatorThreadId) || [];
-    const trivialNoteEvents = postTrivialEvents.slice(preTriviaNoteCount);
+    // Verify notification for short note (now ALL notes notify)
+    const postShortEvents = creatorAgent.getLaceEvents(creatorThreadId) || [];
+    const shortNoteEvents = postShortEvents.slice(preShortNoteCount);
 
-    const trivialNotification = trivialNoteEvents.find(
+    const shortNotification = shortNoteEvents.find(
       (event) =>
         event.type === 'USER_MESSAGE' &&
         typeof event.data === 'string' &&
         event.data.includes('Started')
     );
 
-    expect(trivialNotification).toBeUndefined();
+    expect(shortNotification).toBeDefined();
   });
 
   it('should not notify creator when they complete their own task', async () => {

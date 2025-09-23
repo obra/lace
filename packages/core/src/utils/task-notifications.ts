@@ -1,5 +1,5 @@
-// ABOUTME: Type definitions for task notification routing system
-// ABOUTME: Defines interfaces and types used by notification utilities
+// ABOUTME: Task notification routing system for notifying agents about task updates
+// ABOUTME: Handles completion, assignment, status change, and note notifications
 
 import type { ThreadId } from '~/threads/types';
 import type { Task, TaskContext, TaskNote } from '~/tasks/types';
@@ -208,10 +208,7 @@ function analyzeNoteAdded(task: Task, context: TaskContext): TaskNotification[] 
     return notifications;
   }
 
-  // Only notify for significant notes (>50 chars)
-  if (latestNote.content.length <= 50) {
-    return notifications;
-  }
+  // Notify for all notes from other agents (no minimum length)
 
   // Don't notify creator if they added the note
   if (task.createdBy === context.actor) {
