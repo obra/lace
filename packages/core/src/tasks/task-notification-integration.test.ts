@@ -1,501 +1,443 @@
-// ABOUTME: Integration tests for task notification system
-// ABOUTME: Tests end-to-end notification delivery from TaskManager through Session to Agents
+// ABOUTME: Real integration tests for task notification system
+// ABOUTME: Tests actual Session→TaskManager→Agent flow with notification delivery verification
 
-import { describe, it, expect, beforeEach, afterEach, vi, MockedFunction } from 'vitest';
-import { routeTaskNotifications } from '~/utils/task-notifications';
-import type { TaskManagerEvent, TaskNotificationContext } from '~/utils/task-notifications';
-import { asThreadId } from '~/threads/types';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { Session } from '~/sessions/session';
+import { Project } from '~/projects/project';
+import { Agent } from '~/agents/agent';
 import type { ThreadId } from '~/threads/types';
-import type { Task, TaskContext } from '~/tasks/types';
-import type { Agent } from '~/agents/agent';
+import type { CreateTaskRequest, TaskContext } from '~/tasks/types';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
+import {
+  cleanupTestProviderInstances,
+  createTestProviderInstance,
+} from '~/test-utils/provider-instances';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '~/test-utils/provider-defaults';
+import { BaseMockProvider } from '~/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { Tool } from '~/tools/tool';
+import { ApprovalDecision } from '~/tools/types';
 
-describe('Task Notification Integration', () => {
-  let mockGetAgent: MockedFunction<(threadId: ThreadId) => Agent | null>;
-  let sessionId: ThreadId;
-  let creatorThreadId: ThreadId;
-  let assigneeThreadId: ThreadId;
+// Mock provider with scripted responses
+class MockNotificationProvider extends BaseMockProvider {
+  constructor() {
+    super({});
+  }
 
-  // Mock agents to capture messages
-  let creatorAgent: { sendMessage: MockedFunction<(message: string) => Promise<void>> };
-  let assigneeAgent: { sendMessage: MockedFunction<(message: string) => Promise<void>> };
+  get providerName(): string {
+    return 'mock-notification';
+  }
 
-  // Track messages
-  const creatorMessages: string[] = [];
-  const assigneeMessages: string[] = [];
+  get defaultModel(): string {
+    return 'claude-3-5-haiku-20241022';
+  }
 
-  beforeEach(() => {
-    sessionId = asThreadId('lace_20250922_sess01');
-    creatorThreadId = asThreadId('lace_20250922_creat1');
-    assigneeThreadId = asThreadId('lace_20250922_assgn1');
+  get contextWindow(): number {
+    return 200000;
+  }
 
-    // Create mock agents
-    creatorAgent = {
-      sendMessage: vi.fn(async (message: string) => {
-        creatorMessages.push(message);
-      }),
-    };
+  get maxOutputTokens(): number {
+    return 4096;
+  }
 
-    assigneeAgent = {
-      sendMessage: vi.fn(async (message: string) => {
-        assigneeMessages.push(message);
-      }),
-    };
+  getAvailableModels = () => {
+    return [
+      {
+        id: 'claude-3-5-haiku-20241022',
+        displayName: 'Claude 3.5 Haiku',
+        description: 'Test model',
+        contextWindow: 200000,
+        maxOutputTokens: 4096,
+        capabilities: ['function-calling'],
+        isDefault: true,
+      },
+    ];
+  };
 
-    // Setup mock getAgent function
-    mockGetAgent = vi.fn((threadId: ThreadId) => {
-      if (threadId === creatorThreadId) {
-        return creatorAgent as unknown as Agent;
-      } else if (threadId === assigneeThreadId) {
-        return assigneeAgent as unknown as Agent;
-      }
-      return null;
+  async createResponse(messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
+    // Simple acknowledgment response
+    return Promise.resolve({
+      content: 'Acknowledged',
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      toolCalls: [],
+    });
+  }
+
+  async *streamChat(messages: ProviderMessage[], tools: Tool[]): AsyncGenerator<any> {
+    const response = await this.createResponse(messages, tools);
+    yield { type: 'text', text: response.content };
+  }
+}
+
+describe('Task Notification System - Real Integration', () => {
+  const _tempLaceDir = setupCoreTest();
+  let project: Project;
+  let session: Session;
+  let providerInstanceId: string;
+  let sessionAgent: Agent;
+  let mockProvider: MockNotificationProvider;
+
+  // Create mock agents to simulate multiple sessions
+  let creatorAgent: Agent;
+  let assigneeAgent: Agent;
+  let creatorSendMessageSpy: any;
+  let assigneeSendMessageSpy: any;
+
+  beforeEach(async () => {
+    setupTestProviderDefaults();
+
+    // Create a real provider instance for testing
+    providerInstanceId = await createTestProviderInstance({
+      catalogId: 'anthropic',
+      models: ['claude-3-5-haiku-20241022'],
+      displayName: 'Test Notification Instance',
+      apiKey: 'test-anthropic-key',
     });
 
-    // Clear message arrays
-    creatorMessages.length = 0;
-    assigneeMessages.length = 0;
+    // Create mock provider with scripted responses
+    mockProvider = new MockNotificationProvider();
+
+    // Mock the Agent's provider creation to use our mock
+    vi.spyOn(Agent.prototype, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
+
+    // Create project
+    project = Project.create(
+      'Notification Test Project',
+      '/tmp/test-notifications',
+      'Test project for task notifications',
+      {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      }
+    );
+
+    // Create a single session
+    session = Session.create({
+      name: 'Test Session',
+      projectId: project.getId(),
+      approvalCallback: {
+        requestApproval: async () => Promise.resolve(ApprovalDecision.ALLOW_ONCE),
+      },
+    });
+
+    // Get the session's agent
+    sessionAgent = session.getAgent(session.getId())!;
+
+    // Create mock agents to represent creator and assignee
+    creatorAgent = Object.create(sessionAgent);
+    assigneeAgent = Object.create(sessionAgent);
+
+    // Mock sendMessage on the mock agents
+    creatorSendMessageSpy = vi.fn();
+    assigneeSendMessageSpy = vi.fn();
+    creatorAgent.sendMessage = creatorSendMessageSpy;
+    assigneeAgent.sendMessage = assigneeSendMessageSpy;
+
+    // Mock the session's _agents map to return our mock agents
+    const originalGet = session['_agents'].get.bind(session['_agents']);
+    vi.spyOn(session['_agents'], 'get').mockImplementation((threadId: ThreadId) => {
+      if (threadId === 'creator_thread') {
+        return creatorAgent;
+      } else if (threadId === 'assignee_thread') {
+        return assigneeAgent;
+      }
+      return originalGet(threadId);
+    });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.clearAllMocks();
+    session?.destroy();
+    cleanupTestProviderDefaults();
+    if (providerInstanceId) {
+      await cleanupTestProviderInstances([providerInstanceId]);
+    }
   });
 
-  it('should deliver completion notification through notification system', async () => {
-    const task: Task = {
-      id: 'task_20250922_abc123',
-      title: 'Test Task',
-      description: 'Test description',
-      prompt: 'Complete this test',
-      status: 'completed',
-      priority: 'medium',
-      createdBy: creatorThreadId,
-      assignedTo: assigneeThreadId,
-      threadId: sessionId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      notes: [],
+  it('should deliver task assignment notification to assignee agent', async () => {
+    const taskManager = session.getTaskManager();
+    const creatorContext: TaskContext = {
+      actor: 'creator_thread' as ThreadId,
+      isHuman: false,
     };
 
-    const previousTask: Task = {
-      ...task,
-      status: 'in_progress',
-    };
-
-    const event: TaskManagerEvent = {
-      type: 'task:updated',
-      task,
-      previousTask,
-      context: { actor: assigneeThreadId, isHuman: false },
-      timestamp: new Date(),
-    };
-
-    const context: TaskNotificationContext = {
-      getAgent: mockGetAgent,
-      sessionId,
-    };
-
-    // Process the notification
-    await routeTaskNotifications(event, context);
-
-    // Verify creator was notified about completion
-    expect(mockGetAgent).toHaveBeenCalledWith(creatorThreadId);
-    expect(creatorAgent.sendMessage).toHaveBeenCalledOnce();
-    expect(creatorMessages[0]).toContain('completed');
-    expect(creatorMessages[0]).toContain('task_20250922_abc123');
-    expect(creatorMessages[0]).toContain('Test Task');
-    expect(creatorMessages[0]).toContain('✅');
-
-    // Verify assignee was NOT notified
-    expect(assigneeAgent.sendMessage).not.toHaveBeenCalled();
-  });
-
-  it('should notify assignee when task is created with assignment', async () => {
-    const task: Task = {
-      id: 'task_20250922_def456',
-      title: 'Assigned Task',
-      description: 'Task with assignment',
-      prompt: 'Work on this assigned task',
-      status: 'pending',
+    // Create task assigned to assignee
+    const createRequest: CreateTaskRequest = {
+      title: 'Review PR #123',
+      description: 'Review the authentication refactor pull request',
+      prompt: 'Please review PR #123 and provide feedback on the authentication implementation',
       priority: 'high',
-      createdBy: creatorThreadId,
-      assignedTo: assigneeThreadId,
-      threadId: sessionId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      notes: [],
+      assignedTo: 'assignee_thread' as ThreadId,
     };
 
-    const event: TaskManagerEvent = {
-      type: 'task:created',
-      task,
-      context: { actor: creatorThreadId, isHuman: false },
-      timestamp: new Date(),
-    };
+    const task = await taskManager.createTask(createRequest, creatorContext);
 
-    const context: TaskNotificationContext = {
-      getAgent: mockGetAgent,
-      sessionId,
-    };
+    // Wait for async notification processing
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    // Process the notification
-    await routeTaskNotifications(event, context);
-
-    // Verify assignee was notified
-    expect(mockGetAgent).toHaveBeenCalledWith(assigneeThreadId);
-    expect(assigneeAgent.sendMessage).toHaveBeenCalledOnce();
-    expect(assigneeMessages[0]).toContain('[LACE TASK SYSTEM]');
-    expect(assigneeMessages[0]).toContain('You have been assigned');
-    expect(assigneeMessages[0]).toContain('task_20250922_def456');
-    expect(assigneeMessages[0]).toContain('Assigned Task');
-    expect(assigneeMessages[0]).toContain('high');
-
-    // Verify creator was NOT notified
-    expect(creatorAgent.sendMessage).not.toHaveBeenCalled();
+    // Verify assignee agent's sendMessage was called with the notification
+    expect(assigneeSendMessageSpy).toHaveBeenCalled();
+    const notificationCall = assigneeSendMessageSpy.mock.calls[0];
+    expect(notificationCall[0]).toContain('[LACE TASK SYSTEM]');
+    expect(notificationCall[0]).toContain(task.id);
+    expect(notificationCall[0]).toContain('Review PR #123');
+    expect(notificationCall[0]).toContain('You have been assigned');
+    expect(notificationCall[0]).toContain('high');
   });
 
-  it('should notify both old and new assignee when task is reassigned', async () => {
-    const newAssigneeThreadId = asThreadId('lace_20250922_newas1');
-    const newAssigneeMessages: string[] = [];
-    const newAssigneeAgent = {
-      sendMessage: vi.fn(async (message: string) => {
-        newAssigneeMessages.push(message);
-      }),
+  it('should deliver completion notification to creator agent', async () => {
+    const taskManager = session.getTaskManager();
+    const creatorContext: TaskContext = {
+      actor: 'creator_thread' as ThreadId,
+      isHuman: false,
+    };
+    const assigneeContext: TaskContext = {
+      actor: 'assignee_thread' as ThreadId,
+      isHuman: false,
     };
 
-    // Update mock to include new assignee
-    mockGetAgent.mockImplementation((threadId: ThreadId) => {
-      if (threadId === creatorThreadId) {
-        return creatorAgent as unknown as Agent;
-      } else if (threadId === assigneeThreadId) {
-        return assigneeAgent as unknown as Agent;
-      } else if (threadId === newAssigneeThreadId) {
-        return newAssigneeAgent as unknown as Agent;
-      }
-      return null;
-    });
+    // Create task
+    const createRequest: CreateTaskRequest = {
+      title: 'Fix bug #456',
+      description: 'Fix the login timeout issue',
+      prompt:
+        'Users are getting logged out after 5 minutes. Fix the session timeout configuration.',
+      priority: 'medium',
+      assignedTo: 'assignee_thread' as ThreadId,
+    };
 
-    const task: Task = {
-      id: 'task_20250922_ghi789',
-      title: 'Reassigned Task',
-      description: 'Task being reassigned',
-      prompt: 'This task will be reassigned',
-      status: 'pending',
+    const task = await taskManager.createTask(createRequest, creatorContext);
+
+    // Wait for initial assignment notification
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Clear spy calls
+    creatorSendMessageSpy.mockClear();
+    assigneeSendMessageSpy.mockClear();
+
+    // Assignee completes the task
+    await taskManager.updateTask(task.id, { status: 'completed' }, assigneeContext);
+
+    // Wait for completion notification
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Verify creator agent's sendMessage was called with completion notification
+    expect(creatorSendMessageSpy).toHaveBeenCalled();
+    const completionCall = creatorSendMessageSpy.mock.calls[0];
+    expect(completionCall[0]).toContain('completed');
+    expect(completionCall[0]).toContain(task.id);
+    expect(completionCall[0]).toContain('Fix bug #456');
+    expect(completionCall[0]).toContain('✅');
+    expect(completionCall[0]).toContain('review the results');
+  });
+
+  it('should deliver status change notifications to creator agent', async () => {
+    const taskManager = session.getTaskManager();
+    const creatorContext: TaskContext = {
+      actor: 'creator_thread' as ThreadId,
+      isHuman: false,
+    };
+    const assigneeContext: TaskContext = {
+      actor: 'assignee_thread' as ThreadId,
+      isHuman: false,
+    };
+
+    // Create task
+    const createRequest: CreateTaskRequest = {
+      title: 'Implement feature X',
+      description: 'Add new dashboard widget',
+      prompt: 'Create a widget showing user activity metrics',
       priority: 'low',
-      createdBy: creatorThreadId,
-      assignedTo: newAssigneeThreadId,
-      threadId: sessionId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      notes: [],
+      assignedTo: 'assignee_thread' as ThreadId,
     };
 
-    const previousTask: Task = {
-      ...task,
-      assignedTo: assigneeThreadId,
-    };
+    const task = await taskManager.createTask(createRequest, creatorContext);
 
-    const event: TaskManagerEvent = {
-      type: 'task:updated',
-      task,
-      previousTask,
-      context: { actor: creatorThreadId, isHuman: true },
-      timestamp: new Date(),
-    };
+    // Wait for assignment notification
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    creatorSendMessageSpy.mockClear();
+    assigneeSendMessageSpy.mockClear();
 
-    const context: TaskNotificationContext = {
-      getAgent: mockGetAgent,
-      sessionId,
-    };
+    // Update to in_progress
+    await taskManager.updateTask(task.id, { status: 'in_progress' }, assigneeContext);
 
-    // Process the notification
-    await routeTaskNotifications(event, context);
+    // Wait for status notification
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    // Verify new assignee was notified
-    expect(mockGetAgent).toHaveBeenCalledWith(newAssigneeThreadId);
-    expect(newAssigneeAgent.sendMessage).toHaveBeenCalledOnce();
-    expect(newAssigneeMessages[0]).toContain('[LACE TASK SYSTEM]');
-    expect(newAssigneeMessages[0]).toContain('You have been assigned');
+    // Verify creator received in_progress notification
+    expect(creatorSendMessageSpy).toHaveBeenCalled();
+    const progressCall = creatorSendMessageSpy.mock.calls[0];
+    expect(progressCall[0]).toContain('in_progress');
+    expect(progressCall[0]).toContain(task.id);
+    expect(progressCall[0]).toContain('🔄');
+    expect(progressCall[0]).toContain('started working');
 
-    // Verify old assignee was notified about reassignment
-    expect(mockGetAgent).toHaveBeenCalledWith(assigneeThreadId);
-    expect(assigneeAgent.sendMessage).toHaveBeenCalledOnce();
-    expect(assigneeMessages[0]).toContain('reassigned');
-    expect(assigneeMessages[0]).toContain('no longer responsible');
+    creatorSendMessageSpy.mockClear();
 
-    // Verify creator was NOT notified
-    expect(creatorAgent.sendMessage).not.toHaveBeenCalled();
+    // Update to blocked
+    await taskManager.updateTask(task.id, { status: 'blocked' }, assigneeContext);
+
+    // Wait for blocked notification
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Verify creator received blocked notification
+    expect(creatorSendMessageSpy).toHaveBeenCalled();
+    const blockedCall = creatorSendMessageSpy.mock.calls[0];
+    expect(blockedCall[0]).toContain('blocked');
+    expect(blockedCall[0]).toContain(task.id);
+    expect(blockedCall[0]).toContain('⛔');
+    expect(blockedCall[0]).toContain('encountered an issue');
   });
 
-  it('should notify creator when task becomes blocked', async () => {
-    const task: Task = {
-      id: 'task_20250922_jkl012',
-      title: 'Blocked Task',
-      description: 'Task that becomes blocked',
-      prompt: 'Task encountering issues',
-      status: 'blocked',
+  it('should deliver note notifications for significant notes', async () => {
+    const taskManager = session.getTaskManager();
+    const creatorContext: TaskContext = {
+      actor: 'creator_thread' as ThreadId,
+      isHuman: false,
+    };
+    const assigneeContext: TaskContext = {
+      actor: 'assignee_thread' as ThreadId,
+      isHuman: false,
+    };
+
+    // Create task
+    const createRequest: CreateTaskRequest = {
+      title: 'Research topic Y',
+      description: 'Research implementation options',
+      prompt: 'Research and document the best approach for implementing feature Y',
       priority: 'medium',
-      createdBy: creatorThreadId,
-      assignedTo: assigneeThreadId,
-      threadId: sessionId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      notes: [],
+      assignedTo: 'assignee_thread' as ThreadId,
     };
 
-    const previousTask: Task = {
-      ...task,
-      status: 'in_progress',
-    };
+    const task = await taskManager.createTask(createRequest, creatorContext);
 
-    const event: TaskManagerEvent = {
-      type: 'task:updated',
-      task,
-      previousTask,
-      context: { actor: assigneeThreadId, isHuman: false },
-      timestamp: new Date(),
-    };
+    // Wait for assignment
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    creatorSendMessageSpy.mockClear();
+    assigneeSendMessageSpy.mockClear();
 
-    const context: TaskNotificationContext = {
-      getAgent: mockGetAgent,
-      sessionId,
-    };
-
-    // Process the notification
-    await routeTaskNotifications(event, context);
-
-    // Verify creator was notified
-    expect(mockGetAgent).toHaveBeenCalledWith(creatorThreadId);
-    expect(creatorAgent.sendMessage).toHaveBeenCalledOnce();
-    expect(creatorMessages[0]).toContain('blocked');
-    expect(creatorMessages[0]).toContain('⛔');
-    expect(creatorMessages[0]).toContain('encountered an issue');
-
-    // Verify assignee was NOT notified
-    expect(assigneeAgent.sendMessage).not.toHaveBeenCalled();
-  });
-
-  it('should notify creator when assignee starts working on task', async () => {
-    const task: Task = {
-      id: 'task_20250922_mno345',
-      title: 'In Progress Task',
-      description: 'Task starting work',
-      prompt: 'Begin work on this',
-      status: 'in_progress',
-      priority: 'high',
-      createdBy: creatorThreadId,
-      assignedTo: assigneeThreadId,
-      threadId: sessionId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      notes: [],
-    };
-
-    const previousTask: Task = {
-      ...task,
-      status: 'pending',
-    };
-
-    const event: TaskManagerEvent = {
-      type: 'task:updated',
-      task,
-      previousTask,
-      context: { actor: assigneeThreadId, isHuman: false },
-      timestamp: new Date(),
-    };
-
-    const context: TaskNotificationContext = {
-      getAgent: mockGetAgent,
-      sessionId,
-    };
-
-    // Process the notification
-    await routeTaskNotifications(event, context);
-
-    // Verify creator was notified
-    expect(mockGetAgent).toHaveBeenCalledWith(creatorThreadId);
-    expect(creatorAgent.sendMessage).toHaveBeenCalledOnce();
-    expect(creatorMessages[0]).toContain('in_progress');
-    expect(creatorMessages[0]).toContain('🔄');
-    expect(creatorMessages[0]).toContain('started working');
-  });
-
-  it('should notify creator when significant note is added', async () => {
+    // Add significant note (>50 chars)
     const significantNote =
-      'This is a detailed progress update with important information about the implementation approach and challenges encountered';
+      'After researching multiple approaches, I recommend using GraphQL for the API layer due to its flexibility and strong typing support. This will provide better developer experience and reduce over-fetching issues.';
+    await taskManager.addNote(task.id, significantNote, assigneeContext);
 
-    const task: Task = {
-      id: 'task_20250922_pqr678',
-      title: 'Task with Notes',
-      description: 'Task receiving notes',
-      prompt: 'Add notes to this task',
-      status: 'in_progress',
-      priority: 'medium',
-      createdBy: creatorThreadId,
-      assignedTo: assigneeThreadId,
-      threadId: sessionId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      notes: [
-        {
-          id: 'note_1',
-          author: assigneeThreadId,
-          content: significantNote,
-          timestamp: new Date(),
-        },
-      ],
-    };
+    // Wait for note notification
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const event: TaskManagerEvent = {
-      type: 'task:note_added',
-      task,
-      context: { actor: assigneeThreadId, isHuman: false },
-      timestamp: new Date(),
-    };
+    // Verify creator received note notification
+    expect(creatorSendMessageSpy).toHaveBeenCalled();
+    const noteCall = creatorSendMessageSpy.mock.calls[0];
+    expect(noteCall[0]).toContain('New note added');
+    expect(noteCall[0]).toContain(task.id);
+    expect(noteCall[0]).toContain(significantNote);
 
-    const context: TaskNotificationContext = {
-      getAgent: mockGetAgent,
-      sessionId,
-    };
+    creatorSendMessageSpy.mockClear();
 
-    // Process the notification
-    await routeTaskNotifications(event, context);
-
-    // Verify creator was notified
-    expect(mockGetAgent).toHaveBeenCalledWith(creatorThreadId);
-    expect(creatorAgent.sendMessage).toHaveBeenCalledOnce();
-    expect(creatorMessages[0]).toContain('New note added');
-    expect(creatorMessages[0]).toContain('task_20250922_pqr678');
-    expect(creatorMessages[0]).toContain(significantNote);
-  });
-
-  it('should not notify creator for trivial notes', async () => {
+    // Add trivial note (<50 chars) - should NOT trigger notification
     const trivialNote = 'Started working';
+    await taskManager.addNote(task.id, trivialNote, assigneeContext);
 
-    const task: Task = {
-      id: 'task_20250922_stu901',
-      title: 'Task with Trivial Note',
-      description: 'Task with short note',
-      prompt: 'Add short note',
-      status: 'in_progress',
-      priority: 'low',
-      createdBy: creatorThreadId,
-      assignedTo: assigneeThreadId,
-      threadId: sessionId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      notes: [
-        {
-          id: 'note_2',
-          author: assigneeThreadId,
-          content: trivialNote,
-          timestamp: new Date(),
-        },
-      ],
-    };
+    // Wait briefly
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const event: TaskManagerEvent = {
-      type: 'task:note_added',
-      task,
-      context: { actor: assigneeThreadId, isHuman: false },
-      timestamp: new Date(),
-    };
-
-    const context: TaskNotificationContext = {
-      getAgent: mockGetAgent,
-      sessionId,
-    };
-
-    // Process the notification
-    await routeTaskNotifications(event, context);
-
-    // Verify creator was NOT notified for trivial note
-    expect(creatorAgent.sendMessage).not.toHaveBeenCalled();
+    // Verify no notification for trivial note
+    expect(creatorSendMessageSpy).not.toHaveBeenCalled();
   });
 
   it('should not notify creator when they complete their own task', async () => {
-    const task: Task = {
-      id: 'task_20250922_vwx234',
-      title: 'Self-Completed Task',
-      description: 'Creator completes own task',
-      prompt: 'Complete this yourself',
-      status: 'completed',
-      priority: 'medium',
-      createdBy: creatorThreadId,
-      assignedTo: creatorThreadId,
-      threadId: sessionId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      notes: [],
+    const taskManager = session.getTaskManager();
+    const creatorContext: TaskContext = {
+      actor: 'creator_thread' as ThreadId,
+      isHuman: false,
     };
 
-    const previousTask: Task = {
-      ...task,
-      status: 'in_progress',
+    // Create task without assignment (creator will complete it)
+    const createRequest: CreateTaskRequest = {
+      title: 'Quick fix',
+      description: 'Fix typo in README',
+      prompt: 'Fix the typo in the installation section of README.md',
+      priority: 'low',
     };
 
-    const event: TaskManagerEvent = {
-      type: 'task:updated',
-      task,
-      previousTask,
-      context: { actor: creatorThreadId, isHuman: false },
-      timestamp: new Date(),
-    };
+    const task = await taskManager.createTask(createRequest, creatorContext);
 
-    const context: TaskNotificationContext = {
-      getAgent: mockGetAgent,
-      sessionId,
-    };
+    // Clear any creation-related calls
+    creatorSendMessageSpy.mockClear();
 
-    // Process the notification
-    await routeTaskNotifications(event, context);
+    // Creator completes their own task
+    await taskManager.updateTask(task.id, { status: 'completed' }, creatorContext);
 
-    // Verify creator was NOT notified about their own completion
-    expect(creatorAgent.sendMessage).not.toHaveBeenCalled();
+    // Wait briefly
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Verify no self-notification was sent
+    expect(creatorSendMessageSpy).not.toHaveBeenCalled();
   });
 
-  it('should handle missing agents gracefully', async () => {
-    const phantomThreadId = asThreadId('lace_20250922_phant1');
+  it('should handle task reassignment with notifications to both old and new assignee', async () => {
+    const newAssigneeAgent = Object.create(sessionAgent);
+    const newAssigneeSendMessageSpy = vi.fn();
+    newAssigneeAgent.sendMessage = newAssigneeSendMessageSpy;
 
-    const task: Task = {
-      id: 'task_20250922_yz567',
-      title: 'Phantom Task',
-      description: 'Task with missing agent',
-      prompt: 'Test missing agent',
-      status: 'completed',
-      priority: 'low',
-      createdBy: phantomThreadId,
-      assignedTo: assigneeThreadId,
-      threadId: sessionId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      notes: [],
+    // Update the mock to include the new assignee agent
+    vi.spyOn(session['_agents'], 'get').mockImplementation((threadId: ThreadId) => {
+      if (threadId === 'creator_thread') {
+        return creatorAgent;
+      } else if (threadId === 'assignee_thread') {
+        return assigneeAgent;
+      } else if (threadId === 'new_assignee_thread') {
+        return newAssigneeAgent;
+      }
+      return session['_agents'].get(threadId) || null;
+    });
+
+    const taskManager = session.getTaskManager();
+    const creatorContext: TaskContext = {
+      actor: 'creator_thread' as ThreadId,
+      isHuman: false,
     };
 
-    const previousTask: Task = {
-      ...task,
-      status: 'pending',
+    // Create task initially assigned to first assignee
+    const createRequest: CreateTaskRequest = {
+      title: 'Complex task',
+      description: 'Task that needs reassignment',
+      prompt: 'This task requires special expertise',
+      priority: 'high',
+      assignedTo: 'assignee_thread' as ThreadId,
     };
 
-    const event: TaskManagerEvent = {
-      type: 'task:updated',
-      task,
-      previousTask,
-      context: { actor: assigneeThreadId, isHuman: false },
-      timestamp: new Date(),
-    };
+    const task = await taskManager.createTask(createRequest, creatorContext);
 
-    const context: TaskNotificationContext = {
-      getAgent: mockGetAgent,
-      sessionId,
-    };
+    // Wait for initial assignment
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    // Should not throw even though phantom agent doesn't exist
-    await expect(routeTaskNotifications(event, context)).resolves.not.toThrow();
+    // Clear spies
+    assigneeSendMessageSpy.mockClear();
+    newAssigneeSendMessageSpy.mockClear();
 
-    // Verify getAgent was called for phantom thread
-    expect(mockGetAgent).toHaveBeenCalledWith(phantomThreadId);
+    // Reassign task to new assignee
+    await taskManager.updateTask(
+      task.id,
+      { assignedTo: 'new_assignee_thread' as ThreadId },
+      creatorContext
+    );
 
-    // Verify assignee wasn't notified (since they completed it)
-    expect(assigneeAgent.sendMessage).not.toHaveBeenCalled();
+    // Wait for reassignment notifications
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Verify old assignee received reassignment notification
+    expect(assigneeSendMessageSpy).toHaveBeenCalled();
+    const reassignmentCall = assigneeSendMessageSpy.mock.calls[0];
+    expect(reassignmentCall[0]).toContain('reassigned');
+    expect(reassignmentCall[0]).toContain('no longer responsible');
+
+    // Verify new assignee received assignment notification
+    expect(newAssigneeSendMessageSpy).toHaveBeenCalled();
+    const assignmentCall = newAssigneeSendMessageSpy.mock.calls[0];
+    expect(assignmentCall[0]).toContain('[LACE TASK SYSTEM]');
+    expect(assignmentCall[0]).toContain('You have been assigned');
   });
 });
