@@ -59,6 +59,11 @@ export class Session {
   private _destroyed = false;
   private _projectId?: string;
 
+  // Task notification event handlers for proper cleanup
+  private _onTaskUpdated?: (event: TaskManagerEvent) => Promise<void>;
+  private _onTaskCreated?: (event: TaskManagerEvent) => Promise<void>;
+  private _onTaskNoteAdded?: (event: TaskManagerEvent) => Promise<void>;
+
   constructor(
     sessionId: ThreadId,
     sessionData: SessionData,
@@ -1034,17 +1039,7 @@ export class Session {
         });
       });
 
-      // Send initial task notification to the new agent
-      try {
-        await this.sendTaskNotification(agent, task);
-      } catch (error) {
-        logger.error('Failed to send task notification to spawned agent', {
-          threadId: agent.threadId,
-          task: task.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        // Don't fail task creation if agent fails - the task is still created
-      }
+      // Task notification will be sent automatically via TaskManager events
 
       return asThreadId(agent.threadId);
     };
@@ -1376,18 +1371,47 @@ Use your task_add_note tool to record important notes as you work and your task_
    * - All notes added by other agents
    */
   private setupTaskNotificationRouting(): void {
-    this._taskManager.on(
-      'task:updated',
-      (event: TaskManagerEvent) => void this.handleTaskUpdate(event)
-    );
-    this._taskManager.on(
-      'task:created',
-      (event: TaskManagerEvent) => void this.handleTaskCreated(event)
-    );
-    this._taskManager.on(
-      'task:note_added',
-      (event: TaskManagerEvent) => void this.handleTaskNoteAdded(event)
-    );
+    // Store bound handlers for proper cleanup
+    this._onTaskUpdated = async (event: TaskManagerEvent) => {
+      try {
+        await this.handleTaskUpdate(event);
+      } catch (error) {
+        logger.error('Failed to handle task update notification', {
+          sessionId: this._sessionId,
+          taskId: event.task.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+
+    this._onTaskCreated = async (event: TaskManagerEvent) => {
+      try {
+        await this.handleTaskCreated(event);
+      } catch (error) {
+        logger.error('Failed to handle task creation notification', {
+          sessionId: this._sessionId,
+          taskId: event.task.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+
+    this._onTaskNoteAdded = async (event: TaskManagerEvent) => {
+      try {
+        await this.handleTaskNoteAdded(event);
+      } catch (error) {
+        logger.error('Failed to handle task note notification', {
+          sessionId: this._sessionId,
+          taskId: event.task.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+
+    // Register the handlers
+    this._taskManager.on('task:updated', this._onTaskUpdated);
+    this._taskManager.on('task:created', this._onTaskCreated);
+    this._taskManager.on('task:note_added', this._onTaskNoteAdded);
   }
 
   /** Handles task update events and routes notifications to relevant agents */
@@ -1418,11 +1442,17 @@ Use your task_add_note tool to record important notes as you work and your task_
    * Cleanup method to remove task notification event listeners.
    *
    * This should be called when the session is being destroyed to prevent memory leaks
-   * from accumulated event listeners.
+   * from accumulated event listeners. Only removes listeners added by this session.
    */
   cleanup(): void {
-    this._taskManager.removeAllListeners('task:updated');
-    this._taskManager.removeAllListeners('task:created');
-    this._taskManager.removeAllListeners('task:note_added');
+    if (this._onTaskUpdated) {
+      this._taskManager.removeListener('task:updated', this._onTaskUpdated);
+    }
+    if (this._onTaskCreated) {
+      this._taskManager.removeListener('task:created', this._onTaskCreated);
+    }
+    if (this._onTaskNoteAdded) {
+      this._taskManager.removeListener('task:note_added', this._onTaskNoteAdded);
+    }
   }
 }

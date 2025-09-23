@@ -10,7 +10,7 @@ describe('Task Notification Types', () => {
   it('should compile notification types correctly', () => {
     // Just test that types compile - no runtime logic yet
     const notification: TaskNotification = {
-      threadId: 'lace_20250922_test01' as any,
+      threadId: asThreadId('lace_20250922_test01'),
       message: 'test',
       notificationType: 'completion',
       taskId: 'task_123',
