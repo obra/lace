@@ -212,7 +212,7 @@ describe('Task-Based DelegateTool Integration', () => {
               title: 'Aborted Task',
               prompt: 'This task should be aborted',
               expected_response: 'Should not complete',
-              assignedTo: 'new:lace;anthropic:claude-3-5-haiku-20241022',
+              assignedTo: `new:lace;${providerInstanceId}:claude-3-5-haiku-20241022`,
             },
           ],
         },

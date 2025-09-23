@@ -96,9 +96,6 @@ describe('Multi-Agent Task Manager Integration', () => {
       }
     );
 
-    // Mock the ProviderRegistry createProvider method
-    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
-
     // Create project first with provider configuration
     project = Project.create(
       'Integration Test Project',

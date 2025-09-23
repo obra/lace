@@ -981,6 +981,9 @@ export class Session {
 
     this._destroyed = true;
 
+    // Clean up task notification listeners
+    this.cleanup();
+
     // Remove from registry
     Session._sessionRegistry.delete(this._sessionId);
 

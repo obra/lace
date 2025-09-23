@@ -9,16 +9,16 @@ import {
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 import { ProviderRegistry } from '~/providers/registry';
-import {
-  AIProvider,
+import { AIProvider } from '~/providers/base-provider';
+import type {
   ProviderInfo,
   ModelInfo,
   ProviderMessage,
   ProviderResponse,
   ProviderConfig,
 } from '~/providers/base-provider';
-import { ToolCall } from '~/tools/types';
-import { Tool } from '~/tools/tool';
+import type { ToolCall } from '~/tools/types';
+import type { Tool } from '~/tools/tool';
 
 export interface DelegationTestSetup {
   session: Session;
@@ -201,13 +201,13 @@ export async function createDelegationTestSetup(options?: {
   // Mock Agent._createProviderInstance to handle dynamic agent creation in delegation
   const { Agent } = await import('~/agents/agent');
 
-  // Type-safe approach: mock the method by name without any
-  const createProviderInstanceSpy = vi.fn().mockResolvedValue(new MockProvider('anthropic', model));
-  Object.defineProperty(Agent.prototype, '_createProviderInstance', {
-    value: createProviderInstanceSpy,
-    writable: true,
-    configurable: true,
-  });
+  // Type-safe spy to ensure auto-restore via vi.restoreAllMocks()
+  type AgentPrivate = {
+    _createProviderInstance: (providerType: string, modelId: string) => Promise<AIProvider>;
+  };
+  const _createProviderInstanceSpy = vi
+    .spyOn(Agent.prototype as unknown as AgentPrivate, '_createProviderInstance')
+    .mockResolvedValue(new MockProvider('anthropic', model));
 
   // Provider registry will auto-initialize when needed
   // Just ensure singleton exists for test consistency

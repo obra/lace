@@ -313,6 +313,7 @@ describe('Agent Tool Permissions', () => {
       arguments: {
         title: 'Test task',
         description: 'A test task',
+        prompt: 'Please complete this test task',
       },
     };
 

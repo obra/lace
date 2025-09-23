@@ -76,7 +76,7 @@ class ScriptedMockProvider extends TestProvider {
 }
 
 describe('Task Notification System - Real Integration', () => {
-  const _tempDir = setupCoreTest();
+  const setup = setupCoreTest();
   let project: Project;
   let mainSession: Session;
   let providerInstanceId: string;
@@ -128,7 +128,7 @@ describe('Task Notification System - Real Integration', () => {
     // Create project
     project = Project.create(
       'Notification Test Project',
-      '/tmp/test-notifications',
+      setup.tempDir,
       'Test project for notification integration',
       {
         providerInstanceId,
@@ -271,7 +271,7 @@ describe('Task Notification System - Real Integration', () => {
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     // Get initial event count for creator
-    const initialEventCount = creatorAgent.getLaceEvents(creatorThreadId).length || 0;
+    const initialEventCount = (creatorAgent.getLaceEvents(creatorThreadId) || []).length;
 
     // Assignee completes the task
     await taskManager.updateTask(task.id, { status: 'completed' }, assigneeContext);
@@ -413,7 +413,7 @@ describe('Task Notification System - Real Integration', () => {
     const task = await taskManager.createTask(createRequest, creatorContext);
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    const initialEventCount = creatorAgent.getLaceEvents(creatorThreadId).length || 0;
+    const initialEventCount = (creatorAgent.getLaceEvents(creatorThreadId) || []).length;
 
     // Add longer note
     const longerNote =
@@ -437,7 +437,7 @@ describe('Task Notification System - Real Integration', () => {
     expect(noteNotification?.data).toContain(longerNote);
 
     // Add short note
-    const preShortNoteCount = creatorAgent.getLaceEvents(creatorThreadId).length || 0;
+    const preShortNoteCount = (creatorAgent.getLaceEvents(creatorThreadId) || []).length;
     await taskManager.addNote(task.id, 'Started', assigneeContext);
     await new Promise((resolve) => setTimeout(resolve, 200));
 
@@ -482,7 +482,7 @@ describe('Task Notification System - Real Integration', () => {
     const task = await taskManager.createTask(createRequest, creatorContext);
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    const initialEventCount = creatorAgent.getLaceEvents(creatorThreadId).length || 0;
+    const initialEventCount = (creatorAgent.getLaceEvents(creatorThreadId) || []).length;
 
     // Creator completes their own task
     await taskManager.updateTask(task.id, { status: 'completed' }, creatorContext);
@@ -505,8 +505,8 @@ describe('Task Notification System - Real Integration', () => {
 
   it('should handle concurrent sessions with isolated notification routing', async () => {
     // Create two projects for the sessions
-    const project1 = Project.create('Test Project 1', '/tmp/test1', 'Project 1');
-    const project2 = Project.create('Test Project 2', '/tmp/test2', 'Project 2');
+    const project1 = Project.create('Test Project 1', `${setup.tempDir}/test1`, 'Project 1');
+    const project2 = Project.create('Test Project 2', `${setup.tempDir}/test2`, 'Project 2');
 
     // Create two separate sessions with their own agents
     const session1 = Session.create({
@@ -677,8 +677,10 @@ describe('Task Notification System - Real Integration', () => {
     const task = await taskManager.createTask(createRequest, creatorContext);
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    const oldAssigneeInitialCount = oldAssigneeAgent.getLaceEvents(oldAssigneeThreadId).length || 0;
-    const newAssigneeInitialCount = newAssigneeAgent.getLaceEvents(newAssigneeThreadId).length || 0;
+    const oldAssigneeInitialCount = (oldAssigneeAgent.getLaceEvents(oldAssigneeThreadId) || [])
+      .length;
+    const newAssigneeInitialCount = (newAssigneeAgent.getLaceEvents(newAssigneeThreadId) || [])
+      .length;
 
     // Reassign task
     await taskManager.updateTask(task.id, { assignedTo: newAssigneeThreadId }, creatorContext);

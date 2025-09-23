@@ -12,9 +12,7 @@ import {
   faEdit,
   faStickyNote,
   faEye,
-  faExclamationTriangle,
   faClock,
-  faFlag,
   faUser,
   faArrowRight,
 } from '@fortawesome/free-solid-svg-icons';

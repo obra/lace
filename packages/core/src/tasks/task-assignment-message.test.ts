@@ -113,7 +113,11 @@ describe('Task Assignment Message Sending', () => {
 
     // Mock the Agent's internal provider creation to use our message-capturing provider
     const { Agent } = await import('~/agents/agent');
-    vi.spyOn(Agent.prototype, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
+    // @ts-expect-error: accessing private method for test-only provider injection
+    vi.spyOn(
+      Agent.prototype as unknown as { _createProviderInstance: () => Promise<unknown> },
+      '_createProviderInstance'
+    ).mockResolvedValue(mockProvider);
 
     // Create project and session
     project = Project.create(

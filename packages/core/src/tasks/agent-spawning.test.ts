@@ -214,7 +214,7 @@ describe('Agent Spawning', () => {
         const parts = spec.split(':');
         const persona = parts[1];
         const [provider, model] = parts[2].split('/');
-        expect(() => createNewAgentSpec(persona, provider, model)).not.toThrow();
+        expect(() => createNewAgentSpec(persona, `${provider}:${model}`)).not.toThrow();
       });
     });
 

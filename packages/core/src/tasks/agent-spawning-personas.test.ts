@@ -3,6 +3,7 @@ import { TaskManager, type AgentCreationCallback } from '~/tasks/task-manager';
 import { DatabasePersistence } from '~/persistence/database';
 import { createNewAgentSpec, asNewAgentSpec, asThreadId } from '~/threads/types';
 import { TaskContext } from '~/tasks/types';
+import { parseProviderModel } from '~/providers/provider-utils';
 
 describe('Task Agent Spawning with Personas', () => {
   let taskManager: TaskManager;
@@ -143,8 +144,13 @@ describe('Task Agent Spawning with Personas', () => {
         context
       );
 
-      const [provider, model] = modelSpec.split(':');
-      expect(mockAgentCreator).toHaveBeenCalledWith(persona, provider, model, expect.any(Object));
+      const { instanceId, modelId } = parseProviderModel(modelSpec);
+      expect(mockAgentCreator).toHaveBeenCalledWith(
+        persona,
+        instanceId,
+        modelId,
+        expect.any(Object)
+      );
     }
   });
 

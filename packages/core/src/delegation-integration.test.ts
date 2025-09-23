@@ -118,9 +118,6 @@ describe('Delegation Integration Tests', () => {
       }
     );
 
-    // Mock the ProviderRegistry constructor to return our mock registry
-    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
-
     // Set up test environment using Session/Project pattern for proper tool injection
     threadManager = new ThreadManager();
     project = Project.create(

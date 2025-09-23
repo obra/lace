@@ -2,6 +2,7 @@
 // ABOUTME: Handles completion, assignment, status change, and note notifications
 
 import type { ThreadId } from '~/threads/types';
+import { isNewAgentSpec } from '~/threads/types';
 import type { Task, TaskContext, TaskNote } from '~/tasks/types';
 import type { Agent } from '~/agents/agent';
 import { logger } from '~/utils/logger';
@@ -111,8 +112,8 @@ function analyzeTaskEventForNotifications(
 function analyzeTaskCreation(task: Task, context: TaskContext): TaskNotification[] {
   const notifications: TaskNotification[] = [];
 
-  // Notify assignee if they didn't create the task
-  if (task.assignedTo && task.assignedTo !== context.actor) {
+  // Notify assignee if they didn't create the task (only if it's an actual agent, not a NewAgentSpec)
+  if (task.assignedTo && task.assignedTo !== context.actor && !isNewAgentSpec(task.assignedTo)) {
     notifications.push({
       threadId: task.assignedTo as ThreadId,
       message: formatTaskAssignment(task),
@@ -173,8 +174,8 @@ function analyzeTaskUpdate(
 
   // Reassignment notifications
   if (assigneeChanged) {
-    // Notify new assignee if they didn't cause the change
-    if (task.assignedTo && task.assignedTo !== context.actor) {
+    // Notify new assignee if they didn't cause the change (only if it's an actual agent, not a NewAgentSpec)
+    if (task.assignedTo && task.assignedTo !== context.actor && !isNewAgentSpec(task.assignedTo)) {
       notifications.push({
         threadId: task.assignedTo as ThreadId,
         message: formatTaskAssignment(task),
@@ -184,8 +185,12 @@ function analyzeTaskUpdate(
       });
     }
 
-    // Notify old assignee about reassignment
-    if (previousTask.assignedTo && previousTask.assignedTo !== context.actor) {
+    // Notify old assignee about reassignment (only if it's an actual agent, not a NewAgentSpec)
+    if (
+      previousTask.assignedTo &&
+      previousTask.assignedTo !== context.actor &&
+      !isNewAgentSpec(previousTask.assignedTo)
+    ) {
       notifications.push({
         threadId: previousTask.assignedTo as ThreadId,
         message: formatReassignmentNotification(task, previousTask.assignedTo as ThreadId),

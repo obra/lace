@@ -145,7 +145,9 @@ describe('Task Management Workflow Integration', () => {
 
     // Import Agent dynamically to avoid circular imports in test setup
     const { Agent } = await import('~/agents/agent');
-    vi.spyOn(Agent.prototype, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
+    // TODO(ts): Private method mock for test seam (no public hook available)
+    // @ts-expect-error – mocking private method for test
+    vi.spyOn(Agent.prototype, '_createProviderInstance').mockResolvedValue(mockProvider);
 
     // Create project and session with provider configuration
     project = Project.create(
