@@ -503,6 +503,138 @@ describe('Task Notification System - Real Integration', () => {
     expect(selfNotification).toBeUndefined();
   });
 
+  it('should handle concurrent sessions with isolated notification routing', async () => {
+    // Create two projects for the sessions
+    const project1 = Project.create('Test Project 1', '/tmp/test1', 'Project 1');
+    const project2 = Project.create('Test Project 2', '/tmp/test2', 'Project 2');
+
+    // Create two separate sessions with their own agents
+    const session1 = Session.create({
+      name: 'Session 1',
+      projectId: project1.getId(),
+      configuration: {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      },
+    });
+
+    const session2 = Session.create({
+      name: 'Session 2',
+      projectId: project2.getId(),
+      configuration: {
+        providerInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      },
+    });
+
+    // Create agents in each session
+    const agent1A = await session1.spawnAgent(
+      'agent-1a',
+      providerInstanceId,
+      'claude-3-5-haiku-20241022'
+    );
+    const agent1B = await session1.spawnAgent(
+      'agent-1b',
+      providerInstanceId,
+      'claude-3-5-haiku-20241022'
+    );
+
+    const agent2A = await session2.spawnAgent(
+      'agent-2a',
+      providerInstanceId,
+      'claude-3-5-haiku-20241022'
+    );
+    const agent2B = await session2.spawnAgent(
+      'agent-2b',
+      providerInstanceId,
+      'claude-3-5-haiku-20241022'
+    );
+
+    const taskManager1 = session1.getTaskManager()!;
+    const taskManager2 = session2.getTaskManager()!;
+
+    // Create and assign tasks in session 1
+    const task1 = await taskManager1.createTask(
+      {
+        title: 'Task in session 1',
+        prompt: 'Do something in session 1',
+        assignedTo: agent1B.threadId,
+      },
+      { actor: agent1A.threadId, isHuman: false }
+    );
+
+    // Create and assign tasks in session 2
+    const task2 = await taskManager2.createTask(
+      {
+        title: 'Task in session 2',
+        prompt: 'Do something in session 2',
+        assignedTo: agent2B.threadId,
+      },
+      { actor: agent2A.threadId, isHuman: false }
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // Complete task in session 1
+    await taskManager1.updateTask(
+      task1.id,
+      { status: 'completed' },
+      { actor: agent1B.threadId, isHuman: false }
+    );
+
+    // Complete task in session 2
+    await taskManager2.updateTask(
+      task2.id,
+      { status: 'completed' },
+      { actor: agent2B.threadId, isHuman: false }
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // Verify session 1 agents only received session 1 notifications
+    const agent1AEvents = agent1A.getLaceEvents(agent1A.threadId) || [];
+    const agent1BEvents = agent1B.getLaceEvents(agent1B.threadId) || [];
+
+    const session1CompletionNotif = agent1AEvents.find(
+      (event) =>
+        event.type === 'USER_MESSAGE' &&
+        typeof event.data === 'string' &&
+        event.data.includes('Task in session 1') &&
+        event.data.includes('completed')
+    );
+
+    const session2CrossNotif = agent1AEvents.find(
+      (event) =>
+        event.type === 'USER_MESSAGE' &&
+        typeof event.data === 'string' &&
+        event.data.includes('Task in session 2')
+    );
+
+    expect(session1CompletionNotif).toBeDefined();
+    expect(session2CrossNotif).toBeUndefined(); // Should NOT receive session 2 notifications
+
+    // Verify session 2 agents only received session 2 notifications
+    const agent2AEvents = agent2A.getLaceEvents(agent2A.threadId) || [];
+
+    const session2CompletionNotif = agent2AEvents.find(
+      (event) =>
+        event.type === 'USER_MESSAGE' &&
+        typeof event.data === 'string' &&
+        event.data.includes('Task in session 2') &&
+        event.data.includes('completed')
+    );
+
+    const session1CrossNotif = agent2AEvents.find(
+      (event) =>
+        event.type === 'USER_MESSAGE' &&
+        typeof event.data === 'string' &&
+        event.data.includes('Task in session 1')
+    );
+
+    expect(session2CompletionNotif).toBeDefined();
+    expect(session1CrossNotif).toBeUndefined(); // Should NOT receive session 1 notifications
+  });
+
   it('should handle task reassignment with notifications to both assignees', async () => {
     // Spawn all agents within the main session
     const creatorAgent = await mainSession.spawnAgent(
