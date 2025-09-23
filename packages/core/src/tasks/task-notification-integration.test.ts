@@ -593,7 +593,7 @@ describe('Task Notification System - Real Integration', () => {
 
     // Verify session 1 agents only received session 1 notifications
     const agent1AEvents = agent1A.getLaceEvents(agent1A.threadId) || [];
-    const agent1BEvents = agent1B.getLaceEvents(agent1B.threadId) || [];
+    const _agent1BEvents = agent1B.getLaceEvents(agent1B.threadId) || [];
 
     const session1CompletionNotif = agent1AEvents.find(
       (event) =>

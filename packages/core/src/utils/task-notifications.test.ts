@@ -73,7 +73,7 @@ describe('Task Notification Routing', () => {
       expect.objectContaining({
         queue: true,
         metadata: expect.objectContaining({
-          source: 'task_notification',
+          source: 'task_system',
           priority: 'high',
         }),
       })
@@ -120,7 +120,7 @@ describe('Task Notification Routing', () => {
       expect.objectContaining({
         queue: true,
         metadata: expect.objectContaining({
-          source: 'task_notification',
+          source: 'task_system',
           priority: 'high',
         }),
       })
@@ -187,7 +187,7 @@ describe('Task Notification Routing', () => {
       expect.objectContaining({
         queue: true,
         metadata: expect.objectContaining({
-          source: 'task_notification',
+          source: 'task_system',
           priority: 'high',
         }),
       })
@@ -204,7 +204,7 @@ describe('Task Notification Routing', () => {
       expect.objectContaining({
         queue: true,
         metadata: expect.objectContaining({
-          source: 'task_notification',
+          source: 'task_system',
           priority: 'normal',
         }),
       })
@@ -263,7 +263,7 @@ describe('Task Notification Routing', () => {
       expect.objectContaining({
         queue: true,
         metadata: expect.objectContaining({
-          source: 'task_notification',
+          source: 'task_system',
           priority: 'high',
         }),
       })
@@ -322,7 +322,7 @@ describe('Task Notification Routing', () => {
       expect.objectContaining({
         queue: true,
         metadata: expect.objectContaining({
-          source: 'task_notification',
+          source: 'task_system',
           priority: 'high',
         }),
       })
@@ -547,7 +547,7 @@ describe('Task Notification Routing', () => {
       expect.objectContaining({
         queue: true,
         metadata: expect.objectContaining({
-          source: 'task_notification',
+          source: 'task_system',
           priority: 'normal',
         }),
       })
@@ -601,7 +601,7 @@ describe('Task Notification Routing', () => {
       expect.objectContaining({
         queue: true,
         metadata: expect.objectContaining({
-          source: 'task_notification',
+          source: 'task_system',
           priority: 'normal',
         }),
       })

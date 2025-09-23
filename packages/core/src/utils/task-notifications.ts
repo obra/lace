@@ -264,7 +264,7 @@ export async function routeTaskNotifications(
       await agent.sendMessage(notification.message, {
         queue: true,
         metadata: {
-          source: 'task_notification',
+          source: 'task_system',
           priority: notification.priority === 'immediate' ? 'high' : 'normal',
         },
       });
