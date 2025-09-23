@@ -710,4 +710,51 @@ describe('Task Notification Routing', () => {
     // Old assignee should NOT be notified when they initiated the reassignment
     expect(mockOldAgent.sendMessage).not.toHaveBeenCalled();
   });
+
+  it('should handle sendMessage errors gracefully', async () => {
+    const mockAgent = {
+      sendMessage: vi.fn().mockRejectedValue(new Error('Network error')),
+    };
+    const mockGetAgent = vi.fn().mockReturnValue(mockAgent);
+
+    const taskEvent = {
+      type: 'task:updated' as const,
+      task: {
+        id: 'task_error',
+        title: 'Error Task',
+        status: 'completed' as const,
+        createdBy: creatorAgent,
+        assignedTo: assigneeAgent,
+        prompt: 'Work',
+        priority: 'medium' as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        notes: [],
+      },
+      previousTask: {
+        id: 'task_error',
+        title: 'Error Task',
+        status: 'in_progress' as const,
+        createdBy: creatorAgent,
+        assignedTo: assigneeAgent,
+        prompt: 'Work',
+        priority: 'medium' as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        notes: [],
+      },
+      context: { actor: assigneeAgent },
+      timestamp: new Date(),
+    };
+
+    // Should not throw even when sendMessage fails
+    await expect(
+      routeTaskNotifications(taskEvent, {
+        getAgent: mockGetAgent,
+        sessionId,
+      })
+    ).resolves.toBeUndefined();
+
+    expect(mockAgent.sendMessage).toHaveBeenCalled();
+  });
 });

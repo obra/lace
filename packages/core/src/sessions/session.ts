@@ -1410,4 +1410,16 @@ Use your task_add_note tool to record important notes as you work and your task_
       sessionId: this._sessionId,
     });
   }
+
+  /**
+   * Cleanup method to remove task notification event listeners.
+   *
+   * This should be called when the session is being destroyed to prevent memory leaks
+   * from accumulated event listeners.
+   */
+  cleanup(): void {
+    this._taskManager.removeAllListeners('task:updated');
+    this._taskManager.removeAllListeners('task:created');
+    this._taskManager.removeAllListeners('task:note_added');
+  }
 }

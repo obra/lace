@@ -4,6 +4,7 @@
 import type { ThreadId } from '~/threads/types';
 import type { Task, TaskContext, TaskNote } from '~/tasks/types';
 import type { Agent } from '~/agents/agent';
+import { logger } from '~/utils/logger';
 
 export interface TaskNotification {
   threadId: ThreadId;
@@ -260,13 +261,29 @@ export async function routeTaskNotifications(
   for (const notification of notifications) {
     const agent = context.getAgent(notification.threadId);
     if (agent) {
-      // Queue notifications if agent is busy - they'll be processed when agent returns to idle
-      await agent.sendMessage(notification.message, {
-        queue: true,
-        metadata: {
-          source: 'task_system',
-          priority: notification.priority === 'immediate' ? 'high' : 'normal',
-        },
+      try {
+        // Queue notifications if agent is busy - they'll be processed when agent returns to idle
+        await agent.sendMessage(notification.message, {
+          queue: true,
+          metadata: {
+            source: 'task_system',
+            priority: notification.priority === 'immediate' ? 'high' : 'normal',
+          },
+        });
+      } catch (error) {
+        logger.error('Failed to send task notification', {
+          threadId: notification.threadId,
+          taskId: notification.taskId,
+          notificationType: notification.notificationType,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    } else {
+      logger.warn('Agent not found for task notification', {
+        threadId: notification.threadId,
+        taskId: notification.taskId,
+        notificationType: notification.notificationType,
+        sessionId: context.sessionId,
       });
     }
   }
