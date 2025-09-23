@@ -59,15 +59,20 @@ export class Session {
   private _destroyed = false;
   private _projectId?: string;
 
-  constructor(sessionId: ThreadId, sessionData: SessionData, threadManager: ThreadManager) {
+  constructor(
+    sessionId: ThreadId,
+    sessionData: SessionData,
+    threadManager: ThreadManager,
+    taskManager?: TaskManager
+  ) {
     this._sessionId = sessionId;
     this._sessionData = sessionData;
     this._projectId = sessionData.projectId;
 
     this._threadManager = threadManager;
 
-    // Initialize TaskManager for this session
-    this._taskManager = new TaskManager(this._sessionId, getPersistence());
+    // Use provided TaskManager or create a new one
+    this._taskManager = taskManager || new TaskManager(this._sessionId, getPersistence());
 
     // Create session-scoped MCP server manager
     this._mcpServerManager = new MCPServerManager();
@@ -105,10 +110,6 @@ export class Session {
     // Create thread for this session
     const threadId = threadManager.createThread(sessionData.id, sessionData.id, options.projectId);
 
-    // Create TaskManager using global persistence
-    // Note: We'll update this with agent creation callback after session is created
-    const taskManager = new TaskManager(asThreadId(threadId), getPersistence());
-
     // Note: ToolExecutor will be created after session is created
 
     // Get effective configuration by merging project and session configs
@@ -116,6 +117,18 @@ export class Session {
       options.projectId,
       options.configuration
     );
+
+    // Create TaskManager using global persistence
+    // Note: We'll update this with agent creation callback after session is created
+    const taskManager = new TaskManager(asThreadId(threadId), getPersistence());
+
+    // Set session config on TaskManager immediately
+    if (effectiveConfig.providerInstanceId && effectiveConfig.modelId) {
+      taskManager.setSessionConfig({
+        providerInstanceId: effectiveConfig.providerInstanceId,
+        modelId: effectiveConfig.modelId,
+      });
+    }
 
     // Extract provider instance and model from effective configuration
     let providerInstanceId = effectiveConfig.providerInstanceId;
@@ -207,8 +220,8 @@ export class Session {
 
     // Agent will auto-initialize token budget based on model
 
-    // Create session instance first
-    const session = new Session(asThreadId(threadId), sessionData, threadManager);
+    // Create session instance first, passing the TaskManager we already created
+    const session = new Session(asThreadId(threadId), sessionData, threadManager, taskManager);
 
     // Create configured tool executor
     const toolExecutor = session.createConfiguredToolExecutor();
@@ -231,17 +244,6 @@ export class Session {
 
     // Add coordinator to session
     session._agents.set(asThreadId(threadId), sessionAgent);
-    // Update the session's task manager to use the one we created
-    session._taskManager = taskManager;
-
-    // Set session configuration for model resolution
-    const sessionEffectiveConfig = session.getEffectiveConfiguration();
-    if (sessionEffectiveConfig.providerInstanceId && sessionEffectiveConfig.modelId) {
-      taskManager.setSessionConfig({
-        providerInstanceId: sessionEffectiveConfig.providerInstanceId,
-        modelId: sessionEffectiveConfig.modelId,
-      });
-    }
 
     // Set up agent creation callback for task-based agent spawning
     session.setupAgentCreationCallback();
@@ -399,8 +401,8 @@ export class Session {
 
     logger.debug(`Creating session for ${sessionId}`);
 
-    // Create session instance
-    const session = new Session(sessionId, sessionData, threadManager);
+    // Create session instance, passing the TaskManager we already created
+    const session = new Session(sessionId, sessionData, threadManager, taskManager);
 
     // Create and initialize coordinator agent
     let coordinatorAgent: Agent;
@@ -1359,9 +1361,18 @@ Use your task_add_note tool to record important notes as you work and your task_
   }
 
   private setupTaskNotificationRouting(): void {
-    this._taskManager.on('task:updated', this.handleTaskUpdate.bind(this));
-    this._taskManager.on('task:created', this.handleTaskCreated.bind(this));
-    this._taskManager.on('task:note_added', this.handleTaskNoteAdded.bind(this));
+    this._taskManager.on(
+      'task:updated',
+      (event: TaskManagerEvent) => void this.handleTaskUpdate(event)
+    );
+    this._taskManager.on(
+      'task:created',
+      (event: TaskManagerEvent) => void this.handleTaskCreated(event)
+    );
+    this._taskManager.on(
+      'task:note_added',
+      (event: TaskManagerEvent) => void this.handleTaskNoteAdded(event)
+    );
   }
 
   private async handleTaskUpdate(event: TaskManagerEvent): Promise<void> {

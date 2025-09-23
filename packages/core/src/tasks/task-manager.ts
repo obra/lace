@@ -17,7 +17,6 @@ export type AgentCreationCallback = (
 ) => Promise<ThreadId>;
 
 export class TaskManager extends EventEmitter {
-  private instanceId: string;
   private sessionConfig?: ModelResolutionContext;
 
   constructor(
@@ -26,8 +25,6 @@ export class TaskManager extends EventEmitter {
     private createAgent?: AgentCreationCallback
   ) {
     super();
-    this.instanceId = Math.random().toString(36).substring(2, 8);
-    logger.debug('TaskManager created', { sessionId, instanceId: this.instanceId });
   }
 
   setSessionConfig(config: ModelResolutionContext): void {
@@ -155,7 +152,6 @@ export class TaskManager extends EventEmitter {
 
     // Emit event for real-time updates
     logger.debug('TaskManager emitting task:updated event', {
-      instanceId: this.instanceId,
       taskId: updatedTask.id,
       status: updatedTask.status,
       actor: context.actor,

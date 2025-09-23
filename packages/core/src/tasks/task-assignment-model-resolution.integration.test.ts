@@ -33,6 +33,10 @@ describe('Task Assignment Model Resolution Integration', () => {
     session = Session.create({
       name: 'Test Session',
       projectId: project.getId(),
+      configuration: {
+        providerInstanceId: 'default-instance',
+        modelId: 'default-model',
+      },
     });
 
     taskManager = session.getTaskManager()!;

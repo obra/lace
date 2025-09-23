@@ -230,7 +230,7 @@ function analyzeNoteAdded(task: Task, context: TaskContext): TaskNotification[] 
 }
 
 // Additional formatting functions
-function formatReassignmentNotification(task: Task, oldAssignee: ThreadId): string {
+function formatReassignmentNotification(task: Task, _oldAssignee: ThreadId): string {
   return `Task '${task.id}' has been reassigned:
 Title: "${task.title}"
 New assignee: ${task.assignedTo || 'unassigned'}
@@ -263,7 +263,14 @@ export async function routeTaskNotifications(
   for (const notification of notifications) {
     const agent = context.getAgent(notification.threadId);
     if (agent) {
-      await agent.sendMessage(notification.message);
+      // Queue notifications if agent is busy - they'll be processed when agent returns to idle
+      await agent.sendMessage(notification.message, {
+        queue: true,
+        metadata: {
+          source: 'task_notification',
+          priority: notification.priority === 'immediate' ? 'high' : 'normal',
+        },
+      });
     }
   }
 }
