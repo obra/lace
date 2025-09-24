@@ -94,19 +94,31 @@ export function ProjectProvider({
     loadSessionsForProject,
   } = useSessionManagement(projectId);
 
+  // Debounced reload to avoid spamming reloadSessions on rapid events
+  const scheduleReload = useMemo(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    return () => {
+      if (timeoutId !== null) return;
+      timeoutId = setTimeout(() => {
+        void reloadSessions();
+        timeoutId = null;
+      }, 150);
+    };
+  }, [reloadSessions]);
+
   // Subscribe to session and agent events to refresh session list in real-time
   useEventStream({
     projectId: projectId || undefined,
     onSessionUpdated: useCallback(() => {
       // Reload sessions to get the updated session name in the list
-      void reloadSessions();
-    }, [reloadSessions]),
+      scheduleReload();
+    }, [scheduleReload]),
     onAgentSpawned: useCallback(
-      (agentEvent: AgentEvent) => {
+      (_agentEvent: AgentEvent) => {
         // When an agent is spawned, reload sessions to get updated agents list
-        void reloadSessions();
+        scheduleReload();
       },
-      [reloadSessions]
+      [scheduleReload]
     ),
   });
 

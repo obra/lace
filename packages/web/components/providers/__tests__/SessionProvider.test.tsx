@@ -82,7 +82,7 @@ function ContextConsumer() {
       </button>
       <button
         onClick={() =>
-          createAgent('session-1', {
+          createAgent('test-session', {
             name: 'New Agent',
             providerInstanceId: 'anthropic',
             modelId: 'claude-3-haiku',
@@ -93,7 +93,7 @@ function ContextConsumer() {
         Create Agent
       </button>
       <button
-        onClick={() => updateAgentState('lace_20240101_agent1', 'active')}
+        onClick={() => updateAgentState('lace_20240101_agent1', 'thinking')}
         data-testid="update-agent-state"
       >
         Update Agent State
@@ -306,7 +306,7 @@ describe('SessionProvider', () => {
 
       fireEvent.click(screen.getByTestId('create-agent'));
 
-      expect(mockCreateAgent).toHaveBeenCalledWith('session-1', {
+      expect(mockCreateAgent).toHaveBeenCalledWith('test-session', {
         name: 'New Agent',
         providerInstanceId: 'anthropic',
         modelId: 'claude-3-haiku',
@@ -322,7 +322,7 @@ describe('SessionProvider', () => {
 
       fireEvent.click(screen.getByTestId('update-agent-state'));
 
-      expect(mockUpdateAgentState).toHaveBeenCalledWith('lace_20240101_agent1', 'active');
+      expect(mockUpdateAgentState).toHaveBeenCalledWith('lace_20240101_agent1', 'thinking');
     });
 
     it('calls reloadSessionDetails when requested', async () => {
@@ -358,7 +358,7 @@ describe('SessionProvider', () => {
 
       // SessionProvider doesn't handle errors - it passes them through to the hook
       // The error handling is the responsibility of useAgentManagement
-      expect(mockCreateAgent).toHaveBeenCalledWith('session-1', {
+      expect(mockCreateAgent).toHaveBeenCalledWith('test-session', {
         name: 'New Agent',
         providerInstanceId: 'anthropic',
         modelId: 'claude-3-haiku',
