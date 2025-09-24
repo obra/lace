@@ -70,6 +70,12 @@ const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseOptionalProjectContext = vi.mocked(useOptionalProjectContext);
 const mockUseOptionalSessionContext = vi.mocked(useOptionalSessionContext);
 
+// Helper to keep Projects context mocks in sync
+const setProjectsContexts = (value: ReturnType<typeof createMockProjectsContext>) => {
+  mockUseProjectsContext.mockReturnValue(value);
+  mockUseOptionalProjectsContext.mockReturnValue(value);
+};
+
 // Mock child components
 vi.mock('@/components/layout/Sidebar', () => ({
   SidebarSection: ({
@@ -198,8 +204,7 @@ describe('TaskSidebarSection', () => {
       projectsForSidebar: [],
       foundProject: createMockProject(),
     });
-    mockUseProjectsContext.mockReturnValue(mockProjectsContextValue);
-    mockUseOptionalProjectsContext.mockReturnValue(mockProjectsContextValue);
+    setProjectsContexts(mockProjectsContextValue);
 
     const mockProjectContext = createMockProjectContext({
       selectedSession: 'test-session' as ThreadId,
@@ -244,8 +249,7 @@ describe('TaskSidebarSection', () => {
         selectedProject: null,
         foundProject: null,
       });
-      mockUseProjectsContext.mockReturnValue(nullProjectsContextValue);
-      mockUseOptionalProjectsContext.mockReturnValue(nullProjectsContextValue);
+      setProjectsContexts(nullProjectsContextValue);
 
       const { container } = render(<TaskSidebarSection {...defaultProps} />);
       expect(container.firstChild).toBeNull();
@@ -420,6 +424,13 @@ describe('TaskSidebarSection', () => {
       expect(() => {
         fireEvent.click(screen.getByTestId('add-task-button'));
       }).not.toThrow();
+    });
+
+    it('returns null when ProjectsProvider is absent (optional hook returns null)', () => {
+      mockTaskContext.taskManager = createMockTaskManager();
+      mockUseOptionalProjectsContext.mockReturnValue(null);
+      const { container } = render(<TaskSidebarSection {...defaultProps} />);
+      expect(container.firstChild).toBeNull();
     });
   });
 });

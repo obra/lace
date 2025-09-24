@@ -3,8 +3,9 @@
 
 import React, { type ReactNode } from 'react';
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import type * as ReactRouter from 'react-router';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router';
+import { MemoryRouter } from 'react-router';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { createMockResponse } from '@/test-utils/mock-fetch';
 import {
@@ -39,7 +40,7 @@ vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
 const mockNavigate = vi.fn();
 
 vi.mock('react-router', async () => {
-  const actual = await vi.importActual<typeof import('react-router')>('react-router');
+  const actual = await vi.importActual<typeof ReactRouter>('react-router');
   return {
     ...actual,
     useNavigate: () => mockNavigate,
@@ -86,12 +87,11 @@ const mockHandlers = {
 };
 
 const mockFetch = vi.fn();
-const originalFetch = global.fetch;
-global.fetch = mockFetch as unknown as typeof fetch;
 
 describe('ProjectSelectorPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('fetch', mockFetch);
 
     // Clear router mocks
     mockNavigate.mockClear();
@@ -166,9 +166,9 @@ describe('ProjectSelectorPanel', () => {
     );
 
     render(
-      <BrowserRouter>
+      <MemoryRouter initialEntries={['/']}>
         <ProjectSelectorPanel />
-      </BrowserRouter>
+      </MemoryRouter>
     );
 
     // In simplified onboarding flow, modal opens directly at directory step (step 2)
@@ -191,9 +191,9 @@ describe('ProjectSelectorPanel', () => {
     );
 
     render(
-      <BrowserRouter>
+      <MemoryRouter initialEntries={['/']}>
         <ProjectSelectorPanel />
-      </BrowserRouter>
+      </MemoryRouter>
     );
 
     // In simplified onboarding flow, modal opens directly at directory step
@@ -210,6 +210,6 @@ describe('ProjectSelectorPanel', () => {
   });
 
   afterAll(() => {
-    global.fetch = originalFetch;
+    vi.unstubAllGlobals();
   });
 });
