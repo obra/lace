@@ -76,7 +76,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
       const result = await tool.execute({}, { signal: new AbortController().signal });
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('pattern');
     });
 
@@ -84,7 +84,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
       const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('Cannot be empty');
     });
 
@@ -98,7 +98,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
     });
 
     it('should reject excessive maxResults', async () => {
@@ -111,7 +111,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
     });
 
     it('should reject negative contextLines', async () => {
@@ -124,7 +124,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
     });
 
     it('should reject excessive contextLines', async () => {
@@ -137,7 +137,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
     });
 
     it('should accept valid parameters with defaults', async () => {
@@ -545,7 +545,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
       const result = await tool.execute({ pattern: '' }, { signal: new AbortController().signal });
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
     });
 
     it('should provide helpful error for ripgrep not found', () => {

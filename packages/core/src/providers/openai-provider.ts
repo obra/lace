@@ -618,6 +618,55 @@ export class OpenAIProvider extends AIProvider {
     return (!!config.apiKey && config.apiKey.length > 0) || !!configBaseURL;
   }
 
+  override isRecoverableError(error: unknown): boolean {
+    // Safely narrow unknown to non-null object
+    if (!error || typeof error !== 'object' || error === null) {
+      return false;
+    }
+
+    // Cast to safe interface for property access
+    const errorObj = error as {
+      status?: number;
+      statusCode?: number;
+      type?: string;
+      code?: string;
+      constructor?: { name?: string };
+      error?: {
+        type?: string;
+        code?: string;
+        status_code?: number;
+      };
+    };
+
+    // OpenAI SDK throws BadRequestError for 400 status codes
+    if (errorObj.constructor?.name === 'BadRequestError') {
+      return true;
+    }
+
+    // Check for 400 status code (handle both status and statusCode fields)
+    const status = errorObj.status ?? errorObj.statusCode ?? errorObj.error?.status_code;
+    if (typeof status === 'number' && status === 400) {
+      return true;
+    }
+
+    // Check for specific OpenAI error types that indicate recoverable tool issues
+    if (errorObj.type === 'invalid_request_error' || errorObj.code === 'tool_use_failed') {
+      return true;
+    }
+
+    // Check nested error structure (some OpenAI errors nest details)
+    if (errorObj.error) {
+      if (
+        errorObj.error.type === 'invalid_request_error' ||
+        errorObj.error.code === 'tool_use_failed'
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   // Clean up encoder cache to prevent memory leaks
   destroy(): void {
     for (const encoder of this._encoderCache.values()) {

@@ -134,6 +134,10 @@ export class Agent extends EventEmitter {
   private readonly _tools: Tool[];
   private readonly _persona: string;
 
+  // Error recovery safeguards
+  private _consecutiveRecoverableErrors = 0;
+  private static readonly MAX_CONSECUTIVE_RECOVERABLE_ERRORS = 3;
+
   // Public access to tool executor for interfaces
   get toolExecutor(): ToolExecutor {
     return this._toolExecutor;
@@ -847,13 +851,80 @@ export class Agent extends EventEmitter {
           return;
         }
 
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        // Log sanitized error details to avoid sensitive data exposure
         logger.error('AGENT: Provider error', {
           threadId: this._threadId,
-          errorMessage: error instanceof Error ? error.message : String(error),
+          errorMessage,
           errorStack: error instanceof Error ? error.stack : undefined,
+          errorName: error instanceof Error ? error.name : undefined,
+          errorConstructor: this._getSafeConstructorName(error),
           providerName: this.providerInstance?.providerName || 'missing',
+          errorType: this._getSafeErrorType(error),
         });
 
+        // Check if this is a recoverable error that should be sent back to the model
+        // Use provider-specific error detection instead of generic function
+        const provider = await this.getProvider();
+        const isRecoverableError = provider?.isRecoverableError(error) ?? false;
+
+        if (isRecoverableError) {
+          // Check retry limit to prevent infinite loops
+          this._consecutiveRecoverableErrors++;
+          if (this._consecutiveRecoverableErrors > Agent.MAX_CONSECUTIVE_RECOVERABLE_ERRORS) {
+            logger.warn('AGENT: Too many consecutive recoverable errors, stopping retry', {
+              threadId: this._threadId,
+              consecutiveErrors: this._consecutiveRecoverableErrors,
+            });
+            // Complete the turn properly to clean up metrics/timers
+            this._completeTurn();
+            this._setState('idle');
+            return;
+          }
+
+          // For recoverable errors (like tool validation), continue the conversation
+          // by adding an AGENT_MESSAGE with the error so the model can correct itself
+          logger.info('AGENT: Recoverable provider error, continuing conversation', {
+            threadId: this._threadId,
+            errorMessage,
+            retryCount: this._consecutiveRecoverableErrors,
+          });
+
+          // Create an AGENT_MESSAGE event with the validation error
+          // This allows the model to see the error and correct its tool usage
+          const errorResponseContent = `I encountered a validation error when trying to use a tool:\n\n${errorMessage}\n\nI need to correct the parameters and try again.`;
+
+          this._addEventAndEmit({
+            type: 'AGENT_MESSAGE',
+            data: {
+              content: errorResponseContent,
+              // No token usage for error messages
+            },
+            context: { threadId: this._threadId },
+          });
+
+          // Complete the turn
+          this._completeTurn();
+
+          // Request the next turn to let the model correct itself
+          // Schedule for next tick to avoid deep recursion
+          setImmediate(() => {
+            if (this._state === 'idle' && !this._abortController?.signal.aborted) {
+              // Call _processConversation again to continue
+              this._processConversation().catch((requestError: unknown) => {
+                logger.error('AGENT: Failed to request correction after validation error', {
+                  threadId: this._threadId,
+                  error:
+                    requestError instanceof Error ? requestError.message : String(requestError),
+                });
+              });
+            }
+          });
+          return;
+        }
+
+        // For other provider errors, emit error and stop
         this._emitError(error, {
           phase: 'provider_response',
           threadId: this._threadId,
@@ -1709,7 +1780,8 @@ export class Agent extends EventEmitter {
       this._setState('idle');
       // Don't auto-continue conversation
     } else {
-      // All tools completed successfully - auto-continue conversation
+      // All tools completed successfully - reset error counter and auto-continue conversation
+      this._consecutiveRecoverableErrors = 0;
       this._completeTurn();
       this._setState('idle');
 
@@ -3237,5 +3309,32 @@ export class Agent extends EventEmitter {
       }
     }
     return false;
+  }
+
+  /**
+   * Safely get constructor name without throwing or exposing sensitive data
+   */
+  private _getSafeConstructorName(error: unknown): string | undefined {
+    try {
+      if (typeof error === 'object' && error !== null && error.constructor) {
+        return error.constructor.name;
+      }
+    } catch {
+      // Ignore errors accessing constructor
+    }
+    return undefined;
+  }
+
+  /**
+   * Safely extract basic error type information without sensitive details
+   */
+  private _getSafeErrorType(error: unknown): string {
+    if (error instanceof Error) {
+      return 'Error';
+    }
+    if (typeof error === 'object' && error !== null) {
+      return 'Object';
+    }
+    return typeof error;
   }
 }

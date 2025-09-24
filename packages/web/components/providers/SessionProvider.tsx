@@ -13,7 +13,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import { useSessionManagement } from '@/hooks/useSessionManagement';
-import { useEventStream } from '@/hooks/useEventStream';
+import { useEventStream, type AgentEvent } from '@/hooks/useEventStream';
 import type { SessionInfo, ThreadId, LaceEvent } from '@/types/core';
 
 // Types for session context
@@ -94,13 +94,20 @@ export function SessionProvider({
     loadSessionsForProject,
   } = useSessionManagement(projectId);
 
-  // Subscribe to SESSION_UPDATED events to refresh session list in real-time
+  // Subscribe to session and agent events to refresh session list in real-time
   useEventStream({
     projectId: projectId || undefined,
     onSessionUpdated: useCallback(() => {
       // Reload sessions to get the updated session name in the list
       void reloadSessions();
     }, [reloadSessions]),
+    onAgentSpawned: useCallback(
+      (agentEvent: AgentEvent) => {
+        // When an agent is spawned, reload sessions to get updated agents list
+        void reloadSessions();
+      },
+      [reloadSessions]
+    ),
   });
 
   // Use session from URL params, not hash router

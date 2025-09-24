@@ -237,7 +237,7 @@ describe('MCP Integration E2E', () => {
 
     // Should return validation error due to invalid arguments
     expect(result.status).toBe('failed');
-    expect(result.content[0].text).toContain('Validation failed');
+    expect(result.content[0].text).toContain('ValidationError');
   });
 
   it('should verify MCP approval levels are working in ToolExecutor', async () => {

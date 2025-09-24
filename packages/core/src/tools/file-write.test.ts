@@ -51,9 +51,9 @@ Creates parent directories automatically if needed. Returns file size written.`)
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('path');
-      expect(result.content[0].text).toContain('Required');
+      expect(result.content[0].text).toContain('Missing required');
     });
 
     it('should reject empty path', async () => {
@@ -63,7 +63,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('File path cannot be empty');
     });
 
@@ -74,9 +74,9 @@ Creates parent directories automatically if needed. Returns file size written.`)
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('content');
-      expect(result.content[0].text).toContain('Required');
+      expect(result.content[0].text).toContain('Missing required');
     });
 
     it('should reject non-string content', async () => {
@@ -89,7 +89,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('content');
     });
 
@@ -104,7 +104,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('createDirs');
     });
 
@@ -121,7 +121,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
 
       // Should not fail validation (may fail with file system error in test env)
       if (result.status === 'failed') {
-        expect(result.content[0].text).not.toContain('Validation failed');
+        expect(result.content[0].text).not.toContain('ValidationError');
       }
     });
 
@@ -241,7 +241,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const result = await tool.execute({ path: '' }, { signal: new AbortController().signal });
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
     });
 
     it('should provide enhanced error messages', async () => {

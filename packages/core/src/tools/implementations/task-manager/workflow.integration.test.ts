@@ -74,12 +74,14 @@ class MockProvider extends BaseMockProvider {
   };
 
   async createResponse(messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    // Look for task assignment message
+    // Look for task assignment message from USER (not from task notification system)
     const taskMessage = messages.find(
       (m) =>
+        m.role === 'user' &&
         m.content &&
         typeof m.content === 'string' &&
-        m.content.includes('You have been assigned task')
+        m.content.includes('You have been assigned task') &&
+        !m.content.includes('[LACE TASK SYSTEM]') // Skip auto-notifications
     );
 
     if (taskMessage) {
@@ -145,7 +147,9 @@ describe('Task Management Workflow Integration', () => {
 
     // Import Agent dynamically to avoid circular imports in test setup
     const { Agent } = await import('~/agents/agent');
-    vi.spyOn(Agent.prototype, '_createProviderInstance' as any).mockResolvedValue(mockProvider);
+    // TODO(ts): Private method mock for test seam (no public hook available)
+    // @ts-expect-error – mocking private method for test
+    vi.spyOn(Agent.prototype, '_createProviderInstance').mockResolvedValue(mockProvider);
 
     // Create project and session with provider configuration
     project = Project.create(
@@ -168,7 +172,7 @@ describe('Task Management Workflow Integration', () => {
     // Get tools from session's agent
     const agent = session.getAgent(session.getId());
     const toolExecutor = agent!.toolExecutor;
-    taskCreateTool = toolExecutor.getTool('task_add') as TaskCreateTool;
+    taskCreateTool = toolExecutor.getTool('task_create') as TaskCreateTool;
     taskListTool = toolExecutor.getTool('task_list') as TaskListTool;
     taskCompleteTool = toolExecutor.getTool('task_complete') as TaskCompleteTool;
     taskUpdateTool = toolExecutor.getTool('task_update') as TaskUpdateTool;
@@ -336,8 +340,7 @@ describe('Task Management Workflow Integration', () => {
               priority: 'high',
               assignedTo: createNewAgentSpec(
                 'lace',
-                providerInstanceId,
-                'claude-3-5-haiku-20241022'
+                `${providerInstanceId}:claude-3-5-haiku-20241022`
               ),
             },
           ],
@@ -363,7 +366,7 @@ describe('Task Management Workflow Integration', () => {
       const reassignResult = await taskUpdateTool.execute(
         {
           taskId: validDelegateTaskId,
-          assignTo: createNewAgentSpec('lace', providerInstanceId, 'claude-3-5-haiku-20241022'),
+          assignTo: createNewAgentSpec('lace', `${providerInstanceId}:claude-3-5-haiku-20241022`),
           status: 'in_progress',
         },
         context
@@ -515,8 +518,7 @@ describe('Task Management Workflow Integration', () => {
               priority: 'high',
               assignedTo: createNewAgentSpec(
                 'lace',
-                providerInstanceId,
-                'claude-3-5-haiku-20241022'
+                `${providerInstanceId}:claude-3-5-haiku-20241022`
               ),
             },
           ],

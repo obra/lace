@@ -7,49 +7,66 @@ import { NonEmptyString } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 import type { TaskManager } from '~/tasks/task-manager';
 import type { Task, TaskContext } from '~/tasks/types';
-import { createNewAgentSpec } from '~/threads/types';
 import { logger } from '~/utils/logger';
-import { parseProviderModel } from '~/providers/provider-utils';
 
-// Model format validation - requires provider instance ID
-const ModelFormat = z.string().refine(
-  (value) => {
-    try {
-      const { instanceId, modelId } = parseProviderModel(value);
-      return instanceId && modelId;
-    } catch {
-      return false;
-    }
-  },
-  {
-    message:
-      'Invalid model format. Use "providerInstanceId:model" (e.g., "pi_abc123:claude-3-5-haiku-20241022")',
-  }
-);
-
-const delegateSchema = z.object({
-  title: NonEmptyString.describe(
-    'Short active voice sentence describing the task (e.g., "Find security vulnerabilities")'
-  ),
-  prompt: NonEmptyString.describe('Complete instructions for the subagent - be specific and clear'),
-  expected_response: NonEmptyString.describe(
-    'Description of the expected format/content of the response (guides the subagent)'
-  ),
-  model: ModelFormat.describe(
-    'Provider instance ID and model in format "providerInstanceId:model" (e.g., "pi_abc123:claude-3-5-haiku-20241022")'
-  ),
-});
+// Schema for bulk delegation - matches task_create format
+const delegateSchema = z
+  .object({
+    tasks: z
+      .array(
+        z
+          .object({
+            title: NonEmptyString.describe(
+              'Short active voice sentence describing the task (e.g., "Find security vulnerabilities")'
+            ),
+            prompt: NonEmptyString.describe(
+              'Complete instructions for the subagent - be specific and clear'
+            ),
+            expected_response: NonEmptyString.describe(
+              'Description of the expected format/content of the response (guides the subagent)'
+            ),
+            assignedTo: z.string().describe('NewAgentSpec format: "new:persona[;modelSpec]"'),
+          })
+          .strict() // Reject unknown properties to match JSON schema
+      )
+      .min(1, 'Must provide at least 1 task')
+      .max(10, 'Cannot delegate more than 10 tasks at once'),
+  })
+  .strict(); // Reject unknown properties at root level too
 
 export class DelegateTool extends Tool {
   name = 'delegate';
-  description = `Delegate a specific task to a subagent using a more cost-effective model.
+  description = `Delegate tasks to subagents with specific models - same format as task_create.
 Ideal for research, data extraction, log analysis, or any focused task with clear outputs.
-The subagent starts fresh with only your instructions - no conversation history.
+Each subagent starts fresh with only your instructions - no conversation history.
+
+assignedTo format: "new:persona[;modelSpec]" where modelSpec can be:
+- "fast" - Use the configured fast model (typically Haiku)
+- "smart" - Use the configured smart model (typically Sonnet or GPT-4)
+- "provider:model" - Use a specific provider and model
 
 Examples:
-- title: "Analyze test failures", prompt: "Review the test output and identify the root cause of failures", expected_response: "List of failing tests with specific error reasons", model: "anthropic:claude-3-5-haiku-20241022"
-- title: "Search authentication logs", prompt: "grep through the application logs for authentication errors in the last hour", expected_response: "Timestamps and error messages for each auth failure", model: "anthropic:claude-3-5-haiku-20241022"  
-- title: "Complex code review", prompt: "Review this PR for architecture issues and suggest improvements", expected_response: "Detailed analysis with specific recommendations", model: "anthropic:claude-sonnet-4-20250514"`;
+Single delegation: delegate({ tasks: [{
+  title: "Analyze test failures",
+  prompt: "Review the test output and identify the root cause of failures",
+  expected_response: "List of failing tests with specific error reasons",
+  assignedTo: "new:lace;fast"
+}]})
+
+Multiple delegations: delegate({ tasks: [
+  {
+    title: "Search authentication logs",
+    prompt: "grep through the application logs for authentication errors in the last hour",
+    expected_response: "Timestamps and error messages for each auth failure",
+    assignedTo: "new:lace;anthropic:claude-3-5-haiku-20241022"
+  },
+  {
+    title: "Analyze security vulnerabilities",
+    prompt: "Review the codebase for potential security issues",
+    expected_response: "List of vulnerabilities with severity and mitigation steps",
+    assignedTo: "new:security-analyst;anthropic:claude-sonnet-4-20250514"
+  }
+]})`;
 
   schema = delegateSchema;
   annotations: ToolAnnotations = {
@@ -75,11 +92,51 @@ Examples:
     }
 
     try {
-      const { title, prompt, expected_response, model } = args;
-      return await this.performTaskBasedDelegation(
-        { title, prompt, expected_response, model },
-        context
-      );
+      const createdTasks: Array<{ title: string; assignedTo: string }> = [];
+      const results: ToolResult[] = [];
+
+      // Create and delegate all tasks
+      for (const taskData of args.tasks) {
+        const { title, prompt, expected_response, assignedTo } = taskData;
+
+        // Validate assignedTo format
+        if (!assignedTo.startsWith('new:')) {
+          return this.createError(
+            `Invalid assignedTo format: ${assignedTo}. Must be "new:persona[;modelSpec]"`
+          );
+        }
+
+        const result = await this.performTaskBasedDelegation(
+          { title, prompt, expected_response, assignedTo },
+          context
+        );
+
+        // Check if delegation failed
+        if (result.status === 'failed') {
+          return result; // Return the error immediately
+        }
+
+        results.push(result);
+        createdTasks.push({ title, assignedTo });
+      }
+
+      // Format response
+      if (createdTasks.length === 1) {
+        return results[0]; // Return single result directly
+      } else {
+        // Multiple tasks - format summary
+        const summary = createdTasks
+          .map((t, i) => `${i + 1}. ${t.title} (delegated to ${t.assignedTo})`)
+          .join('\n');
+
+        const fullResults = results
+          .map((r, i) => `\n=== Task ${i + 1}: ${createdTasks[i].title} ===\n${r.content[0].text}`)
+          .join('\n');
+
+        return this.createResult(
+          `Delegated ${createdTasks.length} tasks:\n${summary}${fullResults}`
+        );
+      }
     } catch (error: unknown) {
       return this.createError(
         `Delegate tool execution failed: ${error instanceof Error ? error.message : 'Unknown error occurred'}. Check the parameters and try again.`
@@ -92,22 +149,19 @@ Examples:
       title: string;
       prompt: string;
       expected_response: string;
-      model: string;
+      assignedTo: string;
     },
     context?: ToolContext
   ): Promise<ToolResult> {
-    const { title, prompt, expected_response, model } = params;
+    const { title, prompt, expected_response, assignedTo } = params;
     const taskManager = await this.getTaskManagerFromContext(context);
     if (!taskManager) {
       throw new Error('TaskManager is required for delegation');
     }
 
-    // Parse providerInstanceId:model format
-    const [providerInstanceId, modelName] = model.split(':');
-
     try {
-      // Create assignment spec using provider instance ID with default persona
-      const assigneeSpec = createNewAgentSpec('lace', providerInstanceId, modelName);
+      // assignedTo is already in NewAgentSpec format: "new:persona[;modelSpec]"
+      const assigneeSpec = assignedTo;
 
       logger.debug('DelegateTool: Creating task with agent spawning', {
         title,
@@ -136,7 +190,7 @@ Examples:
       logger.debug('DelegateTool: Created task for delegation', {
         taskId: task.id,
         title,
-        model: `${providerInstanceId}:${modelName}`,
+        assignedTo,
       });
 
       // Wait for task completion via events

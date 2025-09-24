@@ -118,9 +118,6 @@ describe('Delegation Integration Tests', () => {
       }
     );
 
-    // Mock the ProviderRegistry constructor to return our mock registry
-    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
-
     // Set up test environment using Session/Project pattern for proper tool injection
     threadManager = new ThreadManager();
     project = Project.create(
@@ -142,7 +139,7 @@ describe('Delegation Integration Tests', () => {
           bash: 'allow',
           file_read: 'allow',
           file_write: 'allow',
-          task_add: 'allow',
+          task_create: 'allow',
           task_complete: 'allow',
         },
       },
@@ -257,10 +254,14 @@ describe('Delegation Integration Tests', () => {
 
     // Test delegation using the real DelegateTool with provider mocking
     const delegateInput = {
-      title: 'Code Analysis',
-      prompt: 'Analyze the project structure and identify key patterns',
-      expected_response: 'Brief summary of project structure',
-      model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
+      tasks: [
+        {
+          title: 'Code Analysis',
+          prompt: 'Analyze the project structure and identify key patterns',
+          expected_response: 'Brief summary of project structure',
+          assignedTo: `new:lace;${providerInstanceId}:claude-3-5-haiku-20241022`,
+        },
+      ],
     };
 
     const result = await delegateToolInstance.execute(delegateInput, {

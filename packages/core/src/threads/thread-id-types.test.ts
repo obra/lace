@@ -2,15 +2,7 @@
 // ABOUTME: Ensures type safety for thread IDs and new agent specifications
 
 import { describe, it, expect } from 'vitest';
-import {
-  ThreadId,
-  isThreadId,
-  asThreadId,
-  NewAgentSpec,
-  isNewAgentSpec,
-  createNewAgentSpec,
-  isAssigneeId,
-} from '~/threads/types';
+import { ThreadId, isThreadId, asThreadId, isAssigneeId } from '~/threads/types';
 
 describe('ThreadId types', () => {
   describe('isThreadId', () => {
@@ -53,37 +45,6 @@ describe('ThreadId types', () => {
   });
 });
 
-describe('NewAgentSpec types', () => {
-  describe('isNewAgentSpec', () => {
-    it('should validate correct new agent specs', () => {
-      expect(isNewAgentSpec('new:lace:anthropic/claude-3-haiku')).toBe(true);
-      expect(isNewAgentSpec('new:coding-agent:openai/gpt-4')).toBe(true);
-      expect(isNewAgentSpec('new:helper:local/llama-2')).toBe(true);
-    });
-
-    it('should reject invalid new agent specs', () => {
-      expect(isNewAgentSpec('new:anthropic')).toBe(false); // Missing model
-      expect(isNewAgentSpec('anthropic/claude-3-haiku')).toBe(false); // Missing new: prefix
-      expect(isNewAgentSpec('new:anthropic/claude-3-haiku')).toBe(false); // Old format - now invalid
-      expect(isNewAgentSpec('new:openai/gpt-4')).toBe(false); // Old format - now invalid
-      expect(isNewAgentSpec('new:')).toBe(false);
-      expect(isNewAgentSpec('new:/')).toBe(false);
-      expect(isNewAgentSpec('new:provider/')).toBe(false);
-      expect(isNewAgentSpec('new:/model')).toBe(false);
-      expect(isNewAgentSpec('')).toBe(false);
-    });
-  });
-
-  describe('createNewAgentSpec', () => {
-    it('should create valid new agent specs', () => {
-      const spec = createNewAgentSpec('lace', 'anthropic', 'claude-3-haiku');
-      expect(spec).toBe('new:lace:anthropic/claude-3-haiku');
-      // TypeScript should see this as NewAgentSpec type
-      const _typeCheck: NewAgentSpec = spec;
-    });
-  });
-});
-
 describe('AssigneeId types', () => {
   describe('isAssigneeId', () => {
     it('should accept valid thread IDs', () => {
@@ -92,14 +53,14 @@ describe('AssigneeId types', () => {
     });
 
     it('should accept valid new agent specs', () => {
-      expect(isAssigneeId('new:lace:anthropic/claude-3-haiku')).toBe(true);
-      expect(isAssigneeId('new:coding-agent:openai/gpt-4')).toBe(true);
+      expect(isAssigneeId('new:lace;anthropic:claude-3-haiku')).toBe(true);
+      expect(isAssigneeId('new:coding-agent;openai:gpt-4')).toBe(true);
     });
 
     it('should reject invalid formats', () => {
       expect(isAssigneeId('invalid')).toBe(false);
       expect(isAssigneeId('lace_invalid')).toBe(false);
-      expect(isAssigneeId('new:invalid')).toBe(false);
+      expect(isAssigneeId('new:')).toBe(false); // Empty persona is invalid
       expect(isAssigneeId('')).toBe(false);
     });
   });

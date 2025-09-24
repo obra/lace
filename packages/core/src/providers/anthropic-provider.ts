@@ -382,4 +382,9 @@ export class AnthropicProvider extends AIProvider {
     const config = this._config as AnthropicProviderConfig;
     return !!config.apiKey && config.apiKey.length > 0;
   }
+
+  override isRecoverableError(error: unknown): boolean {
+    // Use base class implementation - Anthropic SDK uses same patterns as OpenAI
+    return super.isRecoverableError(error);
+  }
 }

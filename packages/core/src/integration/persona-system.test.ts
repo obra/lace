@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Agent, AgentConfig } from '~/agents/agent';
 import { TaskManager, AgentCreationCallback } from '~/tasks/task-manager';
-import { createNewAgentSpec, asThreadId, isNewAgentSpec, parseNewAgentSpec } from '~/threads/types';
+import { createNewAgentSpec, asThreadId } from '~/threads/types';
 import { personaRegistry } from '~/config/persona-registry';
 import { PromptManager } from '~/config/prompt-manager';
 import { loadPromptConfig } from '~/config/prompts';
@@ -85,7 +85,7 @@ describe('Persona System Integration', () => {
       {
         title: 'Help me organize my files',
         prompt: 'I need help organizing my project files',
-        assignedTo: createNewAgentSpec('helper-agent', 'anthropic', 'claude-3-sonnet'),
+        assignedTo: createNewAgentSpec('helper-agent', 'anthropic:claude-3-sonnet'),
       },
       { actor: 'user' }
     );
@@ -101,7 +101,7 @@ describe('Persona System Integration', () => {
     );
 
     // Verify task assignment was updated to actual thread ID
-    expect(task.assignedTo).not.toBe('new:helper-agent:anthropic/claude-3-sonnet');
+    expect(task.assignedTo).not.toBe('new:helper-agent;anthropic:claude-3-sonnet');
     expect(task.status).toBe('in_progress');
   });
 
@@ -150,36 +150,34 @@ describe('Persona System Integration', () => {
     expect(builtInPersonas.length).toBeGreaterThanOrEqual(3);
   });
 
-  it('newagentspec parsing integrates correctly', () => {
-    const specs = [
-      'new:lace:anthropic/claude-3-sonnet',
-      'new:coding-agent:openai/gpt-4',
-      'new:helper-agent:ollama/llama2',
-    ];
+  it('agent spawning works with different model specifications', async () => {
+    const sessionId = asThreadId('lace_20250904_abc123');
+    const taskManager = new TaskManager(sessionId, mockPersistence);
 
-    for (const spec of specs) {
-      const agentSpec = spec as any; // Type assertion for test
+    const mockAgentCreator: AgentCreationCallback = vi
+      .fn()
+      .mockResolvedValue(asThreadId(`${sessionId}.${Date.now()}`));
+    taskManager.setAgentCreationCallback(mockAgentCreator);
 
-      // Should be recognized as valid NewAgentSpec
-      expect(isNewAgentSpec(agentSpec)).toBe(true);
+    const context = { actor: sessionId };
 
-      // Should parse correctly
-      const parsed = parseNewAgentSpec(agentSpec);
-      expect(parsed).toHaveProperty('persona');
-      expect(parsed).toHaveProperty('provider');
-      expect(parsed).toHaveProperty('model');
-      expect(typeof parsed.persona).toBe('string');
-      expect(parsed.persona.length).toBeGreaterThan(0);
-    }
-  });
+    // Test explicit model spec
+    const task = await taskManager.createTask(
+      {
+        title: 'Integration Test',
+        prompt: 'Test agent spawning integration',
+        assignedTo: createNewAgentSpec('helper-agent', 'anthropic:claude-3-sonnet'),
+      },
+      context
+    );
 
-  it('old format is properly rejected', () => {
-    const oldFormats = ['new:anthropic/claude-3-sonnet', 'new:openai/gpt-4', 'new:ollama/llama2'];
-
-    for (const oldFormat of oldFormats) {
-      const spec = oldFormat as any;
-      expect(isNewAgentSpec(spec)).toBe(false);
-    }
+    expect(mockAgentCreator).toHaveBeenCalledWith(
+      'helper-agent',
+      'anthropic',
+      'claude-3-sonnet',
+      expect.any(Object)
+    );
+    expect(task.status).toBe('in_progress');
   });
 
   it('error handling works throughout the stack', async () => {

@@ -96,9 +96,6 @@ describe('Multi-Agent Task Manager Integration', () => {
       }
     );
 
-    // Mock the ProviderRegistry createProvider method
-    vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
-
     // Create project first with provider configuration
     project = Project.create(
       'Integration Test Project',
@@ -119,7 +116,7 @@ describe('Multi-Agent Task Manager Integration', () => {
     // Get tools from session agent's toolExecutor
     const agent = session.getAgent(session.getId())!;
     const toolExecutor = agent.toolExecutor;
-    createTool = toolExecutor.getTool('task_add') as TaskCreateTool;
+    createTool = toolExecutor.getTool('task_create') as TaskCreateTool;
     listTool = toolExecutor.getTool('task_list') as TaskListTool;
     updateTool = toolExecutor.getTool('task_update') as TaskUpdateTool;
     noteTool = toolExecutor.getTool('task_add_note') as TaskAddNoteTool;
@@ -278,8 +275,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       // Create task assigned to a new agent spec
       const newAgentSpec = createNewAgentSpec(
         'lace',
-        providerInstanceId,
-        'claude-3-5-haiku-20241022'
+        `${providerInstanceId}:claude-3-5-haiku-20241022`
       );
       const createResult = await createTool.execute(
         {
@@ -404,7 +400,7 @@ describe('Multi-Agent Task Manager Integration', () => {
       // Get tools from second session
       const agent2 = session2.getAgent(session2.getId());
       const toolExecutor2 = agent2!.toolExecutor;
-      const createTool2 = toolExecutor2.getTool('task_add') as TaskCreateTool;
+      const createTool2 = toolExecutor2.getTool('task_create') as TaskCreateTool;
       const listTool2 = toolExecutor2.getTool('task_list') as TaskListTool;
 
       const session2Context = {

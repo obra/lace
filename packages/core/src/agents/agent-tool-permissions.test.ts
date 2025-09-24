@@ -290,7 +290,7 @@ describe('Agent Tool Permissions', () => {
       name: 'Test Session',
       description: 'Test session for permission testing',
       configuration: {
-        tools: ['task_add', 'task_list'],
+        tools: ['task_create', 'task_list'],
       },
       status: 'active' as const,
       createdAt: new Date(),
@@ -309,10 +309,11 @@ describe('Agent Tool Permissions', () => {
 
     const toolCall: ToolCall = {
       id: 'tool_call_007',
-      name: 'task_add',
+      name: 'task_create',
       arguments: {
         title: 'Test task',
         description: 'A test task',
+        prompt: 'Please complete this test task',
       },
     };
 

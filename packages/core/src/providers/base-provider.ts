@@ -257,6 +257,36 @@ export abstract class AIProvider extends EventEmitter {
   // Check if provider is properly configured
   abstract isConfigured(): boolean;
 
+  // Check if an error is recoverable (can be sent back to model for correction)
+  // Default implementation checks for common 400-level HTTP errors
+  // Providers can override for their specific error patterns
+  isRecoverableError(error: unknown): boolean {
+    // Safely narrow unknown to non-null object
+    if (!error || typeof error !== 'object' || error === null) {
+      return false;
+    }
+
+    // Cast to safe interface for property access
+    const errorObj = error as {
+      status?: number;
+      statusCode?: number;
+      constructor?: { name?: string };
+    };
+
+    // Generic check for 400-level HTTP errors (most providers use this pattern)
+    const status = errorObj.status ?? errorObj.statusCode;
+    if (typeof status === 'number' && (status === 400 || status === 422)) {
+      return true;
+    }
+
+    // Check constructor name for common BadRequestError classes
+    if (errorObj.constructor?.name === 'BadRequestError') {
+      return true;
+    }
+
+    return false;
+  }
+
   // Token estimation utility for streaming
   protected estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);

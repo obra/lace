@@ -54,15 +54,15 @@ Follows redirects by default. Returns detailed error context for failures.`
       const result = await tool.execute({}, { signal: new AbortController().signal });
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
-      expect(result.content[0].text).toContain('Required');
+      expect(result.content[0].text).toContain('ValidationError');
+      expect(result.content[0].text).toContain('Missing required');
     });
 
     it('should reject empty URL', async () => {
       const result = await tool.execute({ url: '' }, { signal: new AbortController().signal });
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('Cannot be empty');
     });
 
@@ -73,7 +73,7 @@ Follows redirects by default. Returns detailed error context for failures.`
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('Invalid URL format');
     });
 
@@ -84,7 +84,7 @@ Follows redirects by default. Returns detailed error context for failures.`
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
     });
 
     it('should accept valid HTTP/HTTPS URLs', async () => {
@@ -98,7 +98,7 @@ Follows redirects by default. Returns detailed error context for failures.`
         const result = await tool.execute({ url }, { signal: new AbortController().signal });
         // Should get network error, not validation error
         if (result.status === 'failed') {
-          expect(result.content[0].text).not.toContain('Validation failed');
+          expect(result.content[0].text).not.toContain('ValidationError');
         }
       }
     });
@@ -113,7 +113,7 @@ Follows redirects by default. Returns detailed error context for failures.`
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('timeout');
     });
 
@@ -127,7 +127,7 @@ Follows redirects by default. Returns detailed error context for failures.`
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('maxSize');
     });
 
@@ -141,7 +141,7 @@ Follows redirects by default. Returns detailed error context for failures.`
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('method');
     });
 
@@ -169,7 +169,7 @@ Follows redirects by default. Returns detailed error context for failures.`
 
       // May fail with network error, but should not fail validation
       if (result.status === 'failed') {
-        expect(result.content[0].text).not.toContain('Validation failed');
+        expect(result.content[0].text).not.toContain('ValidationError');
       }
     }, 10000);
   });
@@ -273,7 +273,7 @@ Follows redirects by default. Returns detailed error context for failures.`
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
     });
 
     it('should handle returnContent=false properly', () => {
@@ -336,7 +336,7 @@ Follows redirects by default. Returns detailed error context for failures.`
       const errorText = result.content[0].text;
 
       // Schema validation errors come from base Tool class, not the rich error handler
-      expect(errorText).toContain('Validation failed');
+      expect(errorText).toContain('ValidationError');
       // The URL validation happens at schema level, so we get schema validation errors
     });
   });

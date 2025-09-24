@@ -267,4 +267,9 @@ export class GeminiProvider extends AIProvider {
     const config = this._config as GeminiProviderConfig;
     return !!config.apiKey && config.apiKey.length > 0;
   }
+
+  override isRecoverableError(error: unknown): boolean {
+    // Use base implementation - Google AI SDK follows standard HTTP error patterns
+    return super.isRecoverableError(error);
+  }
 }

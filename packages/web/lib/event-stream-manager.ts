@@ -177,15 +177,7 @@ export class EventStreamManager {
       const e = event as AgentSpawnedEvent;
       this.broadcast({
         type: 'AGENT_SPAWNED',
-        data: {
-          type: e.type,
-          taskId: e.taskId,
-          agentThreadId: e.agentThreadId,
-          provider: e.providerInstanceId,
-          model: e.modelId,
-          context: e.context,
-          timestamp: e.timestamp,
-        },
+        data: e,
         context: { projectId, sessionId, taskId: e.taskId, threadId: e.agentThreadId },
         transient: true,
       });

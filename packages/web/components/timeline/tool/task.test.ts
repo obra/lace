@@ -14,7 +14,7 @@ import type { ToolResult } from '@/types/core';
 import { taskRenderers } from './task';
 
 describe('Task Tool Renderers', () => {
-  describe('task_add renderer', () => {
+  describe('task_create renderer', () => {
     const mockTaskAddArgs = {
       title: 'Implement user authentication',
       description: 'Add login and registration functionality',
@@ -39,27 +39,30 @@ describe('Task Tool Renderers', () => {
     };
 
     test('should create formatted summary for task creation', () => {
-      const summary = taskRenderers.task_add.getSummary?.(mockTaskAddArgs);
+      const summary = taskRenderers.task_create.getSummary?.(mockTaskAddArgs);
       expect(summary).toBe('Implement user authentication');
     });
 
     test('should handle missing title gracefully', () => {
-      const summary = taskRenderers.task_add.getSummary?.({});
+      const summary = taskRenderers.task_create.getSummary?.({});
       expect(summary).toBe('New task');
     });
 
     test('should return plus icon', () => {
-      const icon = taskRenderers.task_add.getIcon?.();
+      const icon = taskRenderers.task_create.getIcon?.();
       expect(icon).toBe(faPlus);
     });
 
     test('should return custom display name for success', () => {
-      const displayName = taskRenderers.task_add.getDisplayName?.('task_add', mockTaskAddResult);
+      const displayName = taskRenderers.task_create.getDisplayName?.(
+        'task_create',
+        mockTaskAddResult
+      );
       expect(displayName).toBe('Created task');
     });
 
     test('should return different display name for no result', () => {
-      const displayName = taskRenderers.task_add.getDisplayName?.('task_add');
+      const displayName = taskRenderers.task_create.getDisplayName?.('task_create');
       expect(displayName).toBe('Creating task');
     });
 
@@ -68,12 +71,12 @@ describe('Task Tool Renderers', () => {
         content: [{ type: 'text', text: 'Error creating task' }],
         status: 'failed' as const,
       };
-      const displayName = taskRenderers.task_add.getDisplayName?.('task_add', errorResult);
+      const displayName = taskRenderers.task_create.getDisplayName?.('task_create', errorResult);
       expect(displayName).toBe('Failed to create task');
     });
 
     test('should render successful task creation result', () => {
-      const resultNode = taskRenderers.task_add.renderResult?.(mockTaskAddResult);
+      const resultNode = taskRenderers.task_create.renderResult?.(mockTaskAddResult);
       expect(resultNode).toBeDefined(); // Success cases show link to view task
       expect(typeof resultNode).toBe('object');
     });
@@ -329,7 +332,7 @@ describe('Task Tool Renderers', () => {
 
   describe('integration with tool renderer system', () => {
     test('should have all task renderers defined', () => {
-      expect(taskRenderers.task_add).toBeDefined();
+      expect(taskRenderers.task_create).toBeDefined();
       expect(taskRenderers.task_list).toBeDefined();
       expect(taskRenderers.task_complete).toBeDefined();
       expect(taskRenderers.task_update).toBeDefined();

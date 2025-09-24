@@ -3,6 +3,7 @@ import { TaskManager, type AgentCreationCallback } from '~/tasks/task-manager';
 import { DatabasePersistence } from '~/persistence/database';
 import { createNewAgentSpec, asNewAgentSpec, asThreadId } from '~/threads/types';
 import { TaskContext } from '~/tasks/types';
+import { parseProviderModel } from '~/providers/provider-utils';
 
 describe('Task Agent Spawning with Personas', () => {
   let taskManager: TaskManager;
@@ -32,7 +33,7 @@ describe('Task Agent Spawning with Personas', () => {
   });
 
   it('spawns agent with correct persona from NewAgentSpec', async () => {
-    const agentSpec = createNewAgentSpec('coding-agent', 'anthropic', 'claude-3-sonnet');
+    const agentSpec = createNewAgentSpec('coding-agent', 'anthropic:claude-3-sonnet');
 
     const _taskId = await taskManager.createTask(
       {
@@ -56,7 +57,7 @@ describe('Task Agent Spawning with Personas', () => {
   });
 
   it('spawns agent with helper-agent persona', async () => {
-    const agentSpec = createNewAgentSpec('helper-agent', 'openai', 'gpt-4');
+    const agentSpec = createNewAgentSpec('helper-agent', 'openai:gpt-4');
 
     await taskManager.createTask(
       {
@@ -79,7 +80,7 @@ describe('Task Agent Spawning with Personas', () => {
   });
 
   it('spawns agent with custom persona', async () => {
-    const agentSpec = createNewAgentSpec('my-custom-persona', 'lmstudio', 'custom-model');
+    const agentSpec = createNewAgentSpec('my-custom-persona', 'lmstudio:custom-model');
 
     await taskManager.createTask(
       {
@@ -123,16 +124,16 @@ describe('Task Agent Spawning with Personas', () => {
 
   it('handles different persona types correctly', async () => {
     const testCases = [
-      { persona: 'lace', provider: 'anthropic', model: 'claude-3-sonnet' },
-      { persona: 'coding-agent', provider: 'openai', model: 'gpt-4' },
-      { persona: 'helper-agent', provider: 'ollama', model: 'llama2' },
-      { persona: 'data-analyst', provider: 'anthropic', model: 'claude-3-haiku' },
+      { persona: 'lace', modelSpec: 'anthropic:claude-3-sonnet' },
+      { persona: 'coding-agent', modelSpec: 'openai:gpt-4' },
+      { persona: 'helper-agent', modelSpec: 'ollama:llama2' },
+      { persona: 'data-analyst', modelSpec: 'anthropic:claude-3-haiku' },
     ];
 
-    for (const { persona, provider, model } of testCases) {
+    for (const { persona, modelSpec } of testCases) {
       mockAgentCreator.mockClear();
 
-      const spec = createNewAgentSpec(persona, provider, model);
+      const spec = createNewAgentSpec(persona, modelSpec);
 
       await taskManager.createTask(
         {
@@ -143,7 +144,13 @@ describe('Task Agent Spawning with Personas', () => {
         context
       );
 
-      expect(mockAgentCreator).toHaveBeenCalledWith(persona, provider, model, expect.any(Object));
+      const { instanceId, modelId } = parseProviderModel(modelSpec);
+      expect(mockAgentCreator).toHaveBeenCalledWith(
+        persona,
+        instanceId,
+        modelId,
+        expect.any(Object)
+      );
     }
   });
 
@@ -151,7 +158,7 @@ describe('Task Agent Spawning with Personas', () => {
     const eventListener = vi.fn();
     taskManager.on('agent:spawned', eventListener);
 
-    const agentSpec = createNewAgentSpec('coding-agent', 'anthropic', 'claude-3-sonnet');
+    const agentSpec = createNewAgentSpec('coding-agent', 'anthropic:claude-3-sonnet');
 
     await taskManager.createTask(
       {
@@ -165,8 +172,8 @@ describe('Task Agent Spawning with Personas', () => {
     expect(eventListener).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'agent:spawned',
-        provider: 'anthropic',
-        model: 'claude-3-sonnet',
+        providerInstanceId: 'anthropic',
+        modelId: 'claude-3-sonnet',
         agentThreadId: expect.stringMatching(/^lace_20250904_test01\.\d+$/) as string,
       })
     );
@@ -176,7 +183,7 @@ describe('Task Agent Spawning with Personas', () => {
     // Mock agent creator to fail
     mockAgentCreator.mockRejectedValue(new Error('Agent creation failed'));
 
-    const agentSpec = createNewAgentSpec('lace', 'anthropic', 'claude-3-sonnet');
+    const agentSpec = createNewAgentSpec('lace', 'anthropic:claude-3-sonnet');
 
     await expect(
       taskManager.createTask(

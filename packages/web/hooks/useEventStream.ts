@@ -47,7 +47,7 @@ interface ProjectEvent {
   timestamp: Date;
 }
 
-interface AgentEvent {
+export interface AgentEvent {
   type: 'agent:spawned' | 'agent:started' | 'agent:stopped';
   taskId?: string;
   agentThreadId: string;
@@ -289,6 +289,14 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
             break;
           case 'SESSION_UPDATED':
             currentOptions.onSessionUpdated?.(event);
+            break;
+          case 'AGENT_SPAWNED':
+            {
+              // Agent spawned event - reload session to get updated agents list
+              const agentEvent = event.data as AgentEvent;
+              currentOptions.onAgentSpawned?.(agentEvent);
+              currentOptions.onAgentEvent?.(agentEvent);
+            }
             break;
           // Add other event type cases as needed
         }

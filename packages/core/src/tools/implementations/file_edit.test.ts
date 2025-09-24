@@ -248,7 +248,7 @@ describe('FileEditTool Integration Tests', () => {
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('path');
     });
 
@@ -262,7 +262,7 @@ describe('FileEditTool Integration Tests', () => {
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('File path cannot be empty');
     });
 
@@ -276,7 +276,7 @@ describe('FileEditTool Integration Tests', () => {
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('old_text');
     });
 
@@ -290,7 +290,7 @@ describe('FileEditTool Integration Tests', () => {
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('new_text');
     });
 
@@ -711,7 +711,7 @@ describe('FileEditTool Integration Tests', () => {
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Validation failed');
+      expect(result.content[0].text).toContain('ValidationError');
     });
 
     it('should use createError for file operation failures', async () => {

@@ -130,7 +130,7 @@ describe('Enhanced Task Manager Tools', () => {
       new TaskAddNoteTool(),
       new TaskViewTool(),
     ];
-    taskCreateTool = tools.find((t) => t.name === 'task_add') as TaskCreateTool;
+    taskCreateTool = tools.find((t) => t.name === 'task_create') as TaskCreateTool;
     taskListTool = tools.find((t) => t.name === 'task_list') as TaskListTool;
     _taskCompleteTool = tools.find((t) => t.name === 'task_complete') as TaskCompleteTool;
     taskUpdateTool = tools.find((t) => t.name === 'task_update') as TaskUpdateTool;
@@ -183,7 +183,7 @@ describe('Enhanced Task Manager Tools', () => {
     it('should get TaskManager from context', async () => {
       expect(tools.length).toBe(6);
       expect(taskCreateTool).toBeDefined();
-      expect(taskCreateTool.name).toBe('task_add');
+      expect(taskCreateTool.name).toBe('task_create');
 
       // Test that tools can access TaskManager via agent
       expect(context.agent).toBeDefined();
@@ -251,8 +251,7 @@ describe('Enhanced Task Manager Tools', () => {
     it('should create task with new agent assignment', async () => {
       const newAgentSpec = createNewAgentSpec(
         'lace',
-        providerInstanceId,
-        'claude-3-5-haiku-20241022'
+        `${providerInstanceId}:claude-3-5-haiku-20241022`
       );
 
       const result = await taskCreateTool.execute(
@@ -292,7 +291,7 @@ describe('Enhanced Task Manager Tools', () => {
       const result = await taskCreateTool.execute(invalidInput, context);
 
       expect(result.status).toBe('failed');
-      expect(result.content?.[0]?.text).toContain('Validation failed');
+      expect(result.content?.[0]?.text).toContain('ValidationError');
     });
 
     it('should reject invalid assignee format', async () => {
@@ -388,10 +387,25 @@ describe('Enhanced Task Manager Tools', () => {
       expect(text).not.toContain('Task 3'); // Assigned to agent2
     });
 
-    it('should list all thread tasks', async () => {
+    it('should list current thread tasks only', async () => {
       const result = await taskListTool.execute(
         {
           filter: 'thread',
+        },
+        context
+      );
+
+      expect(result.status).toBe('completed');
+      const text = result.content?.[0]?.text || '';
+      expect(text).toContain('Task 1'); // No assignee, belongs to thread
+      expect(text).not.toContain('Task 2'); // Assigned to agent1, delegated out
+      expect(text).not.toContain('Task 3'); // Assigned to agent2, delegated out
+    });
+
+    it('should list all session tasks', async () => {
+      const result = await taskListTool.execute(
+        {
+          filter: 'all',
         },
         context
       );
@@ -544,7 +558,7 @@ describe('Enhanced Task Manager Tools', () => {
       );
 
       expect(result.status).toBe('failed');
-      expect(result.content?.[0]?.text).toContain('Validation failed');
+      expect(result.content?.[0]?.text).toContain('ValidationError');
     });
 
     it('should handle non-existent task', async () => {
@@ -581,8 +595,7 @@ describe('Enhanced Task Manager Tools', () => {
     it('should assign to new agent spec', async () => {
       const newAgentSpec = createNewAgentSpec(
         'lace',
-        providerInstanceId,
-        'claude-3-5-haiku-20241022'
+        `${providerInstanceId}:claude-3-5-haiku-20241022`
       );
 
       const result = await taskUpdateTool.execute(

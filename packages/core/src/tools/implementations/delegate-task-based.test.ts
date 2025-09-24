@@ -83,10 +83,14 @@ describe('Task-Based DelegateTool Integration', () => {
 
       const result = await delegateTool.execute(
         {
-          title: 'Integration Test Task',
-          prompt: 'Complete this integration test',
-          expected_response: 'Test completed successfully',
-          model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
+          tasks: [
+            {
+              title: 'Integration Test Task',
+              prompt: 'Complete this integration test',
+              expected_response: 'Test completed successfully',
+              assignedTo: `new:lace;${providerInstanceId}:claude-3-5-haiku-20241022`,
+            },
+          ],
         },
         context
       );
@@ -113,28 +117,40 @@ describe('Task-Based DelegateTool Integration', () => {
       const [result1, result2, result3] = await Promise.all([
         tool1.execute(
           {
-            title: 'Task 1',
-            prompt: 'First parallel task',
-            expected_response: 'Task result',
-            model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
+            tasks: [
+              {
+                title: 'Task 1',
+                prompt: 'First parallel task',
+                expected_response: 'Task result',
+                assignedTo: `new:lace;${providerInstanceId}:claude-3-5-haiku-20241022`,
+              },
+            ],
           },
           context
         ),
         tool2.execute(
           {
-            title: 'Task 2',
-            prompt: 'Second parallel task',
-            expected_response: 'Task result',
-            model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
+            tasks: [
+              {
+                title: 'Task 2',
+                prompt: 'Second parallel task',
+                expected_response: 'Task result',
+                assignedTo: `new:lace;${providerInstanceId}:claude-3-5-haiku-20241022`,
+              },
+            ],
           },
           context
         ),
         tool3.execute(
           {
-            title: 'Task 3',
-            prompt: 'Third parallel task',
-            expected_response: 'Task result',
-            model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
+            tasks: [
+              {
+                title: 'Task 3',
+                prompt: 'Third parallel task',
+                expected_response: 'Task result',
+                assignedTo: `new:lace;${providerInstanceId}:claude-3-5-haiku-20241022`,
+              },
+            ],
           },
           context
         ),
@@ -164,10 +180,14 @@ describe('Task-Based DelegateTool Integration', () => {
 
       const result = await delegateTool.execute(
         {
-          title: 'This will be blocked',
-          prompt: 'This task will fail',
-          expected_response: 'Error',
-          model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
+          tasks: [
+            {
+              title: 'This will be blocked',
+              prompt: 'This task will fail',
+              expected_response: 'Error',
+              assignedTo: `new:lace;${providerInstanceId}:claude-3-5-haiku-20241022`,
+            },
+          ],
         },
         context
       );
@@ -187,10 +207,14 @@ describe('Task-Based DelegateTool Integration', () => {
 
       const result = await delegateTool.execute(
         {
-          title: 'Aborted Task',
-          prompt: 'This task should be aborted',
-          expected_response: 'Should not complete',
-          model: 'anthropic:claude-3-5-haiku-20241022',
+          tasks: [
+            {
+              title: 'Aborted Task',
+              prompt: 'This task should be aborted',
+              expected_response: 'Should not complete',
+              assignedTo: `new:lace;${providerInstanceId}:claude-3-5-haiku-20241022`,
+            },
+          ],
         },
         abortedContext
       );

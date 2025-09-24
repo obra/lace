@@ -7,7 +7,6 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TaskManager, AgentCreationCallback } from '~/tasks/task-manager';
-import { Task } from '~/tasks/types';
 import { getPersistence, SessionData } from '~/persistence/database';
 import {
   TaskCreateTool,
@@ -30,11 +29,12 @@ import { UrlFetchTool } from '~/tools/implementations/url_fetch';
 import { logger } from '~/utils/logger';
 import type { ToolPolicy } from '~/tools/types';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
-import { getEnvVar } from '~/config/env-loader';
 import { MCPServerManager } from '~/mcp/server-manager';
 import type { MCPServerConnection, MCPServerConfig } from '~/config/mcp-types';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
+import type { TaskManagerEvent } from '~/utils/task-notifications';
+import { routeTaskNotifications } from '~/utils/task-notifications';
 
 export interface SessionInfo {
   id: ThreadId;
@@ -57,18 +57,34 @@ export class Session {
   private _destroyed = false;
   private _projectId?: string;
 
-  constructor(sessionId: ThreadId, sessionData: SessionData, threadManager: ThreadManager) {
+  // Task notification event handlers for proper cleanup
+  private _onTaskUpdated?: (event: TaskManagerEvent) => Promise<void>;
+  private _onTaskCreated?: (event: TaskManagerEvent) => Promise<void>;
+  private _onTaskNoteAdded?: (event: TaskManagerEvent) => Promise<void>;
+  private _taskUpdatedWrapper?: (event: TaskManagerEvent) => void;
+  private _taskCreatedWrapper?: (event: TaskManagerEvent) => void;
+  private _taskNoteAddedWrapper?: (event: TaskManagerEvent) => void;
+
+  constructor(
+    sessionId: ThreadId,
+    sessionData: SessionData,
+    threadManager: ThreadManager,
+    taskManager?: TaskManager
+  ) {
     this._sessionId = sessionId;
     this._sessionData = sessionData;
     this._projectId = sessionData.projectId;
 
     this._threadManager = threadManager;
 
-    // Initialize TaskManager for this session
-    this._taskManager = new TaskManager(this._sessionId, getPersistence());
+    // Use provided TaskManager or create a new one
+    this._taskManager = taskManager || new TaskManager(this._sessionId, getPersistence());
 
     // Create session-scoped MCP server manager
     this._mcpServerManager = new MCPServerManager();
+
+    // Set up task notification routing
+    this.setupTaskNotificationRouting();
   }
 
   static create(options: {
@@ -100,10 +116,6 @@ export class Session {
     // Create thread for this session
     const threadId = threadManager.createThread(sessionData.id, sessionData.id, options.projectId);
 
-    // Create TaskManager using global persistence
-    // Note: We'll update this with agent creation callback after session is created
-    const taskManager = new TaskManager(asThreadId(threadId), getPersistence());
-
     // Note: ToolExecutor will be created after session is created
 
     // Get effective configuration by merging project and session configs
@@ -111,6 +123,18 @@ export class Session {
       options.projectId,
       options.configuration
     );
+
+    // Create TaskManager using global persistence
+    // Note: We'll update this with agent creation callback after session is created
+    const taskManager = new TaskManager(asThreadId(threadId), getPersistence());
+
+    // Set session config on TaskManager immediately
+    if (effectiveConfig.providerInstanceId && effectiveConfig.modelId) {
+      taskManager.setSessionConfig({
+        providerInstanceId: effectiveConfig.providerInstanceId,
+        modelId: effectiveConfig.modelId,
+      });
+    }
 
     // Extract provider instance and model from effective configuration
     let providerInstanceId = effectiveConfig.providerInstanceId;
@@ -202,8 +226,8 @@ export class Session {
 
     // Agent will auto-initialize token budget based on model
 
-    // Create session instance first
-    const session = new Session(asThreadId(threadId), sessionData, threadManager);
+    // Create session instance first, passing the TaskManager we already created
+    const session = new Session(asThreadId(threadId), sessionData, threadManager, taskManager);
 
     // Create configured tool executor
     const toolExecutor = session.createConfiguredToolExecutor();
@@ -226,8 +250,6 @@ export class Session {
 
     // Add coordinator to session
     session._agents.set(asThreadId(threadId), sessionAgent);
-    // Update the session's task manager to use the one we created
-    session._taskManager = taskManager;
 
     // Set up agent creation callback for task-based agent spawning
     session.setupAgentCreationCallback();
@@ -385,8 +407,8 @@ export class Session {
 
     logger.debug(`Creating session for ${sessionId}`);
 
-    // Create session instance
-    const session = new Session(sessionId, sessionData, threadManager);
+    // Create session instance, passing the TaskManager we already created
+    const session = new Session(sessionId, sessionData, threadManager, taskManager);
 
     // Create and initialize coordinator agent
     let coordinatorAgent: Agent;
@@ -505,8 +527,14 @@ export class Session {
     // Wait for all delegate agents to start (with error handling)
     await Promise.all(delegateStartPromises);
 
-    // Update the session's task manager to use the one we created
-    session._taskManager = taskManager;
+    // Set session configuration for model resolution
+    const sessionEffectiveConfig = session.getEffectiveConfiguration();
+    if (sessionEffectiveConfig.providerInstanceId && sessionEffectiveConfig.modelId) {
+      taskManager.setSessionConfig({
+        providerInstanceId: sessionEffectiveConfig.providerInstanceId,
+        modelId: sessionEffectiveConfig.modelId,
+      });
+    }
 
     // Set up agent creation callback for task-based agent spawning
     session.setupAgentCreationCallback();
@@ -653,8 +681,7 @@ export class Session {
     return process.cwd();
   }
 
-  // Made public for testing - should be private in production
-  // Replace the existing getSessionData method with this:
+  // Cached session data accessor (private)
   private getSessionData(): SessionData {
     return this._sessionData; // 👈 NEW: Return cached data instead of database query
   }
@@ -956,6 +983,9 @@ export class Session {
 
     this._destroyed = true;
 
+    // Clean up task notification listeners
+    this.cleanup();
+
     // Remove from registry
     Session._sessionRegistry.delete(this._sessionId);
 
@@ -1006,55 +1036,13 @@ export class Session {
         });
       });
 
-      // Send initial task notification to the new agent
-      try {
-        await this.sendTaskNotification(agent, task);
-      } catch (error) {
-        logger.error('Failed to send task notification to spawned agent', {
-          threadId: agent.threadId,
-          task: task.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        // Don't fail task creation if agent fails - the task is still created
-      }
+      // Task notification will be sent automatically via TaskManager events
 
       return asThreadId(agent.threadId);
     };
 
     // Set the callback on the existing TaskManager
     this._taskManager.setAgentCreationCallback(agentCreationCallback);
-  }
-
-  /**
-   * Send task assignment notification to an agent
-   */
-  private async sendTaskNotification(agent: Agent, task: Task): Promise<void> {
-    const taskMessage = this.formatTaskAssignment(task);
-    await agent.sendMessage(taskMessage);
-  }
-
-  /**
-   * Format task assignment notification message
-   */
-  private formatTaskAssignment(task: Task): string {
-    return `[LACE TASK SYSTEM] You have been assigned task '${task.id}':
-Title: "${task.title}"
-Created by: ${task.createdBy}
-Priority: ${task.priority}
-
---- TASK DETAILS ---
-${task.prompt}
---- END TASK DETAILS ---
-
-Use your task_add_note tool to record important notes as you work and your task_complete tool when you are done.`;
-  }
-
-  private static detectDefaultProvider(): string {
-    return getEnvVar('ANTHROPIC_KEY') || getEnvVar('ANTHROPIC_API_KEY') ? 'anthropic' : 'openai';
-  }
-
-  private static getDefaultModel(provider: string): string {
-    return provider === 'anthropic' ? 'claude-sonnet-4-20250514' : 'gpt-4';
   }
 
   private static generateSessionName(): string {
@@ -1333,5 +1321,114 @@ Use your task_add_note tool to record important notes as you work and your task_
    */
   static getRegistrySize(): number {
     return Session._sessionRegistry.size;
+  }
+
+  /**
+   * Sets up task notification routing system to automatically notify agents about task changes.
+   *
+   * When agents create tasks and other agents work on them, this system ensures the creator
+   * receives notifications about completion, status changes, and significant progress updates.
+   *
+   * Notifications are delivered via agent.sendMessage() and include:
+   * - Task completion when status changes to 'completed'
+   * - Status changes (pending → in_progress, * → blocked)
+   * - Task assignments and reassignments
+   * - All notes added by other agents
+   */
+  private setupTaskNotificationRouting(): void {
+    // Store bound handlers for proper cleanup
+    this._onTaskUpdated = async (event: TaskManagerEvent) => {
+      try {
+        await this.handleTaskUpdate(event);
+      } catch (error) {
+        logger.error('Failed to handle task update notification', {
+          sessionId: this._sessionId,
+          taskId: event.task.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+
+    this._onTaskCreated = async (event: TaskManagerEvent) => {
+      try {
+        await this.handleTaskCreated(event);
+      } catch (error) {
+        logger.error('Failed to handle task creation notification', {
+          sessionId: this._sessionId,
+          taskId: event.task.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+
+    this._onTaskNoteAdded = async (event: TaskManagerEvent) => {
+      try {
+        await this.handleTaskNoteAdded(event);
+      } catch (error) {
+        logger.error('Failed to handle task note notification', {
+          sessionId: this._sessionId,
+          taskId: event.task.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+
+    // Create wrapper functions for proper cleanup
+    this._taskUpdatedWrapper = (event: TaskManagerEvent) => {
+      void this._onTaskUpdated!(event);
+    };
+    this._taskCreatedWrapper = (event: TaskManagerEvent) => {
+      void this._onTaskCreated!(event);
+    };
+    this._taskNoteAddedWrapper = (event: TaskManagerEvent) => {
+      void this._onTaskNoteAdded!(event);
+    };
+
+    // Register the handlers
+    this._taskManager.on('task:updated', this._taskUpdatedWrapper);
+    this._taskManager.on('task:created', this._taskCreatedWrapper);
+    this._taskManager.on('task:note_added', this._taskNoteAddedWrapper);
+  }
+
+  /** Handles task update events and routes notifications to relevant agents */
+  private async handleTaskUpdate(event: TaskManagerEvent): Promise<void> {
+    await routeTaskNotifications(event, {
+      getAgent: (id: ThreadId) => this._agents.get(id) || null,
+      sessionId: this._sessionId,
+    });
+  }
+
+  /** Handles task creation events and notifies assignees about new assignments */
+  private async handleTaskCreated(event: TaskManagerEvent): Promise<void> {
+    await routeTaskNotifications(event, {
+      getAgent: (id: ThreadId) => this._agents.get(id) || null,
+      sessionId: this._sessionId,
+    });
+  }
+
+  /** Handles note addition events and notifies creators about all notes from other agents */
+  private async handleTaskNoteAdded(event: TaskManagerEvent): Promise<void> {
+    await routeTaskNotifications(event, {
+      getAgent: (id: ThreadId) => this._agents.get(id) || null,
+      sessionId: this._sessionId,
+    });
+  }
+
+  /**
+   * Cleanup method to remove task notification event listeners.
+   *
+   * This should be called when the session is being destroyed to prevent memory leaks
+   * from accumulated event listeners. Only removes listeners added by this session.
+   */
+  cleanup(): void {
+    if (this._taskUpdatedWrapper) {
+      this._taskManager.removeListener('task:updated', this._taskUpdatedWrapper);
+    }
+    if (this._taskCreatedWrapper) {
+      this._taskManager.removeListener('task:created', this._taskCreatedWrapper);
+    }
+    if (this._taskNoteAddedWrapper) {
+      this._taskManager.removeListener('task:note_added', this._taskNoteAddedWrapper);
+    }
   }
 }

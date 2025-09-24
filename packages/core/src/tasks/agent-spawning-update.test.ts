@@ -43,7 +43,7 @@ describe('Agent Spawning on Assignment', () => {
       {
         title: 'Test task creation',
         prompt: 'Test prompt',
-        assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-3-5-haiku-20241022'),
+        assignedTo: createNewAgentSpec('lace', 'anthropic:claude-3-5-haiku-20241022'),
       },
       taskContext
     );
@@ -58,7 +58,7 @@ describe('Agent Spawning on Assignment', () => {
 
     // Task should have delegate thread ID, not original assignment
     expect(task.assignedTo).toBe(`${sessionId}.1`);
-    expect(task.assignedTo).not.toBe('new:lace:anthropic/claude-3-5-haiku-20241022');
+    expect(task.assignedTo).not.toBe('new:lace;anthropic:claude-3-5-haiku-20241022');
 
     // Should be marked as in_progress due to agent spawning
     expect(task.status).toBe('in_progress');
@@ -84,7 +84,7 @@ describe('Agent Spawning on Assignment', () => {
     const updatedTask = await taskManager.updateTask(
       task.id,
       {
-        assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-sonnet-4-20250514'),
+        assignedTo: createNewAgentSpec('lace', 'anthropic:claude-sonnet-4-20250514'),
         status: 'in_progress', // This will be overridden by agent spawning
       },
       taskContext
@@ -100,7 +100,7 @@ describe('Agent Spawning on Assignment', () => {
 
     // Task should have delegate thread ID, not original assignment
     expect(updatedTask.assignedTo).toBe(`${sessionId}.1`);
-    expect(updatedTask.assignedTo).not.toBe('new:lace:anthropic/claude-sonnet-4-20250514');
+    expect(updatedTask.assignedTo).not.toBe('new:lace;anthropic:claude-sonnet-4-20250514');
 
     // Should be marked as in_progress due to agent spawning
     expect(updatedTask.status).toBe('in_progress');
@@ -142,7 +142,7 @@ describe('Agent Spawning on Assignment', () => {
         {
           title: 'Test error handling',
           prompt: 'Test prompt',
-          assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-3-5-haiku-20241022'),
+          assignedTo: createNewAgentSpec('lace', 'anthropic:claude-3-5-haiku-20241022'),
         },
         taskContext
       )
@@ -157,7 +157,7 @@ describe('Agent Spawning on Assignment', () => {
       {
         title: 'Task 1',
         prompt: 'Prompt 1',
-        assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-3-5-haiku-20241022'),
+        assignedTo: createNewAgentSpec('lace', 'anthropic:claude-3-5-haiku-20241022'),
       },
       taskContext
     );
@@ -167,7 +167,7 @@ describe('Agent Spawning on Assignment', () => {
       {
         title: 'Task 2',
         prompt: 'Prompt 2',
-        assignedTo: createNewAgentSpec('lace', 'anthropic', 'claude-sonnet-4-20250514'),
+        assignedTo: createNewAgentSpec('lace', 'anthropic:claude-sonnet-4-20250514'),
       },
       taskContext
     );

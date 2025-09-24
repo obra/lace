@@ -219,8 +219,8 @@ interface AgentSpawnedData {
   type: 'agent:spawned'; // For compatibility with existing handlers
   taskId?: string;
   agentThreadId: ThreadId;
-  provider: string;
-  model: string;
+  providerInstanceId: string;
+  modelId: string;
   context: {
     actor: string;
     isHuman: boolean;
@@ -529,35 +529,41 @@ export function asThreadId(value: string): ThreadId {
 }
 
 // For new agent specifications
+// Format: "new:persona" | "new:persona;fast" | "new:persona;smart" | "new:persona;provider:model"
 export type NewAgentSpec = string & { readonly __brand: 'NewAgentSpec' };
 
 export function isNewAgentSpec(value: string): value is NewAgentSpec {
-  return /^new:([^:]+):([^/]+)\/(.+)$/.test(value);
+  // Must start with "new:" followed by persona, optionally followed by ;modelSpec
+  // Persona cannot contain forward slashes (to reject old format)
+  return /^new:[^;/]+(;.*)?$/.test(value);
 }
 
-export function createNewAgentSpec(persona: string, provider: string, model: string): NewAgentSpec {
-  return `new:${persona}:${provider}/${model}` as NewAgentSpec;
+export function createNewAgentSpec(persona: string, modelSpec?: string): NewAgentSpec {
+  if (!modelSpec) {
+    return `new:${persona}` as NewAgentSpec;
+  }
+  return `new:${persona};${modelSpec}` as NewAgentSpec;
 }
 
-// Add new parsing function
 export interface ParsedNewAgentSpec {
   persona: string;
-  provider: string;
-  model: string;
+  modelSpec?: string; // undefined | 'fast' | 'smart' | 'instanceId:modelId'
 }
 
 export function parseNewAgentSpec(spec: NewAgentSpec): ParsedNewAgentSpec {
-  const match = spec.match(/^new:([^:]+):([^/]+)\/(.+)$/);
+  const match = spec.match(/^new:([^;]+)(;(.*))?$/);
   if (!match) {
     throw new Error(
-      `Invalid NewAgentSpec format: ${spec}. Expected format: new:persona:provider/model`
+      `Invalid NewAgentSpec format: ${spec}. Expected format: new:persona[;modelSpec]`
     );
   }
 
+  const persona = match[1];
+  const modelSpec = match[3]; // The part after semicolon, if any
+
   return {
-    persona: match[1],
-    provider: match[2],
-    model: match[3],
+    persona,
+    modelSpec,
   };
 }
 

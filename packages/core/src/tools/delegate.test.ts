@@ -61,7 +61,7 @@ describe('DelegateTool', () => {
   it('should have correct metadata', () => {
     expect(tool.name).toBe('delegate');
     expect(tool.annotations?.openWorldHint).toBe(true);
-    expect(tool.inputSchema.required).toEqual(['title', 'prompt', 'expected_response', 'model']);
+    expect(tool.inputSchema.required).toEqual(['tasks']);
   });
 
   it('should delegate a simple task with default model', async () => {
@@ -69,10 +69,14 @@ describe('DelegateTool', () => {
 
     const result = await tool.execute(
       {
-        title: 'Analyze test failures',
-        prompt: 'Look at the failing tests and identify common patterns',
-        expected_response: 'A list of failure patterns',
-        model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
+        tasks: [
+          {
+            title: 'Analyze test failures',
+            prompt: 'Look at the failing tests and identify common patterns',
+            expected_response: 'A list of failure patterns',
+            assignedTo: `new:lace;${providerInstanceId}:claude-3-5-haiku-20241022`,
+          },
+        ],
       },
       context
     );
@@ -88,10 +92,14 @@ describe('DelegateTool', () => {
 
     const result = await tool.execute(
       {
-        title: 'Test custom model',
-        prompt: 'Use custom model for delegation',
-        expected_response: 'Custom response',
-        model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
+        tasks: [
+          {
+            title: 'Test custom model',
+            prompt: 'Use custom model for delegation',
+            expected_response: 'Custom response',
+            assignedTo: `new:lace;${providerInstanceId}:claude-3-5-haiku-20241022`,
+          },
+        ],
       },
       context
     );
@@ -106,10 +114,14 @@ describe('DelegateTool', () => {
 
     const result = await tool.execute(
       {
-        title: 'List files',
-        prompt: 'List the files in the current directory',
-        expected_response: 'List of files',
-        model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
+        tasks: [
+          {
+            title: 'List files',
+            prompt: 'List the files in the current directory',
+            expected_response: 'List of files',
+            assignedTo: `new:lace;${providerInstanceId}:claude-3-5-haiku-20241022`,
+          },
+        ],
       },
       context
     );
@@ -125,10 +137,14 @@ describe('DelegateTool', () => {
 
     const result = await tool.execute(
       {
-        title: 'Format test',
-        prompt: 'Test system prompt formatting',
-        expected_response: 'Formatted response',
-        model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
+        tasks: [
+          {
+            title: 'Format test',
+            prompt: 'Test system prompt formatting',
+            expected_response: 'Formatted response',
+            assignedTo: `new:lace;${providerInstanceId}:claude-3-5-haiku-20241022`,
+          },
+        ],
       },
       context
     );
@@ -138,19 +154,23 @@ describe('DelegateTool', () => {
     expect(result.content[0]?.text).toContain('Task completed');
   });
 
-  it('should handle invalid provider format', async () => {
+  it('should handle invalid assignTo format', async () => {
     const result = await tool.execute(
       {
-        title: 'Invalid provider test',
-        prompt: 'Test with invalid provider',
-        expected_response: 'Error',
-        model: 'invalid-provider-format',
+        tasks: [
+          {
+            title: 'Invalid provider test',
+            prompt: 'Test with invalid provider',
+            expected_response: 'Error',
+            assignedTo: 'invalid-format',
+          },
+        ],
       },
       context
     );
 
     expect(result.status).not.toBe('completed');
-    expect(result.content[0].text).toContain('Invalid model format');
+    expect(result.content[0].text).toContain('Invalid assignedTo format');
   });
 
   it('should collect all subagent responses', async () => {
@@ -158,10 +178,14 @@ describe('DelegateTool', () => {
 
     const result = await tool.execute(
       {
-        title: 'Multi-response test',
-        prompt: 'Generate multiple responses',
-        expected_response: 'Combined responses',
-        model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
+        tasks: [
+          {
+            title: 'Multi-response test',
+            prompt: 'Generate multiple responses',
+            expected_response: 'Combined responses',
+            assignedTo: `new:lace;${providerInstanceId}:claude-3-5-haiku-20241022`,
+          },
+        ],
       },
       context
     );
@@ -175,10 +199,14 @@ describe('DelegateTool', () => {
 
     const result = await tool.execute(
       {
-        title: 'Metadata test',
-        prompt: 'Test metadata inclusion',
-        expected_response: 'Response with metadata',
-        model: `${providerInstanceId}:claude-3-5-haiku-20241022`,
+        tasks: [
+          {
+            title: 'Metadata test',
+            prompt: 'Test metadata inclusion',
+            expected_response: 'Response with metadata',
+            assignedTo: `new:lace;${providerInstanceId}:claude-3-5-haiku-20241022`,
+          },
+        ],
       },
       context
     );
@@ -196,10 +224,14 @@ describe('DelegateTool', () => {
 
       const result = await tool.execute(
         {
-          title: `Test ${model}`,
-          prompt: 'Test valid model format',
-          expected_response: 'Valid response',
-          model,
+          tasks: [
+            {
+              title: `Test ${model}`,
+              prompt: 'Test valid model format',
+              expected_response: 'Valid response',
+              assignedTo: `new:lace;${model}`,
+            },
+          ],
         },
         context
       );
