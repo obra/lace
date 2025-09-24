@@ -10,7 +10,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import type { ProjectInfo } from '@/types/core';
 import {
-  createMockProjectContext,
+  createMockProjectsContext,
   createMockSessionContext,
   createMockUIContext,
 } from '@/__tests__/utils/provider-mocks';
@@ -52,7 +52,7 @@ import { useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
-const mockUseProjectContext = vi.mocked(useProjectsContext);
+const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseUIContext = vi.mocked(useUIContext);
 const mockUseOnboarding = vi.mocked(useOnboarding);
@@ -141,8 +141,8 @@ describe('ProjectSelectorPanel', () => {
     }) as unknown as typeof fetch;
 
     // Set up default mock returns
-    mockUseProjectContext.mockReturnValue(
-      createMockProjectContext({
+    mockUseProjectsContext.mockReturnValue(
+      createMockProjectsContext({
         projects: mockProjects,
         projectsForSidebar: mockProjects,
         selectedProject: null,
@@ -237,8 +237,8 @@ describe('ProjectSelectorPanel', () => {
 
   it('should show selected project as active', async () => {
     // Override the current project to be one of the mock projects
-    mockUseProjectContext.mockReturnValue(
-      createMockProjectContext({
+    mockUseProjectsContext.mockReturnValue(
+      createMockProjectsContext({
         projects: mockProjects,
         projectsForSidebar: mockProjects,
         currentProject: mockProjects[0], // Set as selected
@@ -291,8 +291,8 @@ describe('ProjectSelectorPanel', () => {
 
   it('should handle empty project list', async () => {
     // Override to provide empty projects list
-    mockUseProjectContext.mockReturnValue(
-      createMockProjectContext({
+    mockUseProjectsContext.mockReturnValue(
+      createMockProjectsContext({
         projects: [],
         projectsForSidebar: [],
         selectedProject: null,
@@ -316,8 +316,8 @@ describe('ProjectSelectorPanel', () => {
 
   it('should show loading state', async () => {
     // Override to provide loading state
-    mockUseProjectContext.mockReturnValue(
-      createMockProjectContext({
+    mockUseProjectsContext.mockReturnValue(
+      createMockProjectsContext({
         projects: [],
         projectsForSidebar: [],
         loading: true,

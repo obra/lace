@@ -8,7 +8,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { ProjectSelectorPanel } from './ProjectSelectorPanel';
 import { createMockResponse } from '@/test-utils/mock-fetch';
 import {
-  createMockProjectContext,
+  createMockProjectsContext,
   createMockSessionContext,
   createMockUIContext,
 } from '@/__tests__/utils/provider-mocks';
@@ -49,7 +49,7 @@ import { useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
-const mockUseProjectContext = vi.mocked(useProjectsContext);
+const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseUIContext = vi.mocked(useUIContext);
 const mockUseOnboarding = vi.mocked(useOnboarding);
@@ -96,8 +96,8 @@ describe('ProjectSelectorPanel', () => {
     );
 
     // Set up default mock returns
-    mockUseProjectContext.mockReturnValue(
-      createMockProjectContext({
+    mockUseProjectsContext.mockReturnValue(
+      createMockProjectsContext({
         projects: [],
         projectsForSidebar: [],
         selectedProject: null,

@@ -15,7 +15,7 @@ import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 import {
   createMockSessionContext,
   createMockAgentContext,
-  createMockProjectContext,
+  createMockProjectsContext,
 } from '@/__tests__/utils/provider-mocks';
 
 // Mock all the providers
@@ -117,7 +117,7 @@ import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useOptionalAgentContext, useAgentContext } from '@/components/providers/AgentProvider';
 
-const mockUseProjectContext = vi.mocked(useProjectsContext);
+const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseOptionalAgentContext = vi.mocked(useOptionalAgentContext);
 const mockUseAgentContext = vi.mocked(useAgentContext);
@@ -167,8 +167,8 @@ describe('SidebarContent', () => {
     vi.clearAllMocks();
 
     // Set up default mock returns
-    mockUseProjectContext.mockReturnValue(
-      createMockProjectContext({
+    mockUseProjectsContext.mockReturnValue(
+      createMockProjectsContext({
         selectedProject: 'test-project',
         foundProject: createMockProject(),
         projects: [createMockProject()],
@@ -203,8 +203,8 @@ describe('SidebarContent', () => {
     });
 
     it('renders only task section when no project is selected', () => {
-      mockUseProjectContext.mockReturnValue(
-        createMockProjectContext({
+      mockUseProjectsContext.mockReturnValue(
+        createMockProjectsContext({
           selectedProject: null,
           foundProject: null,
           projects: [],
@@ -315,7 +315,7 @@ describe('SidebarContent', () => {
     it('uses ProjectsProvider for project state', () => {
       render(<SidebarContent {...defaultProps} />);
 
-      expect(mockUseProjectContext).toHaveBeenCalled();
+      expect(mockUseProjectsContext).toHaveBeenCalled();
       expect(screen.getByTestId('project-section')).toBeInTheDocument();
     });
 
@@ -329,8 +329,8 @@ describe('SidebarContent', () => {
 
   describe('Edge Cases', () => {
     it('handles null project gracefully', () => {
-      mockUseProjectContext.mockReturnValue(
-        createMockProjectContext({
+      mockUseProjectsContext.mockReturnValue(
+        createMockProjectsContext({
           selectedProject: null,
           foundProject: null,
           projects: [],

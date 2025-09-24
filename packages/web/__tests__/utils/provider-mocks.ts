@@ -84,7 +84,7 @@ export function createMockAgentContext(overrides?: Partial<AgentContextType>): A
  * Creates a mock ProjectsContextType with all required methods
  * @param overrides - Partial object to override default mock values
  */
-export function createMockProjectContext(
+export function createMockProjectsContext(
   overrides?: Partial<ProjectsContextType>
 ): ProjectsContextType {
   return {

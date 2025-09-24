@@ -31,7 +31,7 @@ const mockProjects: ProjectInfo[] = [
   },
 ];
 
-const createMockProjectContext = (
+const createMockProjectsContext = (
   overrides: Partial<ProjectsContextType> = {}
 ): ProjectsContextType => ({
   projects: mockProjects,
@@ -52,14 +52,14 @@ const createMockProjectContext = (
 });
 
 vi.mock('@/components/providers/ProjectsProvider', () => ({
-  useProjectsContext: vi.fn(() => createMockProjectContext()),
+  useProjectsContext: vi.fn(() => createMockProjectsContext()),
 }));
 
 describe('useAvailableTools', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset the mock to return default values
-    vi.mocked(useProjectsContext).mockReturnValue(createMockProjectContext());
+    vi.mocked(useProjectsContext).mockReturnValue(createMockProjectsContext());
   });
 
   it('should start with loading state', () => {
@@ -91,7 +91,7 @@ describe('useAvailableTools', () => {
 
   it('should handle empty projects array', async () => {
     vi.mocked(useProjectsContext).mockReturnValue(
-      createMockProjectContext({
+      createMockProjectsContext({
         projects: [],
       })
     );
@@ -185,7 +185,7 @@ describe('useAvailableTools', () => {
     const { result, rerender } = renderHook(
       ({ projects }) => {
         vi.mocked(useProjectsContext).mockReturnValue(
-          createMockProjectContext({
+          createMockProjectsContext({
             projects,
           })
         );

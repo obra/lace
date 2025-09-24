@@ -11,7 +11,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { ProjectSection } from '@/components/sidebar/ProjectSection';
 import type { ProjectInfo } from '@/types/core';
-import { createMockProjectContext } from '@/__tests__/utils/provider-mocks';
+import { createMockProjectsContext } from '@/__tests__/utils/provider-mocks';
 
 // Mock the providers
 vi.mock('@/components/providers/ProjectsProvider', () => ({
@@ -35,7 +35,7 @@ vi.mock('@/components/config/ProjectEditModal', () => ({
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
-const mockUseProjectContext = vi.mocked(useProjectsContext);
+const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseProviderInstances = vi.mocked(useProviderInstances);
 
 // Test data factories
@@ -64,8 +64,8 @@ describe('ProjectSection', () => {
     vi.clearAllMocks();
 
     // Set up default mock returns using helpers
-    mockUseProjectContext.mockReturnValue(
-      createMockProjectContext({
+    mockUseProjectsContext.mockReturnValue(
+      createMockProjectsContext({
         selectedProject: 'test-project',
         foundProject: createMockProject(),
         projects: [createMockProject()],
@@ -115,8 +115,8 @@ describe('ProjectSection', () => {
     it('displays project name without description when description is undefined', () => {
       const projectWithoutDescription = createMockProject({ description: undefined });
 
-      mockUseProjectContext.mockReturnValue(
-        createMockProjectContext({
+      mockUseProjectsContext.mockReturnValue(
+        createMockProjectsContext({
           selectedProject: 'test-project',
           foundProject: projectWithoutDescription,
           projects: [projectWithoutDescription],
@@ -203,8 +203,8 @@ describe('ProjectSection', () => {
         name: 'This is an extremely long project name that should be truncated in the UI to prevent layout issues',
       });
 
-      mockUseProjectContext.mockReturnValue(
-        createMockProjectContext({
+      mockUseProjectsContext.mockReturnValue(
+        createMockProjectsContext({
           selectedProject: 'test-project',
           foundProject: longNameProject,
           projects: [longNameProject],
@@ -225,8 +225,8 @@ describe('ProjectSection', () => {
           'This is an extremely long project description that should be truncated in the UI to prevent layout issues and maintain clean appearance',
       });
 
-      mockUseProjectContext.mockReturnValue(
-        createMockProjectContext({
+      mockUseProjectsContext.mockReturnValue(
+        createMockProjectsContext({
           selectedProject: 'test-project',
           foundProject: longDescProject,
           projects: [longDescProject],
@@ -243,8 +243,8 @@ describe('ProjectSection', () => {
     it('handles empty project name gracefully', () => {
       const emptyNameProject = createMockProject({ name: '' });
 
-      mockUseProjectContext.mockReturnValue(
-        createMockProjectContext({
+      mockUseProjectsContext.mockReturnValue(
+        createMockProjectsContext({
           selectedProject: 'test-project',
           foundProject: emptyNameProject,
           projects: [emptyNameProject],
@@ -261,8 +261,8 @@ describe('ProjectSection', () => {
     it('handles missing project id', () => {
       const projectWithoutId = createMockProject({ id: '' });
 
-      mockUseProjectContext.mockReturnValue(
-        createMockProjectContext({
+      mockUseProjectsContext.mockReturnValue(
+        createMockProjectsContext({
           selectedProject: '', // Empty project ID should still render if foundProject exists
           foundProject: projectWithoutId,
           projects: [projectWithoutId],
@@ -277,8 +277,8 @@ describe('ProjectSection', () => {
     });
 
     it('does not render when no project is selected', () => {
-      mockUseProjectContext.mockReturnValue(
-        createMockProjectContext({
+      mockUseProjectsContext.mockReturnValue(
+        createMockProjectsContext({
           selectedProject: null,
           foundProject: null,
           projects: [],
@@ -340,7 +340,7 @@ describe('ProjectSection', () => {
     it('uses ProjectsProvider for project state', () => {
       render(<ProjectSection {...defaultProps} />);
 
-      expect(mockUseProjectContext).toHaveBeenCalled();
+      expect(mockUseProjectsContext).toHaveBeenCalled();
     });
   });
 });

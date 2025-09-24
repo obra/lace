@@ -11,7 +11,10 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SessionSection } from '@/components/sidebar/SessionSection';
 import type { SessionInfo, ThreadId, AgentInfo } from '@/types/core';
-import { createMockAgentContext, createMockProjectContext } from '@/__tests__/utils/provider-mocks';
+import {
+  createMockAgentContext,
+  createMockProjectsContext,
+} from '@/__tests__/utils/provider-mocks';
 import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
 // Mock the providers
@@ -33,7 +36,7 @@ import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useURLState } from '@/hooks/useURLState';
 
 const mockUseAgentContext = vi.mocked(useAgentContext);
-const mockUseProjectContext = vi.mocked(useProjectsContext);
+const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseURLState = vi.mocked(useURLState);
 
 // Test data factories
@@ -79,8 +82,8 @@ describe('SessionSection', () => {
       })
     );
 
-    mockUseProjectContext.mockReturnValue(
-      createMockProjectContext({
+    mockUseProjectsContext.mockReturnValue(
+      createMockProjectsContext({
         selectedProject: 'test-project',
         foundProject: {
           id: 'test-project',
@@ -148,8 +151,8 @@ describe('SessionSection', () => {
     });
 
     it('does not render switch icon when no project is selected', () => {
-      mockUseProjectContext.mockReturnValue(
-        createMockProjectContext({
+      mockUseProjectsContext.mockReturnValue(
+        createMockProjectsContext({
           selectedProject: null,
           foundProject: null,
         })
@@ -213,7 +216,7 @@ describe('SessionSection', () => {
     it('uses ProjectsProvider for project context', () => {
       render(<SessionSection {...defaultProps} />);
 
-      expect(mockUseProjectContext).toHaveBeenCalled();
+      expect(mockUseProjectsContext).toHaveBeenCalled();
     });
 
     it('uses URLState for navigation', () => {

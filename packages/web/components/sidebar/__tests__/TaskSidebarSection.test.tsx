@@ -17,7 +17,7 @@ import { asAssigneeId } from '@/types/core';
 import {
   createMockSessionContext,
   createMockAgentContext,
-  createMockProjectContext,
+  createMockProjectsContext,
 } from '@/__tests__/utils/provider-mocks';
 
 // Mock TaskProvider context to control behavior
@@ -60,7 +60,7 @@ import {
 } from '@/components/providers/SessionProvider';
 import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
 
-const mockUseProjectContext = vi.mocked(useProjectsContext);
+const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseOptionalSessionContext = vi.mocked(useOptionalSessionContext);
 const mockUseOptionalAgentContext = vi.mocked(useOptionalAgentContext);
@@ -187,8 +187,8 @@ describe('TaskSidebarSection', () => {
     mockTaskContext.handleTaskAddNote = vi.fn();
 
     // Set up provider mocks with default values
-    mockUseProjectContext.mockReturnValue(
-      createMockProjectContext({
+    mockUseProjectsContext.mockReturnValue(
+      createMockProjectsContext({
         selectedProject: 'test-project',
         currentProject: createMockProject(),
         projectsForSidebar: [],
@@ -235,8 +235,8 @@ describe('TaskSidebarSection', () => {
 
     it('returns null when selectedProject is null', () => {
       mockTaskContext.taskManager = createMockTaskManager();
-      mockUseProjectContext.mockReturnValue(
-        createMockProjectContext({
+      mockUseProjectsContext.mockReturnValue(
+        createMockProjectsContext({
           selectedProject: null,
           foundProject: null,
         })
