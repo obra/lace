@@ -869,7 +869,9 @@ export class Agent extends EventEmitter {
         });
 
         // Check if this is a recoverable error that should be sent back to the model
-        const isRecoverableError = this._isRecoverableProviderError(error);
+        // Use provider-specific error detection instead of generic function
+        const provider = await this.getProvider();
+        const isRecoverableError = provider?.isRecoverableError(error) ?? false;
 
         if (isRecoverableError) {
           // For recoverable errors (like tool validation), continue the conversation
@@ -1753,36 +1755,6 @@ export class Agent extends EventEmitter {
     }
 
     return result;
-  }
-
-  /**
-   * Check if an error is recoverable by sending it back to the model
-   * This includes tool validation errors and other 400-level errors that the model can correct
-   */
-  private _isRecoverableProviderError(error: unknown): boolean {
-    if (!error || typeof error !== 'object') {
-      return false;
-    }
-
-    const errorObj = error as Record<string, unknown>;
-
-    // Check for OpenAI APIError structure
-    // status: HTTP status code
-    // code: Error code like 'invalid_request_error'
-    // error: Object with error details
-    if (typeof errorObj.status === 'number' && errorObj.status === 400) {
-      // Any 400 BadRequestError is potentially recoverable
-      // The model can see the error and adjust its approach
-      return true;
-    }
-
-    // Check by constructor name as fallback (for when instanceof isn't available)
-    const constructorName = (errorObj.constructor as { name?: string })?.name;
-    if (constructorName === 'BadRequestError') {
-      return true;
-    }
-
-    return false;
   }
 
   /**
