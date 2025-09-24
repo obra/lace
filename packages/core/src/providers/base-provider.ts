@@ -261,17 +261,26 @@ export abstract class AIProvider extends EventEmitter {
   // Default implementation checks for common 400-level HTTP errors
   // Providers can override for their specific error patterns
   isRecoverableError(error: unknown): boolean {
-    if (!error || typeof error !== 'object') {
+    // Safely narrow unknown to non-null object
+    if (!error || typeof error !== 'object' || error === null) {
       return false;
     }
 
+    // Cast to safe interface for property access
+    const errorObj = error as {
+      status?: number;
+      statusCode?: number;
+      constructor?: { name?: string };
+    };
+
     // Generic check for 400-level HTTP errors (most providers use this pattern)
-    if ('status' in error && typeof error.status === 'number') {
-      return error.status === 400 || error.status === 422;
+    const status = errorObj.status ?? errorObj.statusCode;
+    if (typeof status === 'number' && (status === 400 || status === 422)) {
+      return true;
     }
 
     // Check constructor name for common BadRequestError classes
-    if (error.constructor?.name === 'BadRequestError') {
+    if (errorObj.constructor?.name === 'BadRequestError') {
       return true;
     }
 

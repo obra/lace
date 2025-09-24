@@ -383,7 +383,7 @@ export class AnthropicProvider extends AIProvider {
     return !!config.apiKey && config.apiKey.length > 0;
   }
 
-  isRecoverableError(error: unknown): boolean {
+  override isRecoverableError(error: unknown): boolean {
     // Use base class implementation - Anthropic SDK uses same patterns as OpenAI
     return super.isRecoverableError(error);
   }

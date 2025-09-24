@@ -134,6 +134,10 @@ export class Agent extends EventEmitter {
   private readonly _tools: Tool[];
   private readonly _persona: string;
 
+  // Error recovery safeguards
+  private _consecutiveRecoverableErrors = 0;
+  private static readonly MAX_CONSECUTIVE_RECOVERABLE_ERRORS = 3;
+
   // Public access to tool executor for interfaces
   get toolExecutor(): ToolExecutor {
     return this._toolExecutor;
@@ -849,23 +853,15 @@ export class Agent extends EventEmitter {
 
         const errorMessage = error instanceof Error ? error.message : String(error);
 
-        // Log EVERYTHING about this error to understand its structure
-        logger.error('AGENT: Provider error - FULL DETAILS', {
+        // Log sanitized error details to avoid sensitive data exposure
+        logger.error('AGENT: Provider error', {
           threadId: this._threadId,
           errorMessage,
           errorStack: error instanceof Error ? error.stack : undefined,
           errorName: error instanceof Error ? error.name : undefined,
-          errorConstructor: (error as { constructor?: { name?: string } })?.constructor?.name,
-          errorPrototype: error
-            ? (Object.getPrototypeOf(error) as { constructor?: { name?: string } })?.constructor
-                ?.name
-            : undefined,
+          errorConstructor: this._getSafeConstructorName(error),
           providerName: this.providerInstance?.providerName || 'missing',
-          // Log all properties of the error object
-          errorKeys: error ? Object.keys(error) : [],
-          errorObject: JSON.stringify(error, null, 2),
-          // Check for specific error properties that providers might set
-          ...this._extractErrorProperties(error),
+          errorType: this._getSafeErrorType(error),
         });
 
         // Check if this is a recoverable error that should be sent back to the model
@@ -874,11 +870,23 @@ export class Agent extends EventEmitter {
         const isRecoverableError = provider?.isRecoverableError(error) ?? false;
 
         if (isRecoverableError) {
+          // Check retry limit to prevent infinite loops
+          this._consecutiveRecoverableErrors++;
+          if (this._consecutiveRecoverableErrors > Agent.MAX_CONSECUTIVE_RECOVERABLE_ERRORS) {
+            logger.warn('AGENT: Too many consecutive recoverable errors, stopping retry', {
+              threadId: this._threadId,
+              consecutiveErrors: this._consecutiveRecoverableErrors,
+            });
+            this._setState('idle');
+            return;
+          }
+
           // For recoverable errors (like tool validation), continue the conversation
           // by adding an AGENT_MESSAGE with the error so the model can correct itself
           logger.info('AGENT: Recoverable provider error, continuing conversation', {
             threadId: this._threadId,
             errorMessage,
+            retryCount: this._consecutiveRecoverableErrors,
           });
 
           // Create an AGENT_MESSAGE event with the validation error
@@ -1723,41 +1731,6 @@ export class Agent extends EventEmitter {
   }
 
   /**
-   * Safely extract error properties for logging without using any
-   */
-  private _extractErrorProperties(error: unknown): Record<string, unknown> {
-    if (!error || typeof error !== 'object') {
-      return {};
-    }
-
-    const result: Record<string, unknown> = {};
-    const errorObj = error as Record<string, unknown>;
-
-    // Common error properties to extract
-    const propertiesToCheck = [
-      'code',
-      'status',
-      'statusCode',
-      'response',
-      'data',
-      'details',
-      'type',
-      'params',
-      'validation',
-      'toolName',
-      'toolCall',
-    ];
-
-    for (const prop of propertiesToCheck) {
-      if (prop in errorObj) {
-        result[`error${prop.charAt(0).toUpperCase()}${prop.slice(1)}`] = errorObj[prop];
-      }
-    }
-
-    return result;
-  }
-
-  /**
    * Determine if the conversation should continue after a batch of tools completes.
    * Returns false if any tools were denied or aborted, indicating user intervention.
    *
@@ -2219,6 +2192,9 @@ export class Agent extends EventEmitter {
   }
 
   private _completeTurn(): void {
+    // Reset error retry counter on successful completion
+    this._consecutiveRecoverableErrors = 0;
+
     if (this._currentTurnMetrics) {
       this._clearProgressTimer();
 
@@ -3333,5 +3309,32 @@ export class Agent extends EventEmitter {
       }
     }
     return false;
+  }
+
+  /**
+   * Safely get constructor name without throwing or exposing sensitive data
+   */
+  private _getSafeConstructorName(error: unknown): string | undefined {
+    try {
+      if (typeof error === 'object' && error !== null && error.constructor) {
+        return error.constructor.name;
+      }
+    } catch {
+      // Ignore errors accessing constructor
+    }
+    return undefined;
+  }
+
+  /**
+   * Safely extract basic error type information without sensitive details
+   */
+  private _getSafeErrorType(error: unknown): string {
+    if (error instanceof Error) {
+      return 'Error';
+    }
+    if (typeof error === 'object' && error !== null) {
+      return 'Object';
+    }
+    return typeof error;
   }
 }

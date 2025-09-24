@@ -268,14 +268,8 @@ export class GeminiProvider extends AIProvider {
     return !!config.apiKey && config.apiKey.length > 0;
   }
 
-  isRecoverableError(error: unknown): boolean {
-    // Google AI SDK uses ApiError class - check specifically for that
-    if (error?.constructor?.name === 'ApiError') {
-      // Use base class logic which checks for 400/422 status codes
-      return super.isRecoverableError(error);
-    }
-
-    // Fall back to base implementation
+  override isRecoverableError(error: unknown): boolean {
+    // Use base implementation - Google AI SDK follows standard HTTP error patterns
     return super.isRecoverableError(error);
   }
 }
