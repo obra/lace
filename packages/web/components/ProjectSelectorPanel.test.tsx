@@ -41,9 +41,13 @@ vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
 // Mock React Router
 const mockNavigate = vi.fn();
 
-vi.mock('react-router', () => ({
-  useNavigate: () => mockNavigate,
-}));
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof import('react-router')>('react-router');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
 
 // Import mocked hooks
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
