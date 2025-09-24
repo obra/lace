@@ -270,8 +270,21 @@ export class TaskManager extends EventEmitter {
         break;
 
       case 'thread':
+        // Tasks in current conversation thread (excludes delegated tasks)
+        tasks = this.persistence.loadTasksByThread(this.sessionId).filter((t: Task) => {
+          // Include tasks with no assignee (belong to current thread)
+          if (!t.assignedTo) return true;
+
+          // Include NewAgentSpecs (not yet spawned, still in current thread)
+          if (t.assignedTo.startsWith('new:')) return true;
+
+          // Include only if assigned to the current actor (same thread)
+          return t.assignedTo === context.actor;
+        });
+        break;
+
       case 'all':
-        // All tasks in this session
+        // All tasks in this session (includes delegated tasks)
         tasks = this.persistence.loadTasksByThread(this.sessionId);
         break;
     }

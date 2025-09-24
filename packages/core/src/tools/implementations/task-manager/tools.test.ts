@@ -387,10 +387,25 @@ describe('Enhanced Task Manager Tools', () => {
       expect(text).not.toContain('Task 3'); // Assigned to agent2
     });
 
-    it('should list all thread tasks', async () => {
+    it('should list current thread tasks only', async () => {
       const result = await taskListTool.execute(
         {
           filter: 'thread',
+        },
+        context
+      );
+
+      expect(result.status).toBe('completed');
+      const text = result.content?.[0]?.text || '';
+      expect(text).toContain('Task 1'); // No assignee, belongs to thread
+      expect(text).not.toContain('Task 2'); // Assigned to agent1, delegated out
+      expect(text).not.toContain('Task 3'); // Assigned to agent2, delegated out
+    });
+
+    it('should list all session tasks', async () => {
+      const result = await taskListTool.execute(
+        {
+          filter: 'all',
         },
         context
       );

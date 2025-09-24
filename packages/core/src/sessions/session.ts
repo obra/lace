@@ -7,7 +7,6 @@ import { ThreadManager } from '~/threads/thread-manager';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import { ToolExecutor } from '~/tools/executor';
 import { TaskManager, AgentCreationCallback } from '~/tasks/task-manager';
-import { Task } from '~/tasks/types';
 import { getPersistence, SessionData } from '~/persistence/database';
 import {
   TaskCreateTool,
@@ -30,7 +29,6 @@ import { UrlFetchTool } from '~/tools/implementations/url_fetch';
 import { logger } from '~/utils/logger';
 import type { ToolPolicy } from '~/tools/types';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
-import { getEnvVar } from '~/config/env-loader';
 import { MCPServerManager } from '~/mcp/server-manager';
 import type { MCPServerConnection, MCPServerConfig } from '~/config/mcp-types';
 import { mkdirSync } from 'fs';
@@ -63,6 +61,9 @@ export class Session {
   private _onTaskUpdated?: (event: TaskManagerEvent) => Promise<void>;
   private _onTaskCreated?: (event: TaskManagerEvent) => Promise<void>;
   private _onTaskNoteAdded?: (event: TaskManagerEvent) => Promise<void>;
+  private _taskUpdatedWrapper?: (event: TaskManagerEvent) => void;
+  private _taskCreatedWrapper?: (event: TaskManagerEvent) => void;
+  private _taskNoteAddedWrapper?: (event: TaskManagerEvent) => void;
 
   constructor(
     sessionId: ThreadId,
@@ -526,9 +527,6 @@ export class Session {
     // Wait for all delegate agents to start (with error handling)
     await Promise.all(delegateStartPromises);
 
-    // Update the session's task manager to use the one we created
-    session._taskManager = taskManager;
-
     // Set session configuration for model resolution
     const sessionEffectiveConfig = session.getEffectiveConfiguration();
     if (sessionEffectiveConfig.providerInstanceId && sessionEffectiveConfig.modelId) {
@@ -683,8 +681,7 @@ export class Session {
     return process.cwd();
   }
 
-  // Made public for testing - should be private in production
-  // Replace the existing getSessionData method with this:
+  // Cached session data accessor (private)
   private getSessionData(): SessionData {
     return this._sessionData; // 👈 NEW: Return cached data instead of database query
   }
@@ -1048,38 +1045,6 @@ export class Session {
     this._taskManager.setAgentCreationCallback(agentCreationCallback);
   }
 
-  /**
-   * Send task assignment notification to an agent
-   */
-  private async sendTaskNotification(agent: Agent, task: Task): Promise<void> {
-    const taskMessage = this.formatTaskAssignment(task);
-    await agent.sendMessage(taskMessage);
-  }
-
-  /**
-   * Format task assignment notification message
-   */
-  private formatTaskAssignment(task: Task): string {
-    return `[LACE TASK SYSTEM] You have been assigned task '${task.id}':
-Title: "${task.title}"
-Created by: ${task.createdBy}
-Priority: ${task.priority}
-
---- TASK DETAILS ---
-${task.prompt}
---- END TASK DETAILS ---
-
-Use your task_add_note tool to record important notes as you work and your task_complete tool when you are done.`;
-  }
-
-  private static detectDefaultProvider(): string {
-    return getEnvVar('ANTHROPIC_KEY') || getEnvVar('ANTHROPIC_API_KEY') ? 'anthropic' : 'openai';
-  }
-
-  private static getDefaultModel(provider: string): string {
-    return provider === 'anthropic' ? 'claude-sonnet-4-20250514' : 'gpt-4';
-  }
-
   private static generateSessionName(): string {
     const date = new Date();
     const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
@@ -1408,10 +1373,21 @@ Use your task_add_note tool to record important notes as you work and your task_
       }
     };
 
+    // Create wrapper functions for proper cleanup
+    this._taskUpdatedWrapper = (event: TaskManagerEvent) => {
+      void this._onTaskUpdated!(event);
+    };
+    this._taskCreatedWrapper = (event: TaskManagerEvent) => {
+      void this._onTaskCreated!(event);
+    };
+    this._taskNoteAddedWrapper = (event: TaskManagerEvent) => {
+      void this._onTaskNoteAdded!(event);
+    };
+
     // Register the handlers
-    this._taskManager.on('task:updated', this._onTaskUpdated);
-    this._taskManager.on('task:created', this._onTaskCreated);
-    this._taskManager.on('task:note_added', this._onTaskNoteAdded);
+    this._taskManager.on('task:updated', this._taskUpdatedWrapper);
+    this._taskManager.on('task:created', this._taskCreatedWrapper);
+    this._taskManager.on('task:note_added', this._taskNoteAddedWrapper);
   }
 
   /** Handles task update events and routes notifications to relevant agents */
@@ -1445,14 +1421,14 @@ Use your task_add_note tool to record important notes as you work and your task_
    * from accumulated event listeners. Only removes listeners added by this session.
    */
   cleanup(): void {
-    if (this._onTaskUpdated) {
-      this._taskManager.removeListener('task:updated', this._onTaskUpdated);
+    if (this._taskUpdatedWrapper) {
+      this._taskManager.removeListener('task:updated', this._taskUpdatedWrapper);
     }
-    if (this._onTaskCreated) {
-      this._taskManager.removeListener('task:created', this._onTaskCreated);
+    if (this._taskCreatedWrapper) {
+      this._taskManager.removeListener('task:created', this._taskCreatedWrapper);
     }
-    if (this._onTaskNoteAdded) {
-      this._taskManager.removeListener('task:note_added', this._onTaskNoteAdded);
+    if (this._taskNoteAddedWrapper) {
+      this._taskManager.removeListener('task:note_added', this._taskNoteAddedWrapper);
     }
   }
 }

@@ -74,12 +74,14 @@ class MockProvider extends BaseMockProvider {
   };
 
   async createResponse(messages: ProviderMessage[], _tools: Tool[]): Promise<ProviderResponse> {
-    // Look for task assignment message
+    // Look for task assignment message from USER (not from task notification system)
     const taskMessage = messages.find(
       (m) =>
+        m.role === 'user' &&
         m.content &&
         typeof m.content === 'string' &&
-        m.content.includes('You have been assigned task')
+        m.content.includes('You have been assigned task') &&
+        !m.content.includes('[LACE TASK SYSTEM]') // Skip auto-notifications
     );
 
     if (taskMessage) {

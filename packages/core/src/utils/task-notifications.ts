@@ -48,7 +48,7 @@ Status: ${task.status}
 ${task.prompt}
 --- END TASK DETAILS ---
 
-Use your task_add_note tool to record progress and task_complete when done.`;
+Use your task_add_note tool to record progress and task_complete tool when you are done.`;
 }
 
 function formatStatusChangeNotification(
@@ -262,12 +262,12 @@ export async function routeTaskNotifications(
     event.type === 'task:updated' ? event.previousTask : undefined
   );
 
-  // Send all notifications
+  // Send all notifications as user messages - LLM will handle not getting stuck in loops
   for (const notification of notifications) {
     const agent = context.getAgent(notification.threadId);
     if (agent) {
       try {
-        // Queue notifications if agent is busy - they'll be processed when agent returns to idle
+        // Send notification as user message with proper metadata
         await agent.sendMessage(notification.message, {
           queue: true,
           metadata: {

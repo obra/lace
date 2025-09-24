@@ -2,8 +2,8 @@
 // ABOUTME: Tests notification logic for completion, assignment, status changes, and notes
 
 import { describe, it, expect, vi } from 'vitest';
-import type { TaskNotification } from './task-notifications';
-import { routeTaskNotifications } from './task-notifications';
+import type { TaskNotification } from '~/utils/task-notifications';
+import { routeTaskNotifications } from '~/utils/task-notifications';
 import { asThreadId } from '~/threads/types';
 
 describe('Task Notification Types', () => {
