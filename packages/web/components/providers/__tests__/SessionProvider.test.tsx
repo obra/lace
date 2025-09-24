@@ -11,8 +11,9 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SessionProvider, useSessionContext } from '@/components/providers/SessionProvider';
 import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
-import type { CreateAgentRequest } from '@/types/api';
 import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
+
+const TEST_SESSION_ID = 'test-session';
 
 // Mock the hooks
 vi.mock('@/hooks/useAgentManagement', () => ({
@@ -83,7 +84,7 @@ function ContextConsumer() {
       </button>
       <button
         onClick={() =>
-          createAgent('session-1', {
+          createAgent(TEST_SESSION_ID, {
             name: 'New Agent',
             providerInstanceId: 'anthropic',
             modelId: 'claude-3-haiku',
@@ -94,7 +95,7 @@ function ContextConsumer() {
         Create Agent
       </button>
       <button
-        onClick={() => updateAgentState('lace_20240101_agent1', 'active')}
+        onClick={() => updateAgentState('lace_20240101_agent1', 'thinking')}
         data-testid="update-agent-state"
       >
         Update Agent State
@@ -110,7 +111,6 @@ describe('SessionProvider', () => {
   const mockCreateAgent = vi.fn();
   const mockUpdateAgentState = vi.fn();
   const mockReloadSessionDetails = vi.fn();
-  const mockSetSelectedAgent = vi.fn();
   // Mock for onAgentChange callback
   const mockOnAgentChangeCallback = vi.fn();
 
@@ -308,7 +308,7 @@ describe('SessionProvider', () => {
 
       fireEvent.click(screen.getByTestId('create-agent'));
 
-      expect(mockCreateAgent).toHaveBeenCalledWith('session-1', {
+      expect(mockCreateAgent).toHaveBeenCalledWith(TEST_SESSION_ID, {
         name: 'New Agent',
         providerInstanceId: 'anthropic',
         modelId: 'claude-3-haiku',
@@ -324,7 +324,7 @@ describe('SessionProvider', () => {
 
       fireEvent.click(screen.getByTestId('update-agent-state'));
 
-      expect(mockUpdateAgentState).toHaveBeenCalledWith('lace_20240101_agent1', 'active');
+      expect(mockUpdateAgentState).toHaveBeenCalledWith('lace_20240101_agent1', 'thinking');
     });
 
     it('calls reloadSessionDetails when requested', async () => {
@@ -360,7 +360,7 @@ describe('SessionProvider', () => {
 
       // SessionProvider doesn't handle errors - it passes them through to the hook
       // The error handling is the responsibility of useAgentManagement
-      expect(mockCreateAgent).toHaveBeenCalledWith('session-1', {
+      expect(mockCreateAgent).toHaveBeenCalledWith(TEST_SESSION_ID, {
         name: 'New Agent',
         providerInstanceId: 'anthropic',
         modelId: 'claude-3-haiku',

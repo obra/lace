@@ -29,10 +29,10 @@ export function useOnboarding(
       await reloadProjects();
 
       // Navigate directly to the agent chat
-      // Use setTimeout to ensure React Router v7 state updates have completed
-      setTimeout(() => {
+      // Use queueMicrotask to ensure React Router v7 state updates have completed
+      queueMicrotask(() => {
         navigateToAgent(projectId, asThreadId(sessionId), asThreadId(agentId));
-      }, 100);
+      });
 
       // Clear auto-open state
       setAutoOpenCreateProject(false);

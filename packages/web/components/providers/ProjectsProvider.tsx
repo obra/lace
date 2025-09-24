@@ -193,6 +193,11 @@ export function ProjectsProvider({
   return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>;
 }
 
+// Optional hook - returns null if not within provider
+export function useOptionalProjectsContext(): ProjectsContextType | null {
+  return useContext(ProjectsContext);
+}
+
 // Hook to use projects context
 export function useProjectsContext(): ProjectsContextType {
   const context = useContext(ProjectsContext);

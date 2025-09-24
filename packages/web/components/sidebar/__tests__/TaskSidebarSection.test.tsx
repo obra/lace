@@ -41,6 +41,7 @@ vi.mock('@/components/providers/TaskProvider', () => ({
 
 vi.mock('@/components/providers/ProjectsProvider', () => ({
   useProjectsContext: vi.fn(),
+  useOptionalProjectsContext: vi.fn(),
 }));
 
 vi.mock('@/components/providers/ProjectProvider', () => ({
@@ -53,7 +54,10 @@ vi.mock('@/components/providers/SessionProvider', () => ({
 }));
 
 // Import mocked hooks
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
+import {
+  useProjectsContext,
+  useOptionalProjectsContext,
+} from '@/components/providers/ProjectsProvider';
 import {
   useProjectContext,
   useOptionalProjectContext,
@@ -61,9 +65,16 @@ import {
 import { useOptionalSessionContext } from '@/components/providers/SessionProvider';
 
 const mockUseProjectsContext = vi.mocked(useProjectsContext);
+const mockUseOptionalProjectsContext = vi.mocked(useOptionalProjectsContext);
 const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseOptionalProjectContext = vi.mocked(useOptionalProjectContext);
 const mockUseOptionalSessionContext = vi.mocked(useOptionalSessionContext);
+
+// Helper to keep Projects context mocks in sync
+const setProjectsContexts = (value: ReturnType<typeof createMockProjectsContext>) => {
+  mockUseProjectsContext.mockReturnValue(value);
+  mockUseOptionalProjectsContext.mockReturnValue(value);
+};
 
 // Mock child components
 vi.mock('@/components/layout/Sidebar', () => ({
@@ -187,14 +198,13 @@ describe('TaskSidebarSection', () => {
     mockTaskContext.handleTaskAddNote = vi.fn();
 
     // Set up provider mocks with default values
-    mockUseProjectsContext.mockReturnValue(
-      createMockProjectsContext({
-        selectedProject: 'test-project',
-        currentProject: createMockProject(),
-        projectsForSidebar: [],
-        foundProject: createMockProject(),
-      })
-    );
+    const mockProjectsContextValue = createMockProjectsContext({
+      selectedProject: 'test-project',
+      currentProject: createMockProject(),
+      projectsForSidebar: [],
+      foundProject: createMockProject(),
+    });
+    setProjectsContexts(mockProjectsContextValue);
 
     const mockProjectContext = createMockProjectContext({
       selectedSession: 'test-session' as ThreadId,
@@ -235,12 +245,11 @@ describe('TaskSidebarSection', () => {
 
     it('returns null when selectedProject is null', () => {
       mockTaskContext.taskManager = createMockTaskManager();
-      mockUseProjectsContext.mockReturnValue(
-        createMockProjectsContext({
-          selectedProject: null,
-          foundProject: null,
-        })
-      );
+      const nullProjectsContextValue = createMockProjectsContext({
+        selectedProject: null,
+        foundProject: null,
+      });
+      setProjectsContexts(nullProjectsContextValue);
 
       const { container } = render(<TaskSidebarSection {...defaultProps} />);
       expect(container.firstChild).toBeNull();
@@ -415,6 +424,13 @@ describe('TaskSidebarSection', () => {
       expect(() => {
         fireEvent.click(screen.getByTestId('add-task-button'));
       }).not.toThrow();
+    });
+
+    it('returns null when ProjectsProvider is absent (optional hook returns null)', () => {
+      mockTaskContext.taskManager = createMockTaskManager();
+      mockUseOptionalProjectsContext.mockReturnValue(null);
+      const { container } = render(<TaskSidebarSection {...defaultProps} />);
+      expect(container.firstChild).toBeNull();
     });
   });
 });

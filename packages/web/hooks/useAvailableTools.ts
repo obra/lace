@@ -13,7 +13,8 @@ export function useAvailableTools() {
   const [availableTools, setAvailableTools] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { projects, loadProjectConfiguration } = useProjectsContext();
+  const { projects, selectedProject, loadProjectConfiguration } = useProjectsContext();
+  const effectiveProjectId = selectedProject ?? projects[0]?.id;
 
   useEffect(() => {
     let isCancelled = false;
@@ -22,9 +23,9 @@ export function useAvailableTools() {
       setLoading(true);
       try {
         setError(null);
-        // Get available tools from any existing project's configuration
-        if (projects.length > 0) {
-          const config = await loadProjectConfiguration(projects[0].id);
+        // Get available tools from selected project or any existing project's configuration
+        if (effectiveProjectId) {
+          const config = await loadProjectConfiguration(effectiveProjectId);
 
           if (!isCancelled) {
             // Defensive type validation
@@ -73,7 +74,7 @@ export function useAvailableTools() {
     return () => {
       isCancelled = true;
     };
-  }, [projects, loadProjectConfiguration]);
+  }, [effectiveProjectId, loadProjectConfiguration]);
 
   return { availableTools, loading, error };
 }

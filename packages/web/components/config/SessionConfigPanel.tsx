@@ -37,8 +37,6 @@ export function SessionConfigPanel(): React.JSX.Element {
     projectConfig,
     createSession,
     loading: sessionLoading,
-    loadSessionConfiguration,
-    updateSessionConfiguration,
     updateSession,
     deleteSession,
   } = useProjectContext();

@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
-import { BrowserRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import type { ProjectInfo } from '@/types/core';
 import {
@@ -41,9 +41,13 @@ vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
 // Mock React Router
 const mockNavigate = vi.fn();
 
-vi.mock('react-router', () => ({
-  useNavigate: () => mockNavigate,
-}));
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof import('react-router')>('react-router');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
 
 // Import mocked hooks
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
@@ -203,9 +207,9 @@ describe('ProjectSelectorPanel', () => {
   it('should render project list', async () => {
     await act(async () => {
       render(
-        <BrowserRouter>
+        <MemoryRouter initialEntries={['/']}>
           <ProjectSelectorPanel />
-        </BrowserRouter>
+        </MemoryRouter>
       );
     });
 
@@ -218,9 +222,9 @@ describe('ProjectSelectorPanel', () => {
   it('should navigate to project page when project is clicked', async () => {
     await act(async () => {
       render(
-        <BrowserRouter>
+        <MemoryRouter initialEntries={['/']}>
           <ProjectSelectorPanel />
-        </BrowserRouter>
+        </MemoryRouter>
       );
     });
 
@@ -252,9 +256,9 @@ describe('ProjectSelectorPanel', () => {
 
     await act(async () => {
       render(
-        <BrowserRouter>
+        <MemoryRouter initialEntries={['/']}>
           <ProjectSelectorPanel />
-        </BrowserRouter>
+        </MemoryRouter>
       );
     });
 
@@ -266,9 +270,9 @@ describe('ProjectSelectorPanel', () => {
   it('should show create project button', async () => {
     await act(async () => {
       render(
-        <BrowserRouter>
+        <MemoryRouter initialEntries={['/']}>
           <ProjectSelectorPanel />
-        </BrowserRouter>
+        </MemoryRouter>
       );
     });
 
@@ -278,9 +282,9 @@ describe('ProjectSelectorPanel', () => {
   it('should open create project modal when create button is clicked', async () => {
     await act(async () => {
       render(
-        <BrowserRouter>
+        <MemoryRouter initialEntries={['/']}>
           <ProjectSelectorPanel />
-        </BrowserRouter>
+        </MemoryRouter>
       );
     });
 
@@ -305,9 +309,9 @@ describe('ProjectSelectorPanel', () => {
 
     await act(async () => {
       render(
-        <BrowserRouter>
+        <MemoryRouter initialEntries={['/']}>
           <ProjectSelectorPanel />
-        </BrowserRouter>
+        </MemoryRouter>
       );
     });
 
@@ -331,9 +335,9 @@ describe('ProjectSelectorPanel', () => {
 
     await act(async () => {
       render(
-        <BrowserRouter>
+        <MemoryRouter initialEntries={['/']}>
           <ProjectSelectorPanel />
-        </BrowserRouter>
+        </MemoryRouter>
       );
     });
 

@@ -79,7 +79,7 @@ function ContextConsumer() {
         Select Project 3
       </button>
       <button
-        onClick={() => updateProject('project-1', { name: 'Updated' })}
+        onClick={() => void updateProject('project-1', { name: 'Updated' })}
         data-testid="update-project"
       >
         Update Project
@@ -94,7 +94,6 @@ function ContextConsumer() {
 describe('ProjectsProvider', () => {
   const mockUpdateProject = vi.fn();
   const mockReloadProjects = vi.fn();
-  const mockSetSelectedProject = vi.fn();
   const mockOnProjectChange = vi.fn();
 
   const defaultProjectManagement = {
@@ -106,7 +105,7 @@ describe('ProjectsProvider', () => {
     deleteProject: vi.fn(),
     loadProjectConfiguration: vi.fn(),
     reloadProjects: mockReloadProjects,
-  };
+  } satisfies ReturnType<typeof useProjectManagement>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -198,7 +197,7 @@ describe('ProjectsProvider', () => {
       expect(mockOnProjectSelect).toHaveBeenCalledWith('project-2');
     });
 
-    it('calls selectProject when onProjectSelect is called', () => {
+    it('calls prop onProjectSelect when context onProjectSelect is invoked', () => {
       const mockOnProjectSelect = vi.fn();
       render(
         <ProjectsProvider {...createTestProps()} onProjectSelect={mockOnProjectSelect}>
@@ -379,7 +378,7 @@ describe('ProjectsProvider', () => {
     });
 
     it('handles date transformation correctly', () => {
-      const projectWithStringDates = [
+      const projectsWithDates = [
         createMockProject({
           createdAt: new Date('2024-01-01'),
           lastUsedAt: new Date('2024-01-02'),
@@ -388,7 +387,7 @@ describe('ProjectsProvider', () => {
 
       mockUseProjectManagement.mockReturnValue({
         ...defaultProjectManagement,
-        projects: projectWithStringDates,
+        projects: projectsWithDates,
       });
 
       render(

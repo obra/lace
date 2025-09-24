@@ -1,11 +1,12 @@
 // ABOUTME: Test file for ProjectSelectorPanel simplified creation mode
 // ABOUTME: Ensures auto-open mode shows streamlined UI with directory-based naming
 
-import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import React, { type ReactNode } from 'react';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import type * as ReactRouter from 'react-router';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
-import { ProjectSelectorPanel } from './ProjectSelectorPanel';
+import { MemoryRouter } from 'react-router';
+import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { createMockResponse } from '@/test-utils/mock-fetch';
 import {
   createMockProjectsContext,
@@ -32,15 +33,19 @@ vi.mock('@/hooks/useOnboarding', () => ({
 
 vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
   useProviderInstances: vi.fn(),
-  ProviderInstanceProvider: ({ children }: { children: React.ReactNode }) => children,
+  ProviderInstanceProvider: ({ children }: { children: ReactNode }) => children,
 }));
 
 // Mock React Router
 const mockNavigate = vi.fn();
 
-vi.mock('react-router', () => ({
-  useNavigate: () => mockNavigate,
-}));
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof ReactRouter>('react-router');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
 
 // Import mocked hooks
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
@@ -82,11 +87,11 @@ const mockHandlers = {
 };
 
 const mockFetch = vi.fn();
-global.fetch = mockFetch as unknown as typeof fetch;
 
 describe('ProjectSelectorPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('fetch', mockFetch);
 
     // Clear router mocks
     mockNavigate.mockClear();
@@ -161,9 +166,9 @@ describe('ProjectSelectorPanel', () => {
     );
 
     render(
-      <BrowserRouter>
+      <MemoryRouter initialEntries={['/']}>
         <ProjectSelectorPanel />
-      </BrowserRouter>
+      </MemoryRouter>
     );
 
     // In simplified onboarding flow, modal opens directly at directory step (step 2)
@@ -186,9 +191,9 @@ describe('ProjectSelectorPanel', () => {
     );
 
     render(
-      <BrowserRouter>
+      <MemoryRouter initialEntries={['/']}>
         <ProjectSelectorPanel />
-      </BrowserRouter>
+      </MemoryRouter>
     );
 
     // In simplified onboarding flow, modal opens directly at directory step
@@ -202,5 +207,9 @@ describe('ProjectSelectorPanel', () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue('my-awesome-project')).toBeInTheDocument();
     });
+  });
+
+  afterAll(() => {
+    vi.unstubAllGlobals();
   });
 });

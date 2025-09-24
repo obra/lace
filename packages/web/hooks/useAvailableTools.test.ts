@@ -3,13 +3,13 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { useAvailableTools } from './useAvailableTools';
+import { useAvailableTools } from '@/hooks/useAvailableTools';
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import type { ProjectsContextType } from '@/components/providers/ProjectsProvider';
 import type { ProjectInfo } from '@/types/core';
 
 // Mock the ProjectsProvider
-const mockLoadProjectConfiguration = vi.fn();
+const mockLoadProjectConfiguration = vi.fn().mockResolvedValue({});
 const mockProjects: ProjectInfo[] = [
   {
     id: 'project-1',

@@ -8,13 +8,13 @@ import React, {
   useContext,
   useMemo,
   useCallback,
-  useState,
   useEffect,
+  useRef,
   type ReactNode,
 } from 'react';
 import { useSessionManagement } from '@/hooks/useSessionManagement';
 import { useEventStream, type AgentEvent } from '@/hooks/useEventStream';
-import type { SessionInfo, ThreadId, LaceEvent } from '@/types/core';
+import type { SessionInfo } from '@/types/core';
 
 // Types for project context
 export interface ProjectContextType {
@@ -94,24 +94,45 @@ export function ProjectProvider({
     loadSessionsForProject,
   } = useSessionManagement(projectId);
 
+  // Debounced reload to avoid spamming reloadSessions on rapid events
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleReload = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      void reloadSessions();
+      timeoutRef.current = null;
+    }, 150);
+  }, [reloadSessions]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, []);
+
   // Subscribe to session and agent events to refresh session list in real-time
   useEventStream({
     projectId: projectId || undefined,
     onSessionUpdated: useCallback(() => {
       // Reload sessions to get the updated session name in the list
-      void reloadSessions();
-    }, [reloadSessions]),
+      scheduleReload();
+    }, [scheduleReload]),
     onAgentSpawned: useCallback(
-      (agentEvent: AgentEvent) => {
+      (_agentEvent: AgentEvent) => {
         // When an agent is spawned, reload sessions to get updated agents list
-        void reloadSessions();
+        scheduleReload();
       },
-      [reloadSessions]
+      [scheduleReload]
     ),
   });
 
   // Use session from URL params, not hash router
-  const selectedSession = selectedSessionId || null;
+  const selectedSession = selectedSessionId ?? null;
 
   // Compute derived state based on data + selection
   const foundSession = useMemo(() => {

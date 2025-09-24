@@ -34,42 +34,43 @@ function sanitizeErrorText(text?: string): string {
   return sanitized;
 }
 
+type AgentWithInfo = {
+  getInfo: () => { providerInstanceId?: string; modelId?: string };
+  // Some agents expose providerName directly; prefer that when present.
+  providerName?: string;
+  providerInstance?: { providerName?: string } | null;
+};
+
+function isAgentWithInfo(val: unknown): val is AgentWithInfo {
+  return (
+    !!val &&
+    typeof val === 'object' &&
+    'getInfo' in (val as object) &&
+    typeof (val as { getInfo?: unknown }).getInfo === 'function'
+  );
+}
+
 // Helper to safely get agent provider context
 function getSessionProviderContext(agent: unknown) {
   try {
-    // Type guard for agent with required methods
-    if (
-      agent &&
-      typeof agent === 'object' &&
-      'getInfo' in agent &&
-      typeof agent.getInfo === 'function'
-    ) {
-      const info = (agent.getInfo as () => { providerInstanceId?: string; modelId?: string })();
+    if (isAgentWithInfo(agent)) {
+      const info = agent.getInfo();
       const providerName =
-        agent &&
-        typeof agent === 'object' &&
-        'providerInstance' in agent &&
-        agent.providerInstance &&
-        typeof agent.providerInstance === 'object' &&
-        'providerName' in agent.providerInstance
-          ? String(agent.providerInstance.providerName)
-          : 'unknown';
-
+        (typeof agent.providerName === 'string' && agent.providerName) ||
+        (agent.providerInstance &&
+          typeof agent.providerInstance.providerName === 'string' &&
+          agent.providerInstance.providerName) ||
+        'unknown';
       return {
-        providerInstanceId: info.providerInstanceId || 'unknown',
-        modelId: info.modelId || 'unknown',
+        providerInstanceId: info.providerInstanceId ?? 'unknown',
+        modelId: info.modelId ?? 'unknown',
         providerName,
       };
     }
   } catch {
     // Fall through to default
   }
-
-  return {
-    providerInstanceId: 'unknown',
-    modelId: 'unknown',
-    providerName: 'unknown',
-  };
+  return { providerInstanceId: 'unknown', modelId: 'unknown', providerName: 'unknown' };
 }
 
 // Request validation schema
