@@ -9,7 +9,7 @@ import type { ProjectsContextType } from '@/components/providers/ProjectsProvide
 import type { ProjectInfo } from '@/types/core';
 
 // Mock the ProjectsProvider
-const mockLoadProjectConfiguration = vi.fn();
+const mockLoadProjectConfiguration = vi.fn().mockResolvedValue({});
 const mockProjects: ProjectInfo[] = [
   {
     id: 'project-1',

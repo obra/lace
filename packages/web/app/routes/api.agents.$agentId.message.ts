@@ -36,7 +36,9 @@ function sanitizeErrorText(text?: string): string {
 
 type AgentWithInfo = {
   getInfo: () => { providerInstanceId?: string; modelId?: string };
-  providerInstance?: { providerName?: unknown } | null;
+  // Some agents expose providerName directly; prefer that when present.
+  providerName?: string;
+  providerInstance?: { providerName?: string } | null;
 };
 
 function isAgentWithInfo(val: unknown): val is AgentWithInfo {
@@ -54,11 +56,11 @@ function getSessionProviderContext(agent: unknown) {
     if (isAgentWithInfo(agent)) {
       const info = agent.getInfo();
       const providerName =
-        agent.providerInstance &&
-        typeof agent.providerInstance === 'object' &&
-        'providerName' in agent.providerInstance
-          ? String((agent.providerInstance as { providerName?: unknown }).providerName)
-          : 'unknown';
+        (typeof agent.providerName === 'string' && agent.providerName) ||
+        (agent.providerInstance &&
+          typeof agent.providerInstance.providerName === 'string' &&
+          agent.providerInstance.providerName) ||
+        'unknown';
       return {
         providerInstanceId: info.providerInstanceId ?? 'unknown',
         modelId: info.modelId ?? 'unknown',

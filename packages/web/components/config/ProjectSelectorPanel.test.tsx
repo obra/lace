@@ -1,8 +1,8 @@
 // ABOUTME: Test file for ProjectSelectorPanel simplified creation mode
 // ABOUTME: Ensures auto-open mode shows streamlined UI with directory-based naming
 
-import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { ReactNode } from 'react';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
@@ -32,15 +32,19 @@ vi.mock('@/hooks/useOnboarding', () => ({
 
 vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
   useProviderInstances: vi.fn(),
-  ProviderInstanceProvider: ({ children }: { children: React.ReactNode }) => children,
+  ProviderInstanceProvider: ({ children }: { children: ReactNode }) => children,
 }));
 
 // Mock React Router
 const mockNavigate = vi.fn();
 
-vi.mock('react-router', () => ({
-  useNavigate: () => mockNavigate,
-}));
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
 
 // Import mocked hooks
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
@@ -82,6 +86,7 @@ const mockHandlers = {
 };
 
 const mockFetch = vi.fn();
+const originalFetch = global.fetch;
 global.fetch = mockFetch as unknown as typeof fetch;
 
 describe('ProjectSelectorPanel', () => {
@@ -202,5 +207,9 @@ describe('ProjectSelectorPanel', () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue('my-awesome-project')).toBeInTheDocument();
     });
+  });
+
+  afterAll(() => {
+    global.fetch = originalFetch;
   });
 });

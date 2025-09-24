@@ -8,13 +8,13 @@ import React, {
   useContext,
   useMemo,
   useCallback,
-  useState,
   useEffect,
+  useRef,
   type ReactNode,
 } from 'react';
 import { useSessionManagement } from '@/hooks/useSessionManagement';
 import { useEventStream, type AgentEvent } from '@/hooks/useEventStream';
-import type { SessionInfo, ThreadId, LaceEvent } from '@/types/core';
+import type { SessionInfo } from '@/types/core';
 
 // Types for project context
 export interface ProjectContextType {
@@ -95,16 +95,25 @@ export function ProjectProvider({
   } = useSessionManagement(projectId);
 
   // Debounced reload to avoid spamming reloadSessions on rapid events
-  const scheduleReload = useMemo(() => {
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    return () => {
-      if (timeoutId !== null) return;
-      timeoutId = setTimeout(() => {
-        void reloadSessions();
-        timeoutId = null;
-      }, 150);
-    };
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleReload = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      void reloadSessions();
+      timeoutRef.current = null;
+    }, 150);
   }, [reloadSessions]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Subscribe to session and agent events to refresh session list in real-time
   useEventStream({

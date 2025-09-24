@@ -13,6 +13,8 @@ import { SessionProvider, useSessionContext } from '@/components/providers/Sessi
 import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
 import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
+const TEST_SESSION_ID = 'test-session';
+
 // Mock the hooks
 vi.mock('@/hooks/useAgentManagement', () => ({
   useAgentManagement: vi.fn(),
@@ -82,7 +84,7 @@ function ContextConsumer() {
       </button>
       <button
         onClick={() =>
-          createAgent('test-session', {
+          createAgent(TEST_SESSION_ID, {
             name: 'New Agent',
             providerInstanceId: 'anthropic',
             modelId: 'claude-3-haiku',
@@ -306,7 +308,7 @@ describe('SessionProvider', () => {
 
       fireEvent.click(screen.getByTestId('create-agent'));
 
-      expect(mockCreateAgent).toHaveBeenCalledWith('test-session', {
+      expect(mockCreateAgent).toHaveBeenCalledWith(TEST_SESSION_ID, {
         name: 'New Agent',
         providerInstanceId: 'anthropic',
         modelId: 'claude-3-haiku',
@@ -358,7 +360,7 @@ describe('SessionProvider', () => {
 
       // SessionProvider doesn't handle errors - it passes them through to the hook
       // The error handling is the responsibility of useAgentManagement
-      expect(mockCreateAgent).toHaveBeenCalledWith('test-session', {
+      expect(mockCreateAgent).toHaveBeenCalledWith(TEST_SESSION_ID, {
         name: 'New Agent',
         providerInstanceId: 'anthropic',
         modelId: 'claude-3-haiku',
