@@ -9,7 +9,7 @@ import { faPlus, faTasks } from '@/lib/fontawesome';
 import { SidebarSection } from '@/components/layout/Sidebar';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import { useOptionalTaskContext } from '@/components/providers/TaskProvider';
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
+import { useOptionalProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useOptionalProjectContext } from '@/components/providers/ProjectProvider';
 import { useOptionalSessionContext } from '@/components/providers/SessionProvider';
 import type { Task } from '@/types/core';
@@ -21,12 +21,13 @@ interface TaskSidebarSectionProps {
 export const TaskSidebarSection = memo(function TaskSidebarSection({
   onCloseMobileNav,
 }: TaskSidebarSectionProps) {
-  // Conditionally use contexts - they may not be available on all pages
+  // Conditionally use contexts - some may not be available on all pages
   const taskContext = useOptionalTaskContext();
   const sessionContext = useOptionalSessionContext();
   const projectContext = useOptionalProjectContext();
 
-  const { selectedProject } = useProjectsContext();
+  const projectsContext = useOptionalProjectsContext();
+  const selectedProject = projectsContext?.selectedProject ?? null;
   const selectedSession = projectContext?.selectedSession ?? null;
 
   // Extract values with fallbacks
@@ -40,21 +41,6 @@ export const TaskSidebarSection = memo(function TaskSidebarSection({
     return null;
   }
 
-  const handleTaskBoardClick = () => {
-    showTaskBoard();
-    onCloseMobileNav?.();
-  };
-
-  const handleTaskCreationClick = () => {
-    showTaskCreation();
-    onCloseMobileNav?.();
-  };
-
-  const handleTaskClick = (task: Task) => {
-    handleTaskDisplay(task);
-    onCloseMobileNav?.();
-  };
-
   const handleOpenTaskBoard = () => {
     showTaskBoard();
     onCloseMobileNav?.();
@@ -65,12 +51,17 @@ export const TaskSidebarSection = memo(function TaskSidebarSection({
     onCloseMobileNav?.();
   };
 
+  const handleTaskClick = (task: Task) => {
+    handleTaskDisplay(task);
+    onCloseMobileNav?.();
+  };
+
   // Filter to only show unassigned tasks
   const unassignedTasks = taskManager.tasks.filter((task: Task) => !task.assignedTo);
 
   const addTaskButton = (
     <button
-      onClick={handleTaskCreationClick}
+      onClick={handleCreateTask}
       className="p-1.5 hover:bg-base-200/80 backdrop-blur-sm rounded-lg transition-all duration-200 border border-transparent hover:border-base-300/30"
       title="Add task"
       data-testid="add-task-button"

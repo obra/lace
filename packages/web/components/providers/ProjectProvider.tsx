@@ -111,7 +111,7 @@ export function ProjectProvider({
   });
 
   // Use session from URL params, not hash router
-  const selectedSession = selectedSessionId || null;
+  const selectedSession = selectedSessionId ?? null;
 
   // Compute derived state based on data + selection
   const foundSession = useMemo(() => {

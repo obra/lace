@@ -5,7 +5,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import { ProjectSelectorPanel } from './ProjectSelectorPanel';
+import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import { createMockResponse } from '@/test-utils/mock-fetch';
 import {
   createMockProjectsContext,

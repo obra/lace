@@ -40,12 +40,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
 
   // Context data
   const { currentProject } = useProjectsContext();
-  const {
-    sessionDetails: selectedSessionDetails,
-    loadAgentConfiguration,
-    updateAgent,
-    reloadSessionDetails,
-  } = useSessionContext();
+  const { sessionDetails: selectedSessionDetails, reloadSessionDetails } = useSessionContext();
   const { pendingApprovals, handleApprovalDecision } = useToolApprovalContext();
   const { availableProviders: providers } = useProviderInstances();
 

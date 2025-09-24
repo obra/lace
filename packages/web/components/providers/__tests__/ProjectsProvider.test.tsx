@@ -79,7 +79,7 @@ function ContextConsumer() {
         Select Project 3
       </button>
       <button
-        onClick={() => updateProject('project-1', { name: 'Updated' })}
+        onClick={() => void updateProject('project-1', { name: 'Updated' })}
         data-testid="update-project"
       >
         Update Project
@@ -94,7 +94,6 @@ function ContextConsumer() {
 describe('ProjectsProvider', () => {
   const mockUpdateProject = vi.fn();
   const mockReloadProjects = vi.fn();
-  const mockSetSelectedProject = vi.fn();
   const mockOnProjectChange = vi.fn();
 
   const defaultProjectManagement = {

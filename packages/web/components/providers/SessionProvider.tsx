@@ -78,14 +78,14 @@ export function SessionProvider({
   } = useAgentManagement(sessionId);
 
   // Subscribe to agent lifecycle events to refresh agent list in real-time
-  const debouncedReloadRef = useRef<NodeJS.Timeout | null>(null);
+  const debouncedReloadRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEventStream({
     projectId: undefined, // Don't filter by project
     sessionId: sessionId || undefined,
     // No threadIds - we want session-level agent events
     onAgentSpawned: useCallback(
-      (agentEvent: AgentEvent) => {
+      (_agentEvent: AgentEvent) => {
         // Debounce rapid spawn events to coalesce into single refresh
         if (debouncedReloadRef.current) {
           clearTimeout(debouncedReloadRef.current);

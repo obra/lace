@@ -80,7 +80,7 @@ function ContextConsumer() {
       <button onClick={() => void reloadSessions()} data-testid="reload-sessions">
         Reload Sessions
       </button>
-      <button onClick={() => enableAgentAutoSelection()} data-testid="enable-auto-selection">
+      <button onClick={() => void enableAgentAutoSelection()} data-testid="enable-auto-selection">
         Enable Auto Selection
       </button>
     </div>

@@ -8,13 +8,15 @@ import { ProjectsProvider } from '@/components/providers/ProjectsProvider';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { HomePage } from './HomePage';
 
+const noop = () => {};
+
 export function HomePageClient() {
   return (
     <UIProvider>
       <ProjectsProvider
         selectedProject={null}
-        onProjectSelect={() => {}} // No-op - ProjectSelectorPanel handles navigation
-        onProjectChange={() => {}}
+        onProjectSelect={noop} // No-op - ProjectSelectorPanel handles navigation
+        onProjectChange={noop}
       >
         <ProjectProvider projectId={null} selectedSessionId={null}>
           <HomePage />

@@ -11,7 +11,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SessionProvider, useSessionContext } from '@/components/providers/SessionProvider';
 import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
-import type { CreateAgentRequest } from '@/types/api';
 import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
 // Mock the hooks
@@ -110,7 +109,6 @@ describe('SessionProvider', () => {
   const mockCreateAgent = vi.fn();
   const mockUpdateAgentState = vi.fn();
   const mockReloadSessionDetails = vi.fn();
-  const mockSetSelectedAgent = vi.fn();
   // Mock for onAgentChange callback
   const mockOnAgentChangeCallback = vi.fn();
 
