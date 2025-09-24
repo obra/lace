@@ -877,6 +877,8 @@ export class Agent extends EventEmitter {
               threadId: this._threadId,
               consecutiveErrors: this._consecutiveRecoverableErrors,
             });
+            // Complete the turn properly to clean up metrics/timers
+            this._completeTurn();
             this._setState('idle');
             return;
           }
@@ -1778,7 +1780,8 @@ export class Agent extends EventEmitter {
       this._setState('idle');
       // Don't auto-continue conversation
     } else {
-      // All tools completed successfully - auto-continue conversation
+      // All tools completed successfully - reset error counter and auto-continue conversation
+      this._consecutiveRecoverableErrors = 0;
       this._completeTurn();
       this._setState('idle');
 
@@ -2192,9 +2195,6 @@ export class Agent extends EventEmitter {
   }
 
   private _completeTurn(): void {
-    // Reset error retry counter on successful completion
-    this._consecutiveRecoverableErrors = 0;
-
     if (this._currentTurnMetrics) {
       this._clearProgressTimer();
 
