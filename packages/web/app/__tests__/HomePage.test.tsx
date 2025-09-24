@@ -25,8 +25,8 @@ vi.mock('@/components/providers/UIProvider', () => ({
   }),
 }));
 
-vi.mock('@/components/providers/SessionProvider', () => ({
-  useSessionContext: () => ({
+vi.mock('@/components/providers/ProjectProvider', () => ({
+  useProjectContext: () => ({
     enableAgentAutoSelection: vi.fn(),
     deleteSession: vi.fn(),
   }),

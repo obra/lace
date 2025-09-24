@@ -1,5 +1,5 @@
-// ABOUTME: Integration tests for SessionProvider focusing on real provider responsibilities
-// ABOUTME: Tests session data management, selection handling, and CRUD operations
+// ABOUTME: Integration tests for ProjectProvider focusing on real provider responsibilities
+// ABOUTME: Tests project session data management, selection handling, and CRUD operations
 
 /**
  * @vitest-environment jsdom
@@ -9,7 +9,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { SessionProvider, useSessionContext } from '@/components/providers/SessionProvider';
+import { ProjectProvider, useProjectContext } from '@/components/providers/ProjectProvider';
 import type { SessionInfo, ThreadId } from '@/types/core';
 
 // Mock the hooks
@@ -17,7 +17,7 @@ vi.mock('@/hooks/useSessionManagement', () => ({
   useSessionManagement: vi.fn(),
 }));
 
-// SessionProvider now uses selectedSessionId prop instead of hash router
+// ProjectProvider now uses selectedSessionId prop instead of hash router
 
 import { useSessionManagement } from '@/hooks/useSessionManagement';
 
@@ -52,7 +52,7 @@ function ContextConsumer() {
     loadProjectConfig,
     reloadSessions,
     enableAgentAutoSelection,
-  } = useSessionContext();
+  } = useProjectContext();
 
   return (
     <div>
@@ -87,7 +87,7 @@ function ContextConsumer() {
   );
 }
 
-describe('SessionProvider', () => {
+describe('ProjectProvider', () => {
   const mockCreateSession = vi.fn();
   const mockLoadProjectConfig = vi.fn();
   const mockReloadSessions = vi.fn();
@@ -116,9 +116,9 @@ describe('SessionProvider', () => {
   describe('Context Provision', () => {
     it('provides session context to children', () => {
       render(
-        <SessionProvider projectId="test-project" selectedSessionId="lace_20240101_sess01">
+        <ProjectProvider projectId="test-project" selectedSessionId="lace_20240101_sess01">
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       expect(screen.getByTestId('session-count')).toHaveTextContent('3');
@@ -133,7 +133,7 @@ describe('SessionProvider', () => {
 
       expect(() => {
         render(<ContextConsumer />);
-      }).toThrow('useSessionContext must be used within a SessionProvider');
+      }).toThrow('useProjectContext must be used within a ProjectProvider');
 
       // Verify that React logged the error (error boundary behavior)
       expect(consoleSpy).toHaveBeenCalled();
@@ -143,7 +143,7 @@ describe('SessionProvider', () => {
         calls.some(
           (call) =>
             typeof call === 'string' &&
-            call.includes('useSessionContext must be used within a SessionProvider')
+            call.includes('useProjectContext must be used within a ProjectProvider')
         )
       ).toBe(true);
 
@@ -154,9 +154,9 @@ describe('SessionProvider', () => {
   describe('Session Data Management', () => {
     it('provides found session data when session is selected', () => {
       render(
-        <SessionProvider projectId="test-project" selectedSessionId="lace_20240101_sess01">
+        <ProjectProvider projectId="test-project" selectedSessionId="lace_20240101_sess01">
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       expect(screen.getByTestId('found-session')).toHaveTextContent('Session One');
@@ -164,9 +164,9 @@ describe('SessionProvider', () => {
 
     it('provides null found session when no session is selected', () => {
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       expect(screen.getByTestId('found-session')).toHaveTextContent('none');
@@ -174,9 +174,9 @@ describe('SessionProvider', () => {
 
     it('provides null found session when selected session not found', () => {
       render(
-        <SessionProvider projectId="test-project" selectedSessionId="lace_20240101_notfnd">
+        <ProjectProvider projectId="test-project" selectedSessionId="lace_20240101_notfnd">
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       expect(screen.getByTestId('found-session')).toHaveTextContent('none');
@@ -189,9 +189,9 @@ describe('SessionProvider', () => {
       });
 
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       expect(screen.getByTestId('project-config')).toHaveTextContent('exists');
@@ -201,13 +201,13 @@ describe('SessionProvider', () => {
   describe('Session Selection', () => {
     it('calls onSessionChange when selectSession is called', () => {
       render(
-        <SessionProvider
+        <ProjectProvider
           projectId="test-project"
           selectedSessionId={null}
           onSessionChange={mockOnSessionChangeCallback}
         >
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       fireEvent.click(screen.getByTestId('select-session-2'));
@@ -217,13 +217,13 @@ describe('SessionProvider', () => {
 
     it('calls selectSession when onSessionSelect is called', () => {
       render(
-        <SessionProvider
+        <ProjectProvider
           projectId="test-project"
           selectedSessionId={null}
           onSessionChange={mockOnSessionChangeCallback}
         >
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       fireEvent.click(screen.getByTestId('select-session-3'));
@@ -233,13 +233,13 @@ describe('SessionProvider', () => {
 
     it('calls onSessionChange callback when session selection changes', () => {
       render(
-        <SessionProvider
+        <ProjectProvider
           projectId="test-project"
           selectedSessionId={null}
           onSessionChange={mockOnSessionChangeCallback}
         >
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       fireEvent.click(screen.getByTestId('select-session-2'));
@@ -250,7 +250,7 @@ describe('SessionProvider', () => {
     it('handles empty string session selection as null', () => {
       // Create a component that calls onSessionSelect with empty string
       function TestComponent() {
-        const { onSessionSelect } = useSessionContext();
+        const { onSessionSelect } = useProjectContext();
         return (
           <button onClick={() => onSessionSelect({ id: '' })} data-testid="clear-selection">
             Clear Selection
@@ -259,13 +259,13 @@ describe('SessionProvider', () => {
       }
 
       render(
-        <SessionProvider
+        <ProjectProvider
           projectId="test-project"
           selectedSessionId={null}
           onSessionChange={mockOnSessionChangeCallback}
         >
           <TestComponent />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       // Click the button that calls onSessionSelect with empty string
@@ -281,9 +281,9 @@ describe('SessionProvider', () => {
       mockCreateSession.mockResolvedValue(undefined);
 
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       fireEvent.click(screen.getByTestId('create-session'));
@@ -295,9 +295,9 @@ describe('SessionProvider', () => {
       mockLoadProjectConfig.mockResolvedValue(undefined);
 
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       fireEvent.click(screen.getByTestId('load-project-config'));
@@ -309,9 +309,9 @@ describe('SessionProvider', () => {
       mockReloadSessions.mockResolvedValue(undefined);
 
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       fireEvent.click(screen.getByTestId('reload-sessions'));
@@ -324,9 +324,9 @@ describe('SessionProvider', () => {
       mockCreateSession.mockRejectedValue(testError);
 
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       fireEvent.click(screen.getByTestId('create-session'));
@@ -336,7 +336,7 @@ describe('SessionProvider', () => {
         expect(mockCreateSession).toHaveBeenCalled();
       });
 
-      // SessionProvider doesn't handle errors - it passes them through to the hook
+      // ProjectProvider doesn't handle errors - it passes them through to the hook
       // The error handling is the responsibility of useSessionManagement
       expect(mockCreateSession).toHaveBeenCalledWith({ name: 'New Session' });
     });
@@ -350,9 +350,9 @@ describe('SessionProvider', () => {
       });
 
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       expect(screen.getByTestId('loading')).toHaveTextContent('true');
@@ -365,9 +365,9 @@ describe('SessionProvider', () => {
       });
 
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       expect(screen.getByTestId('session-count')).toHaveTextContent('0');
@@ -377,9 +377,9 @@ describe('SessionProvider', () => {
   describe('Project Dependency', () => {
     it('passes projectId to useSessionManagement', () => {
       render(
-        <SessionProvider projectId="test-project-123">
+        <ProjectProvider projectId="test-project-123">
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       expect(mockUseSessionManagement).toHaveBeenCalledWith('test-project-123');
@@ -387,9 +387,9 @@ describe('SessionProvider', () => {
 
     it('handles null projectId', () => {
       render(
-        <SessionProvider projectId={null}>
+        <ProjectProvider projectId={null}>
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       expect(mockUseSessionManagement).toHaveBeenCalledWith(null);
@@ -412,9 +412,9 @@ describe('SessionProvider', () => {
       });
 
       render(
-        <SessionProvider projectId="test-project" selectedSessionId="lace_20240101_incomp">
+        <ProjectProvider projectId="test-project" selectedSessionId="lace_20240101_incomp">
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       expect(screen.getByTestId('session-count')).toHaveTextContent('1');
@@ -425,9 +425,9 @@ describe('SessionProvider', () => {
   describe('Agent Auto-Selection', () => {
     it('provides enableAgentAutoSelection function', () => {
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       expect(screen.getByTestId('enable-auto-selection')).toBeInTheDocument();
@@ -435,9 +435,9 @@ describe('SessionProvider', () => {
 
     it('calls enableAgentAutoSelection without errors', () => {
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
-        </SessionProvider>
+        </ProjectProvider>
       );
 
       expect(() => {

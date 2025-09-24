@@ -10,7 +10,7 @@ import { SidebarSection } from '@/components/layout/Sidebar';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import { useOptionalTaskContext } from '@/components/providers/TaskProvider';
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useOptionalSessionContext } from '@/components/providers/SessionProvider';
+import { useOptionalProjectContext } from '@/components/providers/ProjectProvider';
 import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
 import type { Task } from '@/types/core';
 
@@ -24,10 +24,10 @@ export const TaskSidebarSection = memo(function TaskSidebarSection({
   // Conditionally use contexts - they may not be available on all pages
   const taskContext = useOptionalTaskContext();
   const agentContext = useOptionalAgentContext();
-  const sessionContext = useOptionalSessionContext();
+  const projectContext = useOptionalProjectContext();
 
   const { selectedProject } = useProjectsContext();
-  const selectedSession = sessionContext?.selectedSession ?? null;
+  const selectedSession = projectContext?.selectedSession ?? null;
 
   // Extract values with fallbacks
   const taskManager = taskContext?.taskManager ?? null;

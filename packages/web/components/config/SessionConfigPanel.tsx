@@ -15,7 +15,7 @@ import { AnimatedModal } from '@/components/ui/AnimatedModal';
 import type { SessionConfiguration } from '@/types/api';
 import type { SessionInfo, ProjectInfo, ToolPolicy } from '@/types/core';
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useURLState } from '@/hooks/useURLState';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
@@ -41,7 +41,7 @@ export function SessionConfigPanel(): React.JSX.Element {
     updateSessionConfiguration,
     updateSession,
     deleteSession,
-  } = useSessionContext();
+  } = useProjectContext();
   const {
     sessionDetails: selectedSession,
     createAgent,

@@ -11,7 +11,7 @@ import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import type { ProjectInfo } from '@/types/core';
 import {
   createMockProjectsContext,
-  createMockSessionContext,
+  createMockProjectContext,
   createMockUIContext,
 } from '@/__tests__/utils/provider-mocks';
 import { stringify } from '@/lib/serialization';
@@ -21,8 +21,8 @@ vi.mock('@/components/providers/ProjectsProvider', () => ({
   useProjectsContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/SessionProvider', () => ({
-  useSessionContext: vi.fn(),
+vi.mock('@/components/providers/ProjectProvider', () => ({
+  useProjectContext: vi.fn(),
 }));
 
 vi.mock('@/components/providers/UIProvider', () => ({
@@ -47,13 +47,13 @@ vi.mock('react-router', () => ({
 
 // Import mocked hooks
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
 const mockUseProjectsContext = vi.mocked(useProjectsContext);
-const mockUseSessionContext = vi.mocked(useSessionContext);
+const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseUIContext = vi.mocked(useUIContext);
 const mockUseOnboarding = vi.mocked(useOnboarding);
 const mockUseProviderInstances = vi.mocked(useProviderInstances);
@@ -153,8 +153,8 @@ describe('ProjectSelectorPanel', () => {
       })
     );
 
-    mockUseSessionContext.mockReturnValue(
-      createMockSessionContext({
+    mockUseProjectContext.mockReturnValue(
+      createMockProjectContext({
         selectedSession: null,
         enableAgentAutoSelection: mockHandlers.enableAgentAutoSelection,
       })

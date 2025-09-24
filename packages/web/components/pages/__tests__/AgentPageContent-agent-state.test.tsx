@@ -32,8 +32,8 @@ vi.mock('@/components/providers/ProjectsProvider', () => ({
   }),
 }));
 
-vi.mock('@/components/providers/SessionProvider', () => ({
-  useSessionContext: () => ({
+vi.mock('@/components/providers/ProjectProvider', () => ({
+  useProjectContext: () => ({
     currentSession: {
       id: 'lace_20250101_sess01',
       threadId: asThreadId('lace_20250101_sess01'),

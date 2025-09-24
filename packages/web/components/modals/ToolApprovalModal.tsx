@@ -17,7 +17,7 @@ import { api } from '@/lib/api-client';
 import { encodePathSegments } from '@/lib/path-utils';
 import type { SessionFileContentResponse } from '@/types/session-files';
 import type { ToolResult } from '@/components/timeline/tool/types';
-import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
 
 interface ToolApprovalModalProps {
   approvals: PendingApproval[];
@@ -75,7 +75,7 @@ export function ToolApprovalModal({ approvals, onDecision }: ToolApprovalModalPr
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [, forceUpdate] = useState({});
   const [filePreviewCache] = useState(() => new LRUCache<string, ToolResult>(20)); // Max 20 cached previews
-  const { selectedSession } = useSessionContext();
+  const { selectedSession } = useProjectContext();
   const currentApproval = approvals[currentIndex];
   const request = currentApproval?.requestData;
 

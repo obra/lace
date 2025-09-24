@@ -1,5 +1,5 @@
-// ABOUTME: Context provider for shared session selection state across the app
-// ABOUTME: Manages which session is selected and provides computed values based on selection
+// ABOUTME: Context provider for sessions in a project and session selection state
+// ABOUTME: Manages session collection for a project and which session is selected
 
 'use client';
 
@@ -16,8 +16,8 @@ import { useSessionManagement } from '@/hooks/useSessionManagement';
 import { useEventStream, type AgentEvent } from '@/hooks/useEventStream';
 import type { SessionInfo, ThreadId, LaceEvent } from '@/types/core';
 
-// Types for session context
-export interface SessionContextType {
+// Types for project context
+export interface ProjectContextType {
   // Session data (from useSessionManagement hook)
   sessions: SessionInfo[];
   loading: boolean;
@@ -55,9 +55,9 @@ export interface SessionContextType {
   enableAgentAutoSelection: () => void;
 }
 
-const SessionContext = createContext<SessionContextType | null>(null);
+const ProjectContext = createContext<ProjectContextType | null>(null);
 
-interface SessionProviderProps {
+interface ProjectProviderProps {
   children: ReactNode;
   projectId: string | null;
   selectedSessionId?: string | null; // Session ID from URL params
@@ -73,12 +73,12 @@ function useAgentAutoSelection() {
   };
 }
 
-export function SessionProvider({
+export function ProjectProvider({
   children,
   projectId,
   selectedSessionId,
   onSessionChange,
-}: SessionProviderProps) {
+}: ProjectProviderProps) {
   // Get session data from pure data hook
   const {
     sessions,
@@ -140,7 +140,7 @@ export function SessionProvider({
     [selectSession]
   );
 
-  const value: SessionContextType = useMemo(
+  const value: ProjectContextType = useMemo(
     () => ({
       // Session data (from hook)
       sessions,
@@ -188,19 +188,19 @@ export function SessionProvider({
     ]
   );
 
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
 }
 
 // Optional hook - returns null if not within provider
-export function useOptionalSessionContext(): SessionContextType | null {
-  return useContext(SessionContext);
+export function useOptionalProjectContext(): ProjectContextType | null {
+  return useContext(ProjectContext);
 }
 
-// Hook to use session context
-export function useSessionContext(): SessionContextType {
-  const context = useContext(SessionContext);
+// Hook to use project context
+export function useProjectContext(): ProjectContextType {
+  const context = useContext(ProjectContext);
   if (!context) {
-    throw new Error('useSessionContext must be used within a SessionProvider');
+    throw new Error('useProjectContext must be used within a ProjectProvider');
   }
   return context;
 }

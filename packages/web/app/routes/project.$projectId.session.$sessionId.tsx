@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
 import type { SessionNavigationState } from '@/types/navigation';
 import { ProjectsProvider } from '@/components/providers/ProjectsProvider';
-import { SessionProvider } from '@/components/providers/SessionProvider';
+import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { AgentProvider, useAgentContext } from '@/components/providers/AgentProvider';
 import { UIProvider } from '@/components/providers/UIProvider';
 
@@ -59,11 +59,11 @@ export default function ProjectSession() {
         onProjectSelect={noOpCallback}
         onProjectChange={noOpCallback}
       >
-        <SessionProvider projectId={projectId!} selectedSessionId={sessionId!}>
+        <ProjectProvider projectId={projectId!} selectedSessionId={sessionId!}>
           <AgentProvider sessionId={sessionId!} selectedAgentId={null} onAgentChange={noOpCallback}>
             <SessionRedirect projectId={projectId!} sessionId={sessionId!} />
           </AgentProvider>
-        </SessionProvider>
+        </ProjectProvider>
       </ProjectsProvider>
     </UIProvider>
   );

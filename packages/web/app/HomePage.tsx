@@ -13,7 +13,7 @@ import { LoadingView } from '@/components/pages/views/LoadingView';
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
-import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
 
@@ -21,7 +21,7 @@ export function HomePage() {
   const { projects, loading: loadingProjects } = useProjectsContext();
   const { autoOpenCreateProject, setAutoOpenCreateProject, sidebarOpen, toggleSidebar } =
     useUIContext();
-  const { enableAgentAutoSelection } = useSessionContext();
+  const { enableAgentAutoSelection } = useProjectContext();
 
   // Onboarding flow management
   const { handleAutoOpenProjectCreation } = useOnboarding(

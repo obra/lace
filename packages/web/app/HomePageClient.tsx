@@ -5,7 +5,7 @@
 
 import { UIProvider } from '@/components/providers/UIProvider';
 import { ProjectsProvider } from '@/components/providers/ProjectsProvider';
-import { SessionProvider } from '@/components/providers/SessionProvider';
+import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { HomePage } from './HomePage';
 
 export function HomePageClient() {
@@ -16,9 +16,9 @@ export function HomePageClient() {
         onProjectSelect={() => {}} // No-op - ProjectSelectorPanel handles navigation
         onProjectChange={() => {}}
       >
-        <SessionProvider projectId={null} selectedSessionId={null}>
+        <ProjectProvider projectId={null} selectedSessionId={null}>
           <HomePage />
-        </SessionProvider>
+        </ProjectProvider>
       </ProjectsProvider>
     </UIProvider>
   );

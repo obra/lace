@@ -3,7 +3,7 @@
 
 import { useParams } from 'react-router';
 import { ProjectsProvider } from '@/components/providers/ProjectsProvider';
-import { SessionProvider } from '@/components/providers/SessionProvider';
+import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { AgentProvider } from '@/components/providers/AgentProvider';
 import { TaskProvider } from '@/components/providers/TaskProvider';
 import { UIProvider } from '@/components/providers/UIProvider';
@@ -22,13 +22,13 @@ export default function Project() {
         onProjectSelect={noOpCallback} // No-op for individual project page
         onProjectChange={noOpCallback} // No-op for individual project page
       >
-        <SessionProvider projectId={projectId!} selectedSessionId={null}>
+        <ProjectProvider projectId={projectId!} selectedSessionId={null}>
           <AgentProvider sessionId={null} selectedAgentId={null} onAgentChange={noOpCallback}>
             <TaskProvider projectId={projectId!} sessionId={null}>
               <ProjectPageContent projectId={projectId!} />
             </TaskProvider>
           </AgentProvider>
-        </SessionProvider>
+        </ProjectProvider>
       </ProjectsProvider>
     </UIProvider>
   );

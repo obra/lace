@@ -2,18 +2,18 @@
 // ABOUTME: Provides factory functions to create properly typed mock provider contexts
 
 import { vi } from 'vitest';
-import type { SessionContextType } from '@/components/providers/SessionProvider';
+import type { ProjectContextType } from '@/components/providers/ProjectProvider';
 import type { AgentContextType } from '@/components/providers/AgentProvider';
 import type { ProjectsContextType } from '@/components/providers/ProjectsProvider';
 import type { UseUIStateResult } from '@/hooks/useUIState';
 
 /**
- * Creates a mock SessionContextType with all required methods
+ * Creates a mock ProjectContextType with all required methods
  * @param overrides - Partial object to override default mock values
  */
-export function createMockSessionContext(
-  overrides?: Partial<SessionContextType>
-): SessionContextType {
+export function createMockProjectContext(
+  overrides?: Partial<ProjectContextType>
+): ProjectContextType {
   return {
     // Session data
     sessions: [],

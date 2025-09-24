@@ -13,7 +13,7 @@ import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import type { SessionInfo, ThreadId, AgentInfo, ProjectInfo } from '@/types/core';
 import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 import {
-  createMockSessionContext,
+  createMockProjectContext,
   createMockAgentContext,
   createMockProjectsContext,
 } from '@/__tests__/utils/provider-mocks';
@@ -23,8 +23,8 @@ vi.mock('@/components/providers/ProjectsProvider', () => ({
   useProjectsContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/SessionProvider', () => ({
-  useSessionContext: vi.fn(),
+vi.mock('@/components/providers/ProjectProvider', () => ({
+  useProjectContext: vi.fn(),
 }));
 
 vi.mock('@/components/providers/AgentProvider', () => ({
@@ -114,11 +114,11 @@ vi.mock('@/components/sidebar/TaskSidebarSection', () => ({
 
 // Import mocked hooks
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useOptionalAgentContext, useAgentContext } from '@/components/providers/AgentProvider';
 
 const mockUseProjectsContext = vi.mocked(useProjectsContext);
-const mockUseSessionContext = vi.mocked(useSessionContext);
+const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseOptionalAgentContext = vi.mocked(useOptionalAgentContext);
 const mockUseAgentContext = vi.mocked(useAgentContext);
 
@@ -176,8 +176,8 @@ describe('SidebarContent', () => {
       })
     );
 
-    mockUseSessionContext.mockReturnValue(
-      createMockSessionContext({
+    mockUseProjectContext.mockReturnValue(
+      createMockProjectContext({
         selectedSession: 'test-session',
       })
     );
