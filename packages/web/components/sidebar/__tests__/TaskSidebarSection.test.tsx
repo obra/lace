@@ -41,6 +41,7 @@ vi.mock('@/components/providers/TaskProvider', () => ({
 
 vi.mock('@/components/providers/ProjectsProvider', () => ({
   useProjectsContext: vi.fn(),
+  useOptionalProjectsContext: vi.fn(),
 }));
 
 vi.mock('@/components/providers/ProjectProvider', () => ({
@@ -53,7 +54,10 @@ vi.mock('@/components/providers/SessionProvider', () => ({
 }));
 
 // Import mocked hooks
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
+import {
+  useProjectsContext,
+  useOptionalProjectsContext,
+} from '@/components/providers/ProjectsProvider';
 import {
   useProjectContext,
   useOptionalProjectContext,
@@ -61,6 +65,7 @@ import {
 import { useOptionalSessionContext } from '@/components/providers/SessionProvider';
 
 const mockUseProjectsContext = vi.mocked(useProjectsContext);
+const mockUseOptionalProjectsContext = vi.mocked(useOptionalProjectsContext);
 const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseOptionalProjectContext = vi.mocked(useOptionalProjectContext);
 const mockUseOptionalSessionContext = vi.mocked(useOptionalSessionContext);
@@ -187,14 +192,14 @@ describe('TaskSidebarSection', () => {
     mockTaskContext.handleTaskAddNote = vi.fn();
 
     // Set up provider mocks with default values
-    mockUseProjectsContext.mockReturnValue(
-      createMockProjectsContext({
-        selectedProject: 'test-project',
-        currentProject: createMockProject(),
-        projectsForSidebar: [],
-        foundProject: createMockProject(),
-      })
-    );
+    const mockProjectsContextValue = createMockProjectsContext({
+      selectedProject: 'test-project',
+      currentProject: createMockProject(),
+      projectsForSidebar: [],
+      foundProject: createMockProject(),
+    });
+    mockUseProjectsContext.mockReturnValue(mockProjectsContextValue);
+    mockUseOptionalProjectsContext.mockReturnValue(mockProjectsContextValue);
 
     const mockProjectContext = createMockProjectContext({
       selectedSession: 'test-session' as ThreadId,
@@ -235,12 +240,12 @@ describe('TaskSidebarSection', () => {
 
     it('returns null when selectedProject is null', () => {
       mockTaskContext.taskManager = createMockTaskManager();
-      mockUseProjectsContext.mockReturnValue(
-        createMockProjectsContext({
-          selectedProject: null,
-          foundProject: null,
-        })
-      );
+      const nullProjectsContextValue = createMockProjectsContext({
+        selectedProject: null,
+        foundProject: null,
+      });
+      mockUseProjectsContext.mockReturnValue(nullProjectsContextValue);
+      mockUseOptionalProjectsContext.mockReturnValue(nullProjectsContextValue);
 
       const { container } = render(<TaskSidebarSection {...defaultProps} />);
       expect(container.firstChild).toBeNull();
