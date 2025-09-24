@@ -8,7 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComments, faCog } from '@/lib/fontawesome';
 import { SidebarSection } from '@/components/layout/Sidebar';
 import { SwitchIcon } from '@/components/ui/SwitchIcon';
-import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useURLState } from '@/hooks/useURLState';
 
@@ -24,7 +24,7 @@ export const SessionSection = memo(function SessionSection({
   onConfigureSession,
 }: SessionSectionProps) {
   // Get context data
-  const { sessionDetails } = useAgentContext();
+  const { sessionDetails } = useSessionContext();
   const { selectedProject } = useProjectsContext();
   const { navigateToProject } = useURLState();
 

@@ -5,7 +5,7 @@ import { useParams } from 'react-router';
 import { UIProvider } from '@/components/providers/UIProvider';
 import { ProjectsProvider } from '@/components/providers/ProjectsProvider';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
-import { AgentProvider } from '@/components/providers/AgentProvider';
+import { SessionProvider } from '@/components/providers/SessionProvider';
 import { EventStreamProvider } from '@/components/providers/EventStreamProvider';
 import { ToolApprovalProvider } from '@/components/providers/ToolApprovalProvider';
 import { TaskProvider } from '@/components/providers/TaskProvider';
@@ -27,7 +27,7 @@ export default function ProjectSessionAgent() {
         onProjectChange={noOpCallback}
       >
         <ProjectProvider projectId={projectId!} selectedSessionId={sessionId!}>
-          <AgentProvider
+          <SessionProvider
             sessionId={sessionId!}
             selectedAgentId={agentId!}
             onAgentChange={noOpCallback}
@@ -51,7 +51,7 @@ export default function ProjectSessionAgent() {
                 </TaskProvider>
               </EventStreamProvider>
             </ToolApprovalProvider>
-          </AgentProvider>
+          </SessionProvider>
         </ProjectProvider>
       </ProjectsProvider>
     </UIProvider>

@@ -1,5 +1,5 @@
-// ABOUTME: Integration tests for AgentProvider focusing on real provider responsibilities
-// ABOUTME: Tests agent data management, selection handling, and CRUD operations
+// ABOUTME: Integration tests for SessionProvider focusing on real provider responsibilities
+// ABOUTME: Tests session agent data management, selection handling, and CRUD operations
 
 /**
  * @vitest-environment jsdom
@@ -9,7 +9,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { AgentProvider, useAgentContext } from '@/components/providers/AgentProvider';
+import { SessionProvider, useSessionContext } from '@/components/providers/SessionProvider';
 import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
 import type { CreateAgentRequest } from '@/types/api';
 import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
@@ -19,7 +19,7 @@ vi.mock('@/hooks/useAgentManagement', () => ({
   useAgentManagement: vi.fn(),
 }));
 
-// AgentProvider now uses selectedAgentId prop instead of hash router
+// SessionProvider now uses selectedAgentId prop instead of hash router
 
 import { useAgentManagement } from '@/hooks/useAgentManagement';
 
@@ -62,7 +62,7 @@ function ContextConsumer() {
     createAgent,
     updateAgentState,
     reloadSessionDetails,
-  } = useAgentContext();
+  } = useSessionContext();
 
   return (
     <div>
@@ -106,7 +106,7 @@ function ContextConsumer() {
   );
 }
 
-describe('AgentProvider', () => {
+describe('SessionProvider', () => {
   const mockCreateAgent = vi.fn();
   const mockUpdateAgentState = vi.fn();
   const mockReloadSessionDetails = vi.fn();
@@ -132,9 +132,9 @@ describe('AgentProvider', () => {
   describe('Context Provision', () => {
     it('provides agent context to children', () => {
       render(
-        <AgentProvider sessionId="test-session" selectedAgentId="lace_20240101_agent1">
+        <SessionProvider sessionId="test-session" selectedAgentId="lace_20240101_agent1">
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       expect(screen.getByTestId('session-name')).toHaveTextContent('Test Session');
@@ -149,7 +149,7 @@ describe('AgentProvider', () => {
 
       expect(() => {
         render(<ContextConsumer />);
-      }).toThrow('useAgentContext must be used within an AgentProvider');
+      }).toThrow('useSessionContext must be used within a SessionProvider');
 
       // Verify that React logged the error (error boundary behavior)
       expect(consoleSpy).toHaveBeenCalled();
@@ -159,7 +159,7 @@ describe('AgentProvider', () => {
         calls.some(
           (call) =>
             typeof call === 'string' &&
-            call.includes('useAgentContext must be used within an AgentProvider')
+            call.includes('useSessionContext must be used within a SessionProvider')
         )
       ).toBe(true);
 
@@ -170,9 +170,9 @@ describe('AgentProvider', () => {
   describe('Agent Data Management', () => {
     it('provides found agent data when agent is selected', () => {
       render(
-        <AgentProvider sessionId="test-session" selectedAgentId="lace_20240101_agent1">
+        <SessionProvider sessionId="test-session" selectedAgentId="lace_20240101_agent1">
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       expect(screen.getByTestId('found-agent')).toHaveTextContent('Agent One');
@@ -180,9 +180,9 @@ describe('AgentProvider', () => {
 
     it('provides null found agent when no agent is selected', () => {
       render(
-        <AgentProvider sessionId="test-session" selectedAgentId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       expect(screen.getByTestId('found-agent')).toHaveTextContent('none');
@@ -190,9 +190,9 @@ describe('AgentProvider', () => {
 
     it('provides null found agent when selected agent not found', () => {
       render(
-        <AgentProvider sessionId="test-session" selectedAgentId="lace_20240101_notfnd">
+        <SessionProvider sessionId="test-session" selectedAgentId="lace_20240101_notfnd">
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       expect(screen.getByTestId('found-agent')).toHaveTextContent('none');
@@ -205,9 +205,9 @@ describe('AgentProvider', () => {
       });
 
       render(
-        <AgentProvider sessionId="test-session" selectedAgentId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       expect(screen.getByTestId('found-agent')).toHaveTextContent('none');
@@ -216,9 +216,9 @@ describe('AgentProvider', () => {
 
     it('displays session details when available', () => {
       render(
-        <AgentProvider sessionId="test-session" selectedAgentId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       expect(screen.getByTestId('session-name')).toHaveTextContent('Test Session');
@@ -229,13 +229,13 @@ describe('AgentProvider', () => {
   describe('Agent Selection', () => {
     it('calls onAgentChange when selectAgent is called', () => {
       render(
-        <AgentProvider
+        <SessionProvider
           sessionId="test-session"
           selectedAgentId={null}
           onAgentChange={mockOnAgentChangeCallback}
         >
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       fireEvent.click(screen.getByTestId('select-agent-2'));
@@ -245,13 +245,13 @@ describe('AgentProvider', () => {
 
     it('calls selectAgent when onAgentSelect is called', () => {
       render(
-        <AgentProvider
+        <SessionProvider
           sessionId="test-session"
           selectedAgentId={null}
           onAgentChange={mockOnAgentChangeCallback}
         >
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       fireEvent.click(screen.getByTestId('select-agent-3'));
@@ -261,9 +261,9 @@ describe('AgentProvider', () => {
 
     it('calls onAgentChange callback when agent selection changes', () => {
       render(
-        <AgentProvider sessionId="test-session" onAgentChange={mockOnAgentChangeCallback}>
+        <SessionProvider sessionId="test-session" onAgentChange={mockOnAgentChangeCallback}>
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       fireEvent.click(screen.getByTestId('select-agent-2'));
@@ -274,7 +274,7 @@ describe('AgentProvider', () => {
     it('handles empty string agent selection as null', () => {
       // Create a component that calls onAgentSelect with empty string
       function TestComponent() {
-        const { onAgentSelect } = useAgentContext();
+        const { onAgentSelect } = useSessionContext();
         return (
           <button onClick={() => onAgentSelect({ id: '' })} data-testid="clear-selection">
             Clear Selection
@@ -283,9 +283,9 @@ describe('AgentProvider', () => {
       }
 
       render(
-        <AgentProvider sessionId="test-session" onAgentChange={mockOnAgentChangeCallback}>
+        <SessionProvider sessionId="test-session" onAgentChange={mockOnAgentChangeCallback}>
           <TestComponent />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       // Click the button that calls onAgentSelect with empty string
@@ -301,9 +301,9 @@ describe('AgentProvider', () => {
       mockCreateAgent.mockResolvedValue(undefined);
 
       render(
-        <AgentProvider sessionId="test-session" selectedAgentId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       fireEvent.click(screen.getByTestId('create-agent'));
@@ -317,9 +317,9 @@ describe('AgentProvider', () => {
 
     it('calls updateAgentState with correct parameters', () => {
       render(
-        <AgentProvider sessionId="test-session" selectedAgentId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       fireEvent.click(screen.getByTestId('update-agent-state'));
@@ -331,9 +331,9 @@ describe('AgentProvider', () => {
       mockReloadSessionDetails.mockResolvedValue(undefined);
 
       render(
-        <AgentProvider sessionId="test-session" selectedAgentId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       fireEvent.click(screen.getByTestId('reload-session'));
@@ -346,9 +346,9 @@ describe('AgentProvider', () => {
       mockCreateAgent.mockRejectedValue(testError);
 
       render(
-        <AgentProvider sessionId="test-session" selectedAgentId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       fireEvent.click(screen.getByTestId('create-agent'));
@@ -358,7 +358,7 @@ describe('AgentProvider', () => {
         expect(mockCreateAgent).toHaveBeenCalled();
       });
 
-      // AgentProvider doesn't handle errors - it passes them through to the hook
+      // SessionProvider doesn't handle errors - it passes them through to the hook
       // The error handling is the responsibility of useAgentManagement
       expect(mockCreateAgent).toHaveBeenCalledWith('session-1', {
         name: 'New Agent',
@@ -376,9 +376,9 @@ describe('AgentProvider', () => {
       });
 
       render(
-        <AgentProvider sessionId="test-session" selectedAgentId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       expect(screen.getByTestId('loading')).toHaveTextContent('true');
@@ -391,9 +391,9 @@ describe('AgentProvider', () => {
       });
 
       render(
-        <AgentProvider sessionId="test-session" selectedAgentId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       expect(screen.getByTestId('agent-count')).toHaveTextContent('0');
@@ -403,9 +403,9 @@ describe('AgentProvider', () => {
   describe('Session Dependency', () => {
     it('passes sessionId to useAgentManagement', () => {
       render(
-        <AgentProvider sessionId="test-session-123">
+        <SessionProvider sessionId="test-session-123">
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       expect(mockUseAgentManagement).toHaveBeenCalledWith('test-session-123');
@@ -413,9 +413,9 @@ describe('AgentProvider', () => {
 
     it('handles null sessionId', () => {
       render(
-        <AgentProvider sessionId={null}>
+        <SessionProvider sessionId={null}>
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       expect(mockUseAgentManagement).toHaveBeenCalledWith(null);
@@ -441,9 +441,9 @@ describe('AgentProvider', () => {
       });
 
       render(
-        <AgentProvider sessionId="test-session" selectedAgentId="lace_20240101_incomp">
+        <SessionProvider sessionId="test-session" selectedAgentId="lace_20240101_incomp">
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       expect(screen.getByTestId('agent-count')).toHaveTextContent('1');
@@ -461,9 +461,9 @@ describe('AgentProvider', () => {
       });
 
       render(
-        <AgentProvider sessionId="test-session" selectedAgentId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
-        </AgentProvider>
+        </SessionProvider>
       );
 
       expect(screen.getByTestId('agent-count')).toHaveTextContent('0');

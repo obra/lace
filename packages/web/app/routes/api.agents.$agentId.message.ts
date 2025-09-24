@@ -35,7 +35,7 @@ function sanitizeErrorText(text?: string): string {
 }
 
 // Helper to safely get agent provider context
-function getAgentProviderContext(agent: unknown) {
+function getSessionProviderContext(agent: unknown) {
   try {
     // Type guard for agent with required methods
     if (
@@ -304,7 +304,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         errorClassification.phase === 'initialization' ||
         errorClassification.phase === 'conversation_processing'
       ) {
-        const providerContext = getAgentProviderContext(agent);
+        const providerContext = getSessionProviderContext(agent);
         const eventStreamManager = EventStreamManager.getInstance();
         eventStreamManager.broadcast({
           type: 'AGENT_ERROR',

@@ -14,7 +14,7 @@ import type { SessionInfo, ThreadId, AgentInfo, ProjectInfo } from '@/types/core
 import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 import {
   createMockProjectContext,
-  createMockAgentContext,
+  createMockSessionContext,
   createMockProjectsContext,
 } from '@/__tests__/utils/provider-mocks';
 
@@ -27,9 +27,9 @@ vi.mock('@/components/providers/ProjectProvider', () => ({
   useProjectContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/AgentProvider', () => ({
-  useOptionalAgentContext: vi.fn(),
-  useAgentContext: vi.fn(),
+vi.mock('@/components/providers/SessionProvider', () => ({
+  useOptionalSessionContext: vi.fn(),
+  useSessionContext: vi.fn(),
 }));
 
 // Mock the child components to verify they receive correct props
@@ -115,12 +115,15 @@ vi.mock('@/components/sidebar/TaskSidebarSection', () => ({
 // Import mocked hooks
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useOptionalAgentContext, useAgentContext } from '@/components/providers/AgentProvider';
+import {
+  useOptionalSessionContext,
+  useSessionContext,
+} from '@/components/providers/SessionProvider';
 
 const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseProjectContext = vi.mocked(useProjectContext);
-const mockUseOptionalAgentContext = vi.mocked(useOptionalAgentContext);
-const mockUseAgentContext = vi.mocked(useAgentContext);
+const mockUseOptionalSessionContext = vi.mocked(useOptionalSessionContext);
+const mockUseSessionContext = vi.mocked(useSessionContext);
 
 // Test data factories
 const createMockProject = (): ProjectInfo => ({
@@ -182,14 +185,14 @@ describe('SidebarContent', () => {
       })
     );
 
-    const mockAgentContext = createMockAgentContext({
+    const mockSessionContext = createMockSessionContext({
       sessionDetails: createMockSessionDetails(),
       selectedAgent: 'agent-1' as ThreadId,
       foundAgent: createMockAgent('agent-1', 'Agent 1'),
     });
 
-    mockUseOptionalAgentContext.mockReturnValue(mockAgentContext);
-    mockUseAgentContext.mockReturnValue(mockAgentContext);
+    mockUseOptionalSessionContext.mockReturnValue(mockSessionContext);
+    mockUseSessionContext.mockReturnValue(mockSessionContext);
   });
 
   describe('Component Rendering', () => {
@@ -212,7 +215,7 @@ describe('SidebarContent', () => {
         })
       );
 
-      mockUseOptionalAgentContext.mockReturnValue(null);
+      mockUseOptionalSessionContext.mockReturnValue(null);
 
       render(<SidebarContent {...defaultProps} />);
 
@@ -223,7 +226,7 @@ describe('SidebarContent', () => {
     });
 
     it('renders project and task sections when no session is available', () => {
-      mockUseOptionalAgentContext.mockReturnValue(null);
+      mockUseOptionalSessionContext.mockReturnValue(null);
 
       render(<SidebarContent {...defaultProps} />);
 
@@ -319,10 +322,10 @@ describe('SidebarContent', () => {
       expect(screen.getByTestId('project-section')).toBeInTheDocument();
     });
 
-    it('uses AgentProvider for session details', () => {
+    it('uses SessionProvider for session details', () => {
       render(<SidebarContent {...defaultProps} />);
 
-      expect(mockUseOptionalAgentContext).toHaveBeenCalled();
+      expect(mockUseOptionalSessionContext).toHaveBeenCalled();
       expect(screen.getByTestId('session-section')).toBeInTheDocument();
     });
   });
@@ -345,7 +348,7 @@ describe('SidebarContent', () => {
     });
 
     it('handles null session details gracefully', () => {
-      mockUseOptionalAgentContext.mockReturnValue(null);
+      mockUseOptionalSessionContext.mockReturnValue(null);
 
       render(<SidebarContent {...defaultProps} />);
 

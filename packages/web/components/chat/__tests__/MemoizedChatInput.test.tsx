@@ -73,10 +73,13 @@ vi.mock('motion/react', () => ({
   },
 }));
 
-// Mock AgentProvider context with proper typing
-import type { useAgentContext } from '@/components/providers/AgentProvider';
+// Mock SessionProvider context with proper typing
+import type { useSessionContext } from '@/components/providers/SessionProvider';
 
-const mockAgentContext: Pick<ReturnType<typeof useAgentContext>, 'currentAgent' | 'updateAgent'> = {
+const mockSessionContext: Pick<
+  ReturnType<typeof useSessionContext>,
+  'currentAgent' | 'updateAgent'
+> = {
   currentAgent: {
     threadId: 'test-agent-789' as ThreadId,
     name: 'Test Agent',
@@ -88,8 +91,8 @@ const mockAgentContext: Pick<ReturnType<typeof useAgentContext>, 'currentAgent' 
   updateAgent: vi.fn(),
 };
 
-vi.mock('@/components/providers/AgentProvider', () => ({
-  useAgentContext: () => mockAgentContext,
+vi.mock('@/components/providers/SessionProvider', () => ({
+  useSessionContext: () => mockSessionContext,
 }));
 
 // Mock ProviderInstanceProvider context

@@ -60,8 +60,8 @@ vi.mock('@/components/providers/EventStreamProvider', () => ({
   }),
 }));
 
-vi.mock('@/components/providers/AgentProvider', () => ({
-  useAgentContext: () => ({
+vi.mock('@/components/providers/SessionProvider', () => ({
+  useSessionContext: () => ({
     currentAgent: {
       id: asThreadId('lace_20250101_agent1'),
       name: 'Test Agent',

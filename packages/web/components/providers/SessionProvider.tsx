@@ -1,5 +1,5 @@
-// ABOUTME: Context provider for shared agent selection state across the app
-// ABOUTME: Manages which agent is selected and provides computed values based on selection
+// ABOUTME: Context provider for agents in a session and agent selection state
+// ABOUTME: Manages agent collection for a session and which agent is selected
 
 'use client';
 
@@ -18,8 +18,8 @@ import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import type { CreateAgentRequest } from '@/types/api';
 
-// Types for agent context
-export interface AgentContextType {
+// Types for session context
+export interface SessionContextType {
   // Agent data (from useAgentManagement hook)
   sessionDetails: SessionInfo | null;
   loading: boolean;
@@ -49,22 +49,22 @@ export interface AgentContextType {
   ) => Promise<void>;
 }
 
-const AgentContext = createContext<AgentContextType | null>(null);
+const SessionContext = createContext<SessionContextType | null>(null);
 
-interface AgentProviderProps {
+interface SessionProviderProps {
   children: ReactNode;
   sessionId: string | null;
   selectedAgentId?: string | null; // Agent ID from URL params
   onAgentChange?: (agentId: string | null) => void;
 }
 
-export function AgentProvider({
+export function SessionProvider({
   children,
   sessionId,
   selectedAgentId,
   onAgentChange,
-}: AgentProviderProps) {
-  // Debug: AgentProvider initialized
+}: SessionProviderProps) {
+  // Debug: SessionProvider initialized
 
   // Get agent data from pure data hook
   const {
@@ -158,7 +158,7 @@ export function AgentProvider({
     [selectAgent]
   );
 
-  const value: AgentContextType = useMemo(
+  const value: SessionContextType = useMemo(
     () => ({
       // Agent data (from hook)
       sessionDetails,
@@ -200,19 +200,19 @@ export function AgentProvider({
     ]
   );
 
-  return <AgentContext.Provider value={value}>{children}</AgentContext.Provider>;
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
 // Optional hook - returns null if not within provider
-export function useOptionalAgentContext(): AgentContextType | null {
-  return useContext(AgentContext);
+export function useOptionalSessionContext(): SessionContextType | null {
+  return useContext(SessionContext);
 }
 
-// Hook to use agent context - throws if not within provider
-export function useAgentContext(): AgentContextType {
-  const context = useContext(AgentContext);
+// Hook to use session context - throws if not within provider
+export function useSessionContext(): SessionContextType {
+  const context = useContext(SessionContext);
   if (!context) {
-    throw new Error('useAgentContext must be used within an AgentProvider');
+    throw new Error('useSessionContext must be used within a SessionProvider');
   }
   return context;
 }

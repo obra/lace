@@ -16,7 +16,7 @@ import type { SessionConfiguration } from '@/types/api';
 import type { SessionInfo, ProjectInfo, ToolPolicy } from '@/types/core';
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useURLState } from '@/hooks/useURLState';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import { asThreadId } from '@/types/core';
@@ -49,7 +49,7 @@ export function SessionConfigPanel(): React.JSX.Element {
     loading: agentLoading,
     loadAgentConfiguration,
     updateAgent,
-  } = useAgentContext();
+  } = useSessionContext();
   const { project, session, navigateToSession, navigateToAgent, navigateToProject } = useURLState();
   const { availableProviders, instancesLoading: providersLoading } = useProviderInstances();
 

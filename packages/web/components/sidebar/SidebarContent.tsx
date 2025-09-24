@@ -12,7 +12,7 @@ import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
 import { FeedbackSection } from '@/components/sidebar/FeedbackSection';
 import { FileBrowserSection } from '@/components/sidebar/FileBrowserSection';
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
+import { useOptionalSessionContext } from '@/components/providers/SessionProvider';
 
 interface SidebarContentProps {
   // Mobile behavior
@@ -38,10 +38,10 @@ export const SidebarContent = memo(function SidebarContent({
 }: SidebarContentProps) {
   // Get state from providers
   const { selectedProject } = useProjectsContext();
-  // Conditionally use AgentContext - it may not be available on all pages
-  const agentContext = useOptionalAgentContext();
-  const sessionDetails = agentContext?.sessionDetails ?? null;
-  const selectedAgent = agentContext?.selectedAgent ?? null;
+  // Conditionally use SessionContext - it may not be available on all pages
+  const sessionContext = useOptionalSessionContext();
+  const sessionDetails = sessionContext?.sessionDetails ?? null;
+  const selectedAgent = sessionContext?.selectedAgent ?? null;
   // Single container with responsive classes to prevent hydration mismatches
   // Mobile: Normal flow layout, Desktop: Flex layout with feedback anchored to bottom
   return (

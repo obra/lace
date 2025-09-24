@@ -35,8 +35,8 @@ vi.mock('@/components/providers/ProjectsProvider', () => ({
   }),
 }));
 
-vi.mock('@/components/providers/AgentProvider', () => ({
-  useOptionalAgentContext: () => ({
+vi.mock('@/components/providers/SessionProvider', () => ({
+  useOptionalSessionContext: () => ({
     sessionDetails: {
       id: 'session-1',
       name: 'Test Session',

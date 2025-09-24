@@ -9,7 +9,7 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { CompactTokenUsage } from '@/components/ui/CompactTokenUsage';
 import { ModelSelector } from '@/components/ui/ModelSelector';
 import { Alert } from '@/components/ui/Alert';
-import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import type { ThreadId } from '@/types/core';
 
@@ -137,7 +137,7 @@ const CustomChatInput = memo(
       focus: () => chatInputRef.current?.focus(),
     }));
 
-    const { currentAgent, updateAgent } = useAgentContext();
+    const { currentAgent, updateAgent } = useSessionContext();
     const { availableProviders } = useProviderInstances();
 
     // Wrapper for onInterrupt to show "Stop requested" feedback

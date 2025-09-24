@@ -14,7 +14,7 @@ import { Chat } from '@/components/chat/Chat';
 import { ScrollProvider } from '@/components/providers/ScrollProvider';
 import { SettingsProvider } from '@/components/providers/SettingsProvider';
 import type { ThreadId, AgentInfo, LaceEvent } from '@/types/core';
-import { createMockAgentContext } from '@/__tests__/utils/provider-mocks';
+import { createMockSessionContext } from '@/__tests__/utils/provider-mocks';
 import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
 // Use vi.hoisted to ensure mock functions are available during hoisting
@@ -90,8 +90,8 @@ vi.mock('@/components/providers/EventStreamProvider', () => ({
   useCompactionState: vi.fn(),
 }));
 
-vi.mock('@/components/providers/AgentProvider', () => ({
-  useAgentContext: vi.fn(),
+vi.mock('@/components/providers/SessionProvider', () => ({
+  useSessionContext: vi.fn(),
 }));
 
 vi.mock('@/lib/api-client', () => ({
@@ -108,14 +108,14 @@ import {
   useEventStreamContext,
   useCompactionState,
 } from '@/components/providers/EventStreamProvider';
-import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
 import { api } from '@/lib/api-client';
 
 const mockUseSessionEvents = vi.mocked(useSessionEvents);
 const mockUseAgentAPI = vi.mocked(useAgentAPI);
 const mockUseEventStreamContext = vi.mocked(useEventStreamContext);
 const mockUseCompactionState = vi.mocked(useCompactionState);
-const mockUseAgentContext = vi.mocked(useAgentContext);
+const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockApi = vi.mocked(api);
 
 // Test data factories
@@ -206,8 +206,8 @@ describe('Chat', () => {
       compactingAgentId: undefined,
     });
 
-    mockUseAgentContext.mockReturnValue(
-      createMockAgentContext({
+    mockUseSessionContext.mockReturnValue(
+      createMockSessionContext({
         sessionDetails: {
           id: 'session-1' as ThreadId,
           name: 'Test Session',
@@ -248,8 +248,8 @@ describe('Chat', () => {
     });
 
     it('passes isTyping based on agentBusy from provider', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
           sessionDetails: {
             id: 'session-1' as ThreadId,
             name: 'Test Session',
@@ -273,8 +273,8 @@ describe('Chat', () => {
     });
 
     it('passes default Agent name when selected agent not found', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
           sessionDetails: {
             id: 'session-1' as ThreadId,
             name: 'Test Session',
@@ -297,8 +297,8 @@ describe('Chat', () => {
     });
 
     it('falls back to first agent when no agent selected', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
           sessionDetails: {
             id: 'session-1' as ThreadId,
             name: 'Test Session',
@@ -317,8 +317,8 @@ describe('Chat', () => {
 
   describe('Data Passing to MemoizedChatInput', () => {
     it('passes disabled state based on agentBusy from provider', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
           sessionDetails: {
             id: 'session-1' as ThreadId,
             name: 'Test Session',
@@ -336,8 +336,8 @@ describe('Chat', () => {
     });
 
     it('passes streaming state based on agentBusy from provider', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
           sessionDetails: {
             id: 'session-1' as ThreadId,
             name: 'Test Session',
@@ -361,8 +361,8 @@ describe('Chat', () => {
     });
 
     it('generates placeholder with first agent when none selected', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
           sessionDetails: {
             id: 'session-1' as ThreadId,
             name: 'Test Session',
@@ -379,8 +379,8 @@ describe('Chat', () => {
     });
 
     it('uses fallback placeholder when no agents', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
           sessionDetails: {
             id: 'session-1' as ThreadId,
             name: 'Test Session',
@@ -403,8 +403,8 @@ describe('Chat', () => {
     });
 
     it('passes first agent ID when none selected', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
           sessionDetails: {
             id: 'session-1' as ThreadId,
             name: 'Test Session',
@@ -421,8 +421,8 @@ describe('Chat', () => {
     });
 
     it('passes none when no agents available', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
           sessionDetails: {
             id: 'session-1' as ThreadId,
             name: 'Test Session',
@@ -441,8 +441,8 @@ describe('Chat', () => {
 
   describe('Agent Selection Logic', () => {
     it('prefers selected agent over first agent', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
           sessionDetails: {
             id: 'session-1' as ThreadId,
             name: 'Test Session',
@@ -461,8 +461,8 @@ describe('Chat', () => {
     });
 
     it('handles no session details gracefully', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
           sessionDetails: null,
           selectedAgent: null,
         })
@@ -477,8 +477,8 @@ describe('Chat', () => {
     });
 
     it('handles empty agents array', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
           sessionDetails: {
             id: 'session-1' as ThreadId,
             name: 'Test Session',
@@ -538,8 +538,8 @@ describe('Chat', () => {
     });
 
     it('handles single agent from provider', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
           sessionDetails: {
             id: 'session-1' as ThreadId,
             name: 'Test Session',

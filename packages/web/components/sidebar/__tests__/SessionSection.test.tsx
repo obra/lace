@@ -12,14 +12,14 @@ import '@testing-library/jest-dom/vitest';
 import { SessionSection } from '@/components/sidebar/SessionSection';
 import type { SessionInfo, ThreadId, AgentInfo } from '@/types/core';
 import {
-  createMockAgentContext,
+  createMockSessionContext,
   createMockProjectsContext,
 } from '@/__tests__/utils/provider-mocks';
 import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
 // Mock the providers
-vi.mock('@/components/providers/AgentProvider', () => ({
-  useAgentContext: vi.fn(),
+vi.mock('@/components/providers/SessionProvider', () => ({
+  useSessionContext: vi.fn(),
 }));
 
 vi.mock('@/components/providers/ProjectsProvider', () => ({
@@ -31,11 +31,11 @@ vi.mock('@/hooks/useURLState', () => ({
 }));
 
 // Import the mocked hooks
-import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useURLState } from '@/hooks/useURLState';
 
-const mockUseAgentContext = vi.mocked(useAgentContext);
+const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseURLState = vi.mocked(useURLState);
 
@@ -71,8 +71,8 @@ describe('SessionSection', () => {
     vi.clearAllMocks();
 
     // Default mock setup
-    mockUseAgentContext.mockReturnValue(
-      createMockAgentContext({
+    mockUseSessionContext.mockReturnValue(
+      createMockSessionContext({
         sessionDetails: createMockSessionDetails([
           createMockAgent('agent-1', 'Alice', 'idle'),
           createMockAgent('agent-2', 'Bob', 'thinking'),
@@ -117,8 +117,8 @@ describe('SessionSection', () => {
     });
 
     it('does not render when no session details available', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
           sessionDetails: null,
           selectedAgent: null,
           foundAgent: null,
@@ -207,10 +207,10 @@ describe('SessionSection', () => {
   });
 
   describe('Provider Integration', () => {
-    it('uses AgentProvider for session details', () => {
+    it('uses SessionProvider for session details', () => {
       render(<SessionSection {...defaultProps} />);
 
-      expect(mockUseAgentContext).toHaveBeenCalled();
+      expect(mockUseSessionContext).toHaveBeenCalled();
     });
 
     it('uses ProjectsProvider for project context', () => {
@@ -226,8 +226,8 @@ describe('SessionSection', () => {
     });
 
     it('handles loading state from provider', () => {
-      mockUseAgentContext.mockReturnValue(
-        createMockAgentContext({
+      mockUseSessionContext.mockReturnValue(
+        createMockSessionContext({
           sessionDetails: null,
           loading: true,
           selectedAgent: null,

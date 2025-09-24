@@ -11,7 +11,7 @@ import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import { useOptionalTaskContext } from '@/components/providers/TaskProvider';
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useOptionalProjectContext } from '@/components/providers/ProjectProvider';
-import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
+import { useOptionalSessionContext } from '@/components/providers/SessionProvider';
 import type { Task } from '@/types/core';
 
 interface TaskSidebarSectionProps {
@@ -23,7 +23,7 @@ export const TaskSidebarSection = memo(function TaskSidebarSection({
 }: TaskSidebarSectionProps) {
   // Conditionally use contexts - they may not be available on all pages
   const taskContext = useOptionalTaskContext();
-  const agentContext = useOptionalAgentContext();
+  const sessionContext = useOptionalSessionContext();
   const projectContext = useOptionalProjectContext();
 
   const { selectedProject } = useProjectsContext();
@@ -34,7 +34,7 @@ export const TaskSidebarSection = memo(function TaskSidebarSection({
   const showTaskBoard = taskContext?.showTaskBoard ?? (() => {});
   const showTaskCreation = taskContext?.showTaskCreation ?? (() => {});
   const handleTaskDisplay = taskContext?.handleTaskDisplay ?? (() => {});
-  const selectedSessionDetails = agentContext?.sessionDetails ?? null;
+  const selectedSessionDetails = sessionContext?.sessionDetails ?? null;
 
   if (!selectedSessionDetails || !selectedProject || !selectedSession || !taskManager) {
     return null;

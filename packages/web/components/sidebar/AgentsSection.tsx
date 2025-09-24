@@ -7,7 +7,7 @@ import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRobot, faSquare, faChevronRight, faChevronDown, faPlus } from '@/lib/fontawesome';
 import { SidebarItem, SidebarSection } from '@/components/layout/Sidebar';
-import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useOptionalTaskContext } from '@/components/providers/TaskProvider';
 import { getStatusBgColor } from '@/lib/task-status-ui';
 import type { ThreadId, AgentInfo, Task } from '@/types/core';
@@ -28,7 +28,7 @@ export function AgentsSection({
   createAgentButtonRef,
 }: AgentsSectionProps) {
   // Get context data
-  const { sessionDetails, selectedAgent } = useAgentContext();
+  const { sessionDetails, selectedAgent } = useSessionContext();
   const taskContext = useOptionalTaskContext();
   const [expandedAgents, setExpandedAgents] = useState<Set<ThreadId>>(new Set());
 
