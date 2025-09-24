@@ -9,9 +9,9 @@ import { faPlus, faTasks } from '@/lib/fontawesome';
 import { SidebarSection } from '@/components/layout/Sidebar';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import { useOptionalTaskContext } from '@/components/providers/TaskProvider';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
+import { useOptionalProjectContext } from '@/components/providers/ProjectProvider';
 import { useOptionalSessionContext } from '@/components/providers/SessionProvider';
-import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
 import type { Task } from '@/types/core';
 
 interface TaskSidebarSectionProps {
@@ -23,18 +23,18 @@ export const TaskSidebarSection = memo(function TaskSidebarSection({
 }: TaskSidebarSectionProps) {
   // Conditionally use contexts - they may not be available on all pages
   const taskContext = useOptionalTaskContext();
-  const agentContext = useOptionalAgentContext();
   const sessionContext = useOptionalSessionContext();
+  const projectContext = useOptionalProjectContext();
 
-  const { selectedProject } = useProjectContext();
-  const selectedSession = sessionContext?.selectedSession ?? null;
+  const { selectedProject } = useProjectsContext();
+  const selectedSession = projectContext?.selectedSession ?? null;
 
   // Extract values with fallbacks
   const taskManager = taskContext?.taskManager ?? null;
   const showTaskBoard = taskContext?.showTaskBoard ?? (() => {});
   const showTaskCreation = taskContext?.showTaskCreation ?? (() => {});
   const handleTaskDisplay = taskContext?.handleTaskDisplay ?? (() => {});
-  const selectedSessionDetails = agentContext?.sessionDetails ?? null;
+  const selectedSessionDetails = sessionContext?.sessionDetails ?? null;
 
   if (!selectedSessionDetails || !selectedProject || !selectedSession || !taskManager) {
     return null;

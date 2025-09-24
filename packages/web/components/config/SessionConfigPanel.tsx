@@ -14,9 +14,9 @@ import { AgentEditModal } from './AgentEditModal';
 import { AnimatedModal } from '@/components/ui/AnimatedModal';
 import type { SessionConfiguration } from '@/types/api';
 import type { SessionInfo, ProjectInfo, ToolPolicy } from '@/types/core';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useURLState } from '@/hooks/useURLState';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import { asThreadId } from '@/types/core';
@@ -31,7 +31,7 @@ const DEFAULT_CONFIG: SessionConfiguration = {
 
 export function SessionConfigPanel(): React.JSX.Element {
   // Get data from providers instead of props
-  const { currentProject } = useProjectContext();
+  const { currentProject } = useProjectsContext();
   const {
     sessions,
     projectConfig,
@@ -41,7 +41,7 @@ export function SessionConfigPanel(): React.JSX.Element {
     updateSessionConfiguration,
     updateSession,
     deleteSession,
-  } = useSessionContext();
+  } = useProjectContext();
   const {
     sessionDetails: selectedSession,
     createAgent,
@@ -49,7 +49,7 @@ export function SessionConfigPanel(): React.JSX.Element {
     loading: agentLoading,
     loadAgentConfiguration,
     updateAgent,
-  } = useAgentContext();
+  } = useSessionContext();
   const { project, session, navigateToSession, navigateToAgent, navigateToProject } = useURLState();
   const { availableProviders, instancesLoading: providersLoading } = useProviderInstances();
 

@@ -4,7 +4,7 @@
 import { useState, useCallback } from 'react';
 import type { SessionInfo } from '@/types/core';
 import type { SessionConfiguration } from '@/types/api';
-import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useProjectContext } from '@/components/providers/ProjectProvider';
 
 export interface UseSessionEditModalReturn {
   // Modal state
@@ -44,7 +44,7 @@ export function useSessionEditModal({
   onSuccess,
 }: UseSessionEditModalProps = {}): UseSessionEditModalReturn {
   const { loadSessionConfiguration, updateSessionConfiguration, updateSession } =
-    useSessionContext();
+    useProjectContext();
 
   // Modal state
   const [isOpen, setIsOpen] = useState(false);

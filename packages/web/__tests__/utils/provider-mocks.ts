@@ -2,18 +2,18 @@
 // ABOUTME: Provides factory functions to create properly typed mock provider contexts
 
 import { vi } from 'vitest';
-import type { SessionContextType } from '@/components/providers/SessionProvider';
-import type { AgentContextType } from '@/components/providers/AgentProvider';
 import type { ProjectContextType } from '@/components/providers/ProjectProvider';
+import type { SessionContextType } from '@/components/providers/SessionProvider';
+import type { ProjectsContextType } from '@/components/providers/ProjectsProvider';
 import type { UseUIStateResult } from '@/hooks/useUIState';
 
 /**
- * Creates a mock SessionContextType with all required methods
+ * Creates a mock ProjectContextType with all required methods
  * @param overrides - Partial object to override default mock values
  */
-export function createMockSessionContext(
-  overrides?: Partial<SessionContextType>
-): SessionContextType {
+export function createMockProjectContext(
+  overrides?: Partial<ProjectContextType>
+): ProjectContextType {
   return {
     // Session data
     sessions: [],
@@ -47,10 +47,12 @@ export function createMockSessionContext(
 }
 
 /**
- * Creates a mock AgentContextType with all required methods
+ * Creates a mock SessionContextType with all required methods
  * @param overrides - Partial object to override default mock values
  */
-export function createMockAgentContext(overrides?: Partial<AgentContextType>): AgentContextType {
+export function createMockSessionContext(
+  overrides?: Partial<SessionContextType>
+): SessionContextType {
   return {
     // Agent data
     sessionDetails: null,
@@ -81,12 +83,12 @@ export function createMockAgentContext(overrides?: Partial<AgentContextType>): A
 }
 
 /**
- * Creates a mock ProjectContextType with all required methods
+ * Creates a mock ProjectsContextType with all required methods
  * @param overrides - Partial object to override default mock values
  */
-export function createMockProjectContext(
-  overrides?: Partial<ProjectContextType>
-): ProjectContextType {
+export function createMockProjectsContext(
+  overrides?: Partial<ProjectsContextType>
+): ProjectsContextType {
   return {
     // Project data
     projects: [],

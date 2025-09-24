@@ -25,15 +25,15 @@ vi.mock('@/components/providers/UIProvider', () => ({
   }),
 }));
 
-vi.mock('@/components/providers/ProjectProvider', () => ({
-  useProjectContext: () => ({
+vi.mock('@/components/providers/ProjectsProvider', () => ({
+  useProjectsContext: () => ({
     currentProject: { id: 'test-project', name: 'Test Project' },
     projects: [],
   }),
 }));
 
-vi.mock('@/components/providers/SessionProvider', () => ({
-  useSessionContext: () => ({
+vi.mock('@/components/providers/ProjectProvider', () => ({
+  useProjectContext: () => ({
     currentSession: {
       id: 'lace_20250101_sess01',
       threadId: asThreadId('lace_20250101_sess01'),
@@ -60,8 +60,8 @@ vi.mock('@/components/providers/EventStreamProvider', () => ({
   }),
 }));
 
-vi.mock('@/components/providers/AgentProvider', () => ({
-  useAgentContext: () => ({
+vi.mock('@/components/providers/SessionProvider', () => ({
+  useSessionContext: () => ({
     currentAgent: {
       id: asThreadId('lace_20250101_agent1'),
       name: 'Test Agent',

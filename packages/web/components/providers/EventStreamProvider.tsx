@@ -16,7 +16,7 @@ import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
 import { useSessionAPI as useSessionAPIHook } from '@/hooks/useSessionAPI';
 import { useAgentAPI as useAgentAPIHook } from '@/hooks/useAgentAPI';
 import { useToolApprovalContext } from './ToolApprovalProvider';
-import { useAgentContext } from './AgentProvider';
+import { useSessionContext } from './SessionProvider';
 import type { ThreadId } from '@/types/core';
 import type { LaceEvent } from '~/threads/types';
 import type { StreamConnection } from '@/types/stream-events';
@@ -84,8 +84,8 @@ export function EventStreamProvider({
   // Get tool approval handlers from ToolApprovalProvider
   const { handleApprovalRequest, handleApprovalResponse } = useToolApprovalContext();
 
-  // Get agent management functions from AgentProvider
-  const { updateAgentState } = useAgentContext();
+  // Get agent management functions from SessionProvider
+  const { updateAgentState } = useSessionContext();
 
   // Agent events hook (no longer manages approvals internally)
   const { events, loadingHistory, addAgentEvent } = useAgentEventsHook(agentId, false);
@@ -106,7 +106,7 @@ export function EventStreamProvider({
   // Agent state change handler
   const handleAgentStateChangeCallback = useCallback(
     (agentId: string, fromState: string, toState: string) => {
-      // Update the agent state in the AgentProvider
+      // Update the agent state in the SessionProvider
       updateAgentState(agentId, toState);
 
       // Also call the optional callback prop

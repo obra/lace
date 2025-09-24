@@ -1,196 +1,199 @@
-// ABOUTME: Context provider for shared project selection state across the app
-// ABOUTME: Manages which project is selected and provides computed values based on selection
+// ABOUTME: Context provider for sessions in a project and session selection state
+// ABOUTME: Manages session collection for a project and which session is selected
 
 'use client';
 
-import React, { createContext, useContext, useMemo, useCallback, type ReactNode } from 'react';
-import { useProjectManagement } from '@/hooks/useProjectManagement';
-import type { ProjectInfo } from '@/types/core';
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  useCallback,
+  useState,
+  useEffect,
+  type ReactNode,
+} from 'react';
+import { useSessionManagement } from '@/hooks/useSessionManagement';
+import { useEventStream, type AgentEvent } from '@/hooks/useEventStream';
+import type { SessionInfo, ThreadId, LaceEvent } from '@/types/core';
 
 // Types for project context
 export interface ProjectContextType {
-  // Project data (from useProjectManagement hook)
-  projects: ProjectInfo[];
+  // Session data (from useSessionManagement hook)
+  sessions: SessionInfo[];
   loading: boolean;
-  error: string | null;
+  projectConfig: Record<string, unknown> | null;
 
   // Selection state (managed by this provider)
-  selectedProject: string | null;
-  foundProject: ProjectInfo | null;
-
-  // Computed values based on data + selection
-  currentProject: ProjectInfo;
-  projectsForSidebar: ProjectInfo[];
+  selectedSession: string | null;
+  foundSession: SessionInfo | null;
 
   // Selection actions
-  selectProject: (projectId: string | null) => void;
-  onProjectSelect: (project: { id: string }) => void;
+  selectSession: (sessionId: string | null) => void;
+  onSessionSelect: (session: { id: string }) => void;
 
   // Data operations (passed through from hook)
-  updateProject: (
-    projectId: string,
-    updates: {
-      isArchived?: boolean;
-      name?: string;
-      description?: string;
-      workingDirectory?: string;
-      configuration?: Record<string, unknown>;
-    }
-  ) => Promise<void>;
-  createProject: (projectData: {
-    name: string;
+  createSession: (sessionData: {
+    name?: string;
+    initialMessage?: string;
     description?: string;
-    workingDirectory: string;
+    providerInstanceId?: string;
+    modelId?: string;
     configuration?: Record<string, unknown>;
-  }) => Promise<ProjectInfo>;
-  deleteProject: (projectId: string) => Promise<void>;
-  loadProjectConfiguration: (projectId: string) => Promise<Record<string, unknown>>;
-  reloadProjects: () => Promise<ProjectInfo[]>;
+  }) => Promise<SessionInfo | null>;
+  loadProjectConfig: () => Promise<void>;
+  reloadSessions: () => Promise<void>;
+  loadSessionConfiguration: (sessionId: string) => Promise<Record<string, unknown>>;
+  updateSessionConfiguration: (sessionId: string, config: Record<string, unknown>) => Promise<void>;
+  updateSession: (
+    sessionId: string,
+    updates: { name: string; description?: string }
+  ) => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<void>;
+  loadSessionsForProject: (projectId: string) => Promise<SessionInfo[]>;
+
+  // Agent auto-selection control
+  enableAgentAutoSelection: () => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | null>(null);
 
 interface ProjectProviderProps {
   children: ReactNode;
-  onProjectChange?: (projectId: string | null) => void;
-  selectedProject: string | null;
-  onProjectSelect: (projectId: string | null) => void;
+  projectId: string | null;
+  selectedSessionId?: string | null; // Session ID from URL params
+  onSessionChange?: (sessionId: string | null) => void;
+}
+
+// Simple enableAgentAutoSelection function (kept for compatibility)
+function useAgentAutoSelection() {
+  return {
+    enableAgentAutoSelection: useCallback(() => {
+      // No-op in route-based navigation - routes handle navigation directly
+    }, []),
+  };
 }
 
 export function ProjectProvider({
   children,
-  onProjectChange,
-  selectedProject,
-  onProjectSelect,
+  projectId,
+  selectedSessionId,
+  onSessionChange,
 }: ProjectProviderProps) {
-  // Get project data from pure data hook
+  // Get session data from pure data hook
   const {
-    projects,
+    sessions,
     loading,
-    error,
-    updateProject,
-    createProject,
-    deleteProject,
-    loadProjectConfiguration,
-    reloadProjects,
-  } = useProjectManagement();
+    projectConfig,
+    createSession,
+    loadProjectConfig,
+    reloadSessions,
+    loadSessionConfiguration,
+    updateSessionConfiguration,
+    updateSession,
+    deleteSession,
+    loadSessionsForProject,
+  } = useSessionManagement(projectId);
+
+  // Subscribe to session and agent events to refresh session list in real-time
+  useEventStream({
+    projectId: projectId || undefined,
+    onSessionUpdated: useCallback(() => {
+      // Reload sessions to get the updated session name in the list
+      void reloadSessions();
+    }, [reloadSessions]),
+    onAgentSpawned: useCallback(
+      (agentEvent: AgentEvent) => {
+        // When an agent is spawned, reload sessions to get updated agents list
+        void reloadSessions();
+      },
+      [reloadSessions]
+    ),
+  });
+
+  // Use session from URL params, not hash router
+  const selectedSession = selectedSessionId || null;
 
   // Compute derived state based on data + selection
-  const foundProject = useMemo(() => {
-    return selectedProject ? (projects || []).find((p) => p.id === selectedProject) || null : null;
-  }, [selectedProject, projects]);
+  const foundSession = useMemo(() => {
+    return selectedSession ? (sessions || []).find((s) => s.id === selectedSession) || null : null;
+  }, [selectedSession, sessions]);
 
-  // Create fallback current project for UI needs
-  const currentProject = useMemo(() => {
-    // If we have a selectedProject but projects are still loading, show loading state
-    if (selectedProject && loading) {
-      return {
-        id: selectedProject,
-        name: 'Loading project...',
-        description: 'Please wait while we load your project data',
-        workingDirectory: '/',
-        isArchived: false,
-        createdAt: new Date(),
-        lastUsedAt: new Date(),
-        sessionCount: 0,
-      };
-    }
-
-    return (
-      foundProject || {
-        id: '',
-        name: 'No project selected',
-        description: 'Select a project to get started',
-        workingDirectory: '/',
-        isArchived: false,
-        createdAt: new Date(),
-        lastUsedAt: new Date(),
-        sessionCount: 0,
-      }
-    );
-  }, [foundProject, selectedProject, loading]);
-
-  // Transform projects for sidebar display
-  const projectsForSidebar = useMemo(
-    () =>
-      (projects || []).map((p) => ({
-        id: p.id,
-        name: p.name,
-        workingDirectory: p.workingDirectory,
-        description: p.description,
-        isArchived: p.isArchived || false,
-        createdAt: new Date(p.createdAt),
-        lastUsedAt: new Date(p.lastUsedAt),
-        sessionCount: p.sessionCount || 0,
-      })),
-    [projects]
-  );
+  // Agent auto-selection logic (simplified)
+  const { enableAgentAutoSelection } = useAgentAutoSelection();
 
   // Selection actions
-  const selectProject = useCallback(
-    (projectId: string | null) => {
-      onProjectSelect(projectId);
-      if (onProjectChange) {
-        onProjectChange(projectId);
+  const selectSession = useCallback(
+    (sessionId: string | null) => {
+      if (onSessionChange) {
+        onSessionChange(sessionId);
       }
     },
-    [onProjectSelect, onProjectChange]
+    [onSessionChange]
   );
 
-  const handleProjectSelect = useCallback(
-    (project: { id: string }) => {
+  const onSessionSelect = useCallback(
+    (session: { id: string }) => {
       // Handle empty string as null (for clearing selection)
-      const projectId = project.id === '' ? null : project.id;
-      selectProject(projectId);
+      const sessionId = session.id === '' ? null : session.id;
+      selectSession(sessionId);
     },
-    [selectProject]
+    [selectSession]
   );
 
   const value: ProjectContextType = useMemo(
     () => ({
-      // Project data (from hook)
-      projects,
+      // Session data (from hook)
+      sessions,
       loading,
-      error,
+      projectConfig,
 
       // Selection state (managed here)
-      selectedProject,
-      foundProject,
-
-      // Computed values
-      currentProject,
-      projectsForSidebar,
+      selectedSession,
+      foundSession,
 
       // Selection actions
-      selectProject,
-      onProjectSelect: handleProjectSelect,
+      selectSession,
+      onSessionSelect,
 
       // Data operations (passed through)
-      updateProject,
-      createProject,
-      deleteProject,
-      loadProjectConfiguration,
-      reloadProjects,
+      createSession,
+      loadProjectConfig,
+      reloadSessions,
+      loadSessionConfiguration,
+      updateSessionConfiguration,
+      updateSession,
+      deleteSession,
+      loadSessionsForProject,
+
+      // Agent auto-selection control
+      enableAgentAutoSelection,
     }),
     [
-      projects,
+      sessions,
       loading,
-      error,
-      selectedProject,
-      foundProject,
-      currentProject,
-      projectsForSidebar,
-      selectProject,
-      handleProjectSelect,
-      updateProject,
-      createProject,
-      deleteProject,
-      loadProjectConfiguration,
-      reloadProjects,
+      projectConfig,
+      selectedSession,
+      foundSession,
+      selectSession,
+      onSessionSelect,
+      createSession,
+      loadProjectConfig,
+      reloadSessions,
+      loadSessionConfiguration,
+      updateSessionConfiguration,
+      updateSession,
+      deleteSession,
+      loadSessionsForProject,
+      enableAgentAutoSelection,
     ]
   );
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
+}
+
+// Optional hook - returns null if not within provider
+export function useOptionalProjectContext(): ProjectContextType | null {
+  return useContext(ProjectContext);
 }
 
 // Hook to use project context

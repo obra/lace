@@ -29,8 +29,8 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 // Mock the context hooks since AgentsSection needs them but we're testing the component in isolation
-vi.mock('@/components/providers/AgentProvider', () => ({
-  useAgentContext: () => ({
+vi.mock('@/components/providers/SessionProvider', () => ({
+  useSessionContext: () => ({
     sessionDetails: {
       id: 'session-1',
       name: 'Test Session',
@@ -57,7 +57,7 @@ vi.mock('@/components/providers/AgentProvider', () => ({
     createAgentFromSession: vi.fn(),
     deleteAgent: vi.fn(),
   }),
-  useOptionalAgentContext: () => ({
+  useOptionalSessionContext: () => ({
     sessionDetails: {
       id: 'session-1',
       name: 'Test Session',

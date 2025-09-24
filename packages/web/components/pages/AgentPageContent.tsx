@@ -17,8 +17,8 @@ import { AgentCreateChatPopup } from '@/components/modals/AgentCreateChatPopup';
 
 import { useUIContext } from '@/components/providers/UIProvider';
 import { asThreadId, isAgentSummaryUpdatedData } from '@/types/core';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useToolApprovalContext } from '@/components/providers/ToolApprovalProvider';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 import { useURLState } from '@/hooks/useURLState';
@@ -39,13 +39,13 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   const { sidebarOpen, toggleSidebar } = useUIContext();
 
   // Context data
-  const { currentProject } = useProjectContext();
+  const { currentProject } = useProjectsContext();
   const {
     sessionDetails: selectedSessionDetails,
     loadAgentConfiguration,
     updateAgent,
     reloadSessionDetails,
-  } = useAgentContext();
+  } = useSessionContext();
   const { pendingApprovals, handleApprovalDecision } = useToolApprovalContext();
   const { availableProviders: providers } = useProviderInstances();
 

@@ -14,7 +14,7 @@ import {
   useAgentAPI,
   useCompactionState,
 } from '@/components/providers/EventStreamProvider';
-import { useAgentContext } from '@/components/providers/AgentProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useScrollContext } from '@/components/providers/ScrollProvider';
 import { useTheme } from '@/components/providers/SettingsProvider';
 import type { ThreadId } from '@/types/core';
@@ -23,7 +23,7 @@ export const Chat = memo(function Chat(): React.JSX.Element {
   // Get data from providers
   const { events } = useSessionEvents();
   const compactionState = useCompactionState();
-  const { sessionDetails, selectedAgent, agentBusy } = useAgentContext();
+  const { sessionDetails, selectedAgent, agentBusy } = useSessionContext();
   const { sendMessage: sendMessageAPI, stopAgent: stopAgentAPI } = useAgentAPI();
   const { triggerAutoscroll } = useScrollContext();
   const { getTimelineMaxWidthClass } = useTheme();

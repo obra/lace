@@ -10,19 +10,19 @@ import { BrowserRouter } from 'react-router-dom';
 import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
 import type { ProjectInfo } from '@/types/core';
 import {
+  createMockProjectsContext,
   createMockProjectContext,
-  createMockSessionContext,
   createMockUIContext,
 } from '@/__tests__/utils/provider-mocks';
 import { stringify } from '@/lib/serialization';
 
 // Mock all the providers
-vi.mock('@/components/providers/ProjectProvider', () => ({
-  useProjectContext: vi.fn(),
+vi.mock('@/components/providers/ProjectsProvider', () => ({
+  useProjectsContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/SessionProvider', () => ({
-  useSessionContext: vi.fn(),
+vi.mock('@/components/providers/ProjectProvider', () => ({
+  useProjectContext: vi.fn(),
 }));
 
 vi.mock('@/components/providers/UIProvider', () => ({
@@ -46,14 +46,14 @@ vi.mock('react-router', () => ({
 }));
 
 // Import mocked hooks
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
+const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseProjectContext = vi.mocked(useProjectContext);
-const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseUIContext = vi.mocked(useUIContext);
 const mockUseOnboarding = vi.mocked(useOnboarding);
 const mockUseProviderInstances = vi.mocked(useProviderInstances);
@@ -141,8 +141,8 @@ describe('ProjectSelectorPanel', () => {
     }) as unknown as typeof fetch;
 
     // Set up default mock returns
-    mockUseProjectContext.mockReturnValue(
-      createMockProjectContext({
+    mockUseProjectsContext.mockReturnValue(
+      createMockProjectsContext({
         projects: mockProjects,
         projectsForSidebar: mockProjects,
         selectedProject: null,
@@ -153,8 +153,8 @@ describe('ProjectSelectorPanel', () => {
       })
     );
 
-    mockUseSessionContext.mockReturnValue(
-      createMockSessionContext({
+    mockUseProjectContext.mockReturnValue(
+      createMockProjectContext({
         selectedSession: null,
         enableAgentAutoSelection: mockHandlers.enableAgentAutoSelection,
       })
@@ -237,8 +237,8 @@ describe('ProjectSelectorPanel', () => {
 
   it('should show selected project as active', async () => {
     // Override the current project to be one of the mock projects
-    mockUseProjectContext.mockReturnValue(
-      createMockProjectContext({
+    mockUseProjectsContext.mockReturnValue(
+      createMockProjectsContext({
         projects: mockProjects,
         projectsForSidebar: mockProjects,
         currentProject: mockProjects[0], // Set as selected
@@ -291,8 +291,8 @@ describe('ProjectSelectorPanel', () => {
 
   it('should handle empty project list', async () => {
     // Override to provide empty projects list
-    mockUseProjectContext.mockReturnValue(
-      createMockProjectContext({
+    mockUseProjectsContext.mockReturnValue(
+      createMockProjectsContext({
         projects: [],
         projectsForSidebar: [],
         selectedProject: null,
@@ -316,8 +316,8 @@ describe('ProjectSelectorPanel', () => {
 
   it('should show loading state', async () => {
     // Override to provide loading state
-    mockUseProjectContext.mockReturnValue(
-      createMockProjectContext({
+    mockUseProjectsContext.mockReturnValue(
+      createMockProjectsContext({
         projects: [],
         projectsForSidebar: [],
         loading: true,

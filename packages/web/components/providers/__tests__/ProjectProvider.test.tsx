@@ -1,5 +1,5 @@
 // ABOUTME: Integration tests for ProjectProvider focusing on real provider responsibilities
-// ABOUTME: Tests project data management, selection handling, and CRUD operations
+// ABOUTME: Tests project session data management, selection handling, and CRUD operations
 
 /**
  * @vitest-environment jsdom
@@ -10,124 +10,122 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { ProjectProvider, useProjectContext } from '@/components/providers/ProjectProvider';
-import type { ProjectInfo } from '@/types/core';
+import type { SessionInfo, ThreadId } from '@/types/core';
 
 // Mock the hooks
-vi.mock('@/hooks/useProjectManagement', () => ({
-  useProjectManagement: vi.fn(),
+vi.mock('@/hooks/useSessionManagement', () => ({
+  useSessionManagement: vi.fn(),
 }));
 
-import { useProjectManagement } from '@/hooks/useProjectManagement';
+// ProjectProvider now uses selectedSessionId prop instead of hash router
 
-const mockUseProjectManagement = vi.mocked(useProjectManagement);
+import { useSessionManagement } from '@/hooks/useSessionManagement';
+
+const mockUseSessionManagement = vi.mocked(useSessionManagement);
 
 // Test data factories
-const createMockProject = (overrides?: Partial<ProjectInfo>): ProjectInfo => ({
-  id: 'project-1',
-  name: 'Test Project',
-  description: 'A test project',
-  workingDirectory: '/test',
-  isArchived: false,
+const createMockSession = (overrides?: Partial<SessionInfo>): SessionInfo => ({
+  id: 'lace_20240101_sess01' as ThreadId,
+  name: 'Test Session',
   createdAt: new Date('2024-01-01'),
-  lastUsedAt: new Date('2024-01-02'),
-  sessionCount: 3,
+  agents: [],
   ...overrides,
 });
 
-const mockProjects: ProjectInfo[] = [
-  createMockProject({ id: 'project-1', name: 'Project One' }),
-  createMockProject({ id: 'project-2', name: 'Project Two', isArchived: true }),
-  createMockProject({ id: 'project-3', name: 'Project Three', sessionCount: 0 }),
+const mockSessions: SessionInfo[] = [
+  createMockSession({ id: 'lace_20240101_sess01' as ThreadId, name: 'Session One' }),
+  createMockSession({ id: 'lace_20240101_sess02' as ThreadId, name: 'Session Two' }),
+  createMockSession({ id: 'lace_20240101_sess03' as ThreadId, name: 'Session Three' }),
 ];
-
-// Factory for test props to avoid shared mutable state
-function createTestProps() {
-  return {
-    selectedProject: 'project-1' as string | null,
-    onProjectSelect: vi.fn(),
-  };
-}
 
 // Component to test context provision
 function ContextConsumer() {
   const {
-    projects,
+    sessions,
     loading,
-    error,
-    selectedProject,
-    projectsForSidebar,
-    selectProject,
-    onProjectSelect,
-    updateProject,
-    reloadProjects,
-    foundProject,
+    projectConfig,
+    selectedSession,
+    foundSession,
+    selectSession,
+    onSessionSelect,
+    createSession,
+    loadProjectConfig,
+    reloadSessions,
+    enableAgentAutoSelection,
   } = useProjectContext();
 
   return (
     <div>
-      <div data-testid="project-count">{projects.length}</div>
+      <div data-testid="session-count">{sessions.length}</div>
       <div data-testid="loading">{loading.toString()}</div>
-      <div data-testid="error">{error || 'none'}</div>
-      <div data-testid="selected-project">{selectedProject || 'none'}</div>
-      <div data-testid="sidebar-project-count">{projectsForSidebar.length}</div>
-      <div data-testid="found-project">{foundProject?.name || 'none'}</div>
+      <div data-testid="project-config">{projectConfig ? 'exists' : 'none'}</div>
+      <div data-testid="selected-session">{selectedSession || 'none'}</div>
+      <div data-testid="found-session">{foundSession?.name || 'none'}</div>
 
-      <button onClick={() => selectProject('project-2')} data-testid="select-project-2">
-        Select Project 2
-      </button>
-      <button onClick={() => onProjectSelect({ id: 'project-3' })} data-testid="select-project-3">
-        Select Project 3
+      <button onClick={() => selectSession('lace_20240101_sess02')} data-testid="select-session-2">
+        Select Session 2
       </button>
       <button
-        onClick={() => updateProject('project-1', { name: 'Updated' })}
-        data-testid="update-project"
+        onClick={() => onSessionSelect({ id: 'lace_20240101_sess03' })}
+        data-testid="select-session-3"
       >
-        Update Project
+        Select Session 3
       </button>
-      <button onClick={() => void reloadProjects()} data-testid="reload-projects">
-        Reload Projects
+      <button onClick={() => createSession({ name: 'New Session' })} data-testid="create-session">
+        Create Session
+      </button>
+      <button onClick={() => void loadProjectConfig()} data-testid="load-project-config">
+        Load Config
+      </button>
+      <button onClick={() => void reloadSessions()} data-testid="reload-sessions">
+        Reload Sessions
+      </button>
+      <button onClick={() => enableAgentAutoSelection()} data-testid="enable-auto-selection">
+        Enable Auto Selection
       </button>
     </div>
   );
 }
 
 describe('ProjectProvider', () => {
-  const mockUpdateProject = vi.fn();
-  const mockReloadProjects = vi.fn();
-  const mockSetSelectedProject = vi.fn();
-  const mockOnProjectChange = vi.fn();
+  const mockCreateSession = vi.fn();
+  const mockLoadProjectConfig = vi.fn();
+  const mockReloadSessions = vi.fn();
+  // Mock for onSessionChange callback
+  const mockOnSessionChangeCallback = vi.fn();
 
-  const defaultProjectManagement = {
-    projects: mockProjects,
+  const defaultSessionManagement = {
+    sessions: mockSessions,
     loading: false,
-    error: null,
-    updateProject: mockUpdateProject,
-    createProject: vi.fn(),
-    deleteProject: vi.fn(),
-    loadProjectConfiguration: vi.fn(),
-    reloadProjects: mockReloadProjects,
+    projectConfig: null,
+    createSession: mockCreateSession,
+    loadProjectConfig: mockLoadProjectConfig,
+    reloadSessions: mockReloadSessions,
+    loadSessionConfiguration: vi.fn(),
+    updateSessionConfiguration: vi.fn(),
+    updateSession: vi.fn(),
+    deleteSession: vi.fn(),
+    loadSessionsForProject: vi.fn(),
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseProjectManagement.mockReturnValue(defaultProjectManagement);
+    mockUseSessionManagement.mockReturnValue(defaultSessionManagement);
   });
 
   describe('Context Provision', () => {
-    it('provides project context to children', () => {
-      const testProps = createTestProps();
+    it('provides session context to children', () => {
       render(
-        <ProjectProvider {...testProps}>
+        <ProjectProvider projectId="test-project" selectedSessionId="lace_20240101_sess01">
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      expect(screen.getByTestId('project-count')).toHaveTextContent('3');
+      expect(screen.getByTestId('session-count')).toHaveTextContent('3');
       expect(screen.getByTestId('loading')).toHaveTextContent('false');
-      expect(screen.getByTestId('error')).toHaveTextContent('none');
-      expect(screen.getByTestId('selected-project')).toHaveTextContent('project-1');
-      expect(screen.getByTestId('sidebar-project-count')).toHaveTextContent('3');
-      expect(screen.getByTestId('found-project')).toHaveTextContent('Project One');
+      expect(screen.getByTestId('project-config')).toHaveTextContent('none');
+      expect(screen.getByTestId('selected-session')).toHaveTextContent('lace_20240101_sess01');
+      expect(screen.getByTestId('found-session')).toHaveTextContent('Session One');
     });
 
     it('throws error when used outside provider', () => {
@@ -137,182 +135,222 @@ describe('ProjectProvider', () => {
         render(<ContextConsumer />);
       }).toThrow('useProjectContext must be used within a ProjectProvider');
 
+      // Verify that React logged the error (error boundary behavior)
+      expect(consoleSpy).toHaveBeenCalled();
+      // Check that at least one call contains our error message
+      const calls = consoleSpy.mock.calls.flat();
+      expect(
+        calls.some(
+          (call) =>
+            typeof call === 'string' &&
+            call.includes('useProjectContext must be used within a ProjectProvider')
+        )
+      ).toBe(true);
+
       consoleSpy.mockRestore();
     });
   });
 
-  describe('Project Data Management', () => {
-    it('provides found project data when project is selected', () => {
+  describe('Session Data Management', () => {
+    it('provides found session data when session is selected', () => {
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectProvider projectId="test-project" selectedSessionId="lace_20240101_sess01">
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      expect(screen.getByTestId('found-project')).toHaveTextContent('Project One');
+      expect(screen.getByTestId('found-session')).toHaveTextContent('Session One');
     });
 
-    it('provides null found project when no project is selected', () => {
+    it('provides null found session when no session is selected', () => {
       render(
-        <ProjectProvider {...createTestProps()} selectedProject={null}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      expect(screen.getByTestId('found-project')).toHaveTextContent('none');
+      expect(screen.getByTestId('found-session')).toHaveTextContent('none');
     });
 
-    it('provides null found project when selected project not found', () => {
+    it('provides null found session when selected session not found', () => {
       render(
-        <ProjectProvider {...createTestProps()} selectedProject="nonexistent-project">
+        <ProjectProvider projectId="test-project" selectedSessionId="lace_20240101_notfnd">
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      expect(screen.getByTestId('found-project')).toHaveTextContent('none');
+      expect(screen.getByTestId('found-session')).toHaveTextContent('none');
     });
 
-    it('transforms projects for sidebar display correctly', () => {
+    it('displays project configuration when available', () => {
+      mockUseSessionManagement.mockReturnValue({
+        ...defaultSessionManagement,
+        projectConfig: { theme: 'dark' },
+      });
+
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      // All projects should be included in sidebar transformation
-      expect(screen.getByTestId('sidebar-project-count')).toHaveTextContent('3');
+      expect(screen.getByTestId('project-config')).toHaveTextContent('exists');
     });
   });
 
-  describe('Project Selection', () => {
-    it('calls onProjectSelect when selectProject is called', () => {
-      const mockOnProjectSelect = vi.fn();
+  describe('Session Selection', () => {
+    it('calls onSessionChange when selectSession is called', () => {
       render(
-        <ProjectProvider {...createTestProps()} onProjectSelect={mockOnProjectSelect}>
+        <ProjectProvider
+          projectId="test-project"
+          selectedSessionId={null}
+          onSessionChange={mockOnSessionChangeCallback}
+        >
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      fireEvent.click(screen.getByTestId('select-project-2'));
+      fireEvent.click(screen.getByTestId('select-session-2'));
 
-      expect(mockOnProjectSelect).toHaveBeenCalledWith('project-2');
+      expect(mockOnSessionChangeCallback).toHaveBeenCalledWith('lace_20240101_sess02');
     });
 
-    it('calls selectProject when onProjectSelect is called', () => {
-      const mockOnProjectSelect = vi.fn();
+    it('calls selectSession when onSessionSelect is called', () => {
       render(
-        <ProjectProvider {...createTestProps()} onProjectSelect={mockOnProjectSelect}>
+        <ProjectProvider
+          projectId="test-project"
+          selectedSessionId={null}
+          onSessionChange={mockOnSessionChangeCallback}
+        >
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      fireEvent.click(screen.getByTestId('select-project-3'));
+      fireEvent.click(screen.getByTestId('select-session-3'));
 
-      expect(mockOnProjectSelect).toHaveBeenCalledWith('project-3');
+      expect(mockOnSessionChangeCallback).toHaveBeenCalledWith('lace_20240101_sess03');
     });
 
-    it('calls onProjectChange callback when project selection changes', () => {
+    it('calls onSessionChange callback when session selection changes', () => {
       render(
-        <ProjectProvider {...createTestProps()} onProjectChange={mockOnProjectChange}>
+        <ProjectProvider
+          projectId="test-project"
+          selectedSessionId={null}
+          onSessionChange={mockOnSessionChangeCallback}
+        >
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      fireEvent.click(screen.getByTestId('select-project-2'));
+      fireEvent.click(screen.getByTestId('select-session-2'));
 
-      expect(mockOnProjectChange).toHaveBeenCalledWith('project-2');
+      expect(mockOnSessionChangeCallback).toHaveBeenCalledWith('lace_20240101_sess02');
     });
 
-    it('handles empty string project selection as null', () => {
-      // Create a component that calls onProjectSelect with empty string
+    it('handles empty string session selection as null', () => {
+      // Create a component that calls onSessionSelect with empty string
       function TestComponent() {
-        const { onProjectSelect } = useProjectContext();
+        const { onSessionSelect } = useProjectContext();
         return (
-          <button onClick={() => onProjectSelect({ id: '' })} data-testid="clear-selection">
+          <button onClick={() => onSessionSelect({ id: '' })} data-testid="clear-selection">
             Clear Selection
           </button>
         );
       }
 
-      const mockOnProjectSelect = vi.fn();
       render(
         <ProjectProvider
-          {...createTestProps()}
-          onProjectChange={mockOnProjectChange}
-          onProjectSelect={mockOnProjectSelect}
+          projectId="test-project"
+          selectedSessionId={null}
+          onSessionChange={mockOnSessionChangeCallback}
         >
           <TestComponent />
         </ProjectProvider>
       );
 
-      // Click the button that calls onProjectSelect with empty string
+      // Click the button that calls onSessionSelect with empty string
       fireEvent.click(screen.getByTestId('clear-selection'));
 
-      // Verify that onProjectSelect was called with null (empty string converted)
-      expect(mockOnProjectSelect).toHaveBeenCalledWith(null);
-      expect(mockOnProjectChange).toHaveBeenCalledWith(null);
+      // Verify that onSessionChange was called with null (empty string converted)
+      expect(mockOnSessionChangeCallback).toHaveBeenCalledWith(null);
     });
   });
 
-  describe('Project CRUD Operations', () => {
-    it('calls updateProject with correct parameters', async () => {
-      mockUpdateProject.mockResolvedValue(undefined);
+  describe('Session CRUD Operations', () => {
+    it('calls createSession with correct parameters', async () => {
+      mockCreateSession.mockResolvedValue(undefined);
 
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      fireEvent.click(screen.getByTestId('update-project'));
+      fireEvent.click(screen.getByTestId('create-session'));
 
-      expect(mockUpdateProject).toHaveBeenCalledWith('project-1', { name: 'Updated' });
+      expect(mockCreateSession).toHaveBeenCalledWith({ name: 'New Session' });
     });
 
-    it('calls reloadProjects when requested', async () => {
-      mockReloadProjects.mockResolvedValue(mockProjects);
+    it('calls loadProjectConfig when requested', async () => {
+      mockLoadProjectConfig.mockResolvedValue(undefined);
 
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      fireEvent.click(screen.getByTestId('reload-projects'));
+      fireEvent.click(screen.getByTestId('load-project-config'));
 
-      expect(mockReloadProjects).toHaveBeenCalled();
+      expect(mockLoadProjectConfig).toHaveBeenCalled();
     });
 
-    it('handles updateProject errors gracefully', async () => {
-      mockUpdateProject.mockRejectedValue(new Error('Update failed'));
-
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    it('calls reloadSessions when requested', async () => {
+      mockReloadSessions.mockResolvedValue(undefined);
 
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      fireEvent.click(screen.getByTestId('update-project'));
+      fireEvent.click(screen.getByTestId('reload-sessions'));
 
+      expect(mockReloadSessions).toHaveBeenCalled();
+    });
+
+    it('passes through createSession errors from hook', async () => {
+      const testError = new Error('Create failed');
+      mockCreateSession.mockRejectedValue(testError);
+
+      render(
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
+          <ContextConsumer />
+        </ProjectProvider>
+      );
+
+      fireEvent.click(screen.getByTestId('create-session'));
+
+      // Verify that the hook was called and the error was passed through
       await waitFor(() => {
-        expect(mockUpdateProject).toHaveBeenCalled();
+        expect(mockCreateSession).toHaveBeenCalled();
       });
 
-      consoleSpy.mockRestore();
+      // ProjectProvider doesn't handle errors - it passes them through to the hook
+      // The error handling is the responsibility of useSessionManagement
+      expect(mockCreateSession).toHaveBeenCalledWith({ name: 'New Session' });
     });
   });
 
   describe('Loading States', () => {
-    it('reflects loading state from useProjectManagement', () => {
-      mockUseProjectManagement.mockReturnValue({
-        ...defaultProjectManagement,
+    it('reflects loading state from useSessionManagement', () => {
+      mockUseSessionManagement.mockReturnValue({
+        ...defaultSessionManagement,
         loading: true,
       });
 
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
         </ProjectProvider>
       );
@@ -320,85 +358,95 @@ describe('ProjectProvider', () => {
       expect(screen.getByTestId('loading')).toHaveTextContent('true');
     });
 
-    it('handles empty projects list', () => {
-      mockUseProjectManagement.mockReturnValue({
-        ...defaultProjectManagement,
-        projects: [],
+    it('handles empty sessions list', () => {
+      mockUseSessionManagement.mockReturnValue({
+        ...defaultSessionManagement,
+        sessions: [],
       });
 
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      expect(screen.getByTestId('project-count')).toHaveTextContent('0');
-      expect(screen.getByTestId('sidebar-project-count')).toHaveTextContent('0');
+      expect(screen.getByTestId('session-count')).toHaveTextContent('0');
+    });
+  });
+
+  describe('Project Dependency', () => {
+    it('passes projectId to useSessionManagement', () => {
+      render(
+        <ProjectProvider projectId="test-project-123">
+          <ContextConsumer />
+        </ProjectProvider>
+      );
+
+      expect(mockUseSessionManagement).toHaveBeenCalledWith('test-project-123');
     });
 
-    it('displays error state from useProjectManagement', () => {
-      mockUseProjectManagement.mockReturnValue({
-        ...defaultProjectManagement,
-        error: 'Failed to load projects',
-      });
-
+    it('handles null projectId', () => {
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectProvider projectId={null}>
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      expect(screen.getByTestId('error')).toHaveTextContent('Failed to load projects');
+      expect(mockUseSessionManagement).toHaveBeenCalledWith(null);
     });
   });
 
   describe('Data Transformation Edge Cases', () => {
-    it('handles projects with missing optional fields', () => {
-      const incompleteProjects = [
-        createMockProject({
-          id: 'incomplete',
-          description: undefined,
-          isArchived: undefined,
-          sessionCount: undefined,
+    it('handles sessions with missing optional fields', () => {
+      const incompleteSessions = [
+        createMockSession({
+          id: 'lace_20240101_incomp' as ThreadId,
+          name: 'Incomplete Session',
+          agents: undefined,
         }),
       ];
 
-      mockUseProjectManagement.mockReturnValue({
-        ...defaultProjectManagement,
-        projects: incompleteProjects,
+      mockUseSessionManagement.mockReturnValue({
+        ...defaultSessionManagement,
+        sessions: incompleteSessions,
       });
 
       render(
-        <ProjectProvider {...createTestProps()} selectedProject="incomplete">
+        <ProjectProvider projectId="test-project" selectedSessionId="lace_20240101_incomp">
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      expect(screen.getByTestId('sidebar-project-count')).toHaveTextContent('1');
-      expect(screen.getByTestId('found-project')).toHaveTextContent('Test Project');
+      expect(screen.getByTestId('session-count')).toHaveTextContent('1');
+      expect(screen.getByTestId('found-session')).toHaveTextContent('Incomplete Session');
     });
+  });
 
-    it('handles date transformation correctly', () => {
-      const projectWithStringDates = [
-        createMockProject({
-          createdAt: new Date('2024-01-01'),
-          lastUsedAt: new Date('2024-01-02'),
-        }),
-      ];
-
-      mockUseProjectManagement.mockReturnValue({
-        ...defaultProjectManagement,
-        projects: projectWithStringDates,
-      });
-
+  describe('Agent Auto-Selection', () => {
+    it('provides enableAgentAutoSelection function', () => {
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
           <ContextConsumer />
         </ProjectProvider>
       );
 
-      // Should handle date objects correctly in sidebar transformation
-      expect(screen.getByTestId('sidebar-project-count')).toHaveTextContent('1');
+      expect(screen.getByTestId('enable-auto-selection')).toBeInTheDocument();
     });
+
+    it('calls enableAgentAutoSelection without errors', () => {
+      render(
+        <ProjectProvider projectId="test-project" selectedSessionId={null}>
+          <ContextConsumer />
+        </ProjectProvider>
+      );
+
+      expect(() => {
+        fireEvent.click(screen.getByTestId('enable-auto-selection'));
+      }).not.toThrow();
+    });
+
+    // Note: Full auto-selection behavior testing would require integration with
+    // hash router and session details with agents, which is better tested at the
+    // integration level since it involves multiple providers working together
   });
 });

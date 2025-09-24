@@ -1,5 +1,5 @@
 // ABOUTME: Integration tests for SessionProvider focusing on real provider responsibilities
-// ABOUTME: Tests session data management, selection handling, and CRUD operations
+// ABOUTME: Tests session agent data management, selection handling, and CRUD operations
 
 /**
  * @vitest-environment jsdom
@@ -10,122 +10,138 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SessionProvider, useSessionContext } from '@/components/providers/SessionProvider';
-import type { SessionInfo, ThreadId } from '@/types/core';
+import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
+import type { CreateAgentRequest } from '@/types/api';
+import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
 
 // Mock the hooks
-vi.mock('@/hooks/useSessionManagement', () => ({
-  useSessionManagement: vi.fn(),
+vi.mock('@/hooks/useAgentManagement', () => ({
+  useAgentManagement: vi.fn(),
 }));
 
-// SessionProvider now uses selectedSessionId prop instead of hash router
+// SessionProvider now uses selectedAgentId prop instead of hash router
 
-import { useSessionManagement } from '@/hooks/useSessionManagement';
+import { useAgentManagement } from '@/hooks/useAgentManagement';
 
-const mockUseSessionManagement = vi.mocked(useSessionManagement);
+const mockUseAgentManagement = vi.mocked(useAgentManagement);
 
 // Test data factories
+const createMockAgent = (overrides?: Partial<AgentInfo>): AgentInfo =>
+  createMockAgentInfo({
+    threadId: 'lace_20240101_agent1' as ThreadId,
+    name: 'Test Agent',
+    providerInstanceId: 'test-provider',
+    modelId: 'test-model',
+    status: 'idle',
+    ...overrides,
+  });
+
 const createMockSession = (overrides?: Partial<SessionInfo>): SessionInfo => ({
   id: 'lace_20240101_sess01' as ThreadId,
   name: 'Test Session',
   createdAt: new Date('2024-01-01'),
-  agents: [],
+  agents: [
+    createMockAgent({ threadId: 'lace_20240101_agent1' as ThreadId, name: 'Agent One' }),
+    createMockAgent({ threadId: 'lace_20240101_agent2' as ThreadId, name: 'Agent Two' }),
+    createMockAgent({ threadId: 'lace_20240101_agent3' as ThreadId, name: 'Agent Three' }),
+  ],
   ...overrides,
 });
 
-const mockSessions: SessionInfo[] = [
-  createMockSession({ id: 'lace_20240101_sess01' as ThreadId, name: 'Session One' }),
-  createMockSession({ id: 'lace_20240101_sess02' as ThreadId, name: 'Session Two' }),
-  createMockSession({ id: 'lace_20240101_sess03' as ThreadId, name: 'Session Three' }),
-];
+const mockSessionDetails = createMockSession();
 
 // Component to test context provision
 function ContextConsumer() {
   const {
-    sessions,
+    sessionDetails,
     loading,
-    projectConfig,
-    selectedSession,
-    foundSession,
-    selectSession,
-    onSessionSelect,
-    createSession,
-    loadProjectConfig,
-    reloadSessions,
-    enableAgentAutoSelection,
+    selectedAgent,
+    foundAgent,
+    selectAgent,
+    onAgentSelect,
+    createAgent,
+    updateAgentState,
+    reloadSessionDetails,
   } = useSessionContext();
 
   return (
     <div>
-      <div data-testid="session-count">{sessions.length}</div>
+      <div data-testid="session-name">{sessionDetails?.name || 'none'}</div>
+      <div data-testid="agent-count">{sessionDetails?.agents?.length || 0}</div>
       <div data-testid="loading">{loading.toString()}</div>
-      <div data-testid="project-config">{projectConfig ? 'exists' : 'none'}</div>
-      <div data-testid="selected-session">{selectedSession || 'none'}</div>
-      <div data-testid="found-session">{foundSession?.name || 'none'}</div>
+      <div data-testid="selected-agent">{selectedAgent || 'none'}</div>
+      <div data-testid="found-agent">{foundAgent?.name || 'none'}</div>
 
-      <button onClick={() => selectSession('lace_20240101_sess02')} data-testid="select-session-2">
-        Select Session 2
+      <button onClick={() => selectAgent('lace_20240101_agent2')} data-testid="select-agent-2">
+        Select Agent 2
       </button>
       <button
-        onClick={() => onSessionSelect({ id: 'lace_20240101_sess03' })}
-        data-testid="select-session-3"
+        onClick={() => onAgentSelect({ id: 'lace_20240101_agent3' })}
+        data-testid="select-agent-3"
       >
-        Select Session 3
+        Select Agent 3
       </button>
-      <button onClick={() => createSession({ name: 'New Session' })} data-testid="create-session">
-        Create Session
+      <button
+        onClick={() =>
+          createAgent('session-1', {
+            name: 'New Agent',
+            providerInstanceId: 'anthropic',
+            modelId: 'claude-3-haiku',
+          })
+        }
+        data-testid="create-agent"
+      >
+        Create Agent
       </button>
-      <button onClick={() => void loadProjectConfig()} data-testid="load-project-config">
-        Load Config
+      <button
+        onClick={() => updateAgentState('lace_20240101_agent1', 'active')}
+        data-testid="update-agent-state"
+      >
+        Update Agent State
       </button>
-      <button onClick={() => void reloadSessions()} data-testid="reload-sessions">
-        Reload Sessions
-      </button>
-      <button onClick={() => enableAgentAutoSelection()} data-testid="enable-auto-selection">
-        Enable Auto Selection
+      <button onClick={() => void reloadSessionDetails()} data-testid="reload-session">
+        Reload Session
       </button>
     </div>
   );
 }
 
 describe('SessionProvider', () => {
-  const mockCreateSession = vi.fn();
-  const mockLoadProjectConfig = vi.fn();
-  const mockReloadSessions = vi.fn();
-  // Mock for onSessionChange callback
-  const mockOnSessionChangeCallback = vi.fn();
+  const mockCreateAgent = vi.fn();
+  const mockUpdateAgentState = vi.fn();
+  const mockReloadSessionDetails = vi.fn();
+  const mockSetSelectedAgent = vi.fn();
+  // Mock for onAgentChange callback
+  const mockOnAgentChangeCallback = vi.fn();
 
-  const defaultSessionManagement = {
-    sessions: mockSessions,
+  const defaultAgentManagement = {
+    sessionDetails: mockSessionDetails,
     loading: false,
-    projectConfig: null,
-    createSession: mockCreateSession,
-    loadProjectConfig: mockLoadProjectConfig,
-    reloadSessions: mockReloadSessions,
-    loadSessionConfiguration: vi.fn(),
-    updateSessionConfiguration: vi.fn(),
-    updateSession: vi.fn(),
-    deleteSession: vi.fn(),
-    loadSessionsForProject: vi.fn(),
+    createAgent: mockCreateAgent,
+    updateAgentState: mockUpdateAgentState,
+    reloadSessionDetails: mockReloadSessionDetails,
+    loadAgentConfiguration: vi.fn(),
+    updateAgent: vi.fn(),
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseSessionManagement.mockReturnValue(defaultSessionManagement);
+    mockUseAgentManagement.mockReturnValue(defaultAgentManagement);
   });
 
   describe('Context Provision', () => {
-    it('provides session context to children', () => {
+    it('provides agent context to children', () => {
       render(
-        <SessionProvider projectId="test-project" selectedSessionId="lace_20240101_sess01">
+        <SessionProvider sessionId="test-session" selectedAgentId="lace_20240101_agent1">
           <ContextConsumer />
         </SessionProvider>
       );
 
-      expect(screen.getByTestId('session-count')).toHaveTextContent('3');
+      expect(screen.getByTestId('session-name')).toHaveTextContent('Test Session');
+      expect(screen.getByTestId('agent-count')).toHaveTextContent('3');
       expect(screen.getByTestId('loading')).toHaveTextContent('false');
-      expect(screen.getByTestId('project-config')).toHaveTextContent('none');
-      expect(screen.getByTestId('selected-session')).toHaveTextContent('lace_20240101_sess01');
-      expect(screen.getByTestId('found-session')).toHaveTextContent('Session One');
+      expect(screen.getByTestId('selected-agent')).toHaveTextContent('lace_20240101_agent1');
+      expect(screen.getByTestId('found-agent')).toHaveTextContent('Agent One');
     });
 
     it('throws error when used outside provider', () => {
@@ -151,206 +167,216 @@ describe('SessionProvider', () => {
     });
   });
 
-  describe('Session Data Management', () => {
-    it('provides found session data when session is selected', () => {
+  describe('Agent Data Management', () => {
+    it('provides found agent data when agent is selected', () => {
       render(
-        <SessionProvider projectId="test-project" selectedSessionId="lace_20240101_sess01">
+        <SessionProvider sessionId="test-session" selectedAgentId="lace_20240101_agent1">
           <ContextConsumer />
         </SessionProvider>
       );
 
-      expect(screen.getByTestId('found-session')).toHaveTextContent('Session One');
+      expect(screen.getByTestId('found-agent')).toHaveTextContent('Agent One');
     });
 
-    it('provides null found session when no session is selected', () => {
+    it('provides null found agent when no agent is selected', () => {
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </SessionProvider>
       );
 
-      expect(screen.getByTestId('found-session')).toHaveTextContent('none');
+      expect(screen.getByTestId('found-agent')).toHaveTextContent('none');
     });
 
-    it('provides null found session when selected session not found', () => {
+    it('provides null found agent when selected agent not found', () => {
       render(
-        <SessionProvider projectId="test-project" selectedSessionId="lace_20240101_notfnd">
+        <SessionProvider sessionId="test-session" selectedAgentId="lace_20240101_notfnd">
           <ContextConsumer />
         </SessionProvider>
       );
 
-      expect(screen.getByTestId('found-session')).toHaveTextContent('none');
+      expect(screen.getByTestId('found-agent')).toHaveTextContent('none');
     });
 
-    it('displays project configuration when available', () => {
-      mockUseSessionManagement.mockReturnValue({
-        ...defaultSessionManagement,
-        projectConfig: { theme: 'dark' },
+    it('provides null found agent when no session details', () => {
+      mockUseAgentManagement.mockReturnValue({
+        ...defaultAgentManagement,
+        sessionDetails: null,
       });
 
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </SessionProvider>
       );
 
-      expect(screen.getByTestId('project-config')).toHaveTextContent('exists');
+      expect(screen.getByTestId('found-agent')).toHaveTextContent('none');
+      expect(screen.getByTestId('session-name')).toHaveTextContent('none');
+    });
+
+    it('displays session details when available', () => {
+      render(
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
+          <ContextConsumer />
+        </SessionProvider>
+      );
+
+      expect(screen.getByTestId('session-name')).toHaveTextContent('Test Session');
+      expect(screen.getByTestId('agent-count')).toHaveTextContent('3');
     });
   });
 
-  describe('Session Selection', () => {
-    it('calls onSessionChange when selectSession is called', () => {
+  describe('Agent Selection', () => {
+    it('calls onAgentChange when selectAgent is called', () => {
       render(
         <SessionProvider
-          projectId="test-project"
-          selectedSessionId={null}
-          onSessionChange={mockOnSessionChangeCallback}
+          sessionId="test-session"
+          selectedAgentId={null}
+          onAgentChange={mockOnAgentChangeCallback}
         >
           <ContextConsumer />
         </SessionProvider>
       );
 
-      fireEvent.click(screen.getByTestId('select-session-2'));
+      fireEvent.click(screen.getByTestId('select-agent-2'));
 
-      expect(mockOnSessionChangeCallback).toHaveBeenCalledWith('lace_20240101_sess02');
+      expect(mockOnAgentChangeCallback).toHaveBeenCalledWith('lace_20240101_agent2');
     });
 
-    it('calls selectSession when onSessionSelect is called', () => {
+    it('calls selectAgent when onAgentSelect is called', () => {
       render(
         <SessionProvider
-          projectId="test-project"
-          selectedSessionId={null}
-          onSessionChange={mockOnSessionChangeCallback}
+          sessionId="test-session"
+          selectedAgentId={null}
+          onAgentChange={mockOnAgentChangeCallback}
         >
           <ContextConsumer />
         </SessionProvider>
       );
 
-      fireEvent.click(screen.getByTestId('select-session-3'));
+      fireEvent.click(screen.getByTestId('select-agent-3'));
 
-      expect(mockOnSessionChangeCallback).toHaveBeenCalledWith('lace_20240101_sess03');
+      expect(mockOnAgentChangeCallback).toHaveBeenCalledWith('lace_20240101_agent3');
     });
 
-    it('calls onSessionChange callback when session selection changes', () => {
+    it('calls onAgentChange callback when agent selection changes', () => {
       render(
-        <SessionProvider
-          projectId="test-project"
-          selectedSessionId={null}
-          onSessionChange={mockOnSessionChangeCallback}
-        >
+        <SessionProvider sessionId="test-session" onAgentChange={mockOnAgentChangeCallback}>
           <ContextConsumer />
         </SessionProvider>
       );
 
-      fireEvent.click(screen.getByTestId('select-session-2'));
+      fireEvent.click(screen.getByTestId('select-agent-2'));
 
-      expect(mockOnSessionChangeCallback).toHaveBeenCalledWith('lace_20240101_sess02');
+      expect(mockOnAgentChangeCallback).toHaveBeenCalledWith('lace_20240101_agent2');
     });
 
-    it('handles empty string session selection as null', () => {
-      // Create a component that calls onSessionSelect with empty string
+    it('handles empty string agent selection as null', () => {
+      // Create a component that calls onAgentSelect with empty string
       function TestComponent() {
-        const { onSessionSelect } = useSessionContext();
+        const { onAgentSelect } = useSessionContext();
         return (
-          <button onClick={() => onSessionSelect({ id: '' })} data-testid="clear-selection">
+          <button onClick={() => onAgentSelect({ id: '' })} data-testid="clear-selection">
             Clear Selection
           </button>
         );
       }
 
       render(
-        <SessionProvider
-          projectId="test-project"
-          selectedSessionId={null}
-          onSessionChange={mockOnSessionChangeCallback}
-        >
+        <SessionProvider sessionId="test-session" onAgentChange={mockOnAgentChangeCallback}>
           <TestComponent />
         </SessionProvider>
       );
 
-      // Click the button that calls onSessionSelect with empty string
+      // Click the button that calls onAgentSelect with empty string
       fireEvent.click(screen.getByTestId('clear-selection'));
 
-      // Verify that onSessionChange was called with null (empty string converted)
-      expect(mockOnSessionChangeCallback).toHaveBeenCalledWith(null);
+      // Verify that onAgentChange was called with null (empty string converted)
+      expect(mockOnAgentChangeCallback).toHaveBeenCalledWith(null);
     });
   });
 
-  describe('Session CRUD Operations', () => {
-    it('calls createSession with correct parameters', async () => {
-      mockCreateSession.mockResolvedValue(undefined);
+  describe('Agent CRUD Operations', () => {
+    it('calls createAgent with correct parameters', async () => {
+      mockCreateAgent.mockResolvedValue(undefined);
 
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </SessionProvider>
       );
 
-      fireEvent.click(screen.getByTestId('create-session'));
+      fireEvent.click(screen.getByTestId('create-agent'));
 
-      expect(mockCreateSession).toHaveBeenCalledWith({ name: 'New Session' });
+      expect(mockCreateAgent).toHaveBeenCalledWith('session-1', {
+        name: 'New Agent',
+        providerInstanceId: 'anthropic',
+        modelId: 'claude-3-haiku',
+      });
     });
 
-    it('calls loadProjectConfig when requested', async () => {
-      mockLoadProjectConfig.mockResolvedValue(undefined);
-
+    it('calls updateAgentState with correct parameters', () => {
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </SessionProvider>
       );
 
-      fireEvent.click(screen.getByTestId('load-project-config'));
+      fireEvent.click(screen.getByTestId('update-agent-state'));
 
-      expect(mockLoadProjectConfig).toHaveBeenCalled();
+      expect(mockUpdateAgentState).toHaveBeenCalledWith('lace_20240101_agent1', 'active');
     });
 
-    it('calls reloadSessions when requested', async () => {
-      mockReloadSessions.mockResolvedValue(undefined);
+    it('calls reloadSessionDetails when requested', async () => {
+      mockReloadSessionDetails.mockResolvedValue(undefined);
 
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </SessionProvider>
       );
 
-      fireEvent.click(screen.getByTestId('reload-sessions'));
+      fireEvent.click(screen.getByTestId('reload-session'));
 
-      expect(mockReloadSessions).toHaveBeenCalled();
+      expect(mockReloadSessionDetails).toHaveBeenCalled();
     });
 
-    it('passes through createSession errors from hook', async () => {
+    it('passes through createAgent errors from hook', async () => {
       const testError = new Error('Create failed');
-      mockCreateSession.mockRejectedValue(testError);
+      mockCreateAgent.mockRejectedValue(testError);
 
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </SessionProvider>
       );
 
-      fireEvent.click(screen.getByTestId('create-session'));
+      fireEvent.click(screen.getByTestId('create-agent'));
 
       // Verify that the hook was called and the error was passed through
       await waitFor(() => {
-        expect(mockCreateSession).toHaveBeenCalled();
+        expect(mockCreateAgent).toHaveBeenCalled();
       });
 
       // SessionProvider doesn't handle errors - it passes them through to the hook
-      // The error handling is the responsibility of useSessionManagement
-      expect(mockCreateSession).toHaveBeenCalledWith({ name: 'New Session' });
+      // The error handling is the responsibility of useAgentManagement
+      expect(mockCreateAgent).toHaveBeenCalledWith('session-1', {
+        name: 'New Agent',
+        providerInstanceId: 'anthropic',
+        modelId: 'claude-3-haiku',
+      });
     });
   });
 
   describe('Loading States', () => {
-    it('reflects loading state from useSessionManagement', () => {
-      mockUseSessionManagement.mockReturnValue({
-        ...defaultSessionManagement,
+    it('reflects loading state from useAgentManagement', () => {
+      mockUseAgentManagement.mockReturnValue({
+        ...defaultAgentManagement,
         loading: true,
       });
 
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </SessionProvider>
       );
@@ -358,95 +384,90 @@ describe('SessionProvider', () => {
       expect(screen.getByTestId('loading')).toHaveTextContent('true');
     });
 
-    it('handles empty sessions list', () => {
-      mockUseSessionManagement.mockReturnValue({
-        ...defaultSessionManagement,
-        sessions: [],
+    it('handles empty agents list', () => {
+      mockUseAgentManagement.mockReturnValue({
+        ...defaultAgentManagement,
+        sessionDetails: createMockSession({ agents: [] }),
       });
 
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </SessionProvider>
       );
 
-      expect(screen.getByTestId('session-count')).toHaveTextContent('0');
+      expect(screen.getByTestId('agent-count')).toHaveTextContent('0');
     });
   });
 
-  describe('Project Dependency', () => {
-    it('passes projectId to useSessionManagement', () => {
+  describe('Session Dependency', () => {
+    it('passes sessionId to useAgentManagement', () => {
       render(
-        <SessionProvider projectId="test-project-123">
+        <SessionProvider sessionId="test-session-123">
           <ContextConsumer />
         </SessionProvider>
       );
 
-      expect(mockUseSessionManagement).toHaveBeenCalledWith('test-project-123');
+      expect(mockUseAgentManagement).toHaveBeenCalledWith('test-session-123');
     });
 
-    it('handles null projectId', () => {
+    it('handles null sessionId', () => {
       render(
-        <SessionProvider projectId={null}>
+        <SessionProvider sessionId={null}>
           <ContextConsumer />
         </SessionProvider>
       );
 
-      expect(mockUseSessionManagement).toHaveBeenCalledWith(null);
+      expect(mockUseAgentManagement).toHaveBeenCalledWith(null);
     });
   });
 
   describe('Data Transformation Edge Cases', () => {
-    it('handles sessions with missing optional fields', () => {
-      const incompleteSessions = [
-        createMockSession({
-          id: 'lace_20240101_incomp' as ThreadId,
-          name: 'Incomplete Session',
-          agents: undefined,
+    it('handles agents with missing optional fields', () => {
+      const incompleteAgents = [
+        createMockAgent({
+          threadId: 'lace_20240101_incomp' as ThreadId,
+          name: 'Incomplete Agent',
         }),
       ];
 
-      mockUseSessionManagement.mockReturnValue({
-        ...defaultSessionManagement,
-        sessions: incompleteSessions,
+      const sessionWithIncompleteAgents = createMockSession({
+        agents: incompleteAgents,
+      });
+
+      mockUseAgentManagement.mockReturnValue({
+        ...defaultAgentManagement,
+        sessionDetails: sessionWithIncompleteAgents,
       });
 
       render(
-        <SessionProvider projectId="test-project" selectedSessionId="lace_20240101_incomp">
+        <SessionProvider sessionId="test-session" selectedAgentId="lace_20240101_incomp">
           <ContextConsumer />
         </SessionProvider>
       );
 
-      expect(screen.getByTestId('session-count')).toHaveTextContent('1');
-      expect(screen.getByTestId('found-session')).toHaveTextContent('Incomplete Session');
+      expect(screen.getByTestId('agent-count')).toHaveTextContent('1');
+      expect(screen.getByTestId('found-agent')).toHaveTextContent('Incomplete Agent');
     });
-  });
 
-  describe('Agent Auto-Selection', () => {
-    it('provides enableAgentAutoSelection function', () => {
+    it('handles session with no agents array', () => {
+      const sessionWithoutAgents = createMockSession({
+        agents: undefined,
+      });
+
+      mockUseAgentManagement.mockReturnValue({
+        ...defaultAgentManagement,
+        sessionDetails: sessionWithoutAgents,
+      });
+
       render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
+        <SessionProvider sessionId="test-session" selectedAgentId={null}>
           <ContextConsumer />
         </SessionProvider>
       );
 
-      expect(screen.getByTestId('enable-auto-selection')).toBeInTheDocument();
+      expect(screen.getByTestId('agent-count')).toHaveTextContent('0');
+      expect(screen.getByTestId('found-agent')).toHaveTextContent('none');
     });
-
-    it('calls enableAgentAutoSelection without errors', () => {
-      render(
-        <SessionProvider projectId="test-project" selectedSessionId={null}>
-          <ContextConsumer />
-        </SessionProvider>
-      );
-
-      expect(() => {
-        fireEvent.click(screen.getByTestId('enable-auto-selection'));
-      }).not.toThrow();
-    });
-
-    // Note: Full auto-selection behavior testing would require integration with
-    // hash router and session details with agents, which is better tested at the
-    // integration level since it involves multiple providers working together
   });
 });

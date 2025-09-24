@@ -4,9 +4,9 @@
 import { useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
 import type { SessionNavigationState } from '@/types/navigation';
+import { ProjectsProvider } from '@/components/providers/ProjectsProvider';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
-import { SessionProvider } from '@/components/providers/SessionProvider';
-import { AgentProvider, useAgentContext } from '@/components/providers/AgentProvider';
+import { SessionProvider, useSessionContext } from '@/components/providers/SessionProvider';
 import { UIProvider } from '@/components/providers/UIProvider';
 
 // Define stable callback functions outside component to prevent re-renders
@@ -16,7 +16,7 @@ const noOpCallback = () => {};
 function SessionRedirect({ projectId, sessionId }: { projectId: string; sessionId: string }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { sessionDetails } = useAgentContext();
+  const { sessionDetails } = useSessionContext();
 
   useEffect(() => {
     if (sessionDetails && sessionDetails.agents && sessionDetails.agents.length > 0) {
@@ -54,17 +54,21 @@ export default function ProjectSession() {
 
   return (
     <UIProvider>
-      <ProjectProvider
+      <ProjectsProvider
         selectedProject={projectId!}
         onProjectSelect={noOpCallback}
         onProjectChange={noOpCallback}
       >
-        <SessionProvider projectId={projectId!} selectedSessionId={sessionId!}>
-          <AgentProvider sessionId={sessionId!} selectedAgentId={null} onAgentChange={noOpCallback}>
+        <ProjectProvider projectId={projectId!} selectedSessionId={sessionId!}>
+          <SessionProvider
+            sessionId={sessionId!}
+            selectedAgentId={null}
+            onAgentChange={noOpCallback}
+          >
             <SessionRedirect projectId={projectId!} sessionId={sessionId!} />
-          </AgentProvider>
-        </SessionProvider>
-      </ProjectProvider>
+          </SessionProvider>
+        </ProjectProvider>
+      </ProjectsProvider>
     </UIProvider>
   );
 }

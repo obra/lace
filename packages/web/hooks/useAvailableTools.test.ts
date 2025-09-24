@@ -4,11 +4,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useAvailableTools } from './useAvailableTools';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
-import type { ProjectContextType } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
+import type { ProjectsContextType } from '@/components/providers/ProjectsProvider';
 import type { ProjectInfo } from '@/types/core';
 
-// Mock the ProjectProvider
+// Mock the ProjectsProvider
 const mockLoadProjectConfiguration = vi.fn();
 const mockProjects: ProjectInfo[] = [
   {
@@ -31,9 +31,9 @@ const mockProjects: ProjectInfo[] = [
   },
 ];
 
-const createMockProjectContext = (
-  overrides: Partial<ProjectContextType> = {}
-): ProjectContextType => ({
+const createMockProjectsContext = (
+  overrides: Partial<ProjectsContextType> = {}
+): ProjectsContextType => ({
   projects: mockProjects,
   loading: false,
   error: null,
@@ -51,15 +51,15 @@ const createMockProjectContext = (
   ...overrides,
 });
 
-vi.mock('@/components/providers/ProjectProvider', () => ({
-  useProjectContext: vi.fn(() => createMockProjectContext()),
+vi.mock('@/components/providers/ProjectsProvider', () => ({
+  useProjectsContext: vi.fn(() => createMockProjectsContext()),
 }));
 
 describe('useAvailableTools', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset the mock to return default values
-    vi.mocked(useProjectContext).mockReturnValue(createMockProjectContext());
+    vi.mocked(useProjectsContext).mockReturnValue(createMockProjectsContext());
   });
 
   it('should start with loading state', () => {
@@ -90,8 +90,8 @@ describe('useAvailableTools', () => {
   });
 
   it('should handle empty projects array', async () => {
-    vi.mocked(useProjectContext).mockReturnValue(
-      createMockProjectContext({
+    vi.mocked(useProjectsContext).mockReturnValue(
+      createMockProjectsContext({
         projects: [],
       })
     );
@@ -184,8 +184,8 @@ describe('useAvailableTools', () => {
 
     const { result, rerender } = renderHook(
       ({ projects }) => {
-        vi.mocked(useProjectContext).mockReturnValue(
-          createMockProjectContext({
+        vi.mocked(useProjectsContext).mockReturnValue(
+          createMockProjectsContext({
             projects,
           })
         );

@@ -8,7 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolder, faCog } from '@/lib/fontawesome';
 import { ProjectEditModal } from '@/components/config/ProjectEditModal';
 import { SwitchIcon } from '@/components/ui/SwitchIcon';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 
 interface ProjectSectionProps {
   isMobile?: boolean;
@@ -26,9 +26,9 @@ export const ProjectSection = memo(function ProjectSection({
   const [editConfig, setEditConfig] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
 
-  // Get project data from ProjectProvider
+  // Get project data from ProjectsProvider
   const { selectedProject, foundProject, updateProject, loadProjectConfiguration } =
-    useProjectContext();
+    useProjectsContext();
 
   // Load project configuration when modal opens
   useEffect(() => {

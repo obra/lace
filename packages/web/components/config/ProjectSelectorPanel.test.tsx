@@ -8,18 +8,18 @@ import { BrowserRouter } from 'react-router-dom';
 import { ProjectSelectorPanel } from './ProjectSelectorPanel';
 import { createMockResponse } from '@/test-utils/mock-fetch';
 import {
+  createMockProjectsContext,
   createMockProjectContext,
-  createMockSessionContext,
   createMockUIContext,
 } from '@/__tests__/utils/provider-mocks';
 
 // Mock all the providers
-vi.mock('@/components/providers/ProjectProvider', () => ({
-  useProjectContext: vi.fn(),
+vi.mock('@/components/providers/ProjectsProvider', () => ({
+  useProjectsContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/SessionProvider', () => ({
-  useSessionContext: vi.fn(),
+vi.mock('@/components/providers/ProjectProvider', () => ({
+  useProjectContext: vi.fn(),
 }));
 
 vi.mock('@/components/providers/UIProvider', () => ({
@@ -43,14 +43,14 @@ vi.mock('react-router', () => ({
 }));
 
 // Import mocked hooks
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
+const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseProjectContext = vi.mocked(useProjectContext);
-const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseUIContext = vi.mocked(useUIContext);
 const mockUseOnboarding = vi.mocked(useOnboarding);
 const mockUseProviderInstances = vi.mocked(useProviderInstances);
@@ -96,8 +96,8 @@ describe('ProjectSelectorPanel', () => {
     );
 
     // Set up default mock returns
-    mockUseProjectContext.mockReturnValue(
-      createMockProjectContext({
+    mockUseProjectsContext.mockReturnValue(
+      createMockProjectsContext({
         projects: [],
         projectsForSidebar: [],
         selectedProject: null,
@@ -108,8 +108,8 @@ describe('ProjectSelectorPanel', () => {
       })
     );
 
-    mockUseSessionContext.mockReturnValue(
-      createMockSessionContext({
+    mockUseProjectContext.mockReturnValue(
+      createMockProjectContext({
         selectedSession: null,
         enableAgentAutoSelection: mockHandlers.enableAgentAutoSelection,
       })

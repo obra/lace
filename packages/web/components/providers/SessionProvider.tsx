@@ -1,5 +1,5 @@
-// ABOUTME: Context provider for shared session selection state across the app
-// ABOUTME: Manages which session is selected and provides computed values based on selection
+// ABOUTME: Context provider for agents in a session and agent selection state
+// ABOUTME: Manages agent collection for a session and which agent is selected
 
 'use client';
 
@@ -8,183 +8,195 @@ import React, {
   useContext,
   useMemo,
   useCallback,
-  useState,
   useEffect,
+  useRef,
   type ReactNode,
 } from 'react';
-import { useSessionManagement } from '@/hooks/useSessionManagement';
+import { useAgentManagement } from '@/hooks/useAgentManagement';
 import { useEventStream, type AgentEvent } from '@/hooks/useEventStream';
-import type { SessionInfo, ThreadId, LaceEvent } from '@/types/core';
+import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
+import { asThreadId } from '@/types/core';
+import type { CreateAgentRequest } from '@/types/api';
 
 // Types for session context
 export interface SessionContextType {
-  // Session data (from useSessionManagement hook)
-  sessions: SessionInfo[];
+  // Agent data (from useAgentManagement hook)
+  sessionDetails: SessionInfo | null;
   loading: boolean;
-  projectConfig: Record<string, unknown> | null;
 
   // Selection state (managed by this provider)
-  selectedSession: string | null;
-  foundSession: SessionInfo | null;
+  selectedAgent: ThreadId | null;
+  foundAgent: AgentInfo | null;
+
+  // Computed agent state
+  currentAgent: AgentInfo | null;
+  agentBusy: boolean;
 
   // Selection actions
-  selectSession: (sessionId: string | null) => void;
-  onSessionSelect: (session: { id: string }) => void;
+  selectAgent: (agentId: ThreadId | string | null) => void;
+  onAgentSelect: (agent: { id: string }) => void;
 
   // Data operations (passed through from hook)
-  createSession: (sessionData: {
-    name?: string;
-    initialMessage?: string;
-    description?: string;
-    providerInstanceId?: string;
-    modelId?: string;
-    configuration?: Record<string, unknown>;
-  }) => Promise<SessionInfo | null>;
-  loadProjectConfig: () => Promise<void>;
-  reloadSessions: () => Promise<void>;
-  loadSessionConfiguration: (sessionId: string) => Promise<Record<string, unknown>>;
-  updateSessionConfiguration: (sessionId: string, config: Record<string, unknown>) => Promise<void>;
-  updateSession: (
-    sessionId: string,
-    updates: { name: string; description?: string }
+  createAgent: (sessionId: string, request: CreateAgentRequest) => Promise<void>;
+  updateAgentState: (agentId: string, toState: string) => void;
+  reloadSessionDetails: () => Promise<void>;
+  loadAgentConfiguration: (
+    agentId: string
+  ) => Promise<{ name: string; providerInstanceId: string; modelId: string; persona: string }>;
+  updateAgent: (
+    agentId: string,
+    config: { name: string; providerInstanceId: string; modelId: string }
   ) => Promise<void>;
-  deleteSession: (sessionId: string) => Promise<void>;
-  loadSessionsForProject: (projectId: string) => Promise<SessionInfo[]>;
-
-  // Agent auto-selection control
-  enableAgentAutoSelection: () => void;
 }
 
 const SessionContext = createContext<SessionContextType | null>(null);
 
 interface SessionProviderProps {
   children: ReactNode;
-  projectId: string | null;
-  selectedSessionId?: string | null; // Session ID from URL params
-  onSessionChange?: (sessionId: string | null) => void;
-}
-
-// Simple enableAgentAutoSelection function (kept for compatibility)
-function useAgentAutoSelection() {
-  return {
-    enableAgentAutoSelection: useCallback(() => {
-      // No-op in route-based navigation - routes handle navigation directly
-    }, []),
-  };
+  sessionId: string | null;
+  selectedAgentId?: string | null; // Agent ID from URL params
+  onAgentChange?: (agentId: string | null) => void;
 }
 
 export function SessionProvider({
   children,
-  projectId,
-  selectedSessionId,
-  onSessionChange,
+  sessionId,
+  selectedAgentId,
+  onAgentChange,
 }: SessionProviderProps) {
-  // Get session data from pure data hook
-  const {
-    sessions,
-    loading,
-    projectConfig,
-    createSession,
-    loadProjectConfig,
-    reloadSessions,
-    loadSessionConfiguration,
-    updateSessionConfiguration,
-    updateSession,
-    deleteSession,
-    loadSessionsForProject,
-  } = useSessionManagement(projectId);
+  // Debug: SessionProvider initialized
 
-  // Subscribe to session and agent events to refresh session list in real-time
+  // Get agent data from pure data hook
+  const {
+    sessionDetails,
+    loading,
+    createAgent,
+    updateAgentState,
+    reloadSessionDetails,
+    loadAgentConfiguration,
+    updateAgent,
+  } = useAgentManagement(sessionId);
+
+  // Subscribe to agent lifecycle events to refresh agent list in real-time
+  const debouncedReloadRef = useRef<NodeJS.Timeout | null>(null);
+
   useEventStream({
-    projectId: projectId || undefined,
-    onSessionUpdated: useCallback(() => {
-      // Reload sessions to get the updated session name in the list
-      void reloadSessions();
-    }, [reloadSessions]),
+    projectId: undefined, // Don't filter by project
+    sessionId: sessionId || undefined,
+    // No threadIds - we want session-level agent events
     onAgentSpawned: useCallback(
       (agentEvent: AgentEvent) => {
-        // When an agent is spawned, reload sessions to get updated agents list
-        void reloadSessions();
+        // Debounce rapid spawn events to coalesce into single refresh
+        if (debouncedReloadRef.current) {
+          clearTimeout(debouncedReloadRef.current);
+        }
+        debouncedReloadRef.current = setTimeout(() => {
+          void reloadSessionDetails();
+        }, 300);
       },
-      [reloadSessions]
+      [reloadSessionDetails]
     ),
+    onSessionUpdated: useCallback(() => {
+      // Reload session details when session name changes
+      void reloadSessionDetails();
+    }, [reloadSessionDetails]),
   });
 
-  // Use session from URL params, not hash router
-  const selectedSession = selectedSessionId || null;
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debouncedReloadRef.current) {
+        clearTimeout(debouncedReloadRef.current);
+      }
+    };
+  }, []);
+
+  // Use agent from URL params, not hash router
+  const selectedAgent = selectedAgentId ? asThreadId(selectedAgentId) : null;
 
   // Compute derived state based on data + selection
-  const foundSession = useMemo(() => {
-    return selectedSession ? (sessions || []).find((s) => s.id === selectedSession) || null : null;
-  }, [selectedSession, sessions]);
+  const foundAgent = useMemo(() => {
+    return selectedAgent && sessionDetails
+      ? (sessionDetails.agents || []).find((a) => a.threadId === selectedAgent) || null
+      : null;
+  }, [selectedAgent, sessionDetails]);
 
-  // Agent auto-selection logic (simplified)
-  const { enableAgentAutoSelection } = useAgentAutoSelection();
+  // Get current agent (selected agent or first available agent)
+  const currentAgent = useMemo(() => {
+    return (
+      (selectedAgent && sessionDetails?.agents?.find((a) => a.threadId === selectedAgent)) ||
+      sessionDetails?.agents?.[0] ||
+      null
+    );
+  }, [selectedAgent, sessionDetails]);
+
+  // Determine if agent is busy (thinking, streaming, or executing tools)
+  const agentBusy = useMemo(() => {
+    return (
+      currentAgent?.status === 'thinking' ||
+      currentAgent?.status === 'streaming' ||
+      currentAgent?.status === 'tool_execution'
+    );
+  }, [currentAgent]);
 
   // Selection actions
-  const selectSession = useCallback(
-    (sessionId: string | null) => {
-      if (onSessionChange) {
-        onSessionChange(sessionId);
+  const selectAgent = useCallback(
+    (agentId: ThreadId | string | null) => {
+      if (onAgentChange) {
+        onAgentChange(agentId);
       }
     },
-    [onSessionChange]
+    [onAgentChange]
   );
 
-  const onSessionSelect = useCallback(
-    (session: { id: string }) => {
+  const onAgentSelect = useCallback(
+    (agent: { id: string }) => {
       // Handle empty string as null (for clearing selection)
-      const sessionId = session.id === '' ? null : session.id;
-      selectSession(sessionId);
+      const agentId = agent.id === '' ? null : agent.id;
+      selectAgent(agentId);
     },
-    [selectSession]
+    [selectAgent]
   );
 
   const value: SessionContextType = useMemo(
     () => ({
-      // Session data (from hook)
-      sessions,
+      // Agent data (from hook)
+      sessionDetails,
       loading,
-      projectConfig,
 
       // Selection state (managed here)
-      selectedSession,
-      foundSession,
+      selectedAgent,
+      foundAgent,
+
+      // Computed agent state
+      currentAgent,
+      agentBusy,
 
       // Selection actions
-      selectSession,
-      onSessionSelect,
+      selectAgent,
+      onAgentSelect,
 
       // Data operations (passed through)
-      createSession,
-      loadProjectConfig,
-      reloadSessions,
-      loadSessionConfiguration,
-      updateSessionConfiguration,
-      updateSession,
-      deleteSession,
-      loadSessionsForProject,
-
-      // Agent auto-selection control
-      enableAgentAutoSelection,
+      createAgent,
+      updateAgentState,
+      reloadSessionDetails,
+      loadAgentConfiguration,
+      updateAgent,
     }),
     [
-      sessions,
+      sessionDetails,
       loading,
-      projectConfig,
-      selectedSession,
-      foundSession,
-      selectSession,
-      onSessionSelect,
-      createSession,
-      loadProjectConfig,
-      reloadSessions,
-      loadSessionConfiguration,
-      updateSessionConfiguration,
-      updateSession,
-      deleteSession,
-      loadSessionsForProject,
-      enableAgentAutoSelection,
+      selectedAgent,
+      foundAgent,
+      currentAgent,
+      agentBusy,
+      selectAgent,
+      onAgentSelect,
+      createAgent,
+      updateAgentState,
+      reloadSessionDetails,
+      loadAgentConfiguration,
+      updateAgent,
     ]
   );
 
@@ -196,7 +208,7 @@ export function useOptionalSessionContext(): SessionContextType | null {
   return useContext(SessionContext);
 }
 
-// Hook to use session context
+// Hook to use session context - throws if not within provider
 export function useSessionContext(): SessionContextType {
   const context = useContext(SessionContext);
   if (!context) {

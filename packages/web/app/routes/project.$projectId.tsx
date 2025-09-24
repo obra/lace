@@ -2,9 +2,9 @@
 // ABOUTME: Project dashboard page with all providers and context setup
 
 import { useParams } from 'react-router';
+import { ProjectsProvider } from '@/components/providers/ProjectsProvider';
 import { ProjectProvider } from '@/components/providers/ProjectProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
-import { AgentProvider } from '@/components/providers/AgentProvider';
 import { TaskProvider } from '@/components/providers/TaskProvider';
 import { UIProvider } from '@/components/providers/UIProvider';
 import { ProjectPageContent } from '@/components/pages/ProjectPageContent';
@@ -17,19 +17,19 @@ export default function Project() {
 
   return (
     <UIProvider>
-      <ProjectProvider
+      <ProjectsProvider
         selectedProject={projectId!}
         onProjectSelect={noOpCallback} // No-op for individual project page
         onProjectChange={noOpCallback} // No-op for individual project page
       >
-        <SessionProvider projectId={projectId!} selectedSessionId={null}>
-          <AgentProvider sessionId={null} selectedAgentId={null} onAgentChange={noOpCallback}>
+        <ProjectProvider projectId={projectId!} selectedSessionId={null}>
+          <SessionProvider sessionId={null} selectedAgentId={null} onAgentChange={noOpCallback}>
             <TaskProvider projectId={projectId!} sessionId={null}>
               <ProjectPageContent projectId={projectId!} />
             </TaskProvider>
-          </AgentProvider>
-        </SessionProvider>
-      </ProjectProvider>
+          </SessionProvider>
+        </ProjectProvider>
+      </ProjectsProvider>
     </UIProvider>
   );
 }

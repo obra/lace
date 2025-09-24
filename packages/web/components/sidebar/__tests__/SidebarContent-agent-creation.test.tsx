@@ -29,14 +29,14 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 // Mock context providers with complete interfaces
-vi.mock('@/components/providers/ProjectProvider', () => ({
-  useProjectContext: () => ({
+vi.mock('@/components/providers/ProjectsProvider', () => ({
+  useProjectsContext: () => ({
     selectedProject: { id: 'project-1', name: 'Test Project' },
   }),
 }));
 
-vi.mock('@/components/providers/AgentProvider', () => ({
-  useOptionalAgentContext: () => ({
+vi.mock('@/components/providers/SessionProvider', () => ({
+  useOptionalSessionContext: () => ({
     sessionDetails: {
       id: 'session-1',
       name: 'Test Session',

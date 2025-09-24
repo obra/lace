@@ -10,7 +10,7 @@ import { useEventStream } from '@/hooks/useEventStream';
 import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
 import { TaskCreationModal } from '@/components/modals/TaskCreationModal';
 import { TaskDisplayModal } from '@/components/modals/TaskDisplayModal';
-import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
+import { useOptionalSessionContext } from '@/components/providers/SessionProvider';
 import type { Task, AgentInfo } from '@/types/core';
 
 // Task context interface
@@ -58,9 +58,9 @@ interface TaskProviderProps {
 }
 
 export function TaskProvider({ children, projectId, sessionId }: TaskProviderProps) {
-  // Get agents from AgentProvider context instead of props
-  const agentContext = useOptionalAgentContext();
-  const agents: AgentInfo[] = agentContext?.sessionDetails?.agents ?? [];
+  // Get agents from SessionProvider context instead of props
+  const sessionContext = useOptionalSessionContext();
+  const agents: AgentInfo[] = sessionContext?.sessionDetails?.agents ?? [];
   // Task modal states
   const [showTaskBoardModal, setShowTaskBoardModal] = useState(false);
   const [showTaskCreationModal, setShowTaskCreationModal] = useState(false);
