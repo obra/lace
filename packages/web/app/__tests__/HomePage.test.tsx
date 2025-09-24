@@ -14,8 +14,8 @@ import { HomePage } from '@/app/HomePage';
 import { SettingsProvider } from '@/components/providers/SettingsProvider';
 
 // Mock the providers
-vi.mock('@/components/providers/ProjectProvider', () => ({
-  useProjectContext: vi.fn(),
+vi.mock('@/components/providers/ProjectsProvider', () => ({
+  useProjectsContext: vi.fn(),
 }));
 
 vi.mock('@/components/providers/UIProvider', () => ({
@@ -59,7 +59,7 @@ vi.mock('@/components/pages/views/LoadingView', () => ({
   LoadingView: () => <div data-testid="loading-view">Loading...</div>,
 }));
 
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 
 describe('HomePage', () => {
   beforeEach(() => {
@@ -71,7 +71,7 @@ describe('HomePage', () => {
   });
 
   it('should show loading view while projects are loading', async () => {
-    vi.mocked(useProjectContext).mockReturnValue({
+    vi.mocked(useProjectsContext).mockReturnValue({
       projects: [],
       loading: true,
       error: null,
@@ -109,7 +109,7 @@ describe('HomePage', () => {
   });
 
   it('should show FirstProjectHero when no projects exist', async () => {
-    vi.mocked(useProjectContext).mockReturnValue({
+    vi.mocked(useProjectsContext).mockReturnValue({
       projects: [],
       loading: false,
       error: null,
@@ -160,7 +160,7 @@ describe('HomePage', () => {
       sessionCount: 1,
     };
 
-    vi.mocked(useProjectContext).mockReturnValue({
+    vi.mocked(useProjectsContext).mockReturnValue({
       projects: [mockProject],
       loading: false,
       error: null,
@@ -215,7 +215,7 @@ describe('HomePage', () => {
       sessionCount: 1,
     };
 
-    vi.mocked(useProjectContext).mockReturnValue({
+    vi.mocked(useProjectsContext).mockReturnValue({
       projects: [mockProject],
       loading: false,
       error: null,

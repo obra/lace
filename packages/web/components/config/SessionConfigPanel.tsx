@@ -14,7 +14,7 @@ import { AgentEditModal } from './AgentEditModal';
 import { AnimatedModal } from '@/components/ui/AnimatedModal';
 import type { SessionConfiguration } from '@/types/api';
 import type { SessionInfo, ProjectInfo, ToolPolicy } from '@/types/core';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useURLState } from '@/hooks/useURLState';
@@ -31,7 +31,7 @@ const DEFAULT_CONFIG: SessionConfiguration = {
 
 export function SessionConfigPanel(): React.JSX.Element {
   // Get data from providers instead of props
-  const { currentProject } = useProjectContext();
+  const { currentProject } = useProjectsContext();
   const {
     sessions,
     projectConfig,

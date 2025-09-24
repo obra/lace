@@ -4,14 +4,14 @@
 'use client';
 
 import { UIProvider } from '@/components/providers/UIProvider';
-import { ProjectProvider } from '@/components/providers/ProjectProvider';
+import { ProjectsProvider } from '@/components/providers/ProjectsProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { HomePage } from './HomePage';
 
 export function HomePageClient() {
   return (
     <UIProvider>
-      <ProjectProvider
+      <ProjectsProvider
         selectedProject={null}
         onProjectSelect={() => {}} // No-op - ProjectSelectorPanel handles navigation
         onProjectChange={() => {}}
@@ -19,7 +19,7 @@ export function HomePageClient() {
         <SessionProvider projectId={null} selectedSessionId={null}>
           <HomePage />
         </SessionProvider>
-      </ProjectProvider>
+      </ProjectsProvider>
     </UIProvider>
   );
 }

@@ -1,5 +1,5 @@
-// ABOUTME: Context provider for shared project selection state across the app
-// ABOUTME: Manages which project is selected and provides computed values based on selection
+// ABOUTME: Context provider for all projects and project selection state
+// ABOUTME: Manages project collection and which project is selected
 
 'use client';
 
@@ -7,8 +7,8 @@ import React, { createContext, useContext, useMemo, useCallback, type ReactNode 
 import { useProjectManagement } from '@/hooks/useProjectManagement';
 import type { ProjectInfo } from '@/types/core';
 
-// Types for project context
-export interface ProjectContextType {
+// Types for projects context
+export interface ProjectsContextType {
   // Project data (from useProjectManagement hook)
   projects: ProjectInfo[];
   loading: boolean;
@@ -48,21 +48,21 @@ export interface ProjectContextType {
   reloadProjects: () => Promise<ProjectInfo[]>;
 }
 
-const ProjectContext = createContext<ProjectContextType | null>(null);
+const ProjectsContext = createContext<ProjectsContextType | null>(null);
 
-interface ProjectProviderProps {
+interface ProjectsProviderProps {
   children: ReactNode;
   onProjectChange?: (projectId: string | null) => void;
   selectedProject: string | null;
   onProjectSelect: (projectId: string | null) => void;
 }
 
-export function ProjectProvider({
+export function ProjectsProvider({
   children,
   onProjectChange,
   selectedProject,
   onProjectSelect,
-}: ProjectProviderProps) {
+}: ProjectsProviderProps) {
   // Get project data from pure data hook
   const {
     projects,
@@ -146,7 +146,7 @@ export function ProjectProvider({
     [selectProject]
   );
 
-  const value: ProjectContextType = useMemo(
+  const value: ProjectsContextType = useMemo(
     () => ({
       // Project data (from hook)
       projects,
@@ -190,14 +190,14 @@ export function ProjectProvider({
     ]
   );
 
-  return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
+  return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>;
 }
 
-// Hook to use project context
-export function useProjectContext(): ProjectContextType {
-  const context = useContext(ProjectContext);
+// Hook to use projects context
+export function useProjectsContext(): ProjectsContextType {
+  const context = useContext(ProjectsContext);
   if (!context) {
-    throw new Error('useProjectContext must be used within a ProjectProvider');
+    throw new Error('useProjectsContext must be used within a ProjectsProvider');
   }
   return context;
 }

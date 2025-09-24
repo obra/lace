@@ -3,7 +3,7 @@
 
 import { useParams } from 'react-router';
 import { UIProvider } from '@/components/providers/UIProvider';
-import { ProjectProvider } from '@/components/providers/ProjectProvider';
+import { ProjectsProvider } from '@/components/providers/ProjectsProvider';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { AgentProvider } from '@/components/providers/AgentProvider';
 import { EventStreamProvider } from '@/components/providers/EventStreamProvider';
@@ -21,7 +21,7 @@ export default function ProjectSessionAgent() {
 
   return (
     <UIProvider>
-      <ProjectProvider
+      <ProjectsProvider
         selectedProject={projectId!}
         onProjectSelect={noOpCallback}
         onProjectChange={noOpCallback}
@@ -53,7 +53,7 @@ export default function ProjectSessionAgent() {
             </ToolApprovalProvider>
           </AgentProvider>
         </SessionProvider>
-      </ProjectProvider>
+      </ProjectsProvider>
     </UIProvider>
   );
 }

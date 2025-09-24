@@ -2,7 +2,7 @@
 // ABOUTME: Replaces hardcoded AVAILABLE_TOOLS with API-driven tool discovery
 
 import { useState, useEffect } from 'react';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 
 // Type guard to check if value is a string array
 function isStringArray(value: unknown): value is string[] {
@@ -13,7 +13,7 @@ export function useAvailableTools() {
   const [availableTools, setAvailableTools] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { projects, loadProjectConfiguration } = useProjectContext();
+  const { projects, loadProjectConfiguration } = useProjectsContext();
 
   useEffect(() => {
     let isCancelled = false;

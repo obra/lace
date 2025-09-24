@@ -39,8 +39,8 @@ vi.mock('@/components/providers/TaskProvider', () => ({
   useOptionalTaskContext: () => mockTaskContext,
 }));
 
-vi.mock('@/components/providers/ProjectProvider', () => ({
-  useProjectContext: vi.fn(),
+vi.mock('@/components/providers/ProjectsProvider', () => ({
+  useProjectsContext: vi.fn(),
 }));
 
 vi.mock('@/components/providers/SessionProvider', () => ({
@@ -53,14 +53,14 @@ vi.mock('@/components/providers/AgentProvider', () => ({
 }));
 
 // Import mocked hooks
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import {
   useSessionContext,
   useOptionalSessionContext,
 } from '@/components/providers/SessionProvider';
 import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
 
-const mockUseProjectContext = vi.mocked(useProjectContext);
+const mockUseProjectContext = vi.mocked(useProjectsContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseOptionalSessionContext = vi.mocked(useOptionalSessionContext);
 const mockUseOptionalAgentContext = vi.mocked(useOptionalAgentContext);

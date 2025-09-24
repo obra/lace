@@ -20,7 +20,7 @@ import { AddInstanceModal } from '@/components/providers/AddInstanceModal';
 import { ProjectEditModal } from '@/components/config/ProjectEditModal';
 import { ProjectCreateModal } from '@/components/config/ProjectCreateModal';
 import { AnimatedModal } from '@/components/ui/AnimatedModal';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
@@ -64,7 +64,7 @@ export function ProjectSelectorPanel({}: ProjectSelectorPanelProps) {
     deleteProject,
     loadProjectConfiguration,
     reloadProjects,
-  } = useProjectContext();
+  } = useProjectsContext();
   const { enableAgentAutoSelection, loadSessionsForProject } = useSessionContext();
   const { autoOpenCreateProject, setAutoOpenCreateProject } = useUIContext();
   const { handleOnboardingComplete } = useOnboarding(

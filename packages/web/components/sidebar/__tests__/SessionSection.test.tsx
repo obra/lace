@@ -19,8 +19,8 @@ vi.mock('@/components/providers/AgentProvider', () => ({
   useAgentContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/ProjectProvider', () => ({
-  useProjectContext: vi.fn(),
+vi.mock('@/components/providers/ProjectsProvider', () => ({
+  useProjectsContext: vi.fn(),
 }));
 
 vi.mock('@/hooks/useURLState', () => ({
@@ -29,11 +29,11 @@ vi.mock('@/hooks/useURLState', () => ({
 
 // Import the mocked hooks
 import { useAgentContext } from '@/components/providers/AgentProvider';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useURLState } from '@/hooks/useURLState';
 
 const mockUseAgentContext = vi.mocked(useAgentContext);
-const mockUseProjectContext = vi.mocked(useProjectContext);
+const mockUseProjectContext = vi.mocked(useProjectsContext);
 const mockUseURLState = vi.mocked(useURLState);
 
 // Test data factories
@@ -210,7 +210,7 @@ describe('SessionSection', () => {
       expect(mockUseAgentContext).toHaveBeenCalled();
     });
 
-    it('uses ProjectProvider for project context', () => {
+    it('uses ProjectsProvider for project context', () => {
       render(<SessionSection {...defaultProps} />);
 
       expect(mockUseProjectContext).toHaveBeenCalled();

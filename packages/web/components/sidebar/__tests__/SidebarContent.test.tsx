@@ -19,8 +19,8 @@ import {
 } from '@/__tests__/utils/provider-mocks';
 
 // Mock all the providers
-vi.mock('@/components/providers/ProjectProvider', () => ({
-  useProjectContext: vi.fn(),
+vi.mock('@/components/providers/ProjectsProvider', () => ({
+  useProjectsContext: vi.fn(),
 }));
 
 vi.mock('@/components/providers/SessionProvider', () => ({
@@ -113,11 +113,11 @@ vi.mock('@/components/sidebar/TaskSidebarSection', () => ({
 }));
 
 // Import mocked hooks
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useOptionalAgentContext, useAgentContext } from '@/components/providers/AgentProvider';
 
-const mockUseProjectContext = vi.mocked(useProjectContext);
+const mockUseProjectContext = vi.mocked(useProjectsContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseOptionalAgentContext = vi.mocked(useOptionalAgentContext);
 const mockUseAgentContext = vi.mocked(useAgentContext);
@@ -312,7 +312,7 @@ describe('SidebarContent', () => {
   });
 
   describe('Provider Integration', () => {
-    it('uses ProjectProvider for project state', () => {
+    it('uses ProjectsProvider for project state', () => {
       render(<SidebarContent {...defaultProps} />);
 
       expect(mockUseProjectContext).toHaveBeenCalled();

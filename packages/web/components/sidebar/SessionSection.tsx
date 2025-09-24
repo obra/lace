@@ -9,7 +9,7 @@ import { faComments, faCog } from '@/lib/fontawesome';
 import { SidebarSection } from '@/components/layout/Sidebar';
 import { SwitchIcon } from '@/components/ui/SwitchIcon';
 import { useAgentContext } from '@/components/providers/AgentProvider';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useURLState } from '@/hooks/useURLState';
 
 interface SessionSectionProps {
@@ -25,7 +25,7 @@ export const SessionSection = memo(function SessionSection({
 }: SessionSectionProps) {
   // Get context data
   const { sessionDetails } = useAgentContext();
-  const { selectedProject } = useProjectContext();
+  const { selectedProject } = useProjectsContext();
   const { navigateToProject } = useURLState();
 
   // Don't render if no session is selected

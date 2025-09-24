@@ -3,7 +3,7 @@
 
 import { useCallback } from 'react';
 import { useURLState } from '@/hooks/useURLState';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { asThreadId } from '@/types/core';
 
 interface UseOnboardingResult {
@@ -20,7 +20,7 @@ export function useOnboarding(
   enableAgentAutoSelection: () => void
 ): UseOnboardingResult {
   const { navigateToAgent } = useURLState();
-  const { reloadProjects } = useProjectContext();
+  const { reloadProjects } = useProjectsContext();
 
   // Handle onboarding completion - navigate directly to chat
   const handleOnboardingComplete = useCallback(

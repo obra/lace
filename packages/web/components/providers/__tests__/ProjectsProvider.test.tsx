@@ -1,5 +1,5 @@
-// ABOUTME: Integration tests for ProjectProvider focusing on real provider responsibilities
-// ABOUTME: Tests project data management, selection handling, and CRUD operations
+// ABOUTME: Integration tests for ProjectsProvider focusing on real provider responsibilities
+// ABOUTME: Tests projects data management, selection handling, and CRUD operations
 
 /**
  * @vitest-environment jsdom
@@ -9,7 +9,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { ProjectProvider, useProjectContext } from '@/components/providers/ProjectProvider';
+import { ProjectsProvider, useProjectsContext } from '@/components/providers/ProjectsProvider';
 import type { ProjectInfo } from '@/types/core';
 
 // Mock the hooks
@@ -61,7 +61,7 @@ function ContextConsumer() {
     updateProject,
     reloadProjects,
     foundProject,
-  } = useProjectContext();
+  } = useProjectsContext();
 
   return (
     <div>
@@ -91,7 +91,7 @@ function ContextConsumer() {
   );
 }
 
-describe('ProjectProvider', () => {
+describe('ProjectsProvider', () => {
   const mockUpdateProject = vi.fn();
   const mockReloadProjects = vi.fn();
   const mockSetSelectedProject = vi.fn();
@@ -117,9 +117,9 @@ describe('ProjectProvider', () => {
     it('provides project context to children', () => {
       const testProps = createTestProps();
       render(
-        <ProjectProvider {...testProps}>
+        <ProjectsProvider {...testProps}>
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       expect(screen.getByTestId('project-count')).toHaveTextContent('3');
@@ -135,7 +135,7 @@ describe('ProjectProvider', () => {
 
       expect(() => {
         render(<ContextConsumer />);
-      }).toThrow('useProjectContext must be used within a ProjectProvider');
+      }).toThrow('useProjectsContext must be used within a ProjectsProvider');
 
       consoleSpy.mockRestore();
     });
@@ -144,9 +144,9 @@ describe('ProjectProvider', () => {
   describe('Project Data Management', () => {
     it('provides found project data when project is selected', () => {
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectsProvider {...createTestProps()}>
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       expect(screen.getByTestId('found-project')).toHaveTextContent('Project One');
@@ -154,9 +154,9 @@ describe('ProjectProvider', () => {
 
     it('provides null found project when no project is selected', () => {
       render(
-        <ProjectProvider {...createTestProps()} selectedProject={null}>
+        <ProjectsProvider {...createTestProps()} selectedProject={null}>
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       expect(screen.getByTestId('found-project')).toHaveTextContent('none');
@@ -164,9 +164,9 @@ describe('ProjectProvider', () => {
 
     it('provides null found project when selected project not found', () => {
       render(
-        <ProjectProvider {...createTestProps()} selectedProject="nonexistent-project">
+        <ProjectsProvider {...createTestProps()} selectedProject="nonexistent-project">
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       expect(screen.getByTestId('found-project')).toHaveTextContent('none');
@@ -174,9 +174,9 @@ describe('ProjectProvider', () => {
 
     it('transforms projects for sidebar display correctly', () => {
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectsProvider {...createTestProps()}>
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       // All projects should be included in sidebar transformation
@@ -188,9 +188,9 @@ describe('ProjectProvider', () => {
     it('calls onProjectSelect when selectProject is called', () => {
       const mockOnProjectSelect = vi.fn();
       render(
-        <ProjectProvider {...createTestProps()} onProjectSelect={mockOnProjectSelect}>
+        <ProjectsProvider {...createTestProps()} onProjectSelect={mockOnProjectSelect}>
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       fireEvent.click(screen.getByTestId('select-project-2'));
@@ -201,9 +201,9 @@ describe('ProjectProvider', () => {
     it('calls selectProject when onProjectSelect is called', () => {
       const mockOnProjectSelect = vi.fn();
       render(
-        <ProjectProvider {...createTestProps()} onProjectSelect={mockOnProjectSelect}>
+        <ProjectsProvider {...createTestProps()} onProjectSelect={mockOnProjectSelect}>
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       fireEvent.click(screen.getByTestId('select-project-3'));
@@ -213,9 +213,9 @@ describe('ProjectProvider', () => {
 
     it('calls onProjectChange callback when project selection changes', () => {
       render(
-        <ProjectProvider {...createTestProps()} onProjectChange={mockOnProjectChange}>
+        <ProjectsProvider {...createTestProps()} onProjectChange={mockOnProjectChange}>
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       fireEvent.click(screen.getByTestId('select-project-2'));
@@ -226,7 +226,7 @@ describe('ProjectProvider', () => {
     it('handles empty string project selection as null', () => {
       // Create a component that calls onProjectSelect with empty string
       function TestComponent() {
-        const { onProjectSelect } = useProjectContext();
+        const { onProjectSelect } = useProjectsContext();
         return (
           <button onClick={() => onProjectSelect({ id: '' })} data-testid="clear-selection">
             Clear Selection
@@ -236,13 +236,13 @@ describe('ProjectProvider', () => {
 
       const mockOnProjectSelect = vi.fn();
       render(
-        <ProjectProvider
+        <ProjectsProvider
           {...createTestProps()}
           onProjectChange={mockOnProjectChange}
           onProjectSelect={mockOnProjectSelect}
         >
           <TestComponent />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       // Click the button that calls onProjectSelect with empty string
@@ -259,9 +259,9 @@ describe('ProjectProvider', () => {
       mockUpdateProject.mockResolvedValue(undefined);
 
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectsProvider {...createTestProps()}>
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       fireEvent.click(screen.getByTestId('update-project'));
@@ -273,9 +273,9 @@ describe('ProjectProvider', () => {
       mockReloadProjects.mockResolvedValue(mockProjects);
 
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectsProvider {...createTestProps()}>
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       fireEvent.click(screen.getByTestId('reload-projects'));
@@ -289,9 +289,9 @@ describe('ProjectProvider', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectsProvider {...createTestProps()}>
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       fireEvent.click(screen.getByTestId('update-project'));
@@ -312,9 +312,9 @@ describe('ProjectProvider', () => {
       });
 
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectsProvider {...createTestProps()}>
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       expect(screen.getByTestId('loading')).toHaveTextContent('true');
@@ -327,9 +327,9 @@ describe('ProjectProvider', () => {
       });
 
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectsProvider {...createTestProps()}>
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       expect(screen.getByTestId('project-count')).toHaveTextContent('0');
@@ -343,9 +343,9 @@ describe('ProjectProvider', () => {
       });
 
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectsProvider {...createTestProps()}>
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       expect(screen.getByTestId('error')).toHaveTextContent('Failed to load projects');
@@ -369,9 +369,9 @@ describe('ProjectProvider', () => {
       });
 
       render(
-        <ProjectProvider {...createTestProps()} selectedProject="incomplete">
+        <ProjectsProvider {...createTestProps()} selectedProject="incomplete">
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       expect(screen.getByTestId('sidebar-project-count')).toHaveTextContent('1');
@@ -392,9 +392,9 @@ describe('ProjectProvider', () => {
       });
 
       render(
-        <ProjectProvider {...createTestProps()}>
+        <ProjectsProvider {...createTestProps()}>
           <ContextConsumer />
-        </ProjectProvider>
+        </ProjectsProvider>
       );
 
       // Should handle date objects correctly in sidebar transformation

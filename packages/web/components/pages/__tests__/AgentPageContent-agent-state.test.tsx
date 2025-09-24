@@ -25,8 +25,8 @@ vi.mock('@/components/providers/UIProvider', () => ({
   }),
 }));
 
-vi.mock('@/components/providers/ProjectProvider', () => ({
-  useProjectContext: () => ({
+vi.mock('@/components/providers/ProjectsProvider', () => ({
+  useProjectsContext: () => ({
     currentProject: { id: 'test-project', name: 'Test Project' },
     projects: [],
   }),

@@ -14,8 +14,8 @@ import type { ProjectInfo } from '@/types/core';
 import { createMockProjectContext } from '@/__tests__/utils/provider-mocks';
 
 // Mock the providers
-vi.mock('@/components/providers/ProjectProvider', () => ({
-  useProjectContext: vi.fn(),
+vi.mock('@/components/providers/ProjectsProvider', () => ({
+  useProjectsContext: vi.fn(),
 }));
 
 vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
@@ -32,10 +32,10 @@ vi.mock('@/components/config/ProjectEditModal', () => ({
 }));
 
 // Import mocked hooks
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
-const mockUseProjectContext = vi.mocked(useProjectContext);
+const mockUseProjectContext = vi.mocked(useProjectsContext);
 const mockUseProviderInstances = vi.mocked(useProviderInstances);
 
 // Test data factories
@@ -337,7 +337,7 @@ describe('ProjectSection', () => {
   });
 
   describe('Provider Integration', () => {
-    it('uses ProjectProvider for project state', () => {
+    it('uses ProjectsProvider for project state', () => {
       render(<ProjectSection {...defaultProps} />);
 
       expect(mockUseProjectContext).toHaveBeenCalled();

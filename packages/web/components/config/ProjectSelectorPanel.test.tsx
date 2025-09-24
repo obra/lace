@@ -14,8 +14,8 @@ import {
 } from '@/__tests__/utils/provider-mocks';
 
 // Mock all the providers
-vi.mock('@/components/providers/ProjectProvider', () => ({
-  useProjectContext: vi.fn(),
+vi.mock('@/components/providers/ProjectsProvider', () => ({
+  useProjectsContext: vi.fn(),
 }));
 
 vi.mock('@/components/providers/SessionProvider', () => ({
@@ -43,13 +43,13 @@ vi.mock('react-router', () => ({
 }));
 
 // Import mocked hooks
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
 
-const mockUseProjectContext = vi.mocked(useProjectContext);
+const mockUseProjectContext = vi.mocked(useProjectsContext);
 const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseUIContext = vi.mocked(useUIContext);
 const mockUseOnboarding = vi.mocked(useOnboarding);

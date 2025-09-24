@@ -11,7 +11,7 @@ import { AgentsSection } from '@/components/sidebar/AgentsSection';
 import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
 import { FeedbackSection } from '@/components/sidebar/FeedbackSection';
 import { FileBrowserSection } from '@/components/sidebar/FileBrowserSection';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
 
 interface SidebarContentProps {
@@ -37,7 +37,7 @@ export const SidebarContent = memo(function SidebarContent({
   createAgentButtonRef,
 }: SidebarContentProps) {
   // Get state from providers
-  const { selectedProject } = useProjectContext();
+  const { selectedProject } = useProjectsContext();
   // Conditionally use AgentContext - it may not be available on all pages
   const agentContext = useOptionalAgentContext();
   const sessionDetails = agentContext?.sessionDetails ?? null;

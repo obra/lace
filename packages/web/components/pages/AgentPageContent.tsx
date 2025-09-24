@@ -17,7 +17,7 @@ import { AgentCreateChatPopup } from '@/components/modals/AgentCreateChatPopup';
 
 import { useUIContext } from '@/components/providers/UIProvider';
 import { asThreadId, isAgentSummaryUpdatedData } from '@/types/core';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useAgentContext } from '@/components/providers/AgentProvider';
 import { useToolApprovalContext } from '@/components/providers/ToolApprovalProvider';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
@@ -39,7 +39,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   const { sidebarOpen, toggleSidebar } = useUIContext();
 
   // Context data
-  const { currentProject } = useProjectContext();
+  const { currentProject } = useProjectsContext();
   const {
     sessionDetails: selectedSessionDetails,
     loadAgentConfiguration,

@@ -6,7 +6,7 @@
 import React, { useCallback } from 'react';
 import { motion } from 'motion/react';
 import { UIProvider } from '@/components/providers/UIProvider';
-import { ProjectProvider } from '@/components/providers/ProjectProvider';
+import { ProjectsProvider } from '@/components/providers/ProjectsProvider';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { useUIContext } from '@/components/providers/UIProvider';
@@ -65,13 +65,13 @@ export function SettingsPageLayout({ children, activeTab }: SettingsPageLayoutPr
   // Provide minimal context just for the sidebar to render
   return (
     <UIProvider>
-      <ProjectProvider
+      <ProjectsProvider
         selectedProject={null}
         onProjectSelect={noOpCallback}
         onProjectChange={noOpCallback}
       >
         <SettingsPageInner activeTab={activeTab}>{children}</SettingsPageInner>
-      </ProjectProvider>
+      </ProjectsProvider>
     </UIProvider>
   );
 }

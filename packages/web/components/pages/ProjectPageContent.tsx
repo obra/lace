@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars } from '@/lib/fontawesome';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
 import { useUIContext } from '@/components/providers/UIProvider';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -18,7 +18,7 @@ interface ProjectPageContentProps {
 
 export function ProjectPageContent({ projectId }: ProjectPageContentProps) {
   const { sidebarOpen, toggleSidebar } = useUIContext();
-  const { currentProject } = useProjectContext();
+  const { currentProject } = useProjectsContext();
   const navigate = useNavigate();
 
   const handleSwitchProject = useCallback(() => {

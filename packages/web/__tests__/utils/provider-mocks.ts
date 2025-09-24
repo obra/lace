@@ -4,7 +4,7 @@
 import { vi } from 'vitest';
 import type { SessionContextType } from '@/components/providers/SessionProvider';
 import type { AgentContextType } from '@/components/providers/AgentProvider';
-import type { ProjectContextType } from '@/components/providers/ProjectProvider';
+import type { ProjectsContextType } from '@/components/providers/ProjectsProvider';
 import type { UseUIStateResult } from '@/hooks/useUIState';
 
 /**
@@ -81,12 +81,12 @@ export function createMockAgentContext(overrides?: Partial<AgentContextType>): A
 }
 
 /**
- * Creates a mock ProjectContextType with all required methods
+ * Creates a mock ProjectsContextType with all required methods
  * @param overrides - Partial object to override default mock values
  */
 export function createMockProjectContext(
-  overrides?: Partial<ProjectContextType>
-): ProjectContextType {
+  overrides?: Partial<ProjectsContextType>
+): ProjectsContextType {
   return {
     // Project data
     projects: [],

@@ -9,7 +9,7 @@ import { faPlus, faTasks } from '@/lib/fontawesome';
 import { SidebarSection } from '@/components/layout/Sidebar';
 import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
 import { useOptionalTaskContext } from '@/components/providers/TaskProvider';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useOptionalSessionContext } from '@/components/providers/SessionProvider';
 import { useOptionalAgentContext } from '@/components/providers/AgentProvider';
 import type { Task } from '@/types/core';
@@ -26,7 +26,7 @@ export const TaskSidebarSection = memo(function TaskSidebarSection({
   const agentContext = useOptionalAgentContext();
   const sessionContext = useOptionalSessionContext();
 
-  const { selectedProject } = useProjectContext();
+  const { selectedProject } = useProjectsContext();
   const selectedSession = sessionContext?.selectedSession ?? null;
 
   // Extract values with fallbacks
