@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { WorkspaceContainerManager } from './workspace-container-manager';
 import { AppleContainerRuntime } from '~/containers/apple-container';
 import { CloneManager } from './clone-manager';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -12,6 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { execSync } from 'child_process';
 
 describe('Workspace Integration Tests', () => {
+  const testContext = setupCoreTest();
   let manager: WorkspaceContainerManager;
   let testDir: string;
   let projectDir: string;
@@ -89,12 +91,7 @@ if __name__ == '__main__':
       await manager.destroyWorkspace(workspace.sessionId);
     }
 
-    // Clean up any remaining clones
-    const clones = await CloneManager.listSessionClones();
-    for (const sessionId of clones) {
-      await CloneManager.removeSessionClone(sessionId);
-    }
-
+    // Clean up test directory - clones are in isolated LACE_DIR and will be cleaned up automatically
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }

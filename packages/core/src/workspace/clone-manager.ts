@@ -3,14 +3,17 @@
 
 import { existsSync, mkdirSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
 export class CloneManager {
-  private static readonly CLONES_DIR = join(homedir(), '.lace', 'clones');
+  // Use LACE_DIR environment variable for test isolation
+  private static get CLONES_DIR(): string {
+    const laceDir = process.env.LACE_DIR || join(require('os').homedir(), '.lace');
+    return join(laceDir, 'clones');
+  }
 
   /**
    * Create a local git clone for a session workspace

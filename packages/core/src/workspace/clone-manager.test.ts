@@ -3,6 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CloneManager } from './clone-manager';
+import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -10,6 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { execSync } from 'child_process';
 
 describe('CloneManager', () => {
+  const testContext = setupCoreTest();
   let testDir: string;
   let projectDir: string;
 
@@ -30,12 +32,7 @@ describe('CloneManager', () => {
   });
 
   afterEach(async () => {
-    // Clean up any clones we created
-    const clones = await CloneManager.listSessionClones();
-    for (const sessionId of clones) {
-      await CloneManager.removeSessionClone(sessionId);
-    }
-
+    // Clean up test directory - clones are in isolated LACE_DIR and will be cleaned up automatically
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
@@ -68,13 +65,15 @@ describe('CloneManager', () => {
       expect(existsSync(gitObjectsClone)).toBe(true);
     });
 
-    it('should create clone in .lace/clones directory', async () => {
+    it('should create clone in LACE_DIR/clones directory', async () => {
       const sessionId = 'test-session-456';
 
       const clonePath = await CloneManager.createSessionClone(projectDir, sessionId);
 
-      expect(clonePath).toContain('.lace/clones');
+      expect(clonePath).toContain('/clones');
       expect(clonePath).toContain(sessionId);
+      // Verify it uses the test LACE_DIR
+      expect(clonePath.startsWith(testContext.tempDir)).toBe(true);
     });
 
     it('should throw error if project directory does not exist', async () => {
