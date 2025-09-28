@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { logger } from '~/utils/logger';
 
 const execAsync = promisify(exec);
 
@@ -18,6 +19,7 @@ export class CloneManager {
   /**
    * Create a local git clone for a session workspace
    * Uses --local flag to create hardlinks for space efficiency
+   * Auto-initializes git if not already a repository
    */
   static async createSessionClone(projectDir: string, sessionId: string): Promise<string> {
     // Validate project directory exists
@@ -25,10 +27,34 @@ export class CloneManager {
       throw new Error('Project directory does not exist');
     }
 
-    // Validate it's a git repository
+    // Check if it's a git repository, initialize if not
     const gitDir = join(projectDir, '.git');
     if (!existsSync(gitDir)) {
-      throw new Error(`${projectDir} is not a git repository`);
+      logger.info('Project is not a git repository, initializing git', { projectDir });
+
+      // Initialize git repository
+      try {
+        await execAsync('git init', { cwd: projectDir });
+
+        // Set default user if not configured globally
+        try {
+          await execAsync('git config user.email', { cwd: projectDir });
+        } catch {
+          // User email not set, use a default
+          await execAsync('git config user.email "lace@localhost"', { cwd: projectDir });
+          await execAsync('git config user.name "Lace User"', { cwd: projectDir });
+        }
+
+        // Create initial commit with all files
+        await execAsync('git add -A', { cwd: projectDir });
+        await execAsync('git commit -m "Initial commit for workspace isolation" --allow-empty', {
+          cwd: projectDir,
+        });
+
+        logger.info('Git repository initialized successfully', { projectDir });
+      } catch (error: any) {
+        throw new Error(`Failed to initialize git repository: ${error.message}`);
+      }
     }
 
     // Ensure clones directory exists
