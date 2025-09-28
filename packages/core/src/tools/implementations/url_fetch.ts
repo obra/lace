@@ -108,6 +108,7 @@ Follows redirects by default. Returns detailed error context for failures.`;
     readOnlyHint: true,
     idempotentHint: true,
     openWorldHint: true,
+    readOnlySafe: true,
   };
 
   private static tempFiles: string[] = [];

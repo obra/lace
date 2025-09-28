@@ -37,6 +37,7 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
   annotations: ToolAnnotations = {
     readOnlyHint: true,
     idempotentHint: true,
+    readOnlySafe: true,
   };
 
   protected async executeValidated(

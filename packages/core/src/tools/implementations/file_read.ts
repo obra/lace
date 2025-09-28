@@ -37,6 +37,7 @@ export class FileReadTool extends Tool {
   annotations = {
     readOnlyHint: true,
     idempotentHint: true,
+    readOnlySafe: true,
   };
 
   protected async executeValidated(

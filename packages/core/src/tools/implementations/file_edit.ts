@@ -63,6 +63,7 @@ Example:
 
   annotations: ToolAnnotations = {
     destructiveHint: true,
+    readOnlySafe: false,
   };
 
   protected async executeValidated(args: FileEditArgs, context: ToolContext): Promise<ToolResult> {

@@ -28,6 +28,7 @@ export interface ToolAnnotations {
   idempotentHint?: boolean;
   openWorldHint?: boolean;
   safeInternal?: boolean;
+  readOnlySafe?: boolean;
 }
 
 export interface ToolCall {
@@ -130,3 +131,5 @@ export class ApprovalPendingError extends Error {
 }
 
 export type ToolPolicy = 'allow' | 'ask' | 'deny' | 'disable';
+
+export type PermissionOverrideMode = 'normal' | 'yolo' | 'read-only';

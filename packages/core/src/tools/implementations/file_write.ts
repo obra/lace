@@ -21,6 +21,7 @@ Creates parent directories automatically if needed. Returns file size written.`;
   schema = fileWriteSchema;
   annotations: ToolAnnotations = {
     destructiveHint: true,
+    readOnlySafe: false,
   };
 
   protected async executeValidated(

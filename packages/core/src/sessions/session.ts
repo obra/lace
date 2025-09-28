@@ -27,7 +27,7 @@ import { FileFindTool } from '~/tools/implementations/file_find';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url_fetch';
 import { logger } from '~/utils/logger';
-import type { ToolPolicy } from '~/tools/types';
+import type { ToolPolicy, PermissionOverrideMode } from '~/tools/types';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { MCPServerManager } from '~/mcp/server-manager';
 import type { MCPServerConnection, MCPServerConfig } from '~/config/mcp-types';
@@ -64,6 +64,7 @@ export class Session {
   private _projectId?: string;
   private _workspaceManager?: IWorkspaceManager;
   private _workspaceInfo?: WorkspaceInfo;
+  private _permissionOverrideMode: PermissionOverrideMode = 'normal';
 
   // Task notification event handlers for proper cleanup
   private _onTaskUpdated?: (event: TaskManagerEvent) => Promise<void>;
@@ -653,6 +654,15 @@ export class Session {
       );
     }
 
+    // Restore permission override mode from configuration
+    const overrideMode = sessionConfig.runtimeOverrides?.permissionMode as
+      | PermissionOverrideMode
+      | undefined;
+    if (overrideMode && overrideMode !== 'normal') {
+      session.setPermissionOverrideMode(overrideMode);
+      logger.debug(`Restored permission override mode for ${sessionId}`, { mode: overrideMode });
+    }
+
     // Register session in registry ONLY after full reconstruction is complete
     Session._sessionRegistry.set(sessionId, session);
     logger.debug(`Session registered in registry after full reconstruction: ${sessionId}`);
@@ -793,6 +803,37 @@ export class Session {
     }
 
     return process.cwd();
+  }
+
+  getPermissionOverrideMode(): PermissionOverrideMode {
+    return this._permissionOverrideMode;
+  }
+
+  setPermissionOverrideMode(mode: PermissionOverrideMode): void {
+    this._permissionOverrideMode = mode;
+
+    // Update all agents' tool executors
+    for (const agent of this._agents.values()) {
+      // TODO: Uncomment when ToolExecutor.setPermissionOverrideMode is implemented in Phase 3
+      // agent.toolExecutor.setPermissionOverrideMode(mode);
+      void agent; // Suppress unused variable warning
+    }
+
+    // Persist to database
+    const currentConfig = this._sessionData.configuration || {};
+    const newConfig = {
+      ...currentConfig,
+      runtimeOverrides: {
+        ...(currentConfig.runtimeOverrides as Record<string, unknown> | undefined),
+        permissionMode: mode,
+      },
+    };
+    Session.updateSession(this._sessionId, { configuration: newConfig });
+
+    logger.info('Permission override mode updated', {
+      sessionId: this._sessionId,
+      mode,
+    });
   }
 
   // Cached session data accessor (private)

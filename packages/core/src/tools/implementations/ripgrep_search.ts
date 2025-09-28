@@ -52,6 +52,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
     readOnlyHint: true,
     idempotentHint: true,
     openWorldHint: true,
+    readOnlySafe: true,
   };
 
   protected async executeValidated(

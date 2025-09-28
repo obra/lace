@@ -48,6 +48,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
     title: 'Run commands with bash',
     destructiveHint: true,
     openWorldHint: true,
+    readOnlySafe: false,
   };
 
   // Output truncation limits

@@ -49,6 +49,7 @@ export class FileListTool extends Tool {
   annotations: ToolAnnotations = {
     readOnlyHint: true,
     idempotentHint: true,
+    readOnlySafe: true,
   };
 
   private readonly ALWAYS_SUMMARIZE = new Set([
