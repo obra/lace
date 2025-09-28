@@ -772,6 +772,14 @@ export class Session {
   }
 
   getWorkingDirectory(): string {
+    // If we have a workspace with a clone, use the clone directory
+    // This ensures MCP servers write to the same location as file tools
+    const workspaceInfo = this.getWorkspaceInfo();
+    if (workspaceInfo?.clonePath) {
+      return workspaceInfo.clonePath;
+    }
+
+    // Fall back to configured or project directory
     const sessionData = this.getSessionData();
     if (sessionData?.configuration?.workingDirectory) {
       return sessionData.configuration.workingDirectory as string;
