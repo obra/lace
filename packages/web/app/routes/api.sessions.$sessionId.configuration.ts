@@ -25,6 +25,11 @@ const ConfigurationSchema = z.object({
   toolPolicies: z.record(z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
   workingDirectory: z.string().optional(),
   environmentVariables: z.record(z.string()).optional(),
+  runtimeOverrides: z
+    .object({
+      permissionMode: z.enum(['normal', 'yolo', 'read-only']).optional(),
+    })
+    .optional(),
 });
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
@@ -152,6 +157,12 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     // Update session configuration directly
     session.updateConfiguration(validatedData);
+
+    // If permission mode changed, update agents' tool executors
+    if (validatedData.runtimeOverrides?.permissionMode) {
+      session.setPermissionOverrideMode(validatedData.runtimeOverrides.permissionMode);
+    }
+
     const configuration = session.getEffectiveConfiguration();
 
     // FAST: Get tools from cached discovery instead of creating expensive ToolExecutor
