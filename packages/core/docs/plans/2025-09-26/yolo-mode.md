@@ -10,17 +10,29 @@ We're building a runtime permission override system that allows users to quickly
 
 ## Architecture Summary
 
+**ACTUAL IMPLEMENTATION (as of 2025-01-28):**
+
 ```
 Web UI (Segmented Control)
     ↓
-Session API (/api/sessions/:id/permission-mode)
+Session API (/api/sessions/:id/configuration)
     ↓
-Session.setPermissionOverrideMode()
+Session.updateConfiguration({runtimeOverrides: {permissionMode: 'yolo'}})
     ↓
-ToolExecutor (applies override during permission checks)
+Session.setPermissionOverrideMode() [called automatically]
+    ↓
+Updates all Agent ToolExecutors
+    ↓
+ToolExecutor.getEffectivePolicy() [called by Agent during tool approval]
     ↓
 Tool executes with modified permission
 ```
+
+**Key Design Decisions:**
+- Permission mode is set via the existing `/configuration` endpoint (not a separate endpoint)
+- Permission mode is stored in `SessionConfiguration.runtimeOverrides.permissionMode`
+- Logic lives in `Session.updateConfiguration()`, not in the API layer
+- When permission mode changes, `Session` automatically calls `setPermissionOverrideMode()` which updates all agent tool executors
 
 ## Prerequisites
 
@@ -446,78 +458,73 @@ git add -A && git commit -m "test(executor): add tests for permission override m
 
 ### Phase 4: API Layer
 
-#### Task 4.1: Create permission mode API endpoint
+**ACTUAL IMPLEMENTATION:**
 
-**File**: Create `packages/web/app/routes/api.sessions.$sessionId.permission-mode.ts`
+No separate endpoint was created. Instead, permission mode is integrated into the existing configuration endpoint.
 
+#### Task 4.1: Add runtimeOverrides to configuration schema
+
+**File**: `packages/web/app/routes/api.sessions.$sessionId.configuration.ts`
+
+**Changes made**:
+1. Added `runtimeOverrides` to the `ConfigurationSchema`:
 ```typescript
-import { ActionFunction, json } from 'react-router';
-import { Session } from '@lace/core/sessions/session';
-import { z } from 'zod';
-import { logger } from '@lace/core/utils/logger';
-import { asThreadId } from '@lace/core/threads/types';
-
-const PermissionModeSchema = z.object({
-  mode: z.enum(['normal', 'yolo', 'read-only'])
+const ConfigurationSchema = z.object({
+  // ... existing fields ...
+  runtimeOverrides: z
+    .object({
+      permissionMode: z.enum(['normal', 'yolo', 'read-only']).optional(),
+    })
+    .optional(),
 });
-
-export const action: ActionFunction = async ({ params, request }) => {
-  const { sessionId } = params;
-
-  if (!sessionId) {
-    return json({ error: 'Session ID required' }, { status: 400 });
-  }
-
-  if (request.method !== 'PATCH') {
-    return json({ error: 'Method not allowed' }, { status: 405 });
-  }
-
-  try {
-    const body = await request.json();
-    const { mode } = PermissionModeSchema.parse(body);
-
-    const session = await Session.getById(asThreadId(sessionId));
-    if (!session) {
-      return json({ error: 'Session not found' }, { status: 404 });
-    }
-
-    session.setPermissionOverrideMode(mode);
-
-    // TODO: Auto-resolve pending approvals based on new mode
-    // This will be implemented in a later task
-
-    return json({
-      success: true,
-      mode,
-      sessionId
-    });
-  } catch (error) {
-    logger.error('Failed to update permission mode', { error, sessionId });
-    return json(
-      { error: error instanceof Error ? error.message : 'Failed to update permission mode' },
-      { status: 500 }
-    );
-  }
-};
 ```
 
-**Register the route** in `packages/web/app/routes.ts`:
+2. Added to `SessionConfigurationSchema` in `packages/core/src/sessions/session-config.ts`:
 ```typescript
-route('api/sessions/:sessionId/permission-mode', 'routes/api.sessions.$sessionId.permission-mode.ts'),
+export const SessionConfigurationSchema = z.object({
+  // ... existing fields ...
+  runtimeOverrides: z
+    .object({
+      permissionMode: z.enum(['normal', 'yolo', 'read-only']).optional(),
+    })
+    .optional(),
+});
 ```
 
-**Test manually**:
+3. Updated `Session.updateConfiguration()` to automatically handle permission mode changes:
+```typescript
+updateConfiguration(updates: Partial<SessionConfiguration>): void {
+  // Validate configuration
+  const validatedConfig = Session.validateConfiguration(updates);
+
+  const currentConfig = this._sessionData.configuration || {};
+  const newConfig = { ...currentConfig, ...validatedConfig };
+
+  // Update database and cache
+  Session.updateSession(this._sessionId, { configuration: newConfig });
+
+  // If permission mode changed, update all agent tool executors
+  if (validatedConfig.runtimeOverrides?.permissionMode) {
+    this.setPermissionOverrideMode(validatedConfig.runtimeOverrides.permissionMode);
+  }
+}
+```
+
+**Usage**:
 ```bash
-npm run dev
-# Then use curl or browser dev tools to test:
-curl -X PATCH http://localhost:31339/api/sessions/YOUR_SESSION_ID/permission-mode \
+# Update permission mode via existing configuration endpoint
+curl -X PUT http://localhost:31339/api/sessions/SESSION_ID/configuration \
   -H "Content-Type: application/json" \
-  -d '{"mode": "yolo"}'
+  -d '{
+    "runtimeOverrides": {
+      "permissionMode": "yolo"
+    }
+  }'
 ```
 
 **Commit**:
 ```bash
-git add -A && git commit -m "feat(api): add permission mode endpoint"
+git add -A && git commit -m "feat(session): integrate permission mode into configuration system"
 ```
 
 ---
