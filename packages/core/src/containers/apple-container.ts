@@ -18,6 +18,13 @@ import { existsSync, mkdirSync } from 'fs';
 
 const execAsync = promisify(exec);
 
+// Extended container info that includes config for deferred container creation
+interface AppleContainerInfo extends ContainerInfo {
+  config?: ContainerConfig;
+  volumeArgs?: string;
+  envArgs?: string;
+}
+
 export class AppleContainerRuntime extends BaseContainerRuntime {
   // Default image to use for containers
   // Microsoft devcontainer includes common dev tools, git, etc.
@@ -72,7 +79,7 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
       .join(' ');
 
     // Store container info
-    const info: ContainerInfo = {
+    const info: AppleContainerInfo = {
       id: containerId,
       state: 'created',
     };
@@ -81,9 +88,9 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
 
     // Note: We'll actually create the container on start()
     // Store config for later use
-    (info as any).config = config;
-    (info as any).volumeArgs = volumeArgs;
-    (info as any).envArgs = envArgs;
+    info.config = config;
+    info.volumeArgs = volumeArgs;
+    info.envArgs = envArgs;
 
     return containerId;
   }
@@ -94,9 +101,14 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
       return; // Already running
     }
 
-    const config = (info as any).config as ContainerConfig;
-    const volumeArgs = (info as any).volumeArgs as string;
-    const envArgs = (info as any).envArgs as string;
+    const appleInfo = info as AppleContainerInfo;
+    const config = appleInfo.config;
+    const volumeArgs = appleInfo.volumeArgs || '';
+    const envArgs = appleInfo.envArgs || '';
+
+    if (!config) {
+      throw new ContainerError('Container config not found', containerId);
+    }
 
     logger.info('Starting Apple container', { containerId });
 
@@ -110,13 +122,19 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
       try {
         const { stdout, stderr } = await execAsync(createCmd);
         logger.debug('Container created', { containerId, stdout, stderr });
-      } catch (createError: any) {
+      } catch (createError: unknown) {
+        const errorDetails = createError as {
+          message?: string;
+          stderr?: string;
+          stdout?: string;
+          code?: number;
+        };
         logger.error('Container creation failed', {
           containerId,
-          error: createError.message,
-          stderr: createError.stderr,
-          stdout: createError.stdout,
-          code: createError.code,
+          error: errorDetails.message || String(createError),
+          stderr: errorDetails.stderr,
+          stdout: errorDetails.stdout,
+          code: errorDetails.code,
         });
         throw createError;
       }
@@ -127,10 +145,15 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
 
       info.state = 'running';
       info.startedAt = new Date();
-    } catch (error: any) {
-      logger.error('Failed to start container', { containerId, error: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Failed to start container', { containerId, error: errorMessage });
       info.state = 'failed';
-      throw new ContainerError(`Failed to start container: ${error.message}`, containerId, error);
+      throw new ContainerError(
+        `Failed to start container: ${errorMessage}`,
+        containerId,
+        error instanceof Error ? error : undefined
+      );
     }
   }
 
@@ -147,22 +170,24 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
       // Note: container stop returns 143 when it successfully stops the container with SIGTERM
       await execAsync(`container stop ${containerId}`, { timeout: Math.min(timeout, 3000) });
       this.updateContainerState(containerId, 'stopped');
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Exit code 143 means the container was successfully stopped with SIGTERM
-      if (error.code === 143) {
+      const errorCode = (error as { code?: number }).code;
+      if (errorCode === 143) {
         logger.debug('Container stopped with SIGTERM', { containerId });
         this.updateContainerState(containerId, 'stopped');
         return;
       }
 
-      logger.warn('Graceful stop failed, forcing kill', { containerId, errorCode: error.code });
+      logger.warn('Graceful stop failed, forcing kill', { containerId, errorCode });
       // Force kill if stop failed for other reasons
       try {
         await execAsync(`container kill ${containerId}`, { timeout: 2000 });
         this.updateContainerState(containerId, 'stopped');
-      } catch (killError: any) {
+      } catch (killError: unknown) {
         // Exit code 143 is also OK for kill
-        if (killError.code === 143) {
+        const killErrorCode = (killError as { code?: number }).code;
+        if (killErrorCode === 143) {
           this.updateContainerState(containerId, 'stopped');
           return;
         }
@@ -182,7 +207,11 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
           this.updateContainerState(containerId, 'stopped');
           return;
         }
-        throw new ContainerError(`Failed to stop container`, containerId, error);
+        throw new ContainerError(
+          `Failed to stop container`,
+          containerId,
+          error instanceof Error ? error : undefined
+        );
       }
     }
   }
@@ -200,7 +229,7 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
     try {
       // Force remove to handle stuck containers
       await execAsync(`container rm -f ${containerId}`, { timeout: 3000 });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Container might not exist, check if it's really there
       try {
         const { stdout } = await execAsync(
@@ -209,9 +238,10 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
         );
         if (stdout) {
           // Container exists but couldn't be removed
+          const errorMessage = error instanceof Error ? error.message : String(error);
           logger.error('Container exists but cannot be removed', {
             containerId,
-            error: error.message,
+            error: errorMessage,
           });
         } else {
           // Container doesn't exist, that's fine
@@ -268,32 +298,46 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
         stderr: stderr || '',
         exitCode: 0,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Check if this is an exec error with output
-      if (error.code !== undefined) {
-        const exitCode = error.code;
+      const errorWithCode = error as {
+        code?: number;
+        signal?: string;
+        killed?: boolean;
+        stdout?: string;
+        stderr?: string;
+        message?: string;
+      };
+      if (errorWithCode.code !== undefined) {
+        const exitCode = errorWithCode.code;
 
         // Timeout error
-        if (error.signal === 'SIGTERM' || error.killed) {
-          throw new ContainerError('Execution timeout', containerId, error);
+        if (errorWithCode.signal === 'SIGTERM' || errorWithCode.killed) {
+          throw new ContainerError(
+            'Execution timeout',
+            containerId,
+            error instanceof Error ? error : undefined
+          );
         }
 
         // Command executed but returned non-zero exit code
         // Still return the output
         return {
-          stdout: error.stdout || '',
-          stderr: error.stderr || '',
+          stdout: errorWithCode.stdout || '',
+          stderr: errorWithCode.stderr || '',
           exitCode: typeof exitCode === 'number' ? exitCode : 1,
         };
       }
 
       // Unknown error - container might not be running
+      const errorMessage =
+        errorWithCode.message || (error instanceof Error ? error.message : String(error));
       logger.error('Exec failed with unknown error', {
         containerId,
-        error: error.message,
+        error: errorMessage,
         fullCommand,
       });
-      throw new ContainerExecError(containerId, 1, error.message);
+      throw new ContainerExecError(containerId, 1, errorMessage);
     }
   }
 

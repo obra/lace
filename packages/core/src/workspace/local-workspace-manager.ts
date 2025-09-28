@@ -5,8 +5,8 @@ import { ExecOptions, ExecResult } from '~/containers/types';
 import { logger } from '~/utils/logger';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import type { WorkspaceInfo } from './workspace-container-manager';
-import type { IWorkspaceManager } from './workspace-manager';
+import type { WorkspaceInfo } from '~/workspace/workspace-container-manager';
+import type { IWorkspaceManager } from '~/workspace/workspace-manager';
 
 const execAsync = promisify(exec);
 

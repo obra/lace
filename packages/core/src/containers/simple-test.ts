@@ -1,5 +1,5 @@
 // Simpler test without volume mounts
-import { AppleContainerRuntime } from './apple-container';
+import { AppleContainerRuntime } from '~/containers/apple-container';
 
 async function test() {
   const runtime = new AppleContainerRuntime();

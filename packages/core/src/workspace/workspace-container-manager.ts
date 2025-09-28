@@ -2,9 +2,9 @@
 // ABOUTME: Uses git worktrees with dual mounts for connected git workflow
 
 import { ContainerRuntime, ContainerConfig, ExecOptions, ExecResult } from '~/containers/types';
-import { WorktreeManager } from './worktree-manager';
+import { WorktreeManager } from '~/workspace/worktree-manager';
 import { logger } from '~/utils/logger';
-import type { IWorkspaceManager } from './workspace-manager';
+import type { IWorkspaceManager } from '~/workspace/workspace-manager';
 import { join } from 'path';
 
 export interface WorkspaceInfo {
