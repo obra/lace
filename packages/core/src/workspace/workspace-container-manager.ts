@@ -1,18 +1,20 @@
 // ABOUTME: Manages containerized workspaces for isolated development sessions
-// ABOUTME: Integrates git clones with container runtime for secure code execution
+// ABOUTME: Uses git worktrees with dual mounts for connected git workflow
 
 import { ContainerRuntime, ContainerConfig, ExecOptions, ExecResult } from '~/containers/types';
-import { CloneManager } from './clone-manager';
+import { WorktreeManager } from './worktree-manager';
 import { logger } from '~/utils/logger';
 import type { IWorkspaceManager } from './workspace-manager';
+import { join } from 'path';
 
 export interface WorkspaceInfo {
   sessionId: string;
   projectDir: string;
-  clonePath: string;
+  clonePath: string; // For worktrees, this is the worktree path
   containerId: string;
   state: string;
   containerMountPath?: string; // Path where project is mounted inside container
+  branchName?: string; // Git branch name for this session
 }
 
 export class WorkspaceContainerManager implements IWorkspaceManager {
@@ -40,26 +42,39 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
 
     logger.info('Creating workspace', { projectDir, sessionId });
 
-    // Create local clone
-    const clonePath = await CloneManager.createSessionClone(projectDir, sessionId);
+    // Create git worktree for this session
+    const worktreePath = await WorktreeManager.createSessionWorktree(projectDir, sessionId);
+    const branchName = WorktreeManager.getSessionBranchName(sessionId);
 
-    // Define where to mount the project in the container
+    // Define where to mount in the container
     const containerMountPath = '/workspace';
+    const gitDirMount = '/workspace/.git-main';
 
-    // Create container with clone mounted
+    // Get the git directory path for this worktree
+    const gitWorktreeDir = join(projectDir, '.git', 'worktrees', sessionId);
+
+    // Create container with dual mounts: working tree + git database
     const containerConfig: ContainerConfig = {
       id: `workspace-${sessionId}`,
       workingDirectory: containerMountPath,
       mounts: [
         {
-          source: clonePath,
+          source: worktreePath,
           target: containerMountPath,
           readonly: false,
+        },
+        {
+          source: join(projectDir, '.git'),
+          target: gitDirMount,
+          readonly: false, // Need write access for commits
         },
       ],
       environment: {
         NODE_ENV: 'development',
         SESSION_ID: sessionId,
+        // Configure git to use the mounted directories
+        GIT_DIR: `${gitDirMount}/worktrees/${sessionId}`,
+        GIT_WORK_TREE: containerMountPath,
       },
     };
 
@@ -69,10 +84,11 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
     const workspace: WorkspaceInfo = {
       sessionId,
       projectDir,
-      clonePath,
+      clonePath: worktreePath,
       containerId,
       state: 'running',
       containerMountPath,
+      branchName,
     };
 
     this.workspaces.set(sessionId, workspace);
@@ -83,7 +99,8 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
   }
 
   /**
-   * Destroy a workspace (remove container and clone)
+   * Destroy a workspace (remove container and worktree)
+   * Note: Keeps the session branch by default - user can merge or delete manually
    */
   async destroyWorkspace(sessionId: string): Promise<void> {
     const workspace = this.workspaces.get(sessionId);
@@ -102,15 +119,15 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
     }
 
     try {
-      // Remove clone
-      await CloneManager.removeSessionClone(sessionId);
+      // Remove worktree but keep branch (user may want to merge it)
+      await WorktreeManager.removeSessionWorktree(workspace.projectDir, sessionId, false);
     } catch (error) {
-      logger.warn('Failed to remove clone', { sessionId, error });
+      logger.warn('Failed to remove worktree', { sessionId, error });
     }
 
     this.workspaces.delete(sessionId);
 
-    logger.info('Workspace destroyed', { sessionId });
+    logger.info('Workspace destroyed', { sessionId, branchKept: workspace.branchName });
   }
 
   /**
@@ -132,7 +149,7 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
     // First check in-memory cache
     let workspace = this.workspaces.get(sessionId);
 
-    // If not in memory, check if container and clone still exist on system
+    // If not in memory, check if container and worktree still exist on system
     if (!workspace) {
       const containerId = `workspace-${sessionId}`;
 
@@ -140,20 +157,21 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
       try {
         const containerInfo = await this.runtime.inspect(containerId);
 
-        // Check if clone exists
-        const clonePath = await CloneManager.getClonePath(sessionId);
+        // Check if worktree exists
+        const worktreePath = await WorktreeManager.getWorktreePath(sessionId);
         const { existsSync } = await import('fs');
 
-        if (containerInfo && existsSync(clonePath)) {
+        if (containerInfo && existsSync(worktreePath)) {
           // Reconstruct workspace info from existing resources
-          // Assume standard mount path for reconstructed workspaces
+          const branchName = WorktreeManager.getSessionBranchName(sessionId);
           workspace = {
             sessionId,
             projectDir: '', // Will be set when needed
-            clonePath,
+            clonePath: worktreePath,
             containerId,
             state: containerInfo.state,
             containerMountPath: '/workspace', // Standard mount path
+            branchName,
           };
 
           // Cache it for future lookups
@@ -162,12 +180,13 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
           logger.info('Found existing workspace resources, restored to cache', {
             sessionId,
             containerId,
-            clonePath,
+            worktreePath,
+            branchName,
             state: containerInfo.state,
           });
         }
       } catch (error) {
-        // Container or clone doesn't exist, return null
+        // Container or worktree doesn't exist, return null
         logger.debug('No existing workspace found', { sessionId, error });
         return null;
       }
