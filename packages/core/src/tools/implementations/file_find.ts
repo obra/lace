@@ -50,7 +50,7 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
       const { pattern, type, caseSensitive, maxDepth, includeHidden, maxResults } = args;
 
       // Resolve path using working directory from context
-      const resolvedPath = this.resolvePath(args.path, context);
+      const resolvedPath = this.resolveWorkspacePath(args.path, context);
 
       // Validate directory exists
       try {

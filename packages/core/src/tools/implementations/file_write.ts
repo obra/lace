@@ -32,7 +32,7 @@ Creates parent directories automatically if needed. Returns file size written.`;
     }
     try {
       const { content, createDirs } = args;
-      const resolvedPath = this.resolvePath(args.path, context);
+      const resolvedPath = this.resolveWorkspacePath(args.path, context);
 
       // Check read-before-write protection
       const protectionError = await this.checkFileReadProtection(args.path, resolvedPath, context);

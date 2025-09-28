@@ -46,8 +46,8 @@ export class FileReadTool extends Tool {
     if (context.signal.aborted) {
       return this.createCancellationResult();
     }
-    // Resolve path using working directory from context
-    const resolvedPath = this.resolvePath(args.path, context);
+    // Resolve path with workspace support
+    const resolvedPath = this.resolveWorkspacePath(args.path, context);
 
     try {
       // Check file size before reading (unless using line range)

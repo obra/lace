@@ -75,7 +75,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
       } = args;
 
       // Resolve path using working directory from context
-      const resolvedPath = this.resolvePath(path, context);
+      const resolvedPath = this.resolveWorkspacePath(path, context);
 
       const ripgrepArgs = this.buildRipgrepArgs({
         pattern,

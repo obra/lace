@@ -70,7 +70,7 @@ Example:
       return this.createCancellationResult();
     }
 
-    const resolvedPath = this.resolvePath(args.path, context);
+    const resolvedPath = this.resolveWorkspacePath(args.path, context);
     const edits = args.edits;
 
     // Check read-before-write protection

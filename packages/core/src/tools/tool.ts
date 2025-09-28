@@ -11,6 +11,8 @@ import type {
   ToolAnnotations,
   ToolResultStatus,
 } from '~/tools/types';
+import { Session } from '~/sessions/session';
+import { logger } from '~/utils/logger';
 
 export abstract class Tool {
   abstract name: string;
@@ -105,6 +107,101 @@ export abstract class Tool {
 
     const workingDir = context?.workingDirectory || process.cwd();
     return resolve(workingDir, path);
+  }
+
+  /**
+   * Resolve a path with workspace support.
+   * When using workspace (container or local mode), this adjusts paths to work with the workspace.
+   * File tools execute on the host, so they need to access files in the clone directory.
+   */
+  protected resolveWorkspacePath(path: string, context?: ToolContext): string {
+    // Get workspace info from session if available
+    const workspaceInfo = this.getWorkspaceInfo(context);
+
+    if (!workspaceInfo) {
+      // No workspace, use standard path resolution
+      return this.resolvePath(path, context);
+    }
+
+    // When using a workspace, we need to resolve paths relative to the clone directory
+    // because file tools execute on the host and need to access the actual files
+    if (isAbsolute(path)) {
+      // For absolute paths, check if they're within the project directory
+      // and translate to the clone directory
+      if (path.startsWith(workspaceInfo.projectDir)) {
+        const relativePath = path.slice(workspaceInfo.projectDir.length);
+        const clonedPath = workspaceInfo.clonePath + relativePath;
+
+        logger.debug('Translated absolute path to clone directory', {
+          original: path,
+          cloned: clonedPath,
+          projectDir: workspaceInfo.projectDir,
+          clonePath: workspaceInfo.clonePath,
+        });
+
+        return clonedPath;
+      }
+      // Absolute path outside project - return as-is
+      return path;
+    }
+
+    // For relative paths, resolve relative to the clone directory (the workspace working dir)
+    const workingDir = workspaceInfo.clonePath;
+    const resolvedPath = resolve(workingDir, path);
+
+    logger.debug('Resolved relative path in workspace', {
+      relativePath: path,
+      workingDir,
+      resolved: resolvedPath,
+    });
+
+    return resolvedPath;
+  }
+
+  /**
+   * Get workspace info from session if available
+   */
+  private getWorkspaceInfo(context?: ToolContext): any | undefined {
+    if (!context?.agent) {
+      return undefined;
+    }
+
+    const threadId = context.agent.getThreadId();
+    if (!threadId) {
+      return undefined;
+    }
+
+    const session = Session.getByIdSync(threadId);
+    return session?.getWorkspaceInfo();
+  }
+
+  /**
+   * Get workspace manager from session if available
+   */
+  private getWorkspaceManager(context?: ToolContext): any | undefined {
+    if (!context?.agent) {
+      return undefined;
+    }
+
+    const threadId = context.agent.getThreadId();
+    if (!threadId) {
+      return undefined;
+    }
+
+    const session = Session.getByIdSync(threadId);
+    return session?.getWorkspaceManager();
+  }
+
+  /**
+   * Get session ID from context
+   */
+  private getSessionId(context?: ToolContext): string | undefined {
+    if (!context?.agent) {
+      return undefined;
+    }
+
+    const threadId = context.agent.getThreadId();
+    return threadId || undefined;
   }
 
   /**
