@@ -20,7 +20,8 @@ const execAsync = promisify(exec);
 
 export class AppleContainerRuntime extends BaseContainerRuntime {
   // Default image to use for containers
-  private readonly DEFAULT_IMAGE = 'python:alpine';
+  // Microsoft devcontainer includes common dev tools, git, etc.
+  private readonly DEFAULT_IMAGE = 'mcr.microsoft.com/devcontainers/base:ubuntu';
 
   constructor() {
     super();

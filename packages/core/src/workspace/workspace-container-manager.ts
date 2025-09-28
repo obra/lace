@@ -53,6 +53,9 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
     // Get the git directory path for this worktree
     const gitWorktreeDir = join(projectDir, '.git', 'worktrees', sessionId);
 
+    // Get user's git configuration
+    const gitConfig = await this.getGitUserConfig();
+
     // Create container with dual mounts: working tree + git database
     const containerConfig: ContainerConfig = {
       id: `workspace-${sessionId}`,
@@ -75,6 +78,8 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
         // Configure git to use the mounted directories
         GIT_DIR: `${gitDirMount}/worktrees/${sessionId}`,
         GIT_WORK_TREE: containerMountPath,
+        // Pass through user's git identity
+        ...gitConfig,
       },
     };
 
@@ -250,5 +255,42 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
     }
 
     return this.runtime.translateToHost(containerPath, workspace.containerId);
+  }
+
+  /**
+   * Get user's git configuration to pass into container
+   */
+  private async getGitUserConfig(): Promise<Record<string, string>> {
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+
+    const config: Record<string, string> = {};
+
+    try {
+      // Get user name
+      const { stdout: name } = await execAsync('git config --global user.name');
+      if (name.trim()) {
+        config.GIT_AUTHOR_NAME = name.trim();
+        config.GIT_COMMITTER_NAME = name.trim();
+      }
+    } catch {
+      // Not set, will use defaults
+    }
+
+    try {
+      // Get user email
+      const { stdout: email } = await execAsync('git config --global user.email');
+      if (email.trim()) {
+        config.GIT_AUTHOR_EMAIL = email.trim();
+        config.GIT_COMMITTER_EMAIL = email.trim();
+      }
+    } catch {
+      // Not set, will use defaults
+    }
+
+    logger.debug('Git user config for container', { config });
+
+    return config;
   }
 }
