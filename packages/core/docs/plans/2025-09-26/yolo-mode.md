@@ -529,6 +529,126 @@ git add -A && git commit -m "feat(session): integrate permission mode into confi
 
 ---
 
+### Phase 4.5: Fix Circular Dependency (CRITICAL - Must complete before Phase 5)
+
+**Problem**: Circular dependency introduced in container work:
+```
+tool.ts → Session → ToolExecutor → BashTool → tool.ts
+```
+
+**Solution**: Option 1 - Context Enrichment in ToolExecutor
+
+#### Task 4.5.1: Update ToolExecutor to populate workspace context
+
+**File**: `packages/core/src/tools/executor.ts`
+
+**What to do**: In the `execute()` method, add workspace info to the context:
+
+```typescript
+async execute(toolCall: ToolCall, context: ToolContext): Promise<ToolResult> {
+  const tool = this.getTool(toolCall.name);
+  if (!tool) {
+    throw new Error(`Tool '${toolCall.name}' not found`);
+  }
+
+  let toolContext: ToolContext = context || {};
+
+  if (context?.agent) {
+    const session = await context.agent.getFullSession();
+    const projectId = session?.getProjectId();
+
+    // Existing: Add environment variables
+    if (projectId) {
+      const projectEnv = this.envManager.getMergedEnvironment(projectId);
+      toolContext.processEnv = { ...process.env, ...projectEnv };
+    }
+
+    // Existing: Add temp directory
+    const toolTempDir = await this.createToolTempDirectory(toolCall.id, context);
+
+    // NEW: Add workspace context
+    const workspaceInfo = session?.getWorkspaceInfo();
+    const workspaceManager = session?.getWorkspaceManager();
+
+    toolContext = {
+      ...toolContext,
+      toolTempDir,
+      workspaceInfo,      // NEW
+      workspaceManager,   // NEW
+    };
+  }
+
+  const result = await tool.execute(toolCall.arguments, toolContext);
+  // ...
+}
+```
+
+#### Task 4.5.2: Update Tool base class to use context directly
+
+**File**: `packages/core/src/tools/tool.ts`
+
+**What to do**:
+1. Remove Session import (line 14)
+2. Remove `getWorkspaceInfo()` helper method
+3. Remove `getWorkspaceManager()` helper method
+4. Update `resolveWorkspacePath()` to read from context:
+
+```typescript
+protected resolveWorkspacePath(path: string, context?: ToolContext): string {
+  // Read from context instead of calling Session
+  const workspaceInfo = context?.workspaceInfo;
+
+  if (!workspaceInfo) {
+    return this.resolvePath(path, context);
+  }
+
+  // Rest of logic unchanged - just uses workspaceInfo from context
+  // ...
+}
+```
+
+#### Task 4.5.3: Update BashTool to use context directly
+
+**File**: `packages/core/src/tools/implementations/bash.ts`
+
+**What to do**: Update any Session lookups to use context:
+
+```typescript
+// OLD - Don't call Session
+const session = this.getSessionFromContext(context);
+const workspaceInfo = session?.getWorkspaceInfo();
+
+// NEW - Read from context
+const workspaceInfo = context?.workspaceInfo;
+const workspaceManager = context?.workspaceManager;
+```
+
+#### Task 4.5.4: Run all tests
+
+```bash
+npm test
+# Should see all tool tests pass now that circular dependency is fixed
+```
+
+#### Task 4.5.5: Verify build
+
+```bash
+npm run build
+# Should compile without errors
+```
+
+**Commit**:
+```bash
+git add -A && git commit -m "fix(tools): eliminate circular dependency by enriching context in ToolExecutor
+
+- ToolExecutor now populates workspaceInfo and workspaceManager in context
+- Tool base class reads from context instead of calling Session
+- Removes Session import from tool.ts
+- Fixes circular dependency: tool.ts → Session → ToolExecutor → tools → tool.ts"
+```
+
+---
+
 ### Phase 5: Frontend UI Implementation
 
 #### Task 5.1: Create SegmentedControl component
