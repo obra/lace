@@ -901,6 +901,11 @@ export class Session {
 
     // Update database and cache
     Session.updateSession(this._sessionId, { configuration: newConfig });
+
+    // If permission mode changed, update all agent tool executors
+    if (validatedConfig.runtimeOverrides?.permissionMode) {
+      this.setPermissionOverrideMode(validatedConfig.runtimeOverrides.permissionMode);
+    }
   }
 
   getToolPolicy(toolName: string): ToolPolicy {
