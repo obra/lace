@@ -78,10 +78,11 @@ describe('Workspace Integration', () => {
       const result = await bashTool.execute({ command: 'pwd' }, toolContext);
 
       expect(result.status).toBe('completed');
-      expect(result.output).toBeDefined();
 
-      // In local mode, workspace should execute in project directory
-      const output = result.output as any;
+      // Parse the JSON from the content
+      const content = result.content[0];
+      expect(content.type).toBe('text');
+      const output = JSON.parse((content as any).text);
       expect(output.exitCode).toBe(0);
 
       await session.destroy();
@@ -120,7 +121,8 @@ describe('Workspace Integration', () => {
       const readResult = await readTool.execute({ path: 'test.txt' }, toolContext);
 
       expect(readResult.status).toBe('completed');
-      expect(readResult.output).toContain('Original content');
+      const readContent = readResult.content[0];
+      expect((readContent as any).text).toContain('Original content');
 
       // Test FileWriteTool (mark test.txt as read to allow writes)
       filesRead.add('test.txt');
@@ -185,7 +187,8 @@ describe('Workspace Integration', () => {
       const readResult = await readTool.execute({ path: 'bash-file.txt' }, toolContext);
 
       expect(readResult.status).toBe('completed');
-      expect(readResult.output).toContain('Created by bash');
+      const readContent = readResult.content[0];
+      expect((readContent as any).text).toContain('Created by bash');
 
       // Write a file with FileWriteTool
       const writeTool = new FileWriteTool();
@@ -201,7 +204,8 @@ describe('Workspace Integration', () => {
       const bashRead = await bashTool.execute({ command: 'cat tool-file.txt' }, toolContext);
 
       expect(bashRead.status).toBe('completed');
-      const bashOutput = bashRead.output as any;
+      const bashContent = bashRead.content[0];
+      const bashOutput = JSON.parse((bashContent as any).text);
       expect(bashOutput.stdoutPreview).toContain('Created by FileWriteTool');
 
       await session.destroy();
@@ -248,7 +252,8 @@ describe('Workspace Integration', () => {
       const result = await readTool.execute({ path: './subdir/nested.txt' }, toolContext);
 
       expect(result.status).toBe('completed');
-      expect(result.output).toContain('Nested content');
+      const readContent = result.content[0];
+      expect((readContent as any).text).toContain('Nested content');
 
       await session.destroy();
     });
@@ -290,7 +295,8 @@ describe('Workspace Integration', () => {
       const result = await readTool.execute({ path: absolutePath }, toolContext);
 
       expect(result.status).toBe('completed');
-      expect(result.output).toContain('Absolute path content');
+      const readContent = result.content[0];
+      expect((readContent as any).text).toContain('Absolute path content');
 
       await session.destroy();
     });
