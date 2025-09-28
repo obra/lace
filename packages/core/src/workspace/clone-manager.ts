@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { homedir } from 'os';
 import { logger } from '~/utils/logger';
 
 const execAsync = promisify(exec);
@@ -12,7 +13,7 @@ const execAsync = promisify(exec);
 export class CloneManager {
   // Use LACE_DIR environment variable for test isolation
   private static get CLONES_DIR(): string {
-    const laceDir = process.env.LACE_DIR || join(require('os').homedir(), '.lace');
+    const laceDir = process.env.LACE_DIR || join(homedir(), '.lace');
     return join(laceDir, 'clones');
   }
 
