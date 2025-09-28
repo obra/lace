@@ -568,10 +568,33 @@ Exit codes shown even for successful tool execution. Working directory persists 
     });
 
     try {
+      // Determine working directory based on workspace type
+      // In container mode: use /workspace (where project is mounted)
+      // In local mode: use the context's working directory or project directory
+      let workingDirectory: string | undefined;
+
+      // Check if this is container mode by looking at workspace manager type name
+      const isContainerMode = workspaceManager.constructor.name === 'WorkspaceContainerManager';
+
+      if (isContainerMode) {
+        // Container always uses /workspace as the base directory
+        workingDirectory = '/workspace';
+      } else {
+        // Local mode uses the actual project directory
+        workingDirectory = context.workingDirectory;
+      }
+
+      logger.debug('Workspace execution directory resolved', {
+        sessionId,
+        isContainerMode,
+        workingDirectory,
+        originalContext: context.workingDirectory,
+      });
+
       // Execute in workspace
       const result = await workspaceManager.executeInWorkspace(sessionId, {
         command: ['sh', '-c', command],
-        workingDirectory: context.workingDirectory,
+        workingDirectory,
         environment: context.processEnv,
         timeout: 300000, // 5 minute default timeout
       });
