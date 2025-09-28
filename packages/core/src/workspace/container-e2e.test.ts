@@ -110,7 +110,7 @@ describe('Container E2E Test', () => {
       expect(workspaceInfo).toBeDefined();
       expect(workspaceInfo?.containerId).toMatch(/^workspace-/);
       expect(workspaceInfo?.clonePath).not.toBe(tempProjectDir);
-      expect(workspaceInfo?.clonePath).toContain('.lace/clones');
+      expect(workspaceInfo?.clonePath).toContain('/clones/');
 
       // Verify the clone was created
       expect(existsSync(workspaceInfo!.clonePath)).toBe(true);
@@ -127,7 +127,7 @@ describe('Container E2E Test', () => {
       const toolContext: ToolContext = {
         agent: mockAgent,
         signal: new AbortController().signal,
-        workingDirectory: tempProjectDir,
+        workingDirectory: '/workspace', // Use container's working directory
         toolTempDir: tempProjectDir,
       };
 
@@ -136,7 +136,10 @@ describe('Container E2E Test', () => {
       const pwdResult = await bashTool.execute({ command: 'pwd' }, toolContext);
 
       expect(pwdResult.status).toBe('completed');
-      const pwdOutput = pwdResult.output as any;
+      // Parse the JSON from the content
+      const pwdContent = pwdResult.content[0];
+      expect(pwdContent.type).toBe('text');
+      const pwdOutput = JSON.parse((pwdContent as any).text);
       expect(pwdOutput.exitCode).toBe(0);
       // In container, working directory should be /workspace
       expect(pwdOutput.stdoutPreview).toContain('/workspace');
@@ -154,13 +157,16 @@ describe('Container E2E Test', () => {
       const readOriginal = await readTool.execute({ path: 'test.txt' }, toolContext);
 
       expect(readOriginal.status).toBe('completed');
-      expect(readOriginal.output).toContain('Original content from host');
+      const readContent = readOriginal.content[0];
+      expect(readContent.type).toBe('text');
+      expect((readContent as any).text).toContain('Original content from host');
 
       // Test 4: File created in container should be in clone
       const readContainerFile = await readTool.execute({ path: 'container-file.txt' }, toolContext);
 
       expect(readContainerFile.status).toBe('completed');
-      expect(readContainerFile.output).toContain('Created in container');
+      const containerFileContent = readContainerFile.content[0];
+      expect((containerFileContent as any).text).toContain('Created in container');
 
       // Test 5: Write file using FileWriteTool (should write to clone)
       filesRead.add('test.txt'); // Mark as read to allow writes
@@ -183,7 +189,8 @@ describe('Container E2E Test', () => {
       const catResult = await bashTool.execute({ command: 'cat tool-created.txt' }, toolContext);
 
       expect(catResult.status).toBe('completed');
-      const catOutput = catResult.output as any;
+      const catContent = catResult.content[0];
+      const catOutput = JSON.parse((catContent as any).text);
       expect(catOutput.stdoutPreview).toContain('Created by FileWriteTool in workspace');
 
       // Test 8: Verify container isolation - changes don't affect host
@@ -225,12 +232,9 @@ describe('Container E2E Test', () => {
 
     // Container should exist
     const listBefore = execSync('container list --format json', { encoding: 'utf-8' });
-    const containersBefore = listBefore
-      .split('\n')
-      .filter((line) => line)
-      .map((line) => JSON.parse(line));
+    const containersBefore = JSON.parse(listBefore || '[]');
 
-    const containerExists = containersBefore.some((c) => c.id === containerId);
+    const containerExists = containersBefore.some((c) => c.configuration?.id === containerId);
     expect(containerExists).toBe(true);
 
     // Destroy session
@@ -241,15 +245,11 @@ describe('Container E2E Test', () => {
       encoding: 'utf-8',
     });
 
-    if (listAfter && listAfter !== '[]') {
-      const containersAfter = listAfter
-        .split('\n')
-        .filter((line) => line && line !== '[]')
-        .map((line) => JSON.parse(line));
-
-      const containerStillExists = containersAfter.some((c) => c.id === containerId);
-      expect(containerStillExists).toBe(false);
-    }
+    const containersAfter = JSON.parse(listAfter || '[]');
+    const containerStillExists = containersAfter.some(
+      (c: any) => c.configuration?.id === containerId
+    );
+    expect(containerStillExists).toBe(false);
 
     // Clone directory should be removed
     expect(existsSync(workspaceInfo!.clonePath)).toBe(false);
