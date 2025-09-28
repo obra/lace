@@ -1,7 +1,7 @@
 // ABOUTME: Simplified callback-free tool execution engine
 // ABOUTME: Handles tool registration and execution - Agent owns approval flow
 
-import { ToolResult, ToolContext, ToolCall } from '~/tools/types';
+import { ToolResult, ToolContext, ToolCall, PermissionOverrideMode } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
 import { mkdirSync } from 'fs';
@@ -32,6 +32,7 @@ import type { Session } from '~/sessions/session';
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
   private envManager: ProjectEnvironmentManager;
+  private permissionOverrideMode: PermissionOverrideMode = 'normal';
 
   // Constants for temp directory naming
   private static readonly TOOL_CALL_TEMP_PREFIX = 'tool-call-';
@@ -62,6 +63,27 @@ export class ToolExecutor {
     const nativeTools = this.getNativeTools();
     const mcpTools = this.getMCPTools();
     return [...nativeTools, ...mcpTools];
+  }
+
+  setPermissionOverrideMode(mode: PermissionOverrideMode): void {
+    this.permissionOverrideMode = mode;
+  }
+
+  getEffectivePolicy(tool: Tool, configuredPolicy: string): string {
+    switch (this.permissionOverrideMode) {
+      case 'yolo':
+        return 'allow';
+
+      case 'read-only':
+        if (tool.annotations?.readOnlySafe) {
+          return 'allow';
+        }
+        return 'deny';
+
+      case 'normal':
+      default:
+        return configuredPolicy;
+    }
   }
 
   /**

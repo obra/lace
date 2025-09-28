@@ -17,6 +17,11 @@ export const SessionConfigurationSchema = z.object({
   promptTemplate: z.string().optional(),
   specialInstructions: z.string().optional(),
   workspaceMode: z.enum(['container', 'local']).optional(), // Default to 'local' for backwards compatibility
+  runtimeOverrides: z
+    .object({
+      permissionMode: z.enum(['normal', 'yolo', 'read-only']).optional(),
+    })
+    .optional(),
 });
 
 export const AgentConfigurationSchema = SessionConfigurationSchema.extend({

@@ -2812,10 +2812,13 @@ export class Agent extends EventEmitter {
       return 'granted'; // Safe internal tools are always allowed
     }
 
-    // Check specific tool policy
-    const policy = session.getToolPolicy(toolCall.name);
+    // Check specific tool policy with permission override mode
+    const configuredPolicy = session.getToolPolicy(toolCall.name);
+    const effectivePolicy = tool
+      ? this._toolExecutor.getEffectivePolicy(tool, configuredPolicy)
+      : configuredPolicy;
 
-    switch (policy) {
+    switch (effectivePolicy) {
       case 'allow':
         return 'granted';
       case 'deny':

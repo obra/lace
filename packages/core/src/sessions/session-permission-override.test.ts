@@ -49,7 +49,7 @@ describe('Session Permission Override', () => {
     expect(session.getPermissionOverrideMode()).toBe('normal');
   });
 
-  it.skip('should update permission mode', async () => {
+  it('should update permission mode', async () => {
     const session = await Session.create({
       projectId: testProject.getId(),
       name: 'Test Session',
@@ -62,7 +62,7 @@ describe('Session Permission Override', () => {
     expect(session.getPermissionOverrideMode()).toBe('read-only');
   });
 
-  it.skip('should persist permission mode', async () => {
+  it('should persist permission mode', async () => {
     const session = await Session.create({
       projectId: testProject.getId(),
       name: 'Test Session',
@@ -86,7 +86,7 @@ describe('Session Permission Override', () => {
     expect(reloaded?.getPermissionOverrideMode()).toBe('normal');
   });
 
-  it.skip('should update all agent tool executors when mode changes', async () => {
+  it('should update all agent tool executors when mode changes', async () => {
     const session = await Session.create({
       projectId: testProject.getId(),
       name: 'Test Session',

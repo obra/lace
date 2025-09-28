@@ -814,9 +814,7 @@ export class Session {
 
     // Update all agents' tool executors
     for (const agent of this._agents.values()) {
-      // TODO: Uncomment when ToolExecutor.setPermissionOverrideMode is implemented in Phase 3
-      // agent.toolExecutor.setPermissionOverrideMode(mode);
-      void agent; // Suppress unused variable warning
+      agent.toolExecutor.setPermissionOverrideMode(mode);
     }
 
     // Persist to database

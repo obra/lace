@@ -71,6 +71,10 @@ export default [
   route('api/sessions/:sessionId', 'routes/api.sessions.$sessionId.ts'),
   route('api/sessions/:sessionId/agents', 'routes/api.sessions.$sessionId.agents.ts'),
   route('api/sessions/:sessionId/configuration', 'routes/api.sessions.$sessionId.configuration.ts'),
+  route(
+    'api/sessions/:sessionId/permission-mode',
+    'routes/api.sessions.$sessionId.permission-mode.ts'
+  ),
   route('api/sessions/:sessionId/files', 'routes/api.sessions.$sessionId.files.ts'),
   route('api/sessions/:sessionId/files/*', 'routes/api.sessions.$sessionId.files.$path.ts'),
 
