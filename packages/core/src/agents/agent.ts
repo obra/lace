@@ -2884,13 +2884,30 @@ export class Agent extends EventEmitter {
         return undefined;
       }
 
-      // If thread has a sessionId, get the session to find the project
+      // If thread has a sessionId, get the session's working directory
+      // This is important for container workspaces where session uses clone path
       if (thread.sessionId) {
         logger.debug('Agent._getWorkingDirectory() - thread has sessionId, looking up session', {
           threadId: this._threadId,
           sessionId: thread.sessionId,
         });
 
+        // Try to get the full Session instance first (for workspace-aware path)
+        const sessionInstance = Session.getByIdSync(thread.sessionId as ThreadId);
+        if (sessionInstance) {
+          const workingDir = sessionInstance.getWorkingDirectory();
+          logger.debug(
+            'Agent._getWorkingDirectory() - got working directory from Session instance',
+            {
+              threadId: this._threadId,
+              sessionId: thread.sessionId,
+              workingDirectory: workingDir,
+            }
+          );
+          return workingDir;
+        }
+
+        // Fallback to session data if instance not available
         const session = Session.getSession(thread.sessionId);
         logger.debug('Agent._getWorkingDirectory() - got session from sessionId', {
           threadId: this._threadId,
