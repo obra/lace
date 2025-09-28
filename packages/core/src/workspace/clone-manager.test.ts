@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CloneManager } from './clone-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
@@ -84,13 +84,30 @@ describe('CloneManager', () => {
       );
     });
 
-    it('should throw error if project is not a git repository', async () => {
+    it('should auto-initialize git for non-git directories', async () => {
       const nonGitDir = join(testDir, 'non-git');
       mkdirSync(nonGitDir);
 
-      await expect(CloneManager.createSessionClone(nonGitDir, 'session-1')).rejects.toThrow(
-        'not a git repository'
-      );
+      // Create a test file to verify it gets committed
+      writeFileSync(join(nonGitDir, 'test.txt'), 'Test content');
+
+      const sessionId = 'session-auto-init';
+      const clonePath = await CloneManager.createSessionClone(nonGitDir, sessionId);
+
+      // Should have created a clone successfully
+      expect(existsSync(clonePath)).toBe(true);
+
+      // Clone should be a git repository
+      const gitDir = join(clonePath, '.git');
+      expect(existsSync(gitDir)).toBe(true);
+
+      // Test file should be in the clone
+      const testFilePath = join(clonePath, 'test.txt');
+      expect(existsSync(testFilePath)).toBe(true);
+      expect(readFileSync(testFilePath, 'utf8')).toBe('Test content');
+
+      // Original directory should now be a git repository too
+      expect(existsSync(join(nonGitDir, '.git'))).toBe(true);
     });
   });
 

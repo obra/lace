@@ -28,6 +28,8 @@ import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url_fetch';
 import { logger } from '~/utils/logger';
 import type { ToolPolicy } from '~/tools/types';
+import type { IWorkspaceManager } from '~/workspace/workspace-manager';
+import type { WorkspaceInfo } from '~/workspace/workspace-container-manager';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { MCPServerManager } from '~/mcp/server-manager';
 import type { MCPServerConnection, MCPServerConfig } from '~/config/mcp-types';
@@ -450,15 +452,72 @@ export class Session {
 
     logger.debug(`Creating session for ${sessionId}`);
 
+    // Recreate workspace for loaded session if container mode is enabled
+    let workspaceManager: IWorkspaceManager | undefined;
+    let workspaceInfo: WorkspaceInfo | undefined;
+
+    const workspaceMode = (sessionConfig.workspaceMode as 'container' | 'local') || 'local';
+    if (workspaceMode) {
+      // Create appropriate workspace manager
+      if (workspaceMode === 'container') {
+        const { WorkspaceContainerManager } = await import(
+          '~/workspace/workspace-container-manager'
+        );
+        workspaceManager = new WorkspaceContainerManager();
+      } else {
+        const { LocalWorkspaceManager } = await import('~/workspace/local-workspace-manager');
+        workspaceManager = new LocalWorkspaceManager();
+      }
+
+      // Try to get project for workspace creation
+      const project = Project.getById(sessionData.projectId);
+      if (project) {
+        try {
+          // Check if workspace already exists (from previous session)
+          workspaceInfo = await workspaceManager.inspectWorkspace(sessionId);
+
+          if (!workspaceInfo) {
+            // Create new workspace for this session
+            workspaceInfo = await workspaceManager.createWorkspace(
+              project.getWorkingDirectory(),
+              sessionId
+            );
+            logger.info('Workspace recreated for loaded session', {
+              sessionId,
+              mode: workspaceMode,
+              workspaceInfo,
+            });
+          } else {
+            logger.info('Using existing workspace for loaded session', {
+              sessionId,
+              mode: workspaceMode,
+              workspaceInfo,
+            });
+          }
+        } catch (error) {
+          logger.warn('Failed to recreate workspace for loaded session', {
+            sessionId,
+            workspaceMode,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // Continue without workspace - will fall back to local execution
+        }
+      } else {
+        logger.warn('Project not found for loaded session, skipping workspace creation', {
+          sessionId,
+          projectId: sessionData.projectId,
+        });
+      }
+    }
+
     // Create session instance, passing the TaskManager we already created
-    // Note: For loaded sessions, workspace will be recreated on demand if needed
     const session = new Session(
       sessionId,
       sessionData,
       threadManager,
       taskManager,
-      undefined,
-      undefined
+      workspaceManager,
+      workspaceInfo
     );
 
     // Create and initialize coordinator agent
