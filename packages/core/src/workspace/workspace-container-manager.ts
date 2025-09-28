@@ -4,6 +4,7 @@
 import { ContainerRuntime, ContainerConfig, ExecOptions, ExecResult } from '~/containers/types';
 import { CloneManager } from './clone-manager';
 import { logger } from '~/utils/logger';
+import type { IWorkspaceManager } from './workspace-manager';
 
 export interface WorkspaceInfo {
   sessionId: string;
@@ -13,7 +14,7 @@ export interface WorkspaceInfo {
   state: string;
 }
 
-export class WorkspaceContainerManager {
+export class WorkspaceContainerManager implements IWorkspaceManager {
   private workspaces = new Map<string, WorkspaceInfo>();
 
   constructor(private runtime: ContainerRuntime) {}

@@ -35,6 +35,12 @@ import { mkdirSync } from 'fs';
 import { join } from 'path';
 import type { TaskManagerEvent } from '~/utils/task-notifications';
 import { routeTaskNotifications } from '~/utils/task-notifications';
+import {
+  WorkspaceManagerFactory,
+  type IWorkspaceManager,
+  type WorkspaceMode,
+} from '~/workspace/workspace-manager';
+import type { WorkspaceInfo } from '~/workspace/workspace-container-manager';
 
 export interface SessionInfo {
   id: ThreadId;
@@ -56,6 +62,8 @@ export class Session {
   private _mcpServerManager: MCPServerManager;
   private _destroyed = false;
   private _projectId?: string;
+  private _workspaceManager?: IWorkspaceManager;
+  private _workspaceInfo?: WorkspaceInfo;
 
   // Task notification event handlers for proper cleanup
   private _onTaskUpdated?: (event: TaskManagerEvent) => Promise<void>;
@@ -69,7 +77,9 @@ export class Session {
     sessionId: ThreadId,
     sessionData: SessionData,
     threadManager: ThreadManager,
-    taskManager?: TaskManager
+    taskManager?: TaskManager,
+    workspaceManager?: IWorkspaceManager,
+    workspaceInfo?: WorkspaceInfo
   ) {
     this._sessionId = sessionId;
     this._sessionData = sessionData;
@@ -80,6 +90,10 @@ export class Session {
     // Use provided TaskManager or create a new one
     this._taskManager = taskManager || new TaskManager(this._sessionId, getPersistence());
 
+    // Store workspace manager and info if provided
+    this._workspaceManager = workspaceManager;
+    this._workspaceInfo = workspaceInfo;
+
     // Create session-scoped MCP server manager
     this._mcpServerManager = new MCPServerManager();
 
@@ -87,12 +101,12 @@ export class Session {
     this.setupTaskNotificationRouting();
   }
 
-  static create(options: {
+  static async create(options: {
     name?: string;
     description?: string;
     projectId: string;
     configuration?: Record<string, unknown>;
-  }): Session {
+  }): Promise<Session> {
     const name = options.name || Session.generateSessionName();
 
     // Create thread manager
@@ -123,6 +137,28 @@ export class Session {
       options.projectId,
       options.configuration
     );
+
+    // Initialize workspace manager based on configuration
+    const workspaceMode = (effectiveConfig.workspaceMode as WorkspaceMode) || 'local';
+    const workspaceManager = WorkspaceManagerFactory.create(workspaceMode);
+
+    // Get project to access working directory
+    const project = Project.load(options.projectId);
+    if (!project) {
+      throw new Error(`Project ${options.projectId} not found`);
+    }
+
+    // Create workspace for this session
+    const workspaceInfo = await workspaceManager.createWorkspace(
+      project.getWorkingDirectory(),
+      sessionData.id
+    );
+
+    logger.info('Workspace created for session', {
+      sessionId: sessionData.id,
+      mode: workspaceMode,
+      workspaceInfo,
+    });
 
     // Create TaskManager using global persistence
     // Note: We'll update this with agent creation callback after session is created
@@ -227,7 +263,14 @@ export class Session {
     // Agent will auto-initialize token budget based on model
 
     // Create session instance first, passing the TaskManager we already created
-    const session = new Session(asThreadId(threadId), sessionData, threadManager, taskManager);
+    const session = new Session(
+      asThreadId(threadId),
+      sessionData,
+      threadManager,
+      taskManager,
+      workspaceManager,
+      workspaceInfo
+    );
 
     // Create configured tool executor
     const toolExecutor = session.createConfiguredToolExecutor();
@@ -408,7 +451,15 @@ export class Session {
     logger.debug(`Creating session for ${sessionId}`);
 
     // Create session instance, passing the TaskManager we already created
-    const session = new Session(sessionId, sessionData, threadManager, taskManager);
+    // Note: For loaded sessions, workspace will be recreated on demand if needed
+    const session = new Session(
+      sessionId,
+      sessionData,
+      threadManager,
+      taskManager,
+      undefined,
+      undefined
+    );
 
     // Create and initialize coordinator agent
     let coordinatorAgent: Agent;
@@ -663,6 +714,14 @@ export class Session {
   getProjectId(): string | undefined {
     const sessionData = this.getSessionData();
     return sessionData?.projectId;
+  }
+
+  getWorkspaceManager(): IWorkspaceManager | undefined {
+    return this._workspaceManager;
+  }
+
+  getWorkspaceInfo(): WorkspaceInfo | undefined {
+    return this._workspaceInfo;
   }
 
   getWorkingDirectory(): string {
@@ -976,7 +1035,7 @@ export class Session {
     return toolExecutor;
   }
 
-  destroy(): void {
+  async destroy(): Promise<void> {
     if (this._destroyed) {
       return;
     }
@@ -996,8 +1055,18 @@ export class Session {
     }
     this._agents.clear();
 
+    // Destroy workspace if it exists
+    if (this._workspaceManager && this._workspaceInfo) {
+      try {
+        await this._workspaceManager.destroyWorkspace(this._workspaceInfo.sessionId);
+        logger.info('Workspace destroyed for session', { sessionId: this._sessionId });
+      } catch (error) {
+        logger.warn('Failed to destroy workspace', { sessionId: this._sessionId, error });
+      }
+    }
+
     // Shutdown MCP servers for this session
-    void this._mcpServerManager.shutdown();
+    await this._mcpServerManager.shutdown();
   }
 
   /**

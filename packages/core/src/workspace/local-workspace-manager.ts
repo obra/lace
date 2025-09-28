@@ -5,7 +5,8 @@ import { ExecOptions, ExecResult } from '~/containers/types';
 import { logger } from '~/utils/logger';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { WorkspaceInfo } from './workspace-container-manager';
+import type { WorkspaceInfo } from './workspace-container-manager';
+import type { IWorkspaceManager } from './workspace-manager';
 
 const execAsync = promisify(exec);
 
@@ -13,7 +14,7 @@ const execAsync = promisify(exec);
  * Local workspace manager that executes directly on the host system.
  * No containers, no cloning - uses the project directory directly.
  */
-export class LocalWorkspaceManager {
+export class LocalWorkspaceManager implements IWorkspaceManager {
   private workspaces = new Map<string, WorkspaceInfo>();
 
   /**

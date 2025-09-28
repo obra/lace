@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { Tool } from '~/tools/tool';
 import { NonEmptyString } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
+import { Session } from '~/sessions/session';
+import { logger } from '~/utils/logger';
 
 export interface BashOutput {
   command: string;
@@ -68,6 +70,22 @@ Exit codes shown even for successful tool execution. Working directory persists 
         return this.createCancellationResult();
       }
 
+      // Check if we should use workspace execution (container/isolated mode)
+      const session = this.getSessionFromContext(context);
+      const workspaceManager = session?.getWorkspaceManager();
+      const workspaceInfo = session?.getWorkspaceInfo();
+
+      if (workspaceManager && workspaceInfo) {
+        // Use workspace execution (container mode or local mode)
+        return await this.executeInWorkspace(
+          command,
+          context,
+          workspaceManager,
+          workspaceInfo.sessionId
+        );
+      }
+
+      // Fall back to standard spawn-based execution
       // Get temp file paths from ToolExecutor
       const outputPaths = this.getOutputFilePaths(context);
 
@@ -512,5 +530,82 @@ Exit codes shown even for successful tool execution. Working directory persists 
       stderr: `${toolTempDir}/stderr.txt`,
       combined: `${toolTempDir}/combined.txt`,
     };
+  }
+
+  /**
+   * Get the Session instance from the ToolContext via the Agent
+   */
+  private getSessionFromContext(context: ToolContext): Session | undefined {
+    if (!context.agent) {
+      return undefined;
+    }
+
+    // Get the thread ID from the agent
+    const threadId = context.agent.getThreadId();
+    if (!threadId) {
+      return undefined;
+    }
+
+    // Try to get the session from registry
+    return Session.getByIdSync(threadId) || undefined;
+  }
+
+  /**
+   * Execute a command in the workspace using the workspace manager
+   */
+  private async executeInWorkspace(
+    command: string,
+    context: ToolContext,
+    workspaceManager: any, // IWorkspaceManager type
+    sessionId: string
+  ): Promise<ToolResult> {
+    const startTime = Date.now();
+
+    logger.debug('Executing bash command in workspace', {
+      sessionId,
+      command: command.substring(0, 100), // Log first 100 chars
+    });
+
+    try {
+      // Execute in workspace
+      const result = await workspaceManager.executeInWorkspace(sessionId, {
+        command: ['sh', '-c', command],
+        workingDirectory: context.workingDirectory,
+        environment: context.processEnv,
+        timeout: 300000, // 5 minute default timeout
+      });
+
+      const runtime = Date.now() - startTime;
+
+      // Format the output similar to standard execution
+      const output: BashOutput = {
+        command,
+        exitCode: result.exitCode,
+        runtime,
+        stdoutPreview: result.stdout || '',
+        stderrPreview: result.stderr || '',
+        truncated: {
+          stdout: { skipped: 0, total: (result.stdout || '').split('\n').length },
+          stderr: { skipped: 0, total: (result.stderr || '').split('\n').length },
+        },
+        outputFiles: {
+          stdout: 'workspace-execution',
+          stderr: 'workspace-execution',
+          combined: 'workspace-execution',
+        },
+      };
+
+      // Return success with the output
+      return this.createResult(output, {
+        exitCode: result.exitCode,
+        runtime,
+      });
+    } catch (error) {
+      logger.warn('Failed to execute in workspace, error:', error);
+      // Return error result
+      return this.createErrorResult(
+        `Workspace execution failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 }
