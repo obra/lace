@@ -143,7 +143,7 @@ export class Session {
     const workspaceManager = WorkspaceManagerFactory.create(workspaceMode);
 
     // Get project to access working directory
-    const project = Project.load(options.projectId);
+    const project = Project.getById(options.projectId);
     if (!project) {
       throw new Error(`Project ${options.projectId} not found`);
     }
