@@ -23,8 +23,18 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
    * Create a new containerized workspace for a session
    */
   async createWorkspace(projectDir: string, sessionId: string): Promise<WorkspaceInfo> {
-    if (this.workspaces.has(sessionId)) {
-      throw new Error('Workspace already exists for session');
+    // Check if workspace already exists (in memory or on system)
+    const existing = await this.inspectWorkspace(sessionId);
+    if (existing) {
+      logger.info('Workspace already exists, returning existing', {
+        sessionId,
+        state: existing.state,
+      });
+      // Update project directory in case it was missing
+      if (!existing.projectDir) {
+        existing.projectDir = projectDir;
+      }
+      return existing;
     }
 
     logger.info('Creating workspace', { projectDir, sessionId });
@@ -111,10 +121,51 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
   }
 
   /**
-   * Get info about a workspace
+   * Get info about a workspace, checking both memory and system state
    */
   async inspectWorkspace(sessionId: string): Promise<WorkspaceInfo | null> {
-    const workspace = this.workspaces.get(sessionId);
+    // First check in-memory cache
+    let workspace = this.workspaces.get(sessionId);
+
+    // If not in memory, check if container and clone still exist on system
+    if (!workspace) {
+      const containerId = `workspace-${sessionId}`;
+
+      // Check if container exists
+      try {
+        const containerInfo = await this.runtime.inspect(containerId);
+
+        // Check if clone exists
+        const clonePath = await CloneManager.getClonePath(sessionId);
+        const { existsSync } = await import('fs');
+
+        if (containerInfo && existsSync(clonePath)) {
+          // Reconstruct workspace info from existing resources
+          workspace = {
+            sessionId,
+            projectDir: '', // Will be set when needed
+            clonePath,
+            containerId,
+            state: containerInfo.state,
+          };
+
+          // Cache it for future lookups
+          this.workspaces.set(sessionId, workspace);
+
+          logger.info('Found existing workspace resources, restored to cache', {
+            sessionId,
+            containerId,
+            clonePath,
+            state: containerInfo.state,
+          });
+        }
+      } catch (error) {
+        // Container or clone doesn't exist, return null
+        logger.debug('No existing workspace found', { sessionId, error });
+        return null;
+      }
+    }
+
     if (!workspace) {
       return null;
     }

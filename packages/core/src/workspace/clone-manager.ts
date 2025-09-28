@@ -91,6 +91,13 @@ export class CloneManager {
   }
 
   /**
+   * Get the path to a session's clone directory
+   */
+  static async getClonePath(sessionId: string): Promise<string> {
+    return join(this.CLONES_DIR, sessionId);
+  }
+
+  /**
    * List all session clones
    */
   static async listSessionClones(): Promise<string[]> {
