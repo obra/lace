@@ -11,8 +11,6 @@ import type {
   ToolAnnotations,
   ToolResultStatus,
 } from '~/tools/types';
-import { Session } from '~/sessions/session';
-import { asThreadId } from '~/threads/types';
 import { logger } from '~/utils/logger';
 
 export abstract class Tool {
@@ -116,8 +114,8 @@ export abstract class Tool {
    * File tools execute on the host, so they need to access files in the clone directory.
    */
   protected resolveWorkspacePath(path: string, context?: ToolContext): string {
-    // Get workspace info from session if available
-    const workspaceInfo = this.getWorkspaceInfo(context);
+    // Get workspace info from context (populated by ToolExecutor)
+    const workspaceInfo = context?.workspaceInfo;
 
     if (!workspaceInfo) {
       // No workspace, use standard path resolution
@@ -157,52 +155,6 @@ export abstract class Tool {
     });
 
     return resolvedPath;
-  }
-
-  /**
-   * Get workspace info from session if available
-   */
-  private getWorkspaceInfo(context?: ToolContext): any | undefined {
-    if (!context?.agent) {
-      return undefined;
-    }
-
-    const threadId = context.agent.getThreadId();
-    if (!threadId) {
-      return undefined;
-    }
-
-    const session = Session.getByIdSync(asThreadId(threadId));
-    return session?.getWorkspaceInfo();
-  }
-
-  /**
-   * Get workspace manager from session if available
-   */
-  private getWorkspaceManager(context?: ToolContext): any | undefined {
-    if (!context?.agent) {
-      return undefined;
-    }
-
-    const threadId = context.agent.getThreadId();
-    if (!threadId) {
-      return undefined;
-    }
-
-    const session = Session.getByIdSync(asThreadId(threadId));
-    return session?.getWorkspaceManager();
-  }
-
-  /**
-   * Get session ID from context
-   */
-  private getSessionId(context?: ToolContext): string | undefined {
-    if (!context?.agent) {
-      return undefined;
-    }
-
-    const threadId = context.agent.getThreadId();
-    return threadId || undefined;
   }
 
   /**

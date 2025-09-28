@@ -3,6 +3,7 @@
 
 import type { Agent } from '~/agents/agent';
 import type { CombinedTokenUsage } from '~/token-management/types';
+import type { IWorkspaceManager } from '~/workspace/workspace-manager';
 
 export interface ToolContext {
   // Execution control - required for cancellation
@@ -19,6 +20,20 @@ export interface ToolContext {
 
   // Environment variables for subprocess execution
   processEnv?: NodeJS.ProcessEnv;
+
+  // Workspace information - provided by ToolExecutor to avoid circular dependencies
+  workspaceInfo?: {
+    sessionId: string;
+    projectDir: string;
+    clonePath: string;
+    containerId: string;
+    state: string;
+    containerMountPath?: string;
+    branchName?: string;
+  };
+
+  // Workspace manager - provided by ToolExecutor to avoid circular dependencies
+  workspaceManager?: IWorkspaceManager;
 }
 
 export interface ToolAnnotations {

@@ -7,8 +7,6 @@ import { z } from 'zod';
 import { Tool } from '~/tools/tool';
 import { NonEmptyString } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
-import { Session } from '~/sessions/session';
-import { asThreadId } from '~/threads/types';
 import { logger } from '~/utils/logger';
 
 export interface BashOutput {
@@ -73,9 +71,8 @@ Exit codes shown even for successful tool execution. Working directory persists 
       }
 
       // Check if we should use workspace execution (container/isolated mode)
-      const session = this.getSessionFromContext(context);
-      const workspaceManager = session?.getWorkspaceManager();
-      const workspaceInfo = session?.getWorkspaceInfo();
+      const workspaceManager = context.workspaceManager;
+      const workspaceInfo = context.workspaceInfo;
 
       if (workspaceManager && workspaceInfo) {
         // Use workspace execution (container mode or local mode)
@@ -530,31 +527,13 @@ Exit codes shown even for successful tool execution. Working directory persists 
   }
 
   /**
-   * Get the Session instance from the ToolContext via the Agent
-   */
-  private getSessionFromContext(context: ToolContext): Session | undefined {
-    if (!context.agent) {
-      return undefined;
-    }
-
-    // Get the thread ID from the agent
-    const threadId = context.agent.getThreadId();
-    if (!threadId) {
-      return undefined;
-    }
-
-    // Try to get the session from registry
-    return Session.getByIdSync(asThreadId(threadId)) || undefined;
-  }
-
-  /**
    * Execute a command in the workspace using the workspace manager
    */
   private async executeInWorkspace(
     command: string,
     context: ToolContext,
-    workspaceManager: any, // IWorkspaceManager type
-    workspaceInfo: any // WorkspaceInfo type
+    workspaceManager: NonNullable<ToolContext['workspaceManager']>,
+    workspaceInfo: NonNullable<ToolContext['workspaceInfo']>
   ): Promise<ToolResult> {
     const startTime = Date.now();
 
@@ -587,10 +566,20 @@ Exit codes shown even for successful tool execution. Working directory persists 
       });
 
       // Execute in workspace
+      // Filter out undefined values from environment
+      const environment = context.processEnv
+        ? Object.fromEntries(
+            Object.entries(context.processEnv).filter(([_, v]) => v !== undefined) as [
+              string,
+              string,
+            ][]
+          )
+        : undefined;
+
       const result = await workspaceManager.executeInWorkspace(workspaceInfo.sessionId, {
         command: ['sh', '-c', command],
         workingDirectory,
-        environment: context.processEnv,
+        environment,
         timeout: 300000, // 5 minute default timeout
       });
 
