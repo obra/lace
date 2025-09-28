@@ -28,8 +28,6 @@ import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url_fetch';
 import { logger } from '~/utils/logger';
 import type { ToolPolicy } from '~/tools/types';
-import type { IWorkspaceManager } from '~/workspace/workspace-manager';
-import type { WorkspaceInfo } from '~/workspace/workspace-container-manager';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { MCPServerManager } from '~/mcp/server-manager';
 import type { MCPServerConnection, MCPServerConfig } from '~/config/mcp-types';
@@ -464,7 +462,7 @@ export class Session {
       if (project) {
         try {
           // Check if workspace already exists (from previous session)
-          workspaceInfo = await workspaceManager.inspectWorkspace(sessionId);
+          workspaceInfo = (await workspaceManager.inspectWorkspace(sessionId)) || undefined;
 
           if (!workspaceInfo) {
             // Create new workspace for this session

@@ -12,6 +12,7 @@ export interface WorkspaceInfo {
   clonePath: string;
   containerId: string;
   state: string;
+  containerMountPath?: string; // Path where project is mounted inside container
 }
 
 export class WorkspaceContainerManager implements IWorkspaceManager {
@@ -42,14 +43,17 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
     // Create local clone
     const clonePath = await CloneManager.createSessionClone(projectDir, sessionId);
 
+    // Define where to mount the project in the container
+    const containerMountPath = '/workspace';
+
     // Create container with clone mounted
     const containerConfig: ContainerConfig = {
       id: `workspace-${sessionId}`,
-      workingDirectory: '/workspace',
+      workingDirectory: containerMountPath,
       mounts: [
         {
           source: clonePath,
-          target: '/workspace',
+          target: containerMountPath,
           readonly: false,
         },
       ],
@@ -68,6 +72,7 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
       clonePath,
       containerId,
       state: 'running',
+      containerMountPath,
     };
 
     this.workspaces.set(sessionId, workspace);
@@ -141,12 +146,14 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
 
         if (containerInfo && existsSync(clonePath)) {
           // Reconstruct workspace info from existing resources
+          // Assume standard mount path for reconstructed workspaces
           workspace = {
             sessionId,
             projectDir: '', // Will be set when needed
             clonePath,
             containerId,
             state: containerInfo.state,
+            containerMountPath: '/workspace', // Standard mount path
           };
 
           // Cache it for future lookups

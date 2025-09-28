@@ -78,12 +78,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
 
       if (workspaceManager && workspaceInfo) {
         // Use workspace execution (container mode or local mode)
-        return await this.executeInWorkspace(
-          command,
-          context,
-          workspaceManager,
-          workspaceInfo.sessionId
-        );
+        return await this.executeInWorkspace(command, context, workspaceManager, workspaceInfo);
       }
 
       // Fall back to standard spawn-based execution
@@ -558,41 +553,40 @@ Exit codes shown even for successful tool execution. Working directory persists 
     command: string,
     context: ToolContext,
     workspaceManager: any, // IWorkspaceManager type
-    sessionId: string
+    workspaceInfo: any // WorkspaceInfo type
   ): Promise<ToolResult> {
     const startTime = Date.now();
 
     logger.debug('Executing bash command in workspace', {
-      sessionId,
+      sessionId: workspaceInfo.sessionId,
       command: command.substring(0, 100), // Log first 100 chars
     });
 
     try {
       // Determine working directory based on workspace type
-      // In container mode: use /workspace (where project is mounted)
-      // In local mode: use the context's working directory or project directory
+      // Container mode: use the container mount path from workspace info
+      // Local mode: use the context's working directory or clone path
       let workingDirectory: string | undefined;
 
-      // Check if this is container mode by looking at workspace manager type name
-      const isContainerMode = workspaceManager.constructor.name === 'WorkspaceContainerManager';
-
-      if (isContainerMode) {
-        // Container always uses /workspace as the base directory
-        workingDirectory = '/workspace';
+      if (workspaceInfo.containerMountPath) {
+        // Container mode - use the mount path where project is accessible
+        workingDirectory = workspaceInfo.containerMountPath;
       } else {
-        // Local mode uses the actual project directory
-        workingDirectory = context.workingDirectory;
+        // Local mode - use the clone path or context directory
+        // In local mode, we execute in the cloned directory
+        workingDirectory = workspaceInfo.clonePath || context.workingDirectory;
       }
 
       logger.debug('Workspace execution directory resolved', {
-        sessionId,
-        isContainerMode,
+        sessionId: workspaceInfo.sessionId,
         workingDirectory,
+        containerMountPath: workspaceInfo.containerMountPath,
+        clonePath: workspaceInfo.clonePath,
         originalContext: context.workingDirectory,
       });
 
       // Execute in workspace
-      const result = await workspaceManager.executeInWorkspace(sessionId, {
+      const result = await workspaceManager.executeInWorkspace(workspaceInfo.sessionId, {
         command: ['sh', '-c', command],
         workingDirectory,
         environment: context.processEnv,
