@@ -94,16 +94,16 @@ export class LocalWorkspaceManager implements IWorkspaceManager {
     try {
       const { stdout, stderr } = await execAsync(command, execOptions);
       return {
-        stdout: stdout || '',
-        stderr: stderr || '',
+        stdout: stdout?.toString() || '',
+        stderr: stderr?.toString() || '',
         exitCode: 0,
       };
     } catch (error: any) {
       // Command executed but returned non-zero exit code
       if (error.code !== undefined) {
         return {
-          stdout: error.stdout || '',
-          stderr: error.stderr || '',
+          stdout: error.stdout?.toString() || '',
+          stderr: error.stderr?.toString() || '',
           exitCode: typeof error.code === 'number' ? error.code : 1,
         };
       }

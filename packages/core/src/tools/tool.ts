@@ -12,6 +12,7 @@ import type {
   ToolResultStatus,
 } from '~/tools/types';
 import { Session } from '~/sessions/session';
+import { asThreadId } from '~/threads/types';
 import { logger } from '~/utils/logger';
 
 export abstract class Tool {
@@ -171,7 +172,7 @@ export abstract class Tool {
       return undefined;
     }
 
-    const session = Session.getByIdSync(threadId);
+    const session = Session.getByIdSync(asThreadId(threadId));
     return session?.getWorkspaceInfo();
   }
 
@@ -188,7 +189,7 @@ export abstract class Tool {
       return undefined;
     }
 
-    const session = Session.getByIdSync(threadId);
+    const session = Session.getByIdSync(asThreadId(threadId));
     return session?.getWorkspaceManager();
   }
 

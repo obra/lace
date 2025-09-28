@@ -8,6 +8,7 @@ import { Tool } from '~/tools/tool';
 import { NonEmptyString } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
 import { Session } from '~/sessions/session';
+import { asThreadId } from '~/threads/types';
 import { logger } from '~/utils/logger';
 
 export interface BashOutput {
@@ -547,7 +548,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
     }
 
     // Try to get the session from registry
-    return Session.getByIdSync(threadId) || undefined;
+    return Session.getByIdSync(asThreadId(threadId)) || undefined;
   }
 
   /**
@@ -596,14 +597,14 @@ Exit codes shown even for successful tool execution. Working directory persists 
       };
 
       // Return success with the output
-      return this.createResult(output, {
+      return this.createResult(output as unknown as Record<string, unknown>, {
         exitCode: result.exitCode,
         runtime,
       });
     } catch (error) {
       logger.warn('Failed to execute in workspace, error:', error);
       // Return error result
-      return this.createErrorResult(
+      return this.createError(
         `Workspace execution failed: ${error instanceof Error ? error.message : String(error)}`
       );
     }
