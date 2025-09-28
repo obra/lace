@@ -300,16 +300,15 @@ export class ToolExecutor {
       // Use the LLM-provided tool call ID and create temp directory
       const toolTempDir = await this.createToolTempDirectory(toolCall.id, context);
 
-      // Get workspace context from session
-      const workspaceInfo = session?.getWorkspaceInfo();
-      const workspaceManager = session?.getWorkspaceManager();
+      // Get workspace context from session - wait for it if needed
+      const workspaceContext = session ? await session.waitForWorkspace() : undefined;
 
       // Enhanced context with temp directory, workspace info, and workspace manager
       toolContext = {
         ...toolContext,
         toolTempDir,
-        workspaceInfo,
-        workspaceManager,
+        workspaceInfo: workspaceContext?.info,
+        workspaceManager: workspaceContext?.manager,
       };
     }
 

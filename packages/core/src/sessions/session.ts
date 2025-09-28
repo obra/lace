@@ -64,6 +64,7 @@ export class Session {
   private _projectId?: string;
   private _workspaceManager?: IWorkspaceManager;
   private _workspaceInfo?: WorkspaceInfo;
+  private _workspaceInitPromise?: Promise<void>;
   private _permissionOverrideMode: PermissionOverrideMode = 'normal';
 
   // Task notification event handlers for proper cleanup
@@ -102,12 +103,12 @@ export class Session {
     this.setupTaskNotificationRouting();
   }
 
-  static async create(options: {
+  static create(options: {
     name?: string;
     description?: string;
     projectId: string;
     configuration?: Record<string, unknown>;
-  }): Promise<Session> {
+  }): Session {
     const name = options.name || Session.generateSessionName();
 
     // Create thread manager
@@ -148,18 +149,6 @@ export class Session {
     if (!project) {
       throw new Error(`Project ${options.projectId} not found`);
     }
-
-    // Create workspace for this session
-    const workspaceInfo = await workspaceManager.createWorkspace(
-      project.getWorkingDirectory(),
-      sessionData.id
-    );
-
-    logger.info('Workspace created for session', {
-      sessionId: sessionData.id,
-      mode: workspaceMode,
-      workspaceInfo,
-    });
 
     // Create TaskManager using global persistence
     // Note: We'll update this with agent creation callback after session is created
@@ -269,8 +258,14 @@ export class Session {
       sessionData,
       threadManager,
       taskManager,
+      workspaceManager
+    );
+
+    // Start workspace creation in background (don't await)
+    session._workspaceInitPromise = session.initializeWorkspace(
       workspaceManager,
-      workspaceInfo
+      project.getWorkingDirectory(),
+      sessionData.id
     );
 
     // Create configured tool executor
@@ -455,49 +450,6 @@ export class Session {
     const { WorkspaceManagerFactory } = await import('~/workspace/workspace-manager');
     const workspaceMode = (sessionConfig.workspaceMode as 'container' | 'local') || 'local';
     const workspaceManager = WorkspaceManagerFactory.get(workspaceMode);
-    let workspaceInfo: WorkspaceInfo | undefined;
-
-    if (workspaceManager) {
-      // Try to get project for workspace creation
-      const project = Project.getById(sessionData.projectId);
-      if (project) {
-        try {
-          // Check if workspace already exists (from previous session)
-          workspaceInfo = (await workspaceManager.inspectWorkspace(sessionId)) || undefined;
-
-          if (!workspaceInfo) {
-            // Create new workspace for this session
-            workspaceInfo = await workspaceManager.createWorkspace(
-              project.getWorkingDirectory(),
-              sessionId
-            );
-            logger.info('Workspace recreated for loaded session', {
-              sessionId,
-              mode: workspaceMode,
-              workspaceInfo,
-            });
-          } else {
-            logger.info('Using existing workspace for loaded session', {
-              sessionId,
-              mode: workspaceMode,
-              workspaceInfo,
-            });
-          }
-        } catch (error) {
-          logger.warn('Failed to recreate workspace for loaded session', {
-            sessionId,
-            workspaceMode,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          // Continue without workspace - will fall back to local execution
-        }
-      } else {
-        logger.warn('Project not found for loaded session, skipping workspace creation', {
-          sessionId,
-          projectId: sessionData.projectId,
-        });
-      }
-    }
 
     // Create session instance, passing the TaskManager we already created
     const session = new Session(
@@ -505,9 +457,23 @@ export class Session {
       sessionData,
       threadManager,
       taskManager,
-      workspaceManager,
-      workspaceInfo
+      workspaceManager
     );
+
+    // Initialize workspace in background for reconstructed session
+    const project = Project.getById(sessionData.projectId);
+    if (project && workspaceManager) {
+      session._workspaceInitPromise = session.initializeWorkspaceForReconstruction(
+        workspaceManager,
+        project.getWorkingDirectory(),
+        sessionId
+      );
+    } else {
+      logger.warn('Project not found for loaded session, skipping workspace creation', {
+        sessionId,
+        projectId: sessionData.projectId,
+      });
+    }
 
     // Create and initialize coordinator agent
     let coordinatorAgent: Agent;
@@ -778,6 +744,81 @@ export class Session {
 
   getWorkspaceInfo(): WorkspaceInfo | undefined {
     return this._workspaceInfo;
+  }
+
+  /**
+   * Initialize workspace in the background
+   * Called after Session.create() to avoid blocking session creation
+   */
+  private async initializeWorkspace(
+    workspaceManager: IWorkspaceManager,
+    projectDir: string,
+    sessionId: string
+  ): Promise<void> {
+    try {
+      this._workspaceInfo = await workspaceManager.createWorkspace(projectDir, sessionId);
+      this._workspaceManager = workspaceManager;
+
+      logger.info('Workspace initialized for session', {
+        sessionId,
+        workspaceInfo: this._workspaceInfo,
+      });
+    } catch (error) {
+      logger.error('Failed to initialize workspace', { sessionId, error });
+      // Don't throw - session can still work without workspace
+    }
+  }
+
+  /**
+   * Initialize workspace for reconstructed session
+   * Checks if workspace already exists before creating a new one
+   */
+  private async initializeWorkspaceForReconstruction(
+    workspaceManager: IWorkspaceManager,
+    projectDir: string,
+    sessionId: string
+  ): Promise<void> {
+    try {
+      // Check if workspace already exists (from previous session)
+      let workspaceInfo = (await workspaceManager.inspectWorkspace(sessionId)) || undefined;
+
+      if (!workspaceInfo) {
+        // Create new workspace for this session
+        workspaceInfo = await workspaceManager.createWorkspace(projectDir, sessionId);
+        logger.info('Workspace recreated for loaded session', {
+          sessionId,
+          workspaceInfo,
+        });
+      } else {
+        logger.info('Using existing workspace for loaded session', {
+          sessionId,
+          workspaceInfo,
+        });
+      }
+
+      this._workspaceInfo = workspaceInfo;
+      this._workspaceManager = workspaceManager;
+    } catch (error) {
+      logger.warn('Failed to recreate workspace for loaded session', {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Continue without workspace - will fall back to local execution
+    }
+  }
+
+  /**
+   * Wait for workspace initialization to complete
+   * Used by tools that need workspace access
+   */
+  async waitForWorkspace(): Promise<{ manager?: IWorkspaceManager; info?: WorkspaceInfo }> {
+    if (this._workspaceInitPromise) {
+      await this._workspaceInitPromise;
+    }
+    return {
+      manager: this._workspaceManager,
+      info: this._workspaceInfo,
+    };
   }
 
   getWorkingDirectory(): string {
