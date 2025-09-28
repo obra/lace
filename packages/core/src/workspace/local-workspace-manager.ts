@@ -1,0 +1,140 @@
+// ABOUTME: Local workspace manager that runs directly on host without containers
+// ABOUTME: Provides same interface as WorkspaceContainerManager for null-container mode
+
+import { ExecOptions, ExecResult } from '~/containers/types';
+import { logger } from '~/utils/logger';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { WorkspaceInfo } from './workspace-container-manager';
+
+const execAsync = promisify(exec);
+
+/**
+ * Local workspace manager that executes directly on the host system.
+ * No containers, no cloning - uses the project directory directly.
+ */
+export class LocalWorkspaceManager {
+  private workspaces = new Map<string, WorkspaceInfo>();
+
+  /**
+   * Create a "workspace" that just uses the project directory directly
+   */
+  async createWorkspace(projectDir: string, sessionId: string): Promise<WorkspaceInfo> {
+    if (this.workspaces.has(sessionId)) {
+      throw new Error('Workspace already exists for session');
+    }
+
+    logger.info('Creating local workspace (no container)', { projectDir, sessionId });
+
+    const workspace: WorkspaceInfo = {
+      sessionId,
+      projectDir,
+      clonePath: projectDir, // No clone, use project directly
+      containerId: `local-${sessionId}`, // Fake container ID for consistency
+      state: 'running', // Always "running" for local mode
+    };
+
+    this.workspaces.set(sessionId, workspace);
+
+    logger.info('Local workspace created', { sessionId });
+
+    return workspace;
+  }
+
+  /**
+   * Destroy workspace (just remove from registry, no cleanup needed)
+   */
+  async destroyWorkspace(sessionId: string): Promise<void> {
+    this.workspaces.delete(sessionId);
+    logger.info('Local workspace removed from registry', { sessionId });
+  }
+
+  /**
+   * Execute a command locally in the project directory
+   */
+  async executeInWorkspace(sessionId: string, options: ExecOptions): Promise<ExecResult> {
+    const workspace = this.workspaces.get(sessionId);
+    if (!workspace) {
+      throw new Error('Workspace not found');
+    }
+
+    // For array commands with shell invocation, we need special handling
+    let command: string;
+    if (Array.isArray(options.command)) {
+      // If it's a shell command (sh -c), we need to properly quote the command
+      if (options.command[0] === 'sh' && options.command[1] === '-c' && options.command[2]) {
+        command = `sh -c "${options.command[2].replace(/"/g, '\\"')}"`;
+      } else {
+        command = options.command
+          .map((arg) => {
+            // Quote arguments that contain spaces or special characters
+            if (/[\s"'`$\\]/.test(arg)) {
+              return `"${arg.replace(/"/g, '\\"')}"`;
+            }
+            return arg;
+          })
+          .join(' ');
+      }
+    } else {
+      command = options.command;
+    }
+
+    const execOptions: any = {
+      cwd: options.workingDirectory || workspace.projectDir,
+      timeout: options.timeout || 30000,
+      maxBuffer: 10 * 1024 * 1024, // 10MB
+      env: {
+        ...process.env,
+        ...options.environment,
+        SESSION_ID: sessionId,
+      },
+    };
+
+    try {
+      const { stdout, stderr } = await execAsync(command, execOptions);
+      return {
+        stdout: stdout || '',
+        stderr: stderr || '',
+        exitCode: 0,
+      };
+    } catch (error: any) {
+      // Command executed but returned non-zero exit code
+      if (error.code !== undefined) {
+        return {
+          stdout: error.stdout || '',
+          stderr: error.stderr || '',
+          exitCode: typeof error.code === 'number' ? error.code : 1,
+        };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get info about a workspace
+   */
+  async inspectWorkspace(sessionId: string): Promise<WorkspaceInfo | null> {
+    return this.workspaces.get(sessionId) || null;
+  }
+
+  /**
+   * List all active workspaces
+   */
+  async listWorkspaces(): Promise<WorkspaceInfo[]> {
+    return Array.from(this.workspaces.values());
+  }
+
+  /**
+   * No path translation needed for local execution
+   */
+  translateToContainer(sessionId: string, hostPath: string): string {
+    return hostPath; // Pass through - no translation needed
+  }
+
+  /**
+   * No path translation needed for local execution
+   */
+  translateToHost(sessionId: string, containerPath: string): string {
+    return containerPath; // Pass through - no translation needed
+  }
+}
