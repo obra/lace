@@ -24,15 +24,18 @@ export interface IWorkspaceManager {
 export type WorkspaceMode = 'container' | 'local';
 
 /**
- * Factory for creating workspace managers based on mode
+ * Factory for creating workspace managers based on mode.
+ * Managers are singletons - only one instance per mode.
  */
 export class WorkspaceManagerFactory {
-  /**
-   * Create a workspace manager based on the specified mode
-   */
-  static create(mode: WorkspaceMode = 'local'): IWorkspaceManager {
-    logger.info('Creating workspace manager', { mode });
+  private static containerManager: WorkspaceContainerManager | undefined;
+  private static localManager: LocalWorkspaceManager | undefined;
 
+  /**
+   * Get the workspace manager for the specified mode.
+   * Returns the same instance for each mode (singleton pattern).
+   */
+  static get(mode: WorkspaceMode = 'local'): IWorkspaceManager {
     switch (mode) {
       case 'container':
         // For now, only support Apple containers on macOS
@@ -41,13 +44,37 @@ export class WorkspaceManagerFactory {
           logger.warn('Container mode not supported on this platform, falling back to local mode', {
             platform: process.platform,
           });
-          return new LocalWorkspaceManager();
+          return this.getLocalManager();
         }
-        return new WorkspaceContainerManager(new AppleContainerRuntime());
+        return this.getContainerManager();
 
       case 'local':
       default:
-        return new LocalWorkspaceManager();
+        return this.getLocalManager();
     }
+  }
+
+  private static getContainerManager(): WorkspaceContainerManager {
+    if (!this.containerManager) {
+      logger.info('Creating singleton container workspace manager');
+      this.containerManager = new WorkspaceContainerManager(new AppleContainerRuntime());
+    }
+    return this.containerManager;
+  }
+
+  private static getLocalManager(): LocalWorkspaceManager {
+    if (!this.localManager) {
+      logger.info('Creating singleton local workspace manager');
+      this.localManager = new LocalWorkspaceManager();
+    }
+    return this.localManager;
+  }
+
+  /**
+   * Clear singleton instances (mainly for testing)
+   */
+  static reset(): void {
+    this.containerManager = undefined;
+    this.localManager = undefined;
   }
 }

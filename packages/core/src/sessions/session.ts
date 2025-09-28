@@ -140,9 +140,9 @@ export class Session {
       options.configuration
     );
 
-    // Initialize workspace manager based on configuration
+    // Get singleton workspace manager based on configuration
     const workspaceMode = (effectiveConfig.workspaceMode as WorkspaceMode) || 'local';
-    const workspaceManager = WorkspaceManagerFactory.create(workspaceMode);
+    const workspaceManager = WorkspaceManagerFactory.get(workspaceMode);
 
     // Get project to access working directory
     const project = Project.getById(options.projectId);
@@ -452,23 +452,13 @@ export class Session {
 
     logger.debug(`Creating session for ${sessionId}`);
 
-    // Recreate workspace for loaded session if container mode is enabled
-    let workspaceManager: IWorkspaceManager | undefined;
+    // Get singleton workspace manager for loaded session
+    const { WorkspaceManagerFactory } = await import('~/workspace/workspace-manager');
+    const workspaceMode = (sessionConfig.workspaceMode as 'container' | 'local') || 'local';
+    const workspaceManager = WorkspaceManagerFactory.get(workspaceMode);
     let workspaceInfo: WorkspaceInfo | undefined;
 
-    const workspaceMode = (sessionConfig.workspaceMode as 'container' | 'local') || 'local';
-    if (workspaceMode) {
-      // Create appropriate workspace manager
-      if (workspaceMode === 'container') {
-        const { WorkspaceContainerManager } = await import(
-          '~/workspace/workspace-container-manager'
-        );
-        workspaceManager = new WorkspaceContainerManager();
-      } else {
-        const { LocalWorkspaceManager } = await import('~/workspace/local-workspace-manager');
-        workspaceManager = new LocalWorkspaceManager();
-      }
-
+    if (workspaceManager) {
       // Try to get project for workspace creation
       const project = Project.getById(sessionData.projectId);
       if (project) {
