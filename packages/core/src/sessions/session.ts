@@ -655,9 +655,8 @@ export class Session {
     }
 
     // Restore permission override mode from configuration
-    const overrideMode = sessionConfig.runtimeOverrides?.permissionMode as
-      | PermissionOverrideMode
-      | undefined;
+    const overrideMode = (sessionConfig as Partial<SessionConfiguration>).runtimeOverrides
+      ?.permissionMode as PermissionOverrideMode | undefined;
     if (overrideMode && overrideMode !== 'normal') {
       session.setPermissionOverrideMode(overrideMode);
       logger.debug(`Restored permission override mode for ${sessionId}`, { mode: overrideMode });
