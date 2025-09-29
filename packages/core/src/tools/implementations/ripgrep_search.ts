@@ -7,7 +7,14 @@ import { promisify } from 'util';
 import { Tool } from '~/tools/tool';
 import { NonEmptyString, FilePath } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
-import { TOOL_LIMITS } from '~/tools/constants';
+
+const MIN_SEARCH_RESULTS = 1;
+const MAX_SEARCH_RESULTS = 1000;
+const DEFAULT_SEARCH_RESULTS = 50;
+
+const MIN_CONTEXT_LINES = 0;
+const MAX_CONTEXT_LINES = 10;
+const DEFAULT_CONTEXT_LINES = 0;
 
 // Create promisified version of execFile for async/await usage
 const execFileAsync = promisify(childProcess.execFile);
@@ -32,15 +39,15 @@ const ripgrepSearchSchema = z.object({
   maxResults: z
     .number()
     .int('Must be an integer')
-    .min(TOOL_LIMITS.MIN_SEARCH_RESULTS, `Must be at least ${TOOL_LIMITS.MIN_SEARCH_RESULTS}`)
-    .max(TOOL_LIMITS.MAX_SEARCH_RESULTS, `Must be at most ${TOOL_LIMITS.MAX_SEARCH_RESULTS}`)
-    .default(TOOL_LIMITS.DEFAULT_SEARCH_RESULTS),
+    .min(MIN_SEARCH_RESULTS, `Must be at least ${MIN_SEARCH_RESULTS}`)
+    .max(MAX_SEARCH_RESULTS, `Must be at most ${MAX_SEARCH_RESULTS}`)
+    .default(DEFAULT_SEARCH_RESULTS),
   contextLines: z
     .number()
     .int('Must be an integer')
-    .min(0, 'Cannot be negative')
-    .max(10, 'Cannot exceed 10 lines of context')
-    .default(0),
+    .min(MIN_CONTEXT_LINES, 'Cannot be negative')
+    .max(MAX_CONTEXT_LINES, `Cannot exceed ${MAX_CONTEXT_LINES} lines of context`)
+    .default(DEFAULT_CONTEXT_LINES),
 });
 
 export class RipgrepSearchTool extends Tool {

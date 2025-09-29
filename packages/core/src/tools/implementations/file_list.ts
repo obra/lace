@@ -6,7 +6,18 @@ import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import { Tool } from '~/tools/tool';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
-import { TOOL_LIMITS } from '~/tools/constants';
+
+const MIN_DEPTH = 1;
+const MAX_DEPTH = 10;
+const DEFAULT_DEPTH = 3;
+
+const MIN_SUMMARY_THRESHOLD = 1;
+const MAX_SUMMARY_THRESHOLD = 200;
+const DEFAULT_SUMMARY_THRESHOLD = 50;
+
+const MIN_RESULTS = 1;
+const MAX_RESULTS = 1000;
+const DEFAULT_RESULTS = 50;
 
 interface TreeNode {
   name: string;
@@ -25,21 +36,21 @@ const fileListSchema = z.object({
   maxDepth: z
     .number()
     .int('Must be an integer')
-    .min(TOOL_LIMITS.MIN_DEPTH, `Must be at least ${TOOL_LIMITS.MIN_DEPTH}`)
-    .max(TOOL_LIMITS.MAX_LIST_DEPTH, `Must be at most ${TOOL_LIMITS.MAX_LIST_DEPTH}`)
-    .default(TOOL_LIMITS.DEFAULT_LIST_DEPTH),
+    .min(MIN_DEPTH, `Must be at least ${MIN_DEPTH}`)
+    .max(MAX_DEPTH, `Must be at most ${MAX_DEPTH}`)
+    .default(DEFAULT_DEPTH),
   summaryThreshold: z
     .number()
     .int('Must be an integer')
-    .min(TOOL_LIMITS.MIN_SUMMARY_THRESHOLD, `Must be at least ${TOOL_LIMITS.MIN_SUMMARY_THRESHOLD}`)
-    .max(TOOL_LIMITS.MAX_SUMMARY_THRESHOLD, `Must be at most ${TOOL_LIMITS.MAX_SUMMARY_THRESHOLD}`)
-    .default(TOOL_LIMITS.DEFAULT_SUMMARY_THRESHOLD),
+    .min(MIN_SUMMARY_THRESHOLD, `Must be at least ${MIN_SUMMARY_THRESHOLD}`)
+    .max(MAX_SUMMARY_THRESHOLD, `Must be at most ${MAX_SUMMARY_THRESHOLD}`)
+    .default(DEFAULT_SUMMARY_THRESHOLD),
   maxResults: z
     .number()
     .int('Must be an integer')
-    .min(TOOL_LIMITS.MIN_SEARCH_RESULTS, `Must be at least ${TOOL_LIMITS.MIN_SEARCH_RESULTS}`)
-    .max(TOOL_LIMITS.MAX_SEARCH_RESULTS, `Must be at most ${TOOL_LIMITS.MAX_SEARCH_RESULTS}`)
-    .default(TOOL_LIMITS.DEFAULT_SEARCH_RESULTS),
+    .min(MIN_RESULTS, `Must be at least ${MIN_RESULTS}`)
+    .max(MAX_RESULTS, `Must be at most ${MAX_RESULTS}`)
+    .default(DEFAULT_RESULTS),
 });
 
 export class FileListTool extends Tool {
