@@ -197,7 +197,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
 
       expect(result.status).toBe('completed');
       const output = result.content[0].text;
-      expect(output).toMatch(/\d+: function hello/);
+      expect(output).toMatch(/\d+→function hello/);
     });
 
     it('should use current directory as default path', async () => {
@@ -350,9 +350,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
       const output = result.content[0].text!;
 
       // Count actual matches in output
-      const matchLines = output
-        .split('\n')
-        .filter((line) => line.match(/^\s+\d+: .*uniquepattern/));
+      const matchLines = output.split('\n').filter((line) => line.match(/^\s*\d+→.*uniquepattern/));
 
       expect(matchLines.length).toBe(10);
       expect(output).toContain('Results limited to 10');
@@ -402,7 +400,7 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
 
       expect(output).toContain('file1.ts:');
       expect(output).toContain('file2.js:');
-      expect(output).toMatch(/ {2}\d+: .*hello/);
+      expect(output).toMatch(/\d+→.*hello/);
     });
 
     it('should show match count in header', async () => {

@@ -46,7 +46,9 @@ describe('FileFindTool with schema validation', () => {
   describe('Tool metadata', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('file_find');
-      expect(tool.description).toContain('Find files by name pattern');
+      expect(tool.description).toContain('Find files and directories');
+      expect(tool.description).toContain('Case-insensitive');
+      expect(tool.description).toContain('modification time');
     });
 
     it('should have proper input schema', () => {
@@ -54,8 +56,6 @@ describe('FileFindTool with schema validation', () => {
       expect(schema.type).toBe('object');
       expect(schema.properties.pattern).toBeDefined();
       expect(schema.properties.path).toBeDefined();
-      expect(schema.properties.type).toBeDefined();
-      expect(schema.properties.caseSensitive).toBeDefined();
       expect(schema.properties.maxDepth).toBeDefined();
       expect(schema.properties.includeHidden).toBeDefined();
       expect(schema.properties.maxResults).toBeDefined();
@@ -84,19 +84,6 @@ describe('FileFindTool with schema validation', () => {
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
       expect(result.content[0].text).toContain('Cannot be empty');
-    });
-
-    it('should reject invalid type enum', async () => {
-      const result = await tool.execute(
-        {
-          pattern: '*.ts',
-          type: 'invalid',
-        },
-        { signal: new AbortController().signal }
-      );
-
-      expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('ValidationError');
     });
 
     it('should reject negative maxDepth', async () => {
@@ -197,45 +184,23 @@ describe('FileFindTool with schema validation', () => {
       expect(result.content[0].text).toContain('app.test.ts');
     });
 
-    it('should respect type=file filter', async () => {
+    it('should find both files and directories', async () => {
       const result = await tool.execute(
         {
           pattern: '*',
           path: testDir,
-          type: 'file',
           maxDepth: 1,
         },
         { signal: new AbortController().signal }
       );
 
       expect(result.status).toBe('completed');
+      // Should include files
       expect(result.content[0].text).toContain('README.md');
       expect(result.content[0].text).toContain('package.json');
-      // Check that no standalone directory names appear (without file extensions or paths)
-      expect(result.content[0]).toBeDefined();
-      expect(result.content[0].text).toBeDefined();
-      const lines = result.content[0].text!.split('\n');
-      const standaloneDirectories = lines.filter(
-        (line) => line.trim() === join(testDir, 'src') || line.trim() === join(testDir, 'tests')
-      );
-      expect(standaloneDirectories).toHaveLength(0);
-    });
-
-    it('should respect type=directory filter', async () => {
-      const result = await tool.execute(
-        {
-          pattern: '*',
-          path: testDir,
-          type: 'directory',
-          maxDepth: 1,
-        },
-        { signal: new AbortController().signal }
-      );
-
-      expect(result.status).toBe('completed');
-      expect(result.content[0].text).toContain('src');
-      expect(result.content[0].text).toContain('tests');
-      expect(result.content[0].text).not.toContain('README.md'); // Should not include files
+      // Should include directories (with / suffix)
+      expect(result.content[0].text).toContain('src/');
+      expect(result.content[0].text).toContain('tests/');
     });
 
     it('should respect maxDepth parameter', async () => {
@@ -266,26 +231,11 @@ describe('FileFindTool with schema validation', () => {
       expect(result.content[0].text).toContain('Button.tsx');
     });
 
-    it('should handle case sensitivity', async () => {
+    it('should be case insensitive', async () => {
       const result = await tool.execute(
         {
           pattern: 'readme.md',
           path: testDir,
-          caseSensitive: true,
-        },
-        { signal: new AbortController().signal }
-      );
-
-      expect(result.status).toBe('completed');
-      expect(result.content[0].text).toContain('No files found'); // Should not find README.md with different case
-    });
-
-    it('should handle case insensitive search by default', async () => {
-      const result = await tool.execute(
-        {
-          pattern: 'readme.md',
-          path: testDir,
-          caseSensitive: false,
         },
         { signal: new AbortController().signal }
       );
@@ -351,7 +301,6 @@ describe('FileFindTool with schema validation', () => {
         {
           pattern: 'README.md',
           path: testDir,
-          type: 'file',
         },
         { signal: new AbortController().signal }
       );
@@ -360,19 +309,19 @@ describe('FileFindTool with schema validation', () => {
       expect(result.content[0].text).toMatch(/README\.md.*\(/); // Should have size in parentheses
     });
 
-    it('should not show sizes for directories', async () => {
+    it('should show sizes and timestamps for directories', async () => {
       const result = await tool.execute(
         {
           pattern: 'src',
           path: testDir,
-          type: 'directory',
         },
         { signal: new AbortController().signal }
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toContain('src');
-      expect(result.content[0].text).not.toMatch(/src.*\(/); // Should not have size in parentheses
+      expect(result.content[0].text).toContain('src/');
+      expect(result.content[0].text).toMatch(/src\/.*\(/); // Should have size in parentheses
+      expect(result.content[0].text).toMatch(/src\/.*(-|just now)/); // Should have timestamp
     });
   });
 
