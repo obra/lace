@@ -3,7 +3,12 @@
 
 import type { ThreadId } from '~/threads/types';
 import type { Agent } from '~/agents/agent';
-import type { ContextBreakdown, CategoryDetail, ItemDetail } from './context-breakdown-types';
+import type {
+  ContextBreakdown,
+  CategoryDetail,
+  ItemDetail,
+  MessageCategoryDetail,
+} from './context-breakdown-types';
 import { estimateTokens } from '~/utils/token-estimation';
 
 export class ContextAnalyzer {
@@ -13,6 +18,7 @@ export class ContextAnalyzer {
   static async analyze(threadId: ThreadId, agent: Agent): Promise<ContextBreakdown> {
     const systemPromptTokens = await this.countSystemPromptTokens(threadId, agent);
     const { core, mcp } = await this.countToolTokens(agent);
+    const messages = await this.countMessageTokens(threadId, agent);
 
     // Get context limit from agent's provider
     const modelId = agent.model;
@@ -26,9 +32,9 @@ export class ContextAnalyzer {
       }
     }
 
-    const totalUsed = systemPromptTokens + core.tokens + mcp.tokens;
+    const totalUsed = systemPromptTokens + core.tokens + mcp.tokens + messages.tokens;
 
-    // Return minimal valid response for now
+    // Return minimal valid response for now (still missing reserved tokens)
     return {
       timestamp: new Date().toISOString(),
       modelId: agent.model,
@@ -39,16 +45,8 @@ export class ContextAnalyzer {
         systemPrompt: { tokens: systemPromptTokens },
         coreTools: core,
         mcpTools: mcp,
-        messages: {
-          tokens: 0,
-          subcategories: {
-            userMessages: { tokens: 0 },
-            agentMessages: { tokens: 0 },
-            toolCalls: { tokens: 0 },
-            toolResults: { tokens: 0 },
-          },
-        },
-        reservedForResponse: { tokens: 0 },
+        messages,
+        reservedForResponse: { tokens: 0 }, // Still TODO
         freeSpace: { tokens: contextLimit - totalUsed },
       },
     };
@@ -119,6 +117,70 @@ export class ContextAnalyzer {
     return {
       core: { tokens: coreTotal, items: coreToolItems },
       mcp: { tokens: mcpTotal, items: mcpToolItems },
+    };
+  }
+
+  private static async countMessageTokens(
+    threadId: ThreadId,
+    agent: Agent
+  ): Promise<MessageCategoryDetail> {
+    const threadManager = agent.threadManager;
+    const events = threadManager.getEvents(threadId);
+
+    let userTokens = 0;
+    let agentTokens = 0;
+    let toolCallTokens = 0;
+    let toolResultTokens = 0;
+
+    for (const event of events) {
+      switch (event.type) {
+        case 'USER_MESSAGE':
+          if (typeof event.data === 'string') {
+            userTokens += estimateTokens(event.data);
+          }
+          break;
+
+        case 'AGENT_MESSAGE':
+          if (event.data && typeof event.data === 'object' && 'content' in event.data) {
+            const agentData = event.data as { content: string };
+            agentTokens += estimateTokens(agentData.content);
+          }
+          break;
+
+        case 'TOOL_CALL':
+          // Tool calls include name + arguments
+          if (event.data && typeof event.data === 'object') {
+            const toolData = JSON.stringify(event.data);
+            toolCallTokens += estimateTokens(toolData);
+          }
+          break;
+
+        case 'TOOL_RESULT':
+          // Tool results include content blocks
+          if (event.data && typeof event.data === 'object' && 'content' in event.data) {
+            const resultData = event.data as { content: Array<{ text?: string }> };
+            if (Array.isArray(resultData.content)) {
+              for (const block of resultData.content) {
+                if (block.text) {
+                  toolResultTokens += estimateTokens(block.text);
+                }
+              }
+            }
+          }
+          break;
+      }
+    }
+
+    const totalMessageTokens = userTokens + agentTokens + toolCallTokens + toolResultTokens;
+
+    return {
+      tokens: totalMessageTokens,
+      subcategories: {
+        userMessages: { tokens: userTokens },
+        agentMessages: { tokens: agentTokens },
+        toolCalls: { tokens: toolCallTokens },
+        toolResults: { tokens: toolResultTokens },
+      },
     };
   }
 }
