@@ -11,6 +11,7 @@ import { Session } from '~/sessions/session';
 import { ApprovalDecision } from '~/tools/types';
 import type { ToolCall, ApprovalCallback } from '~/tools/types';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import { cleanupSession } from '~/test-utils/core-test-setup';
 
 // Mock the MCP SDK to avoid spawning real processes
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
@@ -90,7 +91,7 @@ describe('MCP Integration E2E', () => {
     });
 
     // Create session (will auto-initialize MCP servers)
-    session = await Session.create({
+    session = Session.create({
       name: 'Test Session',
       projectId: project.getId(),
       approvalCallback: mockApprovalCallback,
@@ -106,7 +107,7 @@ describe('MCP Integration E2E', () => {
   afterEach(async () => {
     // Cleanup session (shuts down MCP servers)
     if (session) {
-      await session.destroy();
+      await cleanupSession(session);
     }
 
     // Explicit project cleanup if it has a cleanup method

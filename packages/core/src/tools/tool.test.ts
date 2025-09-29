@@ -287,3 +287,250 @@ describe('Tool temp directory functionality', () => {
     }).toThrow('Tool temp directory not provided by ToolExecutor');
   });
 });
+
+// Test tool for workspace path resolution
+class WorkspacePathTestTool extends Tool {
+  name = 'workspace_path_test_tool';
+  description = 'Tool for testing workspace path resolution';
+  schema = z.object({
+    path: z.string(),
+  });
+
+  protected async executeValidated(
+    _args: z.infer<typeof this.schema>,
+    _context: ToolContext
+  ): Promise<ToolResult> {
+    return Promise.resolve(this.createResult('Test executed'));
+  }
+
+  // Expose protected method for testing
+  public resolveWorkspacePathPublic(path: string, context?: ToolContext): string {
+    return this.resolveWorkspacePath(path, context);
+  }
+}
+
+describe('Tool workspace path resolution security', () => {
+  let testTool: WorkspacePathTestTool;
+  const projectDir = '/home/user/project';
+  const clonePath = '/tmp/workspace/clone';
+
+  beforeEach(() => {
+    testTool = new WorkspacePathTestTool();
+  });
+
+  describe('without workspace context', () => {
+    it('should resolve relative paths against working directory', () => {
+      const context: ToolContext = {
+        signal: new AbortController().signal,
+        workingDirectory: '/home/user/current',
+      };
+
+      const resolved = testTool.resolveWorkspacePathPublic('file.txt', context);
+      expect(resolved).toBe(join('/home/user/current', 'file.txt'));
+    });
+
+    it('should pass through absolute paths unchanged', () => {
+      const context: ToolContext = {
+        signal: new AbortController().signal,
+      };
+
+      const resolved = testTool.resolveWorkspacePathPublic('/absolute/path/file.txt', context);
+      expect(resolved).toBe('/absolute/path/file.txt');
+    });
+  });
+
+  describe('with workspace context - absolute paths', () => {
+    it('should translate absolute paths inside project to clone directory', () => {
+      const context: ToolContext = {
+        signal: new AbortController().signal,
+        workspaceInfo: {
+          projectDir,
+          clonePath,
+          type: 'local',
+        },
+      };
+
+      const inputPath = join(projectDir, 'src', 'file.ts');
+      const resolved = testTool.resolveWorkspacePathPublic(inputPath, context);
+      expect(resolved).toBe(join(clonePath, 'src', 'file.ts'));
+    });
+
+    it('should reject absolute paths trying to escape project via parent references', () => {
+      const context: ToolContext = {
+        signal: new AbortController().signal,
+        workspaceInfo: {
+          projectDir,
+          clonePath,
+          type: 'local',
+        },
+      };
+
+      // Try to escape using ../../ to go outside project
+      const attackPath = join(projectDir, '..', '..', 'etc', 'passwd');
+
+      expect(() => {
+        testTool.resolveWorkspacePathPublic(attackPath, context);
+      }).toThrow('Access denied: Path');
+      expect(() => {
+        testTool.resolveWorkspacePathPublic(attackPath, context);
+      }).toThrow('outside the workspace directory');
+    });
+
+    it('should reject absolute paths completely outside project directory', () => {
+      const context: ToolContext = {
+        signal: new AbortController().signal,
+        workspaceInfo: {
+          projectDir,
+          clonePath,
+          type: 'local',
+        },
+      };
+
+      expect(() => {
+        testTool.resolveWorkspacePathPublic('/etc/passwd', context);
+      }).toThrow('Access denied: Path');
+      expect(() => {
+        testTool.resolveWorkspacePathPublic('/etc/passwd', context);
+      }).toThrow('outside the workspace directory');
+    });
+  });
+
+  describe('with workspace context - relative paths', () => {
+    it('should resolve relative paths against clone directory', () => {
+      const context: ToolContext = {
+        signal: new AbortController().signal,
+        workspaceInfo: {
+          projectDir,
+          clonePath,
+          type: 'local',
+        },
+      };
+
+      const resolved = testTool.resolveWorkspacePathPublic('src/file.ts', context);
+      expect(resolved).toBe(join(clonePath, 'src', 'file.ts'));
+    });
+
+    it('should reject relative paths with parent references that escape workspace', () => {
+      const context: ToolContext = {
+        signal: new AbortController().signal,
+        workspaceInfo: {
+          projectDir,
+          clonePath,
+          type: 'local',
+        },
+      };
+
+      // Try classic path traversal attack
+      const attackPath = '../'.repeat(10) + 'etc/passwd';
+
+      expect(() => {
+        testTool.resolveWorkspacePathPublic(attackPath, context);
+      }).toThrow('Access denied: Path');
+      expect(() => {
+        testTool.resolveWorkspacePathPublic(attackPath, context);
+      }).toThrow('resolves outside the workspace directory');
+    });
+
+    it('should reject paths with mixed slashes attempting traversal', () => {
+      const context: ToolContext = {
+        signal: new AbortController().signal,
+        workspaceInfo: {
+          projectDir,
+          clonePath,
+          type: 'local',
+        },
+      };
+
+      // Try various obfuscation techniques
+      const attackPaths = [
+        './../../../etc/passwd',
+        'src/../../../../../../etc/passwd',
+        './../../../../../../etc/passwd',
+      ];
+
+      for (const attackPath of attackPaths) {
+        expect(() => {
+          testTool.resolveWorkspacePathPublic(attackPath, context);
+        }).toThrow('Access denied');
+      }
+    });
+
+    it('should allow relative paths with parent references that stay within workspace', () => {
+      const context: ToolContext = {
+        signal: new AbortController().signal,
+        workspaceInfo: {
+          projectDir,
+          clonePath,
+          type: 'local',
+        },
+      };
+
+      // This should be fine - goes up and back down but stays within workspace
+      const safePath = 'src/deep/nested/../../file.ts';
+      const resolved = testTool.resolveWorkspacePathPublic(safePath, context);
+      expect(resolved).toBe(join(clonePath, 'src', 'file.ts'));
+    });
+  });
+
+  describe('path normalization', () => {
+    it('should handle paths with redundant slashes', () => {
+      const context: ToolContext = {
+        signal: new AbortController().signal,
+        workspaceInfo: {
+          projectDir,
+          clonePath,
+          type: 'local',
+        },
+      };
+
+      const weirdPath = 'src//deep///nested////file.ts';
+      const resolved = testTool.resolveWorkspacePathPublic(weirdPath, context);
+      expect(resolved).toBe(join(clonePath, 'src', 'deep', 'nested', 'file.ts'));
+    });
+
+    it('should handle paths with . (current directory) references', () => {
+      const context: ToolContext = {
+        signal: new AbortController().signal,
+        workspaceInfo: {
+          projectDir,
+          clonePath,
+          type: 'local',
+        },
+      };
+
+      const dotPath = './src/./deep/./file.ts';
+      const resolved = testTool.resolveWorkspacePathPublic(dotPath, context);
+      expect(resolved).toBe(join(clonePath, 'src', 'deep', 'file.ts'));
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle workspace at root of filesystem', () => {
+      const context: ToolContext = {
+        signal: new AbortController().signal,
+        workspaceInfo: {
+          projectDir: '/workspace',
+          clonePath: '/tmp/clone',
+          type: 'local',
+        },
+      };
+
+      const resolved = testTool.resolveWorkspacePathPublic('/workspace/file.ts', context);
+      expect(resolved).toBe('/tmp/clone/file.ts');
+    });
+
+    it('should handle empty relative path (current directory)', () => {
+      const context: ToolContext = {
+        signal: new AbortController().signal,
+        workspaceInfo: {
+          projectDir,
+          clonePath,
+          type: 'local',
+        },
+      };
+
+      const resolved = testTool.resolveWorkspacePathPublic('.', context);
+      expect(resolved).toBe(clonePath);
+    });
+  });
+});

@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ThreadManager } from '~/threads/thread-manager';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { logger } from '~/utils/logger';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
@@ -148,7 +148,9 @@ describe('Delegation Integration Tests', () => {
 
   afterEach(async () => {
     vi.clearAllMocks();
-    session?.destroy();
+    if (session) {
+      await cleanupSession(session);
+    }
     threadManager.close();
     // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();

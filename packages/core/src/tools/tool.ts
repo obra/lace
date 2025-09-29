@@ -3,7 +3,7 @@
 
 import { ZodType, ZodError } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { resolve, isAbsolute } from 'path';
+import { resolve, isAbsolute, relative, normalize, sep } from 'path';
 import type {
   ToolResult,
   ToolContext,
@@ -11,6 +11,7 @@ import type {
   ToolAnnotations,
   ToolResultStatus,
 } from '~/tools/types';
+import { logger } from '~/utils/logger';
 
 export abstract class Tool {
   abstract name: string;
@@ -105,6 +106,93 @@ export abstract class Tool {
 
     const workingDir = context?.workingDirectory || process.cwd();
     return resolve(workingDir, path);
+  }
+
+  /**
+   * Resolve a path with workspace support.
+   * When using workspace (container or local mode), this adjusts paths to work with the workspace.
+   * File tools execute on the host, so they need to access files in the clone directory.
+   */
+  protected resolveWorkspacePath(path: string, context?: ToolContext): string {
+    // Get workspace info from context (populated by ToolExecutor)
+    const workspaceInfo = context?.workspaceInfo;
+
+    if (!workspaceInfo) {
+      // No workspace, use standard path resolution
+      return this.resolvePath(path, context);
+    }
+
+    // Normalize all paths to prevent path traversal attacks
+    const normalizedInput = normalize(path);
+    const normalizedProjectDir = normalize(workspaceInfo.projectDir);
+    const normalizedClonePath = normalize(workspaceInfo.clonePath);
+
+    // When using a workspace, we need to resolve paths relative to the clone directory
+    // because file tools execute on the host and need to access the actual files
+    if (isAbsolute(normalizedInput)) {
+      // For absolute paths, use path.relative to check containment and get relative position
+      const relativeToProject = relative(normalizedProjectDir, normalizedInput);
+
+      // Check if path is outside project (starts with '..' or is absolute after relative())
+      if (relativeToProject.startsWith('..' + sep) || isAbsolute(relativeToProject)) {
+        // Path is outside project directory - this is a security violation
+        logger.warn('Attempted access to path outside workspace', {
+          original: path,
+          projectDir: workspaceInfo.projectDir,
+          relativePath: relativeToProject,
+        });
+        throw new Error(
+          `Access denied: Path "${path}" is outside the workspace directory "${workspaceInfo.projectDir}"`
+        );
+      }
+
+      // Path is within project - map to clone directory using relative path
+      const clonedPath = resolve(normalizedClonePath, relativeToProject);
+
+      // Verify the final path is contained within the clone directory
+      const relativeToClone = relative(normalizedClonePath, clonedPath);
+      if (relativeToClone.startsWith('..' + sep) || isAbsolute(relativeToClone)) {
+        logger.error('Path traversal detected after translation', {
+          original: path,
+          clonedPath,
+          clonePath: workspaceInfo.clonePath,
+        });
+        throw new Error(`Security violation: Path traversal detected in "${path}"`);
+      }
+
+      logger.debug('Translated absolute path to clone directory', {
+        original: path,
+        cloned: clonedPath,
+        projectDir: workspaceInfo.projectDir,
+        clonePath: workspaceInfo.clonePath,
+      });
+
+      return clonedPath;
+    }
+
+    // For relative paths, resolve against the clone directory
+    const resolvedPath = resolve(normalizedClonePath, normalizedInput);
+
+    // Verify the resolved path is contained within the clone directory
+    const relativeToClone = relative(normalizedClonePath, resolvedPath);
+    if (relativeToClone.startsWith('..' + sep) || isAbsolute(relativeToClone)) {
+      logger.warn('Relative path escaped workspace', {
+        relativePath: path,
+        resolvedPath,
+        clonePath: workspaceInfo.clonePath,
+      });
+      throw new Error(
+        `Access denied: Path "${path}" resolves outside the workspace directory "${workspaceInfo.clonePath}"`
+      );
+    }
+
+    logger.debug('Resolved relative path in workspace', {
+      relativePath: path,
+      workingDir: workspaceInfo.clonePath,
+      resolved: resolvedPath,
+    });
+
+    return resolvedPath;
   }
 
   /**

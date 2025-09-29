@@ -38,7 +38,7 @@ You MUST use task tools to track all work. Follow this workflow:
 
 #### Planning Phase
 
-- **task_create*: Break complex requests into specific, actionable tasks
+- \*_task_create_: Break complex requests into specific, actionable tasks
   - Use bulk creation for efficient planning: `task_create{ tasks: [...] })`
   - Set clear priorities based on user needs and dependencies
   - Include detailed prompts with acceptance criteria

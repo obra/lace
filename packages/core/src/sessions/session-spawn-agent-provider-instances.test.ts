@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -58,7 +58,9 @@ describe('Session.spawnAgent() with Provider Instances', () => {
   });
 
   afterEach(async () => {
-    testSession?.destroy();
+    if (testSession) {
+      await cleanupSession(testSession);
+    }
     cleanupTestProviderDefaults();
     if (providerInstanceId || openaiProviderInstanceId) {
       await cleanupTestProviderInstances(
@@ -273,7 +275,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
   });
 
   describe('Error handling and edge cases', () => {
-    it('should handle sessions and agents with different model configurations', () => {
+    it('should handle sessions and agents with different model configurations', async () => {
       // Create session with OpenAI provider configuration
       const openaiSession = Session.create({
         name: 'OpenAI Session',
@@ -302,7 +304,7 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       expect(spawnedInfo?.modelId).toBe('claude-3-5-haiku-20241022');
       expect(spawnedInfo?.name).toBe('Cross Provider Agent');
 
-      openaiSession.destroy();
+      await cleanupSession(openaiSession);
     });
 
     it('should track all spawned agents correctly', () => {

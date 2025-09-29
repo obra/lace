@@ -33,6 +33,7 @@
     "openai": "^4.77.0",
     "tiktoken": "^1.0.22",
     "turndown": "^7.2.0",
+    "uuid": "^11.0.5",
     "zod": "^3.25.69",
     "zod-to-json-schema": "^3.24.6"
   },
@@ -160,6 +161,10 @@
       "types": "./dist/test-utils/temp-lace-dir.d.ts",
       "import": "./dist/test-utils/temp-lace-dir.js"
     },
+    "./test-utils/core-test-setup": {
+      "types": "./dist/test-utils/core-test-setup.d.ts",
+      "import": "./dist/test-utils/core-test-setup.js"
+    },
     "./tasks/task-status": {
       "types": "./dist/tasks/task-status.d.ts",
       "import": "./dist/tasks/task-status.js"
@@ -187,6 +192,30 @@
     "./mcp": {
       "types": "./dist/mcp/index.d.ts",
       "import": "./dist/mcp/index.js"
+    },
+    "./tools/tool-catalog": {
+      "types": "./dist/tools/tool-catalog.d.ts",
+      "import": "./dist/tools/tool-catalog.js"
+    },
+    "./helpers/session-helper": {
+      "types": "./dist/helpers/session-helper.d.ts",
+      "import": "./dist/helpers/session-helper.js"
+    },
+    "./helpers/infrastructure-helper": {
+      "types": "./dist/helpers/infrastructure-helper.d.ts",
+      "import": "./dist/helpers/infrastructure-helper.js"
+    },
+    "./config/mcp-config-loader": {
+      "types": "./dist/config/mcp-config-loader.d.ts",
+      "import": "./dist/config/mcp-config-loader.js"
+    },
+    "./config/persona-registry": {
+      "types": "./dist/config/persona-registry.d.ts",
+      "import": "./dist/config/persona-registry.js"
+    },
+    "./providers/openrouter/dynamic-provider": {
+      "types": "./dist/providers/openrouter/dynamic-provider.d.ts",
+      "import": "./dist/providers/openrouter/dynamic-provider.js"
     }
   }
 }

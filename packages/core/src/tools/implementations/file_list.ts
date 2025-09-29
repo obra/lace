@@ -49,6 +49,7 @@ export class FileListTool extends Tool {
   annotations: ToolAnnotations = {
     readOnlyHint: true,
     idempotentHint: true,
+    readOnlySafe: true,
   };
 
   private readonly ALWAYS_SUMMARIZE = new Set([
@@ -77,7 +78,7 @@ export class FileListTool extends Tool {
         args;
 
       // Resolve path using working directory from context
-      const resolvedPath = this.resolvePath(path, context);
+      const resolvedPath = this.resolveWorkspacePath(path, context);
 
       // Validate directory exists
       try {
@@ -395,6 +396,6 @@ export class FileListTool extends Tool {
 
   // Public method for testing
   validatePath(path: string): string {
-    return this.resolvePath(path);
+    return this.resolveWorkspacePath(path);
   }
 }

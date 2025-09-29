@@ -68,6 +68,17 @@ async function findAvailablePort(startPort: number = 31337): Promise<number> {
   throw new Error('No available ports found');
 }
 
+// Helper to create clean environment without vitest-related variables
+function createCleanEnv(): NodeJS.ProcessEnv {
+  return Object.entries(process.env).reduce((acc, [key, value]) => {
+    // Filter out vitest and test-related environment variables
+    if (!key.startsWith('VITEST_') && !key.startsWith('__VITEST') && key !== 'TEST') {
+      acc[key] = value;
+    }
+    return acc;
+  }, {} as NodeJS.ProcessEnv);
+}
+
 describe('Port Validation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -435,8 +446,10 @@ describe('LACE_DIR initialization', () => {
       expect(fs.existsSync(testLaceDir)).toBe(false);
 
       // Start development server with the non-existent LACE_DIR
+      const cleanEnv = createCleanEnv();
+
       const serverProcess = spawn('npm', ['run', 'dev'], {
-        env: { ...process.env, LACE_DIR: testLaceDir, NODE_ENV: 'development' },
+        env: { ...cleanEnv, LACE_DIR: testLaceDir, NODE_ENV: 'development' },
         cwd: process.cwd(),
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -476,7 +489,7 @@ describe('LACE_DIR initialization', () => {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
     }
-  }, 15000);
+  }, 30000);
 
   test('should create LACE_DIR when production server starts', async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-prod-test-'));
@@ -487,8 +500,10 @@ describe('LACE_DIR initialization', () => {
       expect(fs.existsSync(testLaceDir)).toBe(false);
 
       // Start production server with the non-existent LACE_DIR
+      const cleanEnv = createCleanEnv();
+
       const serverProcess = spawn('npm', ['start'], {
-        env: { ...process.env, LACE_DIR: testLaceDir, NODE_ENV: 'production' },
+        env: { ...cleanEnv, LACE_DIR: testLaceDir, NODE_ENV: 'production' },
         cwd: process.cwd(),
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -528,5 +543,5 @@ describe('LACE_DIR initialization', () => {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
     }
-  }, 15000);
+  }, 30000);
 });

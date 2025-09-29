@@ -2,16 +2,22 @@
 // ABOUTME: Validates that agent-owned approval system creates events correctly
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Agent, ToolExecutor, Session, Project, ThreadManager } from '@/lib/server/lace-imports';
-import { asThreadId, type ThreadId } from '@/types/core';
-import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
+  Agent,
+  ToolExecutor,
+  Session,
+  Project,
+  ThreadManager,
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
   createTestProviderInstance,
   cleanupTestProviderInstances,
+  ApprovalDecision,
+  TestProvider,
 } from '@/lib/server/lace-imports';
-import { ApprovalDecision } from '@/lib/server/lace-imports';
-import { TestProvider } from '@/lib/server/lace-imports';
+import { cleanupSession } from '@/lib/server/lace-test-imports';
+import { asThreadId, type ThreadId } from '@/types/core';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 
 describe('Callback-Free Agent Approval Flow', () => {
   const _tempLaceDir = setupWebTest();
@@ -85,7 +91,7 @@ describe('Callback-Free Agent Approval Flow', () => {
 
     // Destroy session to cleanup all agents and resources
     if (session) {
-      session.destroy();
+      await cleanupSession(session);
     }
 
     cleanupTestProviderDefaults();

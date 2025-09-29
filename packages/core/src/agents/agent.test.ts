@@ -106,8 +106,8 @@ describe('Enhanced Agent', () => {
     // Create real project and session for proper context
     project = Project.create(
       'Agent Test Project',
-      'Project for agent testing',
       tempLaceDirContext.tempDir,
+      'Project for agent testing',
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
@@ -124,6 +124,9 @@ describe('Enhanced Agent', () => {
         },
       },
     });
+
+    // Wait for workspace initialization to complete
+    await session.waitForWorkspace();
 
     mockProvider = new MockProvider({
       content: 'Test response',

@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { ConfigurationPresetManager, SessionConfiguration } from '~/sessions/session-config';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -89,7 +89,7 @@ describe('Session Configuration Integration', () => {
   });
 
   describe('Session configuration inheritance', () => {
-    it('should inherit configuration from project', () => {
+    it('should inherit configuration from project', async () => {
       // Create session with minimal configuration to allow inheritance
       const session = Session.create({
         name: 'Test Session',
@@ -108,10 +108,10 @@ describe('Session Configuration Integration', () => {
       expect(effectiveConfig.modelId).toBe('claude-3-5-haiku-20241022'); // From session creation
       expect(effectiveConfig.maxTokens).toBe(4000); // From project
 
-      session.destroy();
+      await cleanupSession(session);
     });
 
-    it('should override project configuration with session configuration', () => {
+    it('should override project configuration with session configuration', async () => {
       const session = Session.create({
         name: 'Test Session',
         projectId,
@@ -136,10 +136,10 @@ describe('Session Configuration Integration', () => {
       expect(effectiveConfig.systemPrompt).toBe('You are a code reviewer.'); // Session override
       expect(effectiveConfig.maxTokens).toBe(4000); // From project
 
-      session.destroy();
+      await cleanupSession(session);
     });
 
-    it('should merge tool policies correctly', () => {
+    it('should merge tool policies correctly', async () => {
       // Set project tool policies
       testProject.updateConfiguration({
         toolPolicies: {
@@ -173,12 +173,12 @@ describe('Session Configuration Integration', () => {
         file_write: 'ask', // Added by session
       });
 
-      session.destroy();
+      await cleanupSession(session);
     });
   });
 
   describe('Configuration preset integration', () => {
-    it('should apply configuration preset to session', () => {
+    it('should apply configuration preset to session', async () => {
       // Create a preset
       presetManager.savePreset(
         'code-review',
@@ -227,12 +227,12 @@ describe('Session Configuration Integration', () => {
         bash: 'ask',
       });
 
-      session.destroy();
+      await cleanupSession(session);
     });
   });
 
   describe('Tool policy enforcement', () => {
-    it('should return correct tool policies from configuration', () => {
+    it('should return correct tool policies from configuration', async () => {
       const session = Session.create({
         name: 'Test Session',
         projectId,
@@ -256,12 +256,12 @@ describe('Session Configuration Integration', () => {
       expect(session.getToolPolicy('file_write')).toBe('deny');
       expect(session.getToolPolicy('unknown-tool')).toBe('ask'); // Default
 
-      session.destroy();
+      await cleanupSession(session);
     });
   });
 
   describe('Session working directory', () => {
-    it('should use session working directory override', () => {
+    it('should use session working directory override', async () => {
       const session = Session.create({
         name: 'Test Session',
         projectId,
@@ -278,10 +278,10 @@ describe('Session Configuration Integration', () => {
 
       expect(session.getWorkingDirectory()).toBe('/custom/working/directory');
 
-      session.destroy();
+      await cleanupSession(session);
     });
 
-    it('should fall back to project working directory', () => {
+    it('should fall back to project working directory', async () => {
       const session = Session.create({
         name: 'Test Session',
         projectId,
@@ -294,12 +294,12 @@ describe('Session Configuration Integration', () => {
       // Should use project working directory
       expect(session.getWorkingDirectory()).toBe('/test/path');
 
-      session.destroy();
+      await cleanupSession(session);
     });
   });
 
   describe('Session metadata', () => {
-    it('should include configuration in session info', () => {
+    it('should include configuration in session info', async () => {
       const session = Session.create({
         name: 'Test Session',
         projectId,
@@ -313,7 +313,7 @@ describe('Session Configuration Integration', () => {
       expect(info).toBeDefined();
       expect(info?.name).toBe('Test Session');
 
-      session.destroy();
+      await cleanupSession(session);
     });
   });
 });

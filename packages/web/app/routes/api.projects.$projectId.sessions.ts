@@ -15,6 +15,7 @@ const CreateSessionSchema = z.object({
   description: z.string().optional(),
   providerInstanceId: z.string().min(1, 'Provider instance ID is required'),
   modelId: z.string().min(1, 'Model ID is required'),
+  workspaceMode: z.enum(['container', 'local']).optional(),
   configuration: z.record(z.unknown()).optional(),
 });
 
@@ -76,7 +77,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     // Create session using Session.create with project inheritance
-    const session = Session.create({
+    const session = await Session.create({
       name: sessionName,
       description: validatedData.description,
       projectId: projectId,
@@ -84,6 +85,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         ...validatedData.configuration,
         providerInstanceId: validatedData.providerInstanceId,
         modelId: validatedData.modelId,
+        workspaceMode: validatedData.workspaceMode || 'container', // Default to container mode
         initialMessage: validatedData.initialMessage, // Store for pre-filling
       },
     });

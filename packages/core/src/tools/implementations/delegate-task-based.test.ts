@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { ToolContext } from '~/tools/types';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -62,7 +62,9 @@ describe('Task-Based DelegateTool Integration', () => {
 
   afterEach(async () => {
     vi.clearAllMocks();
-    testSetup?.session?.destroy();
+    if (testSetup?.session) {
+      await cleanupSession(testSetup.session);
+    }
 
     // Use the cleanup function from test setup
     if (testSetup?.cleanup) {

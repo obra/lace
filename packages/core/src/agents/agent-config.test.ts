@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -55,7 +55,9 @@ describe('Agent Configuration', () => {
 
   afterEach(async () => {
     vi.clearAllMocks();
-    testSession?.destroy();
+    if (testSession) {
+      await cleanupSession(testSession);
+    }
     cleanupTestProviderDefaults();
     // Test cleanup handled by setupCoreTest
     if (providerInstanceId) {

@@ -63,6 +63,7 @@ Example:
 
   annotations: ToolAnnotations = {
     destructiveHint: true,
+    readOnlySafe: false,
   };
 
   protected async executeValidated(args: FileEditArgs, context: ToolContext): Promise<ToolResult> {
@@ -70,7 +71,7 @@ Example:
       return this.createCancellationResult();
     }
 
-    const resolvedPath = this.resolvePath(args.path, context);
+    const resolvedPath = this.resolveWorkspacePath(args.path, context);
     const edits = args.edits;
 
     // Check read-before-write protection

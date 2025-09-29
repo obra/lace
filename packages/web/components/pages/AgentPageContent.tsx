@@ -14,6 +14,8 @@ import { SidebarContent } from '@/components/sidebar/SidebarContent';
 import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
 import { SessionEditModal } from '@/components/config/SessionEditModal';
 import { AgentCreateChatPopup } from '@/components/modals/AgentCreateChatPopup';
+import { PermissionModeBadge } from '@/components/ui/PermissionModeSelector';
+import type { PermissionOverrideMode } from '~/tools/types';
 
 import { useUIContext } from '@/components/providers/UIProvider';
 import { asThreadId, isAgentSummaryUpdatedData } from '@/types/core';
@@ -46,6 +48,7 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
 
   // Agent summary state
   const [agentSummary, setAgentSummary] = useState<string | null>(null);
+  const [permissionMode, setPermissionMode] = useState<PermissionOverrideMode>('normal');
 
   const [showSessionEditModal, setShowSessionEditModal] = useState(false);
   const [showCreateAgentPopup, setShowCreateAgentPopup] = useState(false);
@@ -73,6 +76,26 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
 
     void loadPersonas();
   }, []);
+
+  // Fetch current permission mode
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const fetchConfiguration = async () => {
+      try {
+        const response = await api.get<{
+          configuration: { runtimeOverrides?: { permissionMode?: PermissionOverrideMode } };
+        }>(`/api/sessions/${sessionId}/configuration`);
+        if (response.configuration?.runtimeOverrides?.permissionMode) {
+          setPermissionMode(response.configuration.runtimeOverrides.permissionMode);
+        }
+      } catch (error) {
+        console.error('Failed to fetch session configuration:', error);
+      }
+    };
+
+    void fetchConfiguration();
+  }, [sessionId]);
 
   // Event handlers
   const handleAgentSelect = useCallback(
@@ -215,9 +238,12 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
                 <FontAwesomeIcon icon={faBars} className="w-6 h-6" />
               </motion.button>
               <div className="flex flex-col gap-1">
-                <h1 className="font-semibold text-base-content truncate">
-                  {currentAgent ? currentAgent.name : 'Agent'}
-                </h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="font-semibold text-base-content truncate">
+                    {currentAgent ? currentAgent.name : 'Agent'}
+                  </h1>
+                  <PermissionModeBadge mode={permissionMode} />
+                </div>
                 {agentSummary && (
                   <p className="text-sm text-base-content/70 truncate">{agentSummary}</p>
                 )}

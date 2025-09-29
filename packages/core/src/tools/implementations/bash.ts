@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { Tool } from '~/tools/tool';
 import { NonEmptyString } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
+import { logger } from '~/utils/logger';
 
 export interface BashOutput {
   command: string;
@@ -45,6 +46,7 @@ Exit codes shown even for successful tool execution. Working directory persists 
     title: 'Run commands with bash',
     destructiveHint: true,
     openWorldHint: true,
+    readOnlySafe: false,
   };
 
   // Output truncation limits
@@ -68,6 +70,16 @@ Exit codes shown even for successful tool execution. Working directory persists 
         return this.createCancellationResult();
       }
 
+      // Check if we should use workspace execution (container/isolated mode)
+      const workspaceManager = context.workspaceManager;
+      const workspaceInfo = context.workspaceInfo;
+
+      if (workspaceManager && workspaceInfo) {
+        // Use workspace execution (container mode or local mode)
+        return await this.executeInWorkspace(command, context, workspaceManager, workspaceInfo);
+      }
+
+      // Fall back to standard spawn-based execution
       // Get temp file paths from ToolExecutor
       const outputPaths = this.getOutputFilePaths(context);
 
@@ -512,5 +524,96 @@ Exit codes shown even for successful tool execution. Working directory persists 
       stderr: `${toolTempDir}/stderr.txt`,
       combined: `${toolTempDir}/combined.txt`,
     };
+  }
+
+  /**
+   * Execute a command in the workspace using the workspace manager
+   */
+  private async executeInWorkspace(
+    command: string,
+    context: ToolContext,
+    workspaceManager: NonNullable<ToolContext['workspaceManager']>,
+    workspaceInfo: NonNullable<ToolContext['workspaceInfo']>
+  ): Promise<ToolResult> {
+    const startTime = Date.now();
+
+    logger.debug('Executing bash command in workspace', {
+      sessionId: workspaceInfo.sessionId,
+      command: command.substring(0, 100), // Log first 100 chars
+    });
+
+    try {
+      // Determine working directory based on workspace type
+      // Container mode: use the container mount path from workspace info
+      // Local mode: use the context's working directory or clone path
+      let workingDirectory: string | undefined;
+
+      if (workspaceInfo.containerMountPath) {
+        // Container mode - use the mount path where project is accessible
+        workingDirectory = workspaceInfo.containerMountPath;
+      } else {
+        // Local mode - use the clone path or context directory
+        // In local mode, we execute in the cloned directory
+        workingDirectory = workspaceInfo.clonePath || context.workingDirectory;
+      }
+
+      logger.debug('Workspace execution directory resolved', {
+        sessionId: workspaceInfo.sessionId,
+        workingDirectory,
+        containerMountPath: workspaceInfo.containerMountPath,
+        clonePath: workspaceInfo.clonePath,
+        originalContext: context.workingDirectory,
+      });
+
+      // Execute in workspace
+      // Filter out undefined values from environment
+      const environment = context.processEnv
+        ? Object.fromEntries(
+            Object.entries(context.processEnv).filter(([_, v]) => v !== undefined) as [
+              string,
+              string,
+            ][]
+          )
+        : undefined;
+
+      const result = await workspaceManager.executeInWorkspace(workspaceInfo.sessionId, {
+        command: ['sh', '-c', command],
+        workingDirectory,
+        environment,
+        timeout: 300000, // 5 minute default timeout
+      });
+
+      const runtime = Date.now() - startTime;
+
+      // Format the output similar to standard execution
+      const output: BashOutput = {
+        command,
+        exitCode: result.exitCode,
+        runtime,
+        stdoutPreview: result.stdout || '',
+        stderrPreview: result.stderr || '',
+        truncated: {
+          stdout: { skipped: 0, total: (result.stdout || '').split('\n').length },
+          stderr: { skipped: 0, total: (result.stderr || '').split('\n').length },
+        },
+        outputFiles: {
+          stdout: 'workspace-execution',
+          stderr: 'workspace-execution',
+          combined: 'workspace-execution',
+        },
+      };
+
+      // Return success with the output
+      return this.createResult(output as unknown as Record<string, unknown>, {
+        exitCode: result.exitCode,
+        runtime,
+      });
+    } catch (error) {
+      logger.warn('Failed to execute in workspace, error:', error);
+      // Return error result
+      return this.createError(
+        `Workspace execution failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 }

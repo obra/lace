@@ -25,6 +25,11 @@ const ConfigurationSchema = z.object({
   toolPolicies: z.record(z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
   workingDirectory: z.string().optional(),
   environmentVariables: z.record(z.string()).optional(),
+  runtimeOverrides: z
+    .object({
+      permissionMode: z.enum(['normal', 'yolo', 'read-only']).optional(),
+    })
+    .optional(),
 });
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {

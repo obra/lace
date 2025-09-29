@@ -27,7 +27,7 @@ import { FileFindTool } from '~/tools/implementations/file_find';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url_fetch';
 import { logger } from '~/utils/logger';
-import type { ToolPolicy } from '~/tools/types';
+import { ApprovalDecision, type ToolPolicy, type PermissionOverrideMode } from '~/tools/types';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { MCPServerManager } from '~/mcp/server-manager';
 import type { MCPServerConnection, MCPServerConfig } from '~/config/mcp-types';
@@ -35,6 +35,12 @@ import { mkdirSync } from 'fs';
 import { join } from 'path';
 import type { TaskManagerEvent } from '~/utils/task-notifications';
 import { routeTaskNotifications } from '~/utils/task-notifications';
+import {
+  WorkspaceManagerFactory,
+  type IWorkspaceManager,
+  type WorkspaceMode,
+} from '~/workspace/workspace-manager';
+import type { WorkspaceInfo } from '~/workspace/workspace-container-manager';
 
 export interface SessionInfo {
   id: ThreadId;
@@ -54,8 +60,11 @@ export class Session {
   private _taskManager: TaskManager;
   private _threadManager: ThreadManager;
   private _mcpServerManager: MCPServerManager;
-  private _destroyed = false;
   private _projectId?: string;
+  private _workspaceManager?: IWorkspaceManager;
+  private _workspaceInfo?: WorkspaceInfo;
+  private _workspaceInitPromise?: Promise<void>;
+  private _permissionOverrideMode: PermissionOverrideMode = 'normal';
 
   // Task notification event handlers for proper cleanup
   private _onTaskUpdated?: (event: TaskManagerEvent) => Promise<void>;
@@ -69,7 +78,9 @@ export class Session {
     sessionId: ThreadId,
     sessionData: SessionData,
     threadManager: ThreadManager,
-    taskManager?: TaskManager
+    taskManager?: TaskManager,
+    workspaceManager?: IWorkspaceManager,
+    workspaceInfo?: WorkspaceInfo
   ) {
     this._sessionId = sessionId;
     this._sessionData = sessionData;
@@ -79,6 +90,10 @@ export class Session {
 
     // Use provided TaskManager or create a new one
     this._taskManager = taskManager || new TaskManager(this._sessionId, getPersistence());
+
+    // Store workspace manager and info if provided
+    this._workspaceManager = workspaceManager;
+    this._workspaceInfo = workspaceInfo;
 
     // Create session-scoped MCP server manager
     this._mcpServerManager = new MCPServerManager();
@@ -123,6 +138,16 @@ export class Session {
       options.projectId,
       options.configuration
     );
+
+    // Get singleton workspace manager based on configuration
+    const workspaceMode = (effectiveConfig.workspaceMode as WorkspaceMode) || 'local';
+    const workspaceManager = WorkspaceManagerFactory.get(workspaceMode);
+
+    // Get project to access working directory
+    const project = Project.getById(options.projectId);
+    if (!project) {
+      throw new Error(`Project ${options.projectId} not found`);
+    }
 
     // Create TaskManager using global persistence
     // Note: We'll update this with agent creation callback after session is created
@@ -227,7 +252,20 @@ export class Session {
     // Agent will auto-initialize token budget based on model
 
     // Create session instance first, passing the TaskManager we already created
-    const session = new Session(asThreadId(threadId), sessionData, threadManager, taskManager);
+    const session = new Session(
+      asThreadId(threadId),
+      sessionData,
+      threadManager,
+      taskManager,
+      workspaceManager
+    );
+
+    // Start workspace creation in background (don't await)
+    session._workspaceInitPromise = session.initializeWorkspace(
+      workspaceManager,
+      project.getWorkingDirectory(),
+      sessionData.id
+    );
 
     // Create configured tool executor
     const toolExecutor = session.createConfiguredToolExecutor();
@@ -269,12 +307,8 @@ export class Session {
    */
   static getByIdSync(sessionId: ThreadId): Session | null {
     const existingSession = Session._sessionRegistry.get(sessionId);
-    if (existingSession && !existingSession._destroyed) {
+    if (existingSession) {
       return existingSession;
-    }
-
-    if (existingSession && existingSession._destroyed) {
-      Session._sessionRegistry.delete(sessionId);
     }
 
     return null;
@@ -307,12 +341,8 @@ export class Session {
   static async getById(sessionId: ThreadId): Promise<Session | null> {
     // Check if session already exists in registry
     const existingSession = Session._sessionRegistry.get(sessionId);
-    if (existingSession && !existingSession._destroyed) {
+    if (existingSession) {
       return existingSession;
-    }
-
-    if (existingSession && existingSession._destroyed) {
-      Session._sessionRegistry.delete(sessionId);
     }
 
     // Check if reconstruction is already in progress for this session
@@ -407,8 +437,34 @@ export class Session {
 
     logger.debug(`Creating session for ${sessionId}`);
 
+    // Get singleton workspace manager for loaded session
+    const { WorkspaceManagerFactory } = await import('~/workspace/workspace-manager');
+    const workspaceMode = (sessionConfig.workspaceMode as 'container' | 'local') || 'local';
+    const workspaceManager = WorkspaceManagerFactory.get(workspaceMode);
+
     // Create session instance, passing the TaskManager we already created
-    const session = new Session(sessionId, sessionData, threadManager, taskManager);
+    const session = new Session(
+      sessionId,
+      sessionData,
+      threadManager,
+      taskManager,
+      workspaceManager
+    );
+
+    // Initialize workspace in background for reconstructed session
+    const project = Project.getById(sessionData.projectId);
+    if (project && workspaceManager) {
+      session._workspaceInitPromise = session.initializeWorkspaceForReconstruction(
+        workspaceManager,
+        project.getWorkingDirectory(),
+        sessionId
+      );
+    } else {
+      logger.warn('Project not found for loaded session, skipping workspace creation', {
+        sessionId,
+        projectId: sessionData.projectId,
+      });
+    }
 
     // Create and initialize coordinator agent
     let coordinatorAgent: Agent;
@@ -555,6 +611,14 @@ export class Session {
       );
     }
 
+    // Restore permission override mode from configuration
+    const overrideMode = (sessionConfig as Partial<SessionConfiguration>).runtimeOverrides
+      ?.permissionMode as PermissionOverrideMode | undefined;
+    if (overrideMode && overrideMode !== 'normal') {
+      session.setPermissionOverrideMode(overrideMode);
+      logger.debug(`Restored permission override mode for ${sessionId}`, { mode: overrideMode });
+    }
+
     // Register session in registry ONLY after full reconstruction is complete
     Session._sessionRegistry.set(sessionId, session);
     logger.debug(`Session registered in registry after full reconstruction: ${sessionId}`);
@@ -584,7 +648,7 @@ export class Session {
   static getSession(sessionId: string): SessionData | null {
     // 👈 NEW: Check registry first to avoid database query for active sessions
     const existingSession = Session._sessionRegistry.get(sessionId as ThreadId);
-    if (existingSession && !existingSession._destroyed) {
+    if (existingSession) {
       // Return cached SessionData from the existing session
       return existingSession._sessionData;
     }
@@ -604,12 +668,20 @@ export class Session {
     return getPersistence().loadSessionsByProject(projectId);
   }
 
+  /**
+   * Remove a session from the registry (for test cleanup)
+   * @internal
+   */
+  static removeFromRegistry(sessionId: ThreadId): void {
+    Session._sessionRegistry.delete(sessionId);
+  }
+
   static updateSession(sessionId: string, updates: Partial<SessionData>): void {
     getPersistence().updateSession(sessionId, updates);
 
     // Update cached Session instance if it exists in registry
     const existingSession = Session._sessionRegistry.get(sessionId as ThreadId);
-    if (existingSession && !existingSession._destroyed) {
+    if (existingSession) {
       // Reload the fresh data from database into the cached instance
       const freshData = getPersistence().loadSession(sessionId);
       if (freshData) {
@@ -665,7 +737,98 @@ export class Session {
     return sessionData?.projectId;
   }
 
+  getWorkspaceManager(): IWorkspaceManager | undefined {
+    return this._workspaceManager;
+  }
+
+  getWorkspaceInfo(): WorkspaceInfo | undefined {
+    return this._workspaceInfo;
+  }
+
+  /**
+   * Initialize workspace in the background
+   * Called after Session.create() to avoid blocking session creation
+   */
+  private async initializeWorkspace(
+    workspaceManager: IWorkspaceManager,
+    projectDir: string,
+    sessionId: string
+  ): Promise<void> {
+    try {
+      this._workspaceInfo = await workspaceManager.createWorkspace(projectDir, sessionId);
+      this._workspaceManager = workspaceManager;
+
+      logger.info('Workspace initialized for session', {
+        sessionId,
+        workspaceInfo: this._workspaceInfo,
+      });
+    } catch (error) {
+      logger.error('Failed to initialize workspace', { sessionId, error });
+      // Don't throw - session can still work without workspace
+    }
+  }
+
+  /**
+   * Initialize workspace for reconstructed session
+   * Checks if workspace already exists before creating a new one
+   */
+  private async initializeWorkspaceForReconstruction(
+    workspaceManager: IWorkspaceManager,
+    projectDir: string,
+    sessionId: string
+  ): Promise<void> {
+    try {
+      // Check if workspace already exists (from previous session)
+      let workspaceInfo = (await workspaceManager.inspectWorkspace(sessionId)) || undefined;
+
+      if (!workspaceInfo) {
+        // Create new workspace for this session
+        workspaceInfo = await workspaceManager.createWorkspace(projectDir, sessionId);
+        logger.info('Workspace recreated for loaded session', {
+          sessionId,
+          workspaceInfo,
+        });
+      } else {
+        logger.info('Using existing workspace for loaded session', {
+          sessionId,
+          workspaceInfo,
+        });
+      }
+
+      this._workspaceInfo = workspaceInfo;
+      this._workspaceManager = workspaceManager;
+    } catch (error) {
+      logger.warn('Failed to recreate workspace for loaded session', {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Continue without workspace - will fall back to local execution
+    }
+  }
+
+  /**
+   * Wait for workspace initialization to complete
+   * Used by tools that need workspace access
+   */
+  async waitForWorkspace(): Promise<{ manager?: IWorkspaceManager; info?: WorkspaceInfo }> {
+    if (this._workspaceInitPromise) {
+      await this._workspaceInitPromise;
+    }
+    return {
+      manager: this._workspaceManager,
+      info: this._workspaceInfo,
+    };
+  }
+
   getWorkingDirectory(): string {
+    // If we have a workspace with a clone, use the clone directory
+    // This ensures MCP servers write to the same location as file tools
+    const workspaceInfo = this.getWorkspaceInfo();
+    if (workspaceInfo?.clonePath) {
+      return workspaceInfo.clonePath;
+    }
+
+    // Fall back to configured or project directory
     const sessionData = this.getSessionData();
     if (sessionData?.configuration?.workingDirectory) {
       return sessionData.configuration.workingDirectory as string;
@@ -679,6 +842,82 @@ export class Session {
     }
 
     return process.cwd();
+  }
+
+  getPermissionOverrideMode(): PermissionOverrideMode {
+    return this._permissionOverrideMode;
+  }
+
+  setPermissionOverrideMode(mode: PermissionOverrideMode): void {
+    this._permissionOverrideMode = mode;
+
+    // Update all agents' tool executors
+    for (const agent of this._agents.values()) {
+      agent.toolExecutor.setPermissionOverrideMode(mode);
+    }
+
+    // Auto-resolve pending approvals based on new mode
+    if (mode === 'yolo') {
+      // In yolo mode, auto-approve all pending approvals
+      for (const agent of this._agents.values()) {
+        const pendingApprovals = agent.getPendingApprovals();
+        for (const approval of pendingApprovals) {
+          agent.handleApprovalResponse(approval.toolCallId, ApprovalDecision.ALLOW_ONCE);
+          logger.info('Auto-approved pending tool call in yolo mode', {
+            sessionId: this._sessionId,
+            agentId: agent.threadId,
+            toolCallId: approval.toolCallId,
+          });
+        }
+      }
+    } else if (mode === 'read-only') {
+      // In read-only mode, check each pending approval
+      for (const agent of this._agents.values()) {
+        const pendingApprovals = agent.getPendingApprovals();
+        for (const approval of pendingApprovals) {
+          // Check if the tool is read-only safe
+          const toolCall = approval.toolCall as { name?: string };
+          const toolName = toolCall?.name || 'unknown';
+          const tool = agent.toolExecutor.getTool(toolName);
+          if (tool?.annotations?.readOnlySafe) {
+            // Auto-approve read-only safe tools
+            agent.handleApprovalResponse(approval.toolCallId, ApprovalDecision.ALLOW_ONCE);
+            logger.info('Auto-approved read-only safe tool in read-only mode', {
+              sessionId: this._sessionId,
+              agentId: agent.threadId,
+              toolCallId: approval.toolCallId,
+              toolName,
+            });
+          } else {
+            // Auto-deny non-read-only safe tools
+            agent.handleApprovalResponse(approval.toolCallId, ApprovalDecision.DENY);
+            logger.info('Auto-denied non-read-only tool in read-only mode', {
+              sessionId: this._sessionId,
+              agentId: agent.threadId,
+              toolCallId: approval.toolCallId,
+              toolName,
+            });
+          }
+        }
+      }
+    }
+    // In normal mode, leave pending approvals as-is
+
+    // Persist to database
+    const currentConfig = this._sessionData.configuration || {};
+    const newConfig = {
+      ...currentConfig,
+      runtimeOverrides: {
+        ...(currentConfig.runtimeOverrides as Record<string, unknown> | undefined),
+        permissionMode: mode,
+      },
+    };
+    Session.updateSession(this._sessionId, { configuration: newConfig });
+
+    logger.info('Permission override mode updated', {
+      sessionId: this._sessionId,
+      mode,
+    });
   }
 
   // Cached session data accessor (private)
@@ -748,6 +987,11 @@ export class Session {
 
     // Update database and cache
     Session.updateSession(this._sessionId, { configuration: newConfig });
+
+    // If permission mode changed, update all agent tool executors
+    if (validatedConfig.runtimeOverrides?.permissionMode) {
+      this.setPermissionOverrideMode(validatedConfig.runtimeOverrides.permissionMode);
+    }
   }
 
   getToolPolicy(toolName: string): ToolPolicy {
@@ -974,30 +1218,6 @@ export class Session {
     void this.initializeMCPServers();
 
     return toolExecutor;
-  }
-
-  destroy(): void {
-    if (this._destroyed) {
-      return;
-    }
-
-    this._destroyed = true;
-
-    // Clean up task notification listeners
-    this.cleanup();
-
-    // Remove from registry
-    Session._sessionRegistry.delete(this._sessionId);
-
-    // Stop and cleanup all agents (including coordinator) immediately
-    for (const agent of this._agents.values()) {
-      agent.stop();
-      agent.removeAllListeners();
-    }
-    this._agents.clear();
-
-    // Shutdown MCP servers for this session
-    void this._mcpServerManager.shutdown();
   }
 
   /**

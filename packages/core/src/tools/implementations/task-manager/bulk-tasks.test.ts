@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TaskCreateTool } from '~/tools/implementations/task-manager/tools';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
@@ -53,7 +53,9 @@ describe('Bulk Task Creation', () => {
   });
 
   afterEach(async () => {
-    session?.destroy();
+    if (session) {
+      await cleanupSession(session);
+    }
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
     }

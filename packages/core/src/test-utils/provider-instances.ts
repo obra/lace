@@ -84,7 +84,12 @@ export async function createTestProviderInstance(config: TestProviderConfig): Pr
  *
  * @param instanceIds - Array of instance IDs to remove
  */
-export async function cleanupTestProviderInstances(instanceIds: string[]): Promise<void> {
+export async function cleanupTestProviderInstances(instanceIds?: string[]): Promise<void> {
+  // If no instanceIds provided, nothing to clean up
+  if (!instanceIds || !Array.isArray(instanceIds) || instanceIds.length === 0) {
+    return;
+  }
+
   logger.debug('Cleaning up test provider instances', { instanceIds });
 
   const instanceManager = new ProviderInstanceManager();
