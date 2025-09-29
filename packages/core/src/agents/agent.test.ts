@@ -106,8 +106,8 @@ describe('Enhanced Agent', () => {
     // Create real project and session for proper context
     project = Project.create(
       'Agent Test Project',
-      'Project for agent testing',
       tempLaceDirContext.tempDir,
+      'Project for agent testing',
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
@@ -1290,8 +1290,6 @@ describe('Enhanced Agent', () => {
       // The key fix verification: temp directory is now provided
       // Before fix: "Tool temp directory not provided by ToolExecutor"
       // After fix: Tool gets temp directory and can create output files
-
-      console.log('Tool result:', JSON.stringify(result, null, 2));
 
       if (
         result.status === 'failed' &&

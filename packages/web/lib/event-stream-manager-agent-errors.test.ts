@@ -3,14 +3,16 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EventStreamManager } from '@/lib/event-stream-manager';
-import { Session, Project } from '@/lib/server/lace-imports';
-import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
+  Session,
+  Project,
   createTestProviderInstance,
   cleanupTestProviderInstances,
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '@/lib/server/lace-imports';
+import { cleanupSession } from '@/lib/server/lace-test-imports';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import type { LaceEvent, AgentErrorData } from '@/types/core';
 
 describe('EventStreamManager Agent Error Handling', () => {
@@ -65,7 +67,9 @@ describe('EventStreamManager Agent Error Handling', () => {
   afterEach(async () => {
     // Clean up in correct order
     vi.restoreAllMocks();
-    session?.destroy();
+    if (session) {
+      await cleanupSession(session);
+    }
     cleanupTestProviderDefaults();
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);

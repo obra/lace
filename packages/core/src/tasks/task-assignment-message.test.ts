@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskManager } from '~/tasks/task-manager';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
 import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
@@ -140,7 +140,9 @@ describe('Task Assignment Message Sending', () => {
   });
 
   afterEach(async () => {
-    session?.destroy();
+    if (session) {
+      await cleanupSession(session);
+    }
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
     }

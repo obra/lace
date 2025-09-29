@@ -9,6 +9,7 @@ import { mkdtempSync } from 'fs';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import { cleanupSession } from '~/test-utils/core-test-setup';
 
 describe('Real MCP Server Integration', () => {
   void useTempLaceDir();
@@ -49,10 +50,10 @@ describe('Real MCP Server Integration', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     // Cleanup session (shuts down real MCP servers)
     if (session) {
-      session.destroy();
+      await cleanupSession(session);
     }
 
     // Explicit project cleanup if it has a cleanup method

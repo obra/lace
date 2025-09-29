@@ -11,7 +11,7 @@ import {
 } from '~/tools/implementations/task-manager/tools';
 import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import {
   cleanupTestProviderInstances,
   createTestProviderInstance,
@@ -145,7 +145,9 @@ describe('Multi-Agent Task Manager Integration', () => {
 
   afterEach(async () => {
     vi.clearAllMocks();
-    session?.destroy();
+    if (session) {
+      await cleanupSession(session);
+    }
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
     }
@@ -450,7 +452,7 @@ describe('Multi-Agent Task Manager Integration', () => {
         expect(session2ListResult.content?.[0]?.text).not.toContain('Session 1 task');
       } finally {
         // Clean up second session
-        session2.destroy();
+        await cleanupSession(session2);
       }
     });
   });

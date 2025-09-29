@@ -3,7 +3,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DelegateTool } from '~/tools/implementations/delegate';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import type { ToolContext } from '~/tools/types';
 import {
   createDelegationTestSetup,
@@ -52,7 +52,9 @@ describe('DelegateTool', () => {
 
   afterEach(async () => {
     vi.clearAllMocks();
-    testSetup.session?.destroy();
+    if (testSetup.session) {
+      await cleanupSession(testSetup.session);
+    }
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);
     }

@@ -26,7 +26,14 @@ describe('LocalWorkspaceManager', () => {
     writeFileSync(join(projectDir, 'script.sh'), '#!/bin/bash\necho "Script output"');
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Clean up all workspaces from the manager
+    const workspaces = await manager.listWorkspaces();
+    for (const workspace of workspaces) {
+      await manager.destroyWorkspace(workspace.sessionId);
+    }
+
+    // Clean up filesystem
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }

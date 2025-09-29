@@ -27,7 +27,7 @@ import { FileFindTool } from '~/tools/implementations/file_find';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { UrlFetchTool } from '~/tools/implementations/url_fetch';
 import { logger } from '~/utils/logger';
-import type { ToolPolicy, PermissionOverrideMode } from '~/tools/types';
+import { ApprovalDecision, type ToolPolicy, type PermissionOverrideMode } from '~/tools/types';
 import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
 import { MCPServerManager } from '~/mcp/server-manager';
 import type { MCPServerConnection, MCPServerConfig } from '~/config/mcp-types';
@@ -60,7 +60,6 @@ export class Session {
   private _taskManager: TaskManager;
   private _threadManager: ThreadManager;
   private _mcpServerManager: MCPServerManager;
-  private _destroyed = false;
   private _projectId?: string;
   private _workspaceManager?: IWorkspaceManager;
   private _workspaceInfo?: WorkspaceInfo;
@@ -308,12 +307,8 @@ export class Session {
    */
   static getByIdSync(sessionId: ThreadId): Session | null {
     const existingSession = Session._sessionRegistry.get(sessionId);
-    if (existingSession && !existingSession._destroyed) {
+    if (existingSession) {
       return existingSession;
-    }
-
-    if (existingSession && existingSession._destroyed) {
-      Session._sessionRegistry.delete(sessionId);
     }
 
     return null;
@@ -346,12 +341,8 @@ export class Session {
   static async getById(sessionId: ThreadId): Promise<Session | null> {
     // Check if session already exists in registry
     const existingSession = Session._sessionRegistry.get(sessionId);
-    if (existingSession && !existingSession._destroyed) {
+    if (existingSession) {
       return existingSession;
-    }
-
-    if (existingSession && existingSession._destroyed) {
-      Session._sessionRegistry.delete(sessionId);
     }
 
     // Check if reconstruction is already in progress for this session
@@ -657,7 +648,7 @@ export class Session {
   static getSession(sessionId: string): SessionData | null {
     // 👈 NEW: Check registry first to avoid database query for active sessions
     const existingSession = Session._sessionRegistry.get(sessionId as ThreadId);
-    if (existingSession && !existingSession._destroyed) {
+    if (existingSession) {
       // Return cached SessionData from the existing session
       return existingSession._sessionData;
     }
@@ -677,12 +668,20 @@ export class Session {
     return getPersistence().loadSessionsByProject(projectId);
   }
 
+  /**
+   * Remove a session from the registry (for test cleanup)
+   * @internal
+   */
+  static removeFromRegistry(sessionId: ThreadId): void {
+    Session._sessionRegistry.delete(sessionId);
+  }
+
   static updateSession(sessionId: string, updates: Partial<SessionData>): void {
     getPersistence().updateSession(sessionId, updates);
 
     // Update cached Session instance if it exists in registry
     const existingSession = Session._sessionRegistry.get(sessionId as ThreadId);
-    if (existingSession && !existingSession._destroyed) {
+    if (existingSession) {
       // Reload the fresh data from database into the cached instance
       const freshData = getPersistence().loadSession(sessionId);
       if (freshData) {
@@ -856,6 +855,53 @@ export class Session {
     for (const agent of this._agents.values()) {
       agent.toolExecutor.setPermissionOverrideMode(mode);
     }
+
+    // Auto-resolve pending approvals based on new mode
+    if (mode === 'yolo') {
+      // In yolo mode, auto-approve all pending approvals
+      for (const agent of this._agents.values()) {
+        const pendingApprovals = agent.getPendingApprovals();
+        for (const approval of pendingApprovals) {
+          agent.handleApprovalResponse(approval.toolCallId, ApprovalDecision.ALLOW_ONCE);
+          logger.info('Auto-approved pending tool call in yolo mode', {
+            sessionId: this._sessionId,
+            agentId: agent.threadId,
+            toolCallId: approval.toolCallId,
+          });
+        }
+      }
+    } else if (mode === 'read-only') {
+      // In read-only mode, check each pending approval
+      for (const agent of this._agents.values()) {
+        const pendingApprovals = agent.getPendingApprovals();
+        for (const approval of pendingApprovals) {
+          // Check if the tool is read-only safe
+          const toolCall = approval.toolCall as { name?: string };
+          const toolName = toolCall?.name || 'unknown';
+          const tool = agent.toolExecutor.getTool(toolName);
+          if (tool?.annotations?.readOnlySafe) {
+            // Auto-approve read-only safe tools
+            agent.handleApprovalResponse(approval.toolCallId, ApprovalDecision.ALLOW_ONCE);
+            logger.info('Auto-approved read-only safe tool in read-only mode', {
+              sessionId: this._sessionId,
+              agentId: agent.threadId,
+              toolCallId: approval.toolCallId,
+              toolName,
+            });
+          } else {
+            // Auto-deny non-read-only safe tools
+            agent.handleApprovalResponse(approval.toolCallId, ApprovalDecision.DENY);
+            logger.info('Auto-denied non-read-only tool in read-only mode', {
+              sessionId: this._sessionId,
+              agentId: agent.threadId,
+              toolCallId: approval.toolCallId,
+              toolName,
+            });
+          }
+        }
+      }
+    }
+    // In normal mode, leave pending approvals as-is
 
     // Persist to database
     const currentConfig = this._sessionData.configuration || {};
@@ -1172,40 +1218,6 @@ export class Session {
     void this.initializeMCPServers();
 
     return toolExecutor;
-  }
-
-  async destroy(): Promise<void> {
-    if (this._destroyed) {
-      return;
-    }
-
-    this._destroyed = true;
-
-    // Clean up task notification listeners
-    this.cleanup();
-
-    // Remove from registry
-    Session._sessionRegistry.delete(this._sessionId);
-
-    // Stop and cleanup all agents (including coordinator) immediately
-    for (const agent of this._agents.values()) {
-      agent.stop();
-      agent.removeAllListeners();
-    }
-    this._agents.clear();
-
-    // Destroy workspace if it exists
-    if (this._workspaceManager && this._workspaceInfo) {
-      try {
-        await this._workspaceManager.destroyWorkspace(this._workspaceInfo.sessionId);
-        logger.info('Workspace destroyed for session', { sessionId: this._sessionId });
-      } catch (error) {
-        logger.warn('Failed to destroy workspace', { sessionId: this._sessionId, error });
-      }
-    }
-
-    // Shutdown MCP servers for this session
-    await this._mcpServerManager.shutdown();
   }
 
   /**

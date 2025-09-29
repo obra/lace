@@ -11,7 +11,7 @@ import {
   TaskViewTool,
 } from '~/tools/implementations/task-manager/tools';
 import { DelegateTool } from '~/tools/implementations/delegate';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
@@ -183,7 +183,9 @@ describe('Task Management Workflow Integration', () => {
 
   afterEach(async () => {
     vi.clearAllMocks();
-    session?.destroy();
+    if (session) {
+      await cleanupSession(session);
+    }
     // Test cleanup handled by setupCoreTest
     cleanupTestProviderDefaults();
     if (providerInstanceId) {

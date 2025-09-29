@@ -6,7 +6,7 @@ import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { Agent } from '~/agents/agent';
 import type { CreateTaskRequest, TaskContext } from '~/tasks/types';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import { TestProvider } from '~/test-utils/test-provider';
 import {
   setupTestProviderDefaults,
@@ -149,7 +149,9 @@ describe('Task Notification System - Real Integration', () => {
 
   afterEach(async () => {
     vi.clearAllMocks();
-    mainSession?.destroy();
+    if (mainSession) {
+      await cleanupSession(mainSession);
+    }
     cleanupTestProviderDefaults();
     if (providerInstanceId) {
       await cleanupTestProviderInstances([providerInstanceId]);

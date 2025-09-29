@@ -4,6 +4,8 @@
 import { useTempLaceDir, type TempLaceDirContext } from '~/test-utils/temp-lace-dir';
 import { resetPersistence } from '~/persistence/database';
 import { beforeEach, afterEach } from 'vitest';
+import { Session } from '~/sessions/session';
+import { logger } from '~/utils/logger';
 
 export interface EnhancedTempLaceDirContext extends TempLaceDirContext {
   /** Register a cleanup function to be called in afterEach */
@@ -44,4 +46,50 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
     ...tempLaceDir,
     registerCleanup: (fn: () => void | Promise<void>) => cleanupTasks.push(fn),
   };
+}
+
+/**
+ * Clean up a test session including workspace and registry removal.
+ * This replaces the Session.destroy() method which was test-only.
+ */
+export async function cleanupSession(session: Session): Promise<void> {
+  // Wait for workspace initialization if it's in progress
+  await session.waitForWorkspace();
+
+  // Stop and cleanup all agents
+  const agents = session.getAgents();
+  for (const agent of agents) {
+    agent.stop();
+    agent.removeAllListeners();
+  }
+
+  // Clear agents from session (mimics what destroy() used to do)
+  // Using unknown to avoid unsafe any operations
+  const sessionWithAgents = session as unknown as { _agents: Map<string, unknown> };
+  sessionWithAgents._agents.clear();
+
+  // Clean up task notification listeners
+  session.cleanup();
+
+  // Remove from registry
+  Session.removeFromRegistry(session.getId());
+
+  // Destroy workspace if it exists
+  const workspaceManager = session.getWorkspaceManager();
+  const workspaceInfo = session.getWorkspaceInfo();
+  if (workspaceManager && workspaceInfo) {
+    try {
+      await workspaceManager.destroyWorkspace(workspaceInfo.sessionId);
+      logger.info('Test cleanup: Workspace destroyed for session', { sessionId: session.getId() });
+    } catch (error) {
+      logger.warn('Test cleanup: Failed to destroy workspace', {
+        sessionId: session.getId(),
+        error,
+      });
+    }
+  }
+
+  // Shutdown MCP servers for this session
+  const mcpServerManager = session.getMCPServerManager();
+  await mcpServerManager.shutdown();
 }

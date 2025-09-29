@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session } from './session';
 import { Project } from '~/projects/project';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import { join } from 'path';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
@@ -56,7 +56,7 @@ describe('Session with WorkspaceManager', () => {
       expect(workspaceInfo?.state).toBe('running');
 
       // Clean up
-      await session.destroy();
+      await cleanupSession(session);
     });
 
     it('should explicitly create local workspace when mode is specified', async () => {
@@ -78,7 +78,7 @@ describe('Session with WorkspaceManager', () => {
       const workspaceInfo = session.getWorkspaceInfo();
       expect(workspaceInfo?.containerId).toMatch(/^local-/); // Local mode uses fake container ID
 
-      await session.destroy();
+      await cleanupSession(session);
     });
 
     it('should clean up workspace on session destroy', async () => {
@@ -102,7 +102,7 @@ describe('Session with WorkspaceManager', () => {
       // Mock the destroyWorkspace method to track if it's called
       const destroySpy = vi.spyOn(workspaceManager!, 'destroyWorkspace');
 
-      await session.destroy();
+      await cleanupSession(session);
 
       expect(destroySpy).toHaveBeenCalledWith(workspaceInfo!.sessionId);
     });
@@ -133,7 +133,7 @@ describe('Session with WorkspaceManager', () => {
       const workspaceInfo = session.getWorkspaceInfo();
       expect(workspaceInfo?.containerId).toMatch(/^local-/);
 
-      await session.destroy();
+      await cleanupSession(session);
 
       // Restore platform
       Object.defineProperty(process, 'platform', {
@@ -166,7 +166,7 @@ describe('Session with WorkspaceManager', () => {
       expect(workspaceInfo?.containerId).toMatch(/^workspace-/);
       expect(workspaceInfo?.clonePath).not.toBe(tempProjectDir); // Container mode creates a clone
 
-      await session.destroy();
+      await cleanupSession(session);
     });
   });
 
@@ -198,9 +198,9 @@ describe('Session with WorkspaceManager', () => {
       expect(loadedSession?.getWorkspaceInfo()).toBeDefined();
 
       // Clean up both sessions
-      await session.destroy();
+      await cleanupSession(session);
       if (loadedSession) {
-        await loadedSession.destroy();
+        await cleanupSession(loadedSession);
       }
     });
   });

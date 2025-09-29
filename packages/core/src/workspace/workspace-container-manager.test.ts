@@ -65,7 +65,9 @@ describe('WorkspaceContainerManager', () => {
       expect(workspace).toEqual({
         sessionId,
         projectDir,
-        clonePath: expect.stringContaining('/clones'),
+        containerMountPath: '/workspace',
+        clonePath: expect.stringContaining('/worktrees'),
+        branchName: `lace/session/${sessionId}`,
         containerId: expect.stringContaining(sessionId),
         state: 'running',
       });
@@ -93,14 +95,16 @@ describe('WorkspaceContainerManager', () => {
       expect(result.stdout).toContain('index.js');
     });
 
-    it('should throw error if session already has a workspace', async () => {
+    it('should return existing workspace if session already has one', async () => {
       const sessionId = 'test-session-duplicate';
 
-      await manager.createWorkspace(projectDir, sessionId);
+      const workspace1 = await manager.createWorkspace(projectDir, sessionId);
+      const workspace2 = await manager.createWorkspace(projectDir, sessionId);
 
-      await expect(manager.createWorkspace(projectDir, sessionId)).rejects.toThrow(
-        'Workspace already exists for session'
-      );
+      // Should return the same workspace
+      expect(workspace2.sessionId).toBe(workspace1.sessionId);
+      expect(workspace2.clonePath).toBe(workspace1.clonePath);
+      expect(workspace2.containerId).toBe(workspace1.containerId);
     });
   });
 
@@ -132,9 +136,9 @@ describe('WorkspaceContainerManager', () => {
 
       await manager.createWorkspace(projectDir, sessionId);
 
-      // Use python since we're using python:alpine image
+      // Use a simple echo command that should work in any container
       const result = await manager.executeInWorkspace(sessionId, {
-        command: ['python', '-c', 'print("Hello from container")'],
+        command: ['echo', 'Hello from container'],
       });
 
       expect(result.exitCode).toBe(0);
@@ -173,7 +177,9 @@ describe('WorkspaceContainerManager', () => {
       expect(info).toEqual({
         sessionId,
         projectDir,
+        containerMountPath: '/workspace',
         clonePath: workspace.clonePath,
+        branchName: workspace.branchName,
         containerId: workspace.containerId,
         state: 'running',
       });

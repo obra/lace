@@ -8,12 +8,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session, Project, Agent, ThreadManager } from '@/lib/server/lace-imports';
 import type { ToolExecutor } from '@/lib/server/lace-imports';
-import type { Tool } from '~/tools/tool';
-import { setupWebTest } from '@/test-utils/web-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '@/lib/server/lace-imports';
+import { cleanupSession } from '@/lib/server/lace-test-imports';
+import type { Tool } from '~/tools/tool';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
@@ -62,7 +63,7 @@ describe('Agent Spawning and Thread Creation', () => {
 
   afterEach(async () => {
     if (session) {
-      session.destroy();
+      await cleanupSession(session);
     }
     await cleanupTestProviderInstances([anthropicInstanceId, openaiInstanceId]);
     vi.clearAllMocks();

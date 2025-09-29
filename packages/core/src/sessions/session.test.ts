@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { asThreadId } from '~/threads/types';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import { getPersistence, SessionData } from '~/persistence/database';
 import {
   setupTestProviderDefaults,
@@ -520,7 +520,7 @@ describe('Session', () => {
       );
     });
 
-    it('should create delegate thread automatically when threadId not provided', () => {
+    it('should create delegate thread automatically when threadId not provided', async () => {
       const session = Session.create({
         name: 'Test Session',
         projectId: testProject.getId(),
@@ -536,7 +536,7 @@ describe('Session', () => {
       expect(agent.getThreadMetadata()?.name).toBe('TestAgent');
 
       // Verify agent is tracked for cleanup
-      session.destroy();
+      await cleanupSession(session);
       // Agent should be stopped
     });
 
@@ -559,7 +559,7 @@ describe('Session', () => {
   });
 
   describe('destroy', () => {
-    it('should stop all agents and clear them', () => {
+    it('should stop all agents and clear them', async () => {
       const session = Session.create({
         name: 'Test Session',
         projectId: testProject.getId(),
@@ -572,7 +572,7 @@ describe('Session', () => {
       expect(agentsBefore.some((a) => a.threadId === asThreadId(agent1.threadId))).toBe(true);
       expect(agentsBefore.some((a) => a.threadId === asThreadId(agent2.threadId))).toBe(true);
 
-      session.destroy();
+      await cleanupSession(session);
 
       // After destroy, all agents should be removed (including coordinator)
       const agentsAfter = session.getAgents();

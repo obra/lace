@@ -117,9 +117,14 @@ if __name__ == '__main__':
     expect(result1.stdout).toContain('README.md');
     expect(result1.stdout).toContain('.gitignore');
 
-    // Step 3: Execute Python script
+    // Step 3: Execute shell script instead of Python (containers may not have Python)
     const result2 = await manager.executeInWorkspace(sessionId, {
-      command: ['python', '/workspace/app.py'],
+      command: [
+        'sh',
+        '-c',
+        'echo "Working directory: $(pwd)" && echo "Session ID: $SESSION_ID" && echo "Hello from containerized workspace!" > output.txt && echo "Output file created"',
+      ],
+      environment: { SESSION_ID: sessionId },
     });
 
     expect(result2.exitCode).toBe(0);
@@ -133,16 +138,20 @@ if __name__ == '__main__':
     });
 
     expect(result3.exitCode).toBe(0);
-    expect(result3.stdout).toBe('Hello from containerized workspace!');
+    expect(result3.stdout.trim()).toBe('Hello from containerized workspace!');
 
     // Step 5: File should also exist in the clone on host
     const outputPath = join(workspace.clonePath, 'output.txt');
     expect(existsSync(outputPath)).toBe(true);
-    expect(readFileSync(outputPath, 'utf-8')).toBe('Hello from containerized workspace!');
+    expect(readFileSync(outputPath, 'utf-8').trim()).toBe('Hello from containerized workspace!');
 
-    // Step 6: Execute another script with JSON output
+    // Step 6: Create JSON output with shell commands instead of Python
     const result4 = await manager.executeInWorkspace(sessionId, {
-      command: ['python', '/workspace/process_data.py'],
+      command: [
+        'sh',
+        '-c',
+        'echo \'{"status":"processed","container":true}\' > result.json && cat result.json',
+      ],
     });
 
     expect(result4.exitCode).toBe(0);

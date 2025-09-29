@@ -7,7 +7,7 @@ import { Project } from '~/projects/project';
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file_read';
 import { FileWriteTool } from '~/tools/implementations/file_write';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -86,7 +86,7 @@ describe('Workspace Integration', () => {
       const output = JSON.parse((content as any).text);
       expect(output.exitCode).toBe(0);
 
-      await session.destroy();
+      await cleanupSession(session);
     });
 
     it('should read and write files through workspace paths', async () => {
@@ -144,7 +144,7 @@ describe('Workspace Integration', () => {
       expect(existsSync(newFilePath)).toBe(true);
       expect(readFileSync(newFilePath, 'utf-8')).toBe('New content from workspace');
 
-      await session.destroy();
+      await cleanupSession(session);
     });
 
     it('should coordinate bash and file operations', async () => {
@@ -211,7 +211,7 @@ describe('Workspace Integration', () => {
       const bashOutput = JSON.parse((bashContent as any).text);
       expect(bashOutput.stdoutPreview).toContain('Created by FileWriteTool');
 
-      await session.destroy();
+      await cleanupSession(session);
     });
   });
 
@@ -259,7 +259,7 @@ describe('Workspace Integration', () => {
       const readContent = result.content[0];
       expect((readContent as any).text).toContain('Nested content');
 
-      await session.destroy();
+      await cleanupSession(session);
     });
 
     it('should handle absolute paths correctly', async () => {
@@ -303,7 +303,7 @@ describe('Workspace Integration', () => {
       const readContent = result.content[0];
       expect((readContent as any).text).toContain('Absolute path content');
 
-      await session.destroy();
+      await cleanupSession(session);
     });
   });
 
@@ -323,7 +323,7 @@ describe('Workspace Integration', () => {
       const workspaceInfo = session.getWorkspaceInfo();
       expect(workspaceInfo).toBeDefined();
 
-      await session.destroy();
+      await cleanupSession(session);
 
       // Workspace should be cleaned up
       // Note: For local mode, the workspace isn't actually deleted since it's the project dir

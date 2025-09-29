@@ -16,6 +16,8 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '@/lib/server/lace-imports';
+import { cleanupSession } from '@/lib/server/lace-test-imports';
+
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { parseResponse } from '@/lib/serialization';
 import { loader as getAgent } from '@/app/routes/api.agents.$agentId';
@@ -95,11 +97,7 @@ describe('Compaction Integration Test', () => {
     // Stop all agents before cleanup
     const session = await Session.getById(sessionId);
     if (session) {
-      const agent = session.getAgent(sessionId);
-      if (agent) {
-        await agent.stop();
-      }
-      session.destroy();
+      await cleanupSession(session);
     }
 
     // Cleanup

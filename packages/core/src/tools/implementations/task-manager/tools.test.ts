@@ -13,7 +13,7 @@ import {
 import { ToolContext } from '~/tools/types';
 import { asThreadId, createNewAgentSpec } from '~/threads/types';
 import type { Task } from '~/tasks/types';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -153,7 +153,7 @@ describe('Enhanced Task Manager Tools', () => {
 
     // Clean up session and all its EventEmitters
     if (session) {
-      session.destroy(); // This already calls removeAllListeners() on all agents
+      await cleanupSession(session); // This already calls removeAllListeners() on all agents
     }
 
     // Clean up context AbortController if it exists

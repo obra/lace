@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 import { Session, Project, TestProvider } from '@/lib/server/lace-imports';
 import { createTestProviderInstance } from '@/lib/server/lace-imports';
+import { cleanupSession } from '@/lib/server/lace-test-imports';
 import { parseResponse } from '@/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 import { loader as pendingApprovalsLoader } from '@/app/routes/api.sessions.$sessionId.approvals.pending';
@@ -92,7 +93,9 @@ describe('Session Approval API Integration (Real Components)', () => {
 
     // Provider instances cleanup is handled by setupWebTest
     vi.clearAllMocks();
-    session?.destroy();
+    if (session) {
+      await cleanupSession(session);
+    }
   });
 
   it('should aggregate pending approvals from multiple real agents', async () => {

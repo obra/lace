@@ -3,14 +3,20 @@
 
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComments, faCog } from '@/lib/fontawesome';
 import { SidebarSection } from '@/components/layout/Sidebar';
 import { SwitchIcon } from '@/components/ui/SwitchIcon';
+import {
+  PermissionModeSelector,
+  PermissionModeBadge,
+} from '@/components/ui/PermissionModeSelector';
 import { useSessionContext } from '@/components/providers/SessionProvider';
 import { useProjectsContext } from '@/components/providers/ProjectsProvider';
 import { useURLState } from '@/hooks/useURLState';
+import { api } from '@/lib/api-client';
+import type { PermissionOverrideMode } from '~/tools/types';
 
 interface SessionSectionProps {
   isMobile?: boolean;
@@ -27,6 +33,49 @@ export const SessionSection = memo(function SessionSection({
   const { sessionDetails } = useSessionContext();
   const { selectedProject } = useProjectsContext();
   const { navigateToProject } = useURLState();
+
+  // Permission mode state
+  const [permissionMode, setPermissionMode] = useState<PermissionOverrideMode>('normal');
+  const [isUpdatingMode, setIsUpdatingMode] = useState(false);
+
+  // Fetch current permission mode from session configuration
+  useEffect(() => {
+    if (!sessionDetails?.id) return;
+
+    const fetchConfiguration = async () => {
+      try {
+        const response = await api.get<{
+          configuration: { runtimeOverrides?: { permissionMode?: PermissionOverrideMode } };
+        }>(`/api/sessions/${sessionDetails.id}/configuration`);
+        if (response.configuration?.runtimeOverrides?.permissionMode) {
+          setPermissionMode(response.configuration.runtimeOverrides.permissionMode);
+        }
+      } catch (error) {
+        console.error('Failed to fetch session configuration:', error);
+      }
+    };
+
+    void fetchConfiguration();
+  }, [sessionDetails?.id]);
+
+  // Handle permission mode change
+  const handlePermissionModeChange = async (mode: PermissionOverrideMode) => {
+    if (!sessionDetails?.id || isUpdatingMode) return;
+
+    setIsUpdatingMode(true);
+    try {
+      await api.put(`/api/sessions/${sessionDetails.id}/configuration`, {
+        runtimeOverrides: {
+          permissionMode: mode,
+        },
+      });
+      setPermissionMode(mode);
+    } catch (error) {
+      console.error('Failed to update permission mode:', error);
+    } finally {
+      setIsUpdatingMode(false);
+    }
+  };
 
   // Don't render if no session is selected
   if (!sessionDetails) {
@@ -88,7 +137,23 @@ export const SessionSection = memo(function SessionSection({
         collapsible={false}
         headerActions={sessionHeaderActions}
       >
-        <div></div>
+        <div className="p-3 space-y-3">
+          {/* Permission Mode Selector */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-base-content/70 uppercase tracking-wide">
+                Permissions
+              </label>
+              <PermissionModeBadge mode={permissionMode} />
+            </div>
+            <PermissionModeSelector
+              value={permissionMode}
+              onChange={handlePermissionModeChange}
+              disabled={isUpdatingMode}
+              size="sm"
+            />
+          </div>
+        </div>
       </SidebarSection>
     </div>
   );

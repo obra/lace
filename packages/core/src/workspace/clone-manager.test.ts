@@ -126,9 +126,9 @@ describe('CloneManager', () => {
       expect(existsSync(clonePath)).toBe(false);
     });
 
-    it('should not throw if clone does not exist', async () => {
-      // Should not throw for non-existent session
-      await expect(CloneManager.removeSessionClone('non-existent-session')).resolves.not.toThrow();
+    it('should not throw if clone does not exist', () => {
+      // Should not throw for non-existent session - just silently succeed
+      expect(() => CloneManager.removeSessionClone('non-existent-session')).not.toThrow();
     });
   });
 

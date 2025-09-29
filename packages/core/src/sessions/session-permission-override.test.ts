@@ -35,9 +35,9 @@ describe('Session Permission Override', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     cleanupTestProviderDefaults();
-    cleanupTestProviderInstances();
+    await cleanupTestProviderInstances();
   });
 
   it('should start in normal mode', async () => {

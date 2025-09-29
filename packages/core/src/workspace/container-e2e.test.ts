@@ -7,7 +7,7 @@ import { Project } from '~/projects/project';
 import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file_read';
 import { FileWriteTool } from '~/tools/implementations/file_write';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
 import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { join } from 'path';
@@ -113,7 +113,7 @@ describe('Container E2E Test', () => {
       expect(workspaceInfo).toBeDefined();
       expect(workspaceInfo?.containerId).toMatch(/^workspace-/);
       expect(workspaceInfo?.clonePath).not.toBe(tempProjectDir);
-      expect(workspaceInfo?.clonePath).toContain('/clones/');
+      expect(workspaceInfo?.clonePath).toContain('/worktrees/');
 
       // Verify the clone was created
       expect(existsSync(workspaceInfo!.clonePath)).toBe(true);
@@ -132,6 +132,8 @@ describe('Container E2E Test', () => {
         signal: new AbortController().signal,
         workingDirectory: '/workspace', // Use container's working directory
         toolTempDir: tempProjectDir,
+        workspaceManager: session.getWorkspaceManager(),
+        workspaceInfo: session.getWorkspaceInfo(),
       };
 
       // Test 1: Execute bash command in container
@@ -208,7 +210,7 @@ describe('Container E2E Test', () => {
       expect(cloneContent).toContain('Modified in container');
     } finally {
       // Clean up session and container
-      await session.destroy();
+      await cleanupSession(session);
     }
   });
 
@@ -244,7 +246,7 @@ describe('Container E2E Test', () => {
     expect(containerExists).toBe(true);
 
     // Destroy session
-    await session.destroy();
+    await cleanupSession(session);
 
     // Container should be cleaned up
     const listAfter = execSync('container list --format json 2>/dev/null || echo "[]"', {
