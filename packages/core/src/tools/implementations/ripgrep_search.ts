@@ -235,8 +235,14 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
 
     for (const [filePath, fileMatches] of fileGroups) {
       resultLines.push(`${filePath}:`);
+
+      // Calculate max line number width for right-alignment
+      const maxLineNum = Math.max(...fileMatches.map((m) => m.lineNumber));
+      const width = String(maxLineNum).length;
+
       for (const match of fileMatches) {
-        resultLines.push(`  ${match.lineNumber}: ${match.content}`);
+        const lineNumStr = String(match.lineNumber).padStart(width, ' ');
+        resultLines.push(`${lineNumStr}→${match.content}`);
       }
       resultLines.push('');
     }
