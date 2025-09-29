@@ -263,23 +263,49 @@ export function ContextBreakdownModal({ isOpen, onClose, agentId }: ContextBreak
                   )}
                 </span>
               </div>
+              {/* Individual core tools */}
+              {breakdown.categories.coreTools.items &&
+                breakdown.categories.coreTools.items.length > 0 && (
+                  <div className="ml-7 space-y-1 text-sm">
+                    {breakdown.categories.coreTools.items.map((tool) => (
+                      <div key={tool.name} className="flex justify-between">
+                        <span className="opacity-60">{tool.name}:</span>
+                        <span>{formatNumber(tool.tokens)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
             </div>
 
             {/* MCP Tools */}
             {breakdown.categories.mcpTools.tokens > 0 && (
-              <div className="flex items-center justify-between rounded-lg bg-base-200 p-3">
-                <div className="flex items-center gap-3">
-                  <div className={`h-4 w-4 rounded ${getCategoryColor('mcpTools')}`} />
-                  <span className="font-medium">MCP Tools</span>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between rounded-lg bg-base-200 p-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-4 w-4 rounded ${getCategoryColor('mcpTools')}`} />
+                    <span className="font-medium">MCP Tools</span>
+                  </div>
+                  <span className="text-sm">
+                    {formatNumber(breakdown.categories.mcpTools.tokens)} tokens
+                    {breakdown.categories.mcpTools.items && (
+                      <span className="ml-2 text-xs opacity-60">
+                        ({breakdown.categories.mcpTools.items.length} tools)
+                      </span>
+                    )}
+                  </span>
                 </div>
-                <span className="text-sm">
-                  {formatNumber(breakdown.categories.mcpTools.tokens)} tokens
-                  {breakdown.categories.mcpTools.items && (
-                    <span className="ml-2 text-xs opacity-60">
-                      ({breakdown.categories.mcpTools.items.length} tools)
-                    </span>
+                {/* Individual MCP tools */}
+                {breakdown.categories.mcpTools.items &&
+                  breakdown.categories.mcpTools.items.length > 0 && (
+                    <div className="ml-7 space-y-1 text-sm">
+                      {breakdown.categories.mcpTools.items.map((tool) => (
+                        <div key={tool.name} className="flex justify-between">
+                          <span className="opacity-60">{tool.name}:</span>
+                          <span>{formatNumber(tool.tokens)}</span>
+                        </div>
+                      ))}
+                    </div>
                   )}
-                </span>
               </div>
             )}
 

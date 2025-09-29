@@ -22,11 +22,31 @@ export function ContextTreemap({ breakdown }: ContextTreemapProps) {
   // Transform breakdown into recharts treemap format
   const data: TreemapData[] = [];
 
+  // Use Tailwind color classes that match the progress bar
+  const getCategoryFillColor = (category: string): string => {
+    switch (category) {
+      case 'systemPrompt':
+        return '#a855f7'; // purple-500 (matches bg-primary)
+      case 'coreTools':
+        return '#ec4899'; // pink-500 (matches bg-secondary)
+      case 'mcpTools':
+        return '#f97316'; // orange-500 (matches bg-accent)
+      case 'messages':
+        return '#06b6d4'; // cyan-500 (matches bg-info)
+      case 'reservedForResponse':
+        return '#f59e0b'; // amber-500 (matches bg-warning)
+      case 'freeSpace':
+        return '#10b981'; // emerald-500 (matches bg-success)
+      default:
+        return '#6b7280'; // gray-500
+    }
+  };
+
   if (breakdown.categories.systemPrompt.tokens > 0) {
     data.push({
       name: 'System Prompt',
       size: breakdown.categories.systemPrompt.tokens,
-      fill: 'hsl(var(--p))',
+      fill: getCategoryFillColor('systemPrompt'),
     });
   }
 
@@ -34,7 +54,7 @@ export function ContextTreemap({ breakdown }: ContextTreemapProps) {
     data.push({
       name: 'Core Tools',
       size: breakdown.categories.coreTools.tokens,
-      fill: 'hsl(var(--s))',
+      fill: getCategoryFillColor('coreTools'),
     });
   }
 
@@ -42,7 +62,7 @@ export function ContextTreemap({ breakdown }: ContextTreemapProps) {
     data.push({
       name: 'MCP Tools',
       size: breakdown.categories.mcpTools.tokens,
-      fill: 'hsl(var(--a))',
+      fill: getCategoryFillColor('mcpTools'),
     });
   }
 
@@ -50,7 +70,7 @@ export function ContextTreemap({ breakdown }: ContextTreemapProps) {
     data.push({
       name: 'Messages',
       size: breakdown.categories.messages.tokens,
-      fill: 'hsl(var(--in))',
+      fill: getCategoryFillColor('messages'),
     });
   }
 
@@ -58,7 +78,7 @@ export function ContextTreemap({ breakdown }: ContextTreemapProps) {
     data.push({
       name: 'Reserved',
       size: breakdown.categories.reservedForResponse.tokens,
-      fill: 'hsl(var(--wa))',
+      fill: getCategoryFillColor('reservedForResponse'),
     });
   }
 
@@ -66,7 +86,7 @@ export function ContextTreemap({ breakdown }: ContextTreemapProps) {
     data.push({
       name: 'Free Space',
       size: breakdown.categories.freeSpace.tokens,
-      fill: 'hsl(var(--su))',
+      fill: getCategoryFillColor('freeSpace'),
     });
   }
 
@@ -147,7 +167,13 @@ export function ContextTreemap({ breakdown }: ContextTreemapProps) {
       <div className="text-sm font-medium mb-2">Visual Breakdown</div>
       <div className="rounded-lg border border-base-300 overflow-hidden">
         <ResponsiveContainer width="100%" height={300}>
-          <Treemap data={data} dataKey="size" stroke="#fff" fill="#8884d8">
+          <Treemap
+            data={data}
+            dataKey="size"
+            stroke="#fff"
+            fill="#8884d8"
+            isAnimationActive={false}
+          >
             <Tooltip content={<CustomTooltip />} />
           </Treemap>
         </ResponsiveContainer>
