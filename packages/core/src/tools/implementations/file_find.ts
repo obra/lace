@@ -7,7 +7,14 @@ import { join } from 'path';
 import { Tool } from '~/tools/tool';
 import { NonEmptyString, FilePath } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
-import { TOOL_LIMITS } from '~/tools/constants';
+
+const MIN_DEPTH = 1;
+const MAX_DEPTH = 20;
+const DEFAULT_DEPTH = 10;
+
+const MIN_RESULTS = 1;
+const MAX_RESULTS = 1000;
+const DEFAULT_RESULTS = 50;
 
 const fileFindSchema = z.object({
   pattern: NonEmptyString,
@@ -17,16 +24,16 @@ const fileFindSchema = z.object({
   maxDepth: z
     .number()
     .int('Must be an integer')
-    .min(TOOL_LIMITS.MIN_DEPTH, `Must be at least ${TOOL_LIMITS.MIN_DEPTH}`)
-    .max(TOOL_LIMITS.MAX_DEPTH, `Must be at most ${TOOL_LIMITS.MAX_DEPTH}`)
-    .default(TOOL_LIMITS.DEFAULT_DEPTH),
+    .min(MIN_DEPTH, `Must be at least ${MIN_DEPTH}`)
+    .max(MAX_DEPTH, `Must be at most ${MAX_DEPTH}`)
+    .default(DEFAULT_DEPTH),
   includeHidden: z.boolean().default(false),
   maxResults: z
     .number()
     .int('Must be an integer')
-    .min(TOOL_LIMITS.MIN_SEARCH_RESULTS, `Must be at least ${TOOL_LIMITS.MIN_SEARCH_RESULTS}`)
-    .max(TOOL_LIMITS.MAX_SEARCH_RESULTS, `Must be at most ${TOOL_LIMITS.MAX_SEARCH_RESULTS}`)
-    .default(TOOL_LIMITS.DEFAULT_SEARCH_RESULTS),
+    .min(MIN_RESULTS, `Must be at least ${MIN_RESULTS}`)
+    .max(MAX_RESULTS, `Must be at most ${MAX_RESULTS}`)
+    .default(DEFAULT_RESULTS),
 });
 
 export class FileFindTool extends Tool {

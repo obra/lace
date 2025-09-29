@@ -8,8 +8,8 @@ import { FilePath, LineNumber } from '~/tools/schemas/common';
 import type { ToolResult, ToolContext } from '~/tools/types';
 import { findSimilarPaths } from '~/tools/utils/file-suggestions';
 
-const MAX_FILE_SIZE = 32 * 1024; // 32KB limit for whole file reads
-const MAX_RANGE_SIZE = 100; // Maximum lines in a ranged read
+const MAX_FILE_SIZE = 64 * 1024; // 64KB limit for whole file reads
+const MAX_RANGE_SIZE = 2000; // Maximum lines in a ranged read
 
 const fileReadSchema = z
   .object({
@@ -32,7 +32,7 @@ const fileReadSchema = z
 
 export class FileReadTool extends Tool {
   name = 'file_read';
-  description = `Read file contents. Full reads limited to 32KB, use ranges of up to ${MAX_RANGE_SIZE} lines (startLine/endLine) for larger files.`;
+  description = `Read file contents using cat -n format, with line numbers starting at 1. Full reads limited to ${Math.floor(MAX_FILE_SIZE / 1024)}KB, use ranges of up to ${MAX_RANGE_SIZE} lines (startLine/endLine) for larger files. If you request more than ${MAX_RANGE_SIZE} lines, you'll get the first ${MAX_RANGE_SIZE} lines with metadata indicating truncation.`;
   schema = fileReadSchema;
   annotations = {
     readOnlyHint: true,
@@ -59,16 +59,6 @@ export class FileReadTool extends Tool {
         }
       }
 
-      // Validate range size if both start and end are specified
-      if (args.startLine && args.endLine) {
-        const rangeSize = args.endLine - args.startLine + 1;
-        if (rangeSize > MAX_RANGE_SIZE) {
-          return this.createError(
-            `Range too large (${rangeSize} lines). Use smaller ranges (max ${MAX_RANGE_SIZE} lines per read) to avoid context overflow and performance issues.`
-          );
-        }
-      }
-
       // Read file content
       const content = await readFile(resolvedPath, 'utf-8');
       const lines = content.split('\n');
@@ -81,24 +71,67 @@ export class FileReadTool extends Tool {
       }
 
       // Apply line range if specified
-      let resultContent = content;
-      let linesReturned = lines.length;
+      let resultContent: string;
+      let linesReturned: number;
+      let startLineNum: number;
+      let endLineNum: number;
+      let wasTruncated = false;
+      let requestedRange: { start: number; end: number } | undefined;
 
       if (args.startLine || args.endLine) {
         const start = Math.max(0, (args.startLine || 1) - 1);
-        const end =
-          args.endLine !== undefined ? Math.min(lines.length, args.endLine) : lines.length;
+        let end = args.endLine !== undefined ? Math.min(lines.length, args.endLine) : lines.length;
+
+        // Check if requested range exceeds MAX_RANGE_SIZE
+        const requestedSize = end - start;
+        if (requestedSize > MAX_RANGE_SIZE) {
+          wasTruncated = true;
+          requestedRange = {
+            start: args.startLine || 1,
+            end: args.endLine || lines.length,
+          };
+          end = start + MAX_RANGE_SIZE;
+        }
 
         const resultLines = lines.slice(start, end);
-        resultContent = resultLines.join('\n');
+        startLineNum = start + 1;
+        endLineNum = end;
         linesReturned = resultLines.length;
+
+        // Add line numbers to output (cat -n format)
+        const maxLineNum = startLineNum + resultLines.length - 1;
+        const width = String(maxLineNum).length;
+        resultContent = resultLines
+          .map((line, idx) => {
+            const lineNum = startLineNum + idx;
+            return `${String(lineNum).padStart(width, ' ')}→${line}`;
+          })
+          .join('\n');
+      } else {
+        // Full file read - add line numbers (cat -n format)
+        startLineNum = 1;
+        endLineNum = lines.length;
+        linesReturned = lines.length;
+        const width = String(lines.length).length;
+        resultContent = lines
+          .map((line, idx) => `${String(idx + 1).padStart(width, ' ')}→${line}`)
+          .join('\n');
       }
 
-      return this.createResult(resultContent, {
+      const metadata: Record<string, unknown> = {
         totalLines: lines.length,
         linesReturned,
+        range: { start: startLineNum, end: endLineNum },
         fileSize: this.formatFileSize(content.length),
-      });
+      };
+
+      if (wasTruncated && requestedRange) {
+        metadata.warning = `Requested ${requestedRange.end - requestedRange.start + 1} lines (${requestedRange.start}-${requestedRange.end}), but limit is ${MAX_RANGE_SIZE}. Returned first ${MAX_RANGE_SIZE} lines (${startLineNum}-${endLineNum}). File has ${lines.length} total lines.`;
+        metadata.truncated = true;
+        metadata.requestedRange = requestedRange;
+      }
+
+      return this.createResult(resultContent, metadata);
     } catch (error: unknown) {
       // Type guard for Node.js filesystem errors
       const isNodeError = (err: unknown): err is { code: string; message: string } => {

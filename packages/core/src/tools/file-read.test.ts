@@ -25,7 +25,7 @@ describe('FileReadTool', () => {
     it('should have correct name and description', () => {
       expect(tool.name).toBe('file_read');
       expect(tool.description).toContain('Read file contents');
-      expect(tool.description).toContain('100');
+      expect(tool.description).toContain('2000');
       expect(tool.description).toContain('ranges');
     });
 
@@ -42,7 +42,7 @@ describe('FileReadTool', () => {
   });
 
   describe('file reading', () => {
-    it('should read entire file when no range specified', async () => {
+    it('should read entire file when no range specified with line numbers', async () => {
       const result = await tool.execute(
         { path: testFile },
         { signal: new AbortController().signal }
@@ -51,10 +51,10 @@ describe('FileReadTool', () => {
       expect(result.status).toBe('completed');
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      expect(result.content[0].text).toBe(testContent);
+      expect(result.content[0].text).toBe('1→Line 1\n2→Line 2\n3→Line 3\n4→Line 4\n5→Line 5');
     });
 
-    it('should read specific line range', async () => {
+    it('should read specific line range with line numbers', async () => {
       const result = await tool.execute(
         {
           path: testFile,
@@ -65,10 +65,10 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe('Line 2\nLine 3\nLine 4');
+      expect(result.content[0].text).toBe('2→Line 2\n3→Line 3\n4→Line 4');
     });
 
-    it('should read from start line to end of file', async () => {
+    it('should read from start line to end of file with line numbers', async () => {
       const result = await tool.execute(
         {
           path: testFile,
@@ -78,10 +78,10 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe('Line 3\nLine 4\nLine 5');
+      expect(result.content[0].text).toBe('3→Line 3\n4→Line 4\n5→Line 5');
     });
 
-    it('should read from beginning to end line', async () => {
+    it('should read from beginning to end line with line numbers', async () => {
       const result = await tool.execute(
         {
           path: testFile,
@@ -91,7 +91,7 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe('Line 1\nLine 2');
+      expect(result.content[0].text).toBe('1→Line 1\n2→Line 2');
     });
   });
 
@@ -147,12 +147,12 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe('Line 3\nLine 4\nLine 5');
+      expect(result.content[0].text).toBe('3→Line 3\n4→Line 4\n5→Line 5');
     });
 
-    it('should reject whole-file read for files larger than 32KB', async () => {
-      // Create a large file (>32KB)
-      const largeContent = 'x'.repeat(33 * 1024); // 33KB
+    it('should reject whole-file read for files larger than 64KB', async () => {
+      // Create a large file (>64KB)
+      const largeContent = 'x'.repeat(65 * 1024); // 65KB
       const largeFile = join(testDir, 'large.txt');
       await writeFile(largeFile, largeContent);
 
@@ -168,7 +168,7 @@ describe('FileReadTool', () => {
       expect(result.content[0].text).toContain(
         'Use startLine and endLine parameters for ranged reads'
       );
-      expect(result.content[0].text).toContain('33 KB');
+      expect(result.content[0].text).toContain('65 KB');
     });
 
     it('should allow ranged reads for large files', async () => {
@@ -192,19 +192,31 @@ describe('FileReadTool', () => {
       expect(result.content[0].text).toContain('Line 505');
     });
 
-    it('should reject ranged reads larger than 100 lines', async () => {
+    it('should return partial results for ranged reads larger than 2000 lines', async () => {
+      // Create a file with 3000 lines
+      const lines = Array.from({ length: 3000 }, (_, i) => `Line ${i + 1}`);
+      const largeFile = join(testDir, 'large-3000.txt');
+      await writeFile(largeFile, lines.join('\n'));
+
       const result = await tool.execute(
         {
-          path: testFile,
+          path: largeFile,
           startLine: 1,
-          endLine: 101, // 101 lines = too large
+          endLine: 2500, // Request 2500 lines, should get 2000
         },
         { signal: new AbortController().signal }
       );
 
-      expect(result.status).toBe('failed');
-      expect(result.content[0].text).toContain('Range too large (101 lines)');
-      expect(result.content[0].text).toContain('Use smaller ranges (max 100 lines per read)');
+      expect(result.status).toBe('completed');
+      expect(result.metadata?.truncated).toBe(true);
+      expect(result.metadata?.warning).toContain('Requested 2500 lines');
+      expect(result.metadata?.warning).toContain('limit is 2000');
+      expect(result.metadata?.warning).toContain('Returned first 2000 lines');
+      expect(result.metadata?.linesReturned).toBe(2000);
+      expect(result.metadata?.requestedRange).toEqual({ start: 1, end: 2500 });
+      expect(result.content[0].text).toContain('1→Line 1');
+      expect(result.content[0].text).toContain('2000→Line 2000');
+      expect(result.content[0].text).not.toContain('2001→Line 2001');
     });
   });
 
@@ -219,7 +231,7 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe('');
+      expect(result.content[0].text).toBe('1→');
     });
 
     it('should handle single line file', async () => {
@@ -232,7 +244,7 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe('Only line');
+      expect(result.content[0].text).toBe('1→Only line');
     });
   });
 
@@ -249,7 +261,7 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe('Content from relative path');
+      expect(result.content[0].text).toBe('1→Content from relative path');
     });
 
     it('should use absolute paths directly even when working directory is provided', async () => {
@@ -259,7 +271,7 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe(testContent);
+      expect(result.content[0].text).toBe('1→Line 1\n2→Line 2\n3→Line 3\n4→Line 4\n5→Line 5');
     });
 
     it('should fall back to process.cwd() when no working directory in context', async () => {
@@ -275,7 +287,7 @@ describe('FileReadTool', () => {
         );
 
         expect(result.status).toBe('completed');
-        expect(result.content[0].text).toBe('CWD test content');
+        expect(result.content[0].text).toBe('1→CWD test content');
       } finally {
         await rm(absoluteFile, { force: true });
       }
