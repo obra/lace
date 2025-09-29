@@ -31,8 +31,8 @@ export abstract class BaseContainerRuntime implements ContainerRuntime {
     return info;
   }
 
-  async list(): Promise<ContainerInfo[]> {
-    return Array.from(this.containers.values());
+  list(): Promise<ContainerInfo[]> {
+    return Promise.resolve(Array.from(this.containers.values()));
   }
 
   translateToContainer(hostPath: string, containerId: string): string {

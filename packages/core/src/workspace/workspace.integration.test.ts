@@ -4,7 +4,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { WorkspaceContainerManager } from './workspace-container-manager';
 import { AppleContainerRuntime } from '~/containers/apple-container';
-import { CloneManager } from './clone-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
@@ -13,7 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { execSync } from 'child_process';
 
 describe('Workspace Integration Tests', () => {
-  const testContext = setupCoreTest();
+  const _testContext = setupCoreTest();
   let manager: WorkspaceContainerManager;
   let testDir: string;
   let projectDir: string;
@@ -216,8 +215,8 @@ if __name__ == '__main__':
     const session2 = 'isolated-2';
 
     // Create two workspaces
-    const workspace1 = await manager.createWorkspace(projectDir, session1);
-    const workspace2 = await manager.createWorkspace(projectDir, session2);
+    const _workspace1 = await manager.createWorkspace(projectDir, session1);
+    const _workspace2 = await manager.createWorkspace(projectDir, session2);
 
     // Create different files in each workspace
     await manager.executeInWorkspace(session1, {

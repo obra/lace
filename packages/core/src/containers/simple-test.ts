@@ -1,10 +1,11 @@
 // Simpler test without volume mounts
 import { AppleContainerRuntime } from '~/containers/apple-container';
+import { logger } from '~/utils/logger';
 
 async function test() {
   const runtime = new AppleContainerRuntime();
 
-  console.log('Creating container without mounts...');
+  logger.info('Creating container without mounts...');
   const containerId = runtime.create({
     id: 'simple-test',
     workingDirectory: '/tmp',
@@ -14,31 +15,35 @@ async function test() {
     },
   });
 
-  console.log('Starting container:', containerId);
+  logger.info('Starting container:', { containerId });
   await runtime.start(containerId);
 
   try {
-    console.log('Executing echo...');
+    logger.info('Executing echo...');
     const result = await runtime.exec(containerId, {
       command: ['echo', 'Hello World'],
     });
-    console.log('Result:', result);
+    logger.info('Result:', { result });
 
-    console.log('\nExecuting env check...');
+    logger.info('Executing env check...');
     const result2 = await runtime.exec(containerId, {
       command: ['sh', '-c', 'echo "TEST_VAR=$TEST_VAR"'],
     });
-    console.log('Result2:', result2);
+    logger.info('Result2:', { result2 });
 
     if (result.exitCode === 0 && result.stdout.includes('Hello World')) {
-      console.log('\n✅ SUCCESS! Container works!');
+      logger.info('✅ SUCCESS! Container works!');
     }
-  } catch (error: any) {
-    console.error('Failed:', error.message);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error('Failed:', { error: errorMessage });
   } finally {
     await runtime.stop(containerId);
     await runtime.remove(containerId);
   }
 }
 
-test().catch(console.error);
+test().catch((error: unknown) => {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  logger.error('Test failed:', { error: errorMessage });
+});

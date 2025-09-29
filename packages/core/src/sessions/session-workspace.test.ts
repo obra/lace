@@ -10,7 +10,7 @@ import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 
 describe('Session with WorkspaceManager', () => {
-  const testContext = setupCoreTest();
+  const _testContext = setupCoreTest();
   let tempProjectDir: string;
   let project: Project;
 

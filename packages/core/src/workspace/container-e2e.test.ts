@@ -15,7 +15,7 @@ import { tmpdir } from 'os';
 import type { ToolContext } from '~/tools/types';
 
 describe('Container E2E Test', () => {
-  const testContext = setupCoreTest();
+  const _testContext = setupCoreTest();
   let tempProjectDir: string;
   let project: Project;
 

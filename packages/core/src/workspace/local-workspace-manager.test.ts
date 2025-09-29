@@ -10,7 +10,7 @@ import { tmpdir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
 
 describe('LocalWorkspaceManager', () => {
-  const testContext = setupCoreTest();
+  const _testContext = setupCoreTest();
   let manager: LocalWorkspaceManager;
   let testDir: string;
   let projectDir: string;

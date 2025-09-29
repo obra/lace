@@ -3,7 +3,7 @@
 
 import { ExecOptions, ExecResult } from '~/containers/types';
 import { logger } from '~/utils/logger';
-import { exec } from 'child_process';
+import { exec, ExecOptionsWithBufferEncoding } from 'child_process';
 import { promisify } from 'util';
 import type { WorkspaceInfo } from '~/workspace/workspace-container-manager';
 import type { IWorkspaceManager } from '~/workspace/workspace-manager';
@@ -20,7 +20,7 @@ export class LocalWorkspaceManager implements IWorkspaceManager {
   /**
    * Create a "workspace" that just uses the project directory directly
    */
-  async createWorkspace(projectDir: string, sessionId: string): Promise<WorkspaceInfo> {
+  createWorkspace(projectDir: string, sessionId: string): Promise<WorkspaceInfo> {
     if (this.workspaces.has(sessionId)) {
       throw new Error('Workspace already exists for session');
     }
@@ -39,15 +39,16 @@ export class LocalWorkspaceManager implements IWorkspaceManager {
 
     logger.info('Local workspace created', { sessionId });
 
-    return workspace;
+    return Promise.resolve(workspace);
   }
 
   /**
    * Destroy workspace (just remove from registry, no cleanup needed)
    */
-  async destroyWorkspace(sessionId: string): Promise<void> {
+  destroyWorkspace(sessionId: string): Promise<void> {
     this.workspaces.delete(sessionId);
     logger.info('Local workspace removed from registry', { sessionId });
+    return Promise.resolve();
   }
 
   /**
@@ -80,10 +81,11 @@ export class LocalWorkspaceManager implements IWorkspaceManager {
       command = options.command;
     }
 
-    const execOptions: any = {
+    const execOptions: ExecOptionsWithBufferEncoding = {
       cwd: options.workingDirectory || workspace.projectDir,
       timeout: options.timeout || 30000,
       maxBuffer: 10 * 1024 * 1024, // 10MB
+      encoding: 'buffer',
       env: {
         ...process.env,
         ...options.environment,
@@ -98,13 +100,18 @@ export class LocalWorkspaceManager implements IWorkspaceManager {
         stderr: stderr?.toString() || '',
         exitCode: 0,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Command executed but returned non-zero exit code
-      if (error.code !== undefined) {
+      if (error && typeof error === 'object' && 'code' in error) {
+        const execError = error as {
+          code?: number;
+          stdout?: Buffer | string;
+          stderr?: Buffer | string;
+        };
         return {
-          stdout: error.stdout?.toString() || '',
-          stderr: error.stderr?.toString() || '',
-          exitCode: typeof error.code === 'number' ? error.code : 1,
+          stdout: execError.stdout?.toString() || '',
+          stderr: execError.stderr?.toString() || '',
+          exitCode: typeof execError.code === 'number' ? execError.code : 1,
         };
       }
       throw error;
@@ -114,15 +121,15 @@ export class LocalWorkspaceManager implements IWorkspaceManager {
   /**
    * Get info about a workspace
    */
-  async inspectWorkspace(sessionId: string): Promise<WorkspaceInfo | null> {
-    return this.workspaces.get(sessionId) || null;
+  inspectWorkspace(sessionId: string): Promise<WorkspaceInfo | null> {
+    return Promise.resolve(this.workspaces.get(sessionId) || null);
   }
 
   /**
    * List all active workspaces
    */
-  async listWorkspaces(): Promise<WorkspaceInfo[]> {
-    return Array.from(this.workspaces.values());
+  listWorkspaces(): Promise<WorkspaceInfo[]> {
+    return Promise.resolve(Array.from(this.workspaces.values()));
   }
 
   /**

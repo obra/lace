@@ -1,10 +1,9 @@
 // ABOUTME: Tests for WorkspaceContainerManager that manages containerized session workspaces
 // ABOUTME: Integrates CloneManager with AppleContainerRuntime for isolated development environments
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { WorkspaceContainerManager } from './workspace-container-manager';
 import { AppleContainerRuntime } from '~/containers/apple-container';
-import { CloneManager } from './clone-manager';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -13,7 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { execSync } from 'child_process';
 
 describe('WorkspaceContainerManager', () => {
-  const testContext = setupCoreTest();
+  const _testContext = setupCoreTest();
   let manager: WorkspaceContainerManager;
   let testDir: string;
   let projectDir: string;
@@ -82,7 +81,7 @@ describe('WorkspaceContainerManager', () => {
     it('should mount the cloned repository in the container', async () => {
       const sessionId = 'test-session-2';
 
-      const workspace = await manager.createWorkspace(projectDir, sessionId);
+      const _workspace = await manager.createWorkspace(projectDir, sessionId);
 
       // Execute command in container to verify mount
       const result = await manager.executeInWorkspace(sessionId, {

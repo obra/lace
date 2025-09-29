@@ -33,8 +33,9 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
   constructor() {
     super();
     // Ensure container system is started
-    this.ensureSystemStarted().catch((err) => {
-      logger.error('Failed to start container system', { error: err });
+    this.ensureSystemStarted().catch((err: unknown) => {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      logger.error('Failed to start container system', { error: errorMessage });
     });
   }
 
@@ -345,17 +346,32 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
     // Sync with actual container system
     try {
       const { stdout } = await execAsync('container list --format json');
-      const systemContainers = JSON.parse(stdout || '[]');
+      const systemContainers = JSON.parse(stdout || '[]') as unknown;
 
       // Update our records with system state
-      for (const sc of systemContainers) {
-        if (sc.id && this.containers.has(sc.id)) {
-          const info = this.containers.get(sc.id)!;
-          info.state = sc.state === 'RUNNING' ? 'running' : 'stopped';
+      if (Array.isArray(systemContainers)) {
+        for (const sc of systemContainers) {
+          // Type guard function to properly narrow the type
+          const isValidContainer = (obj: unknown): obj is { id: string; state: string } => {
+            return (
+              typeof obj === 'object' &&
+              obj !== null &&
+              'id' in obj &&
+              'state' in obj &&
+              typeof (obj as { id: unknown }).id === 'string' &&
+              typeof (obj as { state: unknown }).state === 'string'
+            );
+          };
+
+          if (isValidContainer(sc) && this.containers.has(sc.id)) {
+            const info = this.containers.get(sc.id)!;
+            info.state = sc.state === 'RUNNING' ? 'running' : 'stopped';
+          }
         }
       }
-    } catch (error) {
-      logger.warn('Failed to sync container list with system', { error });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.warn('Failed to sync container list with system', { error: errorMessage });
     }
 
     return super.list();

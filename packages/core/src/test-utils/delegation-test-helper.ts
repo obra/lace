@@ -225,7 +225,7 @@ export async function createDelegationTestSetup(options?: {
   );
 
   // Create session WITHOUT provider configuration - it inherits from project
-  const session = await Session.create({
+  const session = Session.create({
     name: 'Delegation Test Session',
     projectId: project.getId(),
     configuration: {

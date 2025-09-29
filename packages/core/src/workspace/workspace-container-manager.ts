@@ -50,8 +50,8 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
     const containerMountPath = '/workspace';
     const gitDirMount = '/workspace/.git-main';
 
-    // Get the git directory path for this worktree
-    const gitWorktreeDir = join(projectDir, '.git', 'worktrees', sessionId);
+    // Get the git directory path for this worktree (used in environment setup)
+    const _gitWorktreeDir = join(projectDir, '.git', 'worktrees', sessionId);
 
     // Get user's git configuration
     const gitConfig = await this.getGitUserConfig();
@@ -163,7 +163,7 @@ export class WorkspaceContainerManager implements IWorkspaceManager {
         const containerInfo = await this.runtime.inspect(containerId);
 
         // Check if worktree exists
-        const worktreePath = await WorktreeManager.getWorktreePath(sessionId);
+        const worktreePath = WorktreeManager.getWorktreePath(sessionId);
         const { existsSync } = await import('fs');
 
         if (containerInfo && existsSync(worktreePath)) {

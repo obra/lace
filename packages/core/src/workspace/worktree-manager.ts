@@ -130,14 +130,14 @@ export class WorktreeManager {
   /**
    * Get the path to a session's worktree directory
    */
-  static async getWorktreePath(sessionId: string): Promise<string> {
+  static getWorktreePath(sessionId: string): string {
     return join(this.WORKTREES_DIR, sessionId);
   }
 
   /**
    * List all session worktrees
    */
-  static async listSessionWorktrees(): Promise<string[]> {
+  static listSessionWorktrees(): string[] {
     if (!existsSync(this.WORKTREES_DIR)) {
       return [];
     }

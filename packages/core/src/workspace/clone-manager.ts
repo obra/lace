@@ -53,8 +53,9 @@ export class CloneManager {
         });
 
         logger.info('Git repository initialized successfully', { projectDir });
-      } catch (error: any) {
-        throw new Error(`Failed to initialize git repository: ${error.message}`);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to initialize git repository: ${message}`);
       }
     }
 
@@ -72,8 +73,9 @@ export class CloneManager {
     // Clone with --local flag for hardlinks
     try {
       await execAsync(`git clone --local "${projectDir}" "${clonePath}"`);
-    } catch (error: any) {
-      throw new Error(`Failed to create clone: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to create clone: ${message}`);
     }
 
     return clonePath;
@@ -82,7 +84,7 @@ export class CloneManager {
   /**
    * Remove a session clone
    */
-  static async removeSessionClone(sessionId: string): Promise<void> {
+  static removeSessionClone(sessionId: string): void {
     const clonePath = join(this.CLONES_DIR, sessionId);
 
     if (existsSync(clonePath)) {
@@ -93,14 +95,14 @@ export class CloneManager {
   /**
    * Get the path to a session's clone directory
    */
-  static async getClonePath(sessionId: string): Promise<string> {
+  static getClonePath(sessionId: string): string {
     return join(this.CLONES_DIR, sessionId);
   }
 
   /**
    * List all session clones
    */
-  static async listSessionClones(): Promise<string[]> {
+  static listSessionClones(): string[] {
     if (!existsSync(this.CLONES_DIR)) {
       return [];
     }
