@@ -135,6 +135,45 @@ describe('LocalWorkspaceManager', () => {
       expect(result.exitCode).not.toBe(0);
       expect(result.stderr).toBeTruthy();
     });
+
+    it('should prevent shell injection via command array arguments', async () => {
+      const sessionId = 'test-injection';
+
+      await manager.createWorkspace(projectDir, sessionId);
+
+      // Attempt injection with a malicious argument that would execute if shell-interpreted
+      // The old implementation would construct: echo "test; echo INJECTED"
+      // The new implementation uses execFile which treats this as a literal argument
+      const result = await manager.executeInWorkspace(sessionId, {
+        command: ['echo', 'test; echo INJECTED'],
+      });
+
+      expect(result.exitCode).toBe(0);
+      // Should output the entire string literally, not execute the injection
+      expect(result.stdout.trim()).toBe('test; echo INJECTED');
+      // The word INJECTED should appear once (in the literal output)
+      const matches = result.stdout.match(/INJECTED/g);
+      expect(matches).toHaveLength(1);
+    });
+
+    it('should handle special characters in array command arguments safely', async () => {
+      const sessionId = 'test-special-chars';
+
+      await manager.createWorkspace(projectDir, sessionId);
+
+      // Test various special characters that could be exploited
+      const specialArgs = ['$HOME', '`whoami`', '$(pwd)', '&&', '||', ';', '|'];
+
+      for (const arg of specialArgs) {
+        const result = await manager.executeInWorkspace(sessionId, {
+          command: ['echo', arg],
+        });
+
+        expect(result.exitCode).toBe(0);
+        // Should echo the literal string, not interpret it
+        expect(result.stdout.trim()).toBe(arg);
+      }
+    });
   });
 
   describe('path translation', () => {

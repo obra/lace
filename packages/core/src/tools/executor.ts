@@ -70,6 +70,11 @@ export class ToolExecutor {
   }
 
   getEffectivePolicy(tool: Tool, configuredPolicy: string): string {
+    // Respect explicit 'disable' policy even in override modes
+    if (configuredPolicy === 'disable') {
+      return 'deny';
+    }
+
     switch (this.permissionOverrideMode) {
       case 'yolo':
         return 'allow';

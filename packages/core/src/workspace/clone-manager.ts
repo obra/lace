@@ -3,12 +3,12 @@
 
 import { existsSync, mkdirSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
 import { logger } from '~/utils/logger';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export class CloneManager {
   // Use LACE_DIR environment variable for test isolation
@@ -35,22 +35,32 @@ export class CloneManager {
 
       // Initialize git repository
       try {
-        await execAsync('git init', { cwd: projectDir });
+        await execFileAsync('git', ['init'], { cwd: projectDir });
 
         // Set default user if not configured globally
         try {
-          await execAsync('git config user.email', { cwd: projectDir });
+          await execFileAsync('git', ['config', 'user.email'], {
+            cwd: projectDir,
+          });
         } catch {
           // User email not set, use a default
-          await execAsync('git config user.email "lace@localhost"', { cwd: projectDir });
-          await execAsync('git config user.name "Lace User"', { cwd: projectDir });
+          await execFileAsync('git', ['config', 'user.email', 'lace@localhost'], {
+            cwd: projectDir,
+          });
+          await execFileAsync('git', ['config', 'user.name', 'Lace User'], {
+            cwd: projectDir,
+          });
         }
 
         // Create initial commit with all files
-        await execAsync('git add -A', { cwd: projectDir });
-        await execAsync('git commit -m "Initial commit for workspace isolation" --allow-empty', {
-          cwd: projectDir,
-        });
+        await execFileAsync('git', ['add', '-A'], { cwd: projectDir });
+        await execFileAsync(
+          'git',
+          ['commit', '-m', 'Initial commit for workspace isolation', '--allow-empty'],
+          {
+            cwd: projectDir,
+          }
+        );
 
         logger.info('Git repository initialized successfully', { projectDir });
       } catch (error: unknown) {
@@ -72,7 +82,7 @@ export class CloneManager {
 
     // Clone with --local flag for hardlinks
     try {
-      await execAsync(`git clone --local "${projectDir}" "${clonePath}"`);
+      await execFileAsync('git', ['clone', '--local', projectDir, clonePath]);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to create clone: ${message}`);

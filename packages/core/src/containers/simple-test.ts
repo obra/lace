@@ -1,4 +1,6 @@
-// Simpler test without volume mounts
+// ABOUTME: Manual test script for Apple Container runtime without volume mounts
+// ABOUTME: Can be run directly with `npx tsx src/containers/simple-test.ts` for debugging
+
 import { AppleContainerRuntime } from '~/containers/apple-container';
 import { logger } from '~/utils/logger';
 
@@ -43,7 +45,11 @@ async function test() {
   }
 }
 
-test().catch((error: unknown) => {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  logger.error('Test failed:', { error: errorMessage });
-});
+// Only run when executed directly, not when imported
+if (import.meta.url === `file://${process.argv[1]}`) {
+  test().catch((error: unknown) => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error('Test failed:', { error: errorMessage });
+    process.exit(1);
+  });
+}

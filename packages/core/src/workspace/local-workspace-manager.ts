@@ -3,12 +3,13 @@
 
 import { ExecOptions, ExecResult } from '~/containers/types';
 import { logger } from '~/utils/logger';
-import { exec, ExecOptionsWithBufferEncoding } from 'child_process';
+import { exec, execFile, ExecFileOptions } from 'child_process';
 import { promisify } from 'util';
 import type { WorkspaceInfo } from '~/workspace/workspace-container-manager';
 import type { IWorkspaceManager } from '~/workspace/workspace-manager';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * Local workspace manager that executes directly on the host system.
@@ -60,32 +61,10 @@ export class LocalWorkspaceManager implements IWorkspaceManager {
       throw new Error('Workspace not found');
     }
 
-    // For array commands with shell invocation, we need special handling
-    let command: string;
-    if (Array.isArray(options.command)) {
-      // If it's a shell command (sh -c), we need to properly quote the command
-      if (options.command[0] === 'sh' && options.command[1] === '-c' && options.command[2]) {
-        command = `sh -c "${options.command[2].replace(/"/g, '\\"')}"`;
-      } else {
-        command = options.command
-          .map((arg) => {
-            // Quote arguments that contain spaces or special characters
-            if (/[\s"'`$\\]/.test(arg)) {
-              return `"${arg.replace(/"/g, '\\"')}"`;
-            }
-            return arg;
-          })
-          .join(' ');
-      }
-    } else {
-      command = options.command;
-    }
-
-    const execOptions: ExecOptionsWithBufferEncoding = {
+    const commonOptions = {
       cwd: options.workingDirectory || workspace.projectDir,
       timeout: options.timeout || 30000,
       maxBuffer: 10 * 1024 * 1024, // 10MB
-      encoding: 'buffer',
       env: {
         ...process.env,
         ...options.environment,
@@ -94,7 +73,31 @@ export class LocalWorkspaceManager implements IWorkspaceManager {
     };
 
     try {
-      const { stdout, stderr } = await execAsync(command, execOptions);
+      let stdout: Buffer | string;
+      let stderr: Buffer | string;
+
+      if (Array.isArray(options.command)) {
+        // Use execFile for array commands - no shell interpretation
+        // This prevents injection attacks by passing args directly to the executable
+        const [command, ...args] = options.command;
+        const execFileOptions: ExecFileOptions = {
+          ...commonOptions,
+          encoding: 'buffer',
+        };
+        const result = await execFileAsync(command, args, execFileOptions);
+        stdout = result.stdout;
+        stderr = result.stderr;
+      } else {
+        // String commands use exec with shell (needed for pipes, redirects, etc.)
+        const execOptions = {
+          ...commonOptions,
+          encoding: 'buffer' as const,
+        };
+        const result = await execAsync(options.command, execOptions);
+        stdout = result.stdout;
+        stderr = result.stderr;
+      }
+
       return {
         stdout: stdout?.toString() || '',
         stderr: stderr?.toString() || '',

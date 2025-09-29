@@ -2,8 +2,8 @@
 // ABOUTME: Defines container lifecycle, configuration, and runtime contracts
 
 export interface ContainerConfig {
-  // Container identification
-  id: string;
+  // Container identification (optional - will be generated if not provided)
+  id?: string;
   name?: string;
 
   // Filesystem configuration
