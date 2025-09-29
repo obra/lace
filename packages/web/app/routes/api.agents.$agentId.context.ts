@@ -8,6 +8,7 @@ import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
 import type { Route } from './+types/api.agents.$agentId.context';
 import { ContextAnalyzer } from '@lace/core/token-management';
+import type { Agent } from '@lace/core/agents/agent';
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
@@ -35,7 +36,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
     }
 
     // Get the specific agent
-    const agent = session.getAgent(agentId);
+    const agent = session.getAgent(agentId) as Agent | null;
     if (!agent) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }

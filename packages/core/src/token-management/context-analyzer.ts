@@ -8,27 +8,37 @@ import type {
   CategoryDetail,
   ItemDetail,
   MessageCategoryDetail,
-} from './context-breakdown-types';
+} from '~/token-management/context-breakdown-types';
 import { estimateTokens } from '~/utils/token-estimation';
+import { MCPToolAdapter } from '~/mcp/tool-adapter';
 
 export class ContextAnalyzer {
   /**
    * Analyzes an agent's thread and returns detailed context breakdown
    */
   static async analyze(threadId: ThreadId, agent: Agent): Promise<ContextBreakdown> {
-    const systemPromptTokens = await this.countSystemPromptTokens(threadId, agent);
-    const { core, mcp } = await this.countToolTokens(agent);
-    const messages = await this.countMessageTokens(threadId, agent);
+    const systemPromptTokens = await Promise.resolve(this.countSystemPromptTokens(threadId, agent));
+    const { core, mcp } = this.countToolTokens(agent);
+    const messages = this.countMessageTokens(threadId, agent);
 
     // Get context limit from agent's provider
     const modelId = agent.model;
-    let contextLimit = 200000; // Default fallback
+    const DEFAULT_CONTEXT_LIMIT = 200000; // Default fallback for unknown models
+    let contextLimit = DEFAULT_CONTEXT_LIMIT;
 
     if (modelId && modelId !== 'unknown-model' && agent.providerInstance) {
-      const models = agent.providerInstance.getAvailableModels();
-      const modelInfo = models.find((m) => m.id === modelId);
-      if (modelInfo) {
-        contextLimit = modelInfo.contextWindow;
+      try {
+        const models = agent.providerInstance.getAvailableModels();
+        const modelInfo = models.find((m) => m.id === modelId);
+        if (modelInfo?.contextWindow) {
+          contextLimit = modelInfo.contextWindow;
+        }
+      } catch (error) {
+        // Log warning but continue with default - don't fail the analysis
+        console.warn(
+          `Failed to retrieve context limit for model ${modelId}:`,
+          error instanceof Error ? error.message : 'Unknown error'
+        );
       }
     }
 
@@ -53,14 +63,27 @@ export class ContextAnalyzer {
     };
   }
 
+  /**
+   * Gets the number of tokens to reserve for the agent's response.
+   *
+   * Reserves 4096 tokens by default, which provides:
+   * - Enough space for meaningful responses (typically 500-1000 words)
+   * - Headroom for tool calls and structured output
+   * - Balance between context usage and response quality
+   *
+   * This value works well across different model sizes:
+   * - Small models (8k context): ~50% reserved for response
+   * - Medium models (128k context): ~3% reserved
+   * - Large models (200k+ context): ~2% reserved
+   *
+   * @param _agent The agent instance (currently unused, reserved for future per-agent configuration)
+   * @returns Number of tokens to reserve for the response
+   */
   private static getReservedTokens(_agent: Agent): number {
-    // Reserve space for agent response
-    // Default to 4096 tokens (reasonable for most models)
-    // This could be made configurable in the future based on agent settings
     return 4096;
   }
 
-  private static async countSystemPromptTokens(threadId: ThreadId, agent: Agent): Promise<number> {
+  private static countSystemPromptTokens(threadId: ThreadId, agent: Agent): number {
     // Get thread manager from agent
     const threadManager = agent.threadManager;
 
@@ -83,9 +106,7 @@ export class ContextAnalyzer {
     return totalTokens;
   }
 
-  private static async countToolTokens(
-    agent: Agent
-  ): Promise<{ core: CategoryDetail; mcp: CategoryDetail }> {
+  private static countToolTokens(agent: Agent): { core: CategoryDetail; mcp: CategoryDetail } {
     // Get tool executor from agent
     const toolExecutor = agent.toolExecutor;
 
@@ -112,8 +133,8 @@ export class ContextAnalyzer {
         tokens: toolTokens,
       };
 
-      // MCP tools have "/" in their name (e.g., "server/tool")
-      if (tool.name.includes('/')) {
+      // Check if tool is an MCP tool using instanceof
+      if (tool instanceof MCPToolAdapter) {
         mcpToolItems.push(item);
         mcpTotal += toolTokens;
       } else {
@@ -128,10 +149,7 @@ export class ContextAnalyzer {
     };
   }
 
-  private static async countMessageTokens(
-    threadId: ThreadId,
-    agent: Agent
-  ): Promise<MessageCategoryDetail> {
+  private static countMessageTokens(threadId: ThreadId, agent: Agent): MessageCategoryDetail {
     const threadManager = agent.threadManager;
     const events = threadManager.getEvents(threadId);
 

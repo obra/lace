@@ -98,6 +98,7 @@ export {
   faNewspaper,
   faBrain,
   faRocket,
+  faChartPie,
 } from '@fortawesome/free-solid-svg-icons';
 
 // Re-export faXmark as faXmark for consistency
