@@ -43,6 +43,7 @@ export default [
   route('api/agents/:agentId/message', 'routes/api.agents.$agentId.message.ts'),
   route('api/agents/:agentId/stop', 'routes/api.agents.$agentId.stop.ts'),
   route('api/agents/:agentId/history', 'routes/api.agents.$agentId.history.ts'),
+  route('api/agents/:agentId/context', 'routes/api.agents.$agentId.context.ts'),
 
   // Project management routes
   route('api/projects', 'routes/api.projects.ts'),
