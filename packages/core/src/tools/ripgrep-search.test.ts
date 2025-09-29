@@ -47,7 +47,7 @@ describe('RipgrepSearchTool with schema validation', () => {
       expect(tool.name).toBe('ripgrep_search');
       expect(tool.description)
         .toBe(`Search file contents using regex patterns. Use for text search, file_find for name patterns.
-Supports glob filters (includePattern/excludePattern). Returns path:line:content format.`);
+Supports glob filters (includePattern/excludePattern). Returns results using cat -n format with line numbers (e.g., 42→matching line).`);
     });
 
     it('should have proper input schema', () => {

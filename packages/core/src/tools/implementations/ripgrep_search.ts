@@ -53,7 +53,7 @@ const ripgrepSearchSchema = z.object({
 export class RipgrepSearchTool extends Tool {
   name = 'ripgrep_search';
   description = `Search file contents using regex patterns. Use for text search, file_find for name patterns.
-Supports glob filters (includePattern/excludePattern). Returns path:line:content format.`;
+Supports glob filters (includePattern/excludePattern). Returns results using cat -n format with line numbers (e.g., 42→matching line).`;
   schema = ripgrepSearchSchema;
   annotations: ToolAnnotations = {
     readOnlyHint: true,
