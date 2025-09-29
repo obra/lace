@@ -47,7 +47,7 @@ describe('ToolCatalog', () => {
       expect(tools).toContain('bash');
       expect(tools).toContain('file_read');
       expect(tools).toContain('task_create');
-      expect(tools.length).toBe(15); // All native tools
+      expect(tools.length).toBe(14); // All native tools
     });
 
     it('should include configured MCP tools from cache', () => {

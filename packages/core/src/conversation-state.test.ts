@@ -54,8 +54,8 @@ class MockConversationProvider extends BaseMockProvider {
       toolCalls: [
         {
           id: 'call_1',
-          name: 'file_list',
-          arguments: { path: '.' },
+          name: 'file_find',
+          arguments: { path: '.', pattern: '*' },
         },
       ],
       stopReason: 'tool_use',
@@ -330,7 +330,7 @@ describe('Conversation State Management with Enhanced Agent', () => {
     expect(events.some((e) => e.includes('state:streaming->tool_execution'))).toBe(true);
     expect(stateSequence[stateSequence.length - 1]).toContain('->idle');
 
-    // Should have tool events (likely file_list)
+    // Should have tool events (likely file_find)
     expect(events.some((e) => e.startsWith('tool_start:'))).toBe(true);
     expect(events.some((e) => e.startsWith('tool_complete:'))).toBe(true);
 
