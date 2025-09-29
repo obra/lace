@@ -21,7 +21,6 @@ import { FileReadTool } from '~/tools/implementations/file_read';
 import { FileWriteTool } from '~/tools/implementations/file_write';
 import { Project } from '~/projects/project';
 import { FileEditTool } from '~/tools/implementations/file_edit';
-import { FileListTool } from '~/tools/implementations/file_list';
 import { RipgrepSearchTool } from '~/tools/implementations/ripgrep_search';
 import { FileFindTool } from '~/tools/implementations/file_find';
 import { DelegateTool } from '~/tools/implementations/delegate';
@@ -937,7 +936,6 @@ export class Session {
       new FileReadTool(),
       new FileWriteTool(),
       new FileEditTool(),
-      new FileListTool(),
       new RipgrepSearchTool(),
       new FileFindTool(),
       new UrlFetchTool(),

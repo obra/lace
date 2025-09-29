@@ -225,7 +225,7 @@ describe('Enhanced Agent', () => {
       expect(agent.providerName).toBe('mock');
       expect(agent.getThreadId()).toBeDefined();
       expect(agent.getCurrentState()).toBe('idle');
-      expect(agent.getAvailableTools().length).toBe(15); // Should have all native tools
+      expect(agent.getAvailableTools().length).toBe(14); // Should have all native tools
     });
 
     it('should return copy of tools to prevent mutation', () => {
@@ -234,7 +234,7 @@ describe('Enhanced Agent', () => {
       const returnedTools = agent.getAvailableTools();
       const returnedTools2 = agent.getAvailableTools();
 
-      expect(returnedTools.length).toBe(15); // Should have all native tools
+      expect(returnedTools.length).toBe(14); // Should have all native tools
       expect(returnedTools).not.toBe(returnedTools2); // Different array reference (copy)
     });
 

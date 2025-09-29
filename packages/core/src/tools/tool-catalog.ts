@@ -31,7 +31,6 @@ export class ToolCatalog {
       'file_read',
       'file_write',
       'file_edit',
-      'file_list',
       'ripgrep_search',
       'file_find',
       'delegate',

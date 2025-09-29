@@ -10,7 +10,6 @@ import { BashTool } from '~/tools/implementations/bash';
 import { FileReadTool } from '~/tools/implementations/file_read';
 import { FileWriteTool } from '~/tools/implementations/file_write';
 import { FileEditTool } from '~/tools/implementations/file_edit';
-import { FileListTool } from '~/tools/implementations/file_list';
 import { RipgrepSearchTool } from '~/tools/implementations/ripgrep_search';
 import { FileFindTool } from '~/tools/implementations/file_find';
 import {
@@ -214,7 +213,6 @@ export class ToolExecutor {
       new FileReadTool(), // Schema-based file read tool
       new FileWriteTool(),
       new FileEditTool(),
-      new FileListTool(),
       new RipgrepSearchTool(),
       new FileFindTool(),
       new TaskCreateTool(),
