@@ -23,7 +23,8 @@ export class LocalWorkspaceManager implements IWorkspaceManager {
    */
   createWorkspace(projectDir: string, sessionId: string): Promise<WorkspaceInfo> {
     if (this.workspaces.has(sessionId)) {
-      return Promise.reject(new Error('Workspace already exists for session'));
+      logger.info('Workspace already exists, returning existing', { sessionId });
+      return Promise.resolve(this.workspaces.get(sessionId) as WorkspaceInfo);
     }
 
     logger.info('Creating local workspace (no container)', { projectDir, sessionId });

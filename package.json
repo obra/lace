@@ -42,7 +42,6 @@
     "@anthropic-ai/sdk": "^0.54.0",
     "@google/genai": "^1.19.0",
     "@lmstudio/sdk": "^1.2.1",
-    "@types/uuid": "^10.0.0",
     "@typescript-eslint/utils": "^8.39.1",
     "better-sqlite3": "^11.10.0",
     "lightningcss": "^1.30.1",

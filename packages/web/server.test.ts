@@ -68,6 +68,17 @@ async function findAvailablePort(startPort: number = 31337): Promise<number> {
   throw new Error('No available ports found');
 }
 
+// Helper to create clean environment without vitest-related variables
+function createCleanEnv(): NodeJS.ProcessEnv {
+  return Object.entries(process.env).reduce((acc, [key, value]) => {
+    // Filter out vitest and test-related environment variables
+    if (!key.startsWith('VITEST_') && !key.startsWith('__VITEST') && key !== 'TEST') {
+      acc[key] = value;
+    }
+    return acc;
+  }, {} as NodeJS.ProcessEnv);
+}
+
 describe('Port Validation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -435,14 +446,7 @@ describe('LACE_DIR initialization', () => {
       expect(fs.existsSync(testLaceDir)).toBe(false);
 
       // Start development server with the non-existent LACE_DIR
-      // Create clean environment without vitest-related variables
-      const cleanEnv = Object.entries(process.env).reduce((acc, [key, value]) => {
-        // Filter out vitest and test-related environment variables
-        if (!key.startsWith('VITEST_') && !key.startsWith('__VITEST') && key !== 'TEST') {
-          acc[key] = value;
-        }
-        return acc;
-      }, {} as NodeJS.ProcessEnv);
+      const cleanEnv = createCleanEnv();
 
       const serverProcess = spawn('npm', ['run', 'dev'], {
         env: { ...cleanEnv, LACE_DIR: testLaceDir, NODE_ENV: 'development' },
@@ -496,14 +500,7 @@ describe('LACE_DIR initialization', () => {
       expect(fs.existsSync(testLaceDir)).toBe(false);
 
       // Start production server with the non-existent LACE_DIR
-      // Create clean environment without vitest-related variables
-      const cleanEnv = Object.entries(process.env).reduce((acc, [key, value]) => {
-        // Filter out vitest and test-related environment variables
-        if (!key.startsWith('VITEST_') && !key.startsWith('__VITEST') && key !== 'TEST') {
-          acc[key] = value;
-        }
-        return acc;
-      }, {} as NodeJS.ProcessEnv);
+      const cleanEnv = createCleanEnv();
 
       const serverProcess = spawn('npm', ['start'], {
         env: { ...cleanEnv, LACE_DIR: testLaceDir, NODE_ENV: 'production' },

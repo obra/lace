@@ -57,14 +57,15 @@ describe('LocalWorkspaceManager', () => {
       expect(workspace.clonePath).toBe(projectDir);
     });
 
-    it('should throw error if workspace already exists', async () => {
+    it('should return existing workspace if workspace already exists', async () => {
       const sessionId = 'test-duplicate';
 
-      await manager.createWorkspace(projectDir, sessionId);
+      const workspace1 = await manager.createWorkspace(projectDir, sessionId);
+      const workspace2 = await manager.createWorkspace(projectDir, sessionId);
 
-      await expect(manager.createWorkspace(projectDir, sessionId)).rejects.toThrow(
-        'Workspace already exists for session'
-      );
+      // Should return the same workspace
+      expect(workspace2).toEqual(workspace1);
+      expect(workspace2.sessionId).toBe(sessionId);
     });
   });
 
