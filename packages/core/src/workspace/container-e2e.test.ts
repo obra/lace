@@ -95,7 +95,7 @@ describe('Container E2E Test', () => {
     }
 
     // Create session with container workspace
-    const session = await Session.create({
+    const session = Session.create({
       projectId: project.getId(),
       name: 'Container E2E Test',
       configuration: {
@@ -104,6 +104,9 @@ describe('Container E2E Test', () => {
         modelId: 'claude-3-5-sonnet-20241022',
       },
     });
+
+    // Wait for workspace to be ready
+    await session.waitForWorkspace();
 
     try {
       const workspaceInfo = session.getWorkspaceInfo();
@@ -215,7 +218,7 @@ describe('Container E2E Test', () => {
       return;
     }
 
-    const session = await Session.create({
+    const session = Session.create({
       projectId: project.getId(),
       name: 'Lifecycle Test',
       configuration: {
@@ -224,6 +227,9 @@ describe('Container E2E Test', () => {
         modelId: 'claude-3-5-sonnet-20241022',
       },
     });
+
+    // Wait for workspace to be ready
+    await session.waitForWorkspace();
 
     const workspaceInfo = session.getWorkspaceInfo();
     const containerId = workspaceInfo?.containerId;

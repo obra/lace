@@ -34,7 +34,7 @@ describe('Session with WorkspaceManager', () => {
 
   describe('local mode (null-container)', () => {
     it('should create session with local workspace manager by default', async () => {
-      const session = await Session.create({
+      const session = Session.create({
         projectId: project.getId(),
         name: 'Test Session',
         configuration: {
@@ -43,6 +43,7 @@ describe('Session with WorkspaceManager', () => {
           modelId: 'claude-3-5-sonnet-20241022',
         },
       });
+      await session.waitForWorkspace();
 
       expect(session).toBeDefined();
       expect(session.getWorkspaceManager()).toBeDefined();
@@ -59,7 +60,7 @@ describe('Session with WorkspaceManager', () => {
     });
 
     it('should explicitly create local workspace when mode is specified', async () => {
-      const session = await Session.create({
+      const session = Session.create({
         projectId: project.getId(),
         name: 'Test Session',
         configuration: {
@@ -68,6 +69,7 @@ describe('Session with WorkspaceManager', () => {
           modelId: 'claude-3-5-sonnet-20241022',
         },
       });
+      await session.waitForWorkspace();
 
       expect(session).toBeDefined();
       expect(session.getWorkspaceManager()).toBeDefined();
@@ -80,7 +82,7 @@ describe('Session with WorkspaceManager', () => {
     });
 
     it('should clean up workspace on session destroy', async () => {
-      const session = await Session.create({
+      const session = Session.create({
         projectId: project.getId(),
         name: 'Test Session',
         configuration: {
@@ -89,6 +91,7 @@ describe('Session with WorkspaceManager', () => {
           modelId: 'claude-3-5-sonnet-20241022',
         },
       });
+      await session.waitForWorkspace();
 
       const workspaceManager = session.getWorkspaceManager();
       const workspaceInfo = session.getWorkspaceInfo();
@@ -115,7 +118,7 @@ describe('Session with WorkspaceManager', () => {
         configurable: true,
       });
 
-      const session = await Session.create({
+      const session = Session.create({
         projectId: project.getId(),
         name: 'Test Session',
         configuration: {
@@ -124,6 +127,7 @@ describe('Session with WorkspaceManager', () => {
           modelId: 'claude-3-5-sonnet-20241022',
         },
       });
+      await session.waitForWorkspace();
 
       // Should fall back to local mode
       const workspaceInfo = session.getWorkspaceInfo();
@@ -146,7 +150,7 @@ describe('Session with WorkspaceManager', () => {
         return;
       }
 
-      const session = await Session.create({
+      const session = Session.create({
         projectId: project.getId(),
         name: 'Test Session',
         configuration: {
@@ -155,6 +159,7 @@ describe('Session with WorkspaceManager', () => {
           modelId: 'claude-3-5-sonnet-20241022',
         },
       });
+      await session.waitForWorkspace();
 
       const workspaceInfo = session.getWorkspaceInfo();
       expect(workspaceInfo).toBeDefined();
@@ -168,7 +173,7 @@ describe('Session with WorkspaceManager', () => {
   describe('session loading', () => {
     it('should properly clean up sessions with workspaces', async () => {
       // Create a session first
-      const session = await Session.create({
+      const session = Session.create({
         projectId: project.getId(),
         name: 'Test Session',
         configuration: {
@@ -176,6 +181,7 @@ describe('Session with WorkspaceManager', () => {
           modelId: 'claude-3-5-sonnet-20241022',
         },
       });
+      await session.waitForWorkspace();
 
       const sessionId = session.getId();
 

@@ -43,7 +43,7 @@ describe('Workspace Integration', () => {
   describe('Local Mode Integration', () => {
     it('should execute bash commands in workspace', async () => {
       // Create session with local workspace
-      const session = await Session.create({
+      const session = Session.create({
         projectId: project.getId(),
         name: 'Integration Test',
         configuration: {
@@ -52,6 +52,7 @@ describe('Workspace Integration', () => {
           modelId: 'claude-3-5-sonnet-20241022',
         },
       });
+      await session.waitForWorkspace();
 
       expect(session.getWorkspaceManager()).toBeDefined();
       expect(session.getWorkspaceInfo()).toBeDefined();
@@ -90,7 +91,7 @@ describe('Workspace Integration', () => {
 
     it('should read and write files through workspace paths', async () => {
       // Create session with local workspace
-      const session = await Session.create({
+      const session = Session.create({
         projectId: project.getId(),
         name: 'File Test',
         configuration: {
@@ -99,6 +100,7 @@ describe('Workspace Integration', () => {
           modelId: 'claude-3-5-sonnet-20241022',
         },
       });
+      await session.waitForWorkspace();
 
       const filesRead = new Set<string>();
       const mockAgent = {
@@ -147,7 +149,7 @@ describe('Workspace Integration', () => {
 
     it('should coordinate bash and file operations', async () => {
       // Create session
-      const session = await Session.create({
+      const session = Session.create({
         projectId: project.getId(),
         name: 'Coordination Test',
         configuration: {
@@ -156,6 +158,7 @@ describe('Workspace Integration', () => {
           modelId: 'claude-3-5-sonnet-20241022',
         },
       });
+      await session.waitForWorkspace();
 
       const filesRead = new Set<string>();
       const mockAgent = {
@@ -214,7 +217,7 @@ describe('Workspace Integration', () => {
 
   describe('Workspace Path Resolution', () => {
     it('should resolve relative paths correctly', async () => {
-      const session = await Session.create({
+      const session = Session.create({
         projectId: project.getId(),
         name: 'Path Test',
         configuration: {
@@ -223,6 +226,7 @@ describe('Workspace Integration', () => {
           modelId: 'claude-3-5-sonnet-20241022',
         },
       });
+      await session.waitForWorkspace();
 
       const mockAgent = {
         getThreadId: () => session.getId(),
@@ -259,7 +263,7 @@ describe('Workspace Integration', () => {
     });
 
     it('should handle absolute paths correctly', async () => {
-      const session = await Session.create({
+      const session = Session.create({
         projectId: project.getId(),
         name: 'Absolute Path Test',
         configuration: {
@@ -268,6 +272,7 @@ describe('Workspace Integration', () => {
           modelId: 'claude-3-5-sonnet-20241022',
         },
       });
+      await session.waitForWorkspace();
 
       const mockAgent = {
         getThreadId: () => session.getId(),
@@ -304,7 +309,7 @@ describe('Workspace Integration', () => {
 
   describe('Session Lifecycle', () => {
     it('should clean up workspace on session destroy', async () => {
-      const session = await Session.create({
+      const session = Session.create({
         projectId: project.getId(),
         name: 'Cleanup Test',
         configuration: {
@@ -313,6 +318,7 @@ describe('Workspace Integration', () => {
           modelId: 'claude-3-5-sonnet-20241022',
         },
       });
+      await session.waitForWorkspace();
 
       const workspaceInfo = session.getWorkspaceInfo();
       expect(workspaceInfo).toBeDefined();

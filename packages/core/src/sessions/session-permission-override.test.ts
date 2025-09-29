@@ -41,7 +41,7 @@ describe('Session Permission Override', () => {
   });
 
   it('should start in normal mode', async () => {
-    const session = await Session.create({
+    const session = Session.create({
       projectId: testProject.getId(),
       name: 'Test Session',
     });
@@ -50,7 +50,7 @@ describe('Session Permission Override', () => {
   });
 
   it('should update permission mode', async () => {
-    const session = await Session.create({
+    const session = Session.create({
       projectId: testProject.getId(),
       name: 'Test Session',
     });
@@ -63,7 +63,7 @@ describe('Session Permission Override', () => {
   });
 
   it('should persist permission mode', async () => {
-    const session = await Session.create({
+    const session = Session.create({
       projectId: testProject.getId(),
       name: 'Test Session',
     });
@@ -76,7 +76,7 @@ describe('Session Permission Override', () => {
   });
 
   it('should restore permission mode to normal if not set', async () => {
-    const session = await Session.create({
+    const session = Session.create({
       projectId: testProject.getId(),
       name: 'Test Session',
     });
@@ -87,7 +87,7 @@ describe('Session Permission Override', () => {
   });
 
   it('should update all agent tool executors when mode changes', async () => {
-    const session = await Session.create({
+    const session = Session.create({
       projectId: testProject.getId(),
       name: 'Test Session',
     });

@@ -90,7 +90,7 @@ describe('MCP Integration E2E', () => {
     });
 
     // Create session (will auto-initialize MCP servers)
-    session = await Session.create({
+    session = Session.create({
       name: 'Test Session',
       projectId: project.getId(),
       approvalCallback: mockApprovalCallback,

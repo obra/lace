@@ -125,6 +125,9 @@ describe('Enhanced Agent', () => {
       },
     });
 
+    // Wait for workspace initialization to complete
+    await session.waitForWorkspace();
+
     mockProvider = new MockProvider({
       content: 'Test response',
       toolCalls: [],
@@ -1287,6 +1290,8 @@ describe('Enhanced Agent', () => {
       // The key fix verification: temp directory is now provided
       // Before fix: "Tool temp directory not provided by ToolExecutor"
       // After fix: Tool gets temp directory and can create output files
+
+      console.log('Tool result:', JSON.stringify(result, null, 2));
 
       if (
         result.status === 'failed' &&
