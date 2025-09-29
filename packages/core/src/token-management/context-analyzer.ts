@@ -32,9 +32,10 @@ export class ContextAnalyzer {
       }
     }
 
+    const reservedTokens = this.getReservedTokens(agent);
     const totalUsed = systemPromptTokens + core.tokens + mcp.tokens + messages.tokens;
+    const freeTokens = contextLimit - totalUsed - reservedTokens;
 
-    // Return minimal valid response for now (still missing reserved tokens)
     return {
       timestamp: new Date().toISOString(),
       modelId: agent.model,
@@ -46,10 +47,17 @@ export class ContextAnalyzer {
         coreTools: core,
         mcpTools: mcp,
         messages,
-        reservedForResponse: { tokens: 0 }, // Still TODO
-        freeSpace: { tokens: contextLimit - totalUsed },
+        reservedForResponse: { tokens: reservedTokens },
+        freeSpace: { tokens: Math.max(0, freeTokens) }, // Don't go negative
       },
     };
+  }
+
+  private static getReservedTokens(_agent: Agent): number {
+    // Reserve space for agent response
+    // Default to 4096 tokens (reasonable for most models)
+    // This could be made configurable in the future based on agent settings
+    return 4096;
   }
 
   private static async countSystemPromptTokens(threadId: ThreadId, agent: Agent): Promise<number> {
