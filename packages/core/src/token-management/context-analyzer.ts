@@ -3,7 +3,7 @@
 
 import type { ThreadId } from '~/threads/types';
 import type { Agent } from '~/agents/agent';
-import type { ContextBreakdown } from './context-breakdown-types';
+import type { ContextBreakdown, CategoryDetail, ItemDetail } from './context-breakdown-types';
 import { estimateTokens } from '~/utils/token-estimation';
 
 export class ContextAnalyzer {
@@ -12,6 +12,7 @@ export class ContextAnalyzer {
    */
   static async analyze(threadId: ThreadId, agent: Agent): Promise<ContextBreakdown> {
     const systemPromptTokens = await this.countSystemPromptTokens(threadId, agent);
+    const { core, mcp } = await this.countToolTokens(agent);
 
     // Get context limit from agent's provider
     const modelId = agent.model;
@@ -25,17 +26,19 @@ export class ContextAnalyzer {
       }
     }
 
+    const totalUsed = systemPromptTokens + core.tokens + mcp.tokens;
+
     // Return minimal valid response for now
     return {
       timestamp: new Date().toISOString(),
       modelId: agent.model,
       contextLimit,
-      totalUsedTokens: systemPromptTokens,
-      percentUsed: systemPromptTokens / contextLimit,
+      totalUsedTokens: totalUsed,
+      percentUsed: totalUsed / contextLimit,
       categories: {
         systemPrompt: { tokens: systemPromptTokens },
-        coreTools: { tokens: 0, items: [] },
-        mcpTools: { tokens: 0, items: [] },
+        coreTools: core,
+        mcpTools: mcp,
         messages: {
           tokens: 0,
           subcategories: {
@@ -46,7 +49,7 @@ export class ContextAnalyzer {
           },
         },
         reservedForResponse: { tokens: 0 },
-        freeSpace: { tokens: contextLimit - systemPromptTokens },
+        freeSpace: { tokens: contextLimit - totalUsed },
       },
     };
   }
@@ -72,5 +75,50 @@ export class ContextAnalyzer {
     }
 
     return totalTokens;
+  }
+
+  private static async countToolTokens(
+    agent: Agent
+  ): Promise<{ core: CategoryDetail; mcp: CategoryDetail }> {
+    // Get tool executor from agent
+    const toolExecutor = agent.toolExecutor;
+
+    // Get all registered tools
+    const allTools = toolExecutor.getAllTools();
+
+    const coreToolItems: ItemDetail[] = [];
+    const mcpToolItems: ItemDetail[] = [];
+    let coreTotal = 0;
+    let mcpTotal = 0;
+
+    // Iterate tools and categorize
+    for (const tool of allTools) {
+      // Convert tool to JSON schema format
+      const toolSchema = {
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.inputSchema,
+      };
+      const toolTokens = estimateTokens(JSON.stringify(toolSchema));
+
+      const item: ItemDetail = {
+        name: tool.name,
+        tokens: toolTokens,
+      };
+
+      // MCP tools have "/" in their name (e.g., "server/tool")
+      if (tool.name.includes('/')) {
+        mcpToolItems.push(item);
+        mcpTotal += toolTokens;
+      } else {
+        coreToolItems.push(item);
+        coreTotal += toolTokens;
+      }
+    }
+
+    return {
+      core: { tokens: coreTotal, items: coreToolItems },
+      mcp: { tokens: mcpTotal, items: mcpToolItems },
+    };
   }
 }
