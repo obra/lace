@@ -28,9 +28,11 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
   // Microsoft devcontainer includes common dev tools, git, etc.
   private readonly DEFAULT_IMAGE = 'mcr.microsoft.com/devcontainers/base:ubuntu';
   private readonly readyPromise: Promise<void>;
+  private readonly image: string;
 
-  constructor() {
+  constructor(image?: string) {
     super();
+    this.image = image || this.DEFAULT_IMAGE;
     // Start system initialization but don't await in constructor
     // Methods will await this.readyPromise before executing
     this.readyPromise = this.ensureSystemStarted();
@@ -122,7 +124,7 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
       args.push('-w', config.workingDirectory);
 
       // Add image and command
-      args.push(this.DEFAULT_IMAGE, 'tail', '-f', '/dev/null');
+      args.push(this.image, 'tail', '-f', '/dev/null');
 
       logger.debug('Starting container', { containerId, argCount: args.length });
 
@@ -145,10 +147,7 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
         throw createError;
       }
 
-      // Wait for container to be fully ready - containers take time to initialize
-      // The container tool needs a moment to fully start the container
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
+      // Container is ready immediately after 'container run' completes
       info.state = 'running';
       info.startedAt = new Date();
     } catch (error: unknown) {
@@ -279,6 +278,23 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
     this.unregisterMounts(containerId);
   }
 
+  private isContainerNotReadyError(error: unknown): boolean {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const stderr = (error as { stderr?: string }).stderr || '';
+
+    // Check for common "not ready" error patterns
+    const notReadyPatterns = [
+      'No such container',
+      'is not running',
+      'cannot connect',
+      'connection refused',
+      'not found',
+    ];
+
+    const combinedMessage = `${errorMessage} ${stderr}`.toLowerCase();
+    return notReadyPatterns.some((pattern) => combinedMessage.includes(pattern.toLowerCase()));
+  }
+
   async exec(containerId: string, options: ExecOptions): Promise<ExecResult> {
     await this.readyPromise; // Wait for system to be ready
 
@@ -313,57 +329,82 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
 
     logger.debug('Executing command', { containerId, argCount: args.length });
 
-    try {
-      const { stdout, stderr } = await execFileAsync('container', args, {
-        timeout: options.timeout ?? 30000,
-        maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-      });
+    // Retry logic: try up to 3 times if container isn't ready
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const { stdout, stderr } = await execFileAsync('container', args, {
+          timeout: options.timeout ?? 30000,
+          maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+        });
 
-      return {
-        stdout: stdout || '',
-        stderr: stderr || '',
-        exitCode: 0,
-      };
-    } catch (error: unknown) {
-      // Check if this is an exec error with output
-      const errorWithCode = error as {
-        code?: number;
-        signal?: string;
-        killed?: boolean;
-        stdout?: string;
-        stderr?: string;
-        message?: string;
-      };
-      if (errorWithCode.code !== undefined) {
-        const exitCode = errorWithCode.code;
+        return {
+          stdout: stdout || '',
+          stderr: stderr || '',
+          exitCode: 0,
+        };
+      } catch (error: unknown) {
+        lastError = error;
 
-        // Timeout error
-        if (errorWithCode.signal === 'SIGTERM' || errorWithCode.killed) {
-          throw new ContainerError(
-            'Execution timeout',
-            containerId,
-            error instanceof Error ? error : undefined
-          );
+        // Check if this is an exec error with output
+        const errorWithCode = error as {
+          code?: number;
+          signal?: string;
+          killed?: boolean;
+          stdout?: string;
+          stderr?: string;
+          message?: string;
+        };
+
+        if (errorWithCode.code !== undefined) {
+          const exitCode = errorWithCode.code;
+
+          // Timeout error - don't retry
+          if (errorWithCode.signal === 'SIGTERM' || errorWithCode.killed) {
+            throw new ContainerError(
+              'Execution timeout',
+              containerId,
+              error instanceof Error ? error : undefined
+            );
+          }
+
+          // Command executed but returned non-zero exit code
+          // Still return the output - don't retry
+          return {
+            stdout: errorWithCode.stdout || '',
+            stderr: errorWithCode.stderr || '',
+            exitCode: typeof exitCode === 'number' ? exitCode : 1,
+          };
         }
 
-        // Command executed but returned non-zero exit code
-        // Still return the output
-        return {
-          stdout: errorWithCode.stdout || '',
-          stderr: errorWithCode.stderr || '',
-          exitCode: typeof exitCode === 'number' ? exitCode : 1,
-        };
-      }
+        // Check if this is a "container not ready" error
+        if (attempt < 2 && this.isContainerNotReadyError(error)) {
+          logger.debug('Container not ready, retrying', {
+            containerId,
+            attempt: attempt + 1,
+            error: errorWithCode.message,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          continue; // Retry
+        }
 
-      // Unknown error - container might not be running
-      const errorMessage =
-        errorWithCode.message || (error instanceof Error ? error.message : String(error));
-      logger.error('Exec failed with unknown error', {
-        containerId,
-        error: errorMessage,
-      });
-      throw new ContainerExecError(containerId, 1, errorMessage);
+        // Not a retry-able error or we've exhausted retries
+        break;
+      }
     }
+
+    // All retries exhausted
+    const errorWithCode = lastError as {
+      message?: string;
+      stderr?: string;
+    };
+    const errorMessage =
+      errorWithCode.message || (lastError instanceof Error ? lastError.message : String(lastError));
+    logger.error('Exec failed after retries', {
+      containerId,
+      error: errorMessage,
+    });
+    throw new ContainerExecError(containerId, 1, errorMessage);
   }
 
   async list(): Promise<ContainerInfo[]> {
