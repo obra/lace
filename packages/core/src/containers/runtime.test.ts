@@ -86,16 +86,16 @@ describe('BaseContainerRuntime', () => {
   });
 
   describe('list', () => {
-    it('should return empty array when no containers exist', () => {
-      const containers = runtime.list();
+    it('should return empty array when no containers exist', async () => {
+      const containers = await runtime.list();
       expect(containers).toHaveLength(0);
     });
 
-    it('should return all containers', () => {
+    it('should return all containers', async () => {
       runtime.create({ id: 'container1', workingDirectory: '/app', mounts: [] });
       runtime.create({ id: 'container2', workingDirectory: '/app', mounts: [] });
 
-      const containers = runtime.list();
+      const containers = await runtime.list();
       expect(containers).toHaveLength(2);
       expect(containers.map((c) => c.id)).toContain('container1');
       expect(containers.map((c) => c.id)).toContain('container2');
