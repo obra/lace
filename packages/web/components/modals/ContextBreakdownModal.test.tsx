@@ -13,6 +13,13 @@ import { ContextBreakdownModal } from './ContextBreakdownModal';
 import { api } from '@/lib/api-client';
 import type { ContextBreakdown } from '@/types/context';
 
+// Mock ResizeObserver for Recharts
+global.ResizeObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+}));
+
 vi.mock('@/lib/api-client', () => ({
   api: {
     get: vi.fn(),
