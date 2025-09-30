@@ -19,7 +19,11 @@ import {
 } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
-import type { ThreadTokenUsage, CombinedTokenUsage } from '~/token-management/types';
+import type {
+  ThreadTokenUsage,
+  CombinedTokenUsage,
+  TokenUsageMetrics,
+} from '~/token-management/types';
 import { loadPromptConfig } from '~/config/prompts';
 import type { PromptConfig } from '~/config/prompts';
 import { estimateTokens } from '~/utils/token-estimation';
@@ -27,7 +31,6 @@ import { QueuedMessage, MessageQueueStats } from '~/agents/types';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
-import { aggregateTokenUsage } from '~/threads/token-aggregation';
 import { ProviderRegistry } from '~/providers/registry';
 
 export interface AgentConfig {
@@ -940,30 +943,59 @@ export class Agent extends EventEmitter {
 
       // Process agent response
       if (response.content) {
-        // Store raw content (with thinking blocks) for model context with token usage
-        const threadTokenUsage = this.getTokenUsage();
+        // Calculate context window usage from CURRENT response
+        let contextUsage: ThreadTokenUsage;
 
-        const agentMessageTokenUsage: CombinedTokenUsage = response.usage
+        if (response.usage) {
+          // Calculate current context state
+          const modelId = this.model;
+          let contextLimit = 200000;
+
+          if (modelId && modelId !== 'unknown-model' && this.providerInstance) {
+            const models = this.providerInstance.getAvailableModels();
+            const modelInfo = models.find((m) => m.id === modelId);
+            if (modelInfo) {
+              contextLimit = modelInfo.contextWindow;
+            }
+          }
+
+          const currentTokens = response.usage.promptTokens + response.usage.completionTokens;
+          const percentUsed = contextLimit > 0 ? currentTokens / contextLimit : 0;
+
+          contextUsage = {
+            totalPromptTokens: currentTokens,
+            totalCompletionTokens: 0, // Not separated
+            totalTokens: currentTokens,
+            contextLimit,
+            percentUsed,
+            nearLimit: percentUsed >= 0.8,
+          };
+        } else {
+          // Fallback: use getTokenUsage() if no usage in response
+          contextUsage = this.getTokenUsage();
+        }
+
+        const agentMessageTokenUsage: TokenUsageMetrics = response.usage
           ? {
-              // Current message token usage from provider
-              message: {
-                promptTokens: response.usage.promptTokens,
-                completionTokens: response.usage.completionTokens,
+              // This turn's token counts
+              turn: {
+                inputTokens: response.usage.promptTokens,
+                outputTokens: response.usage.completionTokens,
                 totalTokens: response.usage.totalTokens,
               },
-              // Thread-level cumulative usage
-              thread: threadTokenUsage,
+              // Current context window state after this turn
+              context: contextUsage,
             }
           : {
-              // Fallback: no message usage data available
-              thread: threadTokenUsage,
+              // Fallback: no turn usage data available
+              context: contextUsage,
             };
 
         logger.debug('Creating AGENT_MESSAGE event with token usage', {
           threadId: this._threadId,
           hasProviderUsage: !!response.usage,
           providerUsage: response.usage,
-          threadTokenUsage,
+          contextUsage,
           finalTokenUsage: agentMessageTokenUsage,
         });
 
@@ -3224,10 +3256,123 @@ export class Agent extends EventEmitter {
 
   /**
    * Gets current token usage information for this agent
+   * Uses last AGENT_MESSAGE event for accurate usage data
    */
   getTokenUsage(): ThreadTokenUsage {
     const events = this._threadManager.getEvents(this._threadId);
-    const tokenSummary = aggregateTokenUsage(events);
+
+    logger.debug('[Agent.getTokenUsage] Starting', {
+      threadId: this._threadId,
+      totalEvents: events.length,
+    });
+
+    // Find last AGENT_MESSAGE with token usage
+    let lastAgentMessageIndex = -1;
+    for (let i = events.length - 1; i >= 0; i--) {
+      const event = events[i];
+      if (
+        event.type === 'AGENT_MESSAGE' &&
+        typeof event.data === 'object' &&
+        event.data !== null &&
+        'tokenUsage' in event.data
+      ) {
+        lastAgentMessageIndex = i;
+        break;
+      }
+    }
+
+    // Find last COMPACTION event
+    let lastCompactionIndex = -1;
+    for (let i = events.length - 1; i >= 0; i--) {
+      if (events[i].type === 'COMPACTION') {
+        lastCompactionIndex = i;
+        break;
+      }
+    }
+
+    logger.debug('[Agent.getTokenUsage] Found events', {
+      lastAgentMessageIndex,
+      lastCompactionIndex,
+      compactionIsNewer: lastCompactionIndex > lastAgentMessageIndex,
+    });
+
+    let totalPromptTokens = 0;
+    let totalCompletionTokens = 0;
+
+    // If compaction is more recent than last AGENT_MESSAGE, conversation has changed
+    // Fall back to estimation since we can't call async countTokens here
+    if (lastCompactionIndex > lastAgentMessageIndex) {
+      // Estimate current conversation tokens
+      const estimatedTokens = this._estimateConversationTokens(this.buildThreadMessages());
+      totalPromptTokens = estimatedTokens;
+      totalCompletionTokens = 0; // Can't separate in estimation
+
+      logger.debug('[Agent.getTokenUsage] Using ESTIMATION path', {
+        estimatedTokens,
+      });
+    } else if (lastAgentMessageIndex >= 0) {
+      // Use last AGENT_MESSAGE tokens (still accurate)
+      const lastAgentMessage = events[lastAgentMessageIndex];
+      if (
+        typeof lastAgentMessage.data === 'object' &&
+        lastAgentMessage.data !== null &&
+        'tokenUsage' in lastAgentMessage.data
+      ) {
+        const tokenUsage = lastAgentMessage.data.tokenUsage as {
+          turn?: { inputTokens?: number; outputTokens?: number };
+          context?: {
+            totalPromptTokens?: number;
+            totalCompletionTokens?: number;
+            totalTokens?: number;
+          };
+          message?: { promptTokens?: number; completionTokens?: number }; // Legacy
+        };
+
+        // Try new format first: context.totalPromptTokens
+        if (tokenUsage.context?.totalPromptTokens !== undefined) {
+          totalPromptTokens = tokenUsage.context.totalPromptTokens;
+          totalCompletionTokens = tokenUsage.context.totalCompletionTokens ?? 0;
+
+          logger.debug('[Agent.getTokenUsage] Using context field', {
+            totalPromptTokens,
+            totalCompletionTokens,
+            source: 'context',
+          });
+        } else if (
+          tokenUsage.turn?.inputTokens !== undefined &&
+          tokenUsage.turn?.outputTokens !== undefined
+        ) {
+          // Fallback: calculate from turn
+          totalPromptTokens = tokenUsage.turn.inputTokens + tokenUsage.turn.outputTokens;
+          totalCompletionTokens = 0; // Not separated
+
+          logger.debug('[Agent.getTokenUsage] Using turn fields', {
+            inputTokens: tokenUsage.turn.inputTokens,
+            outputTokens: tokenUsage.turn.outputTokens,
+            totalPromptTokens,
+            source: 'turn',
+          });
+        } else if (tokenUsage.message) {
+          // Legacy format
+          totalPromptTokens = tokenUsage.message.promptTokens ?? 0;
+          totalCompletionTokens = tokenUsage.message.completionTokens ?? 0;
+
+          logger.debug('[Agent.getTokenUsage] Using legacy message field', {
+            promptTokens: totalPromptTokens,
+            completionTokens: totalCompletionTokens,
+            source: 'message',
+          });
+        }
+      }
+    }
+
+    const totalTokens = totalPromptTokens + totalCompletionTokens;
+
+    logger.debug('[Agent.getTokenUsage] Calculated totals', {
+      totalPromptTokens,
+      totalCompletionTokens,
+      totalTokens,
+    });
 
     // Get context limit from provider system
     const modelId = this.model;
@@ -3241,13 +3386,13 @@ export class Agent extends EventEmitter {
       }
     }
 
-    const percentUsed = contextLimit > 0 ? tokenSummary.totalTokens / contextLimit : 0;
+    const percentUsed = contextLimit > 0 ? totalTokens / contextLimit : 0;
     const nearLimit = percentUsed >= 0.8;
 
     return {
-      totalPromptTokens: tokenSummary.totalPromptTokens,
-      totalCompletionTokens: tokenSummary.totalCompletionTokens,
-      totalTokens: tokenSummary.totalTokens,
+      totalPromptTokens,
+      totalCompletionTokens,
+      totalTokens,
       contextLimit,
       percentUsed,
       nearLimit,

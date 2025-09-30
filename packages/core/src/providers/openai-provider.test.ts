@@ -600,36 +600,36 @@ describe('OpenAIProvider', () => {
   });
 
   describe('token counting', () => {
-    it('should count tokens using tiktoken for known models', () => {
+    it('should count tokens using tiktoken for known models', async () => {
       const messages = [
         { role: 'user' as const, content: 'Hello, how are you?' },
         { role: 'assistant' as const, content: 'I am doing well, thank you!' },
       ];
 
-      const tokenCount = provider.countTokens(messages, [], 'gpt-4o');
+      const tokenCount = await provider.countTokens(messages, [], 'gpt-4o');
 
       expect(tokenCount).toBeGreaterThan(0);
       expect(typeof tokenCount).toBe('number');
     });
 
-    it('should return null if no model is provided', () => {
+    it('should return null if no model is provided', async () => {
       const messages = [{ role: 'user' as const, content: 'Hello' }];
 
-      const tokenCount = provider.countTokens(messages, []);
+      const tokenCount = await provider.countTokens(messages, []);
 
       expect(tokenCount).toBeNull();
     });
 
-    it('should handle token counting with tools', () => {
+    it('should handle token counting with tools', async () => {
       const messages = [{ role: 'user' as const, content: 'Use the test tool' }];
 
-      const tokenCount = provider.countTokens(messages, [mockTool], 'gpt-4o');
+      const tokenCount = await provider.countTokens(messages, [mockTool], 'gpt-4o');
 
       expect(tokenCount).toBeGreaterThan(0);
       expect(typeof tokenCount).toBe('number');
     });
 
-    it('should not double-count system messages', () => {
+    it('should not double-count system messages', async () => {
       const messagesWithSystem = [
         { role: 'system' as const, content: 'You are a helpful assistant.' },
         { role: 'user' as const, content: 'Hello' },
@@ -637,8 +637,8 @@ describe('OpenAIProvider', () => {
 
       const messagesWithoutSystem = [{ role: 'user' as const, content: 'Hello' }];
 
-      const tokensWithSystem = provider.countTokens(messagesWithSystem, [], 'gpt-4o');
-      const tokensWithoutSystem = provider.countTokens(messagesWithoutSystem, [], 'gpt-4o');
+      const tokensWithSystem = await provider.countTokens(messagesWithSystem, [], 'gpt-4o');
+      const tokensWithoutSystem = await provider.countTokens(messagesWithoutSystem, [], 'gpt-4o');
 
       expect(tokensWithSystem).toBeGreaterThan(0);
       expect(tokensWithoutSystem).toBeGreaterThan(0);

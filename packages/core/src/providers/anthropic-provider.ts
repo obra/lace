@@ -57,28 +57,24 @@ export class AnthropicProvider extends AIProvider {
     return this._anthropic;
   }
 
-  // Provider-specific token counting using Anthropic's beta API
-  async countTokens(
+  /**
+   * Helper method for token counting with explicit control over all parameters
+   * Allows precise counting of individual components (system, tools, messages)
+   */
+  private async countTokensExplicit(
     messages: ProviderMessage[],
-    tools: Tool[] = [],
-    model?: string
+    systemPrompt: string,
+    tools: Tool[],
+    model: string
   ): Promise<number | null> {
-    if (!model) {
-      return null; // Can't count without model
-    }
     try {
-      // Convert to Anthropic format
       const anthropicMessages = convertToAnthropicFormat(messages);
-      const systemPrompt = this.getEffectiveSystemPrompt(messages);
-
-      // Convert tools to Anthropic format
       const anthropicTools: Anthropic.Tool[] = tools.map((tool) => ({
         name: tool.name,
         description: tool.description,
         input_schema: tool.inputSchema,
       }));
 
-      // Use beta API to count tokens
       const result = await this.getAnthropicClient().beta.messages.countTokens({
         model,
         messages: anthropicMessages,
@@ -88,8 +84,77 @@ export class AnthropicProvider extends AIProvider {
 
       return result.input_tokens;
     } catch (error) {
-      logger.debug('Token counting failed, falling back to estimation', { error });
-      return null; // Fall back to estimation
+      logger.debug('Token counting failed', { error });
+      return null;
+    }
+  }
+
+  // Provider-specific token counting using Anthropic's beta API
+  async countTokens(
+    messages: ProviderMessage[],
+    tools: Tool[] = [],
+    model?: string
+  ): Promise<number | null> {
+    if (!model) {
+      return null; // Can't count without model
+    }
+
+    const systemPrompt = this.getEffectiveSystemPrompt(messages);
+    return this.countTokensExplicit(messages, systemPrompt, tools, model);
+  }
+
+  /**
+   * Calibrates token costs for system prompt and individual tools
+   * Makes separate API calls to measure each component precisely
+   */
+  async calibrateTokenCosts(
+    messages: ProviderMessage[],
+    tools: Tool[],
+    model: string
+  ): Promise<{
+    systemTokens: number;
+    toolTokens: number;
+    toolDetails: Array<{ name: string; tokens: number }>;
+  } | null> {
+    try {
+      const systemPrompt = this.getEffectiveSystemPrompt(messages);
+
+      logger.debug('[AnthropicProvider] Starting calibration', {
+        model,
+        systemPromptLength: systemPrompt.length,
+        toolCount: tools.length,
+      });
+
+      // Count system prompt only (no messages, no tools)
+      const systemTokens = (await this.countTokensExplicit([], systemPrompt, [], model)) || 0;
+
+      logger.debug('[AnthropicProvider] System prompt counted', { systemTokens });
+
+      // Count each tool individually (no system, no messages)
+      const toolDetails = await Promise.all(
+        tools.map(async (tool) => ({
+          name: tool.name,
+          tokens: (await this.countTokensExplicit([], '', [tool], model)) || 0,
+        }))
+      );
+
+      const toolTokens = toolDetails.reduce((sum, t) => sum + t.tokens, 0);
+
+      logger.debug('[AnthropicProvider] Tools counted', {
+        toolTokens,
+        toolCount: toolDetails.length,
+        sampleTools: toolDetails.slice(0, 3),
+      });
+
+      return {
+        systemTokens,
+        toolTokens,
+        toolDetails,
+      };
+    } catch (error) {
+      logger.error('[AnthropicProvider] Calibration failed', { error });
+      logger.debug('Token calibration failed', { error });
+      return null;
     }
   }
 

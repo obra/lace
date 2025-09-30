@@ -53,9 +53,10 @@ describe('Token aggregation', () => {
 
     const summary = aggregateTokenUsage(events);
 
-    expect(summary.totalPromptTokens).toBe(300);
-    expect(summary.totalCompletionTokens).toBe(125);
-    expect(summary.totalTokens).toBe(425);
+    // Should return the LAST turn's total context (current state)
+    expect(summary.totalPromptTokens).toBe(275); // Current context tokens
+    expect(summary.totalCompletionTokens).toBe(0); // Not separated
+    expect(summary.totalTokens).toBe(275); // Current context
   });
 
   it('should handle mixed events with and without token usage', () => {
@@ -95,12 +96,13 @@ describe('Token aggregation', () => {
 
     const summary = aggregateTokenUsage(events);
 
-    expect(summary.totalPromptTokens).toBe(100);
-    expect(summary.totalCompletionTokens).toBe(50);
+    // Should return last AGENT_MESSAGE with tokenUsage (event 1: 100+50=150)
+    expect(summary.totalPromptTokens).toBe(150); // Current context
+    expect(summary.totalCompletionTokens).toBe(0); // Not separated
     expect(summary.totalTokens).toBe(150);
   });
 
-  it('should aggregate token usage from TOOL_RESULT events', () => {
+  it('should return zero when only TOOL_RESULT events exist', () => {
     const events: LaceEvent[] = [
       {
         id: '1',
@@ -121,9 +123,10 @@ describe('Token aggregation', () => {
 
     const summary = aggregateTokenUsage(events);
 
-    expect(summary.totalPromptTokens).toBe(50);
-    expect(summary.totalCompletionTokens).toBe(25);
-    expect(summary.totalTokens).toBe(75);
+    // No AGENT_MESSAGE, so no current state
+    expect(summary.totalPromptTokens).toBe(0);
+    expect(summary.totalCompletionTokens).toBe(0);
+    expect(summary.totalTokens).toBe(0);
   });
 
   it('should estimate tokens when usage data not available', () => {
@@ -286,11 +289,11 @@ describe('Token aggregation', () => {
 
       const result = aggregateTokenUsage(events);
 
-      // Should be summary (300+200) + post-compaction events (150+100+200+150)
+      // Should return the LAST AGENT_MESSAGE total (200 + 150 = 350)
       expect(result).toEqual({
-        totalPromptTokens: 650, // 300 (summary) + 150 + 200
-        totalCompletionTokens: 450, // 200 (summary) + 100 + 150
-        totalTokens: 1100, // 500 (summary) + 250 + 350
+        totalPromptTokens: 350, // Current context tokens
+        totalCompletionTokens: 0, // Not separated
+        totalTokens: 350,
       });
     });
 
@@ -399,11 +402,11 @@ describe('Token aggregation', () => {
 
       const result = aggregateTokenUsage(events);
 
-      // Should only count the latest summary (150+75) + post-compaction events (100+50)
+      // Should return the LAST AGENT_MESSAGE total (100 + 50 = 150)
       expect(result).toEqual({
-        totalPromptTokens: 250, // 150 (latest summary) + 100
-        totalCompletionTokens: 125, // 75 (latest summary) + 50
-        totalTokens: 375, // 225 (latest summary) + 150
+        totalPromptTokens: 150, // Current context tokens
+        totalCompletionTokens: 0, // Not separated
+        totalTokens: 150,
       });
     });
 
@@ -453,11 +456,12 @@ describe('Token aggregation', () => {
 
       const result = aggregateTokenUsage(events);
 
-      // Should only count the summary
+      // Should return last AGENT_MESSAGE total (before compaction: 1000 + 500 = 1500)
+      // Note: After compaction, agent.getTokenUsage() will re-estimate
       expect(result).toEqual({
-        totalPromptTokens: 200,
-        totalCompletionTokens: 100,
-        totalTokens: 300,
+        totalPromptTokens: 1500, // Last AGENT_MESSAGE total
+        totalCompletionTokens: 0, // Not separated
+        totalTokens: 1500,
       });
     });
 
@@ -506,10 +510,10 @@ describe('Token aggregation', () => {
 
       const result = aggregateTokenUsage(events);
 
-      // Should only count post-compaction events
+      // Should return last AGENT_MESSAGE total (event 2: 100 + 50 = 150)
       expect(result).toEqual({
-        totalPromptTokens: 100,
-        totalCompletionTokens: 50,
+        totalPromptTokens: 150, // Current context tokens
+        totalCompletionTokens: 0, // Not separated
         totalTokens: 150,
       });
     });

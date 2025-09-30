@@ -302,6 +302,25 @@ export abstract class AIProvider extends EventEmitter {
     return null;
   }
 
+  /**
+   * Calibrates token costs for system prompt and individual tools
+   * Makes separate API calls to measure each component precisely
+   * Providers should override this if they support accurate token counting
+   * Returns null if provider doesn't support calibration
+   */
+  calibrateTokenCosts(
+    _messages: ProviderMessage[],
+    _tools: Tool[],
+    _model: string
+  ): Promise<{
+    systemTokens: number;
+    toolTokens: number;
+    toolDetails: Array<{ name: string; tokens: number }>;
+  } | null> {
+    // Default: no calibration support
+    return Promise.resolve(null);
+  }
+
   // System prompt handling with fallback logic
   protected getEffectiveSystemPrompt(messages: ProviderMessage[]): string {
     const systemMessage = messages.find((msg) => msg.role === 'system');

@@ -116,40 +116,32 @@ export abstract class BaseHelper {
         toolCalls: response.toolCalls,
       });
 
-      // Aggregate token usage
+      // Track token usage from last turn
       if (response.usage) {
-        if (!totalUsage) {
-          totalUsage = {
-            message: {
-              promptTokens: response.usage.promptTokens,
-              completionTokens: response.usage.completionTokens,
-              totalTokens: response.usage.totalTokens,
-            },
-            thread: {
-              totalPromptTokens: response.usage.promptTokens,
-              totalCompletionTokens: response.usage.completionTokens,
-              totalTokens: response.usage.totalTokens,
-              contextLimit: 100000, // Default reasonable limit
-              percentUsed: 0,
-              nearLimit: false,
-            },
-          };
-        } else {
-          // Update message usage for current response
-          totalUsage.message = {
-            promptTokens: response.usage.promptTokens,
-            completionTokens: response.usage.completionTokens,
-            totalTokens: response.usage.totalTokens,
-          };
+        // Current context = input + output (output is now in conversation for next turn)
+        const currentTokens = response.usage.promptTokens + response.usage.completionTokens;
+        const contextLimit = 100000; // Default reasonable limit for helpers
+        const percentUsed = contextLimit > 0 ? currentTokens / contextLimit : 0;
 
-          // Aggregate to thread totals
-          totalUsage.thread.totalPromptTokens += response.usage.promptTokens;
-          totalUsage.thread.totalCompletionTokens += response.usage.completionTokens;
-          totalUsage.thread.totalTokens += response.usage.totalTokens;
-          totalUsage.thread.percentUsed =
-            (totalUsage.thread.totalTokens / totalUsage.thread.contextLimit) * 100;
-          totalUsage.thread.nearLimit = totalUsage.thread.percentUsed > 80;
-        }
+        totalUsage = {
+          // Last turn's token counts
+          turn: {
+            inputTokens: response.usage.promptTokens,
+            outputTokens: response.usage.completionTokens,
+            totalTokens: response.usage.totalTokens,
+          },
+          // Current context window state
+          // Note: totalPromptTokens contains the current context size (input + previous outputs)
+          // despite the confusing field name (kept for backwards compatibility)
+          context: {
+            totalPromptTokens: currentTokens, // Current context = last input + last output
+            totalCompletionTokens: 0, // Not separately tracked in context state
+            totalTokens: currentTokens,
+            contextLimit,
+            percentUsed,
+            nearLimit: percentUsed >= 0.8,
+          },
+        };
       }
 
       // If no tool calls, we're done

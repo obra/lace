@@ -177,6 +177,10 @@
       "types": "./dist/token-management/types.d.ts",
       "import": "./dist/token-management/types.js"
     },
+    "./token-management": {
+      "types": "./dist/token-management/index.d.ts",
+      "import": "./dist/token-management/index.js"
+    },
     "./threads/compaction/types": {
       "types": "./dist/threads/compaction/types.d.ts",
       "import": "./dist/threads/compaction/types.js"

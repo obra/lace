@@ -93,7 +93,7 @@ export class OpenAIProvider extends AIProvider {
    * Loads tiktoken with embedded WASM support for bun compile
    * Uses scoped fs patching - only active during import, then fully restored
    */
-  private _loadTiktokenWithEmbeddedWasm(): typeof import('tiktoken') {
+  private async _loadTiktokenWithEmbeddedWasm(): Promise<typeof import('tiktoken')> {
     // Return cached module if already loaded
     if (this._tiktokenModule) {
       return this._tiktokenModule;
@@ -122,9 +122,20 @@ export class OpenAIProvider extends AIProvider {
 
     // If no embedded WASM, fall back to regular import
     if (!wasmBuffer) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- Fallback for non-embedded environments
-      this._tiktokenModule = require('tiktoken') as typeof import('tiktoken');
-      return this._tiktokenModule;
+      logger.debug('[OpenAIProvider] No embedded WASM, attempting regular tiktoken import');
+      try {
+        // Use dynamic import for ESM compatibility (web server)
+        this._tiktokenModule = await import('tiktoken');
+        logger.debug('[OpenAIProvider] Tiktoken loaded successfully via import()');
+        return this._tiktokenModule;
+      } catch (importError) {
+        logger.error('[OpenAIProvider] Failed to import tiktoken', {
+          error: importError,
+          errorMessage: importError instanceof Error ? importError.message : String(importError),
+          errorStack: importError instanceof Error ? importError.stack : undefined,
+        });
+        throw importError; // Re-throw to be caught by outer try-catch
+      }
     }
 
     // Use scoped fs patching for embedded WASM
@@ -153,13 +164,16 @@ export class OpenAIProvider extends AIProvider {
     }
   }
 
-  // Provider-specific token counting using tiktoken for OpenAI-compatible models
-  // Returns 0 when tiktoken WASM fails to load, allowing graceful degradation
-  countTokens(messages: ProviderMessage[], tools: Tool[] = [], model?: string): number | null {
-    if (!model) {
-      return null; // Can't count without model
-    }
-
+  /**
+   * Helper method for token counting with explicit control over system prompt and tools
+   * Allows precise counting of individual components
+   */
+  private async countTokensExplicit(
+    messages: ProviderMessage[],
+    systemPrompt: string,
+    tools: Tool[],
+    model: string
+  ): Promise<number | null> {
     try {
       // Get or create cached encoder for this model
       let encoding: Tiktoken;
@@ -169,13 +183,13 @@ export class OpenAIProvider extends AIProvider {
         // Check if tiktoken is available (cached result)
         if (this._tiktokenAvailable === false) {
           // Previously failed to load, don't retry
-          return 0;
+          return null; // Return null to indicate unavailable
         }
 
         // Load tiktoken with embedded WASM support for bun compile
         let tiktoken: typeof import('tiktoken');
         try {
-          tiktoken = this._loadTiktokenWithEmbeddedWasm();
+          tiktoken = await this._loadTiktokenWithEmbeddedWasm();
           // Mark as available on successful load
           this._tiktokenAvailable = true;
         } catch (importError) {
@@ -184,7 +198,7 @@ export class OpenAIProvider extends AIProvider {
           logger.debug('Tiktoken WASM failed to load, token counting disabled', {
             error: importError,
           });
-          return 0;
+          return null; // Return null to indicate unavailable (not 0)
         }
 
         try {
@@ -201,9 +215,8 @@ export class OpenAIProvider extends AIProvider {
         this._encoderCache.set(model, encoding);
       }
 
-      // Add system prompt
-      const systemPrompt = this.getEffectiveSystemPrompt(messages);
-      let messageText = `system: ${systemPrompt}\n`;
+      // Start with system prompt
+      let messageText = systemPrompt ? `system: ${systemPrompt}\n` : '';
 
       // Convert messages to text for token counting, excluding system messages to avoid double-counting
       for (const message of messages) {
@@ -234,7 +247,94 @@ export class OpenAIProvider extends AIProvider {
       return totalTokens;
     } catch (error) {
       logger.debug('Token counting failed, gracefully degrading', { error });
-      return 0; // Return 0 when tiktoken fails entirely
+      return null; // Return null when tiktoken fails entirely
+    }
+  }
+
+  // Provider-specific token counting using tiktoken for OpenAI-compatible models
+  // Returns null when tiktoken WASM fails to load
+  async countTokens(
+    messages: ProviderMessage[],
+    tools: Tool[] = [],
+    model?: string
+  ): Promise<number | null> {
+    if (!model) {
+      return null; // Can't count without model
+    }
+
+    const systemPrompt = this.getEffectiveSystemPrompt(messages);
+    return this.countTokensExplicit(messages, systemPrompt, tools, model);
+  }
+
+  /**
+   * Calibrates token costs for system prompt and individual tools
+   * Uses tiktoken for precise local counting
+   */
+  async calibrateTokenCosts(
+    messages: ProviderMessage[],
+    tools: Tool[],
+    model: string
+  ): Promise<{
+    systemTokens: number;
+    toolTokens: number;
+    toolDetails: Array<{ name: string; tokens: number }>;
+  } | null> {
+    try {
+      const systemPrompt = this.getEffectiveSystemPrompt(messages);
+
+      logger.debug('[OpenAIProvider] Starting calibration', {
+        model,
+        systemPromptLength: systemPrompt.length,
+        toolCount: tools.length,
+        tiktokenAvailable: this._tiktokenAvailable,
+      });
+
+      // Count system prompt only (no messages, no tools)
+      const systemTokensResult = await this.countTokensExplicit([], systemPrompt, [], model);
+
+      logger.debug('[OpenAIProvider] System token count result', {
+        systemTokensResult,
+        isNull: systemTokensResult === null,
+        isZero: systemTokensResult === 0,
+      });
+
+      // If countTokensExplicit returns null, tiktoken failed - abort calibration
+      if (systemTokensResult === null) {
+        logger.warn('[OpenAIProvider] Tiktoken unavailable or failed, cannot calibrate', {
+          model,
+          tiktokenAvailable: this._tiktokenAvailable,
+        });
+        return null;
+      }
+
+      const systemTokens = systemTokensResult;
+
+      logger.debug('[OpenAIProvider] System prompt counted', { systemTokens });
+
+      // Count each tool individually (no system, no messages)
+      const toolDetails = await Promise.all(
+        tools.map(async (tool) => ({
+          name: tool.name,
+          tokens: (await this.countTokensExplicit([], '', [tool], model)) || 0,
+        }))
+      );
+
+      const toolTokens = toolDetails.reduce((sum, t) => sum + t.tokens, 0);
+
+      logger.debug('[OpenAIProvider] Tools counted', {
+        toolTokens,
+        toolCount: toolDetails.length,
+        sampleTools: toolDetails.slice(0, 3),
+      });
+
+      return {
+        systemTokens,
+        toolTokens,
+        toolDetails,
+      };
+    } catch (error) {
+      logger.error('[OpenAIProvider] Calibration failed with exception', { error });
+      return null;
     }
   }
 
@@ -355,8 +455,9 @@ export class OpenAIProvider extends AIProvider {
           const promptText = systemPrompt + '\n' + messages.map((m) => m.content).join(' ');
           const toolsText = tools.length > 0 ? JSON.stringify(tools) : '';
 
+          const countedTokens = await this.countTokens(messages, tools, model);
           const estimatedPromptTokens =
-            this.countTokens(messages, tools, model) ?? this.estimateTokens(promptText + toolsText);
+            countedTokens ?? this.estimateTokens(promptText + toolsText);
           const estimatedCompletionTokens = this.estimateTokens(textContent);
 
           usage = {
@@ -548,9 +649,9 @@ export class OpenAIProvider extends AIProvider {
               completionText += partial.arguments;
             }
 
+            const countedTokens = await this.countTokens(messages, tools, model);
             const estimatedPromptTokens =
-              this.countTokens(messages, tools, model) ??
-              this.estimateTokens(promptText + toolsText);
+              countedTokens ?? this.estimateTokens(promptText + toolsText);
             const estimatedCompletionTokens = this.estimateTokens(completionText);
 
             finalUsage = {
