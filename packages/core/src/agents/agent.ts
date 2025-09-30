@@ -19,7 +19,12 @@ import {
 } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { StopReasonHandler } from '~/token-management/stop-reason-handler';
-import type { ThreadTokenUsage, CombinedTokenUsage } from '~/token-management/types';
+import type {
+  ThreadTokenUsage,
+  CombinedTokenUsage,
+  ContextWindowUsage,
+  TokenUsageMetrics,
+} from '~/token-management/types';
 import { loadPromptConfig } from '~/config/prompts';
 import type { PromptConfig } from '~/config/prompts';
 import { estimateTokens } from '~/utils/token-estimation';
@@ -762,8 +767,8 @@ export class Agent extends EventEmitter {
         logger.warn('Request blocked by token limit', {
           threadId: this._threadId,
           percentUsed: tokenUsage.percentUsed,
-          totalTokens: tokenUsage.totalTokens,
-          contextLimit: tokenUsage.contextLimit,
+          currentTokens: tokenUsage.currentTokens,
+          limit: tokenUsage.limit,
         });
 
         this._setState('idle');
@@ -939,30 +944,59 @@ export class Agent extends EventEmitter {
 
       // Process agent response
       if (response.content) {
-        // Store raw content (with thinking blocks) for model context with token usage
-        const threadTokenUsage = this.getTokenUsage();
+        // Calculate context window usage from CURRENT response
+        let contextUsage: ContextWindowUsage;
 
-        const agentMessageTokenUsage: CombinedTokenUsage = response.usage
+        if (response.usage) {
+          // Calculate current context state
+          const modelId = this.model;
+          let contextLimit = 200000;
+
+          if (modelId && modelId !== 'unknown-model' && this.providerInstance) {
+            const models = this.providerInstance.getAvailableModels();
+            const modelInfo = models.find((m) => m.id === modelId);
+            if (modelInfo) {
+              contextLimit = modelInfo.contextWindow;
+            }
+          }
+
+          const currentTokens = response.usage.promptTokens + response.usage.completionTokens;
+          const percentUsed = contextLimit > 0 ? currentTokens / contextLimit : 0;
+
+          contextUsage = {
+            totalPromptTokens: currentTokens,
+            totalCompletionTokens: 0, // Not separated
+            totalTokens: currentTokens,
+            contextLimit,
+            percentUsed,
+            nearLimit: percentUsed >= 0.8,
+          };
+        } else {
+          // Fallback: use getTokenUsage() if no usage in response
+          contextUsage = this.getTokenUsage();
+        }
+
+        const agentMessageTokenUsage: TokenUsageMetrics = response.usage
           ? {
-              // Current message token usage from provider
-              message: {
-                promptTokens: response.usage.promptTokens,
-                completionTokens: response.usage.completionTokens,
+              // This turn's token counts
+              turn: {
+                inputTokens: response.usage.promptTokens,
+                outputTokens: response.usage.completionTokens,
                 totalTokens: response.usage.totalTokens,
               },
-              // Thread-level cumulative usage
-              thread: threadTokenUsage,
+              // Current context window state after this turn
+              context: contextUsage,
             }
           : {
-              // Fallback: no message usage data available
-              thread: threadTokenUsage,
+              // Fallback: no turn usage data available
+              context: contextUsage,
             };
 
         logger.debug('Creating AGENT_MESSAGE event with token usage', {
           threadId: this._threadId,
           hasProviderUsage: !!response.usage,
           providerUsage: response.usage,
-          threadTokenUsage,
+          contextUsage,
           finalTokenUsage: agentMessageTokenUsage,
         });
 
@@ -3304,8 +3338,8 @@ export class Agent extends EventEmitter {
     const nearLimit = percentUsed >= 0.8;
 
     return {
-      totalPromptTokens,
-      totalCompletionTokens,
+      totalPromptTokens: totalTokens,
+      totalCompletionTokens: 0, // Not separated in current design
       totalTokens,
       contextLimit,
       percentUsed,

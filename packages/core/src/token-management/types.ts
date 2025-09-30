@@ -1,36 +1,46 @@
 // ABOUTME: Type definitions for token management system
 // ABOUTME: Interfaces for budget tracking, usage monitoring, and conversation optimization
 
-// NEW CANONICAL TYPES - Single source of truth for token usage
+// Token usage tracking types
 
 /**
- * For individual message/request token counts
+ * Token counts for a single API turn
  */
-interface MessageTokenUsage {
-  promptTokens: number; // Tokens in this specific message's prompt
-  completionTokens: number; // Tokens in this specific message's completion
-  totalTokens: number; // promptTokens + completionTokens for this message
+interface TurnTokenUsage {
+  inputTokens: number; // Tokens sent to API this turn
+  outputTokens: number; // Tokens received from API this turn
+  totalTokens: number; // inputTokens + outputTokens
 }
 
 /**
- * For cumulative thread-level token tracking
+ * Current context window state (what would be sent if user types now)
  */
-export interface ThreadTokenUsage {
-  // Cumulative totals across all messages in thread
-  totalPromptTokens: number;
-  totalCompletionTokens: number;
-  totalTokens: number;
+export interface ContextWindowUsage {
+  currentTokens: number; // Current conversation size (last input + last output)
+  limit: number; // Model's context window size
+  percentUsed: number; // currentTokens / limit
+  nearLimit: boolean; // percentUsed >= 0.8
+}
 
-  // Context management
-  contextLimit: number;
+/**
+ * Token usage metrics for an API turn
+ * Stores both the turn's usage and the resulting context state
+ */
+export interface TokenUsageMetrics {
+  turn?: TurnTokenUsage; // This specific turn's token counts
+  context: ContextWindowUsage; // Current context window state after this turn
+}
+
+// Legacy type with old field names for backwards compatibility
+export interface ThreadTokenUsage {
+  totalPromptTokens: number; // Renamed from currentTokens
+  totalCompletionTokens: number; // Always 0 in new design
+  totalTokens: number; // Same as totalPromptTokens
+  contextLimit: number; // Renamed from limit
   percentUsed: number;
   nearLimit: boolean;
 }
 
-/**
- * For contexts needing both message and thread token usage
- */
-export interface CombinedTokenUsage {
-  message?: MessageTokenUsage; // Current message token usage
-  thread: ThreadTokenUsage; // Thread-level cumulative usage
-}
+// Legacy type aliases for backwards compatibility
+export type MessageTokenUsage = TurnTokenUsage;
+export type CombinedTokenUsage = TokenUsageMetrics;

@@ -62,24 +62,30 @@ export class ContextAnalyzer {
         'tokenUsage' in lastAgentMessage.data
       ) {
         const tokenUsage = lastAgentMessage.data.tokenUsage as {
-          message?: { promptTokens?: number; completionTokens?: number };
+          turn?: { inputTokens?: number; outputTokens?: number };
+          context?: { currentTokens?: number };
         };
 
-        // Current context = last input + last output (output is now in conversation)
-        const promptTokens = tokenUsage.message?.promptTokens ?? null;
-        const completionTokens = tokenUsage.message?.completionTokens ?? null;
+        // Try new format first (context.currentTokens)
+        if (tokenUsage.context?.currentTokens) {
+          actualPromptTokens = tokenUsage.context.currentTokens;
 
-        if (promptTokens !== null && completionTokens !== null) {
-          actualPromptTokens = promptTokens + completionTokens;
+          logger.debug('[ContextAnalyzer] Extracted from context field', {
+            actualPromptTokens,
+          });
+        } else if (
+          tokenUsage.turn?.inputTokens !== undefined &&
+          tokenUsage.turn?.outputTokens !== undefined
+        ) {
+          // Fallback: calculate from turn data
+          actualPromptTokens = tokenUsage.turn.inputTokens + tokenUsage.turn.outputTokens;
+
+          logger.debug('[ContextAnalyzer] Calculated from turn fields', {
+            inputTokens: tokenUsage.turn.inputTokens,
+            outputTokens: tokenUsage.turn.outputTokens,
+            actualPromptTokens,
+          });
         }
-
-        logger.debug('[ContextAnalyzer] Extracted actual tokens from last turn', {
-          promptTokens,
-          completionTokens,
-          actualPromptTokens,
-          calculation: `${promptTokens} + ${completionTokens}`,
-          hasMessageUsage: !!tokenUsage.message,
-        });
       }
 
       // Calibrate system and tool costs via provider

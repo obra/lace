@@ -77,21 +77,35 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
       ) {
         const tokenUsageData = (event.data as { tokenUsage: CombinedTokenUsage }).tokenUsage;
 
-        // Transform CombinedTokenUsage to AgentTokenUsage by extracting thread-level data
-        const threadData = tokenUsageData?.thread;
-        if (
-          threadData &&
-          typeof threadData === 'object' &&
-          typeof (threadData as { totalTokens?: number }).totalTokens === 'number'
-        ) {
-          const safeThreadData = threadData as Partial<AgentTokenUsage>;
+        // Extract context window usage (try new format first, fallback to old)
+        const contextData =
+          tokenUsageData?.context || (tokenUsageData as unknown as Record<string, unknown>)?.thread;
+
+        if (contextData && typeof contextData === 'object') {
+          const ctx = contextData as Record<string, unknown>;
+
+          // Try new field names first
+          const currentTokens =
+            typeof ctx.totalPromptTokens === 'number'
+              ? ctx.totalPromptTokens
+              : typeof ctx.currentTokens === 'number'
+                ? ctx.currentTokens
+                : 0;
+
+          const contextLimit =
+            typeof ctx.contextLimit === 'number'
+              ? ctx.contextLimit
+              : typeof ctx.limit === 'number'
+                ? ctx.limit
+                : 0;
+
           const completeTokenUsage: AgentTokenUsage = {
-            totalPromptTokens: safeThreadData.totalPromptTokens ?? 0,
-            totalCompletionTokens: safeThreadData.totalCompletionTokens ?? 0,
-            totalTokens: safeThreadData.totalTokens!,
-            contextLimit: safeThreadData.contextLimit ?? 0,
-            percentUsed: safeThreadData.percentUsed ?? 0,
-            nearLimit: !!safeThreadData.nearLimit,
+            totalPromptTokens: currentTokens,
+            totalCompletionTokens: 0, // Not separately tracked
+            totalTokens: currentTokens,
+            contextLimit,
+            percentUsed: typeof ctx.percentUsed === 'number' ? ctx.percentUsed : 0,
+            nearLimit: !!ctx.nearLimit,
           };
 
           setTokenUsage(completeTokenUsage);
