@@ -50,3 +50,30 @@ export const ListDirectoryResponseSchema = z.object({
   breadcrumbNames: z.array(z.string()),
   homeDirectory: z.string(),
 });
+
+// Create directory types
+export const CreateDirectoryRequestSchema = z.object({
+  parentPath: z.string().min(1, 'Parent path cannot be empty'),
+  name: z
+    .string()
+    .min(1, 'Directory name cannot be empty')
+    .max(255, 'Directory name too long')
+    .regex(/^[^/\\:*?"<>|]+$/, 'Invalid directory name characters'),
+});
+
+export interface CreateDirectoryRequest {
+  parentPath: string;
+  name: string;
+}
+
+export interface CreateDirectoryResponse {
+  path: string;
+  name: string;
+  success: boolean;
+}
+
+export const CreateDirectoryResponseSchema = z.object({
+  path: z.string(),
+  name: z.string(),
+  success: z.boolean(),
+});

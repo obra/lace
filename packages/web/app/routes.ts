@@ -134,5 +134,6 @@ export default [
 
   // Filesystem and debug routes
   route('api/filesystem/list', 'routes/api.filesystem.list.ts'),
+  route('api/filesystem/mkdir', 'routes/api.filesystem.mkdir.ts'),
   route('api/debug/console', 'routes/api.debug.console.ts'),
 ] satisfies RouteConfig;
