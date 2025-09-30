@@ -17,16 +17,107 @@ export class ContextAnalyzer {
    * Analyzes an agent's thread and returns detailed context breakdown
    */
   static async analyze(threadId: ThreadId, agent: Agent): Promise<ContextBreakdown> {
-    const systemPromptTokens = await Promise.resolve(this.countSystemPromptTokens(threadId, agent));
-    const { core, mcp } = this.countToolTokens(agent);
-    const messages = this.countMessageTokens(threadId, agent);
-
-    // Get context limit from agent's provider
+    // Get the conversation and tools that would be sent to the API
+    const conversation = agent.buildThreadMessages();
+    const tools = agent.toolExecutor.getAllTools();
     const modelId = agent.model;
-    const DEFAULT_CONTEXT_LIMIT = 200000; // Default fallback for unknown models
-    let contextLimit = DEFAULT_CONTEXT_LIMIT;
+
+    // Try to use calibration if provider is available
+    let calibration:
+      | {
+          systemTokens: number;
+          toolTokens: number;
+          toolDetails: Array<{ name: string; tokens: number }>;
+        }
+      | null
+      | undefined = null;
+    let actualPromptTokens: number | null = null;
 
     if (modelId && modelId !== 'unknown-model' && agent.providerInstance) {
+      // Get the last AGENT_MESSAGE event to extract real usage from last API call
+      const threadManager = agent.threadManager;
+      const events = threadManager.getEvents(threadId);
+      const lastAgentMessage = [...events]
+        .reverse()
+        .find((e) => e.type === 'AGENT_MESSAGE' && typeof e.data === 'object' && e.data !== null);
+
+      if (
+        lastAgentMessage &&
+        typeof lastAgentMessage.data === 'object' &&
+        lastAgentMessage.data !== null &&
+        'tokenUsage' in lastAgentMessage.data
+      ) {
+        const tokenUsage = lastAgentMessage.data.tokenUsage as {
+          message?: { promptTokens?: number };
+        };
+        actualPromptTokens = tokenUsage.message?.promptTokens ?? null;
+      }
+
+      // Calibrate system and tool costs via provider
+      if (agent.providerInstance.calibrateTokenCosts) {
+        calibration = await agent.providerInstance.calibrateTokenCosts(
+          conversation,
+          tools,
+          modelId
+        );
+      }
+    }
+
+    let systemTokens: number;
+    let coreToolsData: CategoryDetail;
+    let mcpToolsData: CategoryDetail;
+    let messagesData: MessageCategoryDetail;
+
+    if (calibration && actualPromptTokens !== null) {
+      // Use accurate calibration + real usage
+      systemTokens = calibration.systemTokens;
+
+      // Separate tools into core vs MCP
+      const coreTools: ItemDetail[] = [];
+      const mcpTools: ItemDetail[] = [];
+      let coreTotal = 0;
+      let mcpTotal = 0;
+
+      for (const toolDetail of calibration.toolDetails) {
+        const tool = tools.find((t) => t.name === toolDetail.name);
+        if (tool instanceof MCPToolAdapter) {
+          mcpTools.push(toolDetail);
+          mcpTotal += toolDetail.tokens;
+        } else {
+          coreTools.push(toolDetail);
+          coreTotal += toolDetail.tokens;
+        }
+      }
+
+      coreToolsData = { tokens: coreTotal, items: coreTools };
+      mcpToolsData = { tokens: mcpTotal, items: mcpTools };
+
+      // Calculate message tokens by subtraction from actual usage
+      const messageTokens = Math.max(0, actualPromptTokens - systemTokens - calibration.toolTokens);
+
+      messagesData = {
+        tokens: messageTokens,
+        subcategories: {
+          userMessages: { tokens: 0 }, // Can't break down further with calibration
+          agentMessages: { tokens: 0 },
+          toolCalls: { tokens: 0 },
+          toolResults: { tokens: 0 },
+        },
+      };
+    } else {
+      // Fallback to estimation-based approach
+      systemTokens = this.countSystemPromptTokens(threadId, agent);
+      const toolData = this.countToolTokens(agent);
+      coreToolsData = toolData.core;
+      mcpToolsData = toolData.mcp;
+      messagesData = this.countMessageTokens(threadId, agent);
+    }
+
+    // Get context limit from agent's provider
+    const DEFAULT_CONTEXT_LIMIT = 200000;
+    let contextLimit = DEFAULT_CONTEXT_LIMIT;
+
+    if (agent.providerInstance) {
       try {
         const models = agent.providerInstance.getAvailableModels();
         const modelInfo = models.find((m) => m.id === modelId);
@@ -34,7 +125,6 @@ export class ContextAnalyzer {
           contextLimit = modelInfo.contextWindow;
         }
       } catch (error) {
-        // Log warning but continue with default - don't fail the analysis
         console.warn(
           `Failed to retrieve context limit for model ${modelId}:`,
           error instanceof Error ? error.message : 'Unknown error'
@@ -43,7 +133,8 @@ export class ContextAnalyzer {
     }
 
     const reservedTokens = this.getReservedTokens(agent);
-    const totalUsed = systemPromptTokens + core.tokens + mcp.tokens + messages.tokens;
+    const totalUsed =
+      systemTokens + coreToolsData.tokens + mcpToolsData.tokens + messagesData.tokens;
     const freeTokens = contextLimit - totalUsed - reservedTokens;
 
     return {
@@ -53,12 +144,12 @@ export class ContextAnalyzer {
       totalUsedTokens: totalUsed,
       percentUsed: totalUsed / contextLimit,
       categories: {
-        systemPrompt: { tokens: systemPromptTokens },
-        coreTools: core,
-        mcpTools: mcp,
-        messages,
+        systemPrompt: { tokens: systemTokens },
+        coreTools: coreToolsData,
+        mcpTools: mcpToolsData,
+        messages: messagesData,
         reservedForResponse: { tokens: reservedTokens },
-        freeSpace: { tokens: Math.max(0, freeTokens) }, // Don't go negative
+        freeSpace: { tokens: Math.max(0, freeTokens) },
       },
     };
   }
