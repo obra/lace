@@ -118,8 +118,9 @@ export abstract class BaseHelper {
 
       // Track token usage from last turn
       if (response.usage) {
+        // Current context = input + output (output is now in conversation for next turn)
         const currentTokens = response.usage.promptTokens + response.usage.completionTokens;
-        const contextLimit = 100000; // Default reasonable limit
+        const contextLimit = 100000; // Default reasonable limit for helpers
         const percentUsed = contextLimit > 0 ? currentTokens / contextLimit : 0;
 
         totalUsage = {
@@ -129,10 +130,12 @@ export abstract class BaseHelper {
             outputTokens: response.usage.completionTokens,
             totalTokens: response.usage.totalTokens,
           },
-          // Current context window state (using legacy field names)
+          // Current context window state
+          // Note: totalPromptTokens contains the current context size (input + previous outputs)
+          // despite the confusing field name (kept for backwards compatibility)
           context: {
-            totalPromptTokens: currentTokens,
-            totalCompletionTokens: 0,
+            totalPromptTokens: currentTokens, // Current context = last input + last output
+            totalCompletionTokens: 0, // Not separately tracked in context state
             totalTokens: currentTokens,
             contextLimit,
             percentUsed,
