@@ -122,9 +122,20 @@ export class OpenAIProvider extends AIProvider {
 
     // If no embedded WASM, fall back to regular import
     if (!wasmBuffer) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- Fallback for non-embedded environments
-      this._tiktokenModule = require('tiktoken') as typeof import('tiktoken');
-      return this._tiktokenModule;
+      logger.debug('[OpenAIProvider] No embedded WASM, attempting regular tiktoken import');
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- Fallback for non-embedded environments
+        this._tiktokenModule = require('tiktoken') as typeof import('tiktoken');
+        logger.debug('[OpenAIProvider] Tiktoken loaded successfully via require()');
+        return this._tiktokenModule;
+      } catch (requireError) {
+        logger.error('[OpenAIProvider] Failed to require(tiktoken)', {
+          error: requireError,
+          errorMessage: requireError instanceof Error ? requireError.message : String(requireError),
+          errorStack: requireError instanceof Error ? requireError.stack : undefined,
+        });
+        throw requireError; // Re-throw to be caught by outer try-catch
+      }
     }
 
     // Use scoped fs patching for embedded WASM
@@ -172,7 +183,7 @@ export class OpenAIProvider extends AIProvider {
         // Check if tiktoken is available (cached result)
         if (this._tiktokenAvailable === false) {
           // Previously failed to load, don't retry
-          return 0;
+          return null; // Return null to indicate unavailable
         }
 
         // Load tiktoken with embedded WASM support for bun compile
@@ -187,7 +198,7 @@ export class OpenAIProvider extends AIProvider {
           logger.debug('Tiktoken WASM failed to load, token counting disabled', {
             error: importError,
           });
-          return 0;
+          return null; // Return null to indicate unavailable (not 0)
         }
 
         try {
@@ -236,7 +247,7 @@ export class OpenAIProvider extends AIProvider {
       return totalTokens;
     } catch (error) {
       logger.debug('Token counting failed, gracefully degrading', { error });
-      return 0; // Return 0 when tiktoken fails entirely
+      return null; // Return null when tiktoken fails entirely
     }
   }
 
