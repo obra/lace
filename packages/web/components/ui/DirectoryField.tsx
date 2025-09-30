@@ -274,12 +274,13 @@ export function DirectoryField({
         // Close dialog
         setIsNewFolderDialogOpen(false);
 
-        // Refresh directory listing
-        await fetchDirectories(currentPath);
-
-        // Auto-select the new folder
+        // Navigate into the newly created folder
         const newPath = response.path.endsWith('/') ? response.path : response.path + '/';
         onChange(newPath);
+
+        // Small delay to ensure filesystem has flushed the new directory
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        await fetchDirectories(newPath);
       } catch (err) {
         setNewFolderError(err instanceof Error ? err.message : 'Failed to create folder');
       } finally {

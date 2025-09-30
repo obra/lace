@@ -28,9 +28,17 @@ export function NewFolderDialog({
   const [folderName, setFolderName] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Reset state when dialog opens/closes
+  // Input ref for focusing
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // Reset state and focus input when dialog opens/closes
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      // Focus input when dialog opens
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    } else {
       setFolderName('');
       setValidationError(null);
     }
@@ -92,12 +100,12 @@ export function NewFolderDialog({
         <div className="space-y-4">
           <div className="form-control">
             <input
+              ref={inputRef}
               type="text"
               value={folderName}
               onChange={handleNameChange}
               placeholder="New folder name"
               className={`input input-bordered w-full ${validationError ? 'input-error' : ''}`}
-              autoFocus
               disabled={loading}
               data-testid="folder-name-input"
             />
