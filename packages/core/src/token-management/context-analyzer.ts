@@ -11,6 +11,7 @@ import type {
 } from '~/token-management/context-breakdown-types';
 import { estimateTokens } from '~/utils/token-estimation';
 import { MCPToolAdapter } from '~/mcp/tool-adapter';
+import { logger } from '~/utils/logger';
 
 export class ContextAnalyzer {
   /**
@@ -22,7 +23,7 @@ export class ContextAnalyzer {
     const tools = agent.toolExecutor.getAllTools();
     const modelId = agent.model;
 
-    console.log('[ContextAnalyzer] Starting analysis', {
+    logger.debug('[ContextAnalyzer] Starting analysis', {
       threadId,
       modelId,
       hasProvider: !!agent.providerInstance,
@@ -49,7 +50,7 @@ export class ContextAnalyzer {
         .reverse()
         .find((e) => e.type === 'AGENT_MESSAGE' && typeof e.data === 'object' && e.data !== null);
 
-      console.log('[ContextAnalyzer] Looking for last AGENT_MESSAGE', {
+      logger.debug('[ContextAnalyzer] Looking for last AGENT_MESSAGE', {
         foundMessage: !!lastAgentMessage,
         totalEvents: events.length,
       });
@@ -65,7 +66,7 @@ export class ContextAnalyzer {
         };
         actualPromptTokens = tokenUsage.message?.promptTokens ?? null;
 
-        console.log('[ContextAnalyzer] Extracted actual prompt tokens from last turn', {
+        logger.debug('[ContextAnalyzer] Extracted actual prompt tokens from last turn', {
           actualPromptTokens,
           hasMessageUsage: !!tokenUsage.message,
         });
@@ -73,7 +74,7 @@ export class ContextAnalyzer {
 
       // Calibrate system and tool costs via provider
       if (agent.providerInstance.calibrateTokenCosts) {
-        console.log('[ContextAnalyzer] Starting calibration', {
+        logger.debug('[ContextAnalyzer] Starting calibration', {
           provider: agent.providerInstance.providerName,
           toolCount: tools.length,
         });
@@ -84,14 +85,14 @@ export class ContextAnalyzer {
           modelId
         );
 
-        console.log('[ContextAnalyzer] Calibration complete', {
+        logger.debug('[ContextAnalyzer] Calibration complete', {
           hasCalibration: !!calibration,
           systemTokens: calibration?.systemTokens,
           toolTokens: calibration?.toolTokens,
           toolDetailsCount: calibration?.toolDetails?.length,
         });
       } else {
-        console.log('[ContextAnalyzer] Provider does not support calibration');
+        logger.debug('[ContextAnalyzer] Provider does not support calibration');
       }
     }
 
@@ -101,7 +102,7 @@ export class ContextAnalyzer {
     let messagesData: MessageCategoryDetail;
 
     if (calibration && actualPromptTokens !== null) {
-      console.log('[ContextAnalyzer] Using CALIBRATION path', {
+      logger.debug('[ContextAnalyzer] Using CALIBRATION path', {
         actualPromptTokens,
         systemTokens: calibration.systemTokens,
         toolTokens: calibration.toolTokens,
@@ -133,7 +134,7 @@ export class ContextAnalyzer {
       // Calculate message tokens by subtraction from actual usage
       const messageTokens = Math.max(0, actualPromptTokens - systemTokens - calibration.toolTokens);
 
-      console.log('[ContextAnalyzer] Calculated message tokens by subtraction', {
+      logger.debug('[ContextAnalyzer] Calculated message tokens by subtraction', {
         messageTokens,
         calculation: `${actualPromptTokens} - ${systemTokens} - ${calibration.toolTokens}`,
       });
@@ -148,7 +149,7 @@ export class ContextAnalyzer {
         },
       };
     } else {
-      console.log('[ContextAnalyzer] Using ESTIMATION fallback path', {
+      logger.debug('[ContextAnalyzer] Using ESTIMATION fallback path', {
         hasCalibration: !!calibration,
         hasActualPromptTokens: actualPromptTokens !== null,
       });

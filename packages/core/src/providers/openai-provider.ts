@@ -153,13 +153,16 @@ export class OpenAIProvider extends AIProvider {
     }
   }
 
-  // Provider-specific token counting using tiktoken for OpenAI-compatible models
-  // Returns 0 when tiktoken WASM fails to load, allowing graceful degradation
-  countTokens(messages: ProviderMessage[], tools: Tool[] = [], model?: string): number | null {
-    if (!model) {
-      return null; // Can't count without model
-    }
-
+  /**
+   * Helper method for token counting with explicit control over system prompt and tools
+   * Allows precise counting of individual components
+   */
+  private countTokensExplicit(
+    messages: ProviderMessage[],
+    systemPrompt: string,
+    tools: Tool[],
+    model: string
+  ): number | null {
     try {
       // Get or create cached encoder for this model
       let encoding: Tiktoken;
@@ -201,9 +204,8 @@ export class OpenAIProvider extends AIProvider {
         this._encoderCache.set(model, encoding);
       }
 
-      // Add system prompt
-      const systemPrompt = this.getEffectiveSystemPrompt(messages);
-      let messageText = `system: ${systemPrompt}\n`;
+      // Start with system prompt
+      let messageText = systemPrompt ? `system: ${systemPrompt}\n` : '';
 
       // Convert messages to text for token counting, excluding system messages to avoid double-counting
       for (const message of messages) {
@@ -235,6 +237,70 @@ export class OpenAIProvider extends AIProvider {
     } catch (error) {
       logger.debug('Token counting failed, gracefully degrading', { error });
       return 0; // Return 0 when tiktoken fails entirely
+    }
+  }
+
+  // Provider-specific token counting using tiktoken for OpenAI-compatible models
+  // Returns 0 when tiktoken WASM fails to load, allowing graceful degradation
+  countTokens(messages: ProviderMessage[], tools: Tool[] = [], model?: string): number | null {
+    if (!model) {
+      return null; // Can't count without model
+    }
+
+    const systemPrompt = this.getEffectiveSystemPrompt(messages);
+    return this.countTokensExplicit(messages, systemPrompt, tools, model);
+  }
+
+  /**
+   * Calibrates token costs for system prompt and individual tools
+   * Uses tiktoken for precise local counting (synchronous)
+   */
+  calibrateTokenCosts(
+    messages: ProviderMessage[],
+    tools: Tool[],
+    model: string
+  ): Promise<{
+    systemTokens: number;
+    toolTokens: number;
+    toolDetails: Array<{ name: string; tokens: number }>;
+  } | null> {
+    try {
+      const systemPrompt = this.getEffectiveSystemPrompt(messages);
+
+      logger.debug('[OpenAIProvider] Starting calibration', {
+        model,
+        systemPromptLength: systemPrompt.length,
+        toolCount: tools.length,
+      });
+
+      // Count system prompt only (no messages, no tools)
+      const systemTokens = this.countTokensExplicit([], systemPrompt, [], model) || 0;
+
+      logger.debug('[OpenAIProvider] System prompt counted', { systemTokens });
+
+      // Count each tool individually (no system, no messages)
+      const toolDetails = tools.map((tool) => ({
+        name: tool.name,
+        tokens: this.countTokensExplicit([], '', [tool], model) || 0,
+      }));
+
+      const toolTokens = toolDetails.reduce((sum, t) => sum + t.tokens, 0);
+
+      logger.debug('[OpenAIProvider] Tools counted', {
+        toolTokens,
+        toolCount: toolDetails.length,
+        sampleTools: toolDetails.slice(0, 3),
+      });
+
+      return Promise.resolve({
+        systemTokens,
+        toolTokens,
+        toolDetails,
+      });
+    } catch (error) {
+      logger.error('[OpenAIProvider] Calibration failed', { error });
+      logger.debug('Token calibration failed', { error });
+      return Promise.resolve(null);
     }
   }
 

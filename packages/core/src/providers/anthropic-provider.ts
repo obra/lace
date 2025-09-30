@@ -119,7 +119,7 @@ export class AnthropicProvider extends AIProvider {
     try {
       const systemPrompt = this.getEffectiveSystemPrompt(messages);
 
-      console.log('[AnthropicProvider] Starting calibration', {
+      logger.debug('[AnthropicProvider] Starting calibration', {
         model,
         systemPromptLength: systemPrompt.length,
         toolCount: tools.length,
@@ -128,7 +128,7 @@ export class AnthropicProvider extends AIProvider {
       // Count system prompt only (no messages, no tools)
       const systemTokens = (await this.countTokensExplicit([], systemPrompt, [], model)) || 0;
 
-      console.log('[AnthropicProvider] System prompt counted', { systemTokens });
+      logger.debug('[AnthropicProvider] System prompt counted', { systemTokens });
 
       // Count each tool individually (no system, no messages)
       const toolDetails = await Promise.all(
@@ -140,7 +140,7 @@ export class AnthropicProvider extends AIProvider {
 
       const toolTokens = toolDetails.reduce((sum, t) => sum + t.tokens, 0);
 
-      console.log('[AnthropicProvider] Tools counted', {
+      logger.debug('[AnthropicProvider] Tools counted', {
         toolTokens,
         toolCount: toolDetails.length,
         sampleTools: toolDetails.slice(0, 3),
@@ -152,7 +152,7 @@ export class AnthropicProvider extends AIProvider {
         toolDetails,
       };
     } catch (error) {
-      console.error('[AnthropicProvider] Calibration failed', { error });
+      logger.error('[AnthropicProvider] Calibration failed', { error });
       logger.debug('Token calibration failed', { error });
       return null;
     }
