@@ -11,6 +11,7 @@ export { default as AgentBadge } from './AgentBadge';
 export { default as TimestampDisplay } from './TimestampDisplay';
 export { default as TokenUsageDisplay } from './TokenUsageDisplay';
 export { DirectoryField } from './DirectoryField';
+export { NewFolderDialog } from './NewFolderDialog';
 
 // MOLECULES - Simple compositions
 export { default as MessageHeader } from './MessageHeader';
