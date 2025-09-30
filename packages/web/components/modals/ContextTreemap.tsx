@@ -1,17 +1,20 @@
 // ABOUTME: Treemap visualization of context token usage
-// ABOUTME: Shows proportional rectangles for each category with interactive tooltips
+// ABOUTME: Shows proportional rectangles for each category with interactive tooltips and drill-down
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Treemap, ResponsiveContainer, Tooltip } from 'recharts';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faChevronLeft } from '@/lib/fontawesome';
 import type { ContextBreakdown } from '@/types/context';
 
 interface TreemapData {
   name: string;
   size: number;
   fill: string;
-  [key: string]: string | number;
+  category?: string;
+  [key: string]: string | number | undefined;
 }
 
 interface ContextTreemapProps {
@@ -19,8 +22,10 @@ interface ContextTreemapProps {
 }
 
 export function ContextTreemap({ breakdown }: ContextTreemapProps) {
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
   // Transform breakdown into recharts treemap format
-  const data: TreemapData[] = [];
+  let data: TreemapData[] = [];
 
   // Use Tailwind color classes that match the progress bar
   const getCategoryFillColor = (category: string): string => {
@@ -42,52 +47,107 @@ export function ContextTreemap({ breakdown }: ContextTreemapProps) {
     }
   };
 
-  if (breakdown.categories.systemPrompt.tokens > 0) {
-    data.push({
-      name: 'System Prompt',
-      size: breakdown.categories.systemPrompt.tokens,
-      fill: getCategoryFillColor('systemPrompt'),
-    });
-  }
+  // Generate data based on view level
+  if (!selectedCategory) {
+    // Top level: show all categories
+    if (breakdown.categories.systemPrompt.tokens > 0) {
+      data.push({
+        name: 'System Prompt',
+        size: breakdown.categories.systemPrompt.tokens,
+        fill: getCategoryFillColor('systemPrompt'),
+        category: 'systemPrompt',
+      });
+    }
 
-  if (breakdown.categories.coreTools.tokens > 0) {
-    data.push({
-      name: 'Core Tools',
-      size: breakdown.categories.coreTools.tokens,
+    if (breakdown.categories.coreTools.tokens > 0) {
+      data.push({
+        name: 'Core Tools',
+        size: breakdown.categories.coreTools.tokens,
+        fill: getCategoryFillColor('coreTools'),
+        category: 'coreTools',
+      });
+    }
+
+    if (breakdown.categories.mcpTools.tokens > 0) {
+      data.push({
+        name: 'MCP Tools',
+        size: breakdown.categories.mcpTools.tokens,
+        fill: getCategoryFillColor('mcpTools'),
+        category: 'mcpTools',
+      });
+    }
+
+    if (breakdown.categories.messages.tokens > 0) {
+      data.push({
+        name: 'Messages',
+        size: breakdown.categories.messages.tokens,
+        fill: getCategoryFillColor('messages'),
+        category: 'messages',
+      });
+    }
+
+    if (breakdown.categories.reservedForResponse.tokens > 0) {
+      data.push({
+        name: 'Reserved',
+        size: breakdown.categories.reservedForResponse.tokens,
+        fill: getCategoryFillColor('reservedForResponse'),
+        category: 'reservedForResponse',
+      });
+    }
+
+    if (breakdown.categories.freeSpace.tokens > 0) {
+      data.push({
+        name: 'Free Space',
+        size: breakdown.categories.freeSpace.tokens,
+        fill: getCategoryFillColor('freeSpace'),
+        category: 'freeSpace',
+      });
+    }
+  } else if (selectedCategory === 'coreTools' && breakdown.categories.coreTools.items) {
+    // Drilled into core tools - show individual tools
+    data = breakdown.categories.coreTools.items.map((tool) => ({
+      name: tool.name,
+      size: tool.tokens,
       fill: getCategoryFillColor('coreTools'),
-    });
-  }
-
-  if (breakdown.categories.mcpTools.tokens > 0) {
-    data.push({
-      name: 'MCP Tools',
-      size: breakdown.categories.mcpTools.tokens,
+    }));
+  } else if (selectedCategory === 'mcpTools' && breakdown.categories.mcpTools.items) {
+    // Drilled into MCP tools
+    data = breakdown.categories.mcpTools.items.map((tool) => ({
+      name: tool.name,
+      size: tool.tokens,
       fill: getCategoryFillColor('mcpTools'),
-    });
-  }
-
-  if (breakdown.categories.messages.tokens > 0) {
-    data.push({
-      name: 'Messages',
-      size: breakdown.categories.messages.tokens,
-      fill: getCategoryFillColor('messages'),
-    });
-  }
-
-  if (breakdown.categories.reservedForResponse.tokens > 0) {
-    data.push({
-      name: 'Reserved',
-      size: breakdown.categories.reservedForResponse.tokens,
-      fill: getCategoryFillColor('reservedForResponse'),
-    });
-  }
-
-  if (breakdown.categories.freeSpace.tokens > 0) {
-    data.push({
-      name: 'Free Space',
-      size: breakdown.categories.freeSpace.tokens,
-      fill: getCategoryFillColor('freeSpace'),
-    });
+    }));
+  } else if (selectedCategory === 'messages') {
+    // Drilled into messages - show subcategories
+    const subcats = breakdown.categories.messages.subcategories;
+    if (subcats.userMessages.tokens > 0) {
+      data.push({
+        name: 'User Messages',
+        size: subcats.userMessages.tokens,
+        fill: getCategoryFillColor('messages'),
+      });
+    }
+    if (subcats.agentMessages.tokens > 0) {
+      data.push({
+        name: 'Agent Messages',
+        size: subcats.agentMessages.tokens,
+        fill: getCategoryFillColor('messages'),
+      });
+    }
+    if (subcats.toolCalls.tokens > 0) {
+      data.push({
+        name: 'Tool Calls',
+        size: subcats.toolCalls.tokens,
+        fill: getCategoryFillColor('messages'),
+      });
+    }
+    if (subcats.toolResults.tokens > 0) {
+      data.push({
+        name: 'Tool Results',
+        size: subcats.toolResults.tokens,
+        fill: getCategoryFillColor('messages'),
+      });
+    }
   }
 
   const CustomContent = (props: {
@@ -162,10 +222,35 @@ export function ContextTreemap({ breakdown }: ContextTreemapProps) {
     return null;
   }
 
+  const handleTreemapClick = (item: TreemapData) => {
+    if (item.category) {
+      setSelectedCategory(item.category);
+    }
+  };
+
+  const getCategoryTitle = () => {
+    if (!selectedCategory) return 'Visual Breakdown';
+    if (selectedCategory === 'coreTools') return 'Core Tools Breakdown';
+    if (selectedCategory === 'mcpTools') return 'MCP Tools Breakdown';
+    if (selectedCategory === 'messages') return 'Messages Breakdown';
+    return 'Visual Breakdown';
+  };
+
   return (
     <div className="mb-6">
-      <div className="text-sm font-medium mb-2">Visual Breakdown</div>
-      <div className="rounded-lg border border-base-300 overflow-hidden">
+      <div className="flex items-center gap-2 mb-2">
+        {selectedCategory && (
+          <button
+            onClick={() => setSelectedCategory(null)}
+            className="btn btn-xs btn-ghost gap-1"
+            title="Back to overview"
+          >
+            <FontAwesomeIcon icon={faChevronLeft} className="w-3 h-3" />
+          </button>
+        )}
+        <div className="text-sm font-medium">{getCategoryTitle()}</div>
+      </div>
+      <div className="rounded-lg border border-base-300 overflow-hidden cursor-pointer">
         <ResponsiveContainer width="100%" height={300}>
           <Treemap
             data={data}
@@ -173,6 +258,7 @@ export function ContextTreemap({ breakdown }: ContextTreemapProps) {
             stroke="#fff"
             fill="#8884d8"
             isAnimationActive={false}
+            onClick={(item: unknown) => handleTreemapClick(item as TreemapData)}
           >
             <Tooltip content={<CustomTooltip />} />
           </Treemap>
