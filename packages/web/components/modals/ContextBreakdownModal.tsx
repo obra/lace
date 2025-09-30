@@ -132,7 +132,7 @@ export function ContextBreakdownModal({ isOpen, onClose, agentId }: ContextBreak
             {/* Left Column: Stats, Treemap, Progress Bar */}
             <div className="space-y-4">
               {/* Summary Stats */}
-              <div className="stats stats-vertical w-full shadow">
+              <div className="stats stats-horizontal w-full shadow">
                 <div className="stat">
                   <div className="stat-title">Context Window</div>
                   <div className="stat-value text-2xl">{formatNumber(breakdown.contextLimit)}</div>
