@@ -22,6 +22,14 @@ export class ContextAnalyzer {
     const tools = agent.toolExecutor.getAllTools();
     const modelId = agent.model;
 
+    console.log('[ContextAnalyzer] Starting analysis', {
+      threadId,
+      modelId,
+      hasProvider: !!agent.providerInstance,
+      toolCount: tools.length,
+      messageCount: conversation.length,
+    });
+
     // Try to use calibration if provider is available
     let calibration:
       | {
@@ -41,6 +49,11 @@ export class ContextAnalyzer {
         .reverse()
         .find((e) => e.type === 'AGENT_MESSAGE' && typeof e.data === 'object' && e.data !== null);
 
+      console.log('[ContextAnalyzer] Looking for last AGENT_MESSAGE', {
+        foundMessage: !!lastAgentMessage,
+        totalEvents: events.length,
+      });
+
       if (
         lastAgentMessage &&
         typeof lastAgentMessage.data === 'object' &&
@@ -51,15 +64,34 @@ export class ContextAnalyzer {
           message?: { promptTokens?: number };
         };
         actualPromptTokens = tokenUsage.message?.promptTokens ?? null;
+
+        console.log('[ContextAnalyzer] Extracted actual prompt tokens from last turn', {
+          actualPromptTokens,
+          hasMessageUsage: !!tokenUsage.message,
+        });
       }
 
       // Calibrate system and tool costs via provider
       if (agent.providerInstance.calibrateTokenCosts) {
+        console.log('[ContextAnalyzer] Starting calibration', {
+          provider: agent.providerInstance.providerName,
+          toolCount: tools.length,
+        });
+
         calibration = await agent.providerInstance.calibrateTokenCosts(
           conversation,
           tools,
           modelId
         );
+
+        console.log('[ContextAnalyzer] Calibration complete', {
+          hasCalibration: !!calibration,
+          systemTokens: calibration?.systemTokens,
+          toolTokens: calibration?.toolTokens,
+          toolDetailsCount: calibration?.toolDetails?.length,
+        });
+      } else {
+        console.log('[ContextAnalyzer] Provider does not support calibration');
       }
     }
 
@@ -69,6 +101,12 @@ export class ContextAnalyzer {
     let messagesData: MessageCategoryDetail;
 
     if (calibration && actualPromptTokens !== null) {
+      console.log('[ContextAnalyzer] Using CALIBRATION path', {
+        actualPromptTokens,
+        systemTokens: calibration.systemTokens,
+        toolTokens: calibration.toolTokens,
+      });
+
       // Use accurate calibration + real usage
       systemTokens = calibration.systemTokens;
 
@@ -95,6 +133,11 @@ export class ContextAnalyzer {
       // Calculate message tokens by subtraction from actual usage
       const messageTokens = Math.max(0, actualPromptTokens - systemTokens - calibration.toolTokens);
 
+      console.log('[ContextAnalyzer] Calculated message tokens by subtraction', {
+        messageTokens,
+        calculation: `${actualPromptTokens} - ${systemTokens} - ${calibration.toolTokens}`,
+      });
+
       messagesData = {
         tokens: messageTokens,
         subcategories: {
@@ -105,6 +148,11 @@ export class ContextAnalyzer {
         },
       };
     } else {
+      console.log('[ContextAnalyzer] Using ESTIMATION fallback path', {
+        hasCalibration: !!calibration,
+        hasActualPromptTokens: actualPromptTokens !== null,
+      });
+
       // Fallback to estimation-based approach
       systemTokens = this.countSystemPromptTokens(threadId, agent);
       const toolData = this.countToolTokens(agent);
