@@ -49,7 +49,19 @@ export async function action({ request }: Route.ActionArgs) {
     await fs.mkdir(newDirPath, { recursive: false });
 
     // Re-verify created directory is inside home (mitigate TOCTOU)
-    const realNewDirPath = await fs.realpath(newDirPath);
+    let realNewDirPath: string;
+    try {
+      realNewDirPath = await fs.realpath(newDirPath);
+    } catch (realpathError) {
+      // If realpath fails (e.g., permissions changed), clean up and fail
+      await fs.rmdir(newDirPath).catch(() => {
+        /* ignore cleanup errors */
+      });
+      return createErrorResponse('Security violation: created directory outside home', 403, {
+        code: 'SECURITY_VIOLATION',
+      });
+    }
+
     const newDirInsideHome =
       realNewDirPath === realHomeDir ||
       (realNewDirPath.startsWith(realHomeDir) &&
