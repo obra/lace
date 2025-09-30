@@ -227,13 +227,17 @@ export function ProjectEditModal({
                 </div>
               </div>
 
-              <DirectoryField
-                label="Working Directory *"
-                value={editWorkingDirectory}
-                onChange={setEditWorkingDirectory}
-                placeholder="/path/to/project"
-                required
-              />
+              <div className="max-w-3xl">
+                <DirectoryField
+                  label="Working Directory"
+                  value={editWorkingDirectory}
+                  onChange={setEditWorkingDirectory}
+                  placeholder="/path/to/project"
+                  required
+                  inline
+                  minRows={6}
+                />
+              </div>
 
               <div>
                 <label className="label">
