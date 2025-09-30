@@ -129,10 +129,12 @@ export abstract class BaseHelper {
             outputTokens: response.usage.completionTokens,
             totalTokens: response.usage.totalTokens,
           },
-          // Current context window state
+          // Current context window state (using legacy field names)
           context: {
-            currentTokens,
-            limit: contextLimit,
+            totalPromptTokens: currentTokens,
+            totalCompletionTokens: 0,
+            totalTokens: currentTokens,
+            contextLimit,
             percentUsed,
             nearLimit: percentUsed >= 0.8,
           },

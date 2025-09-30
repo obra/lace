@@ -22,7 +22,6 @@ import { StopReasonHandler } from '~/token-management/stop-reason-handler';
 import type {
   ThreadTokenUsage,
   CombinedTokenUsage,
-  ContextWindowUsage,
   TokenUsageMetrics,
 } from '~/token-management/types';
 import { loadPromptConfig } from '~/config/prompts';
@@ -767,8 +766,8 @@ export class Agent extends EventEmitter {
         logger.warn('Request blocked by token limit', {
           threadId: this._threadId,
           percentUsed: tokenUsage.percentUsed,
-          currentTokens: tokenUsage.currentTokens,
-          limit: tokenUsage.limit,
+          totalTokens: tokenUsage.totalTokens,
+          contextLimit: tokenUsage.contextLimit,
         });
 
         this._setState('idle');
@@ -945,7 +944,7 @@ export class Agent extends EventEmitter {
       // Process agent response
       if (response.content) {
         // Calculate context window usage from CURRENT response
-        let contextUsage: ContextWindowUsage;
+        let contextUsage: ThreadTokenUsage;
 
         if (response.usage) {
           // Calculate current context state

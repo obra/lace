@@ -28,7 +28,7 @@ export interface ContextWindowUsage {
  */
 export interface TokenUsageMetrics {
   turn?: TurnTokenUsage; // This specific turn's token counts
-  context: ContextWindowUsage; // Current context window state after this turn
+  context: ThreadTokenUsage; // Current context window state after this turn (uses legacy field names)
 }
 
 // Legacy type with old field names for backwards compatibility

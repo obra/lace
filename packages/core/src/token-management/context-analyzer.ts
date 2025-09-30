@@ -155,14 +155,12 @@ export class ContextAnalyzer {
         calculation: `${actualPromptTokens} - ${systemTokens} - ${calibration.toolTokens}`,
       });
 
+      // Still estimate subcategories from events for breakdown
+      const estimatedBreakdown = this.countMessageTokens(threadId, agent);
+
       messagesData = {
-        tokens: messageTokens,
-        subcategories: {
-          userMessages: { tokens: 0 }, // Can't break down further with calibration
-          agentMessages: { tokens: 0 },
-          toolCalls: { tokens: 0 },
-          toolResults: { tokens: 0 },
-        },
+        tokens: messageTokens, // Accurate total from calibration
+        subcategories: estimatedBreakdown.subcategories, // Estimated proportions
       };
     } else {
       logger.debug('[ContextAnalyzer] Using ESTIMATION fallback path', {
