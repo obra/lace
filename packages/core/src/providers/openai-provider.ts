@@ -271,10 +271,28 @@ export class OpenAIProvider extends AIProvider {
         model,
         systemPromptLength: systemPrompt.length,
         toolCount: tools.length,
+        tiktokenAvailable: this._tiktokenAvailable,
       });
 
       // Count system prompt only (no messages, no tools)
-      const systemTokens = this.countTokensExplicit([], systemPrompt, [], model) || 0;
+      const systemTokensResult = this.countTokensExplicit([], systemPrompt, [], model);
+
+      logger.debug('[OpenAIProvider] System token count result', {
+        systemTokensResult,
+        isNull: systemTokensResult === null,
+        isZero: systemTokensResult === 0,
+      });
+
+      // If countTokensExplicit returns null or 0, tiktoken failed - abort calibration
+      if (systemTokensResult === null || systemTokensResult === 0) {
+        logger.warn('[OpenAIProvider] Tiktoken unavailable or failed, cannot calibrate', {
+          model,
+          tiktokenAvailable: this._tiktokenAvailable,
+        });
+        return Promise.resolve(null);
+      }
+
+      const systemTokens = systemTokensResult;
 
       logger.debug('[OpenAIProvider] System prompt counted', { systemTokens });
 
@@ -298,8 +316,7 @@ export class OpenAIProvider extends AIProvider {
         toolDetails,
       });
     } catch (error) {
-      logger.error('[OpenAIProvider] Calibration failed', { error });
-      logger.debug('Token calibration failed', { error });
+      logger.error('[OpenAIProvider] Calibration failed with exception', { error });
       return Promise.resolve(null);
     }
   }
