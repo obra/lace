@@ -166,7 +166,7 @@ export function ProjectCreateModal({
       isOpen={isOpen}
       onClose={handleClose}
       title="Create New Project"
-      size="full"
+      size="xl"
       className="flex flex-col"
     >
       <form onSubmit={handleCreateProject} className="flex flex-col max-h-[85vh]">

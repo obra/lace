@@ -368,7 +368,7 @@ export function DirectoryField({
         e.preventDefault();
         handlePathInputSubmit();
       } else if (e.key === 'Escape') {
-        e.preventDefault();
+        // Exit edit mode but let ESC bubble to close modal
         setIsEditingPath(false);
         setEditPathValue(currentPath);
       }
