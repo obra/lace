@@ -127,31 +127,42 @@ export function ContextBreakdownModal({ isOpen, onClose, agentId }: ContextBreak
         </div>
       ) : (
         <div className="space-y-6" role="document" aria-label="Context breakdown details">
-          {/* Summary Stats */}
-          <div className="stats stats-vertical lg:stats-horizontal w-full shadow">
-            <div className="stat">
-              <div className="stat-title">Context Window</div>
-              <div className="stat-value text-2xl">{formatNumber(breakdown.contextLimit)}</div>
-              <div className="stat-desc">Total available tokens</div>
-            </div>
-
-            <div className="stat">
-              <div className="stat-title">Used Tokens</div>
-              <div className="stat-value text-2xl">{formatNumber(breakdown.totalUsedTokens)}</div>
-              <div className="stat-desc">{formatPercent(breakdown.percentUsed)} of context</div>
-            </div>
-
-            <div className="stat">
-              <div className="stat-title">Free Space</div>
-              <div className="stat-value text-2xl">
-                {formatNumber(breakdown.categories.freeSpace.tokens)}
+          {/* Top Row: Treemap + Summary Stats */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left: Treemap */}
+            {breakdown.totalUsedTokens > 0 && (
+              <div>
+                <ContextTreemap breakdown={breakdown} />
               </div>
-              <div className="stat-desc">Available for input</div>
+            )}
+
+            {/* Right: Summary Stats */}
+            <div>
+              <div className="stats stats-vertical w-full shadow">
+                <div className="stat">
+                  <div className="stat-title">Context Window</div>
+                  <div className="stat-value text-2xl">{formatNumber(breakdown.contextLimit)}</div>
+                  <div className="stat-desc">Total available tokens</div>
+                </div>
+
+                <div className="stat">
+                  <div className="stat-title">Used Tokens</div>
+                  <div className="stat-value text-2xl">
+                    {formatNumber(breakdown.totalUsedTokens)}
+                  </div>
+                  <div className="stat-desc">{formatPercent(breakdown.percentUsed)} of context</div>
+                </div>
+
+                <div className="stat">
+                  <div className="stat-title">Free Space</div>
+                  <div className="stat-value text-2xl">
+                    {formatNumber(breakdown.categories.freeSpace.tokens)}
+                  </div>
+                  <div className="stat-desc">Available for input</div>
+                </div>
+              </div>
             </div>
           </div>
-
-          {/* Treemap Visualization */}
-          {breakdown.totalUsedTokens > 0 && <ContextTreemap breakdown={breakdown} />}
 
           {/* Visual Breakdown Bar */}
           <div className="space-y-2">
