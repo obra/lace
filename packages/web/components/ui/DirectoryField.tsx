@@ -116,14 +116,7 @@ export function DirectoryField({
         ? `/api/filesystem/list?path=${encodeURIComponent(path)}`
         : '/api/filesystem/list';
 
-      // eslint-disable-next-line no-console
-      console.log('fetchDirectories requesting:', path, '→ url:', url);
-
       const data = await api.get<ListDirectoryResponse>(url, { signal: controller.signal });
-
-      // eslint-disable-next-line no-console
-      console.log('fetchDirectories response - currentPath:', data.currentPath);
-
       setEntries(data.entries);
       setCurrentPath(data.currentPath);
       setParentPath(data.parentPath);
@@ -135,8 +128,6 @@ export function DirectoryField({
     } catch (err) {
       // Treat user-initiated cancels as non-errors
       if (err instanceof Error && err.name === 'AbortError') return;
-      // eslint-disable-next-line no-console
-      console.error('fetchDirectories error:', err);
       setApiError(err instanceof Error ? err.message : 'Failed to load directories');
       setEntries([]);
     } finally {
@@ -280,27 +271,17 @@ export function DirectoryField({
           name,
         });
 
-        // eslint-disable-next-line no-console
-        console.log('Created directory:', response.path);
-
         // Close dialog
         setIsNewFolderDialogOpen(false);
 
         // Navigate into the newly created folder
         const newPath = response.path.endsWith('/') ? response.path : response.path + '/';
-        // eslint-disable-next-line no-console
-        console.log('Navigating to new path:', newPath);
         onChange(newPath);
 
         // Small delay to ensure filesystem has flushed the new directory
         await new Promise((resolve) => setTimeout(resolve, 50));
-
-        // eslint-disable-next-line no-console
-        console.log('Fetching directory contents for:', newPath);
         await fetchDirectories(newPath);
       } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error('Error creating folder:', err);
         setNewFolderError(err instanceof Error ? err.message : 'Failed to create folder');
       } finally {
         setIsCreatingFolder(false);

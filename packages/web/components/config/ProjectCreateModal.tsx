@@ -69,15 +69,9 @@ export function ProjectCreateModal({
   // Initialize with smart model from user settings (or fast as fallback)
   useEffect(() => {
     if (availableProviders.length > 0 && !createConfig.providerInstanceId) {
-      // eslint-disable-next-line no-console
-      console.log('Initializing project model, settings.defaultModels:', settings.defaultModels);
-
       // Try smart model first, fallback to fast if not set
       const modelString = settings.defaultModels?.smart || settings.defaultModels?.fast;
       if (modelString) {
-        // eslint-disable-next-line no-console
-        console.log('Using default model:', modelString);
-
         // Parse "instanceId:modelId" format
         const [instanceId, modelId] = modelString.split(':');
         if (instanceId && modelId) {
@@ -91,8 +85,6 @@ export function ProjectCreateModal({
       }
 
       // Fallback to first available provider
-      // eslint-disable-next-line no-console
-      console.log('Falling back to first provider:', availableProviders[0]);
       const firstProvider = availableProviders[0];
       setCreateConfig((prev) => ({
         ...prev,
@@ -115,8 +107,6 @@ export function ProjectCreateModal({
     setCreateDescription('');
     setCreateWorkingDirectory('');
     setCreateConfig({ ...DEFAULT_PROJECT_CONFIG });
-    setUserEditedName(false);
-    setShowDirHelp(false);
     setShowProviderHelp(false);
     setCreateStep(2);
     onClose();
