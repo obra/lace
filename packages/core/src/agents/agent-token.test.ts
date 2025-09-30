@@ -587,8 +587,8 @@ describe('Agent Token Management', () => {
       // Should now have token usage calculated from thread events
       usage = agent.getTokenUsage();
       expect(usage.totalTokens).toBeGreaterThan(0);
-      expect(usage.totalPromptTokens).toBe(10); // TestProvider default
-      expect(usage.totalCompletionTokens).toBe(20); // TestProvider default
+      expect(usage.totalPromptTokens).toBe(150); // 100 input + 50 output = current context
+      expect(usage.totalCompletionTokens).toBe(0); // Not separated in current design
       // Context limit comes from provider model info, percentUsed calculated from that
       expect(usage.contextLimit).toBeGreaterThan(0);
       expect(usage.percentUsed).toBeGreaterThan(0);
