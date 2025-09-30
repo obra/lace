@@ -62,12 +62,22 @@ export class ContextAnalyzer {
         'tokenUsage' in lastAgentMessage.data
       ) {
         const tokenUsage = lastAgentMessage.data.tokenUsage as {
-          message?: { promptTokens?: number };
+          message?: { promptTokens?: number; completionTokens?: number };
         };
-        actualPromptTokens = tokenUsage.message?.promptTokens ?? null;
 
-        logger.debug('[ContextAnalyzer] Extracted actual prompt tokens from last turn', {
+        // Current context = last input + last output (output is now in conversation)
+        const promptTokens = tokenUsage.message?.promptTokens ?? null;
+        const completionTokens = tokenUsage.message?.completionTokens ?? null;
+
+        if (promptTokens !== null && completionTokens !== null) {
+          actualPromptTokens = promptTokens + completionTokens;
+        }
+
+        logger.debug('[ContextAnalyzer] Extracted actual tokens from last turn', {
+          promptTokens,
+          completionTokens,
           actualPromptTokens,
+          calculation: `${promptTokens} + ${completionTokens}`,
           hasMessageUsage: !!tokenUsage.message,
         });
       }

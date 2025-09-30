@@ -53,9 +53,10 @@ describe('Token aggregation', () => {
 
     const summary = aggregateTokenUsage(events);
 
-    expect(summary.totalPromptTokens).toBe(300);
-    expect(summary.totalCompletionTokens).toBe(125);
-    expect(summary.totalTokens).toBe(425);
+    // Should return the LAST turn's tokens (current state), not sum
+    expect(summary.totalPromptTokens).toBe(200); // Last turn's input
+    expect(summary.totalCompletionTokens).toBe(75); // Last turn's output
+    expect(summary.totalTokens).toBe(275); // Current context
   });
 
   it('should handle mixed events with and without token usage', () => {
@@ -100,7 +101,7 @@ describe('Token aggregation', () => {
     expect(summary.totalTokens).toBe(150);
   });
 
-  it('should aggregate token usage from TOOL_RESULT events', () => {
+  it('should return zero when only TOOL_RESULT events exist', () => {
     const events: LaceEvent[] = [
       {
         id: '1',
@@ -121,9 +122,10 @@ describe('Token aggregation', () => {
 
     const summary = aggregateTokenUsage(events);
 
-    expect(summary.totalPromptTokens).toBe(50);
-    expect(summary.totalCompletionTokens).toBe(25);
-    expect(summary.totalTokens).toBe(75);
+    // No AGENT_MESSAGE, so no current state
+    expect(summary.totalPromptTokens).toBe(0);
+    expect(summary.totalCompletionTokens).toBe(0);
+    expect(summary.totalTokens).toBe(0);
   });
 
   it('should estimate tokens when usage data not available', () => {
@@ -286,11 +288,11 @@ describe('Token aggregation', () => {
 
       const result = aggregateTokenUsage(events);
 
-      // Should be summary (300+200) + post-compaction events (150+100+200+150)
+      // Should return the LAST AGENT_MESSAGE tokens (current state)
       expect(result).toEqual({
-        totalPromptTokens: 650, // 300 (summary) + 150 + 200
-        totalCompletionTokens: 450, // 200 (summary) + 100 + 150
-        totalTokens: 1100, // 500 (summary) + 250 + 350
+        totalPromptTokens: 200, // Last event's input
+        totalCompletionTokens: 150, // Last event's output
+        totalTokens: 350, // Current context
       });
     });
 
@@ -399,11 +401,11 @@ describe('Token aggregation', () => {
 
       const result = aggregateTokenUsage(events);
 
-      // Should only count the latest summary (150+75) + post-compaction events (100+50)
+      // Should return the LAST AGENT_MESSAGE tokens (event id '3')
       expect(result).toEqual({
-        totalPromptTokens: 250, // 150 (latest summary) + 100
-        totalCompletionTokens: 125, // 75 (latest summary) + 50
-        totalTokens: 375, // 225 (latest summary) + 150
+        totalPromptTokens: 100, // Last event's input
+        totalCompletionTokens: 50, // Last event's output
+        totalTokens: 150, // Current context
       });
     });
 
@@ -453,11 +455,13 @@ describe('Token aggregation', () => {
 
       const result = aggregateTokenUsage(events);
 
-      // Should only count the summary
+      // Should return the AGENT_MESSAGE before compaction
+      // (aggregateTokenUsage doesn't have agent context to recount after compaction)
+      // The agent's getTokenUsage() will handle recounting when needed
       expect(result).toEqual({
-        totalPromptTokens: 200,
-        totalCompletionTokens: 100,
-        totalTokens: 300,
+        totalPromptTokens: 1000,
+        totalCompletionTokens: 500,
+        totalTokens: 1500,
       });
     });
 

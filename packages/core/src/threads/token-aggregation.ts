@@ -1,5 +1,5 @@
 // ABOUTME: Utilities for aggregating token usage across thread events
-// ABOUTME: Calculates cumulative token counts from conversation history
+// ABOUTME: Calculates current token counts from last API turn
 
 import type { LaceEvent } from '~/threads/types';
 
@@ -9,111 +9,50 @@ interface TokenSummary {
   totalTokens: number;
 }
 
-export function aggregateTokenUsage(events: LaceEvent[]): TokenSummary {
-  let totalPromptTokens = 0;
-  let totalCompletionTokens = 0;
-
-  // Find the most recent COMPACTION event
-  let lastCompactionIndex = -1;
-  for (let i = events.length - 1; i >= 0; i--) {
-    if (events[i].type === 'COMPACTION') {
-      lastCompactionIndex = i;
-      break;
-    }
+// Helper function to extract tokens from CombinedTokenUsage or old format
+const extractTokens = (tokenUsage: unknown): { promptTokens: number; completionTokens: number } => {
+  if (!tokenUsage || typeof tokenUsage !== 'object') {
+    return { promptTokens: 0, completionTokens: 0 };
   }
 
-  // Helper function to extract tokens from CombinedTokenUsage or old format
-  const extractTokens = (
-    tokenUsage: unknown
-  ): { promptTokens: number; completionTokens: number } => {
-    if (!tokenUsage || typeof tokenUsage !== 'object') {
-      return { promptTokens: 0, completionTokens: 0 };
-    }
+  const usage = tokenUsage as Record<string, unknown>;
 
-    const usage = tokenUsage as Record<string, unknown>;
+  // Handle new CombinedTokenUsage format - use message tokens for aggregation
+  if (usage.message && typeof usage.message === 'object') {
+    const message = usage.message as Record<string, unknown>;
+    return {
+      promptTokens: typeof message.promptTokens === 'number' ? message.promptTokens : 0,
+      completionTokens: typeof message.completionTokens === 'number' ? message.completionTokens : 0,
+    };
+  }
 
-    // Handle new CombinedTokenUsage format - use message tokens for aggregation
-    if (usage.message && typeof usage.message === 'object') {
-      const message = usage.message as Record<string, unknown>;
+  // Old format fallback
+  return {
+    promptTokens: typeof usage.promptTokens === 'number' ? usage.promptTokens : 0,
+    completionTokens: typeof usage.completionTokens === 'number' ? usage.completionTokens : 0,
+  };
+};
+
+export function aggregateTokenUsage(events: LaceEvent[]): TokenSummary {
+  // Find the most recent AGENT_MESSAGE with token usage
+  // Current context = last input + last output (output is now in conversation)
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i];
+    if (event.type === 'AGENT_MESSAGE' && event.data.tokenUsage) {
+      const tokens = extractTokens(event.data.tokenUsage);
       return {
-        promptTokens: typeof message.promptTokens === 'number' ? message.promptTokens : 0,
-        completionTokens:
-          typeof message.completionTokens === 'number' ? message.completionTokens : 0,
+        totalPromptTokens: tokens.promptTokens,
+        totalCompletionTokens: tokens.completionTokens,
+        totalTokens: tokens.promptTokens + tokens.completionTokens,
       };
     }
-
-    // Old format fallback
-    return {
-      promptTokens: typeof usage.promptTokens === 'number' ? usage.promptTokens : 0,
-      completionTokens: typeof usage.completionTokens === 'number' ? usage.completionTokens : 0,
-    };
-  };
-
-  // If there's a compaction, only count:
-  // 1. The summary events from the most recent compaction
-  // 2. Events that come after the most recent compaction
-  if (lastCompactionIndex >= 0) {
-    const compactionEvent = events[lastCompactionIndex];
-
-    // Add tokens from the compaction summary events
-    if (compactionEvent.type === 'COMPACTION') {
-      for (const summaryEvent of compactionEvent.data.compactedEvents) {
-        if (summaryEvent.type === 'AGENT_MESSAGE' && summaryEvent.data.tokenUsage) {
-          const tokens = extractTokens(summaryEvent.data.tokenUsage);
-          totalPromptTokens += tokens.promptTokens;
-          totalCompletionTokens += tokens.completionTokens;
-        } else if (
-          summaryEvent.type === 'TOOL_RESULT' &&
-          'tokenUsage' in summaryEvent.data &&
-          summaryEvent.data.tokenUsage
-        ) {
-          const tokens = extractTokens(summaryEvent.data.tokenUsage);
-          totalPromptTokens += tokens.promptTokens;
-          totalCompletionTokens += tokens.completionTokens;
-        }
-      }
-    }
-
-    // Add tokens from events after the compaction
-    for (let i = lastCompactionIndex + 1; i < events.length; i++) {
-      const event = events[i];
-      if (event.type === 'AGENT_MESSAGE' && event.data.tokenUsage) {
-        const tokens = extractTokens(event.data.tokenUsage);
-        totalPromptTokens += tokens.promptTokens;
-        totalCompletionTokens += tokens.completionTokens;
-      } else if (
-        event.type === 'TOOL_RESULT' &&
-        'tokenUsage' in event.data &&
-        event.data.tokenUsage
-      ) {
-        const tokens = extractTokens(event.data.tokenUsage);
-        totalPromptTokens += tokens.promptTokens;
-        totalCompletionTokens += tokens.completionTokens;
-      }
-    }
-  } else {
-    // No compaction found, process all events (original behavior)
-    for (const event of events) {
-      if (event.type === 'AGENT_MESSAGE' && event.data.tokenUsage) {
-        const tokens = extractTokens(event.data.tokenUsage);
-        totalPromptTokens += tokens.promptTokens;
-        totalCompletionTokens += tokens.completionTokens;
-      } else if (
-        event.type === 'TOOL_RESULT' &&
-        'tokenUsage' in event.data &&
-        event.data.tokenUsage
-      ) {
-        const tokens = extractTokens(event.data.tokenUsage);
-        totalPromptTokens += tokens.promptTokens;
-        totalCompletionTokens += tokens.completionTokens;
-      }
-    }
   }
 
+  // No AGENT_MESSAGE found, return zeros
   return {
-    totalPromptTokens,
-    totalCompletionTokens,
-    totalTokens: totalPromptTokens + totalCompletionTokens,
+    totalPromptTokens: 0,
+    totalCompletionTokens: 0,
+    totalTokens: 0,
   };
 }
 

@@ -27,7 +27,6 @@ import { QueuedMessage, MessageQueueStats } from '~/agents/types';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
-import { aggregateTokenUsage } from '~/threads/token-aggregation';
 import { ProviderRegistry } from '~/providers/registry';
 
 export interface AgentConfig {
@@ -3204,10 +3203,62 @@ export class Agent extends EventEmitter {
 
   /**
    * Gets current token usage information for this agent
+   * Uses last AGENT_MESSAGE event for accurate usage data
    */
   getTokenUsage(): ThreadTokenUsage {
     const events = this._threadManager.getEvents(this._threadId);
-    const tokenSummary = aggregateTokenUsage(events);
+
+    // Find last AGENT_MESSAGE with token usage
+    let lastAgentMessageIndex = -1;
+    for (let i = events.length - 1; i >= 0; i--) {
+      const event = events[i];
+      if (
+        event.type === 'AGENT_MESSAGE' &&
+        typeof event.data === 'object' &&
+        event.data !== null &&
+        'tokenUsage' in event.data
+      ) {
+        lastAgentMessageIndex = i;
+        break;
+      }
+    }
+
+    // Find last COMPACTION event
+    let lastCompactionIndex = -1;
+    for (let i = events.length - 1; i >= 0; i--) {
+      if (events[i].type === 'COMPACTION') {
+        lastCompactionIndex = i;
+        break;
+      }
+    }
+
+    let totalPromptTokens = 0;
+    let totalCompletionTokens = 0;
+
+    // If compaction is more recent than last AGENT_MESSAGE, conversation has changed
+    // Fall back to estimation since we can't call async countTokens here
+    if (lastCompactionIndex > lastAgentMessageIndex) {
+      // Estimate current conversation tokens
+      const estimatedTokens = this._estimateConversationTokens(this.buildThreadMessages());
+      totalPromptTokens = estimatedTokens;
+      totalCompletionTokens = 0; // Can't separate in estimation
+    } else if (lastAgentMessageIndex >= 0) {
+      // Use last AGENT_MESSAGE tokens (still accurate)
+      const lastAgentMessage = events[lastAgentMessageIndex];
+      if (
+        typeof lastAgentMessage.data === 'object' &&
+        lastAgentMessage.data !== null &&
+        'tokenUsage' in lastAgentMessage.data
+      ) {
+        const tokenUsage = lastAgentMessage.data.tokenUsage as {
+          message?: { promptTokens?: number; completionTokens?: number };
+        };
+        totalPromptTokens = tokenUsage.message?.promptTokens ?? 0;
+        totalCompletionTokens = tokenUsage.message?.completionTokens ?? 0;
+      }
+    }
+
+    const totalTokens = totalPromptTokens + totalCompletionTokens;
 
     // Get context limit from provider system
     const modelId = this.model;
@@ -3221,13 +3272,13 @@ export class Agent extends EventEmitter {
       }
     }
 
-    const percentUsed = contextLimit > 0 ? tokenSummary.totalTokens / contextLimit : 0;
+    const percentUsed = contextLimit > 0 ? totalTokens / contextLimit : 0;
     const nearLimit = percentUsed >= 0.8;
 
     return {
-      totalPromptTokens: tokenSummary.totalPromptTokens,
-      totalCompletionTokens: tokenSummary.totalCompletionTokens,
-      totalTokens: tokenSummary.totalTokens,
+      totalPromptTokens,
+      totalCompletionTokens,
+      totalTokens,
       contextLimit,
       percentUsed,
       nearLimit,
