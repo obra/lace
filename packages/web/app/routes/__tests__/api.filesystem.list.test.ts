@@ -41,14 +41,16 @@ describe('/api/filesystem/list', () => {
     expect(data.code).toBe('DIRECTORY_NOT_FOUND');
   });
 
-  it('should only return directories', async () => {
+  it('should return both directories and files', async () => {
     const request = new Request(`http://localhost/api/filesystem/list?path=${homedir()}`);
     const response = await loader(createLoaderArgs(request, {}));
 
     const data = await parseResponse<ListDirectoryResponse>(response);
     for (const entry of data.entries) {
-      expect(entry.type).toBe('directory');
+      expect(['directory', 'file']).toContain(entry.type);
     }
+    // Verify we have valid type field on all entries
+    expect(data.entries.every((e) => e.type === 'directory' || e.type === 'file')).toBe(true);
   });
 
   it('should default to home directory when no path provided', async () => {
@@ -83,15 +85,31 @@ describe('/api/filesystem/list', () => {
     }
   });
 
-  it('should sort directories alphabetically', async () => {
+  it('should sort directories first, then files, both alphabetically', async () => {
     const request = new Request(`http://localhost/api/filesystem/list?path=${homedir()}`);
     const response = await loader(createLoaderArgs(request, {}));
 
     const data = await parseResponse<ListDirectoryResponse>(response);
-    if (data.entries.length > 1) {
-      for (let i = 1; i < data.entries.length; i++) {
-        expect(data.entries[i - 1].name.localeCompare(data.entries[i].name)).toBeLessThanOrEqual(0);
-      }
+
+    // Separate directories and files
+    const directories = data.entries.filter((e) => e.type === 'directory');
+    const files = data.entries.filter((e) => e.type === 'file');
+
+    // Check directories come before files
+    if (directories.length > 0 && files.length > 0) {
+      const lastDirIndex = data.entries.findLastIndex((e) => e.type === 'directory');
+      const firstFileIndex = data.entries.findIndex((e) => e.type === 'file');
+      expect(lastDirIndex).toBeLessThan(firstFileIndex);
+    }
+
+    // Check directories are sorted alphabetically
+    for (let i = 1; i < directories.length; i++) {
+      expect(directories[i - 1].name.localeCompare(directories[i].name)).toBeLessThanOrEqual(0);
+    }
+
+    // Check files are sorted alphabetically
+    for (let i = 1; i < files.length; i++) {
+      expect(files[i - 1].name.localeCompare(files[i].name)).toBeLessThanOrEqual(0);
     }
   });
 
