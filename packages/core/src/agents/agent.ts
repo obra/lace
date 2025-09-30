@@ -3208,6 +3208,11 @@ export class Agent extends EventEmitter {
   getTokenUsage(): ThreadTokenUsage {
     const events = this._threadManager.getEvents(this._threadId);
 
+    logger.debug('[Agent.getTokenUsage] Starting', {
+      threadId: this._threadId,
+      totalEvents: events.length,
+    });
+
     // Find last AGENT_MESSAGE with token usage
     let lastAgentMessageIndex = -1;
     for (let i = events.length - 1; i >= 0; i--) {
@@ -3232,6 +3237,12 @@ export class Agent extends EventEmitter {
       }
     }
 
+    logger.debug('[Agent.getTokenUsage] Found events', {
+      lastAgentMessageIndex,
+      lastCompactionIndex,
+      compactionIsNewer: lastCompactionIndex > lastAgentMessageIndex,
+    });
+
     let totalPromptTokens = 0;
     let totalCompletionTokens = 0;
 
@@ -3242,6 +3253,10 @@ export class Agent extends EventEmitter {
       const estimatedTokens = this._estimateConversationTokens(this.buildThreadMessages());
       totalPromptTokens = estimatedTokens;
       totalCompletionTokens = 0; // Can't separate in estimation
+
+      logger.debug('[Agent.getTokenUsage] Using ESTIMATION path', {
+        estimatedTokens,
+      });
     } else if (lastAgentMessageIndex >= 0) {
       // Use last AGENT_MESSAGE tokens (still accurate)
       const lastAgentMessage = events[lastAgentMessageIndex];
@@ -3255,10 +3270,23 @@ export class Agent extends EventEmitter {
         };
         totalPromptTokens = tokenUsage.message?.promptTokens ?? 0;
         totalCompletionTokens = tokenUsage.message?.completionTokens ?? 0;
+
+        logger.debug('[Agent.getTokenUsage] Using LAST AGENT_MESSAGE', {
+          promptTokens: totalPromptTokens,
+          completionTokens: totalCompletionTokens,
+          hasMessageField: !!tokenUsage.message,
+          rawTokenUsage: tokenUsage,
+        });
       }
     }
 
     const totalTokens = totalPromptTokens + totalCompletionTokens;
+
+    logger.debug('[Agent.getTokenUsage] Calculated totals', {
+      totalPromptTokens,
+      totalCompletionTokens,
+      totalTokens,
+    });
 
     // Get context limit from provider system
     const modelId = this.model;
