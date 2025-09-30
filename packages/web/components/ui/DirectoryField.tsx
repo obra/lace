@@ -12,6 +12,7 @@ import {
   faHome,
   faFile,
   faFolderPlus,
+  faExclamationTriangle,
 } from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
 import type {
@@ -340,12 +341,20 @@ export function DirectoryField({
             }
           >
             {isLoading ? (
-              <div className="flex items-center justify-center p-4">
-                <FontAwesomeIcon icon={faSpinner} className="w-4 h-4 animate-spin mr-2" />
-                <span className="text-sm text-base-content/60">Loading directories...</span>
+              <div className="flex flex-col items-center justify-center p-8">
+                <FontAwesomeIcon
+                  icon={faSpinner}
+                  className="w-6 h-6 animate-spin text-primary mb-2"
+                />
+                <span className="text-sm text-base-content/60">Loading...</span>
               </div>
             ) : apiError ? (
-              <div className="p-4 text-sm text-error">{apiError}</div>
+              <div className="p-4">
+                <div className="alert alert-error">
+                  <FontAwesomeIcon icon={faExclamationTriangle} />
+                  <span>{apiError}</span>
+                </div>
+              </div>
             ) : (
               <>
                 {/* Navigation header with New Folder button */}
@@ -406,20 +415,58 @@ export function DirectoryField({
                             entry.type === 'directory' && handleDirectoryDoubleClick(entry)
                           }
                           disabled={entry.type === 'file'}
-                          className={`w-full px-3 py-2 text-left flex items-center gap-2 border-b border-base-content/10 last:border-b-0 transition-none ${
+                          className={`
+                            w-full px-3 py-2 text-left flex items-center gap-3
+                            border-b border-base-content/10 last:border-b-0
+                            transition-colors duration-150
+                            ${
+                              entry.type === 'directory'
+                                ? 'hover:bg-base-100 cursor-pointer active:bg-base-200'
+                                : 'opacity-60 cursor-default bg-base-200/30'
+                            }
+                          `}
+                          title={
                             entry.type === 'directory'
-                              ? 'hover:bg-base-100 cursor-pointer'
-                              : 'opacity-50 cursor-default'
-                          }`}
+                              ? 'Click to select, double-click to open'
+                              : 'Files cannot be selected'
+                          }
                         >
                           <FontAwesomeIcon
                             icon={entry.type === 'directory' ? faFolder : faFile}
-                            className={`w-4 h-4 ${entry.type === 'directory' ? 'text-primary' : 'text-base-content/40'}`}
+                            className={`
+                              w-4 h-4 flex-shrink-0
+                              ${entry.type === 'directory' ? 'text-primary' : 'text-base-content/30'}
+                            `}
                           />
-                          <span className="truncate flex-1">{entry.name}</span>
-                          <span className="text-xs text-base-content/40">
-                            {entry.permissions.canWrite ? 'R/W' : 'R/O'}
+                          <span
+                            className={`
+                              truncate flex-1 text-sm
+                              ${
+                                entry.type === 'directory'
+                                  ? 'text-base-content font-medium'
+                                  : 'text-base-content/50 font-normal'
+                              }
+                            `}
+                          >
+                            {entry.name}
                           </span>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span
+                              className={`
+                                text-xs px-1.5 py-0.5 rounded
+                                ${
+                                  entry.permissions.canWrite
+                                    ? 'bg-success/10 text-success'
+                                    : 'bg-base-content/10 text-base-content/50'
+                                }
+                              `}
+                            >
+                              {entry.permissions.canWrite ? 'R/W' : 'R/O'}
+                            </span>
+                            {entry.type === 'directory' && (
+                              <span className="text-xs text-base-content/40">→</span>
+                            )}
+                          </div>
                         </button>
                       ))}
                       {getFilteredEntries().length > 100 && !showMore && (
@@ -448,10 +495,25 @@ export function DirectoryField({
                   ) : (
                     !isLoading &&
                     !apiError && (
-                      <div className="p-4 text-sm text-base-content/60 text-center">
-                        {value && value.split('/').pop()
-                          ? `No items found matching "${value.split('/').pop()}"`
-                          : 'No items found'}
+                      <div className="p-8 text-center">
+                        <FontAwesomeIcon
+                          icon={faFolder}
+                          className="w-12 h-12 text-base-content/20 mb-3"
+                        />
+                        <p className="text-sm text-base-content/60">
+                          {value && value.split('/').pop()
+                            ? `No items matching "${value.split('/').pop()}"`
+                            : 'This directory is empty'}
+                        </p>
+                        {!value.split('/').pop() && (
+                          <button
+                            type="button"
+                            onClick={handleOpenNewFolderDialog}
+                            className="btn btn-primary btn-sm mt-3"
+                          >
+                            Create First Folder
+                          </button>
+                        )}
                       </div>
                     )
                   )}
