@@ -165,8 +165,8 @@ describe('Token Usage Integration Tests', () => {
       data: {
         content: 'First test response',
         tokenUsage: {
-          message: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
-          thread: {
+          turn: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+          context: {
             totalPromptTokens: 100,
             totalCompletionTokens: 50,
             totalTokens: 150,
@@ -184,8 +184,8 @@ describe('Token Usage Integration Tests', () => {
       data: {
         content: 'Second test response',
         tokenUsage: {
-          message: { promptTokens: 200, completionTokens: 75, totalTokens: 275 },
-          thread: {
+          turn: { inputTokens: 200, outputTokens: 75, totalTokens: 275 },
+          context: {
             totalPromptTokens: 300,
             totalCompletionTokens: 125,
             totalTokens: 425,
@@ -256,8 +256,8 @@ describe('Token Usage Integration Tests', () => {
       data: {
         content: 'Pre-compaction response',
         tokenUsage: {
-          message: { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 },
-          thread: {
+          turn: { inputTokens: 1000, outputTokens: 500, totalTokens: 1500 },
+          context: {
             totalPromptTokens: 1000,
             totalCompletionTokens: 500,
             totalTokens: 1500,

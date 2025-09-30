@@ -82,7 +82,7 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
           tokenUsageData?.context || (tokenUsageData as unknown as Record<string, unknown>)?.thread;
 
         if (contextData && typeof contextData === 'object') {
-          const ctx = contextData as Record<string, unknown>;
+          const ctx = contextData as unknown as Record<string, unknown>;
 
           // Try new field names first
           const currentTokens =

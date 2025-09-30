@@ -71,9 +71,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       sessionId = agentId;
     }
 
-    sessionId = asThreadId(sessionId);
-
-    const session = await sessionService.getSession(sessionId);
+    const session = await sessionService.getSession(asThreadId(sessionId));
     if (!session) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
