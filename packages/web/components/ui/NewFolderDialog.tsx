@@ -45,17 +45,14 @@ export function NewFolderDialog({
   }, [isOpen]);
 
   const validateName = (name: string): string | null => {
-    if (!name.trim()) {
-      return 'Folder name cannot be empty';
+    if (name.length === 0) {
+      return 'Directory name cannot be empty';
     }
     if (name.length > MAX_LENGTH) {
-      return `Folder name too long (max ${MAX_LENGTH} characters)`;
+      return 'Directory name too long';
     }
     if (INVALID_CHARS.test(name)) {
-      return 'Invalid characters: / \\ : * ? " < > |';
-    }
-    if (name.startsWith('.')) {
-      return 'Folder name cannot start with "."';
+      return 'Invalid directory name characters';
     }
     return null;
   };
@@ -74,7 +71,7 @@ export function NewFolderDialog({
       setValidationError(validationErr);
       return;
     }
-    onConfirm(folderName.trim());
+    onConfirm(folderName);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -92,7 +89,7 @@ export function NewFolderDialog({
     onClose();
   };
 
-  const isValid = folderName.trim() && !validationError;
+  const isValid = folderName.length > 0 && !validationError;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Create New Folder" size="sm">

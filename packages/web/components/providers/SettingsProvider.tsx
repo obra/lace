@@ -21,6 +21,12 @@ const TimelineWidthSchema = z.enum(TIMELINE_WIDTHS);
 
 export { TIMELINE_WIDTHS };
 
+// Default models schema for validation
+const DefaultModelsSchema = z.object({
+  fast: z.string().optional(),
+  smart: z.string().optional(),
+});
+
 // Flat settings structure - matches existing API pattern
 const LaceSettingsSchema = z.object({
   // Theme settings (keeping existing structure for compatibility)
@@ -31,12 +37,7 @@ const LaceSettingsSchema = z.object({
   debugPanelEnabled: z.boolean(),
 
   // Default model settings
-  defaultModels: z
-    .object({
-      fast: z.string().optional(),
-      smart: z.string().optional(),
-    })
-    .optional(),
+  defaultModels: DefaultModelsSchema.optional(),
 });
 
 type DaisyUITheme = z.infer<typeof DaisyUIThemeSchema>;
@@ -145,6 +146,8 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
         const apiSettings = await api.get<Record<string, unknown>>('/api/settings');
 
         // Parse each setting with fallbacks
+        const defaultModelsParsed = DefaultModelsSchema.safeParse(apiSettings.defaultModels);
+
         const parsedSettings: LaceSettings = {
           theme: DaisyUIThemeSchema.safeParse(apiSettings.theme).success
             ? DaisyUIThemeSchema.parse(apiSettings.theme)
@@ -156,10 +159,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
             typeof apiSettings.debugPanelEnabled === 'boolean'
               ? apiSettings.debugPanelEnabled
               : defaultSettings.debugPanelEnabled,
-          defaultModels:
-            typeof apiSettings.defaultModels === 'object' && apiSettings.defaultModels !== null
-              ? (apiSettings.defaultModels as { fast?: string; smart?: string })
-              : undefined,
+          defaultModels: defaultModelsParsed.success ? defaultModelsParsed.data : undefined,
         };
 
         if (!cancelled) {
