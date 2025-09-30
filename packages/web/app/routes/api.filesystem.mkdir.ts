@@ -18,10 +18,34 @@ export async function action({ request }: Route.ActionArgs) {
     // Security: Ensure parent path is within user's home directory
     const homeDir = homedir();
     const absoluteParent = resolve(parentPath);
-    const [realHomeDir, realParentPath] = await Promise.all([
-      fs.realpath(homeDir).catch(() => homeDir),
-      fs.realpath(absoluteParent).catch(() => absoluteParent),
-    ]);
+
+    let realHomeDir: string;
+    let realParentPath: string;
+    try {
+      [realHomeDir, realParentPath] = await Promise.all([
+        fs.realpath(homeDir),
+        fs.realpath(absoluteParent),
+      ]);
+    } catch (realpathError) {
+      // Check error code to return appropriate status
+      if (realpathError instanceof Error) {
+        const fsError = realpathError as NodeJS.ErrnoException;
+        if (fsError.code === 'ENOENT') {
+          return createErrorResponse('Parent directory not found', 404, {
+            code: 'PARENT_NOT_FOUND',
+          });
+        }
+        if (fsError.code === 'EACCES') {
+          return createErrorResponse('Permission denied', 403, {
+            code: 'PERMISSION_DENIED',
+          });
+        }
+      }
+      // Other realpath failures (symlink loops, etc.)
+      return createErrorResponse('Cannot resolve parent directory path', 400, {
+        code: 'PATH_RESOLUTION_FAILED',
+      });
+    }
 
     const isInsideHome =
       realParentPath === realHomeDir ||
