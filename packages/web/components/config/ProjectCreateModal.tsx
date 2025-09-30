@@ -64,15 +64,44 @@ export function ProjectCreateModal({
   // Providers from context are already available/configured, no need to filter
   const availableProviders = useMemo(() => providers || [], [providers]);
 
-  // Initialize with first available provider instance
+  // Initialize with smart model from user settings
   useEffect(() => {
     if (availableProviders.length > 0 && !createConfig.providerInstanceId) {
-      const firstProvider = availableProviders[0];
-      setCreateConfig((prev) => ({
-        ...prev,
-        providerInstanceId: firstProvider.instanceId,
-        modelId: firstProvider.models[0]?.id || '',
-      }));
+      // Load settings to get default smart model
+      void api
+        .get<{ defaultModels?: { fast?: string; smart?: string } }>('/api/settings')
+        .then((settings) => {
+          const smartModel = settings.defaultModels?.smart;
+          if (smartModel) {
+            // Parse "instanceId:modelId" format
+            const [instanceId, modelId] = smartModel.split(':');
+            if (instanceId && modelId) {
+              setCreateConfig((prev) => ({
+                ...prev,
+                providerInstanceId: instanceId,
+                modelId,
+              }));
+              return;
+            }
+          }
+
+          // Fallback to first available provider
+          const firstProvider = availableProviders[0];
+          setCreateConfig((prev) => ({
+            ...prev,
+            providerInstanceId: firstProvider.instanceId,
+            modelId: firstProvider.models[0]?.id || '',
+          }));
+        })
+        .catch(() => {
+          // On error, fallback to first available provider
+          const firstProvider = availableProviders[0];
+          setCreateConfig((prev) => ({
+            ...prev,
+            providerInstanceId: firstProvider.instanceId,
+            modelId: firstProvider.models[0]?.id || '',
+          }));
+        });
     }
   }, [availableProviders, createConfig.providerInstanceId]);
 
