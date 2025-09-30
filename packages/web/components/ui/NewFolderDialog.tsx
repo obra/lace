@@ -60,6 +60,7 @@ export function NewFolderDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation(); // Prevent bubbling to parent form
     const validationErr = validateName(folderName);
     if (validationErr) {
       setValidationError(validationErr);
@@ -68,11 +69,26 @@ export function NewFolderDialog({
     onConfirm(folderName.trim());
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Stop ESC from bubbling up to parent dialog/form
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    }
+  };
+
+  const handleCancel = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+  };
+
   const isValid = folderName.trim() && !validationError;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Create New Folder" size="sm">
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
         <div className="space-y-4">
           <div className="form-control">
             <input
@@ -98,7 +114,7 @@ export function NewFolderDialog({
           </div>
 
           <div className="flex gap-2 justify-end">
-            <button type="button" onClick={onClose} className="btn" disabled={loading}>
+            <button type="button" onClick={handleCancel} className="btn" disabled={loading}>
               Cancel
             </button>
             <AccentButton
