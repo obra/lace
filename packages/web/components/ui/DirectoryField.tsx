@@ -14,8 +14,13 @@ import {
   faFolderPlus,
 } from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
-import type { ListDirectoryResponse, DirectoryEntry } from '@/types/filesystem';
+import type {
+  ListDirectoryResponse,
+  DirectoryEntry,
+  CreateDirectoryResponse,
+} from '@/types/filesystem';
 import { DIRECTORY_BROWSER } from '@/lib/constants/ui';
+import { NewFolderDialog } from '@/components/ui/NewFolderDialog';
 
 interface DirectoryFieldProps {
   label?: string;
@@ -57,6 +62,9 @@ export function DirectoryField({
   const [homeDirectory, setHomeDirectory] = useState<string>('');
   const [apiError, setApiError] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
+  const [isNewFolderDialogOpen, setIsNewFolderDialogOpen] = useState(false);
+  const [newFolderError, setNewFolderError] = useState<string | null>(null);
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const hasInitializedRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -251,10 +259,40 @@ export function DirectoryField({
   };
 
   const handleOpenNewFolderDialog = useCallback(() => {
-    // Will implement dialog in next task
-    // eslint-disable-next-line no-console
-    console.log('Open new folder dialog');
+    setNewFolderError(null);
+    setIsNewFolderDialogOpen(true);
   }, []);
+
+  const handleCreateFolder = useCallback(
+    async (name: string) => {
+      if (!currentPath) return;
+
+      setIsCreatingFolder(true);
+      setNewFolderError(null);
+
+      try {
+        const response = await api.post<CreateDirectoryResponse>('/api/filesystem/mkdir', {
+          parentPath: currentPath,
+          name,
+        });
+
+        // Close dialog
+        setIsNewFolderDialogOpen(false);
+
+        // Refresh directory listing
+        await fetchDirectories(currentPath);
+
+        // Auto-select the new folder
+        const newPath = response.path.endsWith('/') ? response.path : response.path + '/';
+        onChange(newPath);
+      } catch (err) {
+        setNewFolderError(err instanceof Error ? err.message : 'Failed to create folder');
+      } finally {
+        setIsCreatingFolder(false);
+      }
+    },
+    [currentPath, fetchDirectories, onChange]
+  );
 
   const inputClasses = ['input', 'input-bordered', 'w-full', error ? 'input-error' : '', className]
     .filter(Boolean)
@@ -429,6 +467,14 @@ export function DirectoryField({
           <span className="label-text-alt text-base-content/60">{helpText}</span>
         </label>
       )}
+
+      <NewFolderDialog
+        isOpen={isNewFolderDialogOpen}
+        onClose={() => setIsNewFolderDialogOpen(false)}
+        onConfirm={handleCreateFolder}
+        loading={isCreatingFolder}
+        error={newFolderError}
+      />
     </div>
   );
 }
