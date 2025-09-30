@@ -146,7 +146,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     const response: ListDirectoryResponse = {
       currentPath: absolutePath,
       parentPath: absolutePath === homeDir ? null : resolve(absolutePath, '..'),
-      entries: entries.filter((entry) => entry.type === 'directory'), // Only directories
+      entries, // Include both files and directories
       breadcrumbPaths,
       breadcrumbNames,
       homeDirectory: homeDir,

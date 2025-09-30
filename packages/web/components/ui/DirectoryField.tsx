@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFolder, faSpinner, faChevronLeft, faHome } from '@/lib/fontawesome';
+import { faFolder, faSpinner, faChevronLeft, faHome, faFile } from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
 import type { ListDirectoryResponse, DirectoryEntry } from '@/types/filesystem';
 import { DIRECTORY_BROWSER } from '@/lib/constants/ui';
@@ -42,7 +42,7 @@ export function DirectoryField({
   const [isFocused, setIsFocused] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [directories, setDirectories] = useState<DirectoryEntry[]>([]);
+  const [entries, setEntries] = useState<DirectoryEntry[]>([]);
   const [currentPath, setCurrentPath] = useState<string>('');
   const [parentPath, setParentPath] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<string[]>([]);
@@ -98,7 +98,7 @@ export function DirectoryField({
         : '/api/filesystem/list';
 
       const data = await api.get<ListDirectoryResponse>(url, { signal: controller.signal });
-      setDirectories(data.entries);
+      setEntries(data.entries);
       setCurrentPath(data.currentPath);
       setParentPath(data.parentPath);
       setHomeDirectory(data.homeDirectory);
@@ -110,15 +110,15 @@ export function DirectoryField({
       // Treat user-initiated cancels as non-errors
       if (err instanceof Error && err.name === 'AbortError') return;
       setApiError(err instanceof Error ? err.message : 'Failed to load directories');
-      setDirectories([]);
+      setEntries([]);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Get filtered directories based on current input
-  const getFilteredDirectories = useCallback((): DirectoryEntry[] => {
-    let filtered = directories || [];
+  // Get filtered entries based on current input
+  const getFilteredEntries = useCallback((): DirectoryEntry[] => {
+    let filtered = entries || [];
 
     // Extract the search term from the current input
     // This should be the part after the last slash
@@ -126,22 +126,22 @@ export function DirectoryField({
 
     // Filter out dot files unless user is typing them
     if (!searchTerm.startsWith('.')) {
-      filtered = filtered.filter((dir) => !dir.name.startsWith('.'));
+      filtered = filtered.filter((entry) => !entry.name.startsWith('.'));
     }
 
     // If user has typed something and we're not just showing a complete path ending with /
     if (searchTerm.length > 0 && !value.endsWith('/')) {
-      filtered = filtered.filter((dir) => dir.name.toLowerCase().includes(searchTerm));
+      filtered = filtered.filter((entry) => entry.name.toLowerCase().includes(searchTerm));
     }
 
     return filtered;
-  }, [value, directories]);
+  }, [value, entries]);
 
-  // Get visible directories (limited by showMore state)
-  const getVisibleDirectories = useCallback((): DirectoryEntry[] => {
-    const filtered = getFilteredDirectories();
+  // Get visible entries (limited by showMore state)
+  const getVisibleEntries = useCallback((): DirectoryEntry[] => {
+    const filtered = getFilteredEntries();
     return showMore ? filtered : filtered.slice(0, 100);
-  }, [getFilteredDirectories, showMore]);
+  }, [getFilteredEntries, showMore]);
 
   // Initialize with home directory on first load
   useEffect(() => {
@@ -166,11 +166,11 @@ export function DirectoryField({
 
   // Load directories when dropdown opens
   useEffect(() => {
-    if (isDropdownOpen && !isLoading && directories?.length === 0) {
-      // Only fetch if we don't have any directories loaded
+    if (isDropdownOpen && !isLoading && entries?.length === 0) {
+      // Only fetch if we don't have any entries loaded
       void fetchDirectories('');
     }
-  }, [isDropdownOpen, isLoading, directories?.length, fetchDirectories]);
+  }, [isDropdownOpen, isLoading, entries?.length, fetchDirectories]);
 
   // Add navigation handlers
   const handleNavigateToParent = useCallback(() => {
@@ -332,35 +332,45 @@ export function DirectoryField({
                       : undefined
                   }
                 >
-                  {getFilteredDirectories().length > 0 ? (
+                  {getFilteredEntries().length > 0 ? (
                     <>
-                      {getVisibleDirectories().map((dir) => (
+                      {getVisibleEntries().map((entry) => (
                         <button
                           type="button"
-                          key={dir.path}
-                          onClick={() => handleDirectorySelect(dir)}
-                          onDoubleClick={() => handleDirectoryDoubleClick(dir)}
-                          className="w-full px-3 py-2 text-left hover:bg-base-100 flex items-center gap-2 border-b border-base-content/10 last:border-b-0 transition-none"
+                          key={entry.path}
+                          onClick={() => entry.type === 'directory' && handleDirectorySelect(entry)}
+                          onDoubleClick={() =>
+                            entry.type === 'directory' && handleDirectoryDoubleClick(entry)
+                          }
+                          disabled={entry.type === 'file'}
+                          className={`w-full px-3 py-2 text-left flex items-center gap-2 border-b border-base-content/10 last:border-b-0 transition-none ${
+                            entry.type === 'directory'
+                              ? 'hover:bg-base-100 cursor-pointer'
+                              : 'opacity-50 cursor-default'
+                          }`}
                         >
-                          <FontAwesomeIcon icon={faFolder} className="w-4 h-4 text-primary" />
-                          <span className="truncate flex-1">{dir.name}</span>
+                          <FontAwesomeIcon
+                            icon={entry.type === 'directory' ? faFolder : faFile}
+                            className={`w-4 h-4 ${entry.type === 'directory' ? 'text-primary' : 'text-base-content/40'}`}
+                          />
+                          <span className="truncate flex-1">{entry.name}</span>
                           <span className="text-xs text-base-content/40">
-                            {dir.permissions.canWrite ? 'R/W' : 'R/O'}
+                            {entry.permissions.canWrite ? 'R/W' : 'R/O'}
                           </span>
                         </button>
                       ))}
-                      {getFilteredDirectories().length > 100 && !showMore && (
+                      {getFilteredEntries().length > 100 && !showMore && (
                         <div className="border-t border-base-300 p-2">
                           <button
                             type="button"
                             onClick={() => setShowMore(true)}
                             className="w-full text-center text-sm text-primary hover:text-primary-focus py-1"
                           >
-                            Show {getFilteredDirectories().length - 100} more directories
+                            Show {getFilteredEntries().length - 100} more items
                           </button>
                         </div>
                       )}
-                      {showMore && getFilteredDirectories().length > 100 && (
+                      {showMore && getFilteredEntries().length > 100 && (
                         <div className="border-t border-base-300 p-2">
                           <button
                             type="button"
@@ -377,8 +387,8 @@ export function DirectoryField({
                     !apiError && (
                       <div className="p-4 text-sm text-base-content/60 text-center">
                         {value && value.split('/').pop()
-                          ? `No directories found matching "${value.split('/').pop()}"`
-                          : 'No directories found'}
+                          ? `No items found matching "${value.split('/').pop()}"`
+                          : 'No items found'}
                       </div>
                     )
                   )}
