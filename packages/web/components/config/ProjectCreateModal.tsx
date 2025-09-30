@@ -66,19 +66,20 @@ export function ProjectCreateModal({
   // Providers from context are already available/configured, no need to filter
   const availableProviders = useMemo(() => providers || [], [providers]);
 
-  // Initialize with smart model from user settings
+  // Initialize with smart model from user settings (or fast as fallback)
   useEffect(() => {
     if (availableProviders.length > 0 && !createConfig.providerInstanceId) {
       // eslint-disable-next-line no-console
       console.log('Initializing project model, settings.defaultModels:', settings.defaultModels);
 
-      const smartModel = settings.defaultModels?.smart;
-      if (smartModel) {
+      // Try smart model first, fallback to fast if not set
+      const modelString = settings.defaultModels?.smart || settings.defaultModels?.fast;
+      if (modelString) {
         // eslint-disable-next-line no-console
-        console.log('Using smart model:', smartModel);
+        console.log('Using default model:', modelString);
 
         // Parse "instanceId:modelId" format
-        const [instanceId, modelId] = smartModel.split(':');
+        const [instanceId, modelId] = modelString.split(':');
         if (instanceId && modelId) {
           setCreateConfig((prev) => ({
             ...prev,
