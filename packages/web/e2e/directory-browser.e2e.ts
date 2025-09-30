@@ -403,4 +403,44 @@ test.describe('Directory Browser E2E Tests', () => {
     const dirButton = page.locator('button:has-text("subdirectory")');
     await expect(dirButton).toBeEnabled();
   });
+
+  test('should show all entries when input ends with slash', async ({ page }) => {
+    // Create test directory with multiple entries
+    const testDir = path.join(testEnv.tempDir, 'filter-test');
+    fs.mkdirSync(testDir, { recursive: true });
+    fs.mkdirSync(path.join(testDir, 'alpha-dir'));
+    fs.mkdirSync(path.join(testDir, 'beta-dir'));
+    fs.mkdirSync(path.join(testDir, 'gamma-dir'));
+    fs.writeFileSync(path.join(testDir, 'file-one.txt'), 'content');
+    fs.writeFileSync(path.join(testDir, 'file-two.txt'), 'content');
+
+    // Navigate to project creation
+    const newProjectButton = page
+      .locator('button:has-text("New Project")')
+      .or(page.locator('[data-testid="create-first-project-button"]'))
+      .first();
+
+    await newProjectButton.waitFor({ timeout: TIMEOUTS.STANDARD });
+    await newProjectButton.click();
+
+    // Wait for modal
+    await expect(page.getByRole('heading', { name: 'Create New Project' }).first()).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    });
+
+    // Set path with trailing slash (should show all entries)
+    const directoryInput = page.locator('input[placeholder="/path/to/your/project"]');
+    await directoryInput.waitFor({ timeout: TIMEOUTS.QUICK });
+    await directoryInput.fill(testDir + '/');
+
+    // Wait for browser to load
+    await page.waitForTimeout(1000);
+
+    // All directories and files should be visible (not filtered)
+    await expect(page.locator('button:has-text("alpha-dir")')).toBeVisible();
+    await expect(page.locator('button:has-text("beta-dir")')).toBeVisible();
+    await expect(page.locator('button:has-text("gamma-dir")')).toBeVisible();
+    await expect(page.locator('text=file-one.txt')).toBeVisible();
+    await expect(page.locator('text=file-two.txt')).toBeVisible();
+  });
 });
