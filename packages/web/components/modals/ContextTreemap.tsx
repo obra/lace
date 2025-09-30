@@ -223,7 +223,13 @@ export function ContextTreemap({ breakdown }: ContextTreemapProps) {
   }
 
   const handleTreemapClick = (item: TreemapData) => {
-    if (item.category) {
+    // Only allow drilling into categories that have sub-items
+    if (
+      item.category &&
+      (item.category === 'coreTools' ||
+        item.category === 'mcpTools' ||
+        item.category === 'messages')
+    ) {
       setSelectedCategory(item.category);
     }
   };
