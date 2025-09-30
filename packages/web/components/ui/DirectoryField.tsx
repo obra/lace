@@ -66,8 +66,11 @@ export function DirectoryField({
   const [isNewFolderDialogOpen, setIsNewFolderDialogOpen] = useState(false);
   const [newFolderError, setNewFolderError] = useState<string | null>(null);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [isEditingPath, setIsEditingPath] = useState(false);
+  const [editPathValue, setEditPathValue] = useState('');
   const hasInitializedRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pathInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const requestAbortRef = useRef<AbortController | null>(null);
 
@@ -232,32 +235,12 @@ export function DirectoryField({
     [onChange, fetchDirectories]
   );
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    onChange(newValue);
-
-    // If user has typed a complete directory path ending with '/', load that directory
-    if (newValue.endsWith('/') && newValue !== currentPath) {
-      void fetchDirectories(newValue);
+  // Update editPathValue when currentPath changes
+  useEffect(() => {
+    if (!isEditingPath) {
+      setEditPathValue(currentPath);
     }
-  };
-
-  const handleFocus = () => {
-    setIsFocused(true);
-    // Always show dropdown when focused (even in inline mode)
-    setIsDropdownOpen(true);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Escape') {
-      // Close dropdown on Escape key
-      setIsDropdownOpen(false);
-    }
-  };
-
-  const handleBlur = () => {
-    setIsFocused(false);
-  };
+  }, [currentPath, isEditingPath]);
 
   const handleOpenNewFolderDialog = useCallback(() => {
     setNewFolderError(null);
@@ -295,9 +278,69 @@ export function DirectoryField({
     [currentPath, fetchDirectories, onChange]
   );
 
-  const inputClasses = ['input', 'input-bordered', 'w-full', error ? 'input-error' : '', className]
-    .filter(Boolean)
-    .join(' ');
+  // Handle keyboard input on browser to enter edit mode (Finder-style)
+  const handleBrowserKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      // Don't interfere with New Folder dialog or if already editing
+      if (isNewFolderDialogOpen || isEditingPath) return;
+
+      // Check for printable characters (letters, numbers, /, etc.)
+      if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        const pathWithSlash = currentPath.endsWith('/') ? currentPath : currentPath + '/';
+        setEditPathValue(pathWithSlash + e.key);
+        setIsEditingPath(true);
+        // Focus will happen in useEffect
+      }
+    },
+    [isNewFolderDialogOpen, isEditingPath, currentPath]
+  );
+
+  // Focus path input when entering edit mode
+  useEffect(() => {
+    if (isEditingPath && pathInputRef.current) {
+      pathInputRef.current.focus();
+      pathInputRef.current.setSelectionRange(
+        pathInputRef.current.value.length,
+        pathInputRef.current.value.length
+      );
+    }
+  }, [isEditingPath]);
+
+  // Handle path input changes
+  const handlePathInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditPathValue(e.target.value);
+  }, []);
+
+  // Handle path input submit
+  const handlePathInputSubmit = useCallback(() => {
+    if (editPathValue.trim()) {
+      const pathWithSlash = editPathValue.endsWith('/') ? editPathValue : editPathValue + '/';
+      onChange(pathWithSlash);
+      void fetchDirectories(pathWithSlash);
+    }
+    setIsEditingPath(false);
+  }, [editPathValue, onChange, fetchDirectories]);
+
+  // Handle path input blur
+  const handlePathInputBlur = useCallback(() => {
+    setIsEditingPath(false);
+  }, []);
+
+  // Handle path input key down
+  const handlePathInputKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handlePathInputSubmit();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setIsEditingPath(false);
+        setEditPathValue(currentPath);
+      }
+    },
+    [handlePathInputSubmit, currentPath]
+  );
 
   return (
     <div className="form-control w-full">
@@ -314,31 +357,17 @@ export function DirectoryField({
       )}
 
       <div className="relative">
-        <input
-          ref={inputRef}
-          type="text"
-          value={value}
-          onChange={handleInputChange}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          required={required}
-          disabled={disabled}
-          className={inputClasses}
-          aria-label={label}
-          data-testid="project-path-input"
-        />
-
-        {/* Directory Browser */}
+        {/* Directory Browser - always visible in inline mode */}
         {(isDropdownOpen || inline) && (
           <div
             ref={dropdownRef}
             className={
               inline
-                ? 'mt-3 bg-base-200 border border-base-300 rounded-lg overflow-hidden'
-                : 'absolute z-50 left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg max-h-64 overflow-hidden'
+                ? 'mt-3 bg-base-200 border border-base-300 rounded-lg overflow-hidden max-w-3xl w-full'
+                : 'absolute z-50 left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg max-h-64 overflow-hidden max-w-3xl'
             }
+            onKeyDown={handleBrowserKeyDown}
+            tabIndex={-1}
           >
             {isLoading ? (
               <div className="flex flex-col items-center justify-center p-8">
@@ -357,53 +386,56 @@ export function DirectoryField({
               </div>
             ) : (
               <>
-                {/* Navigation header with breadcrumbs and New Folder button */}
+                {/* Navigation header with breadcrumbs/path input and New Folder button */}
                 {!isLoading && !apiError && (
-                  <div className="sticky top-0 bg-base-300 border-b border-base-content/20">
-                    {/* Breadcrumbs row */}
-                    <div className="px-3 py-2 flex items-center gap-1 text-sm overflow-x-auto">
-                      <button
-                        type="button"
-                        onClick={handleNavigateToHome}
-                        className="btn btn-ghost btn-xs normal-case"
-                        title="Go to home directory"
-                      >
-                        <FontAwesomeIcon icon={faHome} className="w-3 h-3" />
-                      </button>
-                      {breadcrumbs.length > 1 &&
-                        breadcrumbs.slice(1).map((crumb, index) => (
-                          <React.Fragment key={breadcrumbPaths[index + 1]}>
-                            <span className="text-base-content/40">/</span>
-                            <button
-                              type="button"
-                              onClick={() => handleBreadcrumbClick(index + 1)}
-                              className="btn btn-ghost btn-xs normal-case hover:text-primary truncate max-w-[150px]"
-                              title={crumb}
-                            >
-                              {crumb}
-                            </button>
-                          </React.Fragment>
-                        ))}
-                    </div>
-
-                    {/* Action buttons row */}
-                    <div className="px-2 pb-2 flex items-center gap-2">
-                      {parentPath && (
-                        <button
-                          type="button"
-                          onClick={handleNavigateToParent}
-                          className="btn btn-ghost btn-xs"
-                          title="Go up one level"
-                        >
-                          <FontAwesomeIcon icon={faChevronLeft} className="w-3 h-3" />
-                          Up
-                        </button>
+                  <div className="sticky top-0 bg-base-300 border-b border-base-content/20 px-3 py-2">
+                    <div className="flex items-center gap-1 text-sm">
+                      {isEditingPath ? (
+                        <>
+                          {/* Editable path input (Finder-style) */}
+                          <input
+                            ref={pathInputRef}
+                            type="text"
+                            value={editPathValue}
+                            onChange={handlePathInputChange}
+                            onBlur={handlePathInputBlur}
+                            onKeyDown={handlePathInputKeyDown}
+                            className="input input-bordered input-xs flex-1 font-mono text-xs"
+                            data-testid="project-path-input"
+                          />
+                        </>
+                      ) : (
+                        <>
+                          {/* Breadcrumb navigation */}
+                          <button
+                            type="button"
+                            onClick={handleNavigateToHome}
+                            className="btn btn-ghost btn-xs normal-case"
+                            title="Go to home directory"
+                          >
+                            <FontAwesomeIcon icon={faHome} className="w-3 h-3" />
+                          </button>
+                          {breadcrumbs.length > 1 &&
+                            breadcrumbs.slice(1).map((crumb, index) => (
+                              <React.Fragment key={breadcrumbPaths[index + 1]}>
+                                <span className="text-base-content/40">/</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleBreadcrumbClick(index + 1)}
+                                  className="btn btn-ghost btn-xs normal-case hover:text-primary truncate max-w-[150px]"
+                                  title={crumb}
+                                >
+                                  {crumb}
+                                </button>
+                              </React.Fragment>
+                            ))}
+                        </>
                       )}
                       <div className="flex-1" />
                       <button
                         type="button"
                         onClick={handleOpenNewFolderDialog}
-                        className="btn btn-primary btn-xs"
+                        className="btn btn-ghost btn-xs"
                         title="Create new folder"
                         disabled={!currentPath || isLoading}
                         data-testid="new-folder-button"
@@ -470,23 +502,9 @@ export function DirectoryField({
                           >
                             {entry.name}
                           </span>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span
-                              className={`
-                                text-xs px-1.5 py-0.5 rounded
-                                ${
-                                  entry.permissions.canWrite
-                                    ? 'bg-success/10 text-success'
-                                    : 'bg-base-content/10 text-base-content/50'
-                                }
-                              `}
-                            >
-                              {entry.permissions.canWrite ? 'R/W' : 'R/O'}
-                            </span>
-                            {entry.type === 'directory' && (
-                              <span className="text-xs text-base-content/40">→</span>
-                            )}
-                          </div>
+                          {entry.type === 'directory' && (
+                            <span className="text-xs text-base-content/40 flex-shrink-0">→</span>
+                          )}
                         </button>
                       ))}
                       {getFilteredEntries().length > 100 && !showMore && (

@@ -59,8 +59,6 @@ export function ProjectCreateModal({
   const [createDescription, setCreateDescription] = useState('');
   const [createWorkingDirectory, setCreateWorkingDirectory] = useState('');
   const [createConfig, setCreateConfig] = useState<ProjectConfiguration>(DEFAULT_PROJECT_CONFIG);
-  const [userEditedName, setUserEditedName] = useState(false);
-  const [showDirHelp, setShowDirHelp] = useState(false);
   const [showProviderHelp, setShowProviderHelp] = useState(false);
 
   // Providers from context are already available/configured, no need to filter
@@ -98,19 +96,18 @@ export function ProjectCreateModal({
     onClose();
   };
 
-  // Auto-populate name from directory in simplified mode
+  // Auto-populate name from directory
   const handleCreateDirectoryChange = (directory: string) => {
     setCreateWorkingDirectory(directory);
 
-    if (!userEditedName) {
-      const baseName =
-        directory
-          .replace(/[/\\]+$/, '')
-          .split(/[/\\]/)
-          .pop() || '';
-      if (baseName) {
-        setCreateName(baseName);
-      }
+    // Always auto-generate name from directory basename
+    const baseName =
+      directory
+        .replace(/[/\\]+$/, '')
+        .split(/[/\\]/)
+        .pop() || '';
+    if (baseName) {
+      setCreateName(baseName);
     }
   };
 
@@ -152,18 +149,8 @@ export function ProjectCreateModal({
           <>
             {createStep === 2 && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between mb-3">
+                <div className="mb-3">
                   <h4 className="text-lg font-semibold">Set project directory</h4>
-                  <button
-                    type="button"
-                    className="btn btn-accent btn-xs btn-circle text-base-100 focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
-                    aria-label="Show directory tips"
-                    onClick={() => setShowDirHelp((v) => !v)}
-                    title={showDirHelp ? 'Hide tips' : 'Show tips'}
-                    aria-expanded={showDirHelp}
-                  >
-                    i
-                  </button>
                 </div>
                 <DirectoryField
                   label="Directory path"
@@ -181,51 +168,6 @@ export function ProjectCreateModal({
                       Please paste an absolute path starting with &quot;/&quot;.
                     </p>
                   )}
-                {showDirHelp && (
-                  <div className="collapse mt-3 text-sm text-base-content/60 space-y-2">
-                    <input type="checkbox" checked readOnly />
-                    <div className="collapse-title font-medium">How to copy the full path</div>
-                    <div className="collapse-content">
-                      <ul className="list-disc pl-5 space-y-1">
-                        <li>
-                          macOS Finder: hold <kbd>Option</kbd>, right‑click the folder → Copy &quot;
-                          <i>name</i>&quot; as Pathname
-                        </li>
-                        <li>
-                          Terminal: drag the folder into the Terminal window to paste its absolute
-                          path
-                        </li>
-                      </ul>
-                      <p className="font-medium">Tips</p>
-                      <ul className="list-disc pl-5 space-y-1">
-                        <li>
-                          Pick the repository root (where your package.json, pyproject.toml, or .git
-                          lives)
-                        </li>
-                        <li>You can change this later in Project Settings</li>
-                      </ul>
-                    </div>
-                  </div>
-                )}
-                <div className="mt-4 grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Project Name</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={createName}
-                      onChange={(e) => {
-                        setCreateName(e.target.value);
-                        setUserEditedName(true);
-                      }}
-                      data-testid="create-project-wizard-project-name"
-                      className="input input-bordered w-full focus:outline-none focus:ring-2 focus:ring-accent/60"
-                      placeholder="Enter project name"
-                      required
-                    />
-                  </div>
-                </div>
               </div>
             )}
 
