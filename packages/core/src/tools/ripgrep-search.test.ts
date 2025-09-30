@@ -47,7 +47,7 @@ describe('RipgrepSearchTool with schema validation', () => {
       expect(tool.name).toBe('ripgrep_search');
       expect(tool.description)
         .toBe(`Search file contents using regex patterns. Use for text search, file_find for name patterns.
-Supports glob filters (includePattern/excludePattern). Returns results using cat -n format with line numbers (e.g., 42→matching line).`);
+Supports glob filters (includePattern/excludePattern). Returns results using cat -n format, with line numbers starting at 1.`);
     });
 
     it('should have proper input schema', () => {
@@ -197,7 +197,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
 
       expect(result.status).toBe('completed');
       const output = result.content[0].text;
-      expect(output).toMatch(/\d+→function hello/);
+      expect(output).toMatch(/\d+\tfunction hello/);
     });
 
     it('should use current directory as default path', async () => {
@@ -350,7 +350,9 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
       const output = result.content[0].text!;
 
       // Count actual matches in output
-      const matchLines = output.split('\n').filter((line) => line.match(/^\s*\d+→.*uniquepattern/));
+      const matchLines = output
+        .split('\n')
+        .filter((line) => line.match(/^\s*\d+\t.*uniquepattern/));
 
       expect(matchLines.length).toBe(10);
       expect(output).toContain('Results limited to 10');
@@ -400,7 +402,7 @@ Supports glob filters (includePattern/excludePattern). Returns results using cat
 
       expect(output).toContain('file1.ts:');
       expect(output).toContain('file2.js:');
-      expect(output).toMatch(/\d+→.*hello/);
+      expect(output).toMatch(/\d+\t.*hello/);
     });
 
     it('should show match count in header', async () => {

@@ -51,7 +51,7 @@ describe('FileReadTool', () => {
       expect(result.status).toBe('completed');
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      expect(result.content[0].text).toBe('1→Line 1\n2→Line 2\n3→Line 3\n4→Line 4\n5→Line 5');
+      expect(result.content[0].text).toBe('1\tLine 1\n2\tLine 2\n3\tLine 3\n4\tLine 4\n5\tLine 5');
     });
 
     it('should read specific line range with line numbers', async () => {
@@ -65,7 +65,7 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe('2→Line 2\n3→Line 3\n4→Line 4');
+      expect(result.content[0].text).toBe('2\tLine 2\n3\tLine 3\n4\tLine 4');
     });
 
     it('should read from start line to end of file with line numbers', async () => {
@@ -78,7 +78,7 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe('3→Line 3\n4→Line 4\n5→Line 5');
+      expect(result.content[0].text).toBe('3\tLine 3\n4\tLine 4\n5\tLine 5');
     });
 
     it('should read from beginning to end line with line numbers', async () => {
@@ -91,7 +91,7 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe('1→Line 1\n2→Line 2');
+      expect(result.content[0].text).toBe('1\tLine 1\n2\tLine 2');
     });
   });
 
@@ -147,7 +147,7 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe('3→Line 3\n4→Line 4\n5→Line 5');
+      expect(result.content[0].text).toBe('3\tLine 3\n4\tLine 4\n5\tLine 5');
     });
 
     it('should reject whole-file read for files larger than 64KB', async () => {
@@ -214,9 +214,9 @@ describe('FileReadTool', () => {
       expect(result.metadata?.warning).toContain('Returned first 2000 lines');
       expect(result.metadata?.linesReturned).toBe(2000);
       expect(result.metadata?.requestedRange).toEqual({ start: 1, end: 2500 });
-      expect(result.content[0].text).toContain('1→Line 1');
-      expect(result.content[0].text).toContain('2000→Line 2000');
-      expect(result.content[0].text).not.toContain('2001→Line 2001');
+      expect(result.content[0].text).toContain('1\tLine 1');
+      expect(result.content[0].text).toContain('2000\tLine 2000');
+      expect(result.content[0].text).not.toContain('2001\tLine 2001');
     });
   });
 
@@ -231,7 +231,7 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe('1→');
+      expect(result.content[0].text).toBe('1\t');
     });
 
     it('should handle single line file', async () => {
@@ -244,7 +244,7 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe('1→Only line');
+      expect(result.content[0].text).toBe('1\tOnly line');
     });
   });
 
@@ -261,7 +261,7 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe('1→Content from relative path');
+      expect(result.content[0].text).toBe('1\tContent from relative path');
     });
 
     it('should use absolute paths directly even when working directory is provided', async () => {
@@ -271,7 +271,7 @@ describe('FileReadTool', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.content[0].text).toBe('1→Line 1\n2→Line 2\n3→Line 3\n4→Line 4\n5→Line 5');
+      expect(result.content[0].text).toBe('1\tLine 1\n2\tLine 2\n3\tLine 3\n4\tLine 4\n5\tLine 5');
     });
 
     it('should fall back to process.cwd() when no working directory in context', async () => {
@@ -287,7 +287,7 @@ describe('FileReadTool', () => {
         );
 
         expect(result.status).toBe('completed');
-        expect(result.content[0].text).toBe('1→CWD test content');
+        expect(result.content[0].text).toBe('1\tCWD test content');
       } finally {
         await rm(absoluteFile, { force: true });
       }
