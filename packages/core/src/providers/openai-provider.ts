@@ -93,7 +93,7 @@ export class OpenAIProvider extends AIProvider {
    * Loads tiktoken with embedded WASM support for bun compile
    * Uses scoped fs patching - only active during import, then fully restored
    */
-  private _loadTiktokenWithEmbeddedWasm(): typeof import('tiktoken') {
+  private async _loadTiktokenWithEmbeddedWasm(): Promise<typeof import('tiktoken')> {
     // Return cached module if already loaded
     if (this._tiktokenModule) {
       return this._tiktokenModule;
@@ -124,17 +124,17 @@ export class OpenAIProvider extends AIProvider {
     if (!wasmBuffer) {
       logger.debug('[OpenAIProvider] No embedded WASM, attempting regular tiktoken import');
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports -- Fallback for non-embedded environments
-        this._tiktokenModule = require('tiktoken') as typeof import('tiktoken');
-        logger.debug('[OpenAIProvider] Tiktoken loaded successfully via require()');
+        // Use dynamic import for ESM compatibility (web server)
+        this._tiktokenModule = await import('tiktoken');
+        logger.debug('[OpenAIProvider] Tiktoken loaded successfully via import()');
         return this._tiktokenModule;
-      } catch (requireError) {
-        logger.error('[OpenAIProvider] Failed to require(tiktoken)', {
-          error: requireError,
-          errorMessage: requireError instanceof Error ? requireError.message : String(requireError),
-          errorStack: requireError instanceof Error ? requireError.stack : undefined,
+      } catch (importError) {
+        logger.error('[OpenAIProvider] Failed to import tiktoken', {
+          error: importError,
+          errorMessage: importError instanceof Error ? importError.message : String(importError),
+          errorStack: importError instanceof Error ? importError.stack : undefined,
         });
-        throw requireError; // Re-throw to be caught by outer try-catch
+        throw importError; // Re-throw to be caught by outer try-catch
       }
     }
 
@@ -168,12 +168,12 @@ export class OpenAIProvider extends AIProvider {
    * Helper method for token counting with explicit control over system prompt and tools
    * Allows precise counting of individual components
    */
-  private countTokensExplicit(
+  private async countTokensExplicit(
     messages: ProviderMessage[],
     systemPrompt: string,
     tools: Tool[],
     model: string
-  ): number | null {
+  ): Promise<number | null> {
     try {
       // Get or create cached encoder for this model
       let encoding: Tiktoken;
@@ -189,7 +189,7 @@ export class OpenAIProvider extends AIProvider {
         // Load tiktoken with embedded WASM support for bun compile
         let tiktoken: typeof import('tiktoken');
         try {
-          tiktoken = this._loadTiktokenWithEmbeddedWasm();
+          tiktoken = await this._loadTiktokenWithEmbeddedWasm();
           // Mark as available on successful load
           this._tiktokenAvailable = true;
         } catch (importError) {
@@ -252,8 +252,12 @@ export class OpenAIProvider extends AIProvider {
   }
 
   // Provider-specific token counting using tiktoken for OpenAI-compatible models
-  // Returns 0 when tiktoken WASM fails to load, allowing graceful degradation
-  countTokens(messages: ProviderMessage[], tools: Tool[] = [], model?: string): number | null {
+  // Returns null when tiktoken WASM fails to load
+  async countTokens(
+    messages: ProviderMessage[],
+    tools: Tool[] = [],
+    model?: string
+  ): Promise<number | null> {
     if (!model) {
       return null; // Can't count without model
     }
@@ -264,9 +268,9 @@ export class OpenAIProvider extends AIProvider {
 
   /**
    * Calibrates token costs for system prompt and individual tools
-   * Uses tiktoken for precise local counting (synchronous)
+   * Uses tiktoken for precise local counting
    */
-  calibrateTokenCosts(
+  async calibrateTokenCosts(
     messages: ProviderMessage[],
     tools: Tool[],
     model: string
@@ -286,7 +290,7 @@ export class OpenAIProvider extends AIProvider {
       });
 
       // Count system prompt only (no messages, no tools)
-      const systemTokensResult = this.countTokensExplicit([], systemPrompt, [], model);
+      const systemTokensResult = await this.countTokensExplicit([], systemPrompt, [], model);
 
       logger.debug('[OpenAIProvider] System token count result', {
         systemTokensResult,
@@ -294,13 +298,13 @@ export class OpenAIProvider extends AIProvider {
         isZero: systemTokensResult === 0,
       });
 
-      // If countTokensExplicit returns null or 0, tiktoken failed - abort calibration
-      if (systemTokensResult === null || systemTokensResult === 0) {
+      // If countTokensExplicit returns null, tiktoken failed - abort calibration
+      if (systemTokensResult === null) {
         logger.warn('[OpenAIProvider] Tiktoken unavailable or failed, cannot calibrate', {
           model,
           tiktokenAvailable: this._tiktokenAvailable,
         });
-        return Promise.resolve(null);
+        return null;
       }
 
       const systemTokens = systemTokensResult;
@@ -308,10 +312,12 @@ export class OpenAIProvider extends AIProvider {
       logger.debug('[OpenAIProvider] System prompt counted', { systemTokens });
 
       // Count each tool individually (no system, no messages)
-      const toolDetails = tools.map((tool) => ({
-        name: tool.name,
-        tokens: this.countTokensExplicit([], '', [tool], model) || 0,
-      }));
+      const toolDetails = await Promise.all(
+        tools.map(async (tool) => ({
+          name: tool.name,
+          tokens: (await this.countTokensExplicit([], '', [tool], model)) || 0,
+        }))
+      );
 
       const toolTokens = toolDetails.reduce((sum, t) => sum + t.tokens, 0);
 
@@ -321,14 +327,14 @@ export class OpenAIProvider extends AIProvider {
         sampleTools: toolDetails.slice(0, 3),
       });
 
-      return Promise.resolve({
+      return {
         systemTokens,
         toolTokens,
         toolDetails,
-      });
+      };
     } catch (error) {
       logger.error('[OpenAIProvider] Calibration failed with exception', { error });
-      return Promise.resolve(null);
+      return null;
     }
   }
 
@@ -449,8 +455,9 @@ export class OpenAIProvider extends AIProvider {
           const promptText = systemPrompt + '\n' + messages.map((m) => m.content).join(' ');
           const toolsText = tools.length > 0 ? JSON.stringify(tools) : '';
 
+          const countedTokens = await this.countTokens(messages, tools, model);
           const estimatedPromptTokens =
-            this.countTokens(messages, tools, model) ?? this.estimateTokens(promptText + toolsText);
+            countedTokens ?? this.estimateTokens(promptText + toolsText);
           const estimatedCompletionTokens = this.estimateTokens(textContent);
 
           usage = {
@@ -642,9 +649,9 @@ export class OpenAIProvider extends AIProvider {
               completionText += partial.arguments;
             }
 
+            const countedTokens = await this.countTokens(messages, tools, model);
             const estimatedPromptTokens =
-              this.countTokens(messages, tools, model) ??
-              this.estimateTokens(promptText + toolsText);
+              countedTokens ?? this.estimateTokens(promptText + toolsText);
             const estimatedCompletionTokens = this.estimateTokens(completionText);
 
             finalUsage = {
