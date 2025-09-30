@@ -78,7 +78,7 @@ export function NewFolderDialog({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Stop ESC from bubbling up to parent dialog/form
+    // Stop ESC from closing parent wizard when this dialog is open
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();

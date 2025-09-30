@@ -69,8 +69,14 @@ export function ProjectCreateModal({
   // Initialize with smart model from user settings
   useEffect(() => {
     if (availableProviders.length > 0 && !createConfig.providerInstanceId) {
+      // eslint-disable-next-line no-console
+      console.log('Initializing project model, settings.defaultModels:', settings.defaultModels);
+
       const smartModel = settings.defaultModels?.smart;
       if (smartModel) {
+        // eslint-disable-next-line no-console
+        console.log('Using smart model:', smartModel);
+
         // Parse "instanceId:modelId" format
         const [instanceId, modelId] = smartModel.split(':');
         if (instanceId && modelId) {
@@ -84,6 +90,8 @@ export function ProjectCreateModal({
       }
 
       // Fallback to first available provider
+      // eslint-disable-next-line no-console
+      console.log('Falling back to first provider:', availableProviders[0]);
       const firstProvider = availableProviders[0];
       setCreateConfig((prev) => ({
         ...prev,

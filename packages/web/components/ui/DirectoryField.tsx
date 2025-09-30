@@ -315,6 +315,9 @@ export function DirectoryField({
       // Don't interfere with New Folder dialog or if already editing
       if (isNewFolderDialogOpen || isEditingPath) return;
 
+      // Let ESC bubble to parent modal for closing wizard
+      if (e.key === 'Escape') return;
+
       // Check for printable characters (letters, numbers, /, etc.)
       if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
