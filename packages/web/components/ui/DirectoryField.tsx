@@ -357,10 +357,37 @@ export function DirectoryField({
               </div>
             ) : (
               <>
-                {/* Navigation header with New Folder button */}
+                {/* Navigation header with breadcrumbs and New Folder button */}
                 {!isLoading && !apiError && (
-                  <div className="sticky top-0 bg-base-300 border-b border-base-content/20 p-2">
-                    <div className="flex items-center gap-2">
+                  <div className="sticky top-0 bg-base-300 border-b border-base-content/20">
+                    {/* Breadcrumbs row */}
+                    <div className="px-3 py-2 flex items-center gap-1 text-sm overflow-x-auto">
+                      <button
+                        type="button"
+                        onClick={handleNavigateToHome}
+                        className="btn btn-ghost btn-xs normal-case"
+                        title="Go to home directory"
+                      >
+                        <FontAwesomeIcon icon={faHome} className="w-3 h-3" />
+                      </button>
+                      {breadcrumbs.length > 1 &&
+                        breadcrumbs.slice(1).map((crumb, index) => (
+                          <React.Fragment key={breadcrumbPaths[index + 1]}>
+                            <span className="text-base-content/40">/</span>
+                            <button
+                              type="button"
+                              onClick={() => handleBreadcrumbClick(index + 1)}
+                              className="btn btn-ghost btn-xs normal-case hover:text-primary truncate max-w-[150px]"
+                              title={crumb}
+                            >
+                              {crumb}
+                            </button>
+                          </React.Fragment>
+                        ))}
+                    </div>
+
+                    {/* Action buttons row */}
+                    <div className="px-2 pb-2 flex items-center gap-2">
                       {parentPath && (
                         <button
                           type="button"
@@ -369,16 +396,9 @@ export function DirectoryField({
                           title="Go up one level"
                         >
                           <FontAwesomeIcon icon={faChevronLeft} className="w-3 h-3" />
+                          Up
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={handleNavigateToHome}
-                        className="btn btn-ghost btn-xs"
-                        title="Go to home directory"
-                      >
-                        <FontAwesomeIcon icon={faHome} className="w-3 h-3" />
-                      </button>
                       <div className="flex-1" />
                       <button
                         type="button"
