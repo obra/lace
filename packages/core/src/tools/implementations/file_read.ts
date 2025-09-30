@@ -104,7 +104,7 @@ export class FileReadTool extends Tool {
         resultContent = resultLines
           .map((line, idx) => {
             const lineNum = startLineNum + idx;
-            return `${String(lineNum).padStart(width, ' ')}→${line}`;
+            return `${String(lineNum).padStart(width, ' ')}\t${line}`;
           })
           .join('\n');
       } else {
@@ -114,7 +114,7 @@ export class FileReadTool extends Tool {
         linesReturned = lines.length;
         const width = String(lines.length).length;
         resultContent = lines
-          .map((line, idx) => `${String(idx + 1).padStart(width, ' ')}→${line}`)
+          .map((line, idx) => `${String(idx + 1).padStart(width, ' ')}\t${line}`)
           .join('\n');
       }
 

@@ -19,8 +19,6 @@ const DEFAULT_RESULTS = 50;
 const fileFindSchema = z.object({
   pattern: NonEmptyString,
   path: FilePath.default('.'),
-  type: z.enum(['file', 'directory', 'both']).default('both'),
-  caseSensitive: z.boolean().default(false),
   maxDepth: z
     .number()
     .int('Must be an integer')
@@ -38,8 +36,7 @@ const fileFindSchema = z.object({
 
 export class FileFindTool extends Tool {
   name = 'file_find';
-  description = `Find files by name pattern using glob syntax (* and ?). Use ripgrep-search for content search.
-Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
+  description = `Find files and directories by name pattern using glob syntax (* and ?). Case-insensitive. Results sorted by modification time (newest first) with sizes and timestamps.`;
   schema = fileFindSchema;
   annotations: ToolAnnotations = {
     readOnlyHint: true,
@@ -55,7 +52,7 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
       return this.createCancellationResult();
     }
     try {
-      const { pattern, type, caseSensitive, maxDepth, includeHidden, maxResults } = args;
+      const { pattern, maxDepth, includeHidden, maxResults } = args;
 
       // Resolve path using working directory from context
       const resolvedPath = this.resolveWorkspacePath(args.path, context);
@@ -81,8 +78,6 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
         resolvedPath,
         {
           pattern,
-          type,
-          caseSensitive,
           maxDepth,
           includeHidden,
           maxResults,
@@ -90,6 +85,9 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
         },
         context.signal
       );
+
+      // Sort by modification time (newest first)
+      matches.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
 
       const limitedMatches = matches.slice(0, maxResults);
       const resultLines: string[] = [];
@@ -100,7 +98,7 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
         // Add truncation message if we hit the limit
         if (matches.length > maxResults) {
           resultLines.push(
-            `Results limited to ${maxResults}. Use maxResults parameter to see more.`
+            `\nResults limited to ${maxResults}. Use maxResults parameter to see more.`
           );
         }
       } else {
@@ -121,21 +119,19 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
     dirPath: string,
     options: {
       pattern: string;
-      type: 'file' | 'directory' | 'both';
-      caseSensitive: boolean;
       maxDepth: number;
       includeHidden: boolean;
       maxResults: number;
       currentDepth: number;
     },
     signal?: AbortSignal
-  ): Promise<Array<{ path: string; size?: number; isDirectory: boolean }>> {
+  ): Promise<Array<{ path: string; size: number; mtime: Date; isDirectory: boolean }>> {
     // Check for abort signal
     if (signal?.aborted) {
       throw new Error('Aborted');
     }
 
-    const matches: Array<{ path: string; size?: number; isDirectory: boolean }> = [];
+    const matches: Array<{ path: string; size: number; mtime: Date; isDirectory: boolean }> = [];
 
     if (options.currentDepth > options.maxDepth) {
       return matches;
@@ -158,18 +154,13 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
         try {
           const stats = await stat(fullPath);
           const isDirectory = stats.isDirectory();
-          const isFile = stats.isFile();
 
-          // Check if this item matches our criteria
-          const shouldInclude =
-            options.type === 'both' ||
-            (options.type === 'file' && isFile) ||
-            (options.type === 'directory' && isDirectory);
-
-          if (shouldInclude && this.matchesPattern(item, options.pattern, options.caseSensitive)) {
+          // Case-insensitive pattern matching
+          if (this.matchesPattern(item, options.pattern)) {
             matches.push({
               path: fullPath,
-              size: isFile ? stats.size : undefined,
+              size: stats.size,
+              mtime: stats.mtime,
               isDirectory,
             });
 
@@ -205,16 +196,19 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
       // Skip directories we can't read
     }
 
-    return matches.sort((a, b) => a.path.localeCompare(b.path));
+    return matches;
   }
 
-  private formatFileEntry(entry: { path: string; size?: number; isDirectory: boolean }): string {
-    if (entry.isDirectory) {
-      return entry.path;
-    } else {
-      const sizeStr = entry.size !== undefined ? ` (${this.formatFileSize(entry.size)})` : '';
-      return `${entry.path}${sizeStr}`;
-    }
+  private formatFileEntry(entry: {
+    path: string;
+    size: number;
+    mtime: Date;
+    isDirectory: boolean;
+  }): string {
+    const sizeStr = this.formatFileSize(entry.size);
+    const timeStr = this.formatRelativeTime(entry.mtime);
+    const typeIndicator = entry.isDirectory ? '/' : '';
+    return `${entry.path}${typeIndicator} (${sizeStr}) - ${timeStr}`;
   }
 
   private formatFileSize(bytes: number): string {
@@ -230,9 +224,30 @@ Returns paths with file sizes. Set type to 'file', 'directory', or 'both'.`;
     return `${size} ${sizes[i]}`;
   }
 
-  private matchesPattern(filename: string, pattern: string, caseSensitive: boolean): boolean {
-    const targetName = caseSensitive ? filename : filename.toLowerCase();
-    const targetPattern = caseSensitive ? pattern : pattern.toLowerCase();
+  private formatRelativeTime(date: Date): string {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffSecs < 60) return 'just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+    if (diffDays < 30) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+    if (diffDays < 365) {
+      const months = Math.floor(diffDays / 30);
+      return `${months} month${months === 1 ? '' : 's'} ago`;
+    }
+    const years = Math.floor(diffDays / 365);
+    return `${years} year${years === 1 ? '' : 's'} ago`;
+  }
+
+  private matchesPattern(filename: string, pattern: string): boolean {
+    // Always case-insensitive
+    const targetName = filename.toLowerCase();
+    const targetPattern = pattern.toLowerCase();
 
     // Convert glob pattern to regex
     const regexPattern = targetPattern

@@ -53,7 +53,7 @@ const ripgrepSearchSchema = z.object({
 export class RipgrepSearchTool extends Tool {
   name = 'ripgrep_search';
   description = `Search file contents using regex patterns. Use for text search, file_find for name patterns.
-Supports glob filters (includePattern/excludePattern). Returns path:line:content format.`;
+Supports glob filters (includePattern/excludePattern). Returns results using cat -n format, with line numbers starting at 1.`;
   schema = ripgrepSearchSchema;
   annotations: ToolAnnotations = {
     readOnlyHint: true,
@@ -236,8 +236,14 @@ Supports glob filters (includePattern/excludePattern). Returns path:line:content
 
     for (const [filePath, fileMatches] of fileGroups) {
       resultLines.push(`${filePath}:`);
+
+      // Calculate max line number width for right-alignment
+      const maxLineNum = Math.max(...fileMatches.map((m) => m.lineNumber));
+      const width = String(maxLineNum).length;
+
       for (const match of fileMatches) {
-        resultLines.push(`  ${match.lineNumber}: ${match.content}`);
+        const lineNumStr = String(match.lineNumber).padStart(width, ' ');
+        resultLines.push(`${lineNumStr}\t${match.content}`);
       }
       resultLines.push('');
     }
