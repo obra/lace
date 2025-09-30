@@ -9,6 +9,14 @@ interface TokenSummary {
   totalTokens: number;
 }
 
+// Helper to validate and extract numeric token value
+const validateTokenValue = (value: unknown): number => {
+  if (typeof value !== 'number') return 0;
+  if (!Number.isFinite(value)) return 0;
+  if (value < 0) return 0;
+  return value;
+};
+
 // Helper function to extract current context tokens from TokenUsageMetrics
 const extractCurrentTokens = (tokenUsage: unknown): number => {
   if (!tokenUsage || typeof tokenUsage !== 'object') {
@@ -17,33 +25,38 @@ const extractCurrentTokens = (tokenUsage: unknown): number => {
 
   const usage = tokenUsage as Record<string, unknown>;
 
-  // New format: context.currentTokens
-  if (usage.context && typeof usage.context === 'object') {
+  // New format: context.currentTokens (or context.totalPromptTokens)
+  if (usage.context && typeof usage.context === 'object' && usage.context !== null) {
     const context = usage.context as Record<string, unknown>;
-    if (typeof context.currentTokens === 'number') {
-      return context.currentTokens;
-    }
+    const currentTokens = validateTokenValue(context.currentTokens);
+    if (currentTokens > 0) return currentTokens;
+
+    // Fallback: context.totalPromptTokens (new field name)
+    const totalPromptTokens = validateTokenValue(context.totalPromptTokens);
+    if (totalPromptTokens > 0) return totalPromptTokens;
   }
 
   // Fallback: turn.inputTokens + turn.outputTokens
-  if (usage.turn && typeof usage.turn === 'object') {
+  if (usage.turn && typeof usage.turn === 'object' && usage.turn !== null) {
     const turn = usage.turn as Record<string, unknown>;
-    const input = typeof turn.inputTokens === 'number' ? turn.inputTokens : 0;
-    const output = typeof turn.outputTokens === 'number' ? turn.outputTokens : 0;
+    const input = validateTokenValue(turn.inputTokens);
+    const output = validateTokenValue(turn.outputTokens);
     return input + output;
   }
 
   // Legacy fallback: message.promptTokens + message.completionTokens
-  if (usage.message && typeof usage.message === 'object') {
+  if (usage.message && typeof usage.message === 'object' && usage.message !== null) {
     const message = usage.message as Record<string, unknown>;
-    const prompt = typeof message.promptTokens === 'number' ? message.promptTokens : 0;
-    const completion = typeof message.completionTokens === 'number' ? message.completionTokens : 0;
+    const prompt = validateTokenValue(message.promptTokens);
+    const completion = validateTokenValue(message.completionTokens);
     return prompt + completion;
   }
 
   // Very old format: top-level promptTokens + completionTokens
-  if (typeof usage.promptTokens === 'number' && typeof usage.completionTokens === 'number') {
-    return usage.promptTokens + usage.completionTokens;
+  const prompt = validateTokenValue(usage.promptTokens);
+  const completion = validateTokenValue(usage.completionTokens);
+  if (prompt > 0 || completion > 0) {
+    return prompt + completion;
   }
 
   return 0;

@@ -3299,17 +3299,50 @@ export class Agent extends EventEmitter {
         'tokenUsage' in lastAgentMessage.data
       ) {
         const tokenUsage = lastAgentMessage.data.tokenUsage as {
-          message?: { promptTokens?: number; completionTokens?: number };
+          turn?: { inputTokens?: number; outputTokens?: number };
+          context?: {
+            totalPromptTokens?: number;
+            totalCompletionTokens?: number;
+            totalTokens?: number;
+          };
+          message?: { promptTokens?: number; completionTokens?: number }; // Legacy
         };
-        totalPromptTokens = tokenUsage.message?.promptTokens ?? 0;
-        totalCompletionTokens = tokenUsage.message?.completionTokens ?? 0;
 
-        logger.debug('[Agent.getTokenUsage] Using LAST AGENT_MESSAGE', {
-          promptTokens: totalPromptTokens,
-          completionTokens: totalCompletionTokens,
-          hasMessageField: !!tokenUsage.message,
-          rawTokenUsage: tokenUsage,
-        });
+        // Try new format first: context.totalPromptTokens
+        if (tokenUsage.context?.totalPromptTokens !== undefined) {
+          totalPromptTokens = tokenUsage.context.totalPromptTokens;
+          totalCompletionTokens = tokenUsage.context.totalCompletionTokens ?? 0;
+
+          logger.debug('[Agent.getTokenUsage] Using context field', {
+            totalPromptTokens,
+            totalCompletionTokens,
+            source: 'context',
+          });
+        } else if (
+          tokenUsage.turn?.inputTokens !== undefined &&
+          tokenUsage.turn?.outputTokens !== undefined
+        ) {
+          // Fallback: calculate from turn
+          totalPromptTokens = tokenUsage.turn.inputTokens + tokenUsage.turn.outputTokens;
+          totalCompletionTokens = 0; // Not separated
+
+          logger.debug('[Agent.getTokenUsage] Using turn fields', {
+            inputTokens: tokenUsage.turn.inputTokens,
+            outputTokens: tokenUsage.turn.outputTokens,
+            totalPromptTokens,
+            source: 'turn',
+          });
+        } else if (tokenUsage.message) {
+          // Legacy format
+          totalPromptTokens = tokenUsage.message.promptTokens ?? 0;
+          totalCompletionTokens = tokenUsage.message.completionTokens ?? 0;
+
+          logger.debug('[Agent.getTokenUsage] Using legacy message field', {
+            promptTokens: totalPromptTokens,
+            completionTokens: totalCompletionTokens,
+            source: 'message',
+          });
+        }
       }
     }
 
@@ -3337,8 +3370,8 @@ export class Agent extends EventEmitter {
     const nearLimit = percentUsed >= 0.8;
 
     return {
-      totalPromptTokens: totalTokens,
-      totalCompletionTokens: 0, // Not separated in current design
+      totalPromptTokens,
+      totalCompletionTokens,
       totalTokens,
       contextLimit,
       percentUsed,

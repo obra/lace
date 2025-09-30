@@ -24,11 +24,54 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
     // For coordinator agents, agentId = sessionId
     // For delegate agents, agentId = sessionId.number
-    let sessionId = agentId;
+    let sessionId: string;
+
     if (agentId.includes('.')) {
       // Extract session ID from delegate agent ID (e.g., "session.1" -> "session")
-      sessionId = asThreadId(agentId.split('.')[0]!);
+      const parts = agentId.split('.');
+
+      // Validate delegate format: exactly two parts
+      if (parts.length !== 2) {
+        return createErrorResponse(
+          'Invalid delegate agent ID format: expected sessionId.number',
+          400,
+          {
+            code: 'VALIDATION_FAILED',
+          }
+        );
+      }
+
+      const extractedSessionId = parts[0];
+      const delegateIndex = parts[1];
+
+      // Validate both parts are non-empty
+      if (!extractedSessionId || !delegateIndex) {
+        return createErrorResponse('Invalid delegate agent ID: empty session ID or index', 400, {
+          code: 'VALIDATION_FAILED',
+        });
+      }
+
+      // Validate delegate index is numeric
+      if (!/^\d+$/.test(delegateIndex)) {
+        return createErrorResponse('Invalid delegate agent ID: index must be numeric', 400, {
+          code: 'VALIDATION_FAILED',
+        });
+      }
+
+      // Validate extracted session ID format
+      if (!isValidThreadId(extractedSessionId)) {
+        return createErrorResponse('Invalid delegate agent ID: malformed session ID', 400, {
+          code: 'VALIDATION_FAILED',
+        });
+      }
+
+      sessionId = extractedSessionId;
+    } else {
+      // Coordinator agent: agentId is the session ID
+      sessionId = agentId;
     }
+
+    sessionId = asThreadId(sessionId);
 
     const session = await sessionService.getSession(sessionId);
     if (!session) {

@@ -188,10 +188,9 @@ export class ContextAnalyzer {
           contextLimit = modelInfo.contextWindow;
         }
       } catch (error) {
-        console.warn(
-          `Failed to retrieve context limit for model ${modelId}:`,
-          error instanceof Error ? error.message : 'Unknown error'
-        );
+        logger.warn(`Failed to retrieve context limit for model ${modelId}:`, {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
       }
     }
 
