@@ -29,6 +29,14 @@ const LaceSettingsSchema = z.object({
 
   // Debugging settings
   debugPanelEnabled: z.boolean(),
+
+  // Default model settings
+  defaultModels: z
+    .object({
+      fast: z.string().optional(),
+      smart: z.string().optional(),
+    })
+    .optional(),
 });
 
 type DaisyUITheme = z.infer<typeof DaisyUIThemeSchema>;
@@ -87,6 +95,15 @@ export function useDebuggingSettings() {
   };
 }
 
+// Settings hook for accessing all settings
+export function useSettings() {
+  const context = useContext(SettingsContext);
+  if (!context) {
+    throw new Error('useSettings must be used within SettingsProvider');
+  }
+  return context;
+}
+
 interface SettingsProviderProps {
   children: ReactNode;
 }
@@ -95,6 +112,7 @@ const defaultSettings: LaceSettings = {
   theme: 'dark',
   timelineWidth: 'medium',
   debugPanelEnabled: false,
+  defaultModels: undefined,
 };
 
 function getTimelineMaxWidthClass(width: TimelineWidth): string {
@@ -138,6 +156,10 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
             typeof apiSettings.debugPanelEnabled === 'boolean'
               ? apiSettings.debugPanelEnabled
               : defaultSettings.debugPanelEnabled,
+          defaultModels:
+            typeof apiSettings.defaultModels === 'object' && apiSettings.defaultModels !== null
+              ? (apiSettings.defaultModels as { fast?: string; smart?: string })
+              : undefined,
         };
 
         if (!cancelled) {

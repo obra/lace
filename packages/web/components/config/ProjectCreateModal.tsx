@@ -12,6 +12,7 @@ import { DirectoryField } from '@/components/ui';
 import { ModelSelector } from '@/components/ui/ModelSelector';
 import type { ToolPolicy } from '@/types/core';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
+import { useSettings } from '@/components/providers/SettingsProvider';
 import { DIRECTORY_BROWSER, WIZARD_PROGRESS } from '@/lib/constants/ui';
 
 interface ProjectConfiguration {
@@ -54,6 +55,7 @@ export function ProjectCreateModal({
 }: ProjectCreateModalProps) {
   // Get providers from ProviderInstanceProvider context
   const { availableProviders: providers } = useProviderInstances();
+  const { settings } = useSettings();
   const [createStep, setCreateStep] = useState<number>(2);
   const [createName, setCreateName] = useState('');
   const [createDescription, setCreateDescription] = useState('');
@@ -67,43 +69,29 @@ export function ProjectCreateModal({
   // Initialize with smart model from user settings
   useEffect(() => {
     if (availableProviders.length > 0 && !createConfig.providerInstanceId) {
-      // Load settings to get default smart model
-      void api
-        .get<{ defaultModels?: { fast?: string; smart?: string } }>('/api/settings')
-        .then((settings) => {
-          const smartModel = settings.defaultModels?.smart;
-          if (smartModel) {
-            // Parse "instanceId:modelId" format
-            const [instanceId, modelId] = smartModel.split(':');
-            if (instanceId && modelId) {
-              setCreateConfig((prev) => ({
-                ...prev,
-                providerInstanceId: instanceId,
-                modelId,
-              }));
-              return;
-            }
-          }
+      const smartModel = settings.defaultModels?.smart;
+      if (smartModel) {
+        // Parse "instanceId:modelId" format
+        const [instanceId, modelId] = smartModel.split(':');
+        if (instanceId && modelId) {
+          setCreateConfig((prev) => ({
+            ...prev,
+            providerInstanceId: instanceId,
+            modelId,
+          }));
+          return;
+        }
+      }
 
-          // Fallback to first available provider
-          const firstProvider = availableProviders[0];
-          setCreateConfig((prev) => ({
-            ...prev,
-            providerInstanceId: firstProvider.instanceId,
-            modelId: firstProvider.models[0]?.id || '',
-          }));
-        })
-        .catch(() => {
-          // On error, fallback to first available provider
-          const firstProvider = availableProviders[0];
-          setCreateConfig((prev) => ({
-            ...prev,
-            providerInstanceId: firstProvider.instanceId,
-            modelId: firstProvider.models[0]?.id || '',
-          }));
-        });
+      // Fallback to first available provider
+      const firstProvider = availableProviders[0];
+      setCreateConfig((prev) => ({
+        ...prev,
+        providerInstanceId: firstProvider.instanceId,
+        modelId: firstProvider.models[0]?.id || '',
+      }));
     }
-  }, [availableProviders, createConfig.providerInstanceId]);
+  }, [availableProviders, createConfig.providerInstanceId, settings.defaultModels]);
 
   // When the modal opens, start at step 2 (Directory)
   useEffect(() => {
