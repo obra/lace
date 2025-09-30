@@ -152,22 +152,24 @@ export function ProjectCreateModal({
                 <div className="mb-3">
                   <h4 className="text-lg font-semibold">Set project directory</h4>
                 </div>
-                <DirectoryField
-                  label="Directory path"
-                  value={createWorkingDirectory}
-                  onChange={handleCreateDirectoryChange}
-                  placeholder="/path/to/your/project"
-                  required
-                  className="input-lg focus:outline-none focus:ring-2 focus:ring-accent/60"
-                  inline
-                  minRows={DIRECTORY_BROWSER.DEFAULT_ROWS}
-                />
-                {createWorkingDirectory.trim() &&
-                  !createWorkingDirectory.trim().startsWith('/') && (
-                    <p className="mt-2 text-sm text-error">
-                      Please paste an absolute path starting with &quot;/&quot;.
-                    </p>
-                  )}
+                <div className="max-w-3xl">
+                  <DirectoryField
+                    label="Directory path"
+                    value={createWorkingDirectory}
+                    onChange={handleCreateDirectoryChange}
+                    placeholder="/path/to/your/project"
+                    required
+                    className="input-lg focus:outline-none focus:ring-2 focus:ring-accent/60"
+                    inline
+                    minRows={DIRECTORY_BROWSER.DEFAULT_ROWS}
+                  />
+                  {createWorkingDirectory.trim() &&
+                    !createWorkingDirectory.trim().startsWith('/') && (
+                      <p className="mt-2 text-sm text-error">
+                        Please paste an absolute path starting with &quot;/&quot;.
+                      </p>
+                    )}
+                </div>
               </div>
             )}
 

@@ -242,6 +242,17 @@ export function DirectoryField({
     }
   }, [currentPath, isEditingPath]);
 
+  // Autofocus browser container in inline mode after initialization
+  useEffect(() => {
+    if (inline && hasInitializedRef.current && dropdownRef.current && !isLoading) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        dropdownRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [inline, isLoading]);
+
   const handleOpenNewFolderDialog = useCallback(() => {
     setNewFolderError(null);
     setIsNewFolderDialogOpen(true);
@@ -363,11 +374,11 @@ export function DirectoryField({
             ref={dropdownRef}
             className={
               inline
-                ? 'mt-3 bg-base-200 border border-base-300 rounded-lg overflow-hidden max-w-3xl w-full'
-                : 'absolute z-50 left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg max-h-64 overflow-hidden max-w-3xl'
+                ? 'mt-3 bg-base-200 border border-base-300 rounded-lg overflow-hidden w-full'
+                : 'absolute z-50 left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg max-h-64 overflow-hidden'
             }
             onKeyDown={handleBrowserKeyDown}
-            tabIndex={-1}
+            tabIndex={0}
           >
             {isLoading ? (
               <div className="flex flex-col items-center justify-center p-8">
