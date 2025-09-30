@@ -192,13 +192,13 @@ export function DirectoryField({
     }
   }, [prepopulatePath, value, currentPath, onChange]);
 
-  // Load directories when dropdown opens
+  // Load directories when dropdown opens (but only on first open, not when navigating to empty dirs)
   useEffect(() => {
-    if (isDropdownOpen && !isLoading && entries?.length === 0) {
-      // Only fetch if we don't have any entries loaded
+    if (isDropdownOpen && !isLoading && entries?.length === 0 && !currentPath) {
+      // Only fetch if we don't have any entries loaded AND haven't set a current path yet
       void fetchDirectories('');
     }
-  }, [isDropdownOpen, isLoading, entries?.length, fetchDirectories]);
+  }, [isDropdownOpen, isLoading, entries?.length, currentPath, fetchDirectories]);
 
   // Add navigation handlers
   const handleNavigateToParent = useCallback(() => {
