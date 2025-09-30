@@ -5,7 +5,14 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFolder, faSpinner, faChevronLeft, faHome, faFile } from '@/lib/fontawesome';
+import {
+  faFolder,
+  faSpinner,
+  faChevronLeft,
+  faHome,
+  faFile,
+  faFolderPlus,
+} from '@/lib/fontawesome';
 import { api } from '@/lib/api-client';
 import type { ListDirectoryResponse, DirectoryEntry } from '@/types/filesystem';
 import { DIRECTORY_BROWSER } from '@/lib/constants/ui';
@@ -243,6 +250,12 @@ export function DirectoryField({
     setIsFocused(false);
   };
 
+  const handleOpenNewFolderDialog = useCallback(() => {
+    // Will implement dialog in next task
+    // eslint-disable-next-line no-console
+    console.log('Open new folder dialog');
+  }, []);
+
   const inputClasses = ['input', 'input-bordered', 'w-full', error ? 'input-error' : '', className]
     .filter(Boolean)
     .join(' ');
@@ -297,7 +310,7 @@ export function DirectoryField({
               <div className="p-4 text-sm text-error">{apiError}</div>
             ) : (
               <>
-                {/* Navigation header - removed breadcrumbs and home line */}
+                {/* Navigation header with New Folder button */}
                 {!isLoading && !apiError && (
                   <div className="sticky top-0 bg-base-300 border-b border-base-content/20 p-2">
                     <div className="flex items-center gap-2">
@@ -318,6 +331,18 @@ export function DirectoryField({
                         title="Go to home directory"
                       >
                         <FontAwesomeIcon icon={faHome} className="w-3 h-3" />
+                      </button>
+                      <div className="flex-1" />
+                      <button
+                        type="button"
+                        onClick={handleOpenNewFolderDialog}
+                        className="btn btn-primary btn-xs"
+                        title="Create new folder"
+                        disabled={!currentPath || isLoading}
+                        data-testid="new-folder-button"
+                      >
+                        <FontAwesomeIcon icon={faFolderPlus} className="w-3 h-3" />
+                        New Folder
                       </button>
                     </div>
                   </div>
