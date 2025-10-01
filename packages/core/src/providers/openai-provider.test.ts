@@ -230,6 +230,51 @@ describe('OpenAIProvider', () => {
       mockCreate.mockReturnValue(mockStream);
     });
 
+    it('should fall back to non-streaming when organization verification required', async () => {
+      // Mock streaming to throw verification error with proper OpenAI error structure
+      const verificationError = Object.assign(
+        new Error(
+          '400 Your organization must be verified to stream this model. Please go to: https://platform.openai.com/settings/organization/general'
+        ),
+        {
+          status: 400,
+          type: 'invalid_request_error',
+          code: 'unsupported_value',
+          param: 'stream',
+        }
+      );
+
+      // First call (streaming) throws error, second call (non-streaming) succeeds
+      mockCreate.mockRejectedValueOnce(verificationError).mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: 'Non-streaming response',
+              tool_calls: undefined,
+            },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      });
+
+      const messages = [{ role: 'user' as const, content: 'Test' }];
+      const response = await provider.createStreamingResponse(messages, [], 'gpt-4o');
+
+      // Should successfully return with non-streaming response
+      expect(response.content).toBe('Non-streaming response');
+      expect(response.stopReason).toBe('stop');
+
+      // Should have called create twice: once for streaming (failed), once for non-streaming (succeeded)
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+
+      // First call should have stream: true
+      expect(mockCreate.mock.calls[0][0]).toMatchObject({ stream: true });
+
+      // Second call should have stream: false (fallback to non-streaming)
+      expect(mockCreate.mock.calls[1][0]).toMatchObject({ stream: false });
+    });
+
     it('should create streaming response correctly', async () => {
       const chunks = [
         {
@@ -596,6 +641,534 @@ describe('OpenAIProvider', () => {
       await expect(provider.createStreamingResponse(messages, [], 'gpt-4o')).rejects.toThrow(
         'Stream setup failed'
       );
+    });
+  });
+
+  describe('tool name sanitization', () => {
+    it('should sanitize tool names with forward slashes (e.g., MCP tools)', async () => {
+      class MCPStyleTool extends Tool {
+        name = 'filesystem/read_file';
+        description = 'MCP tool with slash in name';
+        schema = z.object({
+          path: z.string(),
+        });
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('read file');
+        }
+      }
+
+      const mcpTool = new MCPStyleTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [mcpTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string; description: string } }>;
+      };
+
+      // Tool name should be sanitized to replace / with _
+      expect(callArgs.tools).toBeDefined();
+      expect(callArgs.tools).toHaveLength(1);
+      expect(callArgs.tools![0].function.name).toBe('filesystem_read_file');
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+    });
+
+    it('should sanitize tool names with multiple invalid characters', async () => {
+      class ComplexTool extends Tool {
+        name = 'server:name/tool.action';
+        description = 'Tool with multiple invalid chars';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      const complexTool = new ComplexTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [complexTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // All invalid characters should be replaced with underscores
+      expect(callArgs.tools).toBeDefined();
+      expect(callArgs.tools![0].function.name).toBe('server_name_tool_action');
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+    });
+
+    it('should not modify already valid tool names', async () => {
+      class ValidTool extends Tool {
+        name = 'valid_tool-name123';
+        description = 'Valid tool name';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      const validTool = new ValidTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [validTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Valid name should remain unchanged
+      expect(callArgs.tools![0].function.name).toBe('valid_tool-name123');
+    });
+
+    it('should map sanitized tool names back to original in responses', async () => {
+      class MCPStyleTool extends Tool {
+        name = 'filesystem/read_file';
+        description = 'MCP tool with slash in name';
+        schema = z.object({
+          path: z.string(),
+        });
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('read file');
+        }
+      }
+
+      const mcpTool = new MCPStyleTool();
+
+      // OpenAI returns the sanitized name in tool_calls
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: 'Reading file',
+              tool_calls: [
+                {
+                  id: 'call_123',
+                  function: {
+                    name: 'filesystem_read_file', // Sanitized name
+                    arguments: JSON.stringify({ path: '/test.txt' }),
+                  },
+                },
+              ],
+            },
+            finish_reason: 'tool_calls',
+          },
+        ],
+        usage: {},
+      });
+
+      const response = await provider.createResponse(
+        [{ role: 'user', content: 'Read file' }],
+        [mcpTool],
+        'gpt-4o'
+      );
+
+      // Response should contain the original tool name, not sanitized
+      expect(response.toolCalls).toHaveLength(1);
+      expect(response.toolCalls[0].name).toBe('filesystem/read_file');
+      expect(response.toolCalls[0].arguments).toEqual({ path: '/test.txt' });
+    });
+
+    it('should handle tool name collisions by appending numeric suffix', async () => {
+      class Tool1 extends Tool {
+        name = 'server/action';
+        description = 'Tool 1';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool1');
+        }
+      }
+
+      class Tool2 extends Tool {
+        name = 'server:action'; // Sanitizes to same name as Tool1
+        description = 'Tool 2';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool2');
+        }
+      }
+
+      const tool1 = new Tool1();
+      const tool2 = new Tool2();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [tool1, tool2], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // First tool should get base name, second should get suffix
+      expect(callArgs.tools).toBeDefined();
+      expect(callArgs.tools).toHaveLength(2);
+      expect(callArgs.tools![0].function.name).toBe('server_action');
+      expect(callArgs.tools![1].function.name).toBe('server_action_2');
+      // Both should match OpenAI pattern
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+      expect(callArgs.tools![1].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+    });
+
+    it('should handle concurrent requests with different tool sets without interference', async () => {
+      class ToolA extends Tool {
+        name = 'mcp/tool_a';
+        description = 'Tool A';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('a');
+        }
+      }
+
+      class ToolB extends Tool {
+        name = 'mcp/tool_b';
+        description = 'Tool B';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('b');
+        }
+      }
+
+      const toolA = new ToolA();
+      const toolB = new ToolB();
+
+      // Simulate concurrent requests with different tools
+      mockCreate
+        .mockResolvedValueOnce({
+          choices: [
+            {
+              message: {
+                content: 'Using tool A',
+                tool_calls: [
+                  {
+                    id: 'call_a',
+                    function: {
+                      name: 'mcp_tool_a',
+                      arguments: JSON.stringify({}),
+                    },
+                  },
+                ],
+              },
+              finish_reason: 'tool_calls',
+            },
+          ],
+          usage: {},
+        })
+        .mockResolvedValueOnce({
+          choices: [
+            {
+              message: {
+                content: 'Using tool B',
+                tool_calls: [
+                  {
+                    id: 'call_b',
+                    function: {
+                      name: 'mcp_tool_b',
+                      arguments: JSON.stringify({}),
+                    },
+                  },
+                ],
+              },
+              finish_reason: 'tool_calls',
+            },
+          ],
+          usage: {},
+        });
+
+      // Fire both requests concurrently
+      const [response1, response2] = await Promise.all([
+        provider.createResponse([{ role: 'user', content: 'Use A' }], [toolA], 'gpt-4o'),
+        provider.createResponse([{ role: 'user', content: 'Use B' }], [toolB], 'gpt-4o'),
+      ]);
+
+      // Each response should correctly map back to its original tool name
+      expect(response1.toolCalls[0].name).toBe('mcp/tool_a');
+      expect(response2.toolCalls[0].name).toBe('mcp/tool_b');
+    });
+
+    it('should handle triple collision with unique suffixes', async () => {
+      class Tool1 extends Tool {
+        name = 'server/action';
+        description = 'Tool 1';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool1');
+        }
+      }
+
+      class Tool2 extends Tool {
+        name = 'server:action'; // → server_action_2
+        description = 'Tool 2';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool2');
+        }
+      }
+
+      class Tool3 extends Tool {
+        name = 'server.action'; // → server_action_3
+        description = 'Tool 3';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool3');
+        }
+      }
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse(
+        [{ role: 'user', content: 'Test' }],
+        [new Tool1(), new Tool2(), new Tool3()],
+        'gpt-4o'
+      );
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Verify all three tools get unique sanitized names
+      expect(callArgs.tools).toHaveLength(3);
+      expect(callArgs.tools![0].function.name).toBe('server_action');
+      expect(callArgs.tools![1].function.name).toBe('server_action_2');
+      expect(callArgs.tools![2].function.name).toBe('server_action_3');
+    });
+
+    it('should enforce 64-character limit on tool names', async () => {
+      class LongNameTool extends Tool {
+        // 80 character tool name (exceeds 64 char limit)
+        name = 'very_long_tool_name_that_exceeds_the_maximum_allowed_length_of_sixty_four_chars';
+        description = 'Tool with very long name';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      const longTool = new LongNameTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [longTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Tool name should be truncated to 64 chars max
+      expect(callArgs.tools![0].function.name.length).toBeLessThanOrEqual(64);
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+    });
+
+    it('should handle long tool names with collisions', async () => {
+      // Two 80-char names that both truncate to the same 60 chars
+      class LongTool1 extends Tool {
+        name = 'very_long_tool_name_that_exceeds_maximum_length_and_will_be_truncated_1';
+        description = 'Long tool 1';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool1');
+        }
+      }
+
+      class LongTool2 extends Tool {
+        name = 'very_long_tool_name_that_exceeds_maximum_length_and_will_be_truncated_2';
+        description = 'Long tool 2';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool2');
+        }
+      }
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse(
+        [{ role: 'user', content: 'Test' }],
+        [new LongTool1(), new LongTool2()],
+        'gpt-4o'
+      );
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Both tools should have unique names within 64 char limit
+      expect(callArgs.tools).toHaveLength(2);
+      expect(callArgs.tools![0].function.name.length).toBeLessThanOrEqual(64);
+      expect(callArgs.tools![1].function.name.length).toBeLessThanOrEqual(64);
+      expect(callArgs.tools![0].function.name).not.toBe(callArgs.tools![1].function.name);
+    });
+
+    it('should handle duplicate tool instances with same original name', async () => {
+      class DuplicateTool extends Tool {
+        name = 'server/action';
+        description = 'Duplicate tool';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      // Two instances of the exact same tool
+      const tool1 = new DuplicateTool();
+      const tool2 = new DuplicateTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [tool1, tool2], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Should get different sanitized names even with identical original names
+      expect(callArgs.tools).toHaveLength(2);
+      expect(callArgs.tools![0].function.name).toBe('server_action');
+      expect(callArgs.tools![1].function.name).toBe('server_action_2');
+    });
+
+    it('should reject empty/underscore-only tool names', async () => {
+      class EmptyNameTool extends Tool {
+        name = '///'; // Sanitizes to '___' → collapsed to '_' → rejected
+        description = 'Tool with only special chars';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      const emptyTool = new EmptyNameTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      // Should throw error for invalid tool name
+      await expect(
+        provider.createResponse([{ role: 'user', content: 'Test' }], [emptyTool], 'gpt-4o')
+      ).rejects.toThrow('invalid - sanitizes to empty or underscore-only');
+    });
+
+    it('should handle unicode characters in tool names', async () => {
+      class UnicodeTool extends Tool {
+        name = 'tool/数据库/read';
+        description = 'Tool with unicode';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      const unicodeTool = new UnicodeTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [unicodeTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Unicode should be stripped, leaving only valid chars
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+      // Unicode chars become underscores, then collapsed: 'tool/数据库/read' → 'tool_read'
+      expect(callArgs.tools![0].function.name).toBe('tool_read');
     });
   });
 

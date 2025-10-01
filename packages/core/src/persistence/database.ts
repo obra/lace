@@ -163,6 +163,9 @@ function createLaceEventFromDb(
     case 'AGENT_STATE_CHANGE':
       throw new Error('AGENT_STATE_CHANGE events are transient and should not be persisted');
 
+    case 'TOKEN_USAGE_UPDATE':
+      throw new Error('TOKEN_USAGE_UPDATE events are transient and should not be persisted');
+
     case 'COMPACTION_START':
       throw new Error('COMPACTION_START events are transient and should not be persisted');
 

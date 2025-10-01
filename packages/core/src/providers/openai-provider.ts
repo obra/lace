@@ -267,6 +267,58 @@ export class OpenAIProvider extends AIProvider {
   }
 
   /**
+   * Parses OpenAI tool call and maps sanitized name back to original
+   * Shared by both streaming and non-streaming responses
+   */
+  private parseToolCall(
+    toolCall: { id: string; function: { name: string; arguments: string } },
+    toolNameMapping: Map<string, string>
+  ): ToolCall {
+    const originalName = toolNameMapping.get(toolCall.function.name) || toolCall.function.name;
+
+    try {
+      return {
+        id: toolCall.id,
+        name: originalName,
+        arguments: JSON.parse(toolCall.function.arguments) as Record<string, unknown>,
+      };
+    } catch (error) {
+      logger.error('Failed to parse tool call arguments', {
+        toolCallId: toolCall.id,
+        toolName: originalName,
+        sanitizedName: toolCall.function.name,
+        arguments: toolCall.function.arguments,
+        error: (error as Error).message,
+      });
+      throw new Error(
+        `Invalid JSON in tool call arguments for ${originalName}: ${(error as Error).message}`
+      );
+    }
+  }
+
+  /**
+   * Checks if an error is due to streaming requiring organization verification
+   * OpenAI returns: type='invalid_request_error', code='unsupported_value', param='stream'
+   */
+  private isStreamingVerificationError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    const errorObj = error as {
+      type?: string;
+      code?: string;
+      param?: string;
+    };
+
+    return (
+      errorObj.type === 'invalid_request_error' &&
+      errorObj.code === 'unsupported_value' &&
+      errorObj.param === 'stream'
+    );
+  }
+
+  /**
    * Calibrates token costs for system prompt and individual tools
    * Uses tiktoken for precise local counting
    */
@@ -338,12 +390,96 @@ export class OpenAIProvider extends AIProvider {
     }
   }
 
+  private static readonly MAX_TOOL_NAME_LENGTH = 64;
+  private static readonly COLLISION_SUFFIX_RESERVE = 4;
+
+  /**
+   * Builds OpenAI tools with sanitized names and returns mapping
+   * Request-scoped to prevent concurrent request interference
+   * Enforces OpenAI's 64-character limit on tool names
+   */
+  private buildToolsWithMapping(tools: Tool[]): {
+    openaiTools: OpenAI.Chat.ChatCompletionTool[];
+    mapping: Map<string, string>;
+  } {
+    const mapping = new Map<string, string>();
+    const openaiTools: OpenAI.Chat.ChatCompletionTool[] = tools.map((tool) => {
+      const sanitized = tool.name.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_'); // Collapse consecutive underscores
+
+      // Validate tool name is not empty or underscore-only after sanitization
+      if (!sanitized || /^_+$/.test(sanitized)) {
+        throw new Error(
+          `Tool name "${tool.name}" is invalid - sanitizes to empty or underscore-only string`
+        );
+      }
+
+      // Reserve space for potential collision suffix
+      const maxBaseLength =
+        OpenAIProvider.MAX_TOOL_NAME_LENGTH - OpenAIProvider.COLLISION_SUFFIX_RESERVE;
+
+      // Truncate base name if needed to leave room for suffix
+      let baseName = sanitized;
+      if (baseName.length > maxBaseLength) {
+        baseName = baseName.substring(0, maxBaseLength);
+      }
+
+      // Check if sanitized name is already used (handles both collisions and duplicates)
+      let sanitizedName = baseName;
+
+      if (mapping.has(sanitizedName)) {
+        // Name already used - append suffix to make unique
+        let suffix = 2;
+        sanitizedName = `${baseName}_${suffix}`;
+
+        // Ensure final name doesn't exceed 64 chars and is unique
+        while (
+          mapping.has(sanitizedName) ||
+          sanitizedName.length > OpenAIProvider.MAX_TOOL_NAME_LENGTH
+        ) {
+          suffix++;
+          sanitizedName = `${baseName}_${suffix}`;
+
+          // If suffix grows too large, truncate base name further
+          if (sanitizedName.length > OpenAIProvider.MAX_TOOL_NAME_LENGTH) {
+            const suffixStr = `_${suffix}`;
+            baseName = baseName.substring(
+              0,
+              OpenAIProvider.MAX_TOOL_NAME_LENGTH - suffixStr.length
+            );
+            sanitizedName = `${baseName}${suffixStr}`;
+          }
+        }
+      }
+
+      // Final length check (should never exceed, but defensive)
+      if (sanitizedName.length > OpenAIProvider.MAX_TOOL_NAME_LENGTH) {
+        sanitizedName = sanitizedName.substring(0, OpenAIProvider.MAX_TOOL_NAME_LENGTH);
+      }
+
+      mapping.set(sanitizedName, tool.name);
+
+      return {
+        type: 'function' as const,
+        function: {
+          name: sanitizedName,
+          description: tool.description,
+          parameters: tool.inputSchema,
+        },
+      };
+    });
+
+    return { openaiTools, mapping };
+  }
+
   private _createRequestPayload(
     messages: ProviderMessage[],
     tools: Tool[],
     model: string,
     stream: boolean
-  ): OpenAI.Chat.ChatCompletionCreateParams {
+  ): {
+    payload: OpenAI.Chat.ChatCompletionCreateParams;
+    toolNameMapping: Map<string, string>;
+  } {
     // Convert our enhanced generic messages to OpenAI format
     const openaiMessages = convertToOpenAIFormat(
       messages
@@ -358,15 +494,8 @@ export class OpenAIProvider extends AIProvider {
       ...openaiMessages.filter((msg) => msg.role !== 'system'),
     ];
 
-    // Convert tools to OpenAI format
-    const openaiTools: OpenAI.Chat.ChatCompletionTool[] = tools.map((tool) => ({
-      type: 'function' as const,
-      function: {
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.inputSchema,
-      },
-    }));
+    // Build tools with sanitized names and get mapping (request-scoped)
+    const { openaiTools, mapping } = this.buildToolsWithMapping(tools);
 
     const requestPayload: OpenAI.Chat.ChatCompletionCreateParams = {
       model,
@@ -376,7 +505,7 @@ export class OpenAIProvider extends AIProvider {
       ...(tools.length > 0 && { tools: openaiTools }),
     };
 
-    return requestPayload;
+    return { payload: requestPayload, toolNameMapping: mapping };
   }
 
   async createResponse(
@@ -387,7 +516,12 @@ export class OpenAIProvider extends AIProvider {
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
-        const requestPayload = this._createRequestPayload(messages, tools, model, false);
+        const { payload: requestPayload, toolNameMapping } = this._createRequestPayload(
+          messages,
+          tools,
+          model,
+          false
+        );
 
         // Log request with pretty formatting
         logProviderRequest('openai', requestPayload as unknown as Record<string, unknown>);
@@ -407,25 +541,9 @@ export class OpenAIProvider extends AIProvider {
         const textContent = choice.message.content || '';
 
         const toolCalls: ToolCall[] =
-          choice.message.tool_calls?.map((toolCall: OpenAI.Chat.ChatCompletionMessageToolCall) => {
-            try {
-              return {
-                id: toolCall.id,
-                name: toolCall.function.name,
-                arguments: JSON.parse(toolCall.function.arguments) as Record<string, unknown>,
-              };
-            } catch (error) {
-              logger.error('Failed to parse tool call arguments', {
-                toolCallId: toolCall.id,
-                toolName: toolCall.function.name,
-                arguments: toolCall.function.arguments,
-                error: (error as Error).message,
-              });
-              throw new Error(
-                `Invalid JSON in tool call arguments for ${toolCall.function.name}: ${(error as Error).message}`
-              );
-            }
-          }) || [];
+          choice.message.tool_calls?.map((toolCall: OpenAI.Chat.ChatCompletionMessageToolCall) =>
+            this.parseToolCall(toolCall, toolNameMapping)
+          ) || [];
 
         logger.debug('Received response from OpenAI', {
           provider: 'openai',
@@ -489,7 +607,12 @@ export class OpenAIProvider extends AIProvider {
 
     return this.withRetry(
       async () => {
-        const requestPayload = this._createRequestPayload(messages, tools, model, true);
+        const { payload: requestPayload, toolNameMapping } = this._createRequestPayload(
+          messages,
+          tools,
+          model,
+          true
+        );
 
         // Log streaming request with pretty formatting
         logProviderRequest('openai', requestPayload as unknown as Record<string, unknown>, {
@@ -588,25 +711,15 @@ export class OpenAIProvider extends AIProvider {
           }
 
           // Convert partial tool calls to final format
-          toolCalls = Array.from(partialToolCalls.values()).map((partial) => {
-            try {
-              return {
+          toolCalls = Array.from(partialToolCalls.values()).map((partial) =>
+            this.parseToolCall(
+              {
                 id: partial.id,
-                name: partial.name,
-                arguments: JSON.parse(partial.arguments) as Record<string, unknown>,
-              };
-            } catch (error) {
-              logger.error('Failed to parse streaming tool call arguments', {
-                toolCallId: partial.id,
-                toolName: partial.name,
-                arguments: partial.arguments,
-                error: (error as Error).message,
-              });
-              throw new Error(
-                `Invalid JSON in streaming tool call arguments for ${partial.name}: ${(error as Error).message}`
-              );
-            }
-          });
+                function: { name: partial.name, arguments: partial.arguments },
+              },
+              toolNameMapping
+            )
+          );
 
           logger.debug('Received streaming response from OpenAI', {
             provider: 'openai',
@@ -675,6 +788,17 @@ export class OpenAIProvider extends AIProvider {
         } catch (error) {
           const errorObj = error as Error;
           logger.error('Streaming error from OpenAI', { error: errorObj.message });
+
+          // Check if this is a streaming verification error
+          if (this.isStreamingVerificationError(error)) {
+            logger.warn(
+              'OpenAI streaming requires organization verification, falling back to non-streaming mode',
+              { model }
+            );
+            // Fall back to non-streaming mode
+            return this.createResponse(messages, tools, model, signal);
+          }
+
           throw error;
         }
       },

@@ -25,6 +25,7 @@ export const EVENT_TYPES = [
   'AGENT_TOKEN',
   'AGENT_STREAMING',
   'AGENT_STATE_CHANGE',
+  'TOKEN_USAGE_UPDATE',
   'COMPACTION_START',
   'COMPACTION_COMPLETE',
   // Task events (transient)
@@ -60,6 +61,7 @@ export function isTransientEventType(type: LaceEventType): boolean {
     'AGENT_TOKEN',
     'AGENT_STREAMING',
     'AGENT_STATE_CHANGE',
+    'TOKEN_USAGE_UPDATE',
     'COMPACTION_START',
     'COMPACTION_COMPLETE',
     // Task events
@@ -167,6 +169,10 @@ export interface AgentStateChangeData {
   agentId: ThreadId;
   from: string;
   to: string;
+}
+
+export interface TokenUsageUpdateData {
+  tokenUsage: CombinedTokenUsage;
 }
 
 interface CompactionStartData {
@@ -430,6 +436,10 @@ export type LaceEvent =
   | (BaseLaceEvent & {
       type: 'AGENT_STATE_CHANGE';
       data: AgentStateChangeData;
+    })
+  | (BaseLaceEvent & {
+      type: 'TOKEN_USAGE_UPDATE';
+      data: TokenUsageUpdateData;
     })
   | (BaseLaceEvent & {
       type: 'COMPACTION_START';

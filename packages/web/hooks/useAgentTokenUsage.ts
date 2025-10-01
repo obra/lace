@@ -63,79 +63,92 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
     }
   }, [agentId]);
 
-  // Listen for AGENT_MESSAGE events that include token usage updates
-  const handleAgentMessage = useCallback(
+  // Extract token usage from event data
+  const extractTokenUsageFromEvent = useCallback((tokenUsageData: CombinedTokenUsage) => {
+    // Extract context window usage (try new format first, fallback to old)
+    const contextData =
+      tokenUsageData?.context || (tokenUsageData as unknown as Record<string, unknown>)?.thread;
+
+    if (!contextData || typeof contextData !== 'object') {
+      return null;
+    }
+
+    const ctx = contextData as unknown as Record<string, unknown>;
+
+    const currentTokens =
+      typeof ctx.totalPromptTokens === 'number'
+        ? ctx.totalPromptTokens
+        : typeof ctx.currentTokens === 'number'
+          ? ctx.currentTokens
+          : 0;
+
+    const contextLimit =
+      typeof ctx.contextLimit === 'number'
+        ? ctx.contextLimit
+        : typeof ctx.limit === 'number'
+          ? ctx.limit
+          : 0;
+
+    return {
+      totalPromptTokens: currentTokens,
+      totalCompletionTokens: 0, // Not separately tracked
+      totalTokens: currentTokens,
+      contextLimit,
+      percentUsed: typeof ctx.percentUsed === 'number' ? ctx.percentUsed : 0,
+      nearLimit: !!ctx.nearLimit,
+    };
+  }, []);
+
+  // Listen for AGENT_MESSAGE and TOKEN_USAGE_UPDATE events
+  const handleTokenUpdate = useCallback(
     (event: LaceEvent) => {
-      // Check if this event is for our agent, is AGENT_MESSAGE type, and has token usage data
-      // Note: TokenUsage is now directly at event.data.tokenUsage (no more double nesting)
+      // Skip events not for this agent
+      if (event.context?.threadId !== agentId) {
+        return;
+      }
+
+      // Both AGENT_MESSAGE and TOKEN_USAGE_UPDATE can contain token usage
       if (
-        event.context?.threadId === agentId &&
-        event.type === 'AGENT_MESSAGE' &&
+        (event.type === 'AGENT_MESSAGE' || event.type === 'TOKEN_USAGE_UPDATE') &&
         event.data &&
         typeof event.data === 'object' &&
         'tokenUsage' in event.data
       ) {
         const tokenUsageData = (event.data as { tokenUsage: CombinedTokenUsage }).tokenUsage;
+        const extracted = extractTokenUsageFromEvent(tokenUsageData);
 
-        // Extract context window usage (try new format first, fallback to old)
-        const contextData =
-          tokenUsageData?.context || (tokenUsageData as unknown as Record<string, unknown>)?.thread;
-
-        if (contextData && typeof contextData === 'object') {
-          const ctx = contextData as unknown as Record<string, unknown>;
-
-          // Try new field names first
-          const currentTokens =
-            typeof ctx.totalPromptTokens === 'number'
-              ? ctx.totalPromptTokens
-              : typeof ctx.currentTokens === 'number'
-                ? ctx.currentTokens
-                : 0;
-
-          const contextLimit =
-            typeof ctx.contextLimit === 'number'
-              ? ctx.contextLimit
-              : typeof ctx.limit === 'number'
-                ? ctx.limit
-                : 0;
-
-          const completeTokenUsage: AgentTokenUsage = {
-            totalPromptTokens: currentTokens,
-            totalCompletionTokens: 0, // Not separately tracked
-            totalTokens: currentTokens,
-            contextLimit,
-            percentUsed: typeof ctx.percentUsed === 'number' ? ctx.percentUsed : 0,
-            nearLimit: !!ctx.nearLimit,
-          };
-
-          setTokenUsage(completeTokenUsage);
+        if (extracted) {
+          setTokenUsage(extracted);
         }
       }
     },
-    [agentId]
+    [agentId, extractTokenUsageFromEvent]
   );
 
   // Use shared event stream context for real-time updates
   const { events } = useSessionEvents();
 
-  // Find latest agent message with O(1) reverse scan using useMemo
-  const latestAgentMessage = useMemo(() => {
-    // Reverse scan to find the latest AGENT_MESSAGE for this agent
+  // Find latest token-relevant event (AGENT_MESSAGE or TOKEN_USAGE_UPDATE) with O(1) reverse scan
+  const latestTokenEvent = useMemo(() => {
+    // Reverse scan to find the latest event with token data for this agent
     for (let i = events.length - 1; i >= 0; i--) {
       const event = events[i];
-      if (event.context?.threadId === agentId && event.type === 'AGENT_MESSAGE') {
+      if (
+        event.context?.threadId === agentId &&
+        (event.type === 'AGENT_MESSAGE' || event.type === 'TOKEN_USAGE_UPDATE')
+      ) {
         return event;
       }
     }
     return null;
   }, [events, agentId]);
 
-  // Handle latest agent message for token updates
+  // Handle latest token event for token updates
   useEffect(() => {
-    if (latestAgentMessage) {
-      handleAgentMessage(latestAgentMessage);
+    if (latestTokenEvent) {
+      handleTokenUpdate(latestTokenEvent);
     }
-  }, [latestAgentMessage, handleAgentMessage]);
+  }, [latestTokenEvent, handleTokenUpdate]);
 
   // Initial load on mount or agentId change
   useEffect(() => {

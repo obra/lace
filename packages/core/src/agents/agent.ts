@@ -880,6 +880,13 @@ export class Agent extends EventEmitter {
               threadId: this._threadId,
               consecutiveErrors: this._consecutiveRecoverableErrors,
             });
+            // Emit error event so UI can display the error
+            this._emitError(error, {
+              phase: 'provider_response',
+              threadId: this._threadId,
+              errorType: 'max_retries_exceeded' as ErrorType,
+              consecutiveErrors: this._consecutiveRecoverableErrors,
+            });
             // Complete the turn properly to clean up metrics/timers
             this._completeTurn();
             this._setState('idle');
@@ -1806,6 +1813,20 @@ export class Agent extends EventEmitter {
     // Clean up tool execution state
     this._toolAbortController = null;
     this._activeToolCalls.clear();
+
+    // Emit TOKEN_USAGE_UPDATE event after tool execution (both paths)
+    // This ensures UI gets token updates even when tools are rejected/aborted
+    const tokenUsage = this.getTokenUsage();
+    this._addEventAndEmit({
+      type: 'TOKEN_USAGE_UPDATE',
+      data: {
+        tokenUsage: {
+          context: tokenUsage,
+        },
+      },
+      context: { threadId: this._threadId },
+      transient: true,
+    });
 
     if (!shouldContinue) {
       // Has rejections/aborts - wait for user input
