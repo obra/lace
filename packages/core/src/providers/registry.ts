@@ -7,6 +7,7 @@ import { OpenAIProvider } from '~/providers/openai-provider';
 import { LMStudioProvider } from '~/providers/lmstudio-provider';
 import { OllamaProvider } from '~/providers/ollama-provider';
 import { GeminiProvider } from '~/providers/gemini-provider';
+import { ClaudeSDKProvider } from '~/providers/claude-sdk-provider';
 import { ProviderCatalogManager } from '~/providers/catalog/manager';
 import { ProviderInstanceManager } from '~/providers/instance/manager';
 import type { CatalogProvider, CatalogModel, ModelConfig } from '~/providers/catalog/types';
@@ -273,7 +274,7 @@ export class ProviderRegistry {
     models: ModelInfo[];
     configured: boolean;
   }> {
-    const providers = ['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama'];
+    const providers = ['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama', 'claude-agents-sdk'];
     const results = [];
 
     for (const providerName of providers) {
@@ -337,6 +338,12 @@ export class ProviderRegistry {
         case 'ollama': {
           return new OllamaProvider({ baseURL: 'http://localhost:11434' });
         }
+        case 'claude-agents-sdk': {
+          return new ClaudeSDKProvider({
+            sessionToken: null,
+            ...(catalogProvider ? { catalogProvider } : {}),
+          });
+        }
         default:
           return null;
       }
@@ -391,6 +398,15 @@ export class ProviderRegistry {
       }
       case 'ollama': {
         return new OllamaProvider(config);
+      }
+      case 'claude-agents-sdk': {
+        logger.debug('Creating ClaudeSDKProvider', {
+          hasSessionToken: !!config.apiKey,
+        });
+        return new ClaudeSDKProvider({
+          ...config,
+          sessionToken: typeof config.apiKey === 'string' ? config.apiKey : null,
+        });
       }
       case 'test-provider': {
         // Mock provider needs to be handled differently for tests
