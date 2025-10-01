@@ -430,9 +430,9 @@ export function DirectoryField({
                           >
                             <FontAwesomeIcon icon={faHome} className="w-3 h-3" />
                           </button>
-                          {breadcrumbs.length > 1 &&
+                          {breadcrumbs?.length > 1 &&
                             breadcrumbs.slice(1).map((crumb, index) => (
-                              <React.Fragment key={breadcrumbPaths[index + 1]}>
+                              <React.Fragment key={breadcrumbPaths?.[index + 1]}>
                                 <span className="text-base-content/40">/</span>
                                 <button
                                   type="button"
