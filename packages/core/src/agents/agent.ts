@@ -3,7 +3,7 @@
 
 import { EventEmitter } from 'events';
 import { resolve } from 'path';
-import { AIProvider, ProviderMessage } from '~/providers/base-provider';
+import { AIProvider, ProviderMessage, ProviderRequestContext } from '~/providers/base-provider';
 import { ToolCall, ToolResult } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
@@ -1215,11 +1215,24 @@ export class Agent extends EventEmitter {
         throw new Error('Cannot create streaming response with missing provider instance');
       }
 
+      // Build provider request context
+      const session = await this.getFullSession();
+      const context: ProviderRequestContext = {
+        agent: this,
+        toolExecutor: this._toolExecutor,
+        session: session || undefined,
+        workingDirectory: this._getWorkingDirectory(),
+        processEnv: session
+          ? session.getProject()?.getMergedEnvironment() || process.env
+          : process.env,
+      };
+
       const response = await this.providerInstance.createStreamingResponse(
         messages,
         tools,
         modelId,
-        signal
+        signal,
+        context
       );
 
       // Apply stop reason handling to filter incomplete tool calls
@@ -1342,7 +1355,25 @@ export class Agent extends EventEmitter {
         throw new Error('Cannot create response with missing provider instance');
       }
 
-      const response = await this.providerInstance.createResponse(messages, tools, modelId, signal);
+      // Build provider request context
+      const session = await this.getFullSession();
+      const context: ProviderRequestContext = {
+        agent: this,
+        toolExecutor: this._toolExecutor,
+        session: session || undefined,
+        workingDirectory: this._getWorkingDirectory(),
+        processEnv: session
+          ? session.getProject()?.getMergedEnvironment() || process.env
+          : process.env,
+      };
+
+      const response = await this.providerInstance.createResponse(
+        messages,
+        tools,
+        modelId,
+        signal,
+        context
+      );
 
       // Apply stop reason handling to filter incomplete tool calls
       const processedResponse = this._stopReasonHandler.handleResponse(response, tools);

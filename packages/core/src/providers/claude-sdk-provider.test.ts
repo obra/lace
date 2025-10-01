@@ -37,7 +37,7 @@ describe('ClaudeSDKProvider', () => {
   });
 
   it('should throw on createResponse (not implemented)', async () => {
-    await expect(provider.createResponse([], [], 'model', undefined)).rejects.toThrow(
+    await expect(provider.createResponse([], [], 'model', undefined, undefined)).rejects.toThrow(
       'Not implemented'
     );
   });

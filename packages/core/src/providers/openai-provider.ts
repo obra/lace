@@ -23,6 +23,7 @@ import {
   ProviderResponse,
   ProviderConfig,
   ProviderInfo,
+  ProviderRequestContext,
 } from '~/providers/base-provider';
 import { ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
@@ -512,7 +513,8 @@ export class OpenAIProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: Tool[] = [],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    context?: ProviderRequestContext
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
@@ -600,7 +602,8 @@ export class OpenAIProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: Tool[] = [],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    context?: ProviderRequestContext
   ): Promise<ProviderResponse> {
     let streamingStarted = false;
     let streamCreated = false;

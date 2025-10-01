@@ -7,6 +7,7 @@ import {
   ProviderResponse,
   ProviderInfo,
   ModelInfo,
+  ProviderRequestContext,
 } from '~/providers/base-provider';
 import type { ProviderMessage } from '~/providers/base-provider';
 import type { Tool } from '~/tools/tool';
@@ -36,7 +37,8 @@ export class ClaudeSDKProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: Tool[],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    context?: ProviderRequestContext
   ): Promise<ProviderResponse> {
     throw new Error('Not implemented');
   }

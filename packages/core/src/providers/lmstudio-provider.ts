@@ -9,6 +9,7 @@ import {
   ProviderConfig,
   ProviderInfo,
   ModelInfo,
+  ProviderRequestContext,
 } from '~/providers/base-provider';
 import { ToolCall } from '~/tools/types';
 import { Tool } from '~/tools/tool';
@@ -106,7 +107,8 @@ export class LMStudioProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: Tool[] = [],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    context?: ProviderRequestContext
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
