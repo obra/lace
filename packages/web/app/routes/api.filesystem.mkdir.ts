@@ -13,7 +13,16 @@ import type { Route } from './+types/api.filesystem.mkdir';
 export async function action({ request }: Route.ActionArgs) {
   try {
     const body = (await request.json()) as unknown;
-    const { parentPath, name } = CreateDirectoryRequestSchema.parse(body);
+    const parseResult = CreateDirectoryRequestSchema.safeParse(body);
+
+    if (!parseResult.success) {
+      return createErrorResponse('Invalid request: ' + parseResult.error.message, 400, {
+        code: 'INVALID_REQUEST',
+        details: parseResult.error.errors,
+      });
+    }
+
+    const { parentPath, name } = parseResult.data;
 
     // Security: Ensure parent path is within user's home directory
     const homeDir = homedir();

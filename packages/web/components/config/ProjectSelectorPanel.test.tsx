@@ -203,10 +203,9 @@ describe('ProjectSelectorPanel', () => {
     expect(screen.queryByText('Tool Access Policies')).not.toBeInTheDocument();
   });
 
-  it('should auto-populate project name from directory', async () => {
-    // Skip this test - DirectoryField now uses inline browser with Finder-style interaction
+  it.skip('should auto-populate project name from directory', async () => {
+    // DirectoryField now uses inline browser with Finder-style interaction
     // Project name auto-population from directory is tested in E2E tests
-    // Unit testing this requires mocking the browser interaction which is complex
   });
 
   afterAll(() => {
