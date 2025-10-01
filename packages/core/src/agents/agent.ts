@@ -1824,19 +1824,18 @@ export class Agent extends EventEmitter {
       this._completeTurn();
       this._setState('idle');
 
-      // Emit AGENT_MESSAGE event with current token usage after tool execution
+      // Emit TOKEN_USAGE_UPDATE event after tool execution
       // This ensures UI gets token updates even when no text response is generated
       const tokenUsage = this.getTokenUsage();
       this._addEventAndEmit({
-        type: 'AGENT_MESSAGE',
+        type: 'TOKEN_USAGE_UPDATE',
         data: {
-          content: '', // No text content after tool execution
           tokenUsage: {
             context: tokenUsage,
           },
         },
         context: { threadId: this._threadId },
-        transient: true, // Don't include in conversation history
+        transient: true,
       });
 
       // Emit conversation complete after successful tool batch completion
