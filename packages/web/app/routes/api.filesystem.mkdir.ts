@@ -26,10 +26,10 @@ export async function action({ request }: Route.ActionArgs) {
         fs.realpath(homeDir),
         fs.realpath(absoluteParent),
       ]);
-    } catch (realpathError) {
+    } catch (err) {
       // Check error code to return appropriate status
-      if (realpathError instanceof Error) {
-        const fsError = realpathError as NodeJS.ErrnoException;
+      if (err instanceof Error) {
+        const fsError = err as NodeJS.ErrnoException;
         if (fsError.code === 'ENOENT') {
           return createErrorResponse('Parent directory not found', 404, {
             code: 'PARENT_NOT_FOUND',
@@ -76,7 +76,7 @@ export async function action({ request }: Route.ActionArgs) {
     let realNewDirPath: string;
     try {
       realNewDirPath = await fs.realpath(newDirPath);
-    } catch (realpathError) {
+    } catch (_realpathError) {
       // If realpath fails (e.g., permissions changed), clean up and fail
       await fs.rmdir(newDirPath).catch(() => {
         /* ignore cleanup errors */
