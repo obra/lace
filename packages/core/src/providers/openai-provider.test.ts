@@ -1107,9 +1107,9 @@ describe('OpenAIProvider', () => {
       expect(callArgs.tools![1].function.name).toBe('server_action_2');
     });
 
-    it('should handle empty/whitespace tool names', async () => {
+    it('should reject empty/underscore-only tool names', async () => {
       class EmptyNameTool extends Tool {
-        name = '///';
+        name = '///'; // Sanitizes to '___' → collapsed to '_' → rejected
         description = 'Tool with only special chars';
         schema = z.object({});
 
@@ -1130,15 +1130,10 @@ describe('OpenAIProvider', () => {
         usage: {},
       });
 
-      await provider.createResponse([{ role: 'user', content: 'Test' }], [emptyTool], 'gpt-4o');
-
-      const callArgs = mockCreate.mock.calls[0][0] as {
-        tools?: Array<{ type: string; function: { name: string } }>;
-      };
-
-      // Should produce valid (non-empty) tool name
-      expect(callArgs.tools![0].function.name).toBeTruthy();
-      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+      // Should throw error for invalid tool name
+      await expect(
+        provider.createResponse([{ role: 'user', content: 'Test' }], [emptyTool], 'gpt-4o')
+      ).rejects.toThrow('invalid - sanitizes to empty or underscore-only');
     });
 
     it('should handle unicode characters in tool names', async () => {
@@ -1172,8 +1167,8 @@ describe('OpenAIProvider', () => {
 
       // Unicode should be stripped, leaving only valid chars
       expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
-      // Unicode chars each become underscore: 'tool/数据库/read' → 'tool_____read'
-      expect(callArgs.tools![0].function.name).toBe('tool_____read');
+      // Unicode chars become underscores, then collapsed: 'tool/数据库/read' → 'tool_read'
+      expect(callArgs.tools![0].function.name).toBe('tool_read');
     });
   });
 

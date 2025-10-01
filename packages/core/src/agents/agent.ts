@@ -1814,6 +1814,20 @@ export class Agent extends EventEmitter {
     this._toolAbortController = null;
     this._activeToolCalls.clear();
 
+    // Emit TOKEN_USAGE_UPDATE event after tool execution (both paths)
+    // This ensures UI gets token updates even when tools are rejected/aborted
+    const tokenUsage = this.getTokenUsage();
+    this._addEventAndEmit({
+      type: 'TOKEN_USAGE_UPDATE',
+      data: {
+        tokenUsage: {
+          context: tokenUsage,
+        },
+      },
+      context: { threadId: this._threadId },
+      transient: true,
+    });
+
     if (!shouldContinue) {
       // Has rejections/aborts - wait for user input
       this._setState('idle');
@@ -1823,20 +1837,6 @@ export class Agent extends EventEmitter {
       this._consecutiveRecoverableErrors = 0;
       this._completeTurn();
       this._setState('idle');
-
-      // Emit TOKEN_USAGE_UPDATE event after tool execution
-      // This ensures UI gets token updates even when no text response is generated
-      const tokenUsage = this.getTokenUsage();
-      this._addEventAndEmit({
-        type: 'TOKEN_USAGE_UPDATE',
-        data: {
-          tokenUsage: {
-            context: tokenUsage,
-          },
-        },
-        context: { threadId: this._threadId },
-        transient: true,
-      });
 
       // Emit conversation complete after successful tool batch completion
       this.emit('conversation_complete');

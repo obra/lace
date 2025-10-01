@@ -390,6 +390,9 @@ export class OpenAIProvider extends AIProvider {
     }
   }
 
+  private static readonly MAX_TOOL_NAME_LENGTH = 64;
+  private static readonly COLLISION_SUFFIX_RESERVE = 4;
+
   /**
    * Builds OpenAI tools with sanitized names and returns mapping
    * Request-scoped to prevent concurrent request interference
@@ -399,14 +402,20 @@ export class OpenAIProvider extends AIProvider {
     openaiTools: OpenAI.Chat.ChatCompletionTool[];
     mapping: Map<string, string>;
   } {
-    const MAX_TOOL_NAME_LENGTH = 64;
     const mapping = new Map<string, string>();
     const openaiTools: OpenAI.Chat.ChatCompletionTool[] = tools.map((tool) => {
-      const sanitized = tool.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const sanitized = tool.name.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_'); // Collapse consecutive underscores
 
-      // Reserve space for potential collision suffix (e.g., "_999" = 4 chars)
-      const reservedSuffixLength = 4;
-      const maxBaseLength = MAX_TOOL_NAME_LENGTH - reservedSuffixLength;
+      // Validate tool name is not empty or underscore-only after sanitization
+      if (!sanitized || /^_+$/.test(sanitized)) {
+        throw new Error(
+          `Tool name "${tool.name}" is invalid - sanitizes to empty or underscore-only string`
+        );
+      }
+
+      // Reserve space for potential collision suffix
+      const maxBaseLength =
+        OpenAIProvider.MAX_TOOL_NAME_LENGTH - OpenAIProvider.COLLISION_SUFFIX_RESERVE;
 
       // Truncate base name if needed to leave room for suffix
       let baseName = sanitized;
@@ -423,22 +432,28 @@ export class OpenAIProvider extends AIProvider {
         sanitizedName = `${baseName}_${suffix}`;
 
         // Ensure final name doesn't exceed 64 chars and is unique
-        while (mapping.has(sanitizedName) || sanitizedName.length > MAX_TOOL_NAME_LENGTH) {
+        while (
+          mapping.has(sanitizedName) ||
+          sanitizedName.length > OpenAIProvider.MAX_TOOL_NAME_LENGTH
+        ) {
           suffix++;
           sanitizedName = `${baseName}_${suffix}`;
 
           // If suffix grows too large, truncate base name further
-          if (sanitizedName.length > MAX_TOOL_NAME_LENGTH) {
+          if (sanitizedName.length > OpenAIProvider.MAX_TOOL_NAME_LENGTH) {
             const suffixStr = `_${suffix}`;
-            baseName = baseName.substring(0, MAX_TOOL_NAME_LENGTH - suffixStr.length);
+            baseName = baseName.substring(
+              0,
+              OpenAIProvider.MAX_TOOL_NAME_LENGTH - suffixStr.length
+            );
             sanitizedName = `${baseName}${suffixStr}`;
           }
         }
       }
 
       // Final length check (should never exceed, but defensive)
-      if (sanitizedName.length > MAX_TOOL_NAME_LENGTH) {
-        sanitizedName = sanitizedName.substring(0, MAX_TOOL_NAME_LENGTH);
+      if (sanitizedName.length > OpenAIProvider.MAX_TOOL_NAME_LENGTH) {
+        sanitizedName = sanitizedName.substring(0, OpenAIProvider.MAX_TOOL_NAME_LENGTH);
       }
 
       mapping.set(sanitizedName, tool.name);
