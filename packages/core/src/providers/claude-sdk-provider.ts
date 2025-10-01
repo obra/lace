@@ -215,7 +215,7 @@ export class ClaudeSDKProvider extends AIProvider {
               interrupt: false,
             };
 
-          case 'ask':
+          case 'ask': {
             // Need user approval - create promise and emit event
             const toolCallId = `approval-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -266,6 +266,7 @@ export class ClaudeSDKProvider extends AIProvider {
                 interrupt: true,
               };
             }
+          }
 
           default:
             // Safe default: require approval
