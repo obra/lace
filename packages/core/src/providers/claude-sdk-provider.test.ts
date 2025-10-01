@@ -1,5 +1,30 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ClaudeSDKProvider } from './claude-sdk-provider';
+import { ToolExecutor } from '~/tools/executor';
+import { Tool } from '~/tools/tool';
+import { z } from 'zod';
+import type { ProviderRequestContext } from '~/providers/base-provider';
+import type { ToolContext, ToolResult } from '~/tools/types';
+
+// Simple mock tool for testing
+class MockTool extends Tool {
+  name = 'mock_tool';
+  description = 'A mock tool for testing';
+  schema = z.object({
+    action: z.string(),
+  });
+
+  protected async executeValidated(
+    args: z.infer<typeof this.schema>,
+    context?: ToolContext
+  ): Promise<ToolResult> {
+    return {
+      id: 'test-id',
+      status: 'completed',
+      content: [{ type: 'text', text: `Executed: ${args.action}` }],
+    };
+  }
+}
 
 describe('ClaudeSDKProvider', () => {
   let provider: ClaudeSDKProvider;
@@ -88,5 +113,68 @@ describe('ClaudeSDKProvider - Session Management', () => {
     ];
 
     expect((provider as any).canResumeSession(messages2)).toBe(false);
+  });
+});
+
+describe('ClaudeSDKProvider - MCP Integration', () => {
+  it('should create MCP server from context', () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
+    const toolExecutor = new ToolExecutor();
+    const mockTool = new MockTool();
+    toolExecutor.registerTool(mockTool.name, mockTool);
+
+    const context: ProviderRequestContext = {
+      toolExecutor,
+      workingDirectory: '/test',
+    };
+
+    const server = (provider as any).createLaceToolsServer(context);
+
+    expect(server).toBeDefined();
+    expect(server.type).toBe('sdk');
+    expect(server.name).toBe('__lace-tools');
+  });
+
+  it('should throw if context lacks toolExecutor', () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
+    const context: ProviderRequestContext = {
+      workingDirectory: '/test',
+    };
+
+    expect(() => {
+      (provider as any).createLaceToolsServer(context);
+    }).toThrow('ToolExecutor required');
+  });
+
+  it('should convert ToolResult to CallToolResult', () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
+
+    const toolResult: ToolResult = {
+      id: 'test-id',
+      status: 'completed',
+      content: [
+        { type: 'text', text: 'Hello' },
+        { type: 'image', data: 'base64data', mimeType: 'image/png' },
+      ],
+    };
+
+    const mcpResult = (provider as any).convertToolResultToMCP(toolResult);
+
+    expect(mcpResult.content).toHaveLength(2);
+    expect(mcpResult.content[0].type).toBe('text');
+    expect(mcpResult.isError).toBe(false);
+  });
+
+  it('should mark failed results as errors', () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
+
+    const toolResult: ToolResult = {
+      id: 'test-id',
+      status: 'failed',
+      content: [{ type: 'text', text: 'Error message' }],
+    };
+
+    const mcpResult = (provider as any).convertToolResultToMCP(toolResult);
+    expect(mcpResult.isError).toBe(true);
   });
 });
