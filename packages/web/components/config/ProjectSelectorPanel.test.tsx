@@ -36,6 +36,11 @@ vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
   ProviderInstanceProvider: ({ children }: { children: ReactNode }) => children,
 }));
 
+vi.mock('@/components/providers/SettingsProvider', () => ({
+  useSettings: vi.fn(),
+  SettingsProvider: ({ children }: { children: ReactNode }) => children,
+}));
+
 // Mock React Router
 const mockNavigate = vi.fn();
 
@@ -53,12 +58,14 @@ import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
+import { useSettings } from '@/components/providers/SettingsProvider';
 
 const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseUIContext = vi.mocked(useUIContext);
 const mockUseOnboarding = vi.mocked(useOnboarding);
 const mockUseProviderInstances = vi.mocked(useProviderInstances);
+const mockUseSettings = vi.mocked(useSettings);
 
 const mockProviders = [
   {
@@ -132,6 +139,19 @@ describe('ProjectSelectorPanel', () => {
       handleAutoOpenProjectCreation: vi.fn(),
     });
 
+    mockUseSettings.mockReturnValue({
+      settings: {
+        theme: 'dark',
+        timelineWidth: 'medium',
+        debugPanelEnabled: false,
+        defaultModels: undefined,
+      },
+      setDaisyUITheme: vi.fn(),
+      setTimelineWidth: vi.fn(),
+      getTimelineMaxWidthClass: () => 'max-w-3xl',
+      setDebugPanelEnabled: vi.fn(),
+    });
+
     mockUseProviderInstances.mockReturnValue({
       instances: [],
       instancesLoading: false,
@@ -172,41 +192,20 @@ describe('ProjectSelectorPanel', () => {
     );
 
     // In simplified onboarding flow, modal opens directly at directory step (step 2)
-    expect(await screen.findByText('Create New Project')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Create New Project' })).toBeInTheDocument();
     expect(await screen.findByText('Set project directory')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('/path/to/your/project')).toBeInTheDocument();
+
+    // DirectoryField now uses inline browser - check for the label
+    expect(screen.getByText('Directory path')).toBeInTheDocument();
 
     // Should not show advanced options in simplified mode
     expect(screen.queryByText('Default Provider')).not.toBeInTheDocument();
     expect(screen.queryByText('Tool Access Policies')).not.toBeInTheDocument();
   });
 
-  it('should auto-populate project name from directory', async () => {
-    // Override to enable auto-open mode
-    mockUseUIContext.mockReturnValue(
-      createMockUIContext({
-        autoOpenCreateProject: true,
-        setAutoOpenCreateProject: mockHandlers.setAutoOpenCreateProject,
-      })
-    );
-
-    render(
-      <MemoryRouter initialEntries={['/']}>
-        <ProjectSelectorPanel />
-      </MemoryRouter>
-    );
-
-    // In simplified onboarding flow, modal opens directly at directory step
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText('/path/to/your/project')).toBeInTheDocument();
-    });
-
-    const directoryInput = screen.getByPlaceholderText('/path/to/your/project');
-    fireEvent.change(directoryInput, { target: { value: '/home/user/my-awesome-project' } });
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('my-awesome-project')).toBeInTheDocument();
-    });
+  it.skip('should auto-populate project name from directory', async () => {
+    // DirectoryField now uses inline browser with Finder-style interaction
+    // Project name auto-population from directory is tested in E2E tests
   });
 
   afterAll(() => {

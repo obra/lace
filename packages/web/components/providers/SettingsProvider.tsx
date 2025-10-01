@@ -21,6 +21,12 @@ const TimelineWidthSchema = z.enum(TIMELINE_WIDTHS);
 
 export { TIMELINE_WIDTHS };
 
+// Default models schema for validation
+const DefaultModelsSchema = z.object({
+  fast: z.string().optional(),
+  smart: z.string().optional(),
+});
+
 // Flat settings structure - matches existing API pattern
 const LaceSettingsSchema = z.object({
   // Theme settings (keeping existing structure for compatibility)
@@ -29,6 +35,9 @@ const LaceSettingsSchema = z.object({
 
   // Debugging settings
   debugPanelEnabled: z.boolean(),
+
+  // Default model settings
+  defaultModels: DefaultModelsSchema.optional(),
 });
 
 type DaisyUITheme = z.infer<typeof DaisyUIThemeSchema>;
@@ -87,6 +96,15 @@ export function useDebuggingSettings() {
   };
 }
 
+// Settings hook for accessing all settings
+export function useSettings() {
+  const context = useContext(SettingsContext);
+  if (!context) {
+    throw new Error('useSettings must be used within SettingsProvider');
+  }
+  return context;
+}
+
 interface SettingsProviderProps {
   children: ReactNode;
 }
@@ -95,6 +113,7 @@ const defaultSettings: LaceSettings = {
   theme: 'dark',
   timelineWidth: 'medium',
   debugPanelEnabled: false,
+  defaultModels: undefined,
 };
 
 function getTimelineMaxWidthClass(width: TimelineWidth): string {
@@ -127,6 +146,8 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
         const apiSettings = await api.get<Record<string, unknown>>('/api/settings');
 
         // Parse each setting with fallbacks
+        const defaultModelsParsed = DefaultModelsSchema.safeParse(apiSettings.defaultModels);
+
         const parsedSettings: LaceSettings = {
           theme: DaisyUIThemeSchema.safeParse(apiSettings.theme).success
             ? DaisyUIThemeSchema.parse(apiSettings.theme)
@@ -138,6 +159,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
             typeof apiSettings.debugPanelEnabled === 'boolean'
               ? apiSettings.debugPanelEnabled
               : defaultSettings.debugPanelEnabled,
+          defaultModels: defaultModelsParsed.success ? defaultModelsParsed.data : undefined,
         };
 
         if (!cancelled) {

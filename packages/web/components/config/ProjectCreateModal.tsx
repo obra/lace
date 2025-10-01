@@ -12,6 +12,7 @@ import { DirectoryField } from '@/components/ui';
 import { ModelSelector } from '@/components/ui/ModelSelector';
 import type { ToolPolicy } from '@/types/core';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
+import { useSettings } from '@/components/providers/SettingsProvider';
 import { DIRECTORY_BROWSER, WIZARD_PROGRESS } from '@/lib/constants/ui';
 
 interface ProjectConfiguration {
@@ -54,21 +55,36 @@ export function ProjectCreateModal({
 }: ProjectCreateModalProps) {
   // Get providers from ProviderInstanceProvider context
   const { availableProviders: providers } = useProviderInstances();
+  const { settings } = useSettings();
   const [createStep, setCreateStep] = useState<number>(2);
   const [createName, setCreateName] = useState('');
   const [createDescription, setCreateDescription] = useState('');
   const [createWorkingDirectory, setCreateWorkingDirectory] = useState('');
   const [createConfig, setCreateConfig] = useState<ProjectConfiguration>(DEFAULT_PROJECT_CONFIG);
-  const [userEditedName, setUserEditedName] = useState(false);
-  const [showDirHelp, setShowDirHelp] = useState(false);
   const [showProviderHelp, setShowProviderHelp] = useState(false);
 
   // Providers from context are already available/configured, no need to filter
   const availableProviders = useMemo(() => providers || [], [providers]);
 
-  // Initialize with first available provider instance
+  // Initialize with smart model from user settings (or fast as fallback)
   useEffect(() => {
     if (availableProviders.length > 0 && !createConfig.providerInstanceId) {
+      // Try smart model first, fallback to fast if not set
+      const modelString = settings.defaultModels?.smart || settings.defaultModels?.fast;
+      if (modelString) {
+        // Parse "instanceId:modelId" format
+        const [instanceId, modelId] = modelString.split(':');
+        if (instanceId && modelId) {
+          setCreateConfig((prev) => ({
+            ...prev,
+            providerInstanceId: instanceId,
+            modelId,
+          }));
+          return;
+        }
+      }
+
+      // Fallback to first available provider
       const firstProvider = availableProviders[0];
       setCreateConfig((prev) => ({
         ...prev,
@@ -76,7 +92,7 @@ export function ProjectCreateModal({
         modelId: firstProvider.models[0]?.id || '',
       }));
     }
-  }, [availableProviders, createConfig.providerInstanceId]);
+  }, [availableProviders, createConfig.providerInstanceId, settings.defaultModels]);
 
   // When the modal opens, start at step 2 (Directory)
   useEffect(() => {
@@ -91,26 +107,23 @@ export function ProjectCreateModal({
     setCreateDescription('');
     setCreateWorkingDirectory('');
     setCreateConfig({ ...DEFAULT_PROJECT_CONFIG });
-    setUserEditedName(false);
-    setShowDirHelp(false);
     setShowProviderHelp(false);
     setCreateStep(2);
     onClose();
   };
 
-  // Auto-populate name from directory in simplified mode
+  // Auto-populate name from directory
   const handleCreateDirectoryChange = (directory: string) => {
     setCreateWorkingDirectory(directory);
 
-    if (!userEditedName) {
-      const baseName =
-        directory
-          .replace(/[/\\]+$/, '')
-          .split(/[/\\]/)
-          .pop() || '';
-      if (baseName) {
-        setCreateName(baseName);
-      }
+    // Always auto-generate name from directory basename
+    const baseName =
+      directory
+        .replace(/[/\\]+$/, '')
+        .split(/[/\\]/)
+        .pop() || '';
+    if (baseName) {
+      setCreateName(baseName);
     }
   };
 
@@ -143,7 +156,7 @@ export function ProjectCreateModal({
       isOpen={isOpen}
       onClose={handleClose}
       title="Create New Project"
-      size="full"
+      size="xl"
       className="flex flex-col"
     >
       <form onSubmit={handleCreateProject} className="flex flex-col max-h-[85vh]">
@@ -152,79 +165,26 @@ export function ProjectCreateModal({
           <>
             {createStep === 2 && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between mb-3">
+                <div className="mb-3">
                   <h4 className="text-lg font-semibold">Set project directory</h4>
-                  <button
-                    type="button"
-                    className="btn btn-accent btn-xs btn-circle text-base-100 focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
-                    aria-label="Show directory tips"
-                    onClick={() => setShowDirHelp((v) => !v)}
-                    title={showDirHelp ? 'Hide tips' : 'Show tips'}
-                    aria-expanded={showDirHelp}
-                  >
-                    i
-                  </button>
                 </div>
-                <DirectoryField
-                  label="Directory path"
-                  value={createWorkingDirectory}
-                  onChange={handleCreateDirectoryChange}
-                  placeholder="/path/to/your/project"
-                  required
-                  className="input-lg focus:outline-none focus:ring-2 focus:ring-accent/60"
-                  inline
-                  minRows={DIRECTORY_BROWSER.DEFAULT_ROWS}
-                />
-                {createWorkingDirectory.trim() &&
-                  !createWorkingDirectory.trim().startsWith('/') && (
-                    <p className="mt-2 text-sm text-error">
-                      Please paste an absolute path starting with &quot;/&quot;.
-                    </p>
-                  )}
-                {showDirHelp && (
-                  <div className="collapse mt-3 text-sm text-base-content/60 space-y-2">
-                    <input type="checkbox" checked readOnly />
-                    <div className="collapse-title font-medium">How to copy the full path</div>
-                    <div className="collapse-content">
-                      <ul className="list-disc pl-5 space-y-1">
-                        <li>
-                          macOS Finder: hold <kbd>Option</kbd>, right‑click the folder → Copy &quot;
-                          <i>name</i>&quot; as Pathname
-                        </li>
-                        <li>
-                          Terminal: drag the folder into the Terminal window to paste its absolute
-                          path
-                        </li>
-                      </ul>
-                      <p className="font-medium">Tips</p>
-                      <ul className="list-disc pl-5 space-y-1">
-                        <li>
-                          Pick the repository root (where your package.json, pyproject.toml, or .git
-                          lives)
-                        </li>
-                        <li>You can change this later in Project Settings</li>
-                      </ul>
-                    </div>
-                  </div>
-                )}
-                <div className="mt-4 grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-medium">Project Name</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={createName}
-                      onChange={(e) => {
-                        setCreateName(e.target.value);
-                        setUserEditedName(true);
-                      }}
-                      data-testid="create-project-wizard-project-name"
-                      className="input input-bordered w-full focus:outline-none focus:ring-2 focus:ring-accent/60"
-                      placeholder="Enter project name"
-                      required
-                    />
-                  </div>
+                <div className="max-w-3xl">
+                  <DirectoryField
+                    label="Directory path"
+                    value={createWorkingDirectory}
+                    onChange={handleCreateDirectoryChange}
+                    placeholder="/path/to/your/project"
+                    required
+                    className="input-lg focus:outline-none focus:ring-2 focus:ring-accent/60"
+                    inline
+                    minRows={DIRECTORY_BROWSER.DEFAULT_ROWS}
+                  />
+                  {createWorkingDirectory.trim() &&
+                    !createWorkingDirectory.trim().startsWith('/') && (
+                      <p className="mt-2 text-sm text-error">
+                        Please paste an absolute path starting with &quot;/&quot;.
+                      </p>
+                    )}
                 </div>
               </div>
             )}

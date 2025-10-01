@@ -38,6 +38,11 @@ vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
   ProviderInstanceProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+vi.mock('@/components/providers/SettingsProvider', () => ({
+  useSettings: vi.fn(),
+  SettingsProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 // Mock React Router
 const mockNavigate = vi.fn();
 
@@ -55,12 +60,14 @@ import { useProjectContext } from '@/components/providers/ProjectProvider';
 import { useUIContext } from '@/components/providers/UIProvider';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
+import { useSettings } from '@/components/providers/SettingsProvider';
 
 const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseProjectContext = vi.mocked(useProjectContext);
 const mockUseUIContext = vi.mocked(useUIContext);
 const mockUseOnboarding = vi.mocked(useOnboarding);
 const mockUseProviderInstances = vi.mocked(useProviderInstances);
+const mockUseSettings = vi.mocked(useSettings);
 
 const mockProjects: ProjectInfo[] = [
   {
@@ -176,6 +183,19 @@ describe('ProjectSelectorPanel', () => {
       handleAutoOpenProjectCreation: vi.fn(),
     });
 
+    mockUseSettings.mockReturnValue({
+      settings: {
+        theme: 'dark',
+        timelineWidth: 'medium',
+        debugPanelEnabled: false,
+        defaultModels: undefined,
+      },
+      setDaisyUITheme: vi.fn(),
+      setTimelineWidth: vi.fn(),
+      getTimelineMaxWidthClass: () => 'max-w-3xl',
+      setDebugPanelEnabled: vi.fn(),
+    });
+
     mockUseProviderInstances.mockReturnValue({
       instances: [],
       instancesLoading: false,
@@ -289,8 +309,11 @@ describe('ProjectSelectorPanel', () => {
     });
 
     await user.click(screen.getByTestId('create-project-button'));
-    // Wizard now opens directly on Directory step
-    expect(await screen.findByPlaceholderText('/path/to/your/project')).toBeInTheDocument();
+    // Wizard now opens directly on Directory step with inline browser
+    // Wait for modal content to appear (not the button text)
+    expect(await screen.findByText('Set project directory')).toBeInTheDocument();
+    // Verify modal is open by checking for Directory path label
+    expect(screen.getByText('Directory path')).toBeInTheDocument();
   });
 
   it('should handle empty project list', async () => {

@@ -21,10 +21,34 @@ export async function loader({ request }: Route.LoaderArgs) {
     // Security: Ensure path is within user's home directory (follow symlinks)
     const homeDir = homedir();
     const absolutePath = resolve(path);
-    const [realHomeDir, realAbsolutePath] = await Promise.all([
-      fs.realpath(homeDir).catch(() => homeDir),
-      fs.realpath(absolutePath).catch(() => absolutePath),
-    ]);
+
+    let realHomeDir: string;
+    let realAbsolutePath: string;
+    try {
+      [realHomeDir, realAbsolutePath] = await Promise.all([
+        fs.realpath(homeDir),
+        fs.realpath(absolutePath),
+      ]);
+    } catch (realpathError) {
+      // Check error code to return appropriate status
+      if (realpathError instanceof Error) {
+        const fsError = realpathError as NodeJS.ErrnoException;
+        if (fsError.code === 'ENOENT') {
+          return createErrorResponse('Directory not found', 404, {
+            code: 'DIRECTORY_NOT_FOUND',
+          });
+        }
+        if (fsError.code === 'EACCES') {
+          return createErrorResponse('Permission denied', 403, {
+            code: 'PERMISSION_DENIED',
+          });
+        }
+      }
+      // Other realpath failures (symlink loops, etc.)
+      return createErrorResponse('Cannot resolve directory path', 400, {
+        code: 'PATH_RESOLUTION_FAILED',
+      });
+    }
 
     // Allow exact home or any descendant. Use separator-aware prefix check.
     const isInsideHome =
@@ -146,7 +170,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     const response: ListDirectoryResponse = {
       currentPath: absolutePath,
       parentPath: absolutePath === homeDir ? null : resolve(absolutePath, '..'),
-      entries: entries.filter((entry) => entry.type === 'directory'), // Only directories
+      entries, // Include both files and directories
       breadcrumbPaths,
       breadcrumbNames,
       homeDirectory: homeDir,
