@@ -1369,6 +1369,40 @@ describe('Enhanced Agent', () => {
       expect((errorEvents[0].context as { phase: string }).phase).toBe('provider_response');
     });
 
+    it('should emit error event when consecutive recoverable errors exceed limit', async () => {
+      // Create a provider that always throws recoverable errors
+      class RecoverableErrorProvider extends MockProvider {
+        override isRecoverableError(_error: unknown): boolean {
+          return true; // Treat all errors as recoverable
+        }
+      }
+
+      const recoverableProvider = new RecoverableErrorProvider({
+        content: '',
+        toolCalls: [],
+      });
+
+      vi.spyOn(recoverableProvider, 'createResponse').mockRejectedValue(
+        new Error('Tool validation error')
+      );
+
+      agent = createAgent();
+      vi.spyOn(agent as any, '_createProviderInstance').mockResolvedValue(recoverableProvider);
+      await agent.start();
+
+      const errorEvents: Array<{ error: Error; context: Record<string, unknown> }> = [];
+      agent.on('error', (data) => errorEvents.push(data));
+
+      await agent.sendMessage('Test');
+
+      // Wait for retries to complete (they happen via setImmediate)
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Should emit error event after MAX_CONSECUTIVE_RECOVERABLE_ERRORS (3) attempts
+      expect(errorEvents.length).toBeGreaterThan(0);
+      expect(errorEvents[0].error.message).toBe('Tool validation error');
+    });
+
     it('should return to idle state after error', async () => {
       const errorProvider = new MockProvider({
         content: '',

@@ -880,6 +880,13 @@ export class Agent extends EventEmitter {
               threadId: this._threadId,
               consecutiveErrors: this._consecutiveRecoverableErrors,
             });
+            // Emit error event so UI can display the error
+            this._emitError(error, {
+              phase: 'provider_response',
+              threadId: this._threadId,
+              errorType: 'max_retries_exceeded' as ErrorType,
+              consecutiveErrors: this._consecutiveRecoverableErrors,
+            });
             // Complete the turn properly to clean up metrics/timers
             this._completeTurn();
             this._setState('idle');

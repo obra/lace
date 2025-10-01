@@ -267,6 +267,15 @@ export class OpenAIProvider extends AIProvider {
   }
 
   /**
+   * Sanitizes tool names to match OpenAI's naming requirements
+   * OpenAI only accepts: letters, numbers, underscores, and hyphens
+   * Replaces any other character with underscore
+   */
+  private sanitizeToolName(toolName: string): string {
+    return toolName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  }
+
+  /**
    * Calibrates token costs for system prompt and individual tools
    * Uses tiktoken for precise local counting
    */
@@ -338,6 +347,9 @@ export class OpenAIProvider extends AIProvider {
     }
   }
 
+  // Store mapping between sanitized and original tool names for current request
+  private _toolNameMapping = new Map<string, string>();
+
   private _createRequestPayload(
     messages: ProviderMessage[],
     tools: Tool[],
@@ -359,14 +371,21 @@ export class OpenAIProvider extends AIProvider {
     ];
 
     // Convert tools to OpenAI format
-    const openaiTools: OpenAI.Chat.ChatCompletionTool[] = tools.map((tool) => ({
-      type: 'function' as const,
-      function: {
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.inputSchema,
-      },
-    }));
+    // Sanitize tool names to ensure they match OpenAI's pattern: ^[a-zA-Z0-9_-]+$
+    // Store mapping for reverse lookup when processing responses
+    this._toolNameMapping.clear();
+    const openaiTools: OpenAI.Chat.ChatCompletionTool[] = tools.map((tool) => {
+      const sanitizedName = this.sanitizeToolName(tool.name);
+      this._toolNameMapping.set(sanitizedName, tool.name);
+      return {
+        type: 'function' as const,
+        function: {
+          name: sanitizedName,
+          description: tool.description,
+          parameters: tool.inputSchema,
+        },
+      };
+    });
 
     const requestPayload: OpenAI.Chat.ChatCompletionCreateParams = {
       model,
@@ -409,9 +428,12 @@ export class OpenAIProvider extends AIProvider {
         const toolCalls: ToolCall[] =
           choice.message.tool_calls?.map((toolCall: OpenAI.Chat.ChatCompletionMessageToolCall) => {
             try {
+              // Map sanitized tool name back to original name
+              const originalName =
+                this._toolNameMapping.get(toolCall.function.name) || toolCall.function.name;
               return {
                 id: toolCall.id,
-                name: toolCall.function.name,
+                name: originalName,
                 arguments: JSON.parse(toolCall.function.arguments) as Record<string, unknown>,
               };
             } catch (error) {
@@ -590,9 +612,11 @@ export class OpenAIProvider extends AIProvider {
           // Convert partial tool calls to final format
           toolCalls = Array.from(partialToolCalls.values()).map((partial) => {
             try {
+              // Map sanitized tool name back to original name
+              const originalName = this._toolNameMapping.get(partial.name) || partial.name;
               return {
                 id: partial.id,
-                name: partial.name,
+                name: originalName,
                 arguments: JSON.parse(partial.arguments) as Record<string, unknown>,
               };
             } catch (error) {

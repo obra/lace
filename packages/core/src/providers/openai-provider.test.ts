@@ -599,6 +599,163 @@ describe('OpenAIProvider', () => {
     });
   });
 
+  describe('tool name sanitization', () => {
+    it('should sanitize tool names with forward slashes (e.g., MCP tools)', async () => {
+      class MCPStyleTool extends Tool {
+        name = 'filesystem/read_file';
+        description = 'MCP tool with slash in name';
+        schema = z.object({
+          path: z.string(),
+        });
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('read file');
+        }
+      }
+
+      const mcpTool = new MCPStyleTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [mcpTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string; description: string } }>;
+      };
+
+      // Tool name should be sanitized to replace / with _
+      expect(callArgs.tools).toBeDefined();
+      expect(callArgs.tools).toHaveLength(1);
+      expect(callArgs.tools![0].function.name).toBe('filesystem_read_file');
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+    });
+
+    it('should sanitize tool names with multiple invalid characters', async () => {
+      class ComplexTool extends Tool {
+        name = 'server:name/tool.action';
+        description = 'Tool with multiple invalid chars';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      const complexTool = new ComplexTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [complexTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // All invalid characters should be replaced with underscores
+      expect(callArgs.tools).toBeDefined();
+      expect(callArgs.tools![0].function.name).toBe('server_name_tool_action');
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+    });
+
+    it('should not modify already valid tool names', async () => {
+      class ValidTool extends Tool {
+        name = 'valid_tool-name123';
+        description = 'Valid tool name';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      const validTool = new ValidTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [validTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Valid name should remain unchanged
+      expect(callArgs.tools![0].function.name).toBe('valid_tool-name123');
+    });
+
+    it('should map sanitized tool names back to original in responses', async () => {
+      class MCPStyleTool extends Tool {
+        name = 'filesystem/read_file';
+        description = 'MCP tool with slash in name';
+        schema = z.object({
+          path: z.string(),
+        });
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('read file');
+        }
+      }
+
+      const mcpTool = new MCPStyleTool();
+
+      // OpenAI returns the sanitized name in tool_calls
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: 'Reading file',
+              tool_calls: [
+                {
+                  id: 'call_123',
+                  function: {
+                    name: 'filesystem_read_file', // Sanitized name
+                    arguments: JSON.stringify({ path: '/test.txt' }),
+                  },
+                },
+              ],
+            },
+            finish_reason: 'tool_calls',
+          },
+        ],
+        usage: {},
+      });
+
+      const response = await provider.createResponse(
+        [{ role: 'user', content: 'Read file' }],
+        [mcpTool],
+        'gpt-4o'
+      );
+
+      // Response should contain the original tool name, not sanitized
+      expect(response.toolCalls).toHaveLength(1);
+      expect(response.toolCalls[0].name).toBe('filesystem/read_file');
+      expect(response.toolCalls[0].arguments).toEqual({ path: '/test.txt' });
+    });
+  });
+
   describe('token counting', () => {
     it('should count tokens using tiktoken for known models', async () => {
       const messages = [
