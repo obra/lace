@@ -230,6 +230,51 @@ describe('OpenAIProvider', () => {
       mockCreate.mockReturnValue(mockStream);
     });
 
+    it('should fall back to non-streaming when organization verification required', async () => {
+      // Mock streaming to throw verification error with proper OpenAI error structure
+      const verificationError = Object.assign(
+        new Error(
+          '400 Your organization must be verified to stream this model. Please go to: https://platform.openai.com/settings/organization/general'
+        ),
+        {
+          status: 400,
+          type: 'invalid_request_error',
+          code: 'unsupported_value',
+          param: 'stream',
+        }
+      );
+
+      // First call (streaming) throws error, second call (non-streaming) succeeds
+      mockCreate.mockRejectedValueOnce(verificationError).mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: 'Non-streaming response',
+              tool_calls: undefined,
+            },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      });
+
+      const messages = [{ role: 'user' as const, content: 'Test' }];
+      const response = await provider.createStreamingResponse(messages, [], 'gpt-4o');
+
+      // Should successfully return with non-streaming response
+      expect(response.content).toBe('Non-streaming response');
+      expect(response.stopReason).toBe('stop');
+
+      // Should have called create twice: once for streaming (failed), once for non-streaming (succeeded)
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+
+      // First call should have stream: true
+      expect(mockCreate.mock.calls[0][0]).toMatchObject({ stream: true });
+
+      // Second call should have stream: false (fallback to non-streaming)
+      expect(mockCreate.mock.calls[1][0]).toMatchObject({ stream: false });
+    });
+
     it('should create streaming response correctly', async () => {
       const chunks = [
         {

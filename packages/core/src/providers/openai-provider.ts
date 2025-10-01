@@ -276,6 +276,28 @@ export class OpenAIProvider extends AIProvider {
   }
 
   /**
+   * Checks if an error is due to streaming requiring organization verification
+   * OpenAI returns: type='invalid_request_error', code='unsupported_value', param='stream'
+   */
+  private isStreamingVerificationError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    const errorObj = error as {
+      type?: string;
+      code?: string;
+      param?: string;
+    };
+
+    return (
+      errorObj.type === 'invalid_request_error' &&
+      errorObj.code === 'unsupported_value' &&
+      errorObj.param === 'stream'
+    );
+  }
+
+  /**
    * Calibrates token costs for system prompt and individual tools
    * Uses tiktoken for precise local counting
    */
@@ -699,6 +721,17 @@ export class OpenAIProvider extends AIProvider {
         } catch (error) {
           const errorObj = error as Error;
           logger.error('Streaming error from OpenAI', { error: errorObj.message });
+
+          // Check if this is a streaming verification error
+          if (this.isStreamingVerificationError(error)) {
+            logger.warn(
+              'OpenAI streaming requires organization verification, falling back to non-streaming mode',
+              { model }
+            );
+            // Fall back to non-streaming mode
+            return this.createResponse(messages, tools, model, signal);
+          }
+
           throw error;
         }
       },
