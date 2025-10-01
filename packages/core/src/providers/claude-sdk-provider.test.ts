@@ -42,3 +42,51 @@ describe('ClaudeSDKProvider', () => {
     );
   });
 });
+
+describe('ClaudeSDKProvider - Session Management', () => {
+  it('should not resume on first turn', () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
+    const messages = [{ role: 'user' as const, content: 'Hello' }];
+
+    // Access protected method for testing
+    expect((provider as any).canResumeSession(messages)).toBe(false);
+  });
+
+  it('should resume when history unchanged', () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
+    const messages = [
+      { role: 'user' as const, content: 'Hello' },
+      { role: 'assistant' as const, content: 'Hi' },
+      { role: 'user' as const, content: 'How are you?' },
+    ];
+
+    // Simulate first turn
+    (provider as any).sessionId = 'session-123';
+    (provider as any).updateFingerprint(messages.slice(0, -1));
+
+    // Check second turn with same history
+    expect((provider as any).canResumeSession(messages)).toBe(true);
+  });
+
+  it('should not resume when history changed', () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
+
+    // First conversation
+    const messages1 = [
+      { role: 'user' as const, content: 'Hello' },
+      { role: 'assistant' as const, content: 'Hi' },
+      { role: 'user' as const, content: 'Question' },
+    ];
+
+    (provider as any).sessionId = 'session-123';
+    (provider as any).updateFingerprint(messages1.slice(0, -1));
+
+    // Compacted conversation (different history)
+    const messages2 = [
+      { role: 'assistant' as const, content: 'Summary of previous conversation' },
+      { role: 'user' as const, content: 'New question' },
+    ];
+
+    expect((provider as any).canResumeSession(messages2)).toBe(false);
+  });
+});

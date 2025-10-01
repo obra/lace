@@ -12,6 +12,7 @@ import {
 import type { ProviderMessage } from '~/providers/base-provider';
 import type { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
+import { createHash } from 'crypto';
 
 interface ClaudeSDKProviderConfig extends ProviderConfig {
   sessionToken: string | null; // SDK session credentials
@@ -83,5 +84,36 @@ export class ClaudeSDKProvider extends AIProvider {
   isConfigured(): boolean {
     const config = this._config as ClaudeSDKProviderConfig;
     return !!config.sessionToken && config.sessionToken.length > 0;
+  }
+
+  /**
+   * Fingerprint conversation history to detect changes (compaction, edits)
+   * Returns SHA256 hash of all messages to enable change detection
+   */
+  protected fingerprintHistory(messages: ProviderMessage[]): string {
+    return createHash('sha256').update(JSON.stringify(messages)).digest('hex');
+  }
+
+  /**
+   * Check if history has changed since last turn
+   * Returns true if we can resume, false if we need new session
+   */
+  protected canResumeSession(messages: ProviderMessage[]): boolean {
+    if (!this.sessionId || !this.lastHistoryFingerprint) {
+      return false;
+    }
+
+    // Fingerprint everything except the latest user message
+    const historyMessages = messages.slice(0, -1);
+    const currentFingerprint = this.fingerprintHistory(historyMessages);
+
+    return currentFingerprint === this.lastHistoryFingerprint;
+  }
+
+  /**
+   * Update fingerprint after successful turn
+   */
+  protected updateFingerprint(messages: ProviderMessage[]): void {
+    this.lastHistoryFingerprint = this.fingerprintHistory(messages);
   }
 }
