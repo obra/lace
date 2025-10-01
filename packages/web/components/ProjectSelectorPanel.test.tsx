@@ -310,7 +310,7 @@ describe('ProjectSelectorPanel', () => {
 
     await user.click(screen.getByTestId('create-project-button'));
     // Wizard now opens directly on Directory step with inline browser
-    expect(await screen.findByText('Create New Project')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Create New Project' })).toBeInTheDocument();
     expect(await screen.findByText('Set project directory')).toBeInTheDocument();
   });
 

@@ -192,12 +192,11 @@ describe('ProjectSelectorPanel', () => {
     );
 
     // In simplified onboarding flow, modal opens directly at directory step (step 2)
-    expect(await screen.findByText('Create New Project')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Create New Project' })).toBeInTheDocument();
     expect(await screen.findByText('Set project directory')).toBeInTheDocument();
 
-    // DirectoryField now uses inline browser with hidden input
-    const directoryInput = screen.getByLabelText('Directory path');
-    expect(directoryInput).toBeInTheDocument();
+    // DirectoryField now uses inline browser - check for the label
+    expect(screen.getByText('Directory path')).toBeInTheDocument();
 
     // Should not show advanced options in simplified mode
     expect(screen.queryByText('Default Provider')).not.toBeInTheDocument();
