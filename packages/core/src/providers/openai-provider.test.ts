@@ -799,6 +799,56 @@ describe('OpenAIProvider', () => {
       expect(response.toolCalls[0].name).toBe('filesystem/read_file');
       expect(response.toolCalls[0].arguments).toEqual({ path: '/test.txt' });
     });
+
+    it('should handle tool name collisions by appending numeric suffix', async () => {
+      class Tool1 extends Tool {
+        name = 'server/action';
+        description = 'Tool 1';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool1');
+        }
+      }
+
+      class Tool2 extends Tool {
+        name = 'server:action'; // Sanitizes to same name as Tool1
+        description = 'Tool 2';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool2');
+        }
+      }
+
+      const tool1 = new Tool1();
+      const tool2 = new Tool2();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [tool1, tool2], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // First tool should get base name, second should get suffix
+      expect(callArgs.tools).toBeDefined();
+      expect(callArgs.tools).toHaveLength(2);
+      expect(callArgs.tools![0].function.name).toBe('server_action');
+      expect(callArgs.tools![1].function.name).toBe('server_action_2');
+      // Both should match OpenAI pattern
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+      expect(callArgs.tools![1].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+    });
   });
 
   describe('token counting', () => {

@@ -270,9 +270,25 @@ export class OpenAIProvider extends AIProvider {
    * Sanitizes tool names to match OpenAI's naming requirements
    * OpenAI only accepts: letters, numbers, underscores, and hyphens
    * Replaces any other character with underscore
+   * Handles collisions by appending numeric suffix
    */
   private sanitizeToolName(toolName: string): string {
-    return toolName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const sanitized = toolName.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    // Check for collision with existing mappings
+    const existingOriginal = this._toolNameMapping.get(sanitized);
+    if (existingOriginal !== undefined && existingOriginal !== toolName) {
+      // Collision detected - append suffix to make unique
+      let suffix = 2;
+      let uniqueName = `${sanitized}_${suffix}`;
+      while (this._toolNameMapping.has(uniqueName)) {
+        suffix++;
+        uniqueName = `${sanitized}_${suffix}`;
+      }
+      return uniqueName;
+    }
+
+    return sanitized;
   }
 
   /**
