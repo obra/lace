@@ -1217,12 +1217,15 @@ export class Agent extends EventEmitter {
 
       // Build provider request context
       const session = await this.getFullSession();
+      const projectId = session?.getProjectId();
       const context: ProviderRequestContext = {
         agent: this,
         toolExecutor: this._toolExecutor,
         session: session || undefined,
         workingDirectory: this._getWorkingDirectory(),
-        processEnv: process.env,
+        processEnv: projectId
+          ? this._toolExecutor.getEnvironmentManager().getMergedEnvironment(projectId)
+          : process.env,
       };
 
       const response = await this.providerInstance.createStreamingResponse(
@@ -1355,12 +1358,15 @@ export class Agent extends EventEmitter {
 
       // Build provider request context
       const session = await this.getFullSession();
+      const projectId = session?.getProjectId();
       const context: ProviderRequestContext = {
         agent: this,
         toolExecutor: this._toolExecutor,
         session: session || undefined,
         workingDirectory: this._getWorkingDirectory(),
-        processEnv: process.env,
+        processEnv: projectId
+          ? this._toolExecutor.getEnvironmentManager().getMergedEnvironment(projectId)
+          : process.env,
       };
 
       const response = await this.providerInstance.createResponse(
