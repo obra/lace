@@ -363,27 +363,54 @@ export class OpenAIProvider extends AIProvider {
   /**
    * Builds OpenAI tools with sanitized names and returns mapping
    * Request-scoped to prevent concurrent request interference
+   * Enforces OpenAI's 64-character limit on tool names
    */
   private buildToolsWithMapping(tools: Tool[]): {
     openaiTools: OpenAI.Chat.ChatCompletionTool[];
     mapping: Map<string, string>;
   } {
+    const MAX_TOOL_NAME_LENGTH = 64;
     const mapping = new Map<string, string>();
     const openaiTools: OpenAI.Chat.ChatCompletionTool[] = tools.map((tool) => {
       const sanitized = tool.name.replace(/[^a-zA-Z0-9_-]/g, '_');
 
+      // Reserve space for potential collision suffix (e.g., "_999" = 4 chars)
+      // Start with 3 chars for "_2", grow as needed
+      const reservedSuffixLength = 4;
+      const maxBaseLength = MAX_TOOL_NAME_LENGTH - reservedSuffixLength;
+
+      // Truncate base name if needed to leave room for suffix
+      let baseName = sanitized;
+      if (baseName.length > maxBaseLength) {
+        baseName = baseName.substring(0, maxBaseLength);
+      }
+
       // Check for collision with existing mappings in this request
-      const existingOriginal = mapping.get(sanitized);
-      let sanitizedName = sanitized;
+      const existingOriginal = mapping.get(baseName);
+      let sanitizedName = baseName;
 
       if (existingOriginal !== undefined && existingOriginal !== tool.name) {
         // Collision detected - append suffix to make unique
         let suffix = 2;
-        sanitizedName = `${sanitized}_${suffix}`;
-        while (mapping.has(sanitizedName)) {
+        sanitizedName = `${baseName}_${suffix}`;
+
+        // Ensure final name doesn't exceed 64 chars
+        while (mapping.has(sanitizedName) || sanitizedName.length > MAX_TOOL_NAME_LENGTH) {
           suffix++;
-          sanitizedName = `${sanitized}_${suffix}`;
+          sanitizedName = `${baseName}_${suffix}`;
+
+          // If suffix grows too large, truncate base name further
+          if (sanitizedName.length > MAX_TOOL_NAME_LENGTH) {
+            const suffixStr = `_${suffix}`;
+            baseName = baseName.substring(0, MAX_TOOL_NAME_LENGTH - suffixStr.length);
+            sanitizedName = `${baseName}${suffixStr}`;
+          }
         }
+      }
+
+      // Final length check (should never exceed, but defensive)
+      if (sanitizedName.length > MAX_TOOL_NAME_LENGTH) {
+        sanitizedName = sanitizedName.substring(0, MAX_TOOL_NAME_LENGTH);
       }
 
       mapping.set(sanitizedName, tool.name);

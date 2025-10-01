@@ -985,6 +985,90 @@ describe('OpenAIProvider', () => {
       expect(callArgs.tools![1].function.name).toBe('server_action_2');
       expect(callArgs.tools![2].function.name).toBe('server_action_3');
     });
+
+    it('should enforce 64-character limit on tool names', async () => {
+      class LongNameTool extends Tool {
+        // 80 character tool name (exceeds 64 char limit)
+        name = 'very_long_tool_name_that_exceeds_the_maximum_allowed_length_of_sixty_four_chars';
+        description = 'Tool with very long name';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      const longTool = new LongNameTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [longTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Tool name should be truncated to 64 chars max
+      expect(callArgs.tools![0].function.name.length).toBeLessThanOrEqual(64);
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+    });
+
+    it('should handle long tool names with collisions', async () => {
+      // Two 80-char names that both truncate to the same 60 chars
+      class LongTool1 extends Tool {
+        name = 'very_long_tool_name_that_exceeds_maximum_length_and_will_be_truncated_1';
+        description = 'Long tool 1';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool1');
+        }
+      }
+
+      class LongTool2 extends Tool {
+        name = 'very_long_tool_name_that_exceeds_maximum_length_and_will_be_truncated_2';
+        description = 'Long tool 2';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool2');
+        }
+      }
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse(
+        [{ role: 'user', content: 'Test' }],
+        [new LongTool1(), new LongTool2()],
+        'gpt-4o'
+      );
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Both tools should have unique names within 64 char limit
+      expect(callArgs.tools).toHaveLength(2);
+      expect(callArgs.tools![0].function.name.length).toBeLessThanOrEqual(64);
+      expect(callArgs.tools![1].function.name.length).toBeLessThanOrEqual(64);
+      expect(callArgs.tools![0].function.name).not.toBe(callArgs.tools![1].function.name);
+    });
   });
 
   describe('token counting', () => {
