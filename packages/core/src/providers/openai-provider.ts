@@ -267,31 +267,6 @@ export class OpenAIProvider extends AIProvider {
   }
 
   /**
-   * Sanitizes tool names to match OpenAI's naming requirements
-   * OpenAI only accepts: letters, numbers, underscores, and hyphens
-   * Replaces any other character with underscore
-   * Handles collisions by appending numeric suffix
-   */
-  private sanitizeToolName(toolName: string): string {
-    const sanitized = toolName.replace(/[^a-zA-Z0-9_-]/g, '_');
-
-    // Check for collision with existing mappings
-    const existingOriginal = this._toolNameMapping.get(sanitized);
-    if (existingOriginal !== undefined && existingOriginal !== toolName) {
-      // Collision detected - append suffix to make unique
-      let suffix = 2;
-      let uniqueName = `${sanitized}_${suffix}`;
-      while (this._toolNameMapping.has(uniqueName)) {
-        suffix++;
-        uniqueName = `${sanitized}_${suffix}`;
-      }
-      return uniqueName;
-    }
-
-    return sanitized;
-  }
-
-  /**
    * Checks if an error is due to streaming requiring organization verification
    * OpenAI returns: type='invalid_request_error', code='unsupported_value', param='stream'
    */
@@ -385,15 +360,56 @@ export class OpenAIProvider extends AIProvider {
     }
   }
 
-  // Store mapping between sanitized and original tool names for current request
-  private _toolNameMapping = new Map<string, string>();
+  /**
+   * Builds OpenAI tools with sanitized names and returns mapping
+   * Request-scoped to prevent concurrent request interference
+   */
+  private buildToolsWithMapping(tools: Tool[]): {
+    openaiTools: OpenAI.Chat.ChatCompletionTool[];
+    mapping: Map<string, string>;
+  } {
+    const mapping = new Map<string, string>();
+    const openaiTools: OpenAI.Chat.ChatCompletionTool[] = tools.map((tool) => {
+      const sanitized = tool.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+      // Check for collision with existing mappings in this request
+      const existingOriginal = mapping.get(sanitized);
+      let sanitizedName = sanitized;
+
+      if (existingOriginal !== undefined && existingOriginal !== tool.name) {
+        // Collision detected - append suffix to make unique
+        let suffix = 2;
+        sanitizedName = `${sanitized}_${suffix}`;
+        while (mapping.has(sanitizedName)) {
+          suffix++;
+          sanitizedName = `${sanitized}_${suffix}`;
+        }
+      }
+
+      mapping.set(sanitizedName, tool.name);
+
+      return {
+        type: 'function' as const,
+        function: {
+          name: sanitizedName,
+          description: tool.description,
+          parameters: tool.inputSchema,
+        },
+      };
+    });
+
+    return { openaiTools, mapping };
+  }
 
   private _createRequestPayload(
     messages: ProviderMessage[],
     tools: Tool[],
     model: string,
     stream: boolean
-  ): OpenAI.Chat.ChatCompletionCreateParams {
+  ): {
+    payload: OpenAI.Chat.ChatCompletionCreateParams;
+    toolNameMapping: Map<string, string>;
+  } {
     // Convert our enhanced generic messages to OpenAI format
     const openaiMessages = convertToOpenAIFormat(
       messages
@@ -408,22 +424,8 @@ export class OpenAIProvider extends AIProvider {
       ...openaiMessages.filter((msg) => msg.role !== 'system'),
     ];
 
-    // Convert tools to OpenAI format
-    // Sanitize tool names to ensure they match OpenAI's pattern: ^[a-zA-Z0-9_-]+$
-    // Store mapping for reverse lookup when processing responses
-    this._toolNameMapping.clear();
-    const openaiTools: OpenAI.Chat.ChatCompletionTool[] = tools.map((tool) => {
-      const sanitizedName = this.sanitizeToolName(tool.name);
-      this._toolNameMapping.set(sanitizedName, tool.name);
-      return {
-        type: 'function' as const,
-        function: {
-          name: sanitizedName,
-          description: tool.description,
-          parameters: tool.inputSchema,
-        },
-      };
-    });
+    // Build tools with sanitized names and get mapping (request-scoped)
+    const { openaiTools, mapping } = this.buildToolsWithMapping(tools);
 
     const requestPayload: OpenAI.Chat.ChatCompletionCreateParams = {
       model,
@@ -433,7 +435,7 @@ export class OpenAIProvider extends AIProvider {
       ...(tools.length > 0 && { tools: openaiTools }),
     };
 
-    return requestPayload;
+    return { payload: requestPayload, toolNameMapping: mapping };
   }
 
   async createResponse(
@@ -444,7 +446,12 @@ export class OpenAIProvider extends AIProvider {
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
-        const requestPayload = this._createRequestPayload(messages, tools, model, false);
+        const { payload: requestPayload, toolNameMapping } = this._createRequestPayload(
+          messages,
+          tools,
+          model,
+          false
+        );
 
         // Log request with pretty formatting
         logProviderRequest('openai', requestPayload as unknown as Record<string, unknown>);
@@ -466,9 +473,9 @@ export class OpenAIProvider extends AIProvider {
         const toolCalls: ToolCall[] =
           choice.message.tool_calls?.map((toolCall: OpenAI.Chat.ChatCompletionMessageToolCall) => {
             try {
-              // Map sanitized tool name back to original name
+              // Map sanitized tool name back to original name using request-scoped mapping
               const originalName =
-                this._toolNameMapping.get(toolCall.function.name) || toolCall.function.name;
+                toolNameMapping.get(toolCall.function.name) || toolCall.function.name;
               return {
                 id: toolCall.id,
                 name: originalName,
@@ -549,7 +556,12 @@ export class OpenAIProvider extends AIProvider {
 
     return this.withRetry(
       async () => {
-        const requestPayload = this._createRequestPayload(messages, tools, model, true);
+        const { payload: requestPayload, toolNameMapping } = this._createRequestPayload(
+          messages,
+          tools,
+          model,
+          true
+        );
 
         // Log streaming request with pretty formatting
         logProviderRequest('openai', requestPayload as unknown as Record<string, unknown>, {
@@ -650,8 +662,8 @@ export class OpenAIProvider extends AIProvider {
           // Convert partial tool calls to final format
           toolCalls = Array.from(partialToolCalls.values()).map((partial) => {
             try {
-              // Map sanitized tool name back to original name
-              const originalName = this._toolNameMapping.get(partial.name) || partial.name;
+              // Map sanitized tool name back to original name using request-scoped mapping
+              const originalName = toolNameMapping.get(partial.name) || partial.name;
               return {
                 id: partial.id,
                 name: originalName,

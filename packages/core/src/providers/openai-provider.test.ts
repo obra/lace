@@ -849,6 +849,84 @@ describe('OpenAIProvider', () => {
       expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
       expect(callArgs.tools![1].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
     });
+
+    it('should handle concurrent requests with different tool sets without interference', async () => {
+      class ToolA extends Tool {
+        name = 'mcp/tool_a';
+        description = 'Tool A';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('a');
+        }
+      }
+
+      class ToolB extends Tool {
+        name = 'mcp/tool_b';
+        description = 'Tool B';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('b');
+        }
+      }
+
+      const toolA = new ToolA();
+      const toolB = new ToolB();
+
+      // Simulate concurrent requests with different tools
+      mockCreate
+        .mockResolvedValueOnce({
+          choices: [
+            {
+              message: {
+                content: 'Using tool A',
+                tool_calls: [
+                  {
+                    id: 'call_a',
+                    function: {
+                      name: 'mcp_tool_a',
+                      arguments: JSON.stringify({}),
+                    },
+                  },
+                ],
+              },
+              finish_reason: 'tool_calls',
+            },
+          ],
+          usage: {},
+        })
+        .mockResolvedValueOnce({
+          choices: [
+            {
+              message: {
+                content: 'Using tool B',
+                tool_calls: [
+                  {
+                    id: 'call_b',
+                    function: {
+                      name: 'mcp_tool_b',
+                      arguments: JSON.stringify({}),
+                    },
+                  },
+                ],
+              },
+              finish_reason: 'tool_calls',
+            },
+          ],
+          usage: {},
+        });
+
+      // Fire both requests concurrently
+      const [response1, response2] = await Promise.all([
+        provider.createResponse([{ role: 'user', content: 'Use A' }], [toolA], 'gpt-4o'),
+        provider.createResponse([{ role: 'user', content: 'Use B' }], [toolB], 'gpt-4o'),
+      ]);
+
+      // Each response should correctly map back to its original tool name
+      expect(response1.toolCalls[0].name).toBe('mcp/tool_a');
+      expect(response2.toolCalls[0].name).toBe('mcp/tool_b');
+    });
   });
 
   describe('token counting', () => {
