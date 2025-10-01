@@ -267,6 +267,36 @@ export class OpenAIProvider extends AIProvider {
   }
 
   /**
+   * Parses OpenAI tool call and maps sanitized name back to original
+   * Shared by both streaming and non-streaming responses
+   */
+  private parseToolCall(
+    toolCall: { id: string; function: { name: string; arguments: string } },
+    toolNameMapping: Map<string, string>
+  ): ToolCall {
+    const originalName = toolNameMapping.get(toolCall.function.name) || toolCall.function.name;
+
+    try {
+      return {
+        id: toolCall.id,
+        name: originalName,
+        arguments: JSON.parse(toolCall.function.arguments) as Record<string, unknown>,
+      };
+    } catch (error) {
+      logger.error('Failed to parse tool call arguments', {
+        toolCallId: toolCall.id,
+        toolName: originalName,
+        sanitizedName: toolCall.function.name,
+        arguments: toolCall.function.arguments,
+        error: (error as Error).message,
+      });
+      throw new Error(
+        `Invalid JSON in tool call arguments for ${originalName}: ${(error as Error).message}`
+      );
+    }
+  }
+
+  /**
    * Checks if an error is due to streaming requiring organization verification
    * OpenAI returns: type='invalid_request_error', code='unsupported_value', param='stream'
    */
@@ -375,7 +405,6 @@ export class OpenAIProvider extends AIProvider {
       const sanitized = tool.name.replace(/[^a-zA-Z0-9_-]/g, '_');
 
       // Reserve space for potential collision suffix (e.g., "_999" = 4 chars)
-      // Start with 3 chars for "_2", grow as needed
       const reservedSuffixLength = 4;
       const maxBaseLength = MAX_TOOL_NAME_LENGTH - reservedSuffixLength;
 
@@ -385,16 +414,15 @@ export class OpenAIProvider extends AIProvider {
         baseName = baseName.substring(0, maxBaseLength);
       }
 
-      // Check for collision with existing mappings in this request
-      const existingOriginal = mapping.get(baseName);
+      // Check if sanitized name is already used (handles both collisions and duplicates)
       let sanitizedName = baseName;
 
-      if (existingOriginal !== undefined && existingOriginal !== tool.name) {
-        // Collision detected - append suffix to make unique
+      if (mapping.has(sanitizedName)) {
+        // Name already used - append suffix to make unique
         let suffix = 2;
         sanitizedName = `${baseName}_${suffix}`;
 
-        // Ensure final name doesn't exceed 64 chars
+        // Ensure final name doesn't exceed 64 chars and is unique
         while (mapping.has(sanitizedName) || sanitizedName.length > MAX_TOOL_NAME_LENGTH) {
           suffix++;
           sanitizedName = `${baseName}_${suffix}`;
@@ -498,30 +526,9 @@ export class OpenAIProvider extends AIProvider {
         const textContent = choice.message.content || '';
 
         const toolCalls: ToolCall[] =
-          choice.message.tool_calls?.map((toolCall: OpenAI.Chat.ChatCompletionMessageToolCall) => {
-            // Map sanitized tool name back to original name using request-scoped mapping
-            const originalName =
-              toolNameMapping.get(toolCall.function.name) || toolCall.function.name;
-
-            try {
-              return {
-                id: toolCall.id,
-                name: originalName,
-                arguments: JSON.parse(toolCall.function.arguments) as Record<string, unknown>,
-              };
-            } catch (error) {
-              logger.error('Failed to parse tool call arguments', {
-                toolCallId: toolCall.id,
-                toolName: originalName, // Use original name in error
-                sanitizedName: toolCall.function.name,
-                arguments: toolCall.function.arguments,
-                error: (error as Error).message,
-              });
-              throw new Error(
-                `Invalid JSON in tool call arguments for ${originalName}: ${(error as Error).message}`
-              );
-            }
-          }) || [];
+          choice.message.tool_calls?.map((toolCall: OpenAI.Chat.ChatCompletionMessageToolCall) =>
+            this.parseToolCall(toolCall, toolNameMapping)
+          ) || [];
 
         logger.debug('Received response from OpenAI', {
           provider: 'openai',
@@ -689,29 +696,15 @@ export class OpenAIProvider extends AIProvider {
           }
 
           // Convert partial tool calls to final format
-          toolCalls = Array.from(partialToolCalls.values()).map((partial) => {
-            // Map sanitized tool name back to original name using request-scoped mapping
-            const originalName = toolNameMapping.get(partial.name) || partial.name;
-
-            try {
-              return {
+          toolCalls = Array.from(partialToolCalls.values()).map((partial) =>
+            this.parseToolCall(
+              {
                 id: partial.id,
-                name: originalName,
-                arguments: JSON.parse(partial.arguments) as Record<string, unknown>,
-              };
-            } catch (error) {
-              logger.error('Failed to parse streaming tool call arguments', {
-                toolCallId: partial.id,
-                toolName: originalName, // Use original name in error
-                sanitizedName: partial.name,
-                arguments: partial.arguments,
-                error: (error as Error).message,
-              });
-              throw new Error(
-                `Invalid JSON in streaming tool call arguments for ${originalName}: ${(error as Error).message}`
-              );
-            }
-          });
+                function: { name: partial.name, arguments: partial.arguments },
+              },
+              toolNameMapping
+            )
+          );
 
           logger.debug('Received streaming response from OpenAI', {
             provider: 'openai',

@@ -1069,6 +1069,112 @@ describe('OpenAIProvider', () => {
       expect(callArgs.tools![1].function.name.length).toBeLessThanOrEqual(64);
       expect(callArgs.tools![0].function.name).not.toBe(callArgs.tools![1].function.name);
     });
+
+    it('should handle duplicate tool instances with same original name', async () => {
+      class DuplicateTool extends Tool {
+        name = 'server/action';
+        description = 'Duplicate tool';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      // Two instances of the exact same tool
+      const tool1 = new DuplicateTool();
+      const tool2 = new DuplicateTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [tool1, tool2], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Should get different sanitized names even with identical original names
+      expect(callArgs.tools).toHaveLength(2);
+      expect(callArgs.tools![0].function.name).toBe('server_action');
+      expect(callArgs.tools![1].function.name).toBe('server_action_2');
+    });
+
+    it('should handle empty/whitespace tool names', async () => {
+      class EmptyNameTool extends Tool {
+        name = '///';
+        description = 'Tool with only special chars';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      const emptyTool = new EmptyNameTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [emptyTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Should produce valid (non-empty) tool name
+      expect(callArgs.tools![0].function.name).toBeTruthy();
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+    });
+
+    it('should handle unicode characters in tool names', async () => {
+      class UnicodeTool extends Tool {
+        name = 'tool/数据库/read';
+        description = 'Tool with unicode';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('done');
+        }
+      }
+
+      const unicodeTool = new UnicodeTool();
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'Test' }], [unicodeTool], 'gpt-4o');
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Unicode should be stripped, leaving only valid chars
+      expect(callArgs.tools![0].function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+      // Unicode chars each become underscore: 'tool/数据库/read' → 'tool_____read'
+      expect(callArgs.tools![0].function.name).toBe('tool_____read');
+    });
   });
 
   describe('token counting', () => {
