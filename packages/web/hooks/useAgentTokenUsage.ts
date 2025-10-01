@@ -63,6 +63,42 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
     }
   }, [agentId]);
 
+  // Extract token usage from event data
+  const extractTokenUsageFromEvent = useCallback((tokenUsageData: CombinedTokenUsage) => {
+    // Extract context window usage (try new format first, fallback to old)
+    const contextData =
+      tokenUsageData?.context || (tokenUsageData as unknown as Record<string, unknown>)?.thread;
+
+    if (!contextData || typeof contextData !== 'object') {
+      return null;
+    }
+
+    const ctx = contextData as unknown as Record<string, unknown>;
+
+    const currentTokens =
+      typeof ctx.totalPromptTokens === 'number'
+        ? ctx.totalPromptTokens
+        : typeof ctx.currentTokens === 'number'
+          ? ctx.currentTokens
+          : 0;
+
+    const contextLimit =
+      typeof ctx.contextLimit === 'number'
+        ? ctx.contextLimit
+        : typeof ctx.limit === 'number'
+          ? ctx.limit
+          : 0;
+
+    return {
+      totalPromptTokens: currentTokens,
+      totalCompletionTokens: 0, // Not separately tracked
+      totalTokens: currentTokens,
+      contextLimit,
+      percentUsed: typeof ctx.percentUsed === 'number' ? ctx.percentUsed : 0,
+      nearLimit: !!ctx.nearLimit,
+    };
+  }, []);
+
   // Listen for AGENT_MESSAGE and TOKEN_USAGE_UPDATE events
   const handleTokenUpdate = useCallback(
     (event: LaceEvent) => {
@@ -71,95 +107,22 @@ export function useAgentTokenUsage(agentId: ThreadId): UseAgentTokenUsageResult 
         return;
       }
 
-      // Handle AGENT_MESSAGE events with token usage
+      // Both AGENT_MESSAGE and TOKEN_USAGE_UPDATE can contain token usage
       if (
-        event.type === 'AGENT_MESSAGE' &&
+        (event.type === 'AGENT_MESSAGE' || event.type === 'TOKEN_USAGE_UPDATE') &&
         event.data &&
         typeof event.data === 'object' &&
         'tokenUsage' in event.data
       ) {
         const tokenUsageData = (event.data as { tokenUsage: CombinedTokenUsage }).tokenUsage;
+        const extracted = extractTokenUsageFromEvent(tokenUsageData);
 
-        // Extract context window usage (try new format first, fallback to old)
-        const contextData =
-          tokenUsageData?.context || (tokenUsageData as unknown as Record<string, unknown>)?.thread;
-
-        if (contextData && typeof contextData === 'object') {
-          const ctx = contextData as unknown as Record<string, unknown>;
-
-          // Try new field names first
-          const currentTokens =
-            typeof ctx.totalPromptTokens === 'number'
-              ? ctx.totalPromptTokens
-              : typeof ctx.currentTokens === 'number'
-                ? ctx.currentTokens
-                : 0;
-
-          const contextLimit =
-            typeof ctx.contextLimit === 'number'
-              ? ctx.contextLimit
-              : typeof ctx.limit === 'number'
-                ? ctx.limit
-                : 0;
-
-          const completeTokenUsage: AgentTokenUsage = {
-            totalPromptTokens: currentTokens,
-            totalCompletionTokens: 0, // Not separately tracked
-            totalTokens: currentTokens,
-            contextLimit,
-            percentUsed: typeof ctx.percentUsed === 'number' ? ctx.percentUsed : 0,
-            nearLimit: !!ctx.nearLimit,
-          };
-
-          setTokenUsage(completeTokenUsage);
-        }
-      }
-
-      // Handle TOKEN_USAGE_UPDATE events
-      // Emitted after tool execution to update UI without text response
-      if (
-        event.type === 'TOKEN_USAGE_UPDATE' &&
-        event.data &&
-        typeof event.data === 'object' &&
-        'tokenUsage' in event.data
-      ) {
-        const tokenUsageData = (event.data as { tokenUsage: CombinedTokenUsage }).tokenUsage;
-
-        // Extract context window usage
-        const contextData =
-          tokenUsageData?.context || (tokenUsageData as unknown as Record<string, unknown>)?.thread;
-
-        if (contextData && typeof contextData === 'object') {
-          const ctx = contextData as unknown as Record<string, unknown>;
-
-          const currentTokens =
-            typeof ctx.totalPromptTokens === 'number'
-              ? ctx.totalPromptTokens
-              : typeof ctx.currentTokens === 'number'
-                ? ctx.currentTokens
-                : 0;
-
-          const contextLimit =
-            typeof ctx.contextLimit === 'number'
-              ? ctx.contextLimit
-              : typeof ctx.limit === 'number'
-                ? ctx.limit
-                : 0;
-
-          const completeTokenUsage: AgentTokenUsage = {
-            totalPromptTokens: currentTokens,
-            totalCompletionTokens: 0, // Not separately tracked
-            totalTokens: currentTokens,
-            contextLimit,
-            percentUsed: typeof ctx.percentUsed === 'number' ? ctx.percentUsed : 0,
-            nearLimit: !!ctx.nearLimit,
-          };
-
-          setTokenUsage(completeTokenUsage);
+        if (extracted) {
+          setTokenUsage(extracted);
         }
       }
     },
-    [agentId]
+    [agentId, extractTokenUsageFromEvent]
   );
 
   // Use shared event stream context for real-time updates
