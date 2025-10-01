@@ -1222,9 +1222,7 @@ export class Agent extends EventEmitter {
         toolExecutor: this._toolExecutor,
         session: session || undefined,
         workingDirectory: this._getWorkingDirectory(),
-        processEnv: session
-          ? session.getProject()?.getMergedEnvironment() || process.env
-          : process.env,
+        processEnv: process.env,
       };
 
       const response = await this.providerInstance.createStreamingResponse(
@@ -1362,9 +1360,7 @@ export class Agent extends EventEmitter {
         toolExecutor: this._toolExecutor,
         session: session || undefined,
         workingDirectory: this._getWorkingDirectory(),
-        processEnv: session
-          ? session.getProject()?.getMergedEnvironment() || process.env
-          : process.env,
+        processEnv: process.env,
       };
 
       const response = await this.providerInstance.createResponse(

@@ -4,7 +4,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, AgentConfig, AgentState } from '~/agents/agent';
 import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
+import {
+  ProviderMessage,
+  ProviderResponse,
+  ProviderConfig,
+  ProviderRequestContext,
+} from '~/providers/base-provider';
 import { ToolCall, ToolResult, ToolContext, ApprovalDecision } from '~/tools/types';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
@@ -55,7 +60,9 @@ class MockProvider extends BaseMockProvider {
   createResponse(
     _messages: ProviderMessage[],
     _tools: Tool[],
-    _model: string
+    _model: string,
+    _signal?: AbortSignal,
+    _context?: ProviderRequestContext
   ): Promise<ProviderResponse> {
     return Promise.resolve(this.mockResponse);
   }
