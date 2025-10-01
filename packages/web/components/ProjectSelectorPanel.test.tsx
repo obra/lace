@@ -309,8 +309,9 @@ describe('ProjectSelectorPanel', () => {
     });
 
     await user.click(screen.getByTestId('create-project-button'));
-    // Wizard now opens directly on Directory step
-    expect(await screen.findByPlaceholderText('/path/to/your/project')).toBeInTheDocument();
+    // Wizard now opens directly on Directory step with inline browser
+    expect(await screen.findByText('Create New Project')).toBeInTheDocument();
+    expect(await screen.findByText('Set project directory')).toBeInTheDocument();
   });
 
   it('should handle empty project list', async () => {
