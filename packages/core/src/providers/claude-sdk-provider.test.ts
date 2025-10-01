@@ -5,6 +5,7 @@ import { Tool } from '~/tools/tool';
 import { z } from 'zod';
 import type { ProviderRequestContext } from '~/providers/base-provider';
 import type { ToolContext, ToolResult } from '~/tools/types';
+import { ApprovalDecision } from '~/tools/types';
 
 // Simple mock tool for testing
 class MockTool extends Tool {
@@ -177,4 +178,55 @@ describe('ClaudeSDKProvider - MCP Integration', () => {
     const mcpResult = (provider as any).convertToolResultToMCP(toolResult);
     expect(mcpResult.isError).toBe(true);
   });
+});
+
+describe('ClaudeSDKProvider - Permissions', () => {
+  it('should map yolo to bypassPermissions', () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
+    expect((provider as any).mapPermissionMode('yolo')).toBe('bypassPermissions');
+  });
+
+  it('should map read-only to plan', () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
+    expect((provider as any).mapPermissionMode('read-only')).toBe('plan');
+  });
+
+  it('should map normal to default', () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
+    expect((provider as any).mapPermissionMode('normal')).toBe('default');
+  });
+});
+
+describe('ClaudeSDKProvider - Approval System', () => {
+  it('should create pending approval and resolve it', async () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
+    const toolCallId = 'test-call-123';
+
+    // Create a promise that will be resolved by handleApprovalResponse
+    const promise = new Promise<ApprovalDecision>((resolve) => {
+      (provider as any).pendingApprovals.set(toolCallId, {
+        resolve,
+        reject: () => {},
+      });
+    });
+
+    // Simulate approval response
+    provider.handleApprovalResponse(toolCallId, ApprovalDecision.ALLOW_ONCE);
+
+    // Promise should resolve
+    const decision = await promise;
+    expect(decision).toBe(ApprovalDecision.ALLOW_ONCE);
+    expect((provider as any).pendingApprovals.has(toolCallId)).toBe(false);
+  });
+
+  it('should handle unknown approval responses gracefully', () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
+
+    // Should not throw
+    expect(() => {
+      provider.handleApprovalResponse('unknown-id', ApprovalDecision.DENY);
+    }).not.toThrow();
+  });
+
+  // Note: Full canUseTool testing requires Session mock - will be done in integration tests
 });

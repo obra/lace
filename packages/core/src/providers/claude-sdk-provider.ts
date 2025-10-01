@@ -14,7 +14,25 @@ import type { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
 import { createHash } from 'crypto';
 import { createSdkMcpServer, tool as sdkTool } from '@anthropic-ai/claude-agent-sdk';
-import type { ToolResult } from '~/tools/types';
+import type { ToolResult, PermissionOverrideMode } from '~/tools/types';
+import { ApprovalDecision } from '~/tools/types';
+
+// SDK permission mode types (SDK doesn't export these)
+type SDKPermissionMode = 'default' | 'bypassPermissions' | 'plan';
+
+// SDK permission result types (SDK doesn't export these)
+type PermissionResult = {
+  behavior: 'allow' | 'deny';
+  updatedInput?: Record<string, unknown>;
+  message?: string;
+  interrupt?: boolean;
+};
+
+type CanUseTool = (
+  toolName: string,
+  input: Record<string, unknown>,
+  context: { signal: AbortSignal; suggestions?: string[] }
+) => Promise<PermissionResult>;
 
 // MCP CallToolResult format (SDK doesn't export this type)
 type CallToolResult = {
@@ -33,6 +51,15 @@ interface ClaudeSDKProviderConfig extends ProviderConfig {
 export class ClaudeSDKProvider extends AIProvider {
   private sessionId?: string;
   private lastHistoryFingerprint?: string;
+
+  // Map of pending tool approvals waiting for user decision
+  private pendingApprovals = new Map<
+    string,
+    {
+      resolve: (decision: ApprovalDecision) => void;
+      reject: (error: Error) => void;
+    }
+  >();
 
   constructor(config: ClaudeSDKProviderConfig) {
     super(config);
@@ -96,6 +123,172 @@ export class ClaudeSDKProvider extends AIProvider {
   isConfigured(): boolean {
     const config = this._config as ClaudeSDKProviderConfig;
     return !!config.sessionToken && config.sessionToken.length > 0;
+  }
+
+  /**
+   * Map Lace's permission override mode to SDK permission mode
+   */
+  protected mapPermissionMode(laceMode: PermissionOverrideMode): SDKPermissionMode {
+    switch (laceMode) {
+      case 'yolo':
+        return 'bypassPermissions';
+      case 'read-only':
+        return 'plan'; // Plan mode doesn't execute, only plans
+      case 'normal':
+      default:
+        return 'default';
+    }
+  }
+
+  /**
+   * Handle approval response from external event system
+   * Called when TOOL_APPROVAL_RESPONSE event arrives
+   */
+  public handleApprovalResponse(toolCallId: string, decision: ApprovalDecision): void {
+    const pending = this.pendingApprovals.get(toolCallId);
+    if (pending) {
+      logger.debug('Resolving pending approval', { toolCallId, decision });
+      pending.resolve(decision);
+      this.pendingApprovals.delete(toolCallId);
+    } else {
+      logger.warn('Received approval response for unknown tool call', { toolCallId });
+    }
+  }
+
+  /**
+   * Build canUseTool callback that integrates with Lace's approval system
+   * This is passed to SDK and called before each tool execution
+   *
+   * NOTE: This handler is called by SDK BEFORE tool execution to check permissions.
+   * It does NOT execute the tool - that happens in the MCP handler.
+   * This is purely for permission checking and approval flow.
+   */
+  protected buildCanUseToolHandler(context: ProviderRequestContext): CanUseTool {
+    const { toolExecutor, session } = context;
+
+    if (!toolExecutor || !session) {
+      throw new Error('ToolExecutor and Session required for approval handler');
+    }
+
+    return async (toolName, input, { signal, suggestions }) => {
+      try {
+        // Check tool allowlist first (fail-closed security)
+        const config = session.getEffectiveConfiguration();
+        if (config.tools && !config.tools.includes(toolName)) {
+          logger.debug('Tool denied - not in allowlist', { toolName });
+          return {
+            behavior: 'deny',
+            message: `Tool '${toolName}' is not in the allowed tools list`,
+            interrupt: false,
+          };
+        }
+
+        // Check if tool is marked as safeInternal (auto-allowed)
+        const tool = toolExecutor.getTool(toolName);
+        if (tool?.annotations?.safeInternal) {
+          logger.debug('Tool auto-allowed - safeInternal', { toolName });
+          return { behavior: 'allow', updatedInput: input };
+        }
+
+        // Get effective policy (respects permission override mode)
+        const configuredPolicy = session.getToolPolicy(toolName);
+        const effectivePolicy = tool
+          ? toolExecutor.getEffectivePolicy(tool, configuredPolicy)
+          : configuredPolicy;
+
+        logger.debug('Checking tool permission', {
+          toolName,
+          configuredPolicy,
+          effectivePolicy,
+          permissionMode: session.getPermissionOverrideMode(),
+        });
+
+        // Handle based on effective policy
+        switch (effectivePolicy) {
+          case 'allow':
+            return { behavior: 'allow', updatedInput: input };
+
+          case 'deny':
+            return {
+              behavior: 'deny',
+              message: `Tool '${toolName}' is denied by policy`,
+              interrupt: false,
+            };
+
+          case 'ask':
+            // Need user approval - create promise and emit event
+            const toolCallId = `approval-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+            logger.debug('Requesting tool approval', { toolName, toolCallId });
+
+            const approvalPromise = new Promise<ApprovalDecision>((resolve, reject) => {
+              this.pendingApprovals.set(toolCallId, { resolve, reject });
+
+              // Emit event for external approval system
+              this.emit('approval_request', {
+                toolName,
+                input,
+                isReadOnly: tool?.annotations?.readOnlySafe || false,
+                requestId: toolCallId,
+                resolve, // Pass resolve directly so emitter can resolve
+              });
+
+              // Handle abort
+              signal.addEventListener(
+                'abort',
+                () => {
+                  this.pendingApprovals.delete(toolCallId);
+                  reject(new Error('Tool approval aborted'));
+                },
+                { once: true }
+              );
+            });
+
+            // Wait for approval decision
+            const decision = await approvalPromise;
+
+            logger.debug('Approval received', { toolName, toolCallId, decision });
+
+            // Check if approval was granted
+            const isAllowed = [
+              ApprovalDecision.ALLOW_ONCE,
+              ApprovalDecision.ALLOW_SESSION,
+              ApprovalDecision.ALLOW_PROJECT,
+              ApprovalDecision.ALLOW_ALWAYS,
+            ].includes(decision);
+
+            if (isAllowed) {
+              return { behavior: 'allow', updatedInput: input };
+            } else {
+              return {
+                behavior: 'deny',
+                message: 'User denied tool execution',
+                interrupt: true,
+              };
+            }
+
+          default:
+            // Safe default: require approval
+            logger.warn('Unknown policy, defaulting to ask', { effectivePolicy });
+            return {
+              behavior: 'deny',
+              message: `Unknown policy for tool '${toolName}'`,
+              interrupt: false,
+            };
+        }
+      } catch (error) {
+        logger.error('Error in canUseTool handler', {
+          toolName,
+          error: error instanceof Error ? error.message : String(error),
+        });
+
+        return {
+          behavior: 'deny',
+          message: `Permission check failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          interrupt: false,
+        };
+      }
+    };
   }
 
   /**
