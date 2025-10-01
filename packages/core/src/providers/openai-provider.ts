@@ -472,10 +472,11 @@ export class OpenAIProvider extends AIProvider {
 
         const toolCalls: ToolCall[] =
           choice.message.tool_calls?.map((toolCall: OpenAI.Chat.ChatCompletionMessageToolCall) => {
+            // Map sanitized tool name back to original name using request-scoped mapping
+            const originalName =
+              toolNameMapping.get(toolCall.function.name) || toolCall.function.name;
+
             try {
-              // Map sanitized tool name back to original name using request-scoped mapping
-              const originalName =
-                toolNameMapping.get(toolCall.function.name) || toolCall.function.name;
               return {
                 id: toolCall.id,
                 name: originalName,
@@ -484,12 +485,13 @@ export class OpenAIProvider extends AIProvider {
             } catch (error) {
               logger.error('Failed to parse tool call arguments', {
                 toolCallId: toolCall.id,
-                toolName: toolCall.function.name,
+                toolName: originalName, // Use original name in error
+                sanitizedName: toolCall.function.name,
                 arguments: toolCall.function.arguments,
                 error: (error as Error).message,
               });
               throw new Error(
-                `Invalid JSON in tool call arguments for ${toolCall.function.name}: ${(error as Error).message}`
+                `Invalid JSON in tool call arguments for ${originalName}: ${(error as Error).message}`
               );
             }
           }) || [];
@@ -661,9 +663,10 @@ export class OpenAIProvider extends AIProvider {
 
           // Convert partial tool calls to final format
           toolCalls = Array.from(partialToolCalls.values()).map((partial) => {
+            // Map sanitized tool name back to original name using request-scoped mapping
+            const originalName = toolNameMapping.get(partial.name) || partial.name;
+
             try {
-              // Map sanitized tool name back to original name using request-scoped mapping
-              const originalName = toolNameMapping.get(partial.name) || partial.name;
               return {
                 id: partial.id,
                 name: originalName,
@@ -672,12 +675,13 @@ export class OpenAIProvider extends AIProvider {
             } catch (error) {
               logger.error('Failed to parse streaming tool call arguments', {
                 toolCallId: partial.id,
-                toolName: partial.name,
+                toolName: originalName, // Use original name in error
+                sanitizedName: partial.name,
                 arguments: partial.arguments,
                 error: (error as Error).message,
               });
               throw new Error(
-                `Invalid JSON in streaming tool call arguments for ${partial.name}: ${(error as Error).message}`
+                `Invalid JSON in streaming tool call arguments for ${originalName}: ${(error as Error).message}`
               );
             }
           });

@@ -927,6 +927,64 @@ describe('OpenAIProvider', () => {
       expect(response1.toolCalls[0].name).toBe('mcp/tool_a');
       expect(response2.toolCalls[0].name).toBe('mcp/tool_b');
     });
+
+    it('should handle triple collision with unique suffixes', async () => {
+      class Tool1 extends Tool {
+        name = 'server/action';
+        description = 'Tool 1';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool1');
+        }
+      }
+
+      class Tool2 extends Tool {
+        name = 'server:action'; // → server_action_2
+        description = 'Tool 2';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool2');
+        }
+      }
+
+      class Tool3 extends Tool {
+        name = 'server.action'; // → server_action_3
+        description = 'Tool 3';
+        schema = z.object({});
+
+        protected async executeValidated(): Promise<ToolResult> {
+          return this.createResult('tool3');
+        }
+      }
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: { content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {},
+      });
+
+      await provider.createResponse(
+        [{ role: 'user', content: 'Test' }],
+        [new Tool1(), new Tool2(), new Tool3()],
+        'gpt-4o'
+      );
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        tools?: Array<{ type: string; function: { name: string } }>;
+      };
+
+      // Verify all three tools get unique sanitized names
+      expect(callArgs.tools).toHaveLength(3);
+      expect(callArgs.tools![0].function.name).toBe('server_action');
+      expect(callArgs.tools![1].function.name).toBe('server_action_2');
+      expect(callArgs.tools![2].function.name).toBe('server_action_3');
+    });
   });
 
   describe('token counting', () => {
