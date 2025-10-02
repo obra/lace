@@ -22,7 +22,9 @@ interface SidebarContentProps {
   // Event handlers (still needed for parent coordination)
   onSwitchProject: () => void;
   onAgentSelect: (threadId: ThreadId) => void;
-  onConfigureSession?: () => void;
+  onConfigureSession?: (
+    initialTab?: 'basics' | 'environment' | 'tool-policies' | 'workspace'
+  ) => void;
   onCreateAgent?: () => void;
   createAgentButtonRef?: React.RefObject<HTMLButtonElement | null>;
 }

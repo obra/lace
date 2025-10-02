@@ -51,6 +51,9 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
   const [permissionMode, setPermissionMode] = useState<PermissionOverrideMode>('normal');
 
   const [showSessionEditModal, setShowSessionEditModal] = useState(false);
+  const [sessionEditInitialTab, setSessionEditInitialTab] = useState<
+    'basics' | 'environment' | 'tool-policies' | 'workspace' | undefined
+  >(undefined);
   const [showCreateAgentPopup, setShowCreateAgentPopup] = useState(false);
   const createAgentButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -110,9 +113,13 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
     navigateToRoot();
   }, [navigateToRoot]);
 
-  const handleConfigureSession = useCallback(() => {
-    setShowSessionEditModal(true);
-  }, []);
+  const handleConfigureSession = useCallback(
+    (initialTab?: 'basics' | 'environment' | 'tool-policies' | 'workspace') => {
+      setSessionEditInitialTab(initialTab);
+      setShowSessionEditModal(true);
+    },
+    []
+  );
 
   const handleCreateAgent = useCallback(() => {
     setShowCreateAgentPopup(true);
@@ -269,8 +276,12 @@ export function AgentPageContent({ projectId, sessionId, agentId }: AgentPageCon
           isOpen={showSessionEditModal}
           currentProject={currentProject}
           selectedSession={selectedSessionDetails}
-          onClose={() => setShowSessionEditModal(false)}
+          onClose={() => {
+            setShowSessionEditModal(false);
+            setSessionEditInitialTab(undefined);
+          }}
           onSuccess={reloadSessionDetails}
+          initialTab={sessionEditInitialTab}
         />
       )}
 

@@ -21,7 +21,9 @@ import type { PermissionOverrideMode } from '~/tools/types';
 interface SessionSectionProps {
   isMobile?: boolean;
   onCloseMobileNav?: () => void;
-  onConfigureSession?: () => void;
+  onConfigureSession?: (
+    initialTab?: 'basics' | 'environment' | 'tool-policies' | 'workspace'
+  ) => void;
 }
 
 export const SessionSection = memo(function SessionSection({
@@ -106,11 +108,11 @@ export const SessionSection = memo(function SessionSection({
     />
   ) : null;
 
-  // Workspace mode badge - clickable to open config
+  // Workspace mode badge - clickable to open config on workspace tab
   const workspaceBadge =
     workspaceMode && !workspaceLoading ? (
       <button
-        onClick={handleConfigureSession}
+        onClick={() => onConfigureSession?.('workspace')}
         className="px-2 py-0.5 text-[10px] font-medium rounded-full border transition-all duration-200 hover:scale-105"
         style={{
           backgroundColor: workspaceMode === 'container' ? '#3b82f6' : '#10b981',
