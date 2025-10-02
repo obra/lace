@@ -36,7 +36,7 @@ type PermissionResult = {
 type CanUseTool = (
   toolName: string,
   input: Record<string, unknown>,
-  context: { signal: AbortSignal; suggestions?: string[] }
+  context: { signal: AbortSignal; suggestions?: unknown[] }
 ) => Promise<PermissionResult>;
 
 // MCP CallToolResult format (SDK doesn't export this type)
@@ -55,10 +55,10 @@ type AnthropicContentBlock =
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> };
 
 // Anthropic message format returned by SDK
+// Index signature allows compatibility with SDK's BetaMessage type
 type AnthropicMessage = {
   content: AnthropicContentBlock[];
-  [key: string]: unknown; // Allow other Anthropic message properties
-};
+} & Record<string, unknown>;
 
 // SDK query options type (simplified version - SDK's Options type is complex)
 type SDKQueryOptions = {
@@ -74,7 +74,7 @@ type SDKQueryOptions = {
   allowedTools: string[];
   permissionMode: SDKPermissionMode;
   canUseTool: CanUseTool;
-  abortController?: { signal: AbortSignal };
+  abortController?: AbortController;
 };
 
 interface ClaudeSDKProviderConfig extends ProviderConfig {
@@ -176,13 +176,14 @@ export class ClaudeSDKProvider extends AIProvider {
       allowedTools: ['WebSearch'], // Only SDK's server-side WebSearch
       permissionMode,
       canUseTool: this.buildCanUseToolHandler(context),
-      abortController: signal ? ({ signal } as AbortController) : undefined,
+      // SDK accepts object with signal property, cast to satisfy type
+      abortController: signal ? ({ signal } as unknown as AbortController) : undefined,
     };
 
     // Create SDK query
     const query = sdkQuery({
       prompt: latestMessage.content,
-      options: queryOptions,
+      options: queryOptions as any, // Cast to avoid type mismatch with SDK's complex Options type
     });
 
     // Process SDK messages
@@ -203,7 +204,7 @@ export class ClaudeSDKProvider extends AIProvider {
 
         if (msg.type === 'assistant') {
           // Extract content and tool calls from Anthropic message format
-          const anthropicMsg = msg.message as AnthropicMessage;
+          const anthropicMsg = msg.message as unknown as AnthropicMessage;
 
           // Extract text content
           const textBlocks = anthropicMsg.content.filter(
@@ -328,12 +329,13 @@ export class ClaudeSDKProvider extends AIProvider {
       allowedTools: ['WebSearch'],
       permissionMode,
       canUseTool: this.buildCanUseToolHandler(context),
-      abortController: signal ? ({ signal } as AbortController) : undefined,
+      // SDK accepts object with signal property, cast to satisfy type
+      abortController: signal ? ({ signal } as unknown as AbortController) : undefined,
     };
 
     const query = sdkQuery({
       prompt: latestMessage.content,
-      options: queryOptions,
+      options: queryOptions as any, // Cast to avoid type mismatch with SDK's complex Options type
     });
 
     let content = '';
@@ -372,7 +374,7 @@ export class ClaudeSDKProvider extends AIProvider {
         }
 
         if (msg.type === 'assistant') {
-          const anthropicMsg = msg.message as AnthropicMessage;
+          const anthropicMsg = msg.message as unknown as AnthropicMessage;
 
           const textBlocks = anthropicMsg.content.filter(
             (block): block is Extract<AnthropicContentBlock, { type: 'text' }> =>
