@@ -206,16 +206,20 @@ export function ProviderInstanceProvider({ children }: ProviderInstanceProviderP
 
         const instanceId = generateInstanceId(formData.displayName, catalogProviderId);
 
-        const requestBody = {
+        const requestBody: Record<string, unknown> = {
           instanceId,
           catalogProviderId,
           displayName: formData.displayName,
           endpoint: formData.endpoint || undefined, // Don't send empty string
           timeout: formData.timeout,
-          credential: {
-            apiKey: formData.apiKey,
-          },
         };
+
+        // Only include credential if API key provided (SDK provider uses auto-auth)
+        if (formData.apiKey && formData.apiKey.trim()) {
+          requestBody.credential = {
+            apiKey: formData.apiKey,
+          };
+        }
 
         await api.post('/api/provider/instances', requestBody);
 
