@@ -17,9 +17,12 @@ import {
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
 import { asThreadId } from '~/threads/types';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 
 describe('Agent Session Context', () => {
   const tempLaceDirContext = setupCoreTest();
+  let tempProjectDir: string;
   let session: Session;
   let agent: Agent;
   let project: Project;
@@ -37,11 +40,15 @@ describe('Agent Session Context', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create a separate project directory
+    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create real project
     project = Project.create(
       'Test Project',
       'Project for session context testing',
-      tempLaceDirContext.tempDir,
+      tempProjectDir,
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',

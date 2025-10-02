@@ -31,6 +31,7 @@ export default defineConfig({
     setupFiles: [resolve(__dirname, 'src/test-setup.ts')],
     env: {
       NO_COLOR: '1',
+      NODE_ENV: 'test',
     },
     // Use default pool configuration - should be forks which supports process.chdir()
     // Removing custom pool options to use Vitest defaults

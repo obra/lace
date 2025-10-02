@@ -21,6 +21,8 @@ import {
 } from '~/test-utils/provider-defaults';
 import type { ProviderResponse, ProviderMessage } from '~/providers/base-provider';
 import type { Tool } from '~/tools/tool';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 
 // Mock provider that can return tool calls once then regular responses
 class MockProviderWithToolCalls extends TestProvider {
@@ -67,6 +69,7 @@ class MockProviderWithToolCalls extends TestProvider {
 
 describe('Tool Approval Race Condition Integration Tests', () => {
   const tempLaceDirContext = setupCoreTest();
+  let tempProjectDir: string;
   let agent: Agent;
   let threadManager: ThreadManager;
   let mockProvider: MockProviderWithToolCalls;
@@ -88,11 +91,15 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create a separate project directory
+    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create real project and session for proper context
     project = Project.create(
       'Race Condition Test Project',
       'Project for race condition testing',
-      tempLaceDirContext.tempDir,
+      tempProjectDir,
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',

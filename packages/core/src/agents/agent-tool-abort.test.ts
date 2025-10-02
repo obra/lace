@@ -22,6 +22,8 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 
 class MockProviderWithTools extends BaseMockProvider {
   private mockToolCalls: ToolCall[];
@@ -59,6 +61,7 @@ class MockProviderWithTools extends BaseMockProvider {
 
 describe('Agent Tool Abort Functionality', () => {
   const tempLaceDir = setupCoreTest();
+  let tempProjectDir: string;
   let agent: Agent;
   let toolExecutor: ToolExecutor;
   let threadManager: ThreadManager;
@@ -80,16 +83,15 @@ describe('Agent Tool Abort Functionality', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create a separate project directory
+    tempProjectDir = join(tempLaceDir.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create project and session for proper context
-    project = Project.create(
-      'Abort Test Project',
-      'Project for abort testing',
-      tempLaceDir.tempDir,
-      {
-        providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      }
-    );
+    project = Project.create('Abort Test Project', 'Project for abort testing', tempProjectDir, {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
 
     session = Session.create({
       name: 'Abort Test Session',

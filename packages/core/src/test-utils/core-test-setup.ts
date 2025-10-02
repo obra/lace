@@ -79,7 +79,15 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
   });
 
   return {
-    ...tempLaceDir,
+    get tempDir() {
+      return tempLaceDir.tempDir;
+    },
+    get originalLaceDir() {
+      return tempLaceDir.originalLaceDir;
+    },
+    set originalLaceDir(value: string | undefined) {
+      tempLaceDir.originalLaceDir = value;
+    },
     registerCleanup: (fn: () => void | Promise<void>) => cleanupTasks.push(fn),
   };
 }

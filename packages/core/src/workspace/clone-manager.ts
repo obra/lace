@@ -36,6 +36,18 @@ export class CloneManager {
     // Check if it's a git repository, initialize if not
     const gitDir = join(projectDir, '.git');
     if (!existsSync(gitDir)) {
+      // In tests, prevent git init outside of temp directories
+      if (
+        process.env.NODE_ENV === 'test' &&
+        !projectDir.includes('/tmp/') &&
+        !projectDir.includes('/T/')
+      ) {
+        throw new Error(
+          `Refusing to git init outside temp directory in tests! ` +
+            `projectDir: ${projectDir}, cwd: ${process.cwd()}`
+        );
+      }
+
       logger.warn('CloneManager: Project is not a git repository, initializing git', {
         projectDir,
         cwd: process.cwd(),

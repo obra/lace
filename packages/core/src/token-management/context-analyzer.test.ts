@@ -21,6 +21,8 @@ import {
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
 import type { ThreadId } from '~/threads/types';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 
 // Mock tool for testing
 class TestTool extends Tool {
@@ -40,6 +42,7 @@ class TestTool extends Tool {
 
 describe('ContextAnalyzer', () => {
   const tempLaceDirContext = setupCoreTest();
+  let tempProjectDir: string;
   let project: Project;
   let session: Session;
   let agent: Agent;
@@ -59,8 +62,12 @@ describe('ContextAnalyzer', () => {
       apiKey: 'test-api-key',
     });
 
+    // Create a separate project directory
+    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create project and session
-    project = Project.create('Test Project', tempLaceDirContext.tempDir);
+    project = Project.create('Test Project', tempProjectDir);
 
     session = Session.create({
       name: 'Test Session',

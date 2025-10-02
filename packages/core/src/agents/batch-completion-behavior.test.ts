@@ -22,6 +22,8 @@ import {
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
 import { z } from 'zod';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 
 // Test tool that can be configured to fail or succeed
 class ConfigurableTool extends Tool {
@@ -92,6 +94,7 @@ class MockProviderWithToolCalls extends TestProvider {
 
 describe('Tool Batch Completion Behavior', () => {
   const tempLaceDirContext = setupCoreTest();
+  let tempProjectDir: string;
   let agent: Agent;
   let threadManager: ThreadManager;
   let mockProvider: MockProviderWithToolCalls;
@@ -112,11 +115,15 @@ describe('Tool Batch Completion Behavior', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create a separate project directory
+    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create real project and session for proper context
     project = Project.create(
       'Batch Completion Test Project',
       'Project for batch completion testing',
-      tempLaceDirContext.tempDir,
+      tempProjectDir,
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',

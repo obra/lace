@@ -7,7 +7,7 @@ import * as os from 'os';
 import { beforeEach, afterEach } from 'vitest';
 
 export interface TempLaceDirContext {
-  tempDir: string;
+  readonly tempDir: string;
   originalLaceDir: string | undefined;
 }
 
@@ -16,31 +16,48 @@ export interface TempLaceDirContext {
  * Call this in your describe block to set up isolated test environments.
  */
 export function useTempLaceDir(): TempLaceDirContext {
-  const context: TempLaceDirContext = {
-    tempDir: '',
-    originalLaceDir: undefined,
+  let _tempDir: string = '';
+  let _originalLaceDir: string | undefined;
+
+  const context = {
+    get tempDir(): string {
+      if (!_tempDir) {
+        throw new Error(
+          'tempDir accessed before beforeEach hook ran! ' +
+            'Do not access tempDir at the top level of your test. ' +
+            'Access it inside beforeEach/it blocks only.'
+        );
+      }
+      return _tempDir;
+    },
+    get originalLaceDir(): string | undefined {
+      return _originalLaceDir;
+    },
+    set originalLaceDir(value: string | undefined) {
+      _originalLaceDir = value;
+    },
   };
 
   beforeEach(async () => {
     // Create a proper temp directory
-    context.tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'lace-test-'));
+    _tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'lace-test-'));
 
     // Save original LACE_DIR and set it to our temp directory
-    context.originalLaceDir = process.env.LACE_DIR;
-    process.env.LACE_DIR = context.tempDir;
+    _originalLaceDir = process.env.LACE_DIR;
+    process.env.LACE_DIR = _tempDir;
   });
 
   afterEach(async () => {
     // Restore original LACE_DIR
-    if (context.originalLaceDir !== undefined) {
-      process.env.LACE_DIR = context.originalLaceDir;
+    if (_originalLaceDir !== undefined) {
+      process.env.LACE_DIR = _originalLaceDir;
     } else {
       delete process.env.LACE_DIR;
     }
 
     // Clean up temp directory
-    if (context.tempDir && fs.existsSync(context.tempDir)) {
-      await fs.promises.rm(context.tempDir, { recursive: true, force: true });
+    if (_tempDir && fs.existsSync(_tempDir)) {
+      await fs.promises.rm(_tempDir, { recursive: true, force: true });
     }
   });
 
