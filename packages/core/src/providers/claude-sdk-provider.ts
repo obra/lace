@@ -13,7 +13,8 @@ import type { ProviderMessage } from '~/providers/base-provider';
 import type { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
 import { createHash } from 'crypto';
-import { createSdkMcpServer, tool as sdkTool } from '@anthropic-ai/claude-agent-sdk';
+import { Project } from '~/projects/project';
+import { createSdkMcpServer, tool as sdkTool, query as sdkQuery } from '@anthropic-ai/claude-agent-sdk';
 import type { ToolResult, PermissionOverrideMode } from '~/tools/types';
 import { ApprovalDecision } from '~/tools/types';
 
@@ -80,7 +81,310 @@ export class ClaudeSDKProvider extends AIProvider {
     signal?: AbortSignal,
     context?: ProviderRequestContext
   ): Promise<ProviderResponse> {
-    throw new Error('Not implemented');
+    logger.info('SDK Provider createResponse', {
+      messageCount: messages.length,
+      toolCount: tools.length,
+      model,
+      hasSession: !!this.sessionId,
+      hasContext: !!context,
+    });
+
+    // Get config
+    const config = this._config as ClaudeSDKProviderConfig;
+    if (!config.sessionToken) {
+      throw new Error('SDK provider not configured: missing session token');
+    }
+
+    if (!context) {
+      throw new Error('SDK provider requires ProviderRequestContext');
+    }
+
+    // Check if we can resume previous session
+    const canResume = this.canResumeSession(messages);
+    const latestMessage = messages[messages.length - 1];
+
+    if (!latestMessage || latestMessage.role !== 'user') {
+      throw new Error('Last message must be a user message');
+    }
+
+    logger.debug('SDK query configuration', {
+      canResume,
+      sessionId: this.sessionId,
+      model,
+      systemPrompt: this._systemPrompt?.substring(0, 100),
+    });
+
+    // Create MCP server wrapping Lace tools
+    const laceToolsServer = this.createLaceToolsServer(context);
+
+    // Get project MCP servers if session available
+    const projectId = context.session?.getProjectId();
+    const project = projectId ? Project.getById(projectId) : null;
+    const projectMcpServers = project?.getMCPServers() || {};
+
+    // Get permission mode from session
+    const permissionMode = context.session
+      ? this.mapPermissionMode(context.session.getPermissionOverrideMode())
+      : 'default';
+
+    // Build SDK query options
+    const queryOptions: any = {
+      resume: canResume ? this.sessionId : undefined,
+      forkSession: !canResume && this.sessionId !== undefined,
+      model,
+      systemPrompt: this._systemPrompt,
+      cwd: context.workingDirectory,
+      env: context.processEnv,
+      includePartialMessages: false, // Disable for non-streaming
+      settingSources: [], // Don't load filesystem settings
+      mcpServers: {
+        __lace_tools: laceToolsServer,
+        ...projectMcpServers,
+      },
+      allowedTools: ['WebSearch'], // Only SDK's server-side WebSearch
+      permissionMode,
+      canUseTool: this.buildCanUseToolHandler(context),
+      abortController: signal ? ({ signal } as AbortController) : undefined,
+    };
+
+    // Create SDK query
+    const query = sdkQuery({
+      prompt: latestMessage.content,
+      options: queryOptions,
+    });
+
+    // Process SDK messages
+    let content = '';
+    let toolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown> }> = [];
+    let usage: ProviderResponse['usage'];
+    let stopReason: string | undefined;
+
+    try {
+      for await (const msg of query) {
+        logger.debug('SDK message received', { type: msg.type });
+
+        if (msg.type === 'system' && msg.subtype === 'init') {
+          // Capture session ID for next turn
+          this.sessionId = msg.session_id;
+          logger.debug('SDK session initialized', { sessionId: this.sessionId });
+        }
+
+        if (msg.type === 'assistant') {
+          // Extract content and tool calls from Anthropic message format
+          const anthropicMsg = msg.message;
+
+          // Extract text content
+          const textBlocks = anthropicMsg.content.filter((block: any) => block.type === 'text');
+          content = textBlocks.map((block: any) => block.text).join('');
+
+          // Extract tool calls
+          const toolUseBlocks = anthropicMsg.content.filter((block: any) => block.type === 'tool_use');
+          toolCalls = toolUseBlocks.map((block: any) => ({
+            id: block.id,
+            name: block.name,
+            arguments: block.input as Record<string, unknown>,
+          }));
+
+          logger.debug('Assistant message processed', {
+            contentLength: content.length,
+            toolCallCount: toolCalls.length,
+          });
+        }
+
+        if (msg.type === 'result') {
+          // Extract usage and stop reason
+          if (msg.subtype === 'success') {
+            usage = {
+              promptTokens: msg.usage.input_tokens,
+              completionTokens: msg.usage.output_tokens,
+              totalTokens: msg.usage.input_tokens + msg.usage.output_tokens,
+            };
+            stopReason = 'stop'; // Success = natural stop
+          } else {
+            // Error subtypes
+            stopReason = 'error';
+            throw new Error(`SDK execution failed: ${msg.subtype}`);
+          }
+
+          logger.debug('SDK result received', {
+            subtype: msg.subtype,
+            usage,
+          });
+          break; // Exit iteration
+        }
+      }
+
+      // Update fingerprint for next turn
+      this.updateFingerprint(messages);
+
+      return {
+        content,
+        toolCalls,
+        stopReason,
+        usage,
+      };
+    } catch (error) {
+      logger.error('SDK query failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  async createStreamingResponse(
+    messages: ProviderMessage[],
+    tools: Tool[],
+    model: string,
+    signal?: AbortSignal,
+    context?: ProviderRequestContext
+  ): Promise<ProviderResponse> {
+    logger.info('SDK Provider createStreamingResponse', {
+      messageCount: messages.length,
+      toolCount: tools.length,
+      model,
+    });
+
+    const config = this._config as ClaudeSDKProviderConfig;
+    if (!config.sessionToken) {
+      throw new Error('SDK provider not configured: missing session token');
+    }
+
+    if (!context) {
+      throw new Error('SDK provider requires ProviderRequestContext');
+    }
+
+    const canResume = this.canResumeSession(messages);
+    const latestMessage = messages[messages.length - 1];
+
+    if (!latestMessage || latestMessage.role !== 'user') {
+      throw new Error('Last message must be a user message');
+    }
+
+    // Create MCP server wrapping Lace tools
+    const laceToolsServer = this.createLaceToolsServer(context);
+
+    // Get project MCP servers
+    const projectId = context.session?.getProjectId();
+    const project = projectId ? Project.getById(projectId) : null;
+    const projectMcpServers = project?.getMCPServers() || {};
+
+    // Get permission mode from session
+    const permissionMode = context.session
+      ? this.mapPermissionMode(context.session.getPermissionOverrideMode())
+      : 'default';
+
+    // Build query options with streaming enabled
+    const queryOptions: any = {
+      resume: canResume ? this.sessionId : undefined,
+      forkSession: !canResume && this.sessionId !== undefined,
+      model,
+      systemPrompt: this._systemPrompt,
+      cwd: context.workingDirectory,
+      env: context.processEnv,
+      includePartialMessages: true, // Enable streaming
+      settingSources: [],
+      mcpServers: {
+        __lace_tools: laceToolsServer,
+        ...projectMcpServers,
+      },
+      allowedTools: ['WebSearch'],
+      permissionMode,
+      canUseTool: this.buildCanUseToolHandler(context),
+      abortController: signal ? ({ signal } as AbortController) : undefined,
+    };
+
+    const query = sdkQuery({
+      prompt: latestMessage.content,
+      options: queryOptions,
+    });
+
+    let content = '';
+    let toolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown> }> = [];
+    let usage: ProviderResponse['usage'];
+    let stopReason: string | undefined;
+
+    try {
+      for await (const msg of query) {
+        if (msg.type === 'system' && msg.subtype === 'init') {
+          this.sessionId = msg.session_id;
+        }
+
+        // Handle streaming events
+        if (msg.type === 'stream_event') {
+          const event = msg.event;
+
+          // Extract text deltas from Anthropic streaming format
+          if (event.type === 'content_block_delta') {
+            if (event.delta.type === 'text_delta') {
+              const textDelta = event.delta.text;
+              this.emit('token', { token: textDelta });
+            }
+          }
+
+          // Track progressive token usage
+          if (event.type === 'message_delta' && event.usage) {
+            this.emit('token_usage_update', {
+              usage: {
+                promptTokens: event.usage.input_tokens || 0,
+                completionTokens: event.usage.output_tokens || 0,
+                totalTokens: (event.usage.input_tokens || 0) + (event.usage.output_tokens || 0),
+              },
+            });
+          }
+        }
+
+        if (msg.type === 'assistant') {
+          const anthropicMsg = msg.message;
+
+          const textBlocks = anthropicMsg.content.filter((block: any) => block.type === 'text');
+          content = textBlocks.map((block: any) => block.text).join('');
+
+          const toolUseBlocks = anthropicMsg.content.filter((block: any) => block.type === 'tool_use');
+          toolCalls = toolUseBlocks.map((block: any) => ({
+            id: block.id,
+            name: block.name,
+            arguments: block.input as Record<string, unknown>,
+          }));
+        }
+
+        if (msg.type === 'result') {
+          if (msg.subtype === 'success') {
+            usage = {
+              promptTokens: msg.usage.input_tokens,
+              completionTokens: msg.usage.output_tokens,
+              totalTokens: msg.usage.input_tokens + msg.usage.output_tokens,
+            };
+            stopReason = 'stop';
+
+            // Emit final usage
+            this.emit('token_usage_update', { usage });
+          } else {
+            stopReason = 'error';
+            throw new Error(`SDK execution failed: ${msg.subtype}`);
+          }
+          break;
+        }
+      }
+
+      this.updateFingerprint(messages);
+
+      const response = {
+        content,
+        toolCalls,
+        stopReason,
+        usage,
+      };
+
+      // Emit completion
+      this.emit('complete', { response });
+
+      return response;
+    } catch (error) {
+      logger.error('SDK streaming query failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 
   getProviderInfo(): ProviderInfo {

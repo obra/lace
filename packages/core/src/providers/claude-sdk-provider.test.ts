@@ -62,9 +62,9 @@ describe('ClaudeSDKProvider', () => {
     expect(unconfigured.isConfigured()).toBe(false);
   });
 
-  it('should throw on createResponse (not implemented)', async () => {
+  it('should require context parameter', async () => {
     await expect(provider.createResponse([], [], 'model', undefined, undefined)).rejects.toThrow(
-      'Not implemented'
+      'requires ProviderRequestContext'
     );
   });
 });
@@ -229,4 +229,46 @@ describe('ClaudeSDKProvider - Approval System', () => {
   });
 
   // Note: Full canUseTool testing requires Session mock - will be done in integration tests
+});
+
+describe('ClaudeSDKProvider - createResponse', () => {
+  it('should throw if not configured', async () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: null });
+
+    await expect(
+      provider.createResponse([{ role: 'user', content: 'Hello' }], [], 'sonnet')
+    ).rejects.toThrow('not configured');
+  });
+
+  it('should throw if context is missing', async () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
+
+    await expect(
+      provider.createResponse([{ role: 'user', content: 'Hello' }], [], 'sonnet', undefined, undefined)
+    ).rejects.toThrow('requires ProviderRequestContext');
+  });
+
+  it('should throw if last message is not user message', async () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
+    const toolExecutor = new ToolExecutor();
+    const context: ProviderRequestContext = {
+      toolExecutor,
+      workingDirectory: '/test',
+    };
+
+    await expect(
+      provider.createResponse([{ role: 'assistant', content: 'Hello' }], [], 'sonnet', undefined, context)
+    ).rejects.toThrow('must be a user message');
+  });
+
+  // Full SDK integration tests will be in separate integration test file
+});
+
+describe('ClaudeSDKProvider - Streaming', () => {
+  it('should support streaming', () => {
+    const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
+    expect(provider.supportsStreaming).toBe(true);
+  });
+
+  // Streaming integration tests will verify token emission
 });
