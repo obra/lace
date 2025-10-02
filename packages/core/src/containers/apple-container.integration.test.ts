@@ -9,7 +9,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
 
-describe('AppleContainerRuntime Integration', () => {
+describe.skipIf(process.platform !== 'darwin')('AppleContainerRuntime Integration', () => {
   let runtime: AppleContainerRuntime;
   let testDir: string;
   let createdContainers: string[] = [];

@@ -32,6 +32,9 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
 
   // Run all registered cleanup tasks after each test
   afterEach(async () => {
+    // Close database connections first to release file handles
+    resetPersistence();
+
     // Run all registered cleanup tasks
     for (const cleanup of cleanupTasks) {
       try {
@@ -41,31 +44,12 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
       }
     }
 
-    // Clean up any remaining worktrees from workspace managers before resetting
+    // Reset workspace manager singletons
+    // Skip workspace cleanup since:
+    // 1. Worktrees (default mode) are cleaned up with temp directory
+    // 2. Container cleanup can hang on stuck containers
+    // 3. Tests that need container cleanup should handle it explicitly
     const { WorkspaceManagerFactory } = await import('~/workspace/workspace-manager');
-    try {
-      // Get all managers and clean up their workspaces
-      const managers = ['worktree', 'local', 'container'] as const;
-      for (const mode of managers) {
-        try {
-          const manager = WorkspaceManagerFactory.get(mode);
-          const workspaces = await manager.listWorkspaces();
-          for (const workspace of workspaces) {
-            try {
-              await manager.destroyWorkspace(workspace.sessionId);
-            } catch (_error) {
-              // Ignore cleanup errors - best effort
-            }
-          }
-        } catch (_error) {
-          // Manager may not exist or may fail - ignore
-        }
-      }
-    } catch (_error) {
-      // Ignore any errors during workspace cleanup
-    }
-
-    // Reset workspace manager singletons AFTER all workspaces destroyed
     WorkspaceManagerFactory.reset();
   });
 

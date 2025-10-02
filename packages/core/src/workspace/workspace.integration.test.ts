@@ -11,7 +11,7 @@ import { tmpdir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
 import { execSync } from 'child_process';
 
-describe('Workspace Integration Tests', () => {
+describe.skipIf(process.platform !== 'darwin')('Workspace Integration Tests', () => {
   const _testContext = setupCoreTest();
   let manager: WorkspaceContainerManager;
   let testDir: string;

@@ -36,11 +36,11 @@ export class WorkspaceManagerFactory {
   /**
    * Get the workspace manager for the specified mode.
    * Returns the same instance for each mode (singleton pattern).
-   * Defaults to 'container' on macOS, 'worktree' on other platforms.
+   * Defaults to 'worktree' (safe, works everywhere).
+   * Container mode must be explicitly requested.
    */
   static get(mode?: WorkspaceMode): IWorkspaceManager {
-    const defaultMode = process.platform === 'darwin' ? 'container' : 'worktree';
-    const selectedMode = mode || defaultMode;
+    const selectedMode = mode || 'worktree';
     switch (selectedMode) {
       case 'container':
         // For now, only support Apple containers on macOS
