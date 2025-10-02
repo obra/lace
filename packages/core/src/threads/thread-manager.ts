@@ -532,6 +532,8 @@ export class ThreadManager {
     const compactedEventIds: string[] = [];
     for (const event of result.compactedEvents) {
       // Remove ID so addEvent generates a new one (avoids duplicates)
+      // Strategies may include IDs from the original events they're replacing.
+      // We strip them to ensure fresh IDs are generated, preventing conflicts.
       const { id: _id, ...eventWithoutId } = event;
       const addedEvent = this.addEvent({
         ...eventWithoutId,
@@ -570,7 +572,8 @@ export class ThreadManager {
       throw new Error('Compaction failed: unable to persist COMPACTION event');
     }
 
-    // Mark pre-compaction events as not visible to model
+    // At this point, addedCompactionEvent is guaranteed to have an id (we threw above if not)
+    // 3. Mark pre-compaction events as not visible to model
     const hiddenEventIds: string[] = [];
 
     // Invalidate cache FIRST to ensure we read fresh data and prevent race conditions
@@ -583,8 +586,9 @@ export class ThreadManager {
 
     if (updatedThread) {
       // Find the index of the compaction event we just added
+      // Safe to use .id directly - we verified it exists above with throw
       const compactionIndex = updatedThread.events.findIndex(
-        (e) => e.id === addedCompactionEvent?.id
+        (e) => e.id === addedCompactionEvent.id
       );
 
       // Mark all events before the compaction as not visible, EXCEPT:
@@ -599,10 +603,9 @@ export class ThreadManager {
       }
 
       // Mark the compaction event itself as not visible (it's metadata)
-      if (addedCompactionEvent?.id) {
-        this._persistence.updateEventVisibility(addedCompactionEvent.id, false);
-        hiddenEventIds.push(addedCompactionEvent.id);
-      }
+      // Safe to use .id directly - we verified it exists above with throw
+      this._persistence.updateEventVisibility(addedCompactionEvent.id, false);
+      hiddenEventIds.push(addedCompactionEvent.id);
 
       // Invalidate cache again after visibility updates to ensure fresh reads
       processLocalThreadCache.delete(threadId);
