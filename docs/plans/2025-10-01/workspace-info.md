@@ -1,5 +1,83 @@
 # Workspace Visibility Implementation Plan
 
+## Progress Status
+
+**Completed Tasks**: 1, 2, 3 (API endpoint, SessionProvider integration, sidebar badge)
+**Current Task**: 4 (WorkspaceDetailsPanel component)
+**Remaining Tasks**: 5, 6, 7, 8
+
+## Key Implementation Learnings
+
+### Import Patterns Discovered
+- ✅ WorkspaceInfo type: `import type { WorkspaceInfo } from '~/workspace/workspace-container-manager'`
+  - NOT `@lace/core/workspace/...` - that path doesn't resolve in web package
+- ✅ API client: `import { api } from '@/lib/api-client'` then use `api.get<T>(url)`
+- ✅ Response parsing: `await parseResponse<T>(response)` not `.json()`
+- ✅ Error responses: `createErrorResponse(message, status, { code })` - uses `error` field not `message`
+
+### Test Patterns Used
+- Route tests: `createLoaderArgs(request, params)` where request = `new Request(url)`
+- Hook tests: Mock `api` with `vi.mock('@/lib/api-client', () => ({ api: { get: vi.fn() } }))`
+- Must call `setupWebTest()`, `setupTestProviderDefaults()`, `createTestProviderInstance()` in beforeEach
+- Project.create() takes positional args: `(name, dir, description?, config?)`
+- Session needs provider config or tests fail with "No model configured"
+
+### Component Architecture
+- SessionProvider exposes: `workspaceMode`, `workspaceInfo`, `workspaceLoading` (separate from agent loading)
+- SessionSection accesses via: `const { workspaceMode, workspaceLoading } = useSessionContext()`
+- Badge is simple button element, not separate component (YAGNI)
+
+### What's Working
+- ✅ API endpoint returns workspace data (5 tests passing)
+- ✅ useWorkspaceDetails hook fetches and manages state (8 tests passing)
+- ✅ SessionProvider integrates workspace data
+- ✅ Workspace badge displays in sidebar
+- ✅ Badge click opens config modal (but doesn't go to specific tab yet - that's Task 6)
+- ✅ All code passes linting and pre-commit hooks
+
+## Next Session: Start Here
+
+### Task 4: Create WorkspaceDetailsPanel Component (NEXT)
+
+**Files to Create**:
+- `packages/web/components/config/WorkspaceDetailsPanel.tsx`
+- `packages/web/components/config/__tests__/WorkspaceDetailsPanel.test.tsx`
+
+**Before You Start**:
+1. Check if `faBox`, `faFolder`, `faCircle` icons already exist in `lib/fontawesome.ts`
+2. If not, add them first (part of Task 7, but needed for Task 4)
+
+**Key Points**:
+- Component receives: `mode: 'container' | 'local'`, `info: WorkspaceInfo | null`, `isLoading?: boolean`
+- Shows different sections for container vs local mode
+- Container mode: shows container ID, mount path, branch, worktree paths
+- Local mode: shows project directory with info alert about direct access
+- Must handle null/undefined info gracefully (loading/empty states)
+- Use DaisyUI classes for styling, FontAwesome icons for visual elements
+- State color coding: 'running' = success (green), 'stopped' = warning (yellow)
+
+### Remaining Critical Tasks
+
+**Task 5**: Integrate WorkspaceDetailsPanel into SessionConfigModal
+- Need to find SessionConfigModal/SessionConfigPanel component
+- Add "Workspace" tab to tab list
+- Render WorkspaceDetailsPanel in workspace tab content
+- May need to add initialTab prop support
+
+**Task 6**: Wire badge click to open modal on workspace tab
+- Update SessionSection's onConfigureSession to accept optional tab parameter
+- Update parent component to handle initialTab and pass to modal
+- This connects the badge (Task 3) to the modal tab (Task 5)
+
+**Task 7**: Add FontAwesome icons (quick task)
+- Check lib/fontawesome.ts for faBox, faFolder, faCircle
+- Add imports and exports if missing
+
+**Task 8**: E2E testing
+- Full flow: create session → see badge → click badge → see details
+- Test both container and local modes
+- Verify session switching updates workspace data
+
 ## Overview
 
 Add workspace mode visibility to the web UI so users can see whether a session is running in a container or locally, and view detailed workspace information including paths, container details, and git branch information.
@@ -47,7 +125,22 @@ export interface WorkspaceInfo {
 
 ## Implementation Tasks
 
-### Task 1: Create API Endpoint for Workspace Information
+### Task 1: Create API Endpoint for Workspace Information ✅ COMPLETED
+
+**Status**: Implemented and committed (8d034de46)
+
+**What Was Built**:
+- Created `packages/web/app/routes/api.sessions.$sessionId.workspace.ts`
+- Returns `{ mode: 'container' | 'local', info: WorkspaceInfo | null }`
+- Registered route in `app/routes.ts`
+- Comprehensive test coverage (5 tests passing) in `app/routes/__tests__/api.sessions.$sessionId.workspace.test.ts`
+
+**Implementation Notes**:
+- Used `createSuperjsonResponse` and `createErrorResponse` (not raw json())
+- Cast sessionId to ThreadId type for Session.getById()
+- Used `parseResponse` in tests (not .json())
+- Imported WorkspaceInfo from `~/workspace/workspace-container-manager` (not @lace/core path)
+- Tests follow existing patterns: setupWebTest(), createLoaderArgs(request, params), parseResponse()
 
 **Goal**: Expose workspace data to the web UI through a new API endpoint.
 
@@ -269,7 +362,29 @@ workspace mode (container/local) and detailed WorkspaceInfo.
 
 ---
 
-### Task 2: Extend SessionProvider with Workspace Data
+### Task 2: Extend SessionProvider with Workspace Data ✅ COMPLETED
+
+**Status**: Implemented and committed (f064a4fa9, 388eac408)
+
+**What Was Built**:
+- Created `useWorkspaceDetails` hook in `packages/web/hooks/useWorkspaceDetails.ts`
+  - Fetches workspace data from new API endpoint
+  - Returns workspaceMode, workspaceInfo, loading, error, reload()
+  - Comprehensive test coverage (8 tests passing)
+- Extended SessionProvider to use useWorkspaceDetails hook
+- Added workspaceMode, workspaceInfo, workspaceLoading to SessionContextType
+- Updated provider-mocks.ts to include workspace fields
+
+**Implementation Differences from Plan**:
+- Created separate `useWorkspaceDetails` hook instead of adding fetch logic directly to SessionProvider
+- Cleaner separation of concerns - hook can be reused independently
+- Uses `api.get()` from api-client (standard pattern)
+- Mock uses `vi.mock('@/lib/api-client', () => ({ api: { get: vi.fn() } }))`
+
+**Notes for Next Session**:
+- WorkspaceInfo type imported from `~/workspace/workspace-container-manager`
+- Hook returns loading state separately (workspaceLoading) to avoid conflicting with agent loading
+- Error state is captured but not currently exposed in SessionContext (only in hook)
 
 **Goal**: Add workspace mode and info to SessionProvider context so both sidebar and modal can access it.
 
@@ -604,7 +719,26 @@ workspace info to all consuming components.
 
 ---
 
-### Task 3: Add Workspace Badge to SessionSection Sidebar
+### Task 3: Add Workspace Badge to SessionSection Sidebar ✅ COMPLETED
+
+**Status**: Implemented and committed (bb3efdd2b)
+
+**What Was Built**:
+- Added workspace mode badge to session header actions in SessionSection.tsx:109-124
+- Badge displays "Container" (blue) or "Local" (green) based on workspaceMode from context
+- Clicking badge calls handleConfigureSession to open config modal
+- Hidden when workspaceLoading or mode is null
+- Uses inline styles for color (blue: #3b82f6, green: #10b981)
+
+**Implementation Differences from Plan**:
+- Badge placed in header actions (next to configure button) instead of in sidebar body
+- Simpler inline implementation rather than separate WorkspaceBadge component
+- Used inline color styles instead of DaisyUI badge classes for more control
+- No icons yet (will be added in Task 7)
+
+**Notes for Next Session**:
+- Badge currently just opens modal - Task 6 will wire it to open directly to workspace tab
+- onConfigureSession currently takes no parameters - will need to update signature in Task 6
 
 **Goal**: Display workspace mode badge in the sidebar that opens the SessionConfigModal.
 
