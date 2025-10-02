@@ -23,6 +23,11 @@ export class CloneManager {
    * Auto-initializes git if not already a repository
    */
   static async createSessionClone(projectDir: string, sessionId: string): Promise<string> {
+    // Validate projectDir is not empty
+    if (!projectDir || projectDir.trim() === '') {
+      throw new Error('projectDir cannot be empty - this would cause git init in cwd');
+    }
+
     // Validate project directory exists
     if (!existsSync(projectDir)) {
       throw new Error('Project directory does not exist');

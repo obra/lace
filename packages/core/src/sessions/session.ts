@@ -262,9 +262,10 @@ export class Session {
     );
 
     // Start workspace creation in background (don't await)
+    const projectWorkingDir = project.getWorkingDirectory();
     session._workspaceInitPromise = session.initializeWorkspace(
       workspaceManager,
-      project.getWorkingDirectory(),
+      projectWorkingDir,
       sessionData.id
     );
 

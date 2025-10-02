@@ -14,6 +14,8 @@ import { expectEventAdded } from '~/test-utils/event-helpers';
 import { BashTool } from '~/tools/implementations/bash';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
@@ -91,6 +93,7 @@ describe('Enhanced Agent', () => {
   let session: Session;
   let project: Project;
   let providerInstanceId: string;
+  let tempProjectDir: string;
 
   beforeEach(async () => {
     setupTestProviderDefaults();
@@ -103,16 +106,15 @@ describe('Enhanced Agent', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create temp project directory (separate from LACE_DIR)
+    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create real project and session for proper context
-    project = Project.create(
-      'Agent Test Project',
-      tempLaceDirContext.tempDir,
-      'Project for agent testing',
-      {
-        providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      }
-    );
+    project = Project.create('Agent Test Project', tempProjectDir, 'Project for agent testing', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
 
     session = Session.create({
       name: 'Agent Test Session',

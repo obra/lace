@@ -52,6 +52,13 @@ export class Project {
     description = '',
     configuration: Record<string, unknown> = {}
   ): Project {
+    // Validate workingDirectory is not empty
+    if (!workingDirectory || workingDirectory.trim() === '') {
+      throw new Error(
+        'Project workingDirectory cannot be empty. This usually means tempDir was accessed before beforeEach ran.'
+      );
+    }
+
     const persistence = getPersistence();
 
     // Auto-generate name from directory if not provided

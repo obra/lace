@@ -74,6 +74,11 @@ export class WorktreeManager {
    * The worktree stays connected to the main repo - commits appear immediately
    */
   static async createSessionWorktree(projectDir: string, sessionId: string): Promise<string> {
+    // Validate projectDir is not empty
+    if (!projectDir || projectDir.trim() === '') {
+      throw new Error('projectDir cannot be empty - this would cause git init in cwd');
+    }
+
     // Validate sessionId and resolve safe worktree path
     const worktreePath = this.resolveWorktreePath(sessionId);
 
