@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
 import type { LaceEvent } from '~/threads/types';
-import type { CompactionData } from '~/threads/compaction/types';
 
 describe('conversation-builder', () => {
   const mockEvents: LaceEvent[] = [
@@ -34,113 +33,98 @@ describe('conversation-builder', () => {
       expect(result).toEqual(mockEvents);
     });
 
-    it('uses compacted events when compaction exists', () => {
-      const compactionEvent: LaceEvent = {
-        id: 'comp1',
+    it('filters out events with visibleToModel: false', () => {
+      const hiddenEvent: LaceEvent = {
+        id: 'e1',
         threadId: 'test-thread',
-        type: 'COMPACTION',
-        timestamp: new Date('2024-01-01T10:03:00Z'),
-        data: {
-          strategyId: 'test-strategy',
-          originalEventCount: 3,
-          compactedEvents: [
-            {
-              id: 'c1',
-              threadId: 'test-thread',
-              type: 'AGENT_MESSAGE',
-              timestamp: new Date('2024-01-01T10:01:00Z'),
-              data: { content: 'Summary: User said hello, I replied' },
-            },
-          ],
-        },
+        type: 'USER_MESSAGE',
+        timestamp: new Date('2024-01-01T10:00:00Z'),
+        data: 'Hidden message',
+        visibleToModel: false,
       };
 
-      const newEvent: LaceEvent = {
-        id: 'e4',
+      const visibleEvent: LaceEvent = {
+        id: 'e2',
         threadId: 'test-thread',
         type: 'AGENT_MESSAGE',
-        timestamp: new Date('2024-01-01T10:04:00Z'),
-        data: { content: 'I am fine' },
+        timestamp: new Date('2024-01-01T10:01:00Z'),
+        data: { content: 'Visible message' },
       };
 
-      const eventsWithCompaction = [...mockEvents, compactionEvent, newEvent];
-      const result = buildWorkingConversation(eventsWithCompaction);
+      const undefinedVisibilityEvent: LaceEvent = {
+        id: 'e3',
+        threadId: 'test-thread',
+        type: 'USER_MESSAGE',
+        timestamp: new Date('2024-01-01T10:02:00Z'),
+        data: 'Also visible',
+        visibleToModel: undefined,
+      };
 
-      expect(result).toEqual([
-        (compactionEvent.data as unknown as CompactionData).compactedEvents[0],
-        compactionEvent, // Include COMPACTION event itself
-        newEvent, // Only events after compaction timestamp
-      ]);
+      const events = [hiddenEvent, visibleEvent, undefinedVisibilityEvent];
+      const result = buildWorkingConversation(events);
+
+      // Should exclude only the event with visibleToModel: false
+      expect(result).toEqual([visibleEvent, undefinedVisibilityEvent]);
     });
 
-    it('uses latest compaction when multiple exist', () => {
-      const firstCompaction: LaceEvent = {
-        id: 'comp1',
+    it('treats undefined and true visibleToModel as visible', () => {
+      const eventWithTrue: LaceEvent = {
+        id: 'e1',
         threadId: 'test-thread',
-        type: 'COMPACTION',
-        timestamp: new Date('2024-01-01T10:03:00Z'),
-        data: {
-          strategyId: 'test-strategy',
-          originalEventCount: 2,
-          compactedEvents: [
-            {
-              id: 'c1',
-              threadId: 'test-thread',
-              type: 'AGENT_MESSAGE',
-              timestamp: new Date('2024-01-01T10:01:00Z'),
-              data: { content: 'First summary' },
-            },
-          ],
-        },
+        type: 'USER_MESSAGE',
+        timestamp: new Date('2024-01-01T10:00:00Z'),
+        data: 'Visible with true',
+        visibleToModel: true,
       };
 
-      const secondCompaction: LaceEvent = {
-        id: 'comp2',
+      const eventWithUndefined: LaceEvent = {
+        id: 'e2',
         threadId: 'test-thread',
-        type: 'COMPACTION',
-        timestamp: new Date('2024-01-01T10:05:00Z'),
-        data: {
-          strategyId: 'test-strategy',
-          originalEventCount: 3,
-          compactedEvents: [
-            {
-              id: 'c2',
-              threadId: 'test-thread',
-              type: 'AGENT_MESSAGE',
-              timestamp: new Date('2024-01-01T10:01:00Z'),
-              data: { content: 'Second summary' },
-            },
-          ],
-        },
+        type: 'AGENT_MESSAGE',
+        timestamp: new Date('2024-01-01T10:01:00Z'),
+        data: { content: 'Visible with undefined' },
+        visibleToModel: undefined,
       };
 
-      const eventsWithTwoCompactions = [...mockEvents, firstCompaction, secondCompaction];
-      const result = buildWorkingConversation(eventsWithTwoCompactions);
+      const eventWithNoField: LaceEvent = {
+        id: 'e3',
+        threadId: 'test-thread',
+        type: 'USER_MESSAGE',
+        timestamp: new Date('2024-01-01T10:02:00Z'),
+        data: 'Visible without field',
+      };
 
-      expect(result).toEqual([
-        ...(secondCompaction.data as unknown as CompactionData).compactedEvents,
-        secondCompaction, // Include COMPACTION event itself
-      ]);
+      const events = [eventWithTrue, eventWithUndefined, eventWithNoField];
+      const result = buildWorkingConversation(events);
+
+      // All should be visible
+      expect(result).toEqual(events);
     });
   });
 
   describe('buildCompleteHistory', () => {
-    it('returns all events including compaction events', () => {
-      const compactionEvent: LaceEvent = {
-        id: 'comp1',
+    it('returns all events including hidden ones', () => {
+      const hiddenEvent: LaceEvent = {
+        id: 'e1',
         threadId: 'test-thread',
-        type: 'COMPACTION',
-        timestamp: new Date('2024-01-01T10:03:00Z'),
-        data: {
-          strategyId: 'test-strategy',
-          originalEventCount: 2,
-          compactedEvents: [],
-        },
+        type: 'USER_MESSAGE',
+        timestamp: new Date('2024-01-01T10:00:00Z'),
+        data: 'Hidden message',
+        visibleToModel: false,
       };
 
-      const allEvents = [...mockEvents, compactionEvent];
+      const visibleEvent: LaceEvent = {
+        id: 'e2',
+        threadId: 'test-thread',
+        type: 'AGENT_MESSAGE',
+        timestamp: new Date('2024-01-01T10:01:00Z'),
+        data: { content: 'Visible message' },
+      };
+
+      const allEvents = [hiddenEvent, visibleEvent];
       const result = buildCompleteHistory(allEvents);
 
+      // buildCompleteHistory returns ALL events, regardless of visibleToModel flag
       expect(result).toEqual(allEvents);
     });
   });
@@ -252,51 +236,41 @@ describe('conversation-builder', () => {
       expect((toolResults[0].data as { id: string }).id).toBe('tool-123');
     });
 
-    it('should work correctly with compacted events containing duplicates', () => {
-      const compactionEvent: LaceEvent = {
-        id: 'comp1',
+    it('should work correctly with visible and hidden events containing duplicates', () => {
+      const visibleResult: LaceEvent = {
+        id: 'c1',
         threadId: 'test-thread',
-        type: 'COMPACTION',
-        timestamp: new Date('2024-01-01T10:03:00Z'),
+        type: 'TOOL_RESULT',
+        timestamp: new Date('2024-01-01T10:01:00Z'),
         data: {
-          strategyId: 'test-strategy',
-          originalEventCount: 2,
-          compactedEvents: [
-            {
-              id: 'c1',
-              threadId: 'test-thread',
-              type: 'TOOL_RESULT',
-              timestamp: new Date('2024-01-01T10:01:00Z'),
-              data: {
-                id: 'tool-999',
-                content: [{ type: 'text', text: 'Compacted result' }],
-                status: 'completed',
-              },
-            },
-          ],
+          id: 'tool-999',
+          content: [{ type: 'text', text: 'Visible result' }],
+          status: 'completed',
         },
+        visibleToModel: true,
       };
 
-      const duplicateAfterCompaction: LaceEvent = {
+      const hiddenDuplicate: LaceEvent = {
         id: 'e4',
         threadId: 'test-thread',
         type: 'TOOL_RESULT',
         timestamp: new Date('2024-01-01T10:04:00Z'),
         data: {
           id: 'tool-999',
-          content: [{ type: 'text', text: 'Duplicate result' }],
+          content: [{ type: 'text', text: 'Hidden duplicate' }],
           status: 'completed',
         },
+        visibleToModel: false,
       };
 
-      const events = [compactionEvent, duplicateAfterCompaction];
+      const events = [visibleResult, hiddenDuplicate];
       const result = buildWorkingConversation(events);
 
-      // Should keep only the compacted result, filter the duplicate
+      // Should keep only the visible result (hidden is filtered by visibleToModel)
       const toolResults = result.filter((e) => e.type === 'TOOL_RESULT');
       expect(toolResults).toHaveLength(1);
       expect((toolResults[0].data as { content: Array<{ text: string }> }).content[0].text).toBe(
-        'Compacted result'
+        'Visible result'
       );
     });
 
@@ -482,60 +456,62 @@ describe('conversation-builder', () => {
     });
   });
 
-  describe('malformed compaction data handling', () => {
-    it('gracefully handles malformed compaction data by falling back to all events', () => {
-      const malformedCompactionEvent: LaceEvent = {
-        id: 'compaction-bad',
-        threadId: 'test-thread',
-        type: 'COMPACTION',
-        timestamp: new Date('2024-01-01T10:03:00Z'),
-        data: {
-          strategyId: 123, // Invalid type - should be string
-          originalEventCount: 'invalid', // Invalid type - should be number
-          compactedEvents: 'not-an-array', // Invalid type - should be array
-        } as unknown as CompactionData, // Type assertion to bypass TS checking
-      };
+  describe('visibleToModel filtering edge cases', () => {
+    it('handles mixed visibility flags correctly', () => {
+      const events: LaceEvent[] = [
+        {
+          id: 'e1',
+          threadId: 'test-thread',
+          type: 'USER_MESSAGE',
+          timestamp: new Date('2024-01-01T10:00:00Z'),
+          data: 'Visible 1',
+          visibleToModel: true,
+        },
+        {
+          id: 'e2',
+          threadId: 'test-thread',
+          type: 'AGENT_MESSAGE',
+          timestamp: new Date('2024-01-01T10:01:00Z'),
+          data: { content: 'Hidden 1' },
+          visibleToModel: false,
+        },
+        {
+          id: 'e3',
+          threadId: 'test-thread',
+          type: 'USER_MESSAGE',
+          timestamp: new Date('2024-01-01T10:02:00Z'),
+          data: 'Visible 2',
+        },
+        {
+          id: 'e4',
+          threadId: 'test-thread',
+          type: 'AGENT_MESSAGE',
+          timestamp: new Date('2024-01-01T10:03:00Z'),
+          data: { content: 'Hidden 2' },
+          visibleToModel: false,
+        },
+        {
+          id: 'e5',
+          threadId: 'test-thread',
+          type: 'USER_MESSAGE',
+          timestamp: new Date('2024-01-01T10:04:00Z'),
+          data: 'Visible 3',
+          visibleToModel: undefined,
+        },
+      ];
 
-      const newEvent: LaceEvent = {
-        id: 'e4',
-        threadId: 'test-thread',
-        type: 'AGENT_MESSAGE',
-        timestamp: new Date('2024-01-01T10:04:00Z'),
-        data: { content: 'After malformed compaction' },
-      };
-
-      const events = [...mockEvents, malformedCompactionEvent, newEvent];
       const result = buildWorkingConversation(events);
 
-      // Should fall back to returning all events when compaction data is malformed
-      expect(result).toEqual(events);
+      // Should only include events with visibleToModel !== false
+      expect(result).toHaveLength(3);
+      expect(result[0].id).toBe('e1');
+      expect(result[1].id).toBe('e3');
+      expect(result[2].id).toBe('e5');
     });
 
-    it('handles invalid compaction data gracefully', () => {
-      const invalidCompactionEvent: LaceEvent = {
-        id: 'compaction-invalid',
-        threadId: 'test-thread',
-        type: 'COMPACTION',
-        timestamp: new Date('2024-01-01T10:03:00Z'),
-        data: {
-          // Missing required fields to make it truly invalid
-          wrongField: 'this is not CompactionData',
-        } as unknown as CompactionData, // Type assertion to bypass TS checking
-      };
-
-      const newEvent: LaceEvent = {
-        id: 'e4',
-        threadId: 'test-thread',
-        type: 'AGENT_MESSAGE',
-        timestamp: new Date('2024-01-01T10:04:00Z'),
-        data: { content: 'After invalid compaction' },
-      };
-
-      const events = [...mockEvents, invalidCompactionEvent, newEvent];
-      const result = buildWorkingConversation(events);
-
-      // Should fall back to returning all events when compaction data is invalid
-      expect(result).toEqual(events);
+    it('empty event list returns empty result', () => {
+      const result = buildWorkingConversation([]);
+      expect(result).toEqual([]);
     });
   });
 });
