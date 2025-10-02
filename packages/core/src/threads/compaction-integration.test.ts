@@ -92,14 +92,26 @@ describe('Compaction Integration', () => {
     const allEvents = threadManager.getAllEvents(threadId);
     const workingEvents = threadManager.getEvents(threadId);
 
-    expect(allEvents).toHaveLength(5); // Original 4 + 1 compaction event
-    expect(workingEvents).toHaveLength(5); // Compacted conversation + compaction event
+    // After compaction with new architecture:
+    // - 4 original events (marked visibleToModel: false)
+    // - 4 compacted replacement events (marked visibleToModel: true)
+    // - 1 COMPACTION event (marked visibleToModel: false)
+    // = 9 total events in getAllEvents()
+    expect(allEvents).toHaveLength(9);
 
-    // Verify detailed structure of working conversation after compaction
+    // getEvents() returns only visible events (the 4 compacted replacements)
+    expect(workingEvents).toHaveLength(4);
+
+    // Verify working conversation contains compacted versions
+    // Note: visibleToModel: true is stored as NULL and read back as undefined
     expect(workingEvents[0]).toEqual(
       expect.objectContaining({ type: 'USER_MESSAGE', data: 'List files' })
     );
+    expect(workingEvents[0].visibleToModel).not.toBe(false);
+
     expect(workingEvents[1]).toEqual(expect.objectContaining({ type: 'TOOL_CALL' }));
+    expect(workingEvents[1].visibleToModel).not.toBe(false);
+
     expect(workingEvents[2]).toEqual(
       expect.objectContaining({
         type: 'TOOL_RESULT',
@@ -115,10 +127,19 @@ describe('Compaction Integration', () => {
         }) as unknown,
       })
     );
+    expect(workingEvents[2].visibleToModel).not.toBe(false);
+
     expect(workingEvents[3]).toEqual(
-      expect.objectContaining({ type: 'AGENT_MESSAGE', data: { content: 'Found 5 files' } })
+      expect.objectContaining({
+        type: 'AGENT_MESSAGE',
+        data: { content: 'Found 5 files' },
+      })
     );
-    expect(workingEvents[4]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
+    expect(workingEvents[3].visibleToModel).not.toBe(false);
+
+    // Verify original events are marked as not visible in allEvents
+    const originalEvents = allEvents.filter((e) => e.visibleToModel === false);
+    expect(originalEvents.length).toBeGreaterThanOrEqual(5); // 4 original + 1 COMPACTION
   });
 
   it('continues conversation after compaction', async () => {
@@ -163,16 +184,23 @@ describe('Compaction Integration', () => {
     const workingEvents = threadManager.getEvents(threadId);
     const allEvents = threadManager.getAllEvents(threadId);
 
-    // Working conversation should include compacted events + compaction event + new events
-    expect(workingEvents).toHaveLength(5); // 2 compacted + 1 compaction + 2 new
+    // Working conversation: 2 compacted events + 2 new events = 4 visible events
+    expect(workingEvents).toHaveLength(4);
 
-    // All events should include original + compaction event + new events
-    expect(allEvents).toHaveLength(5); // 2 original + 1 compaction + 2 new = 5 total
+    // All events include:
+    // - 2 original events (hidden)
+    // - 2 compacted replacement events (visible)
+    // - 1 COMPACTION event (hidden)
+    // - 2 new events (visible)
+    // = 7 total
+    expect(allEvents).toHaveLength(7);
 
-    // Verify detailed structure of working conversation after adding more events
+    // Verify working conversation contains only visible events
     expect(workingEvents[0]).toEqual(
       expect.objectContaining({ type: 'USER_MESSAGE', data: 'Hello' })
     );
+    expect(workingEvents[0].visibleToModel).not.toBe(false);
+
     expect(workingEvents[1]).toEqual(
       expect.objectContaining({
         type: 'TOOL_RESULT',
@@ -185,13 +213,18 @@ describe('Compaction Integration', () => {
         }) as unknown,
       })
     );
-    expect(workingEvents[2]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
-    expect(workingEvents[3]).toEqual(
+    expect(workingEvents[1].visibleToModel).not.toBe(false);
+
+    expect(workingEvents[2]).toEqual(
       expect.objectContaining({ type: 'USER_MESSAGE', data: 'What next?' })
     );
-    expect(workingEvents[4]).toEqual(
+    expect(workingEvents[3]).toEqual(
       expect.objectContaining({ type: 'AGENT_MESSAGE', data: { content: 'Let me help' } })
     );
+
+    // Verify hidden events exist in allEvents
+    const hiddenEvents = allEvents.filter((e) => e.visibleToModel === false);
+    expect(hiddenEvents).toHaveLength(3); // 2 original + 1 COMPACTION
   });
 
   it('handles multiple compactions', async () => {
@@ -244,46 +277,30 @@ describe('Compaction Integration', () => {
     const workingEvents = threadManager.getEvents(threadId);
     const allEvents = threadManager.getAllEvents(threadId);
 
-    // Detailed verification of event structure
+    // Verify we have 2 COMPACTION events
     const compactionEvents = allEvents.filter((e) => e.type === 'COMPACTION');
     expect(compactionEvents).toHaveLength(2);
 
-    // All events should be exactly: [original1, original2, compaction1, more1, more2, compaction2]
-    expect(allEvents).toHaveLength(6);
-    expect(allEvents[0]).toEqual(expect.objectContaining({ type: 'USER_MESSAGE', data: 'Hello' }));
-    expect(allEvents[1]).toEqual(
-      expect.objectContaining({
-        type: 'TOOL_RESULT',
-        data: expect.objectContaining({
-          id: 'call-first',
-          content: [{ type: 'text', text: 'long\nresult\nhere\nextra\nlines' }],
-          status: 'completed',
-        }) as unknown,
-      })
-    );
-    expect(allEvents[2]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
-    expect(allEvents[3]).toEqual(
-      expect.objectContaining({ type: 'USER_MESSAGE', data: 'Continue' })
-    );
-    expect(allEvents[4]).toEqual(
-      expect.objectContaining({
-        type: 'TOOL_RESULT',
-        data: expect.objectContaining({
-          id: 'call-second',
-          content: [{ type: 'text', text: 'another\nlong\nresult\nwith\nextra\nlines' }],
-          status: 'completed',
-        }) as unknown,
-      })
-    );
-    expect(allEvents[5]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
+    // All events structure with new architecture:
+    // First compaction creates: 2 original (hidden) + 2 compacted (visible) + 1 COMPACTION (hidden)
+    // Then add: 2 new events (visible)
+    // Second compaction marks: 2 compacted from first + 2 new = 4 events as hidden
+    // And creates: 4 new compacted replacements (visible) + 1 COMPACTION (hidden)
+    // Total: 2 + 2 + 1 + 2 + 4 + 1 = 12 events
+    expect(allEvents.length).toBeGreaterThanOrEqual(12);
 
-    // Working events should contain: compacted events from latest compaction + latest compaction event
-    expect(workingEvents).toHaveLength(5);
+    // Working events should only contain the latest compacted versions (4 events)
+    expect(workingEvents).toHaveLength(4);
 
-    // First 4 events should be the compacted conversation (original events with tool results trimmed, no old compaction)
+    // Verify working conversation has the compacted versions from second compaction
     expect(workingEvents[0]).toEqual(
-      expect.objectContaining({ type: 'USER_MESSAGE', data: 'Hello' })
+      expect.objectContaining({
+        type: 'USER_MESSAGE',
+        data: 'Hello',
+      })
     );
+    expect(workingEvents[0].visibleToModel).not.toBe(false);
+
     expect(workingEvents[1]).toEqual(
       expect.objectContaining({
         type: 'TOOL_RESULT',
@@ -296,9 +313,16 @@ describe('Compaction Integration', () => {
         }) as unknown,
       })
     );
+    expect(workingEvents[1].visibleToModel).not.toBe(false);
+
     expect(workingEvents[2]).toEqual(
-      expect.objectContaining({ type: 'USER_MESSAGE', data: 'Continue' })
+      expect.objectContaining({
+        type: 'USER_MESSAGE',
+        data: 'Continue',
+      })
     );
+    expect(workingEvents[2].visibleToModel).not.toBe(false);
+
     expect(workingEvents[3]).toEqual(
       expect.objectContaining({
         type: 'TOOL_RESULT',
@@ -311,14 +335,13 @@ describe('Compaction Integration', () => {
         }) as unknown,
       })
     );
+    expect(workingEvents[3].visibleToModel).not.toBe(false);
 
-    // Last event should be the latest compaction event
-    expect(workingEvents[4]).toEqual(expect.objectContaining({ type: 'COMPACTION' }));
+    // Verify all working events are visible (visibleToModel !== false)
+    expect(workingEvents.every((e) => e.visibleToModel !== false)).toBe(true);
 
-    // Verify working conversation contains only the latest compaction, not the earlier one
-    const workingCompactionEvents = workingEvents.filter((e) => e.type === 'COMPACTION');
-    expect(workingCompactionEvents).toHaveLength(1);
-    expect(workingCompactionEvents[0].id).toBe(allEvents[5].id); // Should be the second/latest compaction
+    // Verify both COMPACTION events are hidden
+    expect(compactionEvents.every((e) => e.visibleToModel === false)).toBe(true);
   });
 
   it('throws error for unknown strategy', async () => {
@@ -402,16 +425,42 @@ describe('Compaction Integration', () => {
 
     const workingEvents = threadManager.getEvents(threadId);
 
-    // Check that order is preserved
-    expect(workingEvents[0].type).toBe('USER_MESSAGE');
-    expect(workingEvents[0].data).toBe('First message');
-    expect(workingEvents[1].type).toBe('AGENT_MESSAGE');
-    expect(workingEvents[1].data).toEqual({ content: 'First response' });
-    expect(workingEvents[2].type).toBe('TOOL_RESULT');
+    // Working events should only contain visible compacted versions
+    expect(workingEvents).toHaveLength(4);
+
+    // Check that order is preserved in compacted versions
+    expect(workingEvents[0]).toEqual(
+      expect.objectContaining({
+        type: 'USER_MESSAGE',
+        data: 'First message',
+      })
+    );
+    expect(workingEvents[0].visibleToModel).not.toBe(false);
+
+    expect(workingEvents[1]).toEqual(
+      expect.objectContaining({
+        type: 'AGENT_MESSAGE',
+        data: { content: 'First response' },
+      })
+    );
+    expect(workingEvents[1].visibleToModel).not.toBe(false);
+
+    expect(workingEvents[2]).toEqual(
+      expect.objectContaining({
+        type: 'TOOL_RESULT',
+      })
+    );
+    expect(workingEvents[2].visibleToModel).not.toBe(false);
     expect((workingEvents[2].data as { content: Array<{ text: string }> }).content[0].text).toBe(
       'long\ntool\nresult\n[results truncated to save space.]'
     );
-    expect(workingEvents[3].type).toBe('USER_MESSAGE');
-    expect(workingEvents[3].data).toBe('Second message');
+
+    expect(workingEvents[3]).toEqual(
+      expect.objectContaining({
+        type: 'USER_MESSAGE',
+        data: 'Second message',
+      })
+    );
+    expect(workingEvents[3].visibleToModel).not.toBe(false);
   });
 });

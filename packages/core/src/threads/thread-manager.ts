@@ -522,11 +522,27 @@ export class ThreadManager {
       ...(params as object),
     };
 
-    // Run compaction strategy
-    const compactionEvent = await strategy.compact(thread.events, context);
+    // Run compaction strategy on VISIBLE events only (not hidden ones)
+    // This ensures we only compact the current working conversation
+    const visibleEvents = thread.events.filter((e) => e.visibleToModel !== false);
+    const result = await strategy.compact(visibleEvents, context);
 
-    // Add the compaction event to the thread
-    // Extract the CompactionData from the strategy result and add as new event
+    // 1. Persist compacted events as first-class database rows (marked visible)
+    const compactedEventIds: string[] = [];
+    for (const event of result.compactedEvents) {
+      // Remove ID so addEvent generates a new one (avoids duplicates)
+      const { id: _id, ...eventWithoutId } = event;
+      const addedEvent = this.addEvent({
+        ...eventWithoutId,
+        visibleToModel: true,
+        context: { ...event.context, threadId },
+      });
+      if (addedEvent?.id) {
+        compactedEventIds.push(addedEvent.id);
+      }
+    }
+
+    // 2. Add the COMPACTION metadata event (marked not visible)
     //
     // NOTE FOR REVIEWERS: addEvent() persistence failure is handled gracefully:
     // 1. addEvent() logs errors but doesn't throw, preserving thread consistency
@@ -534,12 +550,11 @@ export class ThreadManager {
     // 3. If persistence fails, the in-memory thread remains unchanged
     // 4. Subsequent operations will retry persistence, maintaining eventual consistency
     // 5. The thread cache remains consistent with successful database state
-    const compactionData = compactionEvent.data as CompactionData;
     const addedCompactionEvent = this.addEvent({
-      type: 'COMPACTION',
-      data: compactionData,
+      ...result.compactionEvent,
+      visibleToModel: false,
       context: { threadId },
-    } as LaceEvent);
+    });
 
     // Mark pre-compaction events as not visible to model
     const hiddenEventIds: string[] = [];
@@ -558,10 +573,12 @@ export class ThreadManager {
         (e) => e.id === addedCompactionEvent?.id
       );
 
-      // Mark all events before the compaction as not visible
+      // Mark all events before the compaction as not visible, EXCEPT:
+      // 1. The compacted replacement events we just created
+      // 2. Events that are already hidden
       for (let i = 0; i < compactionIndex; i++) {
         const event = updatedThread.events[i];
-        if (event.id) {
+        if (event.id && !compactedEventIds.includes(event.id) && event.visibleToModel !== false) {
           this._persistence.updateEventVisibility(event.id, false);
           hiddenEventIds.push(event.id);
         }
@@ -575,16 +592,13 @@ export class ThreadManager {
 
       // Invalidate cache again after visibility updates to ensure fresh reads
       processLocalThreadCache.delete(threadId);
-
-      // Note: Compacted replacement events (in compactionData.compactedEvents)
-      // are virtual - they exist only in the COMPACTION event's data field,
-      // not as separate events in the thread
     }
 
     logger.info('THREADMANAGER: Compaction complete', {
       threadId,
       strategyId,
       hiddenEventCount: hiddenEventIds.length,
+      compactedEventCount: result.compactedEvents.length,
     });
 
     return {

@@ -131,31 +131,13 @@ function deduplicateToolResults(events: LaceEvent[]): LaceEvent[] {
 }
 
 export function buildWorkingConversation(events: LaceEvent[]): LaceEvent[] {
-  const { lastCompaction, lastCompactionIndex } = findLastCompactionEventWithIndex(events);
-
-  let workingEvents: LaceEvent[];
-
-  if (!lastCompaction) {
-    workingEvents = events; // No compaction yet, use all events
-  } else {
-    // Use compacted events + compaction event + everything after compaction
-    const eventsAfterCompaction = events.slice(lastCompactionIndex + 1);
-
-    // Type-safe extraction of compaction data with runtime validation
-    if (!isCompactionData(lastCompaction.data)) {
-      // Defensive fallback: if compaction data is malformed, return all events
-      // This preserves conversation integrity even if compaction data is corrupted
-      workingEvents = events;
-    } else {
-      const compactionData = lastCompaction.data;
-      // Ensure compacted events have proper Date timestamps (they may be strings from JSON serialization)
-      const hydratedCompactedEvents = hydrateEvents(compactionData.compactedEvents);
-      workingEvents = [...hydratedCompactedEvents, lastCompaction, ...eventsAfterCompaction];
-    }
-  }
+  // With the new compaction architecture, compacted events are persisted as
+  // separate database rows with visibleToModel flags. We simply filter to
+  // events that are visible to the model (visibleToModel !== false).
+  const visibleEvents = events.filter((e) => e.visibleToModel !== false);
 
   // Apply tool result deduplication as final step
-  return deduplicateToolResults(workingEvents);
+  return deduplicateToolResults(visibleEvents);
 }
 
 export function buildCompleteHistory(events: LaceEvent[]): LaceEvent[] {
