@@ -217,8 +217,8 @@ export function AddInstanceModal({
           {selectedProvider?.id === 'claude-agents-sdk' && (
             <Alert
               variant="info"
-              title="OAuth Authentication"
-              description="You'll authenticate via browser after creating this instance. Requires Claude Pro or Team subscription."
+              title="Auto-Authentication"
+              description="Uses your existing Claude authentication (from Claude Code CLI or browser session). No additional setup needed if you're already logged in to Claude."
             />
           )}
 

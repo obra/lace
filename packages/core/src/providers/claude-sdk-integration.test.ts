@@ -65,8 +65,9 @@ describe('ClaudeSDKProvider - Integration', () => {
     it('should check configuration', () => {
       expect(provider.isConfigured()).toBe(true);
 
-      const unconfigured = new ClaudeSDKProvider({ sessionToken: null });
-      expect(unconfigured.isConfigured()).toBe(false);
+      // SDK provider is always configured - uses auto-detected Claude authentication
+      const withoutToken = new ClaudeSDKProvider({ sessionToken: null });
+      expect(withoutToken.isConfigured()).toBe(true);
     });
   });
 
@@ -275,16 +276,24 @@ describe('ClaudeSDKProvider - Integration', () => {
   describe('Error Handling', () => {
     it('should require context parameter', async () => {
       await expect(
-        provider.createResponse([{ role: 'user', content: 'Hello' }], [], 'model', undefined, undefined)
+        provider.createResponse(
+          [{ role: 'user', content: 'Hello' }],
+          [],
+          'model',
+          undefined,
+          undefined
+        )
       ).rejects.toThrow('requires ProviderRequestContext');
     });
 
-    it('should throw if not configured', async () => {
-      const unconfiguredProvider = new ClaudeSDKProvider({ sessionToken: null });
+    it('should work without explicit session token', async () => {
+      const providerWithoutToken = new ClaudeSDKProvider({ sessionToken: null });
 
+      // Doesn't throw on null token - SDK uses auto-detected auth
+      // But requires context parameter
       await expect(
-        unconfiguredProvider.createResponse([{ role: 'user', content: 'Hello' }], [], 'sonnet')
-      ).rejects.toThrow('not configured');
+        providerWithoutToken.createResponse([{ role: 'user', content: 'Hello' }], [], 'sonnet')
+      ).rejects.toThrow('requires ProviderRequestContext');
     });
 
     it('should throw if last message is not user message', async () => {

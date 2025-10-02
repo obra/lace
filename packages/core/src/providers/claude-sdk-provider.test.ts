@@ -46,7 +46,7 @@ describe('ClaudeSDKProvider', () => {
     const info = provider.getProviderInfo();
     expect(info.name).toBe('claude-agents-sdk');
     expect(info.displayName).toContain('SDK');
-    expect(info.requiresApiKey).toBe(true);
+    expect(info.requiresApiKey).toBe(false); // SDK auto-detects authentication
   });
 
   it('should return model list', () => {
@@ -58,8 +58,9 @@ describe('ClaudeSDKProvider', () => {
   it('should check configuration', () => {
     expect(provider.isConfigured()).toBe(true);
 
-    const unconfigured = new ClaudeSDKProvider({ sessionToken: null });
-    expect(unconfigured.isConfigured()).toBe(false);
+    // SDK provider is always configured - uses auto-detected Claude authentication
+    const withoutToken = new ClaudeSDKProvider({ sessionToken: null });
+    expect(withoutToken.isConfigured()).toBe(true);
   });
 
   it('should require context parameter', async () => {
@@ -232,12 +233,14 @@ describe('ClaudeSDKProvider - Approval System', () => {
 });
 
 describe('ClaudeSDKProvider - createResponse', () => {
-  it('should throw if not configured', async () => {
+  it('should work without explicit session token (uses auto-detected auth)', async () => {
     const provider = new ClaudeSDKProvider({ sessionToken: null });
 
+    // Provider doesn't throw on null token - SDK handles auth automatically
+    // But it does require context parameter
     await expect(
       provider.createResponse([{ role: 'user', content: 'Hello' }], [], 'sonnet')
-    ).rejects.toThrow('not configured');
+    ).rejects.toThrow('requires ProviderRequestContext');
   });
 
   it('should throw if context is missing', async () => {

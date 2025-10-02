@@ -123,9 +123,9 @@ export class ClaudeSDKProvider extends AIProvider {
 
     // Get config
     const config = this._config as ClaudeSDKProviderConfig;
-    if (!config.sessionToken) {
-      throw new Error('SDK provider not configured: missing session token');
-    }
+
+    // Session token is optional - SDK will use existing Claude authentication if available
+    // (from Claude Code CLI, browser session, or ANTHROPIC_API_KEY env var)
 
     if (!context) {
       throw new Error('SDK provider requires ProviderRequestContext');
@@ -301,9 +301,9 @@ export class ClaudeSDKProvider extends AIProvider {
     });
 
     const config = this._config as ClaudeSDKProviderConfig;
-    if (!config.sessionToken) {
-      throw new Error('SDK provider not configured: missing session token');
-    }
+
+    // Session token is optional - SDK will use existing Claude authentication if available
+    // (from Claude Code CLI, browser session, or ANTHROPIC_API_KEY env var)
 
     if (!context) {
       throw new Error('SDK provider requires ProviderRequestContext');
@@ -472,9 +472,9 @@ export class ClaudeSDKProvider extends AIProvider {
     return {
       name: 'claude-agents-sdk',
       displayName: 'Claude Agent SDK (Subscription)',
-      requiresApiKey: true,
+      requiresApiKey: false, // SDK auto-detects authentication
       configurationHint:
-        'Requires Claude Pro/Team subscription. Click "Authenticate" to log in via browser.',
+        'Uses existing Claude authentication. Works automatically if logged in to Claude Code CLI or claude.ai.',
     };
   }
 
@@ -507,8 +507,9 @@ export class ClaudeSDKProvider extends AIProvider {
   }
 
   isConfigured(): boolean {
-    const config = this._config as ClaudeSDKProviderConfig;
-    return !!config.sessionToken && config.sessionToken.length > 0;
+    // SDK provider is always "configured" - it will use existing Claude authentication
+    // Session token is optional - SDK auto-detects auth from Claude Code CLI, browser, or env vars
+    return true;
   }
 
   /**
