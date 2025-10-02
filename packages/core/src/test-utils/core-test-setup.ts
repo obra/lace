@@ -53,15 +53,15 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
           for (const workspace of workspaces) {
             try {
               await manager.destroyWorkspace(workspace.sessionId);
-            } catch (error) {
+            } catch (_error) {
               // Ignore cleanup errors - best effort
             }
           }
-        } catch (error) {
+        } catch (_error) {
           // Manager may not exist or may fail - ignore
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Ignore any errors during workspace cleanup
     }
 
