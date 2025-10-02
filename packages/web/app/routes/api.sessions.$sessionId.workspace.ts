@@ -29,8 +29,8 @@ export async function loader({ params }: { params: LoaderParams }) {
 
     // Get workspace mode from effective configuration
     const config = session.getEffectiveConfiguration();
-    const defaultMode = process.platform === 'darwin' ? 'container' : 'worktree';
-    const mode = (config.workspaceMode as 'container' | 'worktree' | 'local') || defaultMode;
+    // Default to 'worktree' (matches DEFAULT_WORKSPACE_MODE in core)
+    const mode = (config.workspaceMode as 'container' | 'worktree' | 'local') || 'worktree';
 
     // Get workspace info (may be undefined if not initialized)
     const info = session.getWorkspaceInfo();

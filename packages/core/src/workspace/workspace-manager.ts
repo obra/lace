@@ -25,6 +25,12 @@ export interface IWorkspaceManager {
 export type WorkspaceMode = 'container' | 'worktree' | 'local';
 
 /**
+ * Default workspace mode for all environments.
+ * Worktree mode is safe, reliable, and works everywhere.
+ */
+export const DEFAULT_WORKSPACE_MODE: WorkspaceMode = 'worktree';
+
+/**
  * Factory for creating workspace managers based on mode.
  * Managers are singletons - only one instance per mode.
  */
@@ -36,11 +42,10 @@ export class WorkspaceManagerFactory {
   /**
    * Get the workspace manager for the specified mode.
    * Returns the same instance for each mode (singleton pattern).
-   * Defaults to 'worktree' (safe, works everywhere).
-   * Container mode must be explicitly requested.
+   * Defaults to DEFAULT_WORKSPACE_MODE.
    */
   static get(mode?: WorkspaceMode): IWorkspaceManager {
-    const selectedMode = mode || 'worktree';
+    const selectedMode = mode || DEFAULT_WORKSPACE_MODE;
     switch (selectedMode) {
       case 'container':
         // For now, only support Apple containers on macOS

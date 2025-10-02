@@ -54,13 +54,14 @@ export class WorktreeManager {
    */
   private static async runGit(
     args: string[],
-    cwd?: string
+    cwd?: string,
+    timeoutMs: number = 10000
   ): Promise<{ stdout: string; stderr: string }> {
     try {
-      const result = await execFileAsync('git', args, { cwd });
+      const result = await execFileAsync('git', args, { cwd, timeout: timeoutMs });
       return result;
     } catch (error: unknown) {
-      // execFile throws on non-zero exit codes
+      // execFile throws on non-zero exit codes or timeout
       const execError = error as { stdout?: string; stderr?: string; message?: string };
       throw new Error(
         `Git command failed: ${execError.message || 'Unknown error'}\nstderr: ${execError.stderr || ''}`
