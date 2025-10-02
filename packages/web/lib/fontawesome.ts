@@ -13,6 +13,7 @@ export {
   faTasks,
   faFolder,
   faFolderOpen,
+  faBox,
   faMicrophone,
   faPaperPlane,
   faPaperclip,
