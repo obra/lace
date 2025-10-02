@@ -32,13 +32,13 @@ describe('Session with WorkspaceManager', () => {
     }
   });
 
-  describe('worktree mode (default)', () => {
-    it('should create session with worktree workspace manager by default', async () => {
+  describe('default mode (platform-aware)', () => {
+    it('should use container mode by default on macOS, worktree on other platforms', async () => {
       const session = Session.create({
         projectId: project.getId(),
         name: 'Test Session',
         configuration: {
-          // No workspaceMode specified, should default to 'worktree'
+          // No workspaceMode specified, should default based on platform
           providerInstanceId: 'anthropic-default',
           modelId: 'claude-3-5-sonnet-20241022',
         },
@@ -52,10 +52,39 @@ describe('Session with WorkspaceManager', () => {
       const workspaceInfo = session.getWorkspaceInfo();
       expect(workspaceInfo?.sessionId).toBe(session.getId());
       expect(workspaceInfo?.projectDir).toBe(tempProjectDir);
-      expect(workspaceInfo?.clonePath).not.toBe(tempProjectDir); // Worktree mode creates separate worktree
-      expect(workspaceInfo?.containerId).toMatch(/^worktree-/);
+      expect(workspaceInfo?.clonePath).not.toBe(tempProjectDir); // Both modes create separate worktree
+
+      if (process.platform === 'darwin') {
+        // macOS defaults to container mode
+        expect(workspaceInfo?.containerId).toMatch(/^workspace-/);
+      } else {
+        // Other platforms default to worktree mode
+        expect(workspaceInfo?.containerId).toMatch(/^worktree-/);
+      }
+
       expect(workspaceInfo?.branchName).toMatch(/^lace\/session\//);
       expect(workspaceInfo?.state).toBe('running');
+
+      // Clean up
+      await cleanupSession(session);
+    });
+
+    it('should explicitly create worktree workspace when mode is specified', async () => {
+      const session = Session.create({
+        projectId: project.getId(),
+        name: 'Test Session',
+        configuration: {
+          workspaceMode: 'worktree',
+          providerInstanceId: 'anthropic-default',
+          modelId: 'claude-3-5-sonnet-20241022',
+        },
+      });
+      await session.waitForWorkspace();
+
+      expect(session).toBeDefined();
+      const workspaceInfo = session.getWorkspaceInfo();
+      expect(workspaceInfo?.containerId).toMatch(/^worktree-/);
+      expect(workspaceInfo?.branchName).toMatch(/^lace\/session\//);
 
       // Clean up
       await cleanupSession(session);
