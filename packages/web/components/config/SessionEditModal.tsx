@@ -9,12 +9,16 @@ import { faPlus, faTrash, faUser, faCog, faTools } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import { ModelSelector } from '@/components/ui/ModelSelector';
+import { WorkspaceDetailsPanel } from './WorkspaceDetailsPanel';
 import type { ProviderInfo, SessionConfiguration } from '@/types/api';
 import { isToolPolicyData, type ToolPolicyInfo } from '@/lib/type-guards';
 import type { ProjectInfo, SessionInfo } from '@/types/core';
 import type { ToolPolicy } from '@/types/core';
 import { useSessionEditModal } from '@/hooks/useSessionEditModal';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
+
+type TabName = 'basics' | 'environment' | 'tool-policies' | 'workspace';
 
 interface SessionEditModalProps {
   isOpen: boolean;
@@ -22,6 +26,7 @@ interface SessionEditModalProps {
   selectedSession: SessionInfo | null;
   onClose: () => void;
   onSuccess?: () => Promise<void>;
+  initialTab?: TabName;
 }
 
 export const SessionEditModal = memo(function SessionEditModal({
@@ -30,8 +35,10 @@ export const SessionEditModal = memo(function SessionEditModal({
   selectedSession,
   onClose,
   onSuccess,
+  initialTab = 'basics',
 }: SessionEditModalProps) {
   const { availableProviders } = useProviderInstances();
+  const { workspaceMode, workspaceInfo, workspaceLoading } = useSessionContext();
 
   const {
     loading,
@@ -141,7 +148,7 @@ export const SessionEditModal = memo(function SessionEditModal({
               role="tab"
               className="tab"
               aria-label="Basics"
-              defaultChecked
+              defaultChecked={initialTab === 'basics'}
             />
             <div role="tabpanel" className="tab-content p-6 space-y-6 overflow-y-auto max-h-[60vh]">
               {/* Basic Information */}
@@ -200,6 +207,7 @@ export const SessionEditModal = memo(function SessionEditModal({
               role="tab"
               className="tab"
               aria-label="Environment"
+              defaultChecked={initialTab === 'environment'}
             />
             <div role="tabpanel" className="tab-content p-6 space-y-6 overflow-y-auto max-h-[60vh]">
               {/* Working Directory */}
@@ -286,6 +294,7 @@ export const SessionEditModal = memo(function SessionEditModal({
               role="tab"
               className="tab"
               aria-label="Tool Policies"
+              defaultChecked={initialTab === 'tool-policies'}
             />
             <div role="tabpanel" className="tab-content p-6 space-y-6 overflow-y-auto max-h-[60vh]">
               {/* Tool Configuration */}
@@ -300,6 +309,33 @@ export const SessionEditModal = memo(function SessionEditModal({
                   onChange={handleToolPolicyChange}
                 />
               </div>
+            </div>
+
+            <input
+              type="radio"
+              name={`${modalId}-tabs`}
+              role="tab"
+              className="tab"
+              aria-label="Workspace"
+              data-testid="workspace-tab"
+              defaultChecked={initialTab === 'workspace'}
+            />
+            <div
+              role="tabpanel"
+              className="tab-content overflow-y-auto max-h-[60vh]"
+              data-testid="workspace-tab-content"
+            >
+              {workspaceMode ? (
+                <WorkspaceDetailsPanel
+                  mode={workspaceMode}
+                  info={workspaceInfo}
+                  isLoading={workspaceLoading}
+                />
+              ) : (
+                <div className="p-6 text-center">
+                  <p className="text-base-content/60">Workspace information unavailable</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

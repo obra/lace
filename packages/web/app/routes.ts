@@ -74,6 +74,7 @@ export default [
   route('api/sessions/:sessionId/configuration', 'routes/api.sessions.$sessionId.configuration.ts'),
   route('api/sessions/:sessionId/files', 'routes/api.sessions.$sessionId.files.ts'),
   route('api/sessions/:sessionId/files/*', 'routes/api.sessions.$sessionId.files.$path.ts'),
+  route('api/sessions/:sessionId/workspace', 'routes/api.sessions.$sessionId.workspace.ts'),
 
   // Session-level approval routes (aggregated across all agents)
   route(

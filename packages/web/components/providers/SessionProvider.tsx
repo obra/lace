@@ -14,15 +14,22 @@ import React, {
 } from 'react';
 import { useAgentManagement } from '@/hooks/useAgentManagement';
 import { useEventStream, type AgentEvent } from '@/hooks/useEventStream';
+import { useWorkspaceDetails } from '@/hooks/useWorkspaceDetails';
 import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
 import { asThreadId } from '@/types/core';
 import type { CreateAgentRequest } from '@/types/api';
+import type { WorkspaceInfo } from '~/workspace/workspace-container-manager';
 
 // Types for session context
 export interface SessionContextType {
   // Agent data (from useAgentManagement hook)
   sessionDetails: SessionInfo | null;
   loading: boolean;
+
+  // Workspace data (from useWorkspaceDetails hook)
+  workspaceMode: 'container' | 'worktree' | 'local' | null;
+  workspaceInfo: WorkspaceInfo | null;
+  workspaceLoading: boolean;
 
   // Selection state (managed by this provider)
   selectedAgent: ThreadId | null;
@@ -76,6 +83,13 @@ export function SessionProvider({
     loadAgentConfiguration,
     updateAgent,
   } = useAgentManagement(sessionId);
+
+  // Get workspace data from workspace details hook
+  const {
+    workspaceMode,
+    workspaceInfo,
+    loading: workspaceLoading,
+  } = useWorkspaceDetails(sessionId);
 
   // Subscribe to agent lifecycle events to refresh agent list in real-time
   const debouncedReloadRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -164,6 +178,11 @@ export function SessionProvider({
       sessionDetails,
       loading,
 
+      // Workspace data (from hook)
+      workspaceMode,
+      workspaceInfo,
+      workspaceLoading,
+
       // Selection state (managed here)
       selectedAgent,
       foundAgent,
@@ -186,6 +205,9 @@ export function SessionProvider({
     [
       sessionDetails,
       loading,
+      workspaceMode,
+      workspaceInfo,
+      workspaceLoading,
       selectedAgent,
       foundAgent,
       currentAgent,

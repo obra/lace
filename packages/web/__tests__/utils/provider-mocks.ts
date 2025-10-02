@@ -58,6 +58,11 @@ export function createMockSessionContext(
     sessionDetails: null,
     loading: false,
 
+    // Workspace data
+    workspaceMode: null,
+    workspaceInfo: null,
+    workspaceLoading: false,
+
     // Selection state
     selectedAgent: null,
     foundAgent: null,

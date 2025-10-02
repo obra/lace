@@ -40,6 +40,33 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
         console.warn('Cleanup task failed:', error);
       }
     }
+
+    // Clean up any remaining worktrees from workspace managers before resetting
+    const { WorkspaceManagerFactory } = await import('~/workspace/workspace-manager');
+    try {
+      // Get all managers and clean up their workspaces
+      const managers = ['worktree', 'local', 'container'] as const;
+      for (const mode of managers) {
+        try {
+          const manager = WorkspaceManagerFactory.get(mode);
+          const workspaces = await manager.listWorkspaces();
+          for (const workspace of workspaces) {
+            try {
+              await manager.destroyWorkspace(workspace.sessionId);
+            } catch (_error) {
+              // Ignore cleanup errors - best effort
+            }
+          }
+        } catch (_error) {
+          // Manager may not exist or may fail - ignore
+        }
+      }
+    } catch (_error) {
+      // Ignore any errors during workspace cleanup
+    }
+
+    // Reset workspace manager singletons AFTER all workspaces destroyed
+    WorkspaceManagerFactory.reset();
   });
 
   return {

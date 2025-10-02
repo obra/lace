@@ -21,7 +21,9 @@ import type { PermissionOverrideMode } from '~/tools/types';
 interface SessionSectionProps {
   isMobile?: boolean;
   onCloseMobileNav?: () => void;
-  onConfigureSession?: () => void;
+  onConfigureSession?: (
+    initialTab?: 'basics' | 'environment' | 'tool-policies' | 'workspace'
+  ) => void;
 }
 
 export const SessionSection = memo(function SessionSection({
@@ -30,7 +32,7 @@ export const SessionSection = memo(function SessionSection({
   onConfigureSession,
 }: SessionSectionProps) {
   // Get context data
-  const { sessionDetails } = useSessionContext();
+  const { sessionDetails, workspaceMode, workspaceLoading } = useSessionContext();
   const { selectedProject } = useProjectsContext();
   const { navigateToProject } = useURLState();
 
@@ -106,9 +108,51 @@ export const SessionSection = memo(function SessionSection({
     />
   ) : null;
 
+  // Workspace mode badge - clickable to open config on workspace tab
+  const getWorkspaceBadgeStyle = (mode: 'container' | 'worktree' | 'local') => {
+    switch (mode) {
+      case 'container':
+        return {
+          backgroundColor: '#3b82f6', // blue
+          borderColor: '#2563eb',
+          label: 'Container',
+        };
+      case 'worktree':
+        return {
+          backgroundColor: '#06b6d4', // cyan
+          borderColor: '#0891b2',
+          label: 'Worktree',
+        };
+      case 'local':
+        return {
+          backgroundColor: '#eab308', // yellow
+          borderColor: '#ca8a04',
+          label: 'Local',
+        };
+    }
+  };
+
+  const workspaceBadge =
+    workspaceMode && !workspaceLoading ? (
+      <button
+        onClick={() => onConfigureSession?.('workspace')}
+        className="px-2 py-0.5 text-[10px] font-medium rounded-full border transition-all duration-200 hover:scale-105"
+        style={{
+          backgroundColor: getWorkspaceBadgeStyle(workspaceMode).backgroundColor,
+          borderColor: getWorkspaceBadgeStyle(workspaceMode).borderColor,
+          color: 'white',
+        }}
+        title={`Workspace: ${workspaceMode} (click to configure)`}
+        data-testid="workspace-mode-badge"
+      >
+        {getWorkspaceBadgeStyle(workspaceMode).label}
+      </button>
+    ) : null;
+
   // Header actions for session navigation
   const sessionHeaderActions = (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-2">
+      {workspaceBadge}
       {onConfigureSession && (
         <button
           onClick={handleConfigureSession}
