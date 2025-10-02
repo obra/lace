@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { useWorkspaceDetails } from '../useWorkspaceDetails';
+import { useWorkspaceDetails } from '@/hooks/useWorkspaceDetails';
 import { api } from '@/lib/api-client';
 
 vi.mock('@/lib/api-client', () => ({

@@ -2,10 +2,10 @@
 // ABOUTME: Returns workspace mode and detailed workspace info
 
 import { Session } from '@/lib/server/lace-imports';
-import type { WorkspaceInfo } from '~/workspace/workspace-container-manager';
 import { createSuperjsonResponse } from '@/lib/server/serialization';
 import { createErrorResponse } from '@/lib/server/api-utils';
-import type { ThreadId } from '~/types';
+import { asThreadId } from '@/types/core';
+import { logger } from '~/utils/logger';
 
 interface LoaderParams {
   sessionId?: string;
@@ -19,7 +19,7 @@ export async function loader({ params }: { params: LoaderParams }) {
   }
 
   try {
-    const session = await Session.getById(sessionId as ThreadId);
+    const session = await Session.getById(asThreadId(sessionId));
     if (!session) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
@@ -37,7 +37,7 @@ export async function loader({ params }: { params: LoaderParams }) {
 
     return createSuperjsonResponse({ mode, info: info || null });
   } catch (error) {
-    console.error('Failed to fetch workspace info:', error);
+    logger.error('Failed to fetch workspace info', { error, sessionId });
     return createErrorResponse('Failed to fetch workspace information', 500, {
       code: 'INTERNAL_ERROR',
     });
