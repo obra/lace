@@ -177,7 +177,11 @@ export class ProviderRegistry {
     }
 
     const credentials = this.instanceManager.loadCredential(instanceId);
-    if (credentials == null) {
+
+    // SDK provider can be created without credentials (OAuth flow happens later)
+    const allowsNullCredentials = instance.catalogProviderId === 'claude-agents-sdk';
+
+    if (credentials == null && !allowsNullCredentials) {
       throw new Error(`No credentials found for instance: ${instanceId}`);
     }
 
@@ -192,8 +196,8 @@ export class ProviderRegistry {
     const trimmedCatalog = (expandEnvVar(catalogProvider.api_endpoint) ?? '').trim();
     const baseURL = trimmedInstance || trimmedCatalog;
     const providerConfig: ProviderConfig = {
-      apiKey: credentials.apiKey,
-      ...(credentials.additionalAuth || {}),
+      apiKey: credentials?.apiKey ?? null,
+      ...(credentials?.additionalAuth || {}),
       ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
       catalogProvider, // Pass catalog data to provider
@@ -217,7 +221,11 @@ export class ProviderRegistry {
     }
 
     const credentials = this.instanceManager.loadCredential(instanceId);
-    if (credentials == null) {
+
+    // SDK provider can be created without credentials (OAuth flow happens later)
+    const allowsNullCredentials = instance.catalogProviderId === 'claude-agents-sdk';
+
+    if (credentials == null && !allowsNullCredentials) {
       throw new Error(`No credentials found for instance: ${instanceId}`);
     }
 
@@ -241,8 +249,8 @@ export class ProviderRegistry {
     const baseURL = trimmedInstance || trimmedCatalog;
     const providerConfig: ProviderConfig = {
       model: modelId,
-      apiKey: credentials.apiKey,
-      ...(credentials.additionalAuth || {}),
+      apiKey: credentials?.apiKey ?? null,
+      ...(credentials?.additionalAuth || {}),
       ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
       catalogProvider, // Pass catalog data to provider

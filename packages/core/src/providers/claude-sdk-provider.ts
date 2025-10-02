@@ -240,8 +240,25 @@ export class ClaudeSDKProvider extends AIProvider {
             };
             stopReason = 'stop'; // Success = natural stop
           } else {
-            // Error subtypes
+            // Error subtypes - check for authentication failures
             stopReason = 'error';
+
+            // Detect authentication errors and emit re-auth event
+            const errorMessage = String(msg.subtype);
+            if (
+              errorMessage.includes('authentication') ||
+              errorMessage.includes('unauthorized') ||
+              errorMessage.includes('401')
+            ) {
+              logger.warn('SDK authentication failed - re-authentication required', {
+                subtype: msg.subtype,
+              });
+              this.emit('authentication_required', {
+                reason: errorMessage,
+                providerId: this.providerName,
+              });
+            }
+
             throw new Error(`SDK execution failed: ${msg.subtype}`);
           }
 
@@ -405,7 +422,25 @@ export class ClaudeSDKProvider extends AIProvider {
             // Emit final usage
             this.emit('token_usage_update', { usage });
           } else {
+            // Error subtypes - check for authentication failures
             stopReason = 'error';
+
+            // Detect authentication errors and emit re-auth event
+            const errorMessage = String(msg.subtype);
+            if (
+              errorMessage.includes('authentication') ||
+              errorMessage.includes('unauthorized') ||
+              errorMessage.includes('401')
+            ) {
+              logger.warn('SDK authentication failed - re-authentication required', {
+                subtype: msg.subtype,
+              });
+              this.emit('authentication_required', {
+                reason: errorMessage,
+                providerId: this.providerName,
+              });
+            }
+
             throw new Error(`SDK execution failed: ${msg.subtype}`);
           }
           break;
@@ -438,7 +473,8 @@ export class ClaudeSDKProvider extends AIProvider {
       name: 'claude-agents-sdk',
       displayName: 'Claude Agent SDK (Subscription)',
       requiresApiKey: true,
-      configurationHint: 'Requires Claude Pro/Team subscription authentication',
+      configurationHint:
+        'Requires Claude Pro/Team subscription. Click "Authenticate" to log in via browser.',
     };
   }
 
