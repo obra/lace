@@ -76,7 +76,10 @@ export class WorktreeManager {
   static async createSessionWorktree(projectDir: string, sessionId: string): Promise<string> {
     // Validate projectDir is not empty
     if (!projectDir || projectDir.trim() === '') {
-      throw new Error('projectDir cannot be empty - this would cause git init in cwd');
+      throw new Error(
+        `projectDir cannot be empty - this would cause git init in cwd (${process.cwd()}). ` +
+          'In tests, this usually means tempDir was accessed before beforeEach ran.'
+      );
     }
 
     // Validate sessionId and resolve safe worktree path
@@ -87,15 +90,16 @@ export class WorktreeManager {
     // Check if it's a git repository, initialize if not
     const gitDir = join(projectDir, '.git');
     if (!existsSync(gitDir)) {
-      // In tests, prevent git init outside of temp directories
+      // In tests, validate we're not about to git init in source directories
       if (
         process.env.NODE_ENV === 'test' &&
         !projectDir.includes('/tmp/') &&
         !projectDir.includes('/T/')
       ) {
         throw new Error(
-          `Refusing to git init outside temp directory in tests! ` +
-            `projectDir: ${projectDir}, cwd: ${process.cwd()}`
+          `Refusing to git init in non-temp directory during tests! ` +
+            `projectDir: ${projectDir}, cwd: ${process.cwd()}. ` +
+            'This usually means a test passed the wrong directory path.'
         );
       }
 
