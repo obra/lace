@@ -41,6 +41,10 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
       }
     }
 
+    // Close database connections BEFORE cleaning workspaces
+    // This releases file locks on lace.db files in worktrees
+    resetPersistence();
+
     // Clean up workspaces before resetting factory
     const { WorkspaceManagerFactory } = await import('~/workspace/workspace-manager');
     try {
