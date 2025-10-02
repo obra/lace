@@ -32,13 +32,13 @@ describe('Session with WorkspaceManager', () => {
     }
   });
 
-  describe('local mode (null-container)', () => {
-    it('should create session with local workspace manager by default', async () => {
+  describe('worktree mode (default)', () => {
+    it('should create session with worktree workspace manager by default', async () => {
       const session = Session.create({
         projectId: project.getId(),
         name: 'Test Session',
         configuration: {
-          // No workspaceMode specified, should default to 'local'
+          // No workspaceMode specified, should default to 'worktree'
           providerInstanceId: 'anthropic-default',
           modelId: 'claude-3-5-sonnet-20241022',
         },
@@ -52,13 +52,17 @@ describe('Session with WorkspaceManager', () => {
       const workspaceInfo = session.getWorkspaceInfo();
       expect(workspaceInfo?.sessionId).toBe(session.getId());
       expect(workspaceInfo?.projectDir).toBe(tempProjectDir);
-      expect(workspaceInfo?.clonePath).toBe(tempProjectDir); // Local mode uses project dir directly
+      expect(workspaceInfo?.clonePath).not.toBe(tempProjectDir); // Worktree mode creates separate worktree
+      expect(workspaceInfo?.containerId).toMatch(/^worktree-/);
+      expect(workspaceInfo?.branchName).toMatch(/^lace\/session\//);
       expect(workspaceInfo?.state).toBe('running');
 
       // Clean up
       await cleanupSession(session);
     });
+  });
 
+  describe('local mode (null-container)', () => {
     it('should explicitly create local workspace when mode is specified', async () => {
       const session = Session.create({
         projectId: project.getId(),
@@ -109,7 +113,7 @@ describe('Session with WorkspaceManager', () => {
   });
 
   describe('container mode', () => {
-    it('should fall back to local mode on unsupported platforms', async () => {
+    it('should fall back to worktree mode on unsupported platforms', async () => {
       const originalPlatform = process.platform;
 
       // Mock a non-Darwin platform
@@ -129,9 +133,9 @@ describe('Session with WorkspaceManager', () => {
       });
       await session.waitForWorkspace();
 
-      // Should fall back to local mode
+      // Should fall back to worktree mode
       const workspaceInfo = session.getWorkspaceInfo();
-      expect(workspaceInfo?.containerId).toMatch(/^local-/);
+      expect(workspaceInfo?.containerId).toMatch(/^worktree-/);
 
       await cleanupSession(session);
 

@@ -6,12 +6,12 @@ import { api } from '@/lib/api-client';
 import type { WorkspaceInfo } from '~/workspace/workspace-container-manager';
 
 export interface WorkspaceDetails {
-  mode: 'container' | 'local';
+  mode: 'container' | 'worktree' | 'local';
   info: WorkspaceInfo | null;
 }
 
 export interface UseWorkspaceDetailsReturn {
-  workspaceMode: 'container' | 'local' | null;
+  workspaceMode: 'container' | 'worktree' | 'local' | null;
   workspaceInfo: WorkspaceInfo | null;
   loading: boolean;
   error: Error | null;
@@ -19,7 +19,9 @@ export interface UseWorkspaceDetailsReturn {
 }
 
 export function useWorkspaceDetails(sessionId: string | null): UseWorkspaceDetailsReturn {
-  const [workspaceMode, setWorkspaceMode] = useState<'container' | 'local' | null>(null);
+  const [workspaceMode, setWorkspaceMode] = useState<'container' | 'worktree' | 'local' | null>(
+    null
+  );
   const [workspaceInfo, setWorkspaceInfo] = useState<WorkspaceInfo | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);

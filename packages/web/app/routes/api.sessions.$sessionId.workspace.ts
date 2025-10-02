@@ -29,7 +29,7 @@ export async function loader({ params }: { params: LoaderParams }) {
 
     // Get workspace mode from effective configuration
     const config = session.getEffectiveConfiguration();
-    const mode = (config.workspaceMode as 'container' | 'local') || 'local';
+    const mode = (config.workspaceMode as 'container' | 'worktree' | 'local') || 'worktree';
 
     // Get workspace info (may be undefined if not initialized)
     const info = session.getWorkspaceInfo();

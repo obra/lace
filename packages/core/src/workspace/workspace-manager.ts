@@ -4,6 +4,7 @@
 import { ExecOptions, ExecResult } from '~/containers/types';
 import { WorkspaceContainerManager, WorkspaceInfo } from '~/workspace/workspace-container-manager';
 import { LocalWorkspaceManager } from '~/workspace/local-workspace-manager';
+import { WorktreeWorkspaceManager } from '~/workspace/worktree-workspace-manager';
 import { AppleContainerRuntime } from '~/containers/apple-container';
 import { logger } from '~/utils/logger';
 
@@ -21,7 +22,7 @@ export interface IWorkspaceManager {
   translateToHost(sessionId: string, containerPath: string): string;
 }
 
-export type WorkspaceMode = 'container' | 'local';
+export type WorkspaceMode = 'container' | 'worktree' | 'local';
 
 /**
  * Factory for creating workspace managers based on mode.
@@ -29,24 +30,31 @@ export type WorkspaceMode = 'container' | 'local';
  */
 export class WorkspaceManagerFactory {
   private static containerManager: WorkspaceContainerManager | undefined;
+  private static worktreeManager: WorktreeWorkspaceManager | undefined;
   private static localManager: LocalWorkspaceManager | undefined;
 
   /**
    * Get the workspace manager for the specified mode.
    * Returns the same instance for each mode (singleton pattern).
    */
-  static get(mode: WorkspaceMode = 'local'): IWorkspaceManager {
+  static get(mode: WorkspaceMode = 'worktree'): IWorkspaceManager {
     switch (mode) {
       case 'container':
         // For now, only support Apple containers on macOS
         // TODO: Add DockerContainerRuntime for Linux (#325)
         if (process.platform !== 'darwin') {
-          logger.warn('Container mode not supported on this platform, falling back to local mode', {
-            platform: process.platform,
-          });
-          return this.getLocalManager();
+          logger.warn(
+            'Container mode not supported on this platform, falling back to worktree mode',
+            {
+              platform: process.platform,
+            }
+          );
+          return this.getWorktreeManager();
         }
         return this.getContainerManager();
+
+      case 'worktree':
+        return this.getWorktreeManager();
 
       case 'local':
       default:
@@ -62,6 +70,14 @@ export class WorkspaceManagerFactory {
     return this.containerManager;
   }
 
+  private static getWorktreeManager(): WorktreeWorkspaceManager {
+    if (!this.worktreeManager) {
+      logger.info('Creating singleton worktree workspace manager');
+      this.worktreeManager = new WorktreeWorkspaceManager();
+    }
+    return this.worktreeManager;
+  }
+
   private static getLocalManager(): LocalWorkspaceManager {
     if (!this.localManager) {
       logger.info('Creating singleton local workspace manager');
@@ -75,6 +91,7 @@ export class WorkspaceManagerFactory {
    */
   static reset(): void {
     this.containerManager = undefined;
+    this.worktreeManager = undefined;
     this.localManager = undefined;
   }
 }

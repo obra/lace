@@ -27,7 +27,7 @@ export interface SessionContextType {
   loading: boolean;
 
   // Workspace data (from useWorkspaceDetails hook)
-  workspaceMode: 'container' | 'local' | null;
+  workspaceMode: 'container' | 'worktree' | 'local' | null;
   workspaceInfo: WorkspaceInfo | null;
   workspaceLoading: boolean;
 

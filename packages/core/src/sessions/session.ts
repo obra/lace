@@ -139,7 +139,7 @@ export class Session {
     );
 
     // Get singleton workspace manager based on configuration
-    const workspaceMode = (effectiveConfig.workspaceMode as WorkspaceMode) || 'local';
+    const workspaceMode = (effectiveConfig.workspaceMode as WorkspaceMode) || 'worktree';
     const workspaceManager = WorkspaceManagerFactory.get(workspaceMode);
 
     // Get project to access working directory
@@ -438,7 +438,8 @@ export class Session {
 
     // Get singleton workspace manager for loaded session
     const { WorkspaceManagerFactory } = await import('~/workspace/workspace-manager');
-    const workspaceMode = (sessionConfig.workspaceMode as 'container' | 'local') || 'local';
+    const workspaceMode =
+      (sessionConfig.workspaceMode as 'container' | 'worktree' | 'local') || 'worktree';
     const workspaceManager = WorkspaceManagerFactory.get(workspaceMode);
 
     // Create session instance, passing the TaskManager we already created

@@ -9,7 +9,7 @@ import { faBox, faFolder, faCircle } from '@/lib/fontawesome';
 import type { WorkspaceInfo } from '~/workspace/workspace-container-manager';
 
 interface WorkspaceDetailsPanelProps {
-  mode: 'container' | 'local';
+  mode: 'container' | 'worktree' | 'local';
   info: WorkspaceInfo | null | undefined;
   isLoading?: boolean;
 }
@@ -37,6 +37,8 @@ export function WorkspaceDetailsPanel({
   }
 
   const isContainer = mode === 'container';
+  const isWorktree = mode === 'worktree';
+  const isLocal = mode === 'local';
 
   // State indicator
   const getStateColor = (state: string) => {
@@ -50,20 +52,43 @@ export function WorkspaceDetailsPanel({
     }
   };
 
+  // Visual config based on mode
+  const getModeConfig = () => {
+    if (isContainer) {
+      return {
+        title: 'Container Workspace',
+        icon: faBox,
+        bgClass: 'bg-primary/10',
+        iconClass: 'text-primary',
+      };
+    }
+    if (isWorktree) {
+      return {
+        title: 'Worktree Workspace',
+        icon: faFolder,
+        bgClass: 'bg-info/10',
+        iconClass: 'text-info',
+      };
+    }
+    return {
+      title: 'Local Workspace',
+      icon: faFolder,
+      bgClass: 'bg-base-200',
+      iconClass: 'text-base-content/70',
+    };
+  };
+
+  const modeConfig = getModeConfig();
+
   return (
     <div className="space-y-6 p-6" data-testid="workspace-details-panel">
       {/* Header Section */}
       <div className="flex items-center gap-3 pb-4 border-b border-base-300">
-        <div className={`p-3 rounded-lg ${isContainer ? 'bg-primary/10' : 'bg-base-200'}`}>
-          <FontAwesomeIcon
-            icon={isContainer ? faBox : faFolder}
-            className={`w-6 h-6 ${isContainer ? 'text-primary' : 'text-base-content/70'}`}
-          />
+        <div className={`p-3 rounded-lg ${modeConfig.bgClass}`}>
+          <FontAwesomeIcon icon={modeConfig.icon} className={`w-6 h-6 ${modeConfig.iconClass}`} />
         </div>
         <div>
-          <h3 className="text-lg font-semibold">
-            {isContainer ? 'Container Workspace' : 'Local Workspace'}
-          </h3>
+          <h3 className="text-lg font-semibold">{modeConfig.title}</h3>
           <div className="flex items-center gap-2 mt-1">
             <FontAwesomeIcon icon={faCircle} className={`w-2 h-2 ${getStateColor(info.state)}`} />
             <span className="text-sm text-base-content/60 capitalize">{info.state}</span>
@@ -80,6 +105,29 @@ export function WorkspaceDetailsPanel({
         <DetailRow label="Working Directory" value={info.clonePath} />
         <DetailRow label="Session ID" value={info.sessionId} mono />
       </div>
+
+      {/* Worktree-Specific Information */}
+      {isWorktree && (
+        <div className="space-y-4">
+          <h4 className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">
+            Git Isolation
+          </h4>
+
+          {info.branchName && <DetailRow label="Branch" value={info.branchName} mono />}
+          <DetailRow label="Worktree Path" value={info.clonePath} mono />
+          <DetailRow label="Original Project" value={info.projectDir} mono />
+
+          <div className="alert alert-info">
+            <div className="flex flex-col gap-1">
+              <div className="font-medium">Git Worktree Isolation</div>
+              <div className="text-sm opacity-80">
+                This session uses a separate git worktree on its own branch. Changes are isolated
+                from the main working tree but remain connected to the repository.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Container-Specific Information */}
       {isContainer && (
@@ -108,19 +156,19 @@ export function WorkspaceDetailsPanel({
       )}
 
       {/* Local Mode Information */}
-      {!isContainer && (
+      {isLocal && (
         <div className="space-y-4">
           <h4 className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">
             Local Details
           </h4>
 
           <DetailRow label="Project Directory" value={info.projectDir} mono />
-          <div className="alert alert-info">
+          <div className="alert alert-warning">
             <div className="flex flex-col gap-1">
               <div className="font-medium">Direct Project Access</div>
               <div className="text-sm opacity-80">
                 This session runs directly in your project directory without isolation. Changes
-                affect the working tree immediately.
+                affect the working tree immediately. Consider using worktree mode for isolation.
               </div>
             </div>
           </div>

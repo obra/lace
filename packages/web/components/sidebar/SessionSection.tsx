@@ -109,20 +109,43 @@ export const SessionSection = memo(function SessionSection({
   ) : null;
 
   // Workspace mode badge - clickable to open config on workspace tab
+  const getWorkspaceBadgeStyle = (mode: 'container' | 'worktree' | 'local') => {
+    switch (mode) {
+      case 'container':
+        return {
+          backgroundColor: '#3b82f6', // blue
+          borderColor: '#2563eb',
+          label: 'Container',
+        };
+      case 'worktree':
+        return {
+          backgroundColor: '#06b6d4', // cyan
+          borderColor: '#0891b2',
+          label: 'Worktree',
+        };
+      case 'local':
+        return {
+          backgroundColor: '#eab308', // yellow
+          borderColor: '#ca8a04',
+          label: 'Local',
+        };
+    }
+  };
+
   const workspaceBadge =
     workspaceMode && !workspaceLoading ? (
       <button
         onClick={() => onConfigureSession?.('workspace')}
         className="px-2 py-0.5 text-[10px] font-medium rounded-full border transition-all duration-200 hover:scale-105"
         style={{
-          backgroundColor: workspaceMode === 'container' ? '#3b82f6' : '#10b981',
-          borderColor: workspaceMode === 'container' ? '#2563eb' : '#059669',
+          backgroundColor: getWorkspaceBadgeStyle(workspaceMode).backgroundColor,
+          borderColor: getWorkspaceBadgeStyle(workspaceMode).borderColor,
           color: 'white',
         }}
         title={`Workspace: ${workspaceMode} (click to configure)`}
         data-testid="workspace-mode-badge"
       >
-        {workspaceMode === 'container' ? 'Container' : 'Local'}
+        {getWorkspaceBadgeStyle(workspaceMode).label}
       </button>
     ) : null;
 

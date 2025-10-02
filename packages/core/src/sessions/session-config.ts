@@ -16,7 +16,7 @@ export const SessionConfigurationSchema = z.object({
   environmentVariables: z.record(z.string()).optional(),
   promptTemplate: z.string().optional(),
   specialInstructions: z.string().optional(),
-  workspaceMode: z.enum(['container', 'local']).optional(), // Default to 'local' for backwards compatibility
+  workspaceMode: z.enum(['container', 'worktree', 'local']).optional(), // Default to 'worktree' for isolation
   runtimeOverrides: z
     .object({
       permissionMode: z.enum(['normal', 'yolo', 'read-only']).optional(),
