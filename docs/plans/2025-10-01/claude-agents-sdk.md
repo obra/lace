@@ -1491,81 +1491,88 @@ describe('ClaudeSDKProvider - Streaming', () => {
 
 ---
 
-### Phase 6: Integration & Configuration
+### Phase 6: Integration & Configuration ✅
 
-#### Task 6.1: Add Provider to Registry
+**Status:** Complete
+
+**Commit:** `a1efe03ef` - feat(providers): add Claude Agent SDK catalog entry
+
+#### Task 6.1: Add Provider to Registry ✅
 
 **Goal:** Register the new provider so it can be discovered and used.
 
-**Files to modify:**
-- `packages/core/src/providers/registry.ts`
+**What was done:**
+- Provider was already registered in `registry.ts` during Phase 1
+- Added to provider list in `getAvailableProviders()`
+- Added to `getProviderForMetadata()` switch statement
+- Added to `createProvider()` switch statement
 
-**Add import:**
-```typescript
-import { ClaudeSDKProvider } from '~/providers/claude-sdk-provider';
-```
-
-**Add to provider registry map** (find the section where providers are registered):
-```typescript
-registry.registerProvider('claude-agents-sdk', ClaudeSDKProvider);
-```
-
-**Files to modify:**
-- `packages/core/src/providers/index.ts` (if exists)
-
-**Add export:**
-```typescript
-export { ClaudeSDKProvider } from './claude-sdk-provider';
-```
-
-**Testing:**
-```bash
-# Verify registry can find the provider
-npm test -- registry.test.ts
-```
-
-**Commit:** `feat(claude-sdk): register provider in registry`
+**Testing:** All provider registry tests pass ✅
 
 ---
 
-#### Task 6.2: Add Provider Catalog Entry
+#### Task 6.2: Add Provider Catalog Entry ✅
 
 **Goal:** Add SDK provider to the catalog system for UI discovery.
 
-**Files to check:**
-- `packages/core/src/providers/catalog/` - Understand catalog structure
-- Look for catalog JSON files or TypeScript definitions
+**What was done:**
+Created `packages/core/src/providers/catalog/data/claude-agents-sdk.json`:
 
-**Add catalog entry** (format depends on catalog implementation):
-
-```typescript
+```json
 {
-  id: 'claude-agents-sdk',
-  name: 'Claude Agent SDK',
-  description: 'Use Claude with your Pro/Team subscription (no per-token costs)',
-  provider_type: 'claude-agents-sdk',
-  requires_api_key: true,
-  api_key_name: 'Session Token',
-  supports_streaming: true,
-  default_models: [
+  "name": "Claude Agent SDK",
+  "id": "claude-agents-sdk",
+  "type": "claude-agents-sdk",
+  "api_key": "$CLAUDE_SESSION_TOKEN",
+  "default_large_model_id": "claude-opus-4",
+  "default_small_model_id": "claude-haiku-4",
+  "models": [
     {
-      id: 'claude-sonnet-4',
-      name: 'Claude 4 Sonnet',
-      context_window: 200000,
-      default_max_tokens: 8192,
-      supports_attachments: false,
+      "id": "claude-sonnet-4",
+      "name": "Claude 4 Sonnet",
+      "cost_per_1m_in": 0,
+      "cost_per_1m_out": 0,
+      "context_window": 200000,
+      "default_max_tokens": 8192,
+      "can_reason": true,
+      "supports_attachments": true
+    },
+    {
+      "id": "claude-opus-4",
+      "name": "Claude 4 Opus",
+      "cost_per_1m_in": 0,
+      "cost_per_1m_out": 0,
+      "context_window": 200000,
+      "default_max_tokens": 8192,
+      "can_reason": true,
+      "supports_attachments": true
+    },
+    {
+      "id": "claude-haiku-4",
+      "name": "Claude 4 Haiku",
+      "cost_per_1m_in": 0,
+      "cost_per_1m_out": 0,
+      "context_window": 200000,
+      "default_max_tokens": 8192,
+      "can_reason": false,
+      "supports_attachments": true
     }
-  ],
+  ]
 }
 ```
 
-**Testing:**
-```bash
-# Verify catalog includes the provider
-npm test -- catalog
-```
+**Key design decisions:**
+- Costs are $0 because this provider uses subscription authentication
+- Models match those hardcoded in `claude-sdk-provider.ts`
+- Environment variable support via `$CLAUDE_SESSION_TOKEN`
+- Reasoning support enabled for Opus and Sonnet models
 
-**Commit:** `feat(claude-sdk): add provider to catalog`
+**Testing:** All catalog tests pass ✅
+```bash
+npm test -- src/providers/catalog
+npm test -- src/providers/provider-registry.test.ts
+npm test  # Full suite: 1808 passed | 25 skipped
+```
 
 ---
 
