@@ -202,6 +202,10 @@ function createLaceEventFromDb(
     case 'AGENT_ERROR':
       throw new Error('AGENT_ERROR events are transient and should not be persisted');
 
+    case 'EVENT_UPDATED':
+      // EVENT_UPDATED is transient and should never be in database
+      throw new TransientEventError(type, id, threadId);
+
     // MCP events are transient
     case 'MCP_CONFIG_CHANGED':
       throw new Error('MCP_CONFIG_CHANGED events are transient and should not be persisted');
@@ -303,6 +307,9 @@ export class DatabasePersistence {
     }
     if (currentVersion < 13) {
       this.upgradeToVersion13();
+    }
+    if (currentVersion < 14) {
+      this.migrateToV14();
     }
   }
 
@@ -480,6 +487,28 @@ export class DatabasePersistence {
     this.setSchemaVersion(13);
   }
 
+  private migrateToV14(): void {
+    if (!this.db) return;
+
+    // Add visible_to_model column to events table
+    // NULL means visible (default), 0 means not visible to model
+    this.db.exec(`
+      ALTER TABLE events ADD COLUMN visible_to_model BOOLEAN;
+    `);
+
+    // Add index for potential future queries filtering by visibility
+    // Cache invalidation timing is critical: we invalidate cache BEFORE reading
+    // thread data to prevent race conditions where another component could read
+    // stale data between database update and cache invalidation
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_events_visibility ON events(visible_to_model);
+    `);
+
+    this.setSchemaVersion(14);
+
+    logger.info('DATABASE: Migrated to schema version 14 (event visibility)');
+  }
+
   transaction<T>(fn: () => T): T {
     if (!this.db) {
       throw new Error('Database not initialized');
@@ -567,8 +596,8 @@ export class DatabasePersistence {
 
     try {
       const stmt = this.db.prepare(`
-        INSERT INTO events (id, thread_id, type, timestamp, data)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO events (id, thread_id, type, timestamp, data, visible_to_model)
+        VALUES (?, ?, ?, ?, ?, ?)
       `);
 
       stmt.run(
@@ -576,7 +605,8 @@ export class DatabasePersistence {
         event.context?.threadId,
         event.type,
         event.timestamp!.toISOString(),
-        JSON.stringify(event.data)
+        JSON.stringify(event.data),
+        event.visibleToModel === false ? 0 : null // NULL = visible, 0 = not visible
       );
 
       // Update thread's updated_at timestamp
@@ -602,6 +632,26 @@ export class DatabasePersistence {
     }
   }
 
+  /**
+   * Update the visibility flag for a specific event
+   * Used during compaction to mark events as not visible to model
+   */
+  updateEventVisibility(eventId: string, visibleToModel: boolean): void {
+    if (!this.db) {
+      logger.warn('DATABASE: Cannot update event visibility - database not initialized');
+      return;
+    }
+
+    const value = visibleToModel ? null : 0; // NULL = visible, 0 = not visible
+
+    this.db.prepare('UPDATE events SET visible_to_model = ? WHERE id = ?').run(value, eventId);
+
+    logger.debug('DATABASE: Updated event visibility', {
+      eventId,
+      visibleToModel,
+    });
+  }
+
   private isConstraintViolation(error: unknown): boolean {
     return (
       error instanceof Error &&
@@ -614,7 +664,8 @@ export class DatabasePersistence {
     if (this._disabled || !this.db || this._closed) return [];
 
     const stmt = this.db.prepare(`
-      SELECT * FROM events
+      SELECT id, thread_id, type, timestamp, data, visible_to_model
+      FROM events
       WHERE thread_id = ?
       ORDER BY timestamp ASC
     `);
@@ -625,13 +676,12 @@ export class DatabasePersistence {
       type: string;
       timestamp: string;
       data: string;
+      visible_to_model: number | null;
     }>;
-
-    // Load events from database for thread
 
     return rows.map((row) => {
       try {
-        return createLaceEventFromDb(
+        const event = createLaceEventFromDb(
           row.id,
           row.thread_id,
           row.type as LaceEventType,
@@ -639,6 +689,12 @@ export class DatabasePersistence {
           JSON.parse(row.data) as unknown,
           context
         );
+
+        // Return new object if visibility explicitly set to false (maintains immutability)
+        const finalEvent = row.visible_to_model === 0 ? { ...event, visibleToModel: false } : event;
+        // If NULL or 1, leave as undefined (treated as true)
+
+        return finalEvent;
       } catch (error) {
         throw new Error(
           `Failed to parse event data for event ${row.id}: ${error instanceof Error ? error.message : String(error)}`

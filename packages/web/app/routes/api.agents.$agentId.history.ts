@@ -40,8 +40,9 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
       return createErrorResponse('Agent not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
 
-    // Get events only for this specific agent
-    const agentEvents = agent.getLaceEvents();
+    // Get ALL events for this agent (including pre-compaction events with visibility flags)
+    // Use getAllEvents instead of getLaceEvents to get complete history with visibility
+    const agentEvents = agent.getAllEvents();
 
     // Filter to only conversation events (persisted and shown in timeline)
     const events: LaceEvent[] = agentEvents.filter((event): event is LaceEvent =>

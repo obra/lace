@@ -498,7 +498,14 @@ export class ThreadManager {
    * await threadManager.compact('thread-123', 'trim-tool-results');
    * ```
    */
-  async compact(threadId: string, strategyId: string, params?: unknown): Promise<void> {
+  async compact(
+    threadId: string,
+    strategyId: string,
+    params?: unknown
+  ): Promise<{
+    compactionEvent: LaceEvent;
+    hiddenEventIds: string[];
+  }> {
     const strategy = this._compactionStrategies.get(strategyId);
     if (!strategy) {
       throw new Error(`Unknown compaction strategy: ${strategyId}`);
@@ -528,11 +535,62 @@ export class ThreadManager {
     // 4. Subsequent operations will retry persistence, maintaining eventual consistency
     // 5. The thread cache remains consistent with successful database state
     const compactionData = compactionEvent.data as CompactionData;
-    this.addEvent({
+    const addedCompactionEvent = this.addEvent({
       type: 'COMPACTION',
       data: compactionData,
       context: { threadId },
     } as LaceEvent);
+
+    // Mark pre-compaction events as not visible to model
+    const hiddenEventIds: string[] = [];
+
+    // Invalidate cache FIRST to ensure we read fresh data and prevent race conditions
+    // where another component could read stale data between database update and cache
+    // invalidation
+    processLocalThreadCache.delete(threadId);
+
+    // NOW get fresh thread data
+    const updatedThread = this.getThread(threadId);
+
+    if (updatedThread) {
+      // Find the index of the compaction event we just added
+      const compactionIndex = updatedThread.events.findIndex(
+        (e) => e.id === addedCompactionEvent?.id
+      );
+
+      // Mark all events before the compaction as not visible
+      for (let i = 0; i < compactionIndex; i++) {
+        const event = updatedThread.events[i];
+        if (event.id) {
+          this._persistence.updateEventVisibility(event.id, false);
+          hiddenEventIds.push(event.id);
+        }
+      }
+
+      // Mark the compaction event itself as not visible (it's metadata)
+      if (addedCompactionEvent?.id) {
+        this._persistence.updateEventVisibility(addedCompactionEvent.id, false);
+        hiddenEventIds.push(addedCompactionEvent.id);
+      }
+
+      // Invalidate cache again after visibility updates to ensure fresh reads
+      processLocalThreadCache.delete(threadId);
+
+      // Note: Compacted replacement events (in compactionData.compactedEvents)
+      // are virtual - they exist only in the COMPACTION event's data field,
+      // not as separate events in the thread
+    }
+
+    logger.info('THREADMANAGER: Compaction complete', {
+      threadId,
+      strategyId,
+      hiddenEventCount: hiddenEventIds.length,
+    });
+
+    return {
+      compactionEvent: addedCompactionEvent!,
+      hiddenEventIds,
+    };
   }
 
   clearEvents(threadId: string): void {
