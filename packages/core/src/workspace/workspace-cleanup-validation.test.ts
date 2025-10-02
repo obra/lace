@@ -46,9 +46,17 @@ describe('Workspace Cleanup Validation', () => {
     const gitDirBefore = join(SOURCE_PACKAGES_DIR, '.git');
     const hadGitBefore = existsSync(gitDirBefore);
 
+    console.log('Test using tempProjectDir:', tempProjectDir);
+    console.log('Source dir to check:', SOURCE_PACKAGES_DIR);
+    console.log('Had .git before:', hadGitBefore);
+
     // Create and destroy a workspace
     const sessionId = 'test-session-no-git-pollution';
     await manager.createWorkspace(tempProjectDir, sessionId);
+
+    console.log('After createWorkspace - checking for .git in source');
+    console.log('tempProjectDir .git exists:', existsSync(join(tempProjectDir, '.git')));
+    console.log('SOURCE .git exists:', existsSync(join(SOURCE_PACKAGES_DIR, '.git')));
 
     // Verify .git was NOT created in source directory
     const gitDirAfter = join(SOURCE_PACKAGES_DIR, '.git');

@@ -31,7 +31,10 @@ export class CloneManager {
     // Check if it's a git repository, initialize if not
     const gitDir = join(projectDir, '.git');
     if (!existsSync(gitDir)) {
-      logger.info('Project is not a git repository, initializing git', { projectDir });
+      logger.warn('CloneManager: Project is not a git repository, initializing git', {
+        projectDir,
+        cwd: process.cwd(),
+      });
 
       // Initialize git repository
       try {

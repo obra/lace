@@ -842,7 +842,10 @@ export class Session {
       }
     }
 
-    return process.cwd();
+    // NEVER fall back to process.cwd() - it can cause git init in source directories
+    throw new Error(
+      `Cannot determine working directory for session ${this._sessionId}: no workspace, project, or configuration found`
+    );
   }
 
   getPermissionOverrideMode(): PermissionOverrideMode {

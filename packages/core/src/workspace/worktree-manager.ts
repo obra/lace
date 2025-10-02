@@ -77,10 +77,12 @@ export class WorktreeManager {
     // Validate sessionId and resolve safe worktree path
     const worktreePath = this.resolveWorktreePath(sessionId);
 
+    logger.debug('createSessionWorktree called', { projectDir, sessionId, worktreePath });
+
     // Check if it's a git repository, initialize if not
     const gitDir = join(projectDir, '.git');
     if (!existsSync(gitDir)) {
-      logger.info('Project is not a git repository, initializing git', { projectDir });
+      logger.warn('Project is not a git repository, initializing git', { projectDir });
 
       try {
         await this.runGit(['init'], projectDir);
