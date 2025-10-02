@@ -30,7 +30,7 @@ export const SessionSection = memo(function SessionSection({
   onConfigureSession,
 }: SessionSectionProps) {
   // Get context data
-  const { sessionDetails } = useSessionContext();
+  const { sessionDetails, workspaceMode, workspaceLoading } = useSessionContext();
   const { selectedProject } = useProjectsContext();
   const { navigateToProject } = useURLState();
 
@@ -106,9 +106,28 @@ export const SessionSection = memo(function SessionSection({
     />
   ) : null;
 
+  // Workspace mode badge - clickable to open config
+  const workspaceBadge =
+    workspaceMode && !workspaceLoading ? (
+      <button
+        onClick={handleConfigureSession}
+        className="px-2 py-0.5 text-[10px] font-medium rounded-full border transition-all duration-200 hover:scale-105"
+        style={{
+          backgroundColor: workspaceMode === 'container' ? '#3b82f6' : '#10b981',
+          borderColor: workspaceMode === 'container' ? '#2563eb' : '#059669',
+          color: 'white',
+        }}
+        title={`Workspace: ${workspaceMode} (click to configure)`}
+        data-testid="workspace-mode-badge"
+      >
+        {workspaceMode === 'container' ? 'Container' : 'Local'}
+      </button>
+    ) : null;
+
   // Header actions for session navigation
   const sessionHeaderActions = (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-2">
+      {workspaceBadge}
       {onConfigureSession && (
         <button
           onClick={handleConfigureSession}
