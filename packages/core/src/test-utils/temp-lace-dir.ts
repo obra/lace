@@ -57,7 +57,17 @@ export function useTempLaceDir(): TempLaceDirContext {
 
     // Clean up temp directory
     if (_tempDir && fs.existsSync(_tempDir)) {
-      await fs.promises.rm(_tempDir, { recursive: true, force: true });
+      try {
+        await fs.promises.rm(_tempDir, { recursive: true, force: true, maxRetries: 3 });
+      } catch (error) {
+        // If rm fails, try sync rmSync with retries (sometimes more aggressive)
+        try {
+          fs.rmSync(_tempDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+        } catch (finalError) {
+          // Log but don't fail cleanup - test might have locked files
+          console.warn(`Failed to clean up temp directory ${_tempDir}:`, finalError);
+        }
+      }
     }
   });
 
