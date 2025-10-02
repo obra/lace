@@ -2,13 +2,12 @@
   "name": "Claude Agent SDK",
   "id": "claude-agents-sdk",
   "type": "claude-agents-sdk",
-  "api_key": "$CLAUDE_SESSION_TOKEN",
-  "default_large_model_id": "claude-opus-4",
-  "default_small_model_id": "claude-haiku-4",
+  "default_large_model_id": "opus",
+  "default_small_model_id": "default",
   "models": [
     {
-      "id": "claude-sonnet-4",
-      "name": "Claude 4 Sonnet",
+      "id": "default",
+      "name": "Default (Sonnet 4.5)",
       "cost_per_1m_in": 0,
       "cost_per_1m_out": 0,
       "context_window": 200000,
@@ -17,8 +16,8 @@
       "supports_attachments": true
     },
     {
-      "id": "claude-opus-4",
-      "name": "Claude 4 Opus",
+      "id": "opus",
+      "name": "Opus 4.1",
       "cost_per_1m_in": 0,
       "cost_per_1m_out": 0,
       "context_window": 200000,
@@ -27,13 +26,13 @@
       "supports_attachments": true
     },
     {
-      "id": "claude-haiku-4",
-      "name": "Claude 4 Haiku",
+      "id": "sonnet[1m]",
+      "name": "Sonnet (1M context)",
       "cost_per_1m_in": 0,
       "cost_per_1m_out": 0,
-      "context_window": 200000,
+      "context_window": 1000000,
       "default_max_tokens": 8192,
-      "can_reason": false,
+      "can_reason": true,
       "supports_attachments": true
     }
   ]

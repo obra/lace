@@ -194,7 +194,11 @@ export class ClaudeSDKProvider extends AIProvider {
 
     try {
       for await (const msg of query) {
-        logger.debug('SDK message received', { type: msg.type });
+        logger.debug('SDK message received', {
+          type: msg.type,
+          subtype: (msg as any).subtype,
+          hasMessage: !!(msg as any).message,
+        });
 
         if (msg.type === 'system' && msg.subtype === 'init') {
           // Capture session ID for next turn
@@ -282,6 +286,8 @@ export class ClaudeSDKProvider extends AIProvider {
     } catch (error) {
       logger.error('SDK query failed', {
         error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
       });
       throw error;
     }
@@ -463,6 +469,8 @@ export class ClaudeSDKProvider extends AIProvider {
     } catch (error) {
       logger.error('SDK streaming query failed', {
         error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
       });
       throw error;
     }
@@ -479,28 +487,28 @@ export class ClaudeSDKProvider extends AIProvider {
   }
 
   getAvailableModels(): ModelInfo[] {
-    // Hardcoded fallback - will be replaced with dynamic fetching
+    // SDK uses short model identifiers, not full API model IDs
     return [
       this.createModel({
-        id: 'claude-sonnet-4',
-        displayName: 'Claude 4 Sonnet',
-        description: 'Balanced performance and capability',
+        id: 'default',
+        displayName: 'Default (Sonnet 4.5)',
+        description: 'Smartest model for daily use (recommended)',
         contextWindow: 200000,
         maxOutputTokens: 8192,
         isDefault: true,
       }),
       this.createModel({
-        id: 'claude-opus-4',
-        displayName: 'Claude 4 Opus',
-        description: 'Most capable model',
+        id: 'opus',
+        displayName: 'Opus 4.1',
+        description: 'Most capable for complex tasks',
         contextWindow: 200000,
         maxOutputTokens: 8192,
       }),
       this.createModel({
-        id: 'claude-haiku-4',
-        displayName: 'Claude 4 Haiku',
-        description: 'Fastest model',
-        contextWindow: 200000,
+        id: 'sonnet[1m]',
+        displayName: 'Sonnet (1M context)',
+        description: 'Sonnet 4.5 with extended 1M context window',
+        contextWindow: 1000000,
         maxOutputTokens: 8192,
       }),
     ];
