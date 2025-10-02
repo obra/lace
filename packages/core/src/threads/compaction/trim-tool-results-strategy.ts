@@ -2,13 +2,17 @@
 // ABOUTME: Preserves conversation flow while reducing tool output size
 
 import type { LaceEvent } from '~/threads/types';
-import type { CompactionStrategy, CompactionContext } from '~/threads/compaction/types';
+import type {
+  CompactionStrategy,
+  CompactionContext,
+  CompactionResult,
+} from '~/threads/compaction/types';
 import type { ToolResult, ContentBlock } from '~/tools/types';
 
 export class TrimToolResultsStrategy implements CompactionStrategy {
   id = 'trim-tool-results';
 
-  compact(events: LaceEvent[], context: CompactionContext): Promise<LaceEvent> {
+  compact(events: LaceEvent[], context: CompactionContext): Promise<CompactionResult> {
     const compactedEvents: LaceEvent[] = [];
     let modifiedCount = 0;
 
@@ -38,7 +42,7 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
       }
     }
 
-    // Create the compaction event with data in the data field
+    // Create the compaction event (metadata only)
     const compactionEvent: LaceEvent = {
       id: this.generateEventId(),
       type: 'COMPACTION',
@@ -47,7 +51,7 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
       data: {
         strategyId: this.id,
         originalEventCount: events.length,
-        compactedEvents,
+        compactedEventCount: compactedEvents.length,
         metadata: {
           toolResultsModified: modifiedCount,
           maxLines: 3,
@@ -56,7 +60,10 @@ export class TrimToolResultsStrategy implements CompactionStrategy {
       },
     };
 
-    return Promise.resolve(compactionEvent);
+    return Promise.resolve({
+      compactionEvent,
+      compactedEvents,
+    });
   }
 
   private generateEventId(): string {
