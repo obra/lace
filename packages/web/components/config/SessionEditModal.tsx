@@ -9,12 +9,14 @@ import { faPlus, faTrash, faUser, faCog, faTools } from '@/lib/fontawesome';
 import { Modal } from '@/components/ui/Modal';
 import { ToolPolicyList } from '@/components/config/ToolPolicyList';
 import { ModelSelector } from '@/components/ui/ModelSelector';
+import { WorkspaceDetailsPanel } from './WorkspaceDetailsPanel';
 import type { ProviderInfo, SessionConfiguration } from '@/types/api';
 import { isToolPolicyData, type ToolPolicyInfo } from '@/lib/type-guards';
 import type { ProjectInfo, SessionInfo } from '@/types/core';
 import type { ToolPolicy } from '@/types/core';
 import { useSessionEditModal } from '@/hooks/useSessionEditModal';
 import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
+import { useSessionContext } from '@/components/providers/SessionProvider';
 
 interface SessionEditModalProps {
   isOpen: boolean;
@@ -32,6 +34,7 @@ export const SessionEditModal = memo(function SessionEditModal({
   onSuccess,
 }: SessionEditModalProps) {
   const { availableProviders } = useProviderInstances();
+  const { workspaceMode, workspaceInfo, workspaceLoading } = useSessionContext();
 
   const {
     loading,
@@ -300,6 +303,32 @@ export const SessionEditModal = memo(function SessionEditModal({
                   onChange={handleToolPolicyChange}
                 />
               </div>
+            </div>
+
+            <input
+              type="radio"
+              name={`${modalId}-tabs`}
+              role="tab"
+              className="tab"
+              aria-label="Workspace"
+              data-testid="workspace-tab"
+            />
+            <div
+              role="tabpanel"
+              className="tab-content overflow-y-auto max-h-[60vh]"
+              data-testid="workspace-tab-content"
+            >
+              {workspaceMode ? (
+                <WorkspaceDetailsPanel
+                  mode={workspaceMode}
+                  info={workspaceInfo}
+                  isLoading={workspaceLoading}
+                />
+              ) : (
+                <div className="p-6 text-center">
+                  <p className="text-base-content/60">Workspace information unavailable</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
