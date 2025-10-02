@@ -194,23 +194,33 @@ export function AddInstanceModal({
             </div>
           </div>
 
-          <div>
-            <label className="label">
-              <span className="label-text">API Key *</span>
-            </label>
-            <input
-              type="password"
-              className="input input-bordered w-full"
-              value={formData.apiKey}
-              onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
-              placeholder="sk-..."
-              required
-              data-testid="api-key-input"
-            />
-            <div className="label">
-              <span className="label-text-alt">Your API key will be stored securely</span>
+          {selectedProvider?.id !== 'claude-agents-sdk' && (
+            <div>
+              <label className="label">
+                <span className="label-text">API Key *</span>
+              </label>
+              <input
+                type="password"
+                className="input input-bordered w-full"
+                value={formData.apiKey}
+                onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
+                placeholder="sk-..."
+                required
+                data-testid="api-key-input"
+              />
+              <div className="label">
+                <span className="label-text-alt">Your API key will be stored securely</span>
+              </div>
             </div>
-          </div>
+          )}
+
+          {selectedProvider?.id === 'claude-agents-sdk' && (
+            <Alert
+              variant="info"
+              title="OAuth Authentication"
+              description="You'll authenticate via browser after creating this instance. Requires Claude Pro or Team subscription."
+            />
+          )}
 
           <div>
             <label className="label">
