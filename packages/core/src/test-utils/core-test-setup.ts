@@ -25,13 +25,9 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
   const cleanupTasks: (() => void | Promise<void>)[] = [];
 
   // Reset persistence before each test - it will auto-initialize to temp directory on first use
-  beforeEach(async () => {
+  beforeEach(() => {
     resetPersistence();
     cleanupTasks.length = 0; // Reset cleanup tasks
-
-    // Reset workspace manager singletons to avoid state leakage between tests
-    const { WorkspaceManagerFactory } = await import('~/workspace/workspace-manager');
-    WorkspaceManagerFactory.reset();
   });
 
   // Run all registered cleanup tasks after each test
@@ -44,6 +40,10 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
         console.warn('Cleanup task failed:', error);
       }
     }
+
+    // Reset workspace manager singletons AFTER cleanup to ensure destroyWorkspace works
+    const { WorkspaceManagerFactory } = await import('~/workspace/workspace-manager');
+    WorkspaceManagerFactory.reset();
   });
 
   return {
