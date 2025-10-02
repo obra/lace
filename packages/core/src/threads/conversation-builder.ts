@@ -2,32 +2,8 @@
 // ABOUTME: Core logic for reconstructing conversations post-compaction
 
 import type { LaceEvent } from '~/threads/types';
-import type { CompactionData } from '~/threads/compaction/types';
 import type { ToolResult } from '~/tools/types';
 import { logger } from '~/utils/logger';
-import { hydrateEvents } from '~/threads/event-hydration';
-
-/**
- * Type guard to ensure data from COMPACTION events is valid CompactionData
- *
- * NOTE FOR REVIEWERS: This type guard is defensive programming against malformed
- * COMPACTION events. In normal operation, all COMPACTION events are created by
- * our compaction strategies and are guaranteed to have valid CompactionData.
- * However, this guard protects against potential corruption or invalid data
- * that could theoretically exist in the event stream.
- */
-function isCompactionData(data: unknown): data is CompactionData {
-  return (
-    data !== null &&
-    typeof data === 'object' &&
-    'strategyId' in data &&
-    'compactedEvents' in data &&
-    'originalEventCount' in data &&
-    typeof (data as CompactionData).strategyId === 'string' &&
-    Array.isArray((data as CompactionData).compactedEvents) &&
-    typeof (data as CompactionData).originalEventCount === 'number'
-  );
-}
 
 /**
  * Status precedence for deduplication (higher number = higher priority)
@@ -143,28 +119,4 @@ export function buildWorkingConversation(events: LaceEvent[]): LaceEvent[] {
 export function buildCompleteHistory(events: LaceEvent[]): LaceEvent[] {
   // Return all events including compaction events (for debugging/inspection)
   return events;
-}
-
-/**
- * Finds the last COMPACTION event and its index in a single pass
- * @param events Array of thread events
- * @returns Object with the last compaction event and its index, or null if no compaction found
- */
-function findLastCompactionEventWithIndex(events: LaceEvent[]): {
-  lastCompaction: LaceEvent | null;
-  lastCompactionIndex: number;
-} {
-  // Single reverse pass to find the most recent COMPACTION event
-  for (let i = events.length - 1; i >= 0; i--) {
-    if (events[i].type === 'COMPACTION') {
-      return {
-        lastCompaction: events[i],
-        lastCompactionIndex: i,
-      };
-    }
-  }
-  return {
-    lastCompaction: null,
-    lastCompactionIndex: -1,
-  };
 }
