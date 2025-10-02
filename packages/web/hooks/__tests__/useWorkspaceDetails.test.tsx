@@ -148,9 +148,12 @@ describe('useWorkspaceDetails', () => {
 
     vi.mocked(api.get).mockResolvedValueOnce(mockWorkspaceData);
 
-    const { result, rerender } = renderHook(({ sessionId }) => useWorkspaceDetails(sessionId), {
-      initialProps: { sessionId: 'session-1' },
-    });
+    const { result, rerender } = renderHook(
+      ({ sessionId }: { sessionId: string | null }) => useWorkspaceDetails(sessionId),
+      {
+        initialProps: { sessionId: 'session-1' as string | null },
+      }
+    );
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
