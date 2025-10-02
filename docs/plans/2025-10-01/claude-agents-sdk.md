@@ -1576,150 +1576,109 @@ npm test  # Full suite: 1808 passed | 25 skipped
 
 ---
 
-### Phase 7: Integration Testing
+### Phase 7: Integration Testing ✅
 
-#### Task 7.1: Create Integration Test File
+**Status:** Complete
+
+**Commit:** `c6d9271dc` - test(claude-sdk): add integration and E2E tests
+
+#### Task 7.1: Create Integration Test File ✅
 
 **Goal:** Test the complete flow with mocked SDK.
 
-**Files to create:**
-- `packages/core/src/providers/claude-sdk-integration.test.ts`
+**What was done:**
+Created `packages/core/src/providers/claude-sdk-integration.test.ts` with comprehensive test coverage:
 
-**Implementation:**
+**Test Coverage (29 tests total):**
 
-```typescript
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ClaudeSDKProvider } from './claude-sdk-provider';
-import { ToolExecutor } from '~/tools/executor';
-import { ReadTool } from '~/tools/implementations/read';
+1. **Provider Initialization (5 tests)**
+   - Provider name verification
+   - Streaming support confirmation
+   - Provider info retrieval
+   - Model list availability
+   - Configuration checking
 
-// Mock the SDK
-vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
-  query: vi.fn(),
-  createSdkMcpServer: vi.fn((opts) => ({
-    type: 'sdk',
-    name: opts.name,
-    instance: {},
-  })),
-  tool: vi.fn((name, desc, schema, handler) => ({
-    name,
-    description: desc,
-    inputSchema: schema,
-    handler,
-  })),
-}));
+2. **MCP Server Creation (3 tests)**
+   - Server creation from context
+   - Error handling for missing toolExecutor
+   - Tool wrapping from ToolExecutor
 
-describe('ClaudeSDKProvider - Integration', () => {
-  let provider: ClaudeSDKProvider;
-  let toolExecutor: ToolExecutor;
+3. **Tool Result Conversion (3 tests)**
+   - ToolResult to MCP CallToolResult conversion
+   - Error marking for failed results
+   - Resource block handling
 
-  beforeEach(() => {
-    provider = new ClaudeSDKProvider({ sessionToken: 'test-token' });
-    toolExecutor = new ToolExecutor();
-    toolExecutor.registerTool(new ReadTool());
-  });
+4. **History Fingerprinting (2 tests)**
+   - Consistent fingerprint generation
+   - Different fingerprints for different histories
 
-  it('should complete full request-response cycle', async () => {
-    // This test will be expanded once we understand SDK mocking better
-    expect(provider).toBeDefined();
-  });
+5. **Session Resumption Logic (3 tests)**
+   - No resumption on first turn
+   - Resumption when history unchanged
+   - No resumption when history changed (compaction)
 
-  it('should handle tool execution via MCP', async () => {
-    const context: ProviderRequestContext = {
-      toolExecutor,
-      workingDirectory: '/test',
-    };
+6. **Permission Mode Mapping (3 tests)**
+   - yolo → bypassPermissions
+   - read-only → plan
+   - normal → default
 
-    const server = (provider as any).createLaceToolsServer(context);
-    expect(server.name).toBe('__lace-tools');
-  });
+7. **Approval System (2 tests)**
+   - Pending approval creation and resolution
+   - Graceful handling of unknown approvals
 
-  it('should emit tokens during streaming', async () => {
-    const tokens: string[] = [];
-    provider.on('token', ({ token }) => tokens.push(token));
+8. **Error Handling (3 tests)**
+   - Context parameter requirement
+   - Configuration validation
+   - User message validation
 
-    // Mock streaming response - to be implemented with SDK mock
-    // expect(tokens.length).toBeGreaterThan(0);
-  });
-});
-```
+9. **Streaming Support (2 tests)**
+   - Streaming capability indication
+   - Method availability
 
-**Testing:**
-```bash
-npm test -- claude-sdk-integration.test.ts
-```
+10. **Cross-Provider Compatibility (3 tests)**
+    - Consistent method signatures
+    - AbortSignal support in both methods
 
-**Commit:** `test(claude-sdk): add integration tests`
+**Testing results:** ✅ All 29 tests passing
 
 ---
 
-#### Task 7.2: Add End-to-End Test
+#### Task 7.2: Add End-to-End Test ✅
 
-**Goal:** Test with a real SDK call (requires credentials, may be manual).
+**Goal:** Test with real SDK calls (requires credentials, skipped by default).
 
-**Files to create:**
-- `packages/core/src/providers/claude-sdk-e2e.test.ts`
+**What was done:**
+Created `packages/core/src/providers/claude-sdk-e2e.test.ts` with real SDK integration tests:
 
-**Implementation:**
+**E2E Test Coverage (skipped by default):**
 
-```typescript
-import { describe, it, expect, beforeEach } from 'vitest';
-import { ClaudeSDKProvider } from './claude-sdk-provider';
-import { ToolExecutor } from '~/tools/executor';
+1. **Basic Request-Response (2 tests)**
+   - Real SDK request with response validation
+   - Follow-up message handling with context
 
-// Skip by default - requires real credentials
-describe.skip('ClaudeSDKProvider - E2E', () => {
-  let provider: ClaudeSDKProvider;
+2. **Streaming (2 tests)**
+   - Real-time token streaming
+   - Token usage update emission
 
-  beforeEach(() => {
-    const sessionToken = process.env.CLAUDE_SDK_SESSION_TOKEN;
-    if (!sessionToken) {
-      throw new Error('CLAUDE_SDK_SESSION_TOKEN not set');
-    }
+3. **Session Resumption (1 test)**
+   - Multi-turn session persistence
 
-    provider = new ClaudeSDKProvider({ sessionToken });
-  });
+4. **Model Support (3 tests)**
+   - Claude Sonnet 4
+   - Claude Opus 4
+   - Claude Haiku 4
 
-  it('should make real SDK request', async () => {
-    const messages = [
-      { role: 'user' as const, content: 'What is 2+2?' }
-    ];
-
-    const response = await provider.createResponse(
-      messages,
-      [],
-      'sonnet'
-    );
-
-    expect(response.content).toBeTruthy();
-    expect(response.content.toLowerCase()).toContain('4');
-  }, 30000); // 30 second timeout
-
-  it('should handle streaming', async () => {
-    const tokens: string[] = [];
-    provider.on('token', ({ token }) => tokens.push(token));
-
-    const messages = [
-      { role: 'user' as const, content: 'Count to 5' }
-    ];
-
-    await provider.createStreamingResponse(messages, [], 'sonnet');
-
-    expect(tokens.length).toBeGreaterThan(0);
-  }, 30000);
-});
-```
+5. **Error Handling (1 test)**
+   - Invalid model graceful failure
 
 **Manual testing:**
 ```bash
-# Set credentials
 export CLAUDE_SDK_SESSION_TOKEN="your-token-here"
-
-# Run e2e tests
-npm test -- claude-sdk-e2e.test.ts
+cd packages/core
+npx vitest --run src/providers/claude-sdk-e2e.test.ts
 ```
 
-**Commit:** `test(claude-sdk): add e2e tests (skip by default)`
+All E2E tests require `CLAUDE_SDK_SESSION_TOKEN` environment variable and are skipped in CI.
 
 ---
 
