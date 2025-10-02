@@ -89,7 +89,7 @@ describe('Agent Single Event Source Integration', () => {
     expect(Array.isArray(events)).toBe(true);
   });
 
-  it('should handle Agent API operations correctly', () => {
+  it('should handle Agent API operations correctly', async () => {
     // Create thread and add some events
     threadManager.createThread('api-test-thread');
     threadManager.addEvent({
@@ -109,7 +109,7 @@ describe('Agent Single Event Source Integration', () => {
     expect(events[0].type).toBe('USER_MESSAGE');
     expect(events[1].type).toBe('AGENT_MESSAGE');
 
-    // Test compact (should not throw)
-    expect(() => agent.compact('api-test-thread')).not.toThrow();
+    // Test compact (should not throw) - must await since it's async
+    await expect(agent.compact('api-test-thread')).resolves.not.toThrow();
   });
 });
