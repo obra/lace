@@ -14,7 +14,11 @@ import type { Tool } from '~/tools/tool';
 import { logger } from '~/utils/logger';
 import { createHash } from 'crypto';
 import { Project } from '~/projects/project';
-import { createSdkMcpServer, tool as sdkTool, query as sdkQuery } from '@anthropic-ai/claude-agent-sdk';
+import {
+  createSdkMcpServer,
+  tool as sdkTool,
+  query as sdkQuery,
+} from '@anthropic-ai/claude-agent-sdk';
 import type { ToolResult, PermissionOverrideMode } from '~/tools/types';
 import { ApprovalDecision } from '~/tools/types';
 
@@ -43,6 +47,34 @@ type CallToolResult = {
     | { type: 'resource'; resource: { uri: string; text: string; mimeType?: string } }
   >;
   isError: boolean;
+};
+
+// Anthropic message content block types (SDK returns these but doesn't export types)
+type AnthropicContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> };
+
+// Anthropic message format returned by SDK
+type AnthropicMessage = {
+  content: AnthropicContentBlock[];
+  [key: string]: unknown; // Allow other Anthropic message properties
+};
+
+// SDK query options type (simplified version - SDK's Options type is complex)
+type SDKQueryOptions = {
+  resume?: string;
+  forkSession?: boolean;
+  model: string;
+  systemPrompt?: string;
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  includePartialMessages: boolean;
+  settingSources: string[];
+  mcpServers: Record<string, ReturnType<typeof createSdkMcpServer>>;
+  allowedTools: string[];
+  permissionMode: SDKPermissionMode;
+  canUseTool: CanUseTool;
+  abortController?: { signal: AbortSignal };
 };
 
 interface ClaudeSDKProviderConfig extends ProviderConfig {
@@ -128,7 +160,7 @@ export class ClaudeSDKProvider extends AIProvider {
       : 'default';
 
     // Build SDK query options
-    const queryOptions: any = {
+    const queryOptions: SDKQueryOptions = {
       resume: canResume ? this.sessionId : undefined,
       forkSession: !canResume && this.sessionId !== undefined,
       model,
@@ -171,18 +203,24 @@ export class ClaudeSDKProvider extends AIProvider {
 
         if (msg.type === 'assistant') {
           // Extract content and tool calls from Anthropic message format
-          const anthropicMsg = msg.message;
+          const anthropicMsg = msg.message as AnthropicMessage;
 
           // Extract text content
-          const textBlocks = anthropicMsg.content.filter((block: any) => block.type === 'text');
-          content = textBlocks.map((block: any) => block.text).join('');
+          const textBlocks = anthropicMsg.content.filter(
+            (block): block is Extract<AnthropicContentBlock, { type: 'text' }> =>
+              block.type === 'text'
+          );
+          content = textBlocks.map((block) => block.text).join('');
 
           // Extract tool calls
-          const toolUseBlocks = anthropicMsg.content.filter((block: any) => block.type === 'tool_use');
-          toolCalls = toolUseBlocks.map((block: any) => ({
+          const toolUseBlocks = anthropicMsg.content.filter(
+            (block): block is Extract<AnthropicContentBlock, { type: 'tool_use' }> =>
+              block.type === 'tool_use'
+          );
+          toolCalls = toolUseBlocks.map((block) => ({
             id: block.id,
             name: block.name,
-            arguments: block.input as Record<string, unknown>,
+            arguments: block.input,
           }));
 
           logger.debug('Assistant message processed', {
@@ -274,7 +312,7 @@ export class ClaudeSDKProvider extends AIProvider {
       : 'default';
 
     // Build query options with streaming enabled
-    const queryOptions: any = {
+    const queryOptions: SDKQueryOptions = {
       resume: canResume ? this.sessionId : undefined,
       forkSession: !canResume && this.sessionId !== undefined,
       model,
@@ -334,16 +372,22 @@ export class ClaudeSDKProvider extends AIProvider {
         }
 
         if (msg.type === 'assistant') {
-          const anthropicMsg = msg.message;
+          const anthropicMsg = msg.message as AnthropicMessage;
 
-          const textBlocks = anthropicMsg.content.filter((block: any) => block.type === 'text');
-          content = textBlocks.map((block: any) => block.text).join('');
+          const textBlocks = anthropicMsg.content.filter(
+            (block): block is Extract<AnthropicContentBlock, { type: 'text' }> =>
+              block.type === 'text'
+          );
+          content = textBlocks.map((block) => block.text).join('');
 
-          const toolUseBlocks = anthropicMsg.content.filter((block: any) => block.type === 'tool_use');
-          toolCalls = toolUseBlocks.map((block: any) => ({
+          const toolUseBlocks = anthropicMsg.content.filter(
+            (block): block is Extract<AnthropicContentBlock, { type: 'tool_use' }> =>
+              block.type === 'tool_use'
+          );
+          toolCalls = toolUseBlocks.map((block) => ({
             id: block.id,
             name: block.name,
-            arguments: block.input as Record<string, unknown>,
+            arguments: block.input,
           }));
         }
 
@@ -474,7 +518,7 @@ export class ClaudeSDKProvider extends AIProvider {
       throw new Error('ToolExecutor and Session required for approval handler');
     }
 
-    return async (toolName, input, { signal, suggestions }) => {
+    return async (toolName, input, { signal, suggestions: _suggestions }) => {
       try {
         // Check tool allowlist first (fail-closed security)
         const config = session.getEffectiveConfiguration();
@@ -646,8 +690,9 @@ export class ClaudeSDKProvider extends AIProvider {
       sdkTool(
         tool.name,
         tool.description,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tool.schema as any, // Zod schema - SDK expects ZodRawShape but accepts any Zod schema
-        async (args: Record<string, unknown>, extra: unknown) => {
+        async (args: Record<string, unknown>, _extra: unknown) => {
           logger.debug('MCP tool called via SDK', {
             toolName: tool.name,
             args,

@@ -17,7 +17,7 @@ class MockTool extends Tool {
 
   protected async executeValidated(
     args: z.infer<typeof this.schema>,
-    context?: ToolContext
+    _context?: ToolContext
   ): Promise<ToolResult> {
     return {
       id: 'test-id',
@@ -244,7 +244,13 @@ describe('ClaudeSDKProvider - createResponse', () => {
     const provider = new ClaudeSDKProvider({ sessionToken: 'test' });
 
     await expect(
-      provider.createResponse([{ role: 'user', content: 'Hello' }], [], 'sonnet', undefined, undefined)
+      provider.createResponse(
+        [{ role: 'user', content: 'Hello' }],
+        [],
+        'sonnet',
+        undefined,
+        undefined
+      )
     ).rejects.toThrow('requires ProviderRequestContext');
   });
 
@@ -257,7 +263,13 @@ describe('ClaudeSDKProvider - createResponse', () => {
     };
 
     await expect(
-      provider.createResponse([{ role: 'assistant', content: 'Hello' }], [], 'sonnet', undefined, context)
+      provider.createResponse(
+        [{ role: 'assistant', content: 'Hello' }],
+        [],
+        'sonnet',
+        undefined,
+        context
+      )
     ).rejects.toThrow('must be a user message');
   });
 
