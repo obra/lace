@@ -2456,6 +2456,11 @@ export class Agent extends EventEmitter {
     return this._threadManager.getEvents(targetThreadId);
   }
 
+  getAllEvents(threadId?: string): LaceEvent[] {
+    const targetThreadId = threadId || this._threadId;
+    return this._threadManager.getAllEvents(targetThreadId);
+  }
+
   generateThreadId(): ThreadId {
     return asThreadId(this._threadManager.generateThreadId());
   }
@@ -2539,9 +2544,22 @@ export class Agent extends EventEmitter {
 
   async compact(threadId: string): Promise<void> {
     // Use the AI-powered summarization strategy for better compaction
-    await this._threadManager.compact(threadId, 'summarize', {
+    const result = await this._threadManager.compact(threadId, 'summarize', {
       agent: this,
     });
+
+    // Emit EVENT_UPDATED for each hidden event
+    for (const eventId of result.hiddenEventIds) {
+      this._addEventAndEmit({
+        type: 'EVENT_UPDATED',
+        data: {
+          eventId,
+          visibleToModel: false,
+        },
+        transient: true,
+        context: { threadId },
+      });
+    }
 
     // Compaction handling is now automatic through event sourcing
     // TokenBudgetManager no longer needed for compaction tracking

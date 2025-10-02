@@ -267,3 +267,31 @@ describe('Error Event Types', () => {
     expect(eventType).toBe('AGENT_ERROR');
   });
 });
+
+describe('EVENT_UPDATED type', () => {
+  it('should be recognized as a transient event type', () => {
+    expect(isTransientEventType('EVENT_UPDATED')).toBe(true);
+  });
+
+  it('should be included in EVENT_TYPES array', () => {
+    expect(EVENT_TYPES).toContain('EVENT_UPDATED');
+  });
+
+  it('should create a well-formed EVENT_UPDATED event', () => {
+    const event: LaceEvent = {
+      type: 'EVENT_UPDATED',
+      data: {
+        eventId: 'evt_123',
+        visibleToModel: false,
+      },
+      transient: true,
+      context: {
+        threadId: 'lace_20251001_test01',
+      },
+    };
+
+    expect(event.type).toBe('EVENT_UPDATED');
+    expect(event.data.eventId).toBe('evt_123');
+    expect(event.data.visibleToModel).toBe(false);
+  });
+});

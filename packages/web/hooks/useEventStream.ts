@@ -111,6 +111,7 @@ interface EventHandlers {
   // Compaction events
   onCompactionStart?: (event: LaceEvent) => void;
   onCompactionComplete?: (event: LaceEvent) => void;
+  onEventUpdated?: (event: LaceEvent) => void;
 
   // Global events
   onGlobalEvent?: (event: GlobalEvent) => void;
@@ -274,6 +275,9 @@ export function useEventStream(options: UseEventStreamOptions): UseEventStreamRe
             break;
           case 'COMPACTION_COMPLETE':
             currentOptions.onCompactionComplete?.(event);
+            break;
+          case 'EVENT_UPDATED':
+            currentOptions.onEventUpdated?.(event);
             break;
           // Add error event handling
           case 'AGENT_ERROR':

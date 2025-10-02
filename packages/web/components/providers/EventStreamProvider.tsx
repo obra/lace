@@ -88,7 +88,10 @@ export function EventStreamProvider({
   const { updateAgentState } = useSessionContext();
 
   // Agent events hook (no longer manages approvals internally)
-  const { events, loadingHistory, addAgentEvent } = useAgentEventsHook(agentId, false);
+  const { events, loadingHistory, addAgentEvent, updateEventVisibility } = useAgentEventsHook(
+    agentId,
+    false
+  );
 
   // API hooks
   const sessionAPI = useSessionAPIHook();
@@ -145,6 +148,22 @@ export function EventStreamProvider({
       compactingAgentId: undefined,
     });
   }, []);
+
+  // EVENT_UPDATED handler
+  const handleEventUpdated = useCallback(
+    (event: LaceEvent) => {
+      if (
+        event.data &&
+        typeof event.data === 'object' &&
+        'eventId' in event.data &&
+        'visibleToModel' in event.data
+      ) {
+        const updateData = event.data as { eventId: string; visibleToModel: boolean };
+        updateEventVisibility(updateData.eventId, updateData.visibleToModel);
+      }
+    },
+    [updateEventVisibility]
+  );
 
   const handleAgentError = useCallback(
     (event: LaceEvent) => {
@@ -206,6 +225,7 @@ export function EventStreamProvider({
       // Compaction events
       onCompactionStart: handleCompactionStart,
       onCompactionComplete: handleCompactionComplete,
+      onEventUpdated: handleEventUpdated,
     };
 
     return options;
@@ -221,6 +241,7 @@ export function EventStreamProvider({
     handleApprovalResponse,
     handleCompactionStart,
     handleCompactionComplete,
+    handleEventUpdated,
     handleAgentError,
   ]);
 

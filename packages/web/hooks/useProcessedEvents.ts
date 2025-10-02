@@ -175,6 +175,8 @@ function processToolCallAggregation(events: LaceEvent[]): ProcessedEvent[] {
       },
       transient: call.transient,
       context: call.context,
+      // Preserve visibleToModel from either the call or result (use call's value if both exist)
+      visibleToModel: call.visibleToModel ?? result?.visibleToModel,
     };
 
     processed.push(aggregatedEvent);

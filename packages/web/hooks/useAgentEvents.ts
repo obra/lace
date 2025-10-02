@@ -13,6 +13,7 @@ interface UseAgentEventsReturn {
   connected: boolean;
   // Event handlers for the parent to wire to useEventStream
   addAgentEvent: (event: LaceEvent) => void;
+  updateEventVisibility: (eventId: string, visibleToModel: boolean) => void;
 }
 
 export function useAgentEvents(
@@ -65,6 +66,11 @@ export function useAgentEvents(
     },
     [getEventKey]
   );
+
+  // Update event visibility when EVENT_UPDATED is received
+  const updateEventVisibility = useCallback((eventId: string, visibleToModel: boolean) => {
+    setEvents((prev) => prev.map((e) => (e.id === eventId ? { ...e, visibleToModel } : e)));
+  }, []);
 
   // Load historical events when agent changes
   useEffect(() => {
@@ -135,5 +141,6 @@ export function useAgentEvents(
     connected,
     // Export event handlers for parent to use
     addAgentEvent,
+    updateEventVisibility,
   };
 }

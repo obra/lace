@@ -38,13 +38,21 @@ export function TimelineMessage({
   const timestamp = event.timestamp || new Date();
   const agentName = getAgentName(event.context?.threadId || '', agents);
 
+  // Check if event is visible to model (undefined/true = visible, false = not visible)
+  const isVisibleToModel = event.visibleToModel !== false;
+
+  // Base classes for visibility styling
+  const visibilityClasses = isVisibleToModel ? '' : 'opacity-40';
+
   switch (event.type) {
     case 'USER_MESSAGE':
       return (
         <div className={`${isGrouped && !isFirstInGroup ? 'mt-0.5' : isGrouped ? 'mt-2' : 'mt-3'}`}>
           {/* Only show header for first message in group */}
           {isFirstInGroup && (
-            <div className="flex gap-3 items-start">
+            <div
+              className={`flex gap-3 items-start transition-opacity duration-200 ${visibilityClasses}`}
+            >
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 rounded-md bg-[rgb(var(--user-primary))] text-white flex items-center justify-center">
                   <span className="text-xs font-semibold">Me</span>
@@ -59,9 +67,14 @@ export function TimelineMessage({
           )}
           {!isFirstInGroup && (
             <div
-              className={`ml-11 bg-neutral-700/20 rounded-lg px-3 py-2 ${isLastInGroup ? 'mb-1' : ''}`}
+              className={`ml-11 bg-neutral-700/20 rounded-lg px-3 py-2 ${isLastInGroup ? 'mb-1' : ''} transition-opacity duration-200 ${visibilityClasses}`}
             >
               <MessageText content={event.data} className="!leading-normal" />
+            </div>
+          )}
+          {!isVisibleToModel && (
+            <div className="ml-11 -mt-2">
+              <span className="badge badge-ghost badge-xs opacity-60">Compacted</span>
             </div>
           )}
         </div>
@@ -72,11 +85,20 @@ export function TimelineMessage({
         <div className={`${isGrouped && !isFirstInGroup ? 'mt-0.5' : isGrouped ? 'mt-2' : 'mt-3'}`}>
           {/* Only show header for first message in group */}
           {isFirstInGroup && (
-            <MessageHeader name={agentName} timestamp={timestamp} role="assistant" />
+            <div className={`transition-opacity duration-200 ${visibilityClasses}`}>
+              <MessageHeader name={agentName} timestamp={timestamp} role="assistant" />
+            </div>
           )}
-          <div className={`ml-11 ${isLastInGroup ? 'mb-1' : ''}`}>
+          <div
+            className={`ml-11 ${isLastInGroup ? 'mb-1' : ''} transition-opacity duration-200 ${visibilityClasses}`}
+          >
             <MessageText content={event.data.content} className="!leading-normal" />
           </div>
+          {!isVisibleToModel && (
+            <div className="ml-11 -mt-2">
+              <span className="badge badge-ghost badge-xs opacity-60">Compacted</span>
+            </div>
+          )}
         </div>
       );
 
@@ -96,7 +118,7 @@ export function TimelineMessage({
     case 'TOOL_AGGREGATED':
       // Use enhanced display for aggregated tools
       return (
-        <div className="my-2">
+        <div className={`my-2 transition-opacity duration-200 ${visibilityClasses}`}>
           <ToolCallDisplay
             tool={event.data.toolName}
             content={`Tool: ${event.data.toolName}`}
@@ -107,13 +129,18 @@ export function TimelineMessage({
               arguments: event.data.arguments,
             }}
           />
+          {!isVisibleToModel && (
+            <div className="ml-11 -mt-2">
+              <span className="badge badge-ghost badge-xs opacity-60">Compacted</span>
+            </div>
+          )}
         </div>
       );
 
     case 'TOOL_CALL':
       // Standalone tool call (not aggregated)
       return (
-        <div className="flex gap-3">
+        <div className={`flex gap-3 transition-opacity duration-200 ${visibilityClasses}`}>
           <div className="flex-shrink-0">
             <div className="w-8 h-8 rounded-md bg-info/20 text-info flex items-center justify-center text-sm">
               <div className="w-3 h-3 bg-info rounded"></div>
@@ -127,6 +154,11 @@ export function TimelineMessage({
                 {JSON.stringify(event.data.arguments, null, 2)}
               </div>
             </div>
+            {!isVisibleToModel && (
+              <div className="ml-11 -mt-2">
+                <span className="badge badge-ghost badge-xs opacity-60">Compacted</span>
+              </div>
+            )}
           </div>
         </div>
       );
@@ -134,7 +166,7 @@ export function TimelineMessage({
     case 'TOOL_RESULT':
       // Standalone tool result (not aggregated)
       return (
-        <div className="flex gap-3">
+        <div className={`flex gap-3 transition-opacity duration-200 ${visibilityClasses}`}>
           <div className="flex-shrink-0">
             <div className="w-8 h-8 rounded-md bg-green-100 text-green-700 flex items-center justify-center text-sm">
               ✓
@@ -151,6 +183,11 @@ export function TimelineMessage({
                     : 'No result'}
               </div>
             </div>
+            {!isVisibleToModel && (
+              <div className="ml-11 -mt-2">
+                <span className="badge badge-ghost badge-xs opacity-60">Compacted</span>
+              </div>
+            )}
           </div>
         </div>
       );
@@ -178,7 +215,16 @@ export function TimelineMessage({
       );
 
     case 'COMPACTION':
-      return <CompactionEntry data={event.data} timestamp={timestamp} />;
+      return (
+        <div className={`transition-opacity duration-200 ${visibilityClasses}`}>
+          <CompactionEntry data={event.data} timestamp={timestamp} />
+          {!isVisibleToModel && (
+            <div className="ml-11 -mt-2">
+              <span className="badge badge-ghost badge-xs opacity-60">Compacted</span>
+            </div>
+          )}
+        </div>
+      );
 
     case 'COMPACTION_START':
       return (
