@@ -216,7 +216,6 @@ describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
     ];
 
     const result = await strategy.compact(events, context);
-    const compactionData = getCompactionData(result);
 
     // Should have summary + user message + 2 recent agent messages
     const agentMessages = result.compactedEvents.filter((e) => e.type === 'AGENT_MESSAGE');
@@ -325,7 +324,6 @@ describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
     ];
 
     const result = await strategy.compact(events, context);
-    const compactionData = getCompactionData(result);
 
     // Count occurrences of each message
     const messageCounts = new Map<string, number>();

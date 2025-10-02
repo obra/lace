@@ -10,7 +10,7 @@ import {
 import { Thread, LaceEvent, isTransientEventType } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
-import type { CompactionStrategy, CompactionData } from '~/threads/compaction/types';
+import type { CompactionStrategy } from '~/threads/compaction/types';
 import { registerDefaultStrategies } from '~/threads/compaction/registry';
 
 export interface ThreadSessionInfo {
@@ -528,6 +528,7 @@ export class ThreadManager {
     const result = await strategy.compact(visibleEvents, context);
 
     // 1. Persist compacted events as first-class database rows (marked visible)
+    // Abort if any event fails to persist to prevent data loss
     const compactedEventIds: string[] = [];
     for (const event of result.compactedEvents) {
       // Remove ID so addEvent generates a new one (avoids duplicates)
@@ -537,24 +538,37 @@ export class ThreadManager {
         visibleToModel: true,
         context: { ...event.context, threadId },
       });
-      if (addedEvent?.id) {
-        compactedEventIds.push(addedEvent.id);
+
+      // Abort compaction if persistence fails
+      if (!addedEvent?.id) {
+        logger.error('THREADMANAGER: Compaction failed - could not persist compacted event', {
+          threadId,
+          strategyId,
+          eventType: event.type,
+        });
+        throw new Error(
+          `Compaction failed: unable to persist compacted event of type ${event.type}`
+        );
       }
+
+      compactedEventIds.push(addedEvent.id);
     }
 
     // 2. Add the COMPACTION metadata event (marked not visible)
-    //
-    // NOTE FOR REVIEWERS: addEvent() persistence failure is handled gracefully:
-    // 1. addEvent() logs errors but doesn't throw, preserving thread consistency
-    // 2. SQLite ACID properties ensure atomic persistence operations
-    // 3. If persistence fails, the in-memory thread remains unchanged
-    // 4. Subsequent operations will retry persistence, maintaining eventual consistency
-    // 5. The thread cache remains consistent with successful database state
     const addedCompactionEvent = this.addEvent({
       ...result.compactionEvent,
       visibleToModel: false,
       context: { threadId },
     });
+
+    // Abort if COMPACTION event fails to persist
+    if (!addedCompactionEvent?.id) {
+      logger.error('THREADMANAGER: Compaction failed - could not persist COMPACTION event', {
+        threadId,
+        strategyId,
+      });
+      throw new Error('Compaction failed: unable to persist COMPACTION event');
+    }
 
     // Mark pre-compaction events as not visible to model
     const hiddenEventIds: string[] = [];
@@ -602,7 +616,7 @@ export class ThreadManager {
     });
 
     return {
-      compactionEvent: addedCompactionEvent!,
+      compactionEvent: addedCompactionEvent,
       hiddenEventIds,
     };
   }

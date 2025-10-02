@@ -1,11 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TrimToolResultsStrategy } from '~/threads/compaction/trim-tool-results-strategy';
 import type { LaceEvent } from '~/threads/types';
-import type {
-  CompactionContext,
-  CompactionData,
-  CompactionResult,
-} from '~/threads/compaction/types';
+import type { CompactionContext, CompactionData } from '~/threads/compaction/types';
 import type { ToolResult } from '~/tools/types';
 
 describe('TrimToolResultsStrategy', () => {
