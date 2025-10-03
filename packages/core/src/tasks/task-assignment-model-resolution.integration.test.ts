@@ -119,9 +119,12 @@ describe('Task Assignment Model Resolution Integration', () => {
 
   it('should handle missing session config gracefully', async () => {
     // Create session with minimal config to allow creation
+    const tempProjectDir2 = join(context.tempDir, 'test-project-2');
+    mkdirSync(tempProjectDir2, { recursive: true });
+
     const projectWithMinimalConfig = Project.create(
       'Test Project 2',
-      '/tmp/test2',
+      tempProjectDir2,
       'Test project 2',
       {
         providerInstanceId: 'some-instance',
