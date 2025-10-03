@@ -15,12 +15,14 @@ import {
 import { cleanupSession } from '@/lib/server/lace-test-imports';
 import type { Tool } from '~/tools/tool';
 import { setupWebTest } from '@/test-utils/web-test-setup';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 describe('Agent Spawning and Thread Creation', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let session: Session;
   let projectId: string;
   let anthropicInstanceId: string;
@@ -46,8 +48,11 @@ describe('Agent Spawning and Thread Creation', () => {
       apiKey: 'test-openai-key',
     });
 
-    // Create a test project
-    const project = Project.create('Test Project', '/test/path', 'Test project', {});
+    // Create temp directory and test project
+    const testDir = join(context.tempProjectDir, 'agent-start-test');
+    await fs.mkdir(testDir, { recursive: true });
+
+    const project = Project.create('Test Project', testDir, 'Test project', {});
     projectId = project.getId();
 
     // Create session

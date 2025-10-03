@@ -2,15 +2,21 @@
 // ABOUTME: Covers GET all projects, POST new project with validation and error scenarios
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { setupWebTest } from '@/test-utils/web-test-setup';
 import { loader, action } from '@/app/routes/api.projects';
 import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 import { parseResponse } from '@/lib/serialization';
 import type { ProjectInfo } from '@/types/core';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 interface ErrorResponse {
   error: string;
   details?: unknown;
 }
+
+// Setup test context BEFORE imports
+const context = setupWebTest();
 
 // Mock external dependencies (database persistence) but not business logic
 const projectStore = new Map<string, Record<string, unknown>>();
@@ -42,6 +48,8 @@ vi.mock('~/persistence/database', () => {
         return sessionStore.get(sessionId) || null;
       }),
     })),
+    // resetPersistence needed by setupWebTest()
+    resetPersistence: vi.fn(),
   };
 });
 
@@ -89,9 +97,15 @@ describe('Projects API', () => {
       // Arrange: Create test projects using real Project class
       const { Project } = await import('@/lib/server/lace-imports');
 
+      // Create temp project directories
+      const dir1 = join(context.tempProjectDir, 'project1');
+      const dir2 = join(context.tempProjectDir, 'project2');
+      await fs.mkdir(dir1, { recursive: true });
+      await fs.mkdir(dir2, { recursive: true });
+
       // Create projects and they will be stored in our mocked persistence
-      const _project1 = Project.create('Project 1', '/path/1', 'First project');
-      const _project2 = Project.create('Project 2', '/path/2', 'Second project');
+      const _project1 = Project.create('Project 1', dir1, 'First project');
+      const _project2 = Project.create('Project 2', dir2, 'Second project');
 
       // Act: Call the API endpoint
       const response = await loader(
@@ -110,14 +124,14 @@ describe('Projects API', () => {
       expect(returnedProject1).toMatchObject({
         name: 'Project 1',
         description: 'First project',
-        workingDirectory: '/path/1',
+        workingDirectory: dir1,
         isArchived: false,
         sessionCount: 0,
       });
       expect(returnedProject2).toMatchObject({
         name: 'Project 2',
         description: 'Second project',
-        workingDirectory: '/path/2',
+        workingDirectory: dir2,
         isArchived: false,
         sessionCount: 0,
       });
@@ -138,11 +152,14 @@ describe('Projects API', () => {
 
   describe('POST /api/projects', () => {
     it('should create new project with full data', async () => {
-      // Arrange: Prepare request with full project data
+      // Arrange: Create temp directory and prepare request with full project data
+      const newDir = join(context.tempProjectDir, 'new-project');
+      await fs.mkdir(newDir, { recursive: true });
+
       const requestBody = {
         name: 'New Project',
         description: 'A new project',
-        workingDirectory: '/new/path',
+        workingDirectory: newDir,
         configuration: { key: 'value' },
       };
 
@@ -161,7 +178,7 @@ describe('Projects API', () => {
       expect(data).toMatchObject({
         name: 'New Project',
         description: 'A new project',
-        workingDirectory: '/new/path',
+        workingDirectory: newDir,
         isArchived: false,
         sessionCount: 0,
       });
@@ -178,10 +195,13 @@ describe('Projects API', () => {
     });
 
     it('should create project with minimal required data', async () => {
-      // Arrange: Request with only required fields
+      // Arrange: Create temp directory and request with only required fields
+      const minimalDir = join(context.tempProjectDir, 'minimal');
+      await fs.mkdir(minimalDir, { recursive: true });
+
       const requestBody = {
         name: 'Minimal Project',
-        workingDirectory: '/minimal/path',
+        workingDirectory: minimalDir,
       };
 
       const request = new Request('http://localhost/api/projects', {
@@ -199,7 +219,7 @@ describe('Projects API', () => {
       expect(data).toMatchObject({
         name: 'Minimal Project',
         description: '', // Default empty description
-        workingDirectory: '/minimal/path',
+        workingDirectory: minimalDir,
         isArchived: false,
         sessionCount: 0,
       });
@@ -225,9 +245,12 @@ describe('Projects API', () => {
     });
 
     it('should handle empty name by auto-generating', async () => {
+      const testDir = join(context.tempProjectDir, 'auto-name');
+      await fs.mkdir(testDir, { recursive: true });
+
       const requestBody = {
         name: '',
-        workingDirectory: '/test/path',
+        workingDirectory: testDir,
       };
 
       const request = new Request('http://localhost/api/projects', {
@@ -245,13 +268,21 @@ describe('Projects API', () => {
     });
 
     it('should handle creation errors gracefully', async () => {
-      // Arrange: Mock persistence layer to simulate database error
+      // Arrange: Create temp directory first
+      const errorTestDir = join(context.tempProjectDir, 'error-test');
+      await fs.mkdir(errorTestDir, { recursive: true });
+
+      // Mock persistence layer to simulate database error
       const mockPersistence = {
         loadAllProjects: vi.fn(() => []),
         loadProject: vi.fn(() => null),
         saveProject: vi.fn(() => {
           throw new Error('Database connection failed');
         }),
+        // Need to add session methods since Project.create() creates a session
+        saveSession: vi.fn(),
+        loadSession: vi.fn(() => null),
+        loadSessionsByProject: vi.fn(() => []),
       };
 
       // Override the persistence mock for this test
@@ -262,7 +293,7 @@ describe('Projects API', () => {
 
       const requestBody = {
         name: 'Test Project',
-        workingDirectory: '/test/path',
+        workingDirectory: errorTestDir,
       };
 
       const request = new Request('http://localhost/api/projects', {
