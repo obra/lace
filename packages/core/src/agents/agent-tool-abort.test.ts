@@ -24,36 +24,7 @@ import {
 } from '~/test-utils/provider-defaults';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
-import type { LaceEvent } from '~/threads/types';
-
-// Helper to wait for a specific number of events of a given type
-function waitForEventCount(
-  threadManager: ThreadManager,
-  threadId: string,
-  eventType: string,
-  count: number,
-  timeoutMs = 5000
-): Promise<LaceEvent[]> {
-  return new Promise((resolve, reject) => {
-    const startTime = Date.now();
-    const checkForEvents = () => {
-      const events = threadManager.getEvents(threadId);
-      const matchingEvents = events.filter((e) => e.type === eventType);
-      if (matchingEvents.length >= count) {
-        resolve(matchingEvents);
-      } else if (Date.now() - startTime > timeoutMs) {
-        reject(
-          new Error(
-            `Timeout waiting for ${count} ${eventType} events after ${timeoutMs}ms (got ${matchingEvents.length})`
-          )
-        );
-      } else {
-        setTimeout(checkForEvents, 10);
-      }
-    };
-    checkForEvents();
-  });
-}
+import { waitForEventCount } from '~/test-utils/event-waiters';
 
 class MockProviderWithTools extends BaseMockProvider {
   private mockToolCalls: ToolCall[];
@@ -345,7 +316,8 @@ describe('Agent Tool Abort Functionality', () => {
     // Wait for TOOL_CALL event to confirm tool execution has started
     await waitForEventCount(threadManager, threadId, 'TOOL_CALL', 1);
 
-    // Give the tool time to start its interval loop and capture some progress
+    // Give the tool time to capture progress (MockSlowTool ticks every 100ms)
+    // 200ms = 2 ticks, ensuring we get partial output like "Processing... 6% complete"
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     // Abort the tool

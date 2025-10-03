@@ -23,6 +23,7 @@ import type { ProviderResponse, ProviderMessage } from '~/providers/base-provide
 import type { Tool } from '~/tools/tool';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
+import { waitForEvent, waitForEventMatch } from '~/test-utils/event-waiters';
 
 // Mock provider that can return tool calls once then regular responses
 class MockProviderWithToolCalls extends TestProvider {
@@ -186,15 +187,12 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       // Start agent conversation - this creates TOOL_CALL and approval request
       const conversationPromise = agent.sendMessage('Run echo test');
 
-      // Wait for approval request to be created with polling
-      let approvalRequest;
-      let events;
-      for (let i = 0; i < 50; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-        events = threadManager.getEvents(agent.threadId);
-        approvalRequest = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
-        if (approvalRequest) break;
-      }
+      // Wait for approval request to be created
+      const approvalRequest = await waitForEvent(
+        threadManager,
+        agent.threadId,
+        'TOOL_APPROVAL_REQUEST'
+      );
 
       // Verify approval request was created
       expect(approvalRequest).toBeDefined();
@@ -211,14 +209,12 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       }
 
       // Wait for TOOL_RESULT event to ensure tool execution completes
-      // Poll for up to 500ms
-      let toolResult;
-      for (let i = 0; i < 50; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-        const events = threadManager.getEvents(agent.threadId);
-        toolResult = events.find((e) => e.type === 'TOOL_RESULT' && e.data.id === 'tool-counter');
-        if (toolResult) break;
-      }
+      const toolResult = await waitForEventMatch(
+        threadManager,
+        agent.threadId,
+        (e) => e.type === 'TOOL_RESULT' && e.data.id === 'tool-counter',
+        'TOOL_RESULT with id=tool-counter'
+      );
 
       // Wait for conversation to complete
       await conversationPromise;
