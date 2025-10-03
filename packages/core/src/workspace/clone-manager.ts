@@ -2,10 +2,10 @@
 // ABOUTME: Uses git clone --local for space-efficient clones with hardlinks
 
 import { existsSync, mkdirSync, readdirSync, rmSync } from 'fs';
-import { join } from 'path';
+import { join, resolve, normalize } from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { homedir } from 'os';
+import { homedir, tmpdir } from 'os';
 import { logger } from '~/utils/logger';
 
 const execFileAsync = promisify(execFile);
@@ -40,22 +40,26 @@ export class CloneManager {
     const gitDir = join(projectDir, '.git');
     if (!existsSync(gitDir)) {
       // In tests, validate we're not about to git init in source directories
-      if (
-        process.env.NODE_ENV === 'test' &&
-        !projectDir.includes('/tmp/') &&
-        !projectDir.includes('/T/')
-      ) {
-        const stack = new Error().stack;
-        console.error('🚨 WOULD GIT INIT IN NON-TEMP DIR (CloneManager):', {
-          projectDir,
-          cwd: process.cwd(),
-          stack,
-        });
-        throw new Error(
-          `Refusing to git init in non-temp directory during tests! ` +
-            `projectDir: ${projectDir}, cwd: ${process.cwd()}. ` +
-            'This usually means a test passed the wrong directory path.'
-        );
+      if (process.env.NODE_ENV === 'test') {
+        // Use platform-aware temp directory check
+        const normalizedProjectDir = normalize(resolve(projectDir));
+        const normalizedTmpDir = normalize(resolve(tmpdir()));
+
+        if (!normalizedProjectDir.startsWith(normalizedTmpDir)) {
+          const stack = new Error().stack;
+          logger.error('🚨 WOULD GIT INIT IN NON-TEMP DIR (CloneManager)', {
+            projectDir,
+            normalizedProjectDir,
+            normalizedTmpDir,
+            cwd: process.cwd(),
+            stack,
+          });
+          throw new Error(
+            `Refusing to git init in non-temp directory during tests! ` +
+              `projectDir: ${projectDir}, cwd: ${process.cwd()}. ` +
+              'This usually means a test passed the wrong directory path.'
+          );
+        }
       }
 
       logger.warn('CloneManager: Project is not a git repository, initializing git', {

@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { ContainerConfig } from '~/containers/types';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { logger } from '~/utils/logger';
 
 const execFileAsync = promisify(execFile);
 
@@ -45,7 +46,10 @@ describe.skipIf(process.platform !== 'darwin')('Container Cleanup Validation', (
         await runtime.stop(containerId, 3000);
         await runtime.remove(containerId);
       } catch (error) {
-        console.warn(`Cleanup: Failed to remove container ${containerId}:`, error);
+        logger.warn('Cleanup: Failed to remove container', {
+          containerId,
+          error: error instanceof Error ? error.message : String(error),
+        });
         // Force remove via container CLI as fallback
         try {
           await execFileAsync('container', ['rm', '-f', containerId], { timeout: 2000 });
