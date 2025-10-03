@@ -11,7 +11,12 @@ const __dirname = dirname(__filename);
 export default defineConfig({
   plugins: [reactRouter(), tsconfigPaths()],
   optimizeDeps: {
-    entries: ['./app/entry.client.tsx', './app/root.tsx', './app/routes/**/*.tsx'],
+    entries: [
+      './app/entry.client.tsx',
+      './app/root.tsx',
+      './app/routes/**/*.tsx',
+      './app/routes/**/*.ts',
+    ],
   },
   server: {
     warmup: {
