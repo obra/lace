@@ -68,7 +68,10 @@ class ConfigurableTool extends Tool {
     args: z.infer<typeof this.schema>,
     _context: ToolContext
   ): Promise<ToolResult> {
-    if (this.shouldFail) {
+    // Check if this specific action should fail (based on action name or global flag)
+    const shouldFailThisCall = this.shouldFail || args.action.includes('fail');
+
+    if (shouldFailThisCall) {
       return Promise.resolve(this.createError('Simulated tool execution failure'));
     }
     return Promise.resolve(this.createResult(`Tool executed: ${args.action}`));
@@ -250,6 +253,9 @@ describe('Tool Batch Completion Behavior', () => {
     // Wait for tool result event to appear
     await waitForEvent(threadManager, agent.threadId, 'TOOL_RESULT');
 
+    // Give the agent time to process the tool result and continue the conversation
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
     const events = threadManager.getEvents(agent.threadId);
 
     // Should have tool result with error
@@ -337,11 +343,21 @@ describe('Tool Batch Completion Behavior', () => {
 
     const conversationPromise = agent.sendMessage('Please run the test tools');
 
-    // Wait for first approval request
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Wait for both approval requests to appear (agent processes tools in batch)
+    await new Promise<void>((resolve) => {
+      const checkApprovals = () => {
+        const events = threadManager.getEvents(agent.threadId);
+        const approvalRequests = events.filter((e) => e.type === 'TOOL_APPROVAL_REQUEST');
+        if (approvalRequests.length >= 2) {
+          resolve();
+        } else {
+          setTimeout(checkApprovals, 10);
+        }
+      };
+      checkApprovals();
+    });
 
-    // Approve first tool (will succeed)
-    configurableTool.setShouldFail(false);
+    // Approve first tool (will succeed - action is 'success_test')
     const response1Event = expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
@@ -354,11 +370,7 @@ describe('Tool Batch Completion Behavior', () => {
     );
     agent.emit('thread_event_added', { event: response1Event, threadId: agent.threadId });
 
-    // Wait for second approval request
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    // Approve second tool (will fail)
-    configurableTool.setShouldFail(true);
+    // Approve second tool (will fail - action is 'fail_test')
     const response2Event = expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
@@ -374,8 +386,22 @@ describe('Tool Batch Completion Behavior', () => {
     // Wait for conversation to complete
     await conversationPromise;
 
-    // Add delay for async execution
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Wait for both tool results to appear
+    await new Promise<void>((resolve) => {
+      const checkResults = () => {
+        const events = threadManager.getEvents(agent.threadId);
+        const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');
+        if (toolResults.length >= 2) {
+          resolve();
+        } else {
+          setTimeout(checkResults, 10);
+        }
+      };
+      checkResults();
+    });
+
+    // Give the agent time to continue the conversation after tool batch completes
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
     const events = threadManager.getEvents(agent.threadId);
     const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');

@@ -253,8 +253,13 @@ describe('Thread Messaging API', () => {
     const session = await sessionService.getSession(asThreadId(realSessionId));
     const agent = session!.getAgent(asThreadId(realThreadId));
 
-    // Wait a short time for the async sendMessage call to complete and start the agent
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Wait for agent to start with retry logic
+    let attempts = 0;
+    const maxAttempts = 10;
+    while (attempts < maxAttempts && !agent!.isRunning) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      attempts++;
+    }
 
     // Verify agent is running after message processing starts
     expect(agent!.isRunning).toBe(true);

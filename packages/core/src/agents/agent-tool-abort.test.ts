@@ -364,10 +364,6 @@ describe('Agent Tool Abort Functionality', () => {
 
     // Should have partial progress info
     const resultText = toolResult!.content[0].text;
-    // Debug: log the actual result text
-    if (!resultText.includes('interrupted at')) {
-      console.log('Actual result text:', resultText);
-    }
     expect(resultText).toContain('interrupted at');
   });
 

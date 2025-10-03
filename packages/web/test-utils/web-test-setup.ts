@@ -34,6 +34,9 @@ export function setupWebTest(): WebTestContext {
     get tempDir(): string {
       return tempLaceDir.tempDir;
     },
+    get originalLaceDir(): string | undefined {
+      return tempLaceDir.originalLaceDir;
+    },
     get tempProjectDir(): string {
       if (!_tempProjectDir) {
         throw new Error(

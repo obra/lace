@@ -200,23 +200,28 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       expect(approvalRequest).toBeDefined();
 
       // Send multiple concurrent approval responses (simulating rapid clicking)
-      const approvalPromises = Array(10)
-        .fill(null)
-        .map(async (_, index) => {
-          // Slight delay to create more realistic race conditions
-          await new Promise((resolve) => setTimeout(resolve, index * 2));
+      // Note: handleApprovalResponse is synchronous, so to create true concurrency,
+      // we need to call them all without awaiting
+      const approvals = Array(10).fill(null);
+      const startTime = Date.now();
 
-          return agent.handleApprovalResponse('tool-counter', ApprovalDecision.ALLOW_ONCE);
-        });
+      // Call all approvals synchronously to create true race condition
+      for (const [index] of approvals.entries()) {
+        agent.handleApprovalResponse('tool-counter', ApprovalDecision.ALLOW_ONCE);
+      }
 
-      // Execute all approvals concurrently
-      await Promise.all(approvalPromises);
+      // Wait for TOOL_RESULT event to ensure tool execution completes
+      // Poll for up to 500ms
+      let toolResult;
+      for (let i = 0; i < 50; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        const events = threadManager.getEvents(agent.threadId);
+        toolResult = events.find((e) => e.type === 'TOOL_RESULT' && e.data.id === 'tool-counter');
+        if (toolResult) break;
+      }
 
       // Wait for conversation to complete
       await conversationPromise;
-
-      // Add delay to allow all async processing to complete
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // ASSERTIONS: Defense-in-depth should work
 
