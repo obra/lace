@@ -1,14 +1,12 @@
 // ABOUTME: Tests for context analyzer token counting
 // ABOUTME: Validates category calculations and edge cases
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ContextAnalyzer } from './context-analyzer';
 import { Agent, AgentConfig } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
 import { Tool } from '~/tools/tool';
 import { z } from 'zod';
 import type { ToolResult, ToolContext } from '~/tools/types';
@@ -21,8 +19,6 @@ import {
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
 import type { ThreadId } from '~/threads/types';
-import { join } from 'path';
-import { mkdirSync } from 'fs';
 
 // Mock tool for testing
 class TestTool extends Tool {
@@ -41,10 +37,7 @@ class TestTool extends Tool {
 }
 
 describe('ContextAnalyzer', () => {
-  const tempLaceDirContext = setupCoreTest();
-  let tempProjectDir: string;
-  let project: Project;
-  let session: Session;
+  setupCoreTest();
   let agent: Agent;
   let threadManager: ThreadManager;
   let toolExecutor: ToolExecutor;
@@ -62,30 +55,14 @@ describe('ContextAnalyzer', () => {
       apiKey: 'test-api-key',
     });
 
-    // Create a separate project directory
-    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-project');
-    mkdirSync(tempProjectDir, { recursive: true });
-
-    // Create project and session
-    project = Project.create('Test Project', tempProjectDir);
-
-    session = Session.create({
-      name: 'Test Session',
-      projectId: project.getId(),
-      configuration: {
-        providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      },
-    });
-
-    // Create thread manager and tool executor
+    // Create thread manager and tool executor - no session/project needed for token counting
     threadManager = new ThreadManager();
     toolExecutor = new ToolExecutor();
     toolExecutor.registerAllAvailableTools();
 
-    // Generate thread ID and create thread
+    // Generate thread ID and create simple thread (no session/project)
     agentThreadId = threadManager.generateThreadId();
-    threadManager.createThread(agentThreadId, session.getId(), project.getId());
+    threadManager.createThread(agentThreadId);
 
     // Create agent configuration
     const agentConfig: AgentConfig = {
@@ -101,7 +78,13 @@ describe('ContextAnalyzer', () => {
     };
 
     agent = new Agent(agentConfig);
-    await agent.initialize(session);
+    // Initialize to create provider instance
+    await agent.initialize();
+
+    // Mock calibrateTokenCosts to avoid network calls
+    if (agent.providerInstance && agent.providerInstance.calibrateTokenCosts) {
+      vi.spyOn(agent.providerInstance, 'calibrateTokenCosts').mockResolvedValue(null);
+    }
   });
 
   afterEach(async () => {
