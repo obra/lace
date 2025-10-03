@@ -422,7 +422,7 @@ describe('Error Logging', () => {
   });
 });
 
-describe('LACE_DIR initialization', () => {
+describe.sequential('LACE_DIR initialization', () => {
   let originalLaceDir: string | undefined;
 
   beforeEach(() => {

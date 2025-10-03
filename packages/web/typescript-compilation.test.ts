@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { execSync } from 'child_process';
 
-describe('Web Package TypeScript Compilation', () => {
+describe.sequential('Web Package TypeScript Compilation', () => {
   it('should pass TypeScript type checking', () => {
     expect(() => {
       // Run TypeScript compiler without emitting files
