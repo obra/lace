@@ -13,11 +13,14 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 
 // Using shared delegation test utilities
 
 describe('DelegateTool', () => {
-  const _tempLaceDir = setupCoreTest();
+  const tempLaceDirContext = setupCoreTest();
+  let tempProjectDir: string;
   let testSetup: DelegationTestSetup;
   let tool: DelegateTool;
   let context: ToolContext;
@@ -32,10 +35,15 @@ describe('DelegateTool', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create temp project directory
+    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-delegation');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Use shared delegation test setup
     testSetup = await createDelegationTestSetup({
       sessionName: 'Delegate Test Session',
       projectName: 'Delegate Test Project',
+      projectPath: tempProjectDir,
       model: 'claude-3-5-haiku-20241022',
     });
 

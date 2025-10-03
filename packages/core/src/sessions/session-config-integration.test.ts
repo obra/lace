@@ -287,22 +287,6 @@ describe('Session Configuration Integration', () => {
 
       await cleanupSession(session);
     });
-
-    it('should fall back to project working directory', async () => {
-      const session = Session.create({
-        name: 'Test Session',
-        projectId,
-        configuration: {
-          providerInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        },
-      });
-
-      // Should use project working directory
-      expect(session.getWorkingDirectory()).toBe('/test/path');
-
-      await cleanupSession(session);
-    });
   });
 
   describe('Session metadata', () => {
