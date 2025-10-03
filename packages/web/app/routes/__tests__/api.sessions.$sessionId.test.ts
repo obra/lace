@@ -15,6 +15,8 @@ import { getSessionService } from '@/lib/server/session-service';
 import { Project } from '@/lib/server/lace-imports';
 import { Session } from '@/lib/server/lace-imports';
 import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 // ✅ ESSENTIAL MOCK - Next.js server-side module compatibility in test environment
 // Required for Next.js framework compatibility during testing
@@ -48,7 +50,7 @@ vi.mock('~/tools/implementations/bash', () => ({
 }));
 
 describe('Session Detail API Route', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
@@ -101,15 +103,13 @@ describe('Session Detail API Route', () => {
   describe('GET /api/sessions/[sessionId]', () => {
     it('should return session details with agents', async () => {
       // Create a test project first
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {
-          providerInstanceId: anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        }
-      );
+      const testDir = join(context.tempProjectDir, 'session-detail-test');
+      await fs.mkdir(testDir, { recursive: true });
+
+      const testProject = Project.create('Test Project', testDir, 'Test project for API test', {
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      });
       const projectId = testProject.getId();
 
       // Create a real session using the session service
@@ -170,15 +170,13 @@ describe('Session Detail API Route', () => {
   describe('PATCH /api/sessions/[sessionId]', () => {
     it('should update session metadata', async () => {
       // Create a test project first
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {
-          providerInstanceId: anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        }
-      );
+      const testDir = join(context.tempProjectDir, 'session-update-test');
+      await fs.mkdir(testDir, { recursive: true });
+
+      const testProject = Project.create('Test Project', testDir, 'Test project for API test', {
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      });
       const projectId = testProject.getId();
 
       // Create a real session using the session service
@@ -240,15 +238,13 @@ describe('Session Detail API Route', () => {
 
     it('should validate request data', async () => {
       // Create a test project first
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {
-          providerInstanceId: anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        }
-      );
+      const testDir = join(context.tempProjectDir, 'session-validate-test');
+      await fs.mkdir(testDir, { recursive: true });
+
+      const testProject = Project.create('Test Project', testDir, 'Test project for API test', {
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      });
       const projectId = testProject.getId();
 
       // Create a real session using the session service
@@ -280,15 +276,13 @@ describe('Session Detail API Route', () => {
 
     it('should handle partial updates', async () => {
       // Create a test project first
-      const testProject = Project.create(
-        'Test Project',
-        '/test/path',
-        'Test project for API test',
-        {
-          providerInstanceId: anthropicInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        }
-      );
+      const testDir = join(context.tempProjectDir, 'session-partial-test');
+      await fs.mkdir(testDir, { recursive: true });
+
+      const testProject = Project.create('Test Project', testDir, 'Test project for API test', {
+        providerInstanceId: anthropicInstanceId,
+        modelId: 'claude-3-5-haiku-20241022',
+      });
       const projectId = testProject.getId();
 
       // Create a real session using the session service
@@ -364,7 +358,10 @@ describe('Session Detail API Route', () => {
         .mockReturnValue(mockDirectSessionData as never);
 
       // Create a real session first for the route to work with
-      const testProject = Project.create('TDD Test Project', '/test/path', 'TDD test project', {
+      const testDir = join(context.tempProjectDir, 'session-tdd-test');
+      await fs.mkdir(testDir, { recursive: true });
+
+      const testProject = Project.create('TDD Test Project', testDir, 'TDD test project', {
         providerInstanceId: anthropicInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
       });

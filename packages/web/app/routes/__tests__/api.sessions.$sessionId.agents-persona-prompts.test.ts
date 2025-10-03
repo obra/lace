@@ -7,6 +7,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupWebTest } from '@/test-utils/web-test-setup';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
@@ -31,7 +33,7 @@ import { Project, Session } from '@/lib/server/lace-imports';
 import { asThreadId } from '@/types/core';
 
 describe('Agent Creation API - Persona System Prompt Generation', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let sessionService: SessionService;
   let testProject: Project;
   let sessionId: string;
@@ -54,7 +56,9 @@ describe('Agent Creation API - Persona System Prompt Generation', () => {
     });
 
     // Create real project and session
-    testProject = Project.create('Test Project', '/test/path', 'Test project for persona prompts', {
+    const testDir = join(context.tempProjectDir, 'persona-prompts');
+    await fs.mkdir(testDir, { recursive: true });
+    testProject = Project.create('Test Project', testDir, 'Test project for persona prompts', {
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });

@@ -7,6 +7,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupWebTest } from '@/test-utils/web-test-setup';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
@@ -41,7 +43,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 describe('TaskAPIClient E2E with Real API Routes', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let sessionId: string;
   let projectId: string;
   let client: TaskAPIClient;
@@ -65,9 +67,11 @@ describe('TaskAPIClient E2E with Real API Routes', () => {
     });
 
     // Create a test project with the real provider instance
+    const testDir = join(context.tempProjectDir, 'task-manager');
+    await fs.mkdir(testDir, { recursive: true });
     const testProject = Project.create(
       'TaskAPIClient E2E Test Project',
-      '/test/path',
+      testDir,
       'Test project for TaskAPIClient E2E testing',
       {
         providerInstanceId,

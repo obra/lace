@@ -14,6 +14,8 @@ import {
 import { parseResponse } from '@/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 import type { ToolPolicy } from '@/types/core';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 // Type interfaces for new API structure
 interface ToolPermissionInfo {
@@ -32,7 +34,7 @@ interface ConfigurationResponse {
 }
 
 describe('Session Configuration API - Tool Permissions Structure', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let _sessionService: ReturnType<typeof getSessionService>;
   let testProject: ReturnType<typeof Project.create>;
   let sessionId: string;
@@ -53,7 +55,10 @@ describe('Session Configuration API - Tool Permissions Structure', () => {
     });
 
     // Create test project with tool policies
-    testProject = Project.create('Tool Permission Test Project', '/test/path');
+    const testDir = join(context.tempProjectDir, 'tool-permission-test');
+    await fs.mkdir(testDir, { recursive: true });
+
+    testProject = Project.create('Tool Permission Test Project', testDir);
     testProject.updateConfiguration({
       toolPolicies: {
         bash: 'allow', // Project allows bash
@@ -117,7 +122,10 @@ describe('Session Configuration API - Tool Permissions Structure', () => {
 
     it('should handle tools with no project override (full permissions)', async () => {
       // Create project with no tool policy overrides
-      const cleanProject = Project.create('Clean Project', '/test/path');
+      const cleanDir = join(context.tempProjectDir, 'clean-project');
+      await fs.mkdir(cleanDir, { recursive: true });
+
+      const cleanProject = Project.create('Clean Project', cleanDir);
       cleanProject.updateConfiguration({
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',

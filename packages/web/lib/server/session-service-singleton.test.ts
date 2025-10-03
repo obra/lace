@@ -10,6 +10,8 @@ import { getSessionService } from '@/lib/server/session-service';
 import { Project, Session } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
   createTestProviderInstance,
@@ -27,7 +29,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 describe('SessionService Singleton E2E Reproduction', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let providerInstanceId: string;
 
@@ -58,7 +60,9 @@ describe('SessionService Singleton E2E Reproduction', () => {
 
   it('should reproduce the exact E2E test scenario step by step', async () => {
     // Step 1: Create project with provider instance
-    const testProject = Project.create('Test Project', '/test/path', 'Test project for API test', {
+    const testDir = join(context.tempProjectDir, 'singleton-scenario');
+    await fs.mkdir(testDir, { recursive: true });
+    const testProject = Project.create('Test Project', testDir, 'Test project for API test', {
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });
@@ -102,7 +106,9 @@ describe('SessionService Singleton E2E Reproduction', () => {
   it('should test multiple session creation cycles', async () => {
     // Create multiple sessions in sequence to test state pollution
     for (let i = 0; i < 3; i++) {
-      const testProject = Project.create(`Test Project ${i}`, '/test/path', 'Test project', {
+      const testDir = join(context.tempProjectDir, `multiple-cycles-${i}`);
+      await fs.mkdir(testDir, { recursive: true });
+      const testProject = Project.create(`Test Project ${i}`, testDir, 'Test project', {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
       });
@@ -127,7 +133,9 @@ describe('SessionService Singleton E2E Reproduction', () => {
 
   it('should test session service state after clearing', async () => {
     // Create session and agent
-    const testProject = Project.create('Test Project', '/test/path', 'Test project', {
+    const testDir = join(context.tempProjectDir, 'service-clearing');
+    await fs.mkdir(testDir, { recursive: true });
+    const testProject = Project.create('Test Project', testDir, 'Test project', {
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });
@@ -162,7 +170,9 @@ describe('SessionService Singleton E2E Reproduction', () => {
 
   it('should test session reconstruction after clearing', async () => {
     // Create session and agent
-    const testProject = Project.create('Test Project', '/test/path', 'Test project', {
+    const testDir = join(context.tempProjectDir, 'service-reconstruction');
+    await fs.mkdir(testDir, { recursive: true });
+    const testProject = Project.create('Test Project', testDir, 'Test project', {
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });

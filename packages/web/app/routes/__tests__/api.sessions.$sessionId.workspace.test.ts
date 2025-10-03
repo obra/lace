@@ -13,6 +13,8 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '@/lib/server/lace-imports';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 // ✅ ESSENTIAL MOCK - Server-side module compatibility in test environment
 vi.mock('server-only', () => ({}));
@@ -44,10 +46,10 @@ vi.mock('~/tools/implementations/bash', () => ({
 }));
 
 describe('GET /api/sessions/:sessionId/workspace', () => {
+  const context = setupWebTest();
   let anthropicInstanceId: string;
 
   beforeEach(async () => {
-    setupWebTest();
     setupTestProviderDefaults();
 
     // Create test provider instance
@@ -87,7 +89,10 @@ describe('GET /api/sessions/:sessionId/workspace', () => {
 
   it('returns workspace info for local mode session', async () => {
     // Create test project
-    const project = Project.create('Test Project', '/test/project', 'Test project', {
+    const testDir = join(context.tempProjectDir, 'local-workspace-test');
+    await fs.mkdir(testDir, { recursive: true });
+
+    const project = Project.create('Test Project', testDir, 'Test project', {
       providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });
@@ -126,7 +131,10 @@ describe('GET /api/sessions/:sessionId/workspace', () => {
     }
 
     // Create test project
-    const project = Project.create('Test Project', '/test/project', 'Test project', {
+    const testDir = join(context.tempProjectDir, 'container-workspace-test');
+    await fs.mkdir(testDir, { recursive: true });
+
+    const project = Project.create('Test Project', testDir, 'Test project', {
       providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });
@@ -163,7 +171,10 @@ describe('GET /api/sessions/:sessionId/workspace', () => {
 
   it('handles sessions where workspace is not yet initialized', async () => {
     // Create test project
-    const project = Project.create('Test Project', '/test/project', 'Test project', {
+    const testDir = join(context.tempProjectDir, 'uninit-workspace-test');
+    await fs.mkdir(testDir, { recursive: true });
+
+    const project = Project.create('Test Project', testDir, 'Test project', {
       providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });

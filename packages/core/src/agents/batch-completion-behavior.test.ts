@@ -234,7 +234,7 @@ describe('Tool Batch Completion Behavior', () => {
     const responseEvent = expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           toolCallId: 'call_fail',
           decision: ApprovalDecision.ALLOW_ONCE,
@@ -286,7 +286,7 @@ describe('Tool Batch Completion Behavior', () => {
     const responseEvent = expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           toolCallId: 'call_deny',
           decision: ApprovalDecision.DENY,
@@ -345,7 +345,7 @@ describe('Tool Batch Completion Behavior', () => {
     const response1Event = expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           toolCallId: 'call_success',
           decision: ApprovalDecision.ALLOW_ONCE,
@@ -362,7 +362,7 @@ describe('Tool Batch Completion Behavior', () => {
     const response2Event = expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           toolCallId: 'call_fail',
           decision: ApprovalDecision.ALLOW_ONCE,

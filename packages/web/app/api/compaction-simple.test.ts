@@ -19,6 +19,8 @@ import {
 import { cleanupSession } from '@/lib/server/lace-test-imports';
 
 import { setupWebTest } from '@/test-utils/web-test-setup';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 import { parseResponse } from '@/lib/serialization';
 import { loader as getAgent } from '@/app/routes/api.agents.$agentId';
 import { createLoaderArgs } from '@/test-utils/route-test-helpers';
@@ -29,7 +31,7 @@ import type { ThreadId } from '@/types/core';
 vi.mock('server-only', () => ({}));
 
 describe('Compaction Integration Test', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let projectId: string;
   let sessionId: ThreadId;
   let providerInstanceId: string;
@@ -49,15 +51,12 @@ describe('Compaction Integration Test', () => {
     });
 
     // Create project and session
-    const project = Project.create(
-      'Compaction Test',
-      '/test/compaction',
-      'Testing compaction features',
-      {
-        providerInstanceId,
-        modelId: 'claude-3-5-sonnet-20241022',
-      }
-    );
+    const testDir = join(context.tempProjectDir, 'compaction');
+    await fs.mkdir(testDir, { recursive: true });
+    const project = Project.create('Compaction Test', testDir, 'Testing compaction features', {
+      providerInstanceId,
+      modelId: 'claude-3-5-sonnet-20241022',
+    });
     projectId = project.getId();
 
     const session = Session.create({
