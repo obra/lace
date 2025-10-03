@@ -201,15 +201,14 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       // Note: handleApprovalResponse is synchronous, so to create true concurrency,
       // we need to call them all without awaiting
       const approvals = Array(10).fill(null);
-      const startTime = Date.now();
 
       // Call all approvals synchronously to create true race condition
-      for (const [index] of approvals.entries()) {
+      for (const _entry of approvals) {
         agent.handleApprovalResponse('tool-counter', ApprovalDecision.ALLOW_ONCE);
       }
 
       // Wait for TOOL_RESULT event to ensure tool execution completes
-      const toolResult = await waitForEventMatch(
+      await waitForEventMatch(
         threadManager,
         agent.threadId,
         (e) => e.type === 'TOOL_RESULT' && e.data.id === 'tool-counter',

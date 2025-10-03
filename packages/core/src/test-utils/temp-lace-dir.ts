@@ -59,7 +59,7 @@ export function useTempLaceDir(): TempLaceDirContext {
     if (_tempDir && fs.existsSync(_tempDir)) {
       try {
         await fs.promises.rm(_tempDir, { recursive: true, force: true, maxRetries: 3 });
-      } catch (error) {
+      } catch {
         // If rm fails, try sync rmSync with retries (sometimes more aggressive)
         try {
           fs.rmSync(_tempDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });

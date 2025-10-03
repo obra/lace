@@ -591,12 +591,23 @@ export class ThreadManager {
         (e) => e.id === addedCompactionEvent.id
       );
 
+      // Defensive check: ensure compaction event is in the thread
+      if (compactionIndex === -1) {
+        logger.error('THREADMANAGER: Compaction event not found in updated thread', {
+          threadId,
+          compactionEventId: addedCompactionEvent.id,
+        });
+        throw new Error('Compaction event not found after persistence');
+      }
+
       // Mark all events before the compaction as not visible, EXCEPT:
       // 1. The compacted replacement events we just created
       // 2. Events that are already hidden
+      // Use Set for O(1) lookup instead of O(n) array includes
+      const compactedEventIdSet = new Set(compactedEventIds);
       for (let i = 0; i < compactionIndex; i++) {
         const event = updatedThread.events[i];
-        if (event.id && !compactedEventIds.includes(event.id) && event.visibleToModel !== false) {
+        if (event.id && !compactedEventIdSet.has(event.id) && event.visibleToModel !== false) {
           this._persistence.updateEventVisibility(event.id, false);
           hiddenEventIds.push(event.id);
         }

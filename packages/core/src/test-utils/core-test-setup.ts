@@ -70,7 +70,7 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
           });
         }
       }
-    } catch (error) {
+    } catch {
       // Ignore errors - workspace manager may not exist
     }
 
