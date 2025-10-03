@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupWebTest } from '@/test-utils/web-test-setup';
 
 // CRITICAL: Setup test isolation BEFORE any imports that might initialize persistence
-const _tempLaceDir = setupWebTest();
+const context = setupWebTest();
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
   createTestProviderInstance,
@@ -13,6 +13,8 @@ import {
 } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 import type { ProjectInfo } from '@/types/core';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
@@ -26,7 +28,7 @@ interface ErrorResponse {
 }
 
 describe('Projects API Integration Tests', () => {
-  // _tempLaceDir already set up at module level
+  // context already set up at module level
   let providerInstanceId: string;
 
   beforeEach(async () => {
@@ -56,11 +58,16 @@ describe('Projects API Integration Tests', () => {
       // Create some test projects directly using the real Project class
       const { Project } = await import('~/projects/project');
 
-      const project1 = Project.create('Project 1', '/path/1', 'First project', {
+      const project1Dir = join(context.tempProjectDir, 'project1');
+      const project2Dir = join(context.tempProjectDir, 'project2');
+      await fs.mkdir(project1Dir, { recursive: true });
+      await fs.mkdir(project2Dir, { recursive: true });
+
+      const project1 = Project.create('Project 1', project1Dir, 'First project', {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
       });
-      Project.create('Project 2', '/path/2', 'Second project', {
+      Project.create('Project 2', project2Dir, 'Second project', {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
       });
@@ -90,13 +97,13 @@ describe('Projects API Integration Tests', () => {
 
       expect(proj1).toBeDefined();
       expect(proj1!.sessionCount).toBe(3); // 1 auto-created + 2 explicitly created
-      expect(proj1!.workingDirectory).toBe('/path/1');
+      expect(proj1!.workingDirectory).toBe(project1Dir);
       expect(proj1!.description).toBe('First project');
       expect(proj1!.isArchived).toBe(false);
 
       expect(proj2).toBeDefined();
       expect(proj2!.sessionCount).toBe(1); // Project.create() auto-creates a default session
-      expect(proj2!.workingDirectory).toBe('/path/2');
+      expect(proj2!.workingDirectory).toBe(project2Dir);
       expect(proj2!.description).toBe('Second project');
       expect(proj2!.isArchived).toBe(false);
     });
@@ -114,10 +121,13 @@ describe('Projects API Integration Tests', () => {
 
   describe('POST /api/projects', () => {
     it('should create new project with all fields', async () => {
+      const newProjectDir = join(context.tempProjectDir, 'new-project');
+      await fs.mkdir(newProjectDir, { recursive: true });
+
       const requestBody = {
         name: 'New Project',
         description: 'A new project',
-        workingDirectory: '/new/path',
+        workingDirectory: newProjectDir,
         configuration: { key: 'value' },
       };
 
@@ -133,7 +143,7 @@ describe('Projects API Integration Tests', () => {
       expect(response.status).toBe(201);
       expect(data.name).toBe('New Project');
       expect(data.description).toBe('A new project');
-      expect(data.workingDirectory).toBe('/new/path');
+      expect(data.workingDirectory).toBe(newProjectDir);
       expect(data.isArchived).toBe(false);
       expect(data.sessionCount).toBe(1); // Project.create() auto-creates a default session
       expect(data.id).toBeDefined();
@@ -145,14 +155,17 @@ describe('Projects API Integration Tests', () => {
       const createdProject = Project.getById(data.id);
       expect(createdProject).not.toBeNull();
       expect(createdProject!.getName()).toBe('New Project');
-      expect(createdProject!.getWorkingDirectory()).toBe('/new/path');
+      expect(createdProject!.getWorkingDirectory()).toBe(newProjectDir);
       expect(createdProject!.getConfiguration()).toEqual({ key: 'value' });
     });
 
     it('should create project with minimal required fields', async () => {
+      const minimalDir = join(context.tempProjectDir, 'minimal-project');
+      await fs.mkdir(minimalDir, { recursive: true });
+
       const requestBody = {
         name: 'Minimal Project',
-        workingDirectory: '/minimal/path',
+        workingDirectory: minimalDir,
       };
 
       const request = new Request('http://localhost/api/projects', {
@@ -167,7 +180,7 @@ describe('Projects API Integration Tests', () => {
       expect(response.status).toBe(201);
       expect(data.name).toBe('Minimal Project');
       expect(data.description).toBe('');
-      expect(data.workingDirectory).toBe('/minimal/path');
+      expect(data.workingDirectory).toBe(minimalDir);
       expect(data.id).toBeDefined();
 
       // Verify the project was actually created in the database
@@ -198,9 +211,12 @@ describe('Projects API Integration Tests', () => {
     });
 
     it('should auto-generate name from directory when name is empty', async () => {
+      const awesomeDir = join(context.tempProjectDir, 'my-awesome-project');
+      await fs.mkdir(awesomeDir, { recursive: true });
+
       const requestBody = {
         name: '',
-        workingDirectory: '/test/my-awesome-project',
+        workingDirectory: awesomeDir,
       };
 
       const request = new Request('http://localhost/api/projects', {
@@ -214,7 +230,7 @@ describe('Projects API Integration Tests', () => {
 
       expect(response.status).toBe(201);
       expect(data.name).toBe('my-awesome-project');
-      expect(data.workingDirectory).toBe('/test/my-awesome-project');
+      expect(data.workingDirectory).toBe(awesomeDir);
     });
 
     it('should validate empty working directory', async () => {
@@ -252,9 +268,12 @@ describe('Projects API Integration Tests', () => {
     });
 
     it('should handle duplicate project names', async () => {
+      const duplicateDir = join(context.tempProjectDir, 'duplicate-project');
+      await fs.mkdir(duplicateDir, { recursive: true });
+
       const requestBody = {
         name: 'Duplicate Project',
-        workingDirectory: '/duplicate/path',
+        workingDirectory: duplicateDir,
       };
 
       const request1 = new Request('http://localhost/api/projects', {

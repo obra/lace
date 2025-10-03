@@ -7,6 +7,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupWebTest } from '@/test-utils/web-test-setup';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
@@ -43,7 +45,7 @@ interface ErrorResponse {
 // Note: parseResponse is imported from @/lib/serialization
 
 describe('Agent Spawning API E2E Tests', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let sessionService: SessionService;
   let testProject: Project;
   let sessionId: string;
@@ -75,9 +77,11 @@ describe('Agent Spawning API E2E Tests', () => {
     });
 
     // Create real project and session using the session service
+    const testDir = join(context.tempProjectDir, 'agent-spawning');
+    await fs.mkdir(testDir, { recursive: true });
     testProject = Project.create(
       'Agent Spawning E2E Test Project',
-      '/test/path',
+      testDir,
       'Test project for agent spawning E2E testing',
       {
         providerInstanceId: anthropicInstanceId,

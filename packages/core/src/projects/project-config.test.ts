@@ -2,6 +2,8 @@
 // ABOUTME: Tests configuration inheritance from project to session level
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 import { Project } from '~/projects/project';
 import { Session } from '~/sessions/session';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
@@ -14,7 +16,8 @@ import {
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
 describe('Project configuration', () => {
-  const _tempLaceDir = setupCoreTest();
+  const context = setupCoreTest();
+  let tempProjectDir: string;
   let project: Project;
   let projectId: string;
   let providerInstanceId: string;
@@ -30,7 +33,11 @@ describe('Project configuration', () => {
       apiKey: 'test-anthropic-key',
     });
 
-    project = Project.create('Test Project', '/project/path', 'A test project', {
+    // Create temp project directory
+    tempProjectDir = join(context.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
+    project = Project.create('Test Project', tempProjectDir, 'A test project', {
       providerInstanceId,
       modelId: 'claude-3-5-sonnet-20241022',
       maxTokens: 4000,

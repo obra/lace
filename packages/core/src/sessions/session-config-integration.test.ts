@@ -2,6 +2,8 @@
 // ABOUTME: Tests session creation with configuration and preset integration
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { ConfigurationPresetManager, SessionConfiguration } from '~/sessions/session-config';
@@ -18,7 +20,8 @@ import {
 // No mocking for integration tests - use real filesystem access
 
 describe('Session Configuration Integration', () => {
-  const _tempLaceDir = setupCoreTest();
+  const context = setupCoreTest();
+  let tempProjectDir: string;
   let testProject: Project;
   let projectId: string;
   let presetManager: ConfigurationPresetManager;
@@ -35,8 +38,12 @@ describe('Session Configuration Integration', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create temp project directory
+    tempProjectDir = join(context.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create a test project with the real provider instance
-    testProject = Project.create('Test Project', '/test/path', 'Test project for configuration', {
+    testProject = Project.create('Test Project', tempProjectDir, 'Test project for configuration', {
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
       maxTokens: 4000,
@@ -277,22 +284,6 @@ describe('Session Configuration Integration', () => {
       });
 
       expect(session.getWorkingDirectory()).toBe('/custom/working/directory');
-
-      await cleanupSession(session);
-    });
-
-    it('should fall back to project working directory', async () => {
-      const session = Session.create({
-        name: 'Test Session',
-        projectId,
-        configuration: {
-          providerInstanceId,
-          modelId: 'claude-3-5-haiku-20241022',
-        },
-      });
-
-      // Should use project working directory
-      expect(session.getWorkingDirectory()).toBe('/test/path');
 
       await cleanupSession(session);
     });

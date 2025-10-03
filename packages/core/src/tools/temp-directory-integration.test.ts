@@ -8,7 +8,7 @@ import { Session } from '~/sessions/session';
 import { Tool } from '~/tools/tool';
 import { ToolExecutor } from '~/tools/executor';
 import { z } from 'zod';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 import { writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import type { ToolContext, ToolResult } from '~/tools/types';
@@ -47,6 +47,7 @@ class IntegrationTestTool extends Tool {
 
 describe('Temp Directory Integration', () => {
   const tempLaceDirContext = setupCoreTest();
+  let tempProjectDir: string;
   let toolExecutor: ToolExecutor;
   let integrationTool: IntegrationTestTool;
   let session: Session;
@@ -64,10 +65,14 @@ describe('Temp Directory Integration', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create a separate project directory
+    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create real project and session
     project = Project.create(
       'Integration Test Project',
-      tempLaceDirContext.tempDir,
+      tempProjectDir,
       'Project for integration testing',
       {
         providerInstanceId,

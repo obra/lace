@@ -22,6 +22,9 @@ import {
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
 import { z } from 'zod';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
+import { waitForEvent, waitForEventCount } from '~/test-utils/event-waiters';
 
 // Test tool that can be configured to fail or succeed
 class ConfigurableTool extends Tool {
@@ -41,7 +44,10 @@ class ConfigurableTool extends Tool {
     args: z.infer<typeof this.schema>,
     _context: ToolContext
   ): Promise<ToolResult> {
-    if (this.shouldFail) {
+    // Check if this specific action should fail (based on action name or global flag)
+    const shouldFailThisCall = this.shouldFail || args.action.includes('fail');
+
+    if (shouldFailThisCall) {
       return Promise.resolve(this.createError('Simulated tool execution failure'));
     }
     return Promise.resolve(this.createResult(`Tool executed: ${args.action}`));
@@ -92,6 +98,7 @@ class MockProviderWithToolCalls extends TestProvider {
 
 describe('Tool Batch Completion Behavior', () => {
   const tempLaceDirContext = setupCoreTest();
+  let tempProjectDir: string;
   let agent: Agent;
   let threadManager: ThreadManager;
   let mockProvider: MockProviderWithToolCalls;
@@ -112,11 +119,15 @@ describe('Tool Batch Completion Behavior', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create a separate project directory
+    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create real project and session for proper context
     project = Project.create(
       'Batch Completion Test Project',
+      tempProjectDir,
       'Project for batch completion testing',
-      tempLaceDirContext.tempDir,
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
@@ -195,14 +206,14 @@ describe('Tool Batch Completion Behavior', () => {
 
     const conversationPromise = agent.sendMessage('Please run the test tool');
 
-    // Wait for approval request
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Wait for approval request to appear in events
+    await waitForEvent(threadManager, agent.threadId, 'TOOL_APPROVAL_REQUEST');
 
     // Approve the tool
     const responseEvent = expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           toolCallId: 'call_fail',
           decision: ApprovalDecision.ALLOW_ONCE,
@@ -215,8 +226,11 @@ describe('Tool Batch Completion Behavior', () => {
     // Wait for conversation to complete
     await conversationPromise;
 
-    // Add delay for async execution
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Wait for tool result event to appear
+    await waitForEvent(threadManager, agent.threadId, 'TOOL_RESULT');
+
+    // Wait for the second AGENT_MESSAGE (conversation continuation after tool failure)
+    await waitForEventCount(threadManager, agent.threadId, 'AGENT_MESSAGE', 2);
 
     const events = threadManager.getEvents(agent.threadId);
 
@@ -248,13 +262,13 @@ describe('Tool Batch Completion Behavior', () => {
     const conversationPromise = agent.sendMessage('Please run the test tool');
 
     // Wait for approval request
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await waitForEvent(threadManager, agent.threadId, 'TOOL_APPROVAL_REQUEST');
 
     // Deny the tool
     const responseEvent = expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           toolCallId: 'call_deny',
           decision: ApprovalDecision.DENY,
@@ -267,8 +281,8 @@ describe('Tool Batch Completion Behavior', () => {
     // Wait for conversation to complete
     await conversationPromise;
 
-    // Add delay for processing
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Wait for tool result (denial creates a result)
+    await waitForEvent(threadManager, agent.threadId, 'TOOL_RESULT');
 
     const events = threadManager.getEvents(agent.threadId);
 
@@ -305,15 +319,14 @@ describe('Tool Batch Completion Behavior', () => {
 
     const conversationPromise = agent.sendMessage('Please run the test tools');
 
-    // Wait for first approval request
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Wait for both approval requests to appear (agent processes tools in batch)
+    await waitForEventCount(threadManager, agent.threadId, 'TOOL_APPROVAL_REQUEST', 2);
 
-    // Approve first tool (will succeed)
-    configurableTool.setShouldFail(false);
+    // Approve first tool (will succeed - action is 'success_test')
     const response1Event = expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           toolCallId: 'call_success',
           decision: ApprovalDecision.ALLOW_ONCE,
@@ -322,15 +335,11 @@ describe('Tool Batch Completion Behavior', () => {
     );
     agent.emit('thread_event_added', { event: response1Event, threadId: agent.threadId });
 
-    // Wait for second approval request
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    // Approve second tool (will fail)
-    configurableTool.setShouldFail(true);
+    // Approve second tool (will fail - action is 'fail_test')
     const response2Event = expectEventAdded(
       threadManager.addEvent({
         type: 'TOOL_APPROVAL_RESPONSE',
-        threadId: agent.threadId,
+        context: { threadId: agent.threadId },
         data: {
           toolCallId: 'call_fail',
           decision: ApprovalDecision.ALLOW_ONCE,
@@ -342,8 +351,11 @@ describe('Tool Batch Completion Behavior', () => {
     // Wait for conversation to complete
     await conversationPromise;
 
-    // Add delay for async execution
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Wait for both tool results to appear
+    await waitForEventCount(threadManager, agent.threadId, 'TOOL_RESULT', 2);
+
+    // Wait for the second AGENT_MESSAGE (conversation continuation after batch completes)
+    await waitForEventCount(threadManager, agent.threadId, 'AGENT_MESSAGE', 2);
 
     const events = threadManager.getEvents(agent.threadId);
     const toolResults = events.filter((e) => e.type === 'TOOL_RESULT');

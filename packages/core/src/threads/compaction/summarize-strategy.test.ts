@@ -9,11 +9,15 @@ import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import type { LaceEvent } from '~/threads/types';
-import type { CompactionContext, CompactionData } from '~/threads/compaction/types';
+import type {
+  CompactionContext,
+  CompactionData,
+  CompactionResult,
+} from '~/threads/compaction/types';
 
 // Helper to cast result data to CompactionData
-function getCompactionData(result: LaceEvent): CompactionData {
-  return result.data as CompactionData;
+function getCompactionData(result: CompactionResult): CompactionData {
+  return result.compactionEvent.data as CompactionData;
 }
 
 // Mock provider for testing summarization
@@ -133,21 +137,26 @@ describe('SummarizeCompactionStrategy', () => {
 
     const result = await strategy.compact(events, context);
 
-    expect(result.type).toBe('COMPACTION');
-    expect(result.context?.threadId).toBe(context.threadId);
+    expect(result.compactionEvent.type).toBe('COMPACTION');
+    expect(result.compactionEvent.context?.threadId).toBe(context.threadId);
 
     const compactionData = getCompactionData(result);
     expect(compactionData.strategyId).toBe('summarize');
     expect(compactionData.originalEventCount).toBe(3);
-    expect(compactionData.compactedEvents).toHaveLength(1); // Only user message (non-user events were summarized)
+    expect(result.compactedEvents).toHaveLength(2); // Summary event + user message
 
-    // Summary should be in metadata, not as a separate event
+    // Summary should be in metadata
     expect(compactionData.metadata?.summary).toContain(
       'Summary of conversation about writing functions'
     );
 
+    // First event should be the summary as a USER_MESSAGE
+    const summaryEvent = result.compactedEvents[0];
+    expect(summaryEvent.type).toBe('USER_MESSAGE');
+    expect(summaryEvent.data).toContain('[Earlier in our conversation:');
+
     // Should preserve the user message
-    const userEvent = compactionData.compactedEvents[0];
+    const userEvent = result.compactedEvents[1];
     expect(userEvent.type).toBe('USER_MESSAGE');
     expect(userEvent.data).toBe('Help me write a function to calculate fibonacci numbers');
   });
@@ -203,19 +212,24 @@ describe('SummarizeCompactionStrategy', () => {
     const result = await strategy.compact(events, context);
     const compactionData = getCompactionData(result);
 
-    expect(compactionData.compactedEvents).toHaveLength(3); // 1 user + 2 recent agent
+    expect(result.compactedEvents).toHaveLength(4); // 1 summary + 1 user + 2 recent agent
 
     // Summary should be in metadata
     expect(compactionData.metadata?.summary).toContain('Summary of conversation');
 
+    // Should have summary event first
+    const summaryEvent = result.compactedEvents[0];
+    expect(summaryEvent.type).toBe('USER_MESSAGE');
+    expect(summaryEvent.data).toContain('[Earlier in our conversation:');
+
     // Should preserve user message
-    const userEvent = compactionData.compactedEvents.find((e) => e.type === 'USER_MESSAGE');
-    expect(userEvent?.data).toBe('Old message 1');
+    const userMessages = result.compactedEvents.filter(
+      (e) => e.type === 'USER_MESSAGE' && !String(e.data).includes('[Earlier in our conversation:')
+    );
+    expect(userMessages[0]?.data).toBe('Old message 1');
 
     // Should preserve recent agent events
-    const preservedAgentEvents = compactionData.compactedEvents.filter(
-      (e) => e.type === 'AGENT_MESSAGE'
-    );
+    const preservedAgentEvents = result.compactedEvents.filter((e) => e.type === 'AGENT_MESSAGE');
     expect(preservedAgentEvents).toHaveLength(2);
     expect((preservedAgentEvents[0].data as { content: string }).content).toBe('Recent response 1');
     expect((preservedAgentEvents[1].data as { content: string }).content).toBe('Recent response 2');
@@ -257,16 +271,20 @@ describe('SummarizeCompactionStrategy', () => {
 
     // Should preserve user message and summarize tool interactions
     const compactionData = getCompactionData(result);
-    expect(compactionData.compactedEvents).toHaveLength(1); // only user message (tool events were summarized)
+    expect(result.compactedEvents).toHaveLength(2); // summary event + user message
 
     // Summary should be in metadata
     expect(compactionData.metadata?.summary).toContain(
       'Summary of conversation about writing functions'
     );
 
+    // First should be summary event
+    expect(result.compactedEvents[0].type).toBe('USER_MESSAGE');
+    expect(result.compactedEvents[0].data).toContain('[Earlier in our conversation:');
+
     // Should preserve user message
-    expect(compactionData.compactedEvents[0].type).toBe('USER_MESSAGE');
-    expect(compactionData.compactedEvents[0].data).toBe('Create a file');
+    expect(result.compactedEvents[1].type).toBe('USER_MESSAGE');
+    expect(result.compactedEvents[1].data).toBe('Create a file');
   });
 
   it('should throw error when no agent or provider available', async () => {
@@ -294,7 +312,7 @@ describe('SummarizeCompactionStrategy', () => {
     const compactionData = getCompactionData(result);
 
     expect(compactionData.originalEventCount).toBe(0);
-    expect(compactionData.compactedEvents).toHaveLength(0);
+    expect(result.compactedEvents).toHaveLength(0);
     expect(compactionData.metadata?.summary).toBeUndefined();
   });
 
@@ -322,9 +340,11 @@ describe('SummarizeCompactionStrategy', () => {
     const result = await strategy.compact(events, providerContext);
     const compactionData = getCompactionData(result);
 
-    // Should have only user message (agent message was summarized)
-    expect(compactionData.compactedEvents).toHaveLength(1);
-    expect(compactionData.compactedEvents[0].type).toBe('USER_MESSAGE');
+    // Should have summary event + user message
+    expect(result.compactedEvents).toHaveLength(2);
+    expect(result.compactedEvents[0].type).toBe('USER_MESSAGE');
+    expect(result.compactedEvents[0].data).toContain('[Earlier in our conversation:');
+    expect(result.compactedEvents[1].type).toBe('USER_MESSAGE');
     expect(compactionData.metadata?.summary).toContain('Summary of conversation');
   });
 
@@ -362,7 +382,7 @@ describe('SummarizeCompactionStrategy', () => {
 
     // Should only process the USER_MESSAGE and AGENT_MESSAGE, skip the COMPACTION event
     expect(compactionData.originalEventCount).toBe(3);
-    expect(compactionData.compactedEvents).toHaveLength(1); // only user message (agent message was summarized)
+    expect(result.compactedEvents).toHaveLength(2); // summary event + user message
     expect(compactionData.metadata?.summary).toContain('Summary of conversation');
   });
 });

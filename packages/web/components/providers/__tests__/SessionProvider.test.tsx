@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { SessionProvider, useSessionContext } from '@/components/providers/SessionProvider';
 import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
@@ -199,9 +199,11 @@ describe('SessionProvider', () => {
     });
 
     it('provides null found agent when no session details', () => {
-      mockUseAgentManagement.mockReturnValue({
-        ...defaultAgentManagement,
-        sessionDetails: null,
+      act(() => {
+        mockUseAgentManagement.mockReturnValue({
+          ...defaultAgentManagement,
+          sessionDetails: null,
+        });
       });
 
       render(
@@ -370,9 +372,11 @@ describe('SessionProvider', () => {
 
   describe('Loading States', () => {
     it('reflects loading state from useAgentManagement', () => {
-      mockUseAgentManagement.mockReturnValue({
-        ...defaultAgentManagement,
-        loading: true,
+      act(() => {
+        mockUseAgentManagement.mockReturnValue({
+          ...defaultAgentManagement,
+          loading: true,
+        });
       });
 
       render(
@@ -385,9 +389,11 @@ describe('SessionProvider', () => {
     });
 
     it('handles empty agents list', () => {
-      mockUseAgentManagement.mockReturnValue({
-        ...defaultAgentManagement,
-        sessionDetails: createMockSession({ agents: [] }),
+      act(() => {
+        mockUseAgentManagement.mockReturnValue({
+          ...defaultAgentManagement,
+          sessionDetails: createMockSession({ agents: [] }),
+        });
       });
 
       render(
@@ -435,9 +441,11 @@ describe('SessionProvider', () => {
         agents: incompleteAgents,
       });
 
-      mockUseAgentManagement.mockReturnValue({
-        ...defaultAgentManagement,
-        sessionDetails: sessionWithIncompleteAgents,
+      act(() => {
+        mockUseAgentManagement.mockReturnValue({
+          ...defaultAgentManagement,
+          sessionDetails: sessionWithIncompleteAgents,
+        });
       });
 
       render(
@@ -455,9 +463,11 @@ describe('SessionProvider', () => {
         agents: undefined,
       });
 
-      mockUseAgentManagement.mockReturnValue({
-        ...defaultAgentManagement,
-        sessionDetails: sessionWithoutAgents,
+      act(() => {
+        mockUseAgentManagement.mockReturnValue({
+          ...defaultAgentManagement,
+          sessionDetails: sessionWithoutAgents,
+        });
       });
 
       render(

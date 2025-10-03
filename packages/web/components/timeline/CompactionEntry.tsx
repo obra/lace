@@ -49,7 +49,7 @@ export function CompactionEntry({ data, timestamp }: CompactionEntryProps) {
                     <strong className="text-base-content">{String(data.originalEventCount)}</strong>{' '}
                     →{' '}
                     <strong className="text-base-content">
-                      {String(data.compactedEvents.length)}
+                      {String(data.compactedEventCount)}
                     </strong>{' '}
                     events
                   </span>

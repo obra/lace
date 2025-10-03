@@ -2,10 +2,10 @@
 // ABOUTME: Uses git clone --local for space-efficient clones with hardlinks
 
 import { existsSync, mkdirSync, readdirSync, rmSync } from 'fs';
-import { join } from 'path';
+import { join, resolve, normalize } from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { homedir } from 'os';
+import { homedir, tmpdir } from 'os';
 import { logger } from '~/utils/logger';
 
 const execFileAsync = promisify(execFile);
@@ -23,6 +23,14 @@ export class CloneManager {
    * Auto-initializes git if not already a repository
    */
   static async createSessionClone(projectDir: string, sessionId: string): Promise<string> {
+    // Validate projectDir is not empty
+    if (!projectDir || projectDir.trim() === '') {
+      throw new Error(
+        `projectDir cannot be empty - this would cause git init in cwd (${process.cwd()}). ` +
+          'In tests, this usually means tempDir was accessed before beforeEach ran.'
+      );
+    }
+
     // Validate project directory exists
     if (!existsSync(projectDir)) {
       throw new Error('Project directory does not exist');
@@ -31,7 +39,33 @@ export class CloneManager {
     // Check if it's a git repository, initialize if not
     const gitDir = join(projectDir, '.git');
     if (!existsSync(gitDir)) {
-      logger.info('Project is not a git repository, initializing git', { projectDir });
+      // In tests, validate we're not about to git init in source directories
+      if (process.env.NODE_ENV === 'test') {
+        // Use platform-aware temp directory check
+        const normalizedProjectDir = normalize(resolve(projectDir));
+        const normalizedTmpDir = normalize(resolve(tmpdir()));
+
+        if (!normalizedProjectDir.startsWith(normalizedTmpDir)) {
+          const stack = new Error().stack;
+          logger.error('🚨 WOULD GIT INIT IN NON-TEMP DIR (CloneManager)', {
+            projectDir,
+            normalizedProjectDir,
+            normalizedTmpDir,
+            cwd: process.cwd(),
+            stack,
+          });
+          throw new Error(
+            `Refusing to git init in non-temp directory during tests! ` +
+              `projectDir: ${projectDir}, cwd: ${process.cwd()}. ` +
+              'This usually means a test passed the wrong directory path.'
+          );
+        }
+      }
+
+      logger.warn('CloneManager: Project is not a git repository, initializing git', {
+        projectDir,
+        cwd: process.cwd(),
+      });
 
       // Initialize git repository
       try {

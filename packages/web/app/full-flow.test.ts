@@ -29,9 +29,11 @@ import { getSessionService } from '@/lib/server/session-service';
 
 // Use real EventStreamManager for integration testing
 import { EventStreamManager } from '@/lib/event-stream-manager';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 describe('Full Conversation Flow', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let addConnectionSpy: ReturnType<typeof vi.spyOn>;
   let broadcastSpy: ReturnType<typeof vi.spyOn>;
@@ -92,15 +94,13 @@ describe('Full Conversation Flow', () => {
     const sessionName = 'Test Conversation';
 
     // Create a real project for the test
-    const project = Project.create(
-      'Test Project',
-      '/test/path',
-      'Test project for integration test',
-      {
-        providerInstanceId: anthropicInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      }
-    );
+    const testDir = join(context.tempProjectDir, 'full-flow-test');
+    await fs.mkdir(testDir, { recursive: true });
+
+    const project = Project.create('Test Project', testDir, 'Test project for integration test', {
+      providerInstanceId: anthropicInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
     const projectId = project.getId();
 
     const createSessionRequest = new Request(
@@ -189,9 +189,12 @@ describe('Full Conversation Flow', () => {
 
   it('should handle multi-agent scenario', async () => {
     // Create a real project for the test
+    const testDir = join(context.tempProjectDir, 'multi-agent-test');
+    await fs.mkdir(testDir, { recursive: true });
+
     const project = Project.create(
       'Multi-Agent Project',
-      '/test/path',
+      testDir,
       'Test project for multi-agent test',
       {
         providerInstanceId: anthropicInstanceId,
@@ -269,9 +272,14 @@ describe('Full Conversation Flow', () => {
 
   it('should isolate events between sessions', async () => {
     // Create real projects for the test
+    const project1Dir = join(context.tempProjectDir, 'session1-project');
+    const project2Dir = join(context.tempProjectDir, 'session2-project');
+    await fs.mkdir(project1Dir, { recursive: true });
+    await fs.mkdir(project2Dir, { recursive: true });
+
     const project1 = Project.create(
       'Session 1 Project',
-      '/test/path1',
+      project1Dir,
       'Test project for session 1',
       {
         providerInstanceId: anthropicInstanceId,
@@ -280,7 +288,7 @@ describe('Full Conversation Flow', () => {
     );
     const project2 = Project.create(
       'Session 2 Project',
-      '/test/path2',
+      project2Dir,
       'Test project for session 2',
       {
         providerInstanceId: anthropicInstanceId,

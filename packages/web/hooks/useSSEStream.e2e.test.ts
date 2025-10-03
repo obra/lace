@@ -17,6 +17,8 @@ import { Project } from '@/lib/server/lace-imports';
 import type { SessionInfo } from '@/types/core';
 import { parseResponse } from '@/lib/serialization';
 import { setupWebTest } from '@/test-utils/web-test-setup';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
   createTestProviderInstance,
@@ -24,7 +26,7 @@ import {
 } from '@/lib/server/lace-imports';
 
 describe('SSE Stream E2E Tests', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let sessionId: string;
   let projectId: string;
@@ -48,9 +50,11 @@ describe('SSE Stream E2E Tests', () => {
     sessionService = getSessionService();
 
     // Create a real project and session for testing
+    const testDir = join(context.tempProjectDir, 'sse-stream');
+    await fs.mkdir(testDir, { recursive: true });
     const testProject = Project.create(
       'SSE E2E Test Project',
-      '/test/path',
+      testDir,
       'Test project for SSE E2E testing',
       {
         providerInstanceId,

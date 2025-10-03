@@ -36,6 +36,7 @@ import type { TaskManagerEvent } from '~/utils/task-notifications';
 import { routeTaskNotifications } from '~/utils/task-notifications';
 import {
   WorkspaceManagerFactory,
+  DEFAULT_WORKSPACE_MODE,
   type IWorkspaceManager,
   type WorkspaceMode,
 } from '~/workspace/workspace-manager';
@@ -139,9 +140,8 @@ export class Session {
     );
 
     // Get singleton workspace manager based on configuration
-    // Default to 'container' on macOS, 'worktree' on other platforms
-    const defaultMode = process.platform === 'darwin' ? 'container' : 'worktree';
-    const workspaceMode = (effectiveConfig.workspaceMode as WorkspaceMode) || defaultMode;
+    const workspaceMode =
+      (effectiveConfig.workspaceMode as WorkspaceMode) || DEFAULT_WORKSPACE_MODE;
     const workspaceManager = WorkspaceManagerFactory.get(workspaceMode);
 
     // Get project to access working directory
@@ -262,9 +262,10 @@ export class Session {
     );
 
     // Start workspace creation in background (don't await)
+    const projectWorkingDir = project.getWorkingDirectory();
     session._workspaceInitPromise = session.initializeWorkspace(
       workspaceManager,
-      project.getWorkingDirectory(),
+      projectWorkingDir,
       sessionData.id
     );
 
@@ -439,11 +440,8 @@ export class Session {
     logger.debug(`Creating session for ${sessionId}`);
 
     // Get singleton workspace manager for loaded session
-    const { WorkspaceManagerFactory } = await import('~/workspace/workspace-manager');
-    // Default to 'container' on macOS, 'worktree' on other platforms
-    const defaultMode = process.platform === 'darwin' ? 'container' : 'worktree';
     const workspaceMode =
-      (sessionConfig.workspaceMode as 'container' | 'worktree' | 'local') || defaultMode;
+      (sessionConfig.workspaceMode as 'container' | 'worktree' | 'local') || DEFAULT_WORKSPACE_MODE;
     const workspaceManager = WorkspaceManagerFactory.get(workspaceMode);
 
     // Create session instance, passing the TaskManager we already created
@@ -845,7 +843,10 @@ export class Session {
       }
     }
 
-    return process.cwd();
+    // NEVER fall back to process.cwd() - it can cause git init in source directories
+    throw new Error(
+      `Cannot determine working directory for session ${this._sessionId}: no workspace, project, or configuration found`
+    );
   }
 
   getPermissionOverrideMode(): PermissionOverrideMode {

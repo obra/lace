@@ -13,6 +13,8 @@ import {
 } from '@/lib/server/lace-imports';
 import { parseResponse } from '@/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 // Type interfaces for API responses
 interface ConfigurationResponse {
@@ -35,7 +37,7 @@ interface ErrorResponse {
 }
 
 describe('Session Configuration API', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let testProject: ReturnType<typeof Project.create>;
   let sessionId: string;
@@ -58,7 +60,10 @@ describe('Session Configuration API', () => {
     });
 
     // Create a real project and session for testing
-    testProject = Project.create('Test Project', '/test/path', 'Test project', {
+    const testDir = join(context.tempProjectDir, 'config-test');
+    await fs.mkdir(testDir, { recursive: true });
+
+    testProject = Project.create('Test Project', testDir, 'Test project', {
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
       maxTokens: 4000,
@@ -228,7 +233,7 @@ describe('Session Configuration API', () => {
 });
 
 describe('TDD: Direct Session Usage', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let testSessionId: string;
   let tddProviderInstanceId: string;
@@ -249,7 +254,10 @@ describe('TDD: Direct Session Usage', () => {
     });
 
     // Create a real session to test with
-    const testProject = Project.create('TDD Test Project', '/test/path', 'Test project', {
+    const testDir = join(context.tempProjectDir, 'config-tdd-test');
+    await fs.mkdir(testDir, { recursive: true });
+
+    const testProject = Project.create('TDD Test Project', testDir, 'Test project', {
       providerInstanceId: tddProviderInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });
@@ -281,7 +289,7 @@ describe('TDD: Direct Session Usage', () => {
 });
 
 describe('TDD: Direct Session Configuration Update', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let testSessionId: string;
   let updateProviderInstanceId: string;
@@ -302,7 +310,10 @@ describe('TDD: Direct Session Configuration Update', () => {
     });
 
     // Create a real session to test with
-    const testProject = Project.create('TDD Update Test Project', '/test/path', 'Test project', {
+    const testDir = join(context.tempProjectDir, 'config-update-test');
+    await fs.mkdir(testDir, { recursive: true });
+
+    const testProject = Project.create('TDD Update Test Project', testDir, 'Test project', {
       providerInstanceId: updateProviderInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });

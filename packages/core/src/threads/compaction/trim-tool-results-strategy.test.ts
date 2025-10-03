@@ -36,11 +36,12 @@ describe('TrimToolResultsStrategy', () => {
 
       const result = await strategy.compact(events, mockContext);
 
-      expect(result.type).toBe('COMPACTION');
-      const compactionData = result.data as unknown as CompactionData;
-      expect(compactionData.compactedEvents).toEqual(events);
+      expect(result.compactionEvent.type).toBe('COMPACTION');
+      expect(result.compactedEvents).toEqual(events);
+      const compactionData = result.compactionEvent.data as unknown as CompactionData;
       expect(compactionData.strategyId).toBe('trim-tool-results');
       expect(compactionData.originalEventCount).toBe(2);
+      expect(compactionData.compactedEventCount).toBe(2);
     });
 
     it('truncates string tool results longer than 3 lines', async () => {
@@ -61,8 +62,8 @@ describe('TrimToolResultsStrategy', () => {
 
       const result = await strategy.compact(events, mockContext);
 
-      const compactionData = result.data as unknown as CompactionData;
-      const compactedResult = compactionData.compactedEvents[0].data as {
+      expect(result.compactedEvents).toHaveLength(1);
+      const compactedResult = result.compactedEvents[0].data as {
         content: Array<{ type: string; text: string }>;
       };
       expect(compactedResult.content[0].text).toBe(
@@ -88,8 +89,8 @@ describe('TrimToolResultsStrategy', () => {
 
       const result = await strategy.compact(events, mockContext);
 
-      const compactionData = result.data as unknown as CompactionData;
-      const compactedResult = compactionData.compactedEvents[0].data as {
+      expect(result.compactedEvents).toHaveLength(1);
+      const compactedResult = result.compactedEvents[0].data as {
         content: Array<{ type: string; text: string }>;
       };
       expect(compactedResult.content[0].text).toBe(shortResult);
@@ -119,8 +120,8 @@ describe('TrimToolResultsStrategy', () => {
 
       const result = await strategy.compact(events, mockContext);
 
-      const compactionData = result.data as unknown as CompactionData;
-      const compactedData = compactionData.compactedEvents[0].data as unknown as typeof toolResult;
+      expect(result.compactedEvents).toHaveLength(1);
+      const compactedData = result.compactedEvents[0].data as unknown as typeof toolResult;
       expect(compactedData.content[0].text).toBe(
         'line1\nline2\nline3\n[results truncated to save space.]'
       );
@@ -152,12 +153,13 @@ describe('TrimToolResultsStrategy', () => {
 
       const result = await strategy.compact(events, mockContext);
 
-      const compactionData = result.data as unknown as CompactionData;
+      const compactionData = result.compactionEvent.data as unknown as CompactionData;
       expect(compactionData.metadata).toEqual({
         toolResultsModified: 1,
         maxLines: 3,
         truncationMessage: '[results truncated to save space.]',
       });
+      expect(result.compactedEvents).toHaveLength(2);
     });
 
     it('handles mixed content types in ToolResult', async () => {
@@ -187,8 +189,8 @@ describe('TrimToolResultsStrategy', () => {
 
       const result = await strategy.compact(events, mockContext);
 
-      const compactionData = result.data as unknown as CompactionData;
-      const compactedData = compactionData.compactedEvents[0].data as unknown as typeof toolResult;
+      expect(result.compactedEvents).toHaveLength(1);
+      const compactedData = result.compactedEvents[0].data as unknown as typeof toolResult;
       expect(compactedData.content[0].text).toBe(
         'line1\nline2\nline3\n[results truncated to save space.]'
       );
@@ -217,8 +219,8 @@ describe('TrimToolResultsStrategy', () => {
 
       const result = await strategy.compact(events, mockContext);
 
-      const compactionData = result.data as unknown as CompactionData;
-      expect(compactionData.compactedEvents[0].data).toEqual(toolResult);
+      expect(result.compactedEvents).toHaveLength(1);
+      expect(result.compactedEvents[0].data).toEqual(toolResult);
     });
 
     it('generates unique event IDs', async () => {
@@ -235,7 +237,7 @@ describe('TrimToolResultsStrategy', () => {
       const result1 = await strategy.compact(events, mockContext);
       const result2 = await strategy.compact(events, mockContext);
 
-      expect(result1.id).not.toBe(result2.id);
+      expect(result1.compactionEvent.id).not.toBe(result2.compactionEvent.id);
     });
   });
 });

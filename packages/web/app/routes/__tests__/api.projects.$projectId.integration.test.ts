@@ -16,6 +16,8 @@ import { parseResponse } from '@/lib/serialization';
 import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 import { Session } from '@/lib/server/lace-imports';
 import type { ProjectInfo } from '@/types/core';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 interface ErrorResponse {
   error: string;
@@ -27,8 +29,9 @@ interface SuccessResponse {
 }
 
 describe('Individual Project API Integration Tests', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let testProject: import('@/lib/server/lace-imports').Project;
+  let testProjectDir: string;
   let anthropicInstanceId: string;
   let openaiInstanceId: string;
 
@@ -48,9 +51,13 @@ describe('Individual Project API Integration Tests', () => {
       apiKey: 'test-openai-key',
     });
 
+    // Create temp directory for test project
+    testProjectDir = join(context.tempProjectDir, 'project-id-test');
+    await fs.mkdir(testProjectDir, { recursive: true });
+
     // Create a test project for each test
     const { Project } = await import('@/lib/server/lace-imports');
-    testProject = Project.create('Test Project', '/test/path', 'A test project', {
+    testProject = Project.create('Test Project', testProjectDir, 'A test project', {
       providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });
@@ -72,7 +79,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.id).toBe(testProject.getId());
       expect(data.name).toBe('Test Project');
       expect(data.description).toBe('A test project');
-      expect(data.workingDirectory).toBe('/test/path');
+      expect(data.workingDirectory).toBe(testProjectDir);
       expect(data.isArchived).toBe(false);
       expect(data.sessionCount).toBe(1); // Project.create() auto-creates a default session
       expect(data.createdAt).toBeDefined();
@@ -124,7 +131,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(response.status).toBe(200);
       expect(data.name).toBe('Updated Project Name');
       expect(data.description).toBe('A test project'); // Should remain unchanged
-      expect(data.workingDirectory).toBe('/test/path'); // Should remain unchanged
+      expect(data.workingDirectory).toBe(testProjectDir); // Should remain unchanged
 
       // Verify the update was persisted
       const { Project } = await import('@/lib/server/lace-imports');
@@ -154,7 +161,10 @@ describe('Individual Project API Integration Tests', () => {
     });
 
     it('should update working directory', async () => {
-      const updateData = { workingDirectory: '/updated/path' };
+      const updatedDir = join(context.tempProjectDir, 'updated-path');
+      await fs.mkdir(updatedDir, { recursive: true });
+
+      const updateData = { workingDirectory: updatedDir };
       const request = new Request(`http://localhost/api/projects/${testProject.getId()}`, {
         method: 'PATCH',
         body: JSON.stringify(updateData),
@@ -165,12 +175,12 @@ describe('Individual Project API Integration Tests', () => {
       const data = await parseResponse<ProjectInfo>(response);
 
       expect(response.status).toBe(200);
-      expect(data.workingDirectory).toBe('/updated/path');
+      expect(data.workingDirectory).toBe(updatedDir);
 
       // Verify the update was persisted
       const { Project } = await import('@/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
-      expect(updatedProject!.getWorkingDirectory()).toBe('/updated/path');
+      expect(updatedProject!.getWorkingDirectory()).toBe(updatedDir);
     });
 
     it('should update configuration', async () => {
@@ -236,10 +246,13 @@ describe('Individual Project API Integration Tests', () => {
     });
 
     it('should update multiple fields at once', async () => {
+      const multiDir = join(context.tempProjectDir, 'multi-path');
+      await fs.mkdir(multiDir, { recursive: true });
+
       const updateData = {
         name: 'Multi-Update Project',
         description: 'Multiple fields updated',
-        workingDirectory: '/multi/path',
+        workingDirectory: multiDir,
         isArchived: true,
         configuration: { multi: 'update' },
       };
@@ -256,7 +269,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(response.status).toBe(200);
       expect(data.name).toBe('Multi-Update Project');
       expect(data.description).toBe('Multiple fields updated');
-      expect(data.workingDirectory).toBe('/multi/path');
+      expect(data.workingDirectory).toBe(multiDir);
       expect(data.isArchived).toBe(true);
 
       // Verify all updates were persisted
@@ -264,7 +277,7 @@ describe('Individual Project API Integration Tests', () => {
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getName()).toBe('Multi-Update Project');
       expect(updatedProject!.getInfo()!.description).toBe('Multiple fields updated');
-      expect(updatedProject!.getWorkingDirectory()).toBe('/multi/path');
+      expect(updatedProject!.getWorkingDirectory()).toBe(multiDir);
       expect(updatedProject!.getInfo()!.isArchived).toBe(true);
       expect(updatedProject!.getConfiguration()).toEqual({ multi: 'update' });
     });

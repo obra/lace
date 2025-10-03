@@ -21,6 +21,9 @@ import {
 } from '~/test-utils/provider-defaults';
 import type { ProviderResponse, ProviderMessage } from '~/providers/base-provider';
 import type { Tool } from '~/tools/tool';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
+import { waitForEvent, waitForEventMatch } from '~/test-utils/event-waiters';
 
 // Mock provider that can return tool calls once then regular responses
 class MockProviderWithToolCalls extends TestProvider {
@@ -67,6 +70,7 @@ class MockProviderWithToolCalls extends TestProvider {
 
 describe('Tool Approval Race Condition Integration Tests', () => {
   const tempLaceDirContext = setupCoreTest();
+  let tempProjectDir: string;
   let agent: Agent;
   let threadManager: ThreadManager;
   let mockProvider: MockProviderWithToolCalls;
@@ -88,11 +92,15 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create a separate project directory
+    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create real project and session for proper context
     project = Project.create(
       'Race Condition Test Project',
+      tempProjectDir,
       'Project for race condition testing',
-      tempLaceDirContext.tempDir,
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
@@ -179,37 +187,36 @@ describe('Tool Approval Race Condition Integration Tests', () => {
       // Start agent conversation - this creates TOOL_CALL and approval request
       const conversationPromise = agent.sendMessage('Run echo test');
 
-      // Wait for approval request to be created with polling
-      let approvalRequest;
-      let events;
-      for (let i = 0; i < 50; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-        events = threadManager.getEvents(agent.threadId);
-        approvalRequest = events.find((e) => e.type === 'TOOL_APPROVAL_REQUEST');
-        if (approvalRequest) break;
-      }
+      // Wait for approval request to be created
+      const approvalRequest = await waitForEvent(
+        threadManager,
+        agent.threadId,
+        'TOOL_APPROVAL_REQUEST'
+      );
 
       // Verify approval request was created
       expect(approvalRequest).toBeDefined();
 
       // Send multiple concurrent approval responses (simulating rapid clicking)
-      const approvalPromises = Array(10)
-        .fill(null)
-        .map(async (_, index) => {
-          // Slight delay to create more realistic race conditions
-          await new Promise((resolve) => setTimeout(resolve, index * 2));
+      // Note: handleApprovalResponse is synchronous, so to create true concurrency,
+      // we need to call them all without awaiting
+      const approvals = Array(10).fill(null);
 
-          return agent.handleApprovalResponse('tool-counter', ApprovalDecision.ALLOW_ONCE);
-        });
+      // Call all approvals synchronously to create true race condition
+      for (const _entry of approvals) {
+        agent.handleApprovalResponse('tool-counter', ApprovalDecision.ALLOW_ONCE);
+      }
 
-      // Execute all approvals concurrently
-      await Promise.all(approvalPromises);
+      // Wait for TOOL_RESULT event to ensure tool execution completes
+      await waitForEventMatch(
+        threadManager,
+        agent.threadId,
+        (e) => e.type === 'TOOL_RESULT' && e.data.id === 'tool-counter',
+        'TOOL_RESULT with id=tool-counter'
+      );
 
       // Wait for conversation to complete
       await conversationPromise;
-
-      // Add delay to allow all async processing to complete
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // ASSERTIONS: Defense-in-depth should work
 

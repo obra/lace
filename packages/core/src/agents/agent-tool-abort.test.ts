@@ -22,6 +22,9 @@ import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
 } from '~/test-utils/provider-defaults';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
+import { waitForEventCount } from '~/test-utils/event-waiters';
 
 class MockProviderWithTools extends BaseMockProvider {
   private mockToolCalls: ToolCall[];
@@ -59,6 +62,7 @@ class MockProviderWithTools extends BaseMockProvider {
 
 describe('Agent Tool Abort Functionality', () => {
   const tempLaceDir = setupCoreTest();
+  let tempProjectDir: string;
   let agent: Agent;
   let toolExecutor: ToolExecutor;
   let threadManager: ThreadManager;
@@ -80,16 +84,15 @@ describe('Agent Tool Abort Functionality', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create a separate project directory
+    tempProjectDir = join(tempLaceDir.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create project and session for proper context
-    project = Project.create(
-      'Abort Test Project',
-      'Project for abort testing',
-      tempLaceDir.tempDir,
-      {
-        providerInstanceId,
-        modelId: 'claude-3-5-haiku-20241022',
-      }
-    );
+    project = Project.create('Abort Test Project', tempProjectDir, 'Project for abort testing', {
+      providerInstanceId,
+      modelId: 'claude-3-5-haiku-20241022',
+    });
 
     session = Session.create({
       name: 'Abort Test Session',
@@ -310,8 +313,12 @@ describe('Agent Tool Abort Functionality', () => {
     await agent.start();
     const messagePromise = agent.sendMessage('Run slow tool');
 
-    // Wait for tool to start processing
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Wait for TOOL_CALL event to confirm tool execution has started
+    await waitForEventCount(threadManager, threadId, 'TOOL_CALL', 1);
+
+    // Give the tool time to capture progress (MockSlowTool ticks every 100ms)
+    // 200ms = 2 ticks, ensuring we get partial output like "Processing... 6% complete"
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
     // Abort the tool
     const aborted = agent.abort();
@@ -319,10 +326,8 @@ describe('Agent Tool Abort Functionality', () => {
 
     await messagePromise;
 
-    // Wait for result to be set
-    for (let i = 0; i < 50 && !toolResult; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
+    // Wait for TOOL_RESULT event to be written
+    await waitForEventCount(threadManager, threadId, 'TOOL_RESULT', 1);
 
     // Tool should be cancelled
     expect(toolResult).not.toBeNull();
@@ -378,19 +383,20 @@ describe('Agent Tool Abort Functionality', () => {
     await agent.start();
     const messagePromise = agent.sendMessage('Execute mixed speed tools');
 
-    // Wait for fast tool to complete but slow tool still running
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    // Wait for both TOOL_CALL events to confirm tool execution has started
+    await waitForEventCount(threadManager, threadId, 'TOOL_CALL', 2);
 
-    // Abort (fast tool should already be done)
+    // Wait for fast tool to complete (1 TOOL_RESULT event)
+    await waitForEventCount(threadManager, threadId, 'TOOL_RESULT', 1);
+
+    // Abort (fast tool should already be done, slow tool still running)
     const aborted = agent.abort();
     expect(aborted).toBe(true);
 
     await messagePromise;
 
-    // Wait until both results are observed (max ~1s)
-    for (let i = 0; i < 50 && toolResults.size < 2; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
+    // Wait for both TOOL_RESULT events (fast completed + slow aborted)
+    await waitForEventCount(threadManager, threadId, 'TOOL_RESULT', 2);
 
     // Check results
     expect(toolResults.size).toBe(2);
@@ -581,8 +587,8 @@ describe('Agent Tool Abort Functionality', () => {
     await agent.start();
     const messagePromise = agent.sendMessage('Execute tools');
 
-    // Wait for tool execution to start
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Wait for all 3 TOOL_CALL events to confirm tools have started
+    await waitForEventCount(threadManager, threadId, 'TOOL_CALL', 3);
 
     // Verify we're in tool_execution state
     expect(stateChanges).toContain('tool_execution');
@@ -592,8 +598,8 @@ describe('Agent Tool Abort Functionality', () => {
 
     await messagePromise;
 
-    // Wait for state to settle after abort
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Wait for all 3 TOOL_RESULT events (aborted results)
+    await waitForEventCount(threadManager, threadId, 'TOOL_RESULT', 3);
 
     // State should have changed from tool_execution (either to idle or thinking for followup)
     const finalState = stateChanges[stateChanges.length - 1];

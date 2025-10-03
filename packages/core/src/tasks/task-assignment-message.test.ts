@@ -2,6 +2,8 @@
 // ABOUTME: Ensures newly spawned agents receive task notification messages when assigned
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 import { TaskManager } from '~/tasks/task-manager';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
@@ -89,7 +91,8 @@ class MessageCapturingProvider extends BaseMockProvider {
 }
 
 describe('Task Assignment Message Sending', () => {
-  const _tempLaceDir = setupCoreTest();
+  const context = setupCoreTest();
+  let tempProjectDir: string;
   let session: Session;
   let project: Project;
   let mockProvider: MessageCapturingProvider;
@@ -119,10 +122,14 @@ describe('Task Assignment Message Sending', () => {
       '_createProviderInstance'
     ).mockResolvedValue(mockProvider);
 
+    // Create temp project directory
+    tempProjectDir = join(context.tempDir, 'test-task-assignment');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create project and session
     project = Project.create(
       'Test Task Assignment Project',
-      '/tmp/test-task-assignment',
+      tempProjectDir,
       'Test project for task assignment message testing',
       {
         providerInstanceId,

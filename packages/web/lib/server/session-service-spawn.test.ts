@@ -10,6 +10,8 @@ import { getSessionService } from '@/lib/server/session-service';
 import { Project, Session, ThreadManager } from '@/lib/server/lace-imports';
 import type { ThreadId } from '@/types/core';
 import { setupWebTest } from '@/test-utils/web-test-setup';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
   cleanupTestProviderInstances,
@@ -39,7 +41,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 describe('SessionService.spawnAgent Method', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
   let sessionId: string;
   let projectId: string;
@@ -60,7 +62,9 @@ describe('SessionService.spawnAgent Method', () => {
     sessionService = getSessionService();
 
     // Create a test project with provider configuration
-    const project = Project.create('Test Project', '/test/path', 'Test project', {
+    const testDir = join(context.tempProjectDir, 'service-spawn');
+    await fs.mkdir(testDir, { recursive: true });
+    const project = Project.create('Test Project', testDir, 'Test project', {
       providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });

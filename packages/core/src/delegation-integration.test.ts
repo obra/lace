@@ -2,6 +2,8 @@
 // ABOUTME: Tests end-to-end delegation workflow including UI component rendering
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 import { ThreadManager } from '~/threads/thread-manager';
 import { DelegateTool } from '~/tools/implementations/delegate';
 import { logger } from '~/utils/logger';
@@ -84,7 +86,8 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Delegation Integration Tests', () => {
-  const _tempLaceDir = setupCoreTest();
+  const context = setupCoreTest();
+  let tempProjectDir: string;
   let threadManager: ThreadManager;
   let session: Session;
   let project: Project;
@@ -118,11 +121,15 @@ describe('Delegation Integration Tests', () => {
       }
     );
 
+    // Create temp project directory
+    tempProjectDir = join(context.tempDir, 'test-delegation');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Set up test environment using Session/Project pattern for proper tool injection
     threadManager = new ThreadManager();
     project = Project.create(
       'Test Project',
-      '/tmp/test-delegation',
+      tempProjectDir,
       'Test project for delegation integration',
       {
         providerInstanceId,

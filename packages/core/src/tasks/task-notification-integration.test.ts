@@ -2,6 +2,8 @@
 // ABOUTME: Tests actual Session→TaskManager→Agent flow with thread history verification
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { Agent } from '~/agents/agent';
@@ -77,6 +79,7 @@ class ScriptedMockProvider extends TestProvider {
 
 describe('Task Notification System - Real Integration', () => {
   const setup = setupCoreTest();
+  let tempProjectDir: string;
   let project: Project;
   let mainSession: Session;
   let providerInstanceId: string;
@@ -91,6 +94,10 @@ describe('Task Notification System - Real Integration', () => {
       displayName: 'Test Notification Instance',
       apiKey: 'test-anthropic-key',
     });
+
+    // Create temp project directory
+    tempProjectDir = join(setup.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
 
     // Use scripted test provider for agent responses
     const testProvider = new ScriptedMockProvider({
@@ -128,7 +135,7 @@ describe('Task Notification System - Real Integration', () => {
     // Create project
     project = Project.create(
       'Notification Test Project',
-      setup.tempDir,
+      tempProjectDir,
       'Test project for notification integration',
       {
         providerInstanceId,
@@ -506,9 +513,15 @@ describe('Task Notification System - Real Integration', () => {
   });
 
   it('should handle concurrent sessions with isolated notification routing', async () => {
+    // Create two temp project directories
+    const tempProjectDir1 = join(setup.tempDir, 'test-project-1');
+    const tempProjectDir2 = join(setup.tempDir, 'test-project-2');
+    mkdirSync(tempProjectDir1, { recursive: true });
+    mkdirSync(tempProjectDir2, { recursive: true });
+
     // Create two projects for the sessions
-    const project1 = Project.create('Test Project 1', `${setup.tempDir}/test1`, 'Project 1');
-    const project2 = Project.create('Test Project 2', `${setup.tempDir}/test2`, 'Project 2');
+    const project1 = Project.create('Test Project 1', tempProjectDir1, 'Project 1');
+    const project2 = Project.create('Test Project 2', tempProjectDir2, 'Project 2');
 
     // Create two separate sessions with their own agents
     const session1 = Session.create({

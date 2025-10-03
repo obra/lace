@@ -15,6 +15,7 @@ const mockSession = {
   getProjectId: vi.fn().mockReturnValue('test-project'),
   getEnvironmentVariables: vi.fn().mockReturnValue({}),
   createToolTempDirectory: vi.fn().mockReturnValue('/tmp/test-tool-dir'),
+  getWorkingDirectory: vi.fn().mockReturnValue('/tmp/test-working-dir'),
 };
 
 describe('Agent Approval Orchestration', () => {

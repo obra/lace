@@ -54,13 +54,14 @@ export class WorktreeManager {
    */
   private static async runGit(
     args: string[],
-    cwd?: string
+    cwd?: string,
+    timeoutMs: number = 10000
   ): Promise<{ stdout: string; stderr: string }> {
     try {
-      const result = await execFileAsync('git', args, { cwd });
+      const result = await execFileAsync('git', args, { cwd, timeout: timeoutMs });
       return result;
     } catch (error: unknown) {
-      // execFile throws on non-zero exit codes
+      // execFile throws on non-zero exit codes or timeout
       const execError = error as { stdout?: string; stderr?: string; message?: string };
       throw new Error(
         `Git command failed: ${execError.message || 'Unknown error'}\nstderr: ${execError.stderr || ''}`
@@ -73,13 +74,42 @@ export class WorktreeManager {
    * The worktree stays connected to the main repo - commits appear immediately
    */
   static async createSessionWorktree(projectDir: string, sessionId: string): Promise<string> {
+    // Validate projectDir is not empty
+    if (!projectDir || projectDir.trim() === '') {
+      throw new Error(
+        `projectDir cannot be empty - this would cause git init in cwd (${process.cwd()}). ` +
+          'In tests, this usually means tempDir was accessed before beforeEach ran.'
+      );
+    }
+
     // Validate sessionId and resolve safe worktree path
     const worktreePath = this.resolveWorktreePath(sessionId);
+
+    logger.debug('createSessionWorktree called', { projectDir, sessionId, worktreePath });
 
     // Check if it's a git repository, initialize if not
     const gitDir = join(projectDir, '.git');
     if (!existsSync(gitDir)) {
-      logger.info('Project is not a git repository, initializing git', { projectDir });
+      // In tests, validate we're not about to git init in source directories
+      if (
+        process.env.NODE_ENV === 'test' &&
+        !projectDir.includes('/tmp/') &&
+        !projectDir.includes('/T/')
+      ) {
+        const stack = new Error().stack;
+        console.error('🚨 WOULD GIT INIT IN NON-TEMP DIR:', {
+          projectDir,
+          cwd: process.cwd(),
+          stack,
+        });
+        throw new Error(
+          `Refusing to git init in non-temp directory during tests! ` +
+            `projectDir: ${projectDir}, cwd: ${process.cwd()}. ` +
+            'This usually means a test passed the wrong directory path.'
+        );
+      }
+
+      logger.warn('Project is not a git repository, initializing git', { projectDir });
 
       try {
         await this.runGit(['init'], projectDir);

@@ -19,6 +19,8 @@ import {
 import { cleanupSession } from '@/lib/server/lace-test-imports';
 
 import { setupWebTest } from '@/test-utils/web-test-setup';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 import { parseResponse } from '@/lib/serialization';
 import { loader as getAgent } from '@/app/routes/api.agents.$agentId';
 import { loader as getSession } from '@/app/routes/api.projects.$projectId.sessions.$sessionId';
@@ -31,7 +33,7 @@ import type { AgentWithTokenUsage } from '@/types/api';
 vi.mock('server-only', () => ({}));
 
 describe('Token Usage Integration Tests', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let projectId: string;
   let sessionId: ThreadId;
   let providerInstanceId: string;
@@ -50,9 +52,11 @@ describe('Token Usage Integration Tests', () => {
     });
 
     // Create project with provider configuration
+    const testDir = join(context.tempProjectDir, 'token-integration');
+    await fs.mkdir(testDir, { recursive: true });
     const project = Project.create(
       'Token Integration Test',
-      '/test/token-integration',
+      testDir,
       'Testing token usage across APIs',
       {
         providerInstanceId,

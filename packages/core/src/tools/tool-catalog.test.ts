@@ -176,7 +176,8 @@ describe('ToolCatalog', () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
 
       const { MCPConfigLoader } = vi.mocked(await import('~/config/mcp-config-loader'));
-      expect(MCPConfigLoader.updateServerConfig).toHaveBeenLastCalledWith(
+      // Check for call with 'broken-server' specifically, not last call
+      expect(MCPConfigLoader.updateServerConfig).toHaveBeenCalledWith(
         'broken-server',
         expect.objectContaining({
           discoveryStatus: 'failed',

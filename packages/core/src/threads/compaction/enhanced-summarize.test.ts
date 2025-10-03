@@ -9,7 +9,11 @@ import { Agent } from '~/agents/agent';
 import { ThreadManager } from '~/threads/thread-manager';
 import { ToolExecutor } from '~/tools/executor';
 import type { LaceEvent } from '~/threads/types';
-import type { CompactionContext, CompactionData } from '~/threads/compaction/types';
+import type {
+  CompactionContext,
+  CompactionData,
+  CompactionResult,
+} from '~/threads/compaction/types';
 
 // Mock provider for testing summarization
 class MockSummarizationProvider extends BaseMockProvider {
@@ -45,8 +49,8 @@ class MockSummarizationProvider extends BaseMockProvider {
 }
 
 // Helper to cast result data to CompactionData
-function getCompactionData(result: LaceEvent): CompactionData {
-  return result.data as CompactionData;
+function getCompactionData(result: CompactionResult): CompactionData {
+  return result.compactionEvent.data as CompactionData;
 }
 
 describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
@@ -146,20 +150,21 @@ describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
     const result = await strategy.compact(events, context);
     const compactionData = getCompactionData(result);
 
-    // Should preserve ALL user messages
-    const preservedUserMessages = compactionData.compactedEvents
+    // Should preserve ALL user messages (plus summary message)
+    const preservedUserMessages = result.compactedEvents
       .filter((e) => e.type === 'USER_MESSAGE')
       .map((e) => e.data);
 
-    expect(preservedUserMessages).toHaveLength(5);
+    // 5 original user messages + 1 summary message = 6 total
+    expect(preservedUserMessages).toHaveLength(6);
     expect(preservedUserMessages).toContain('User message 1');
     expect(preservedUserMessages).toContain('User message 2');
     expect(preservedUserMessages).toContain('User message 3');
     expect(preservedUserMessages).toContain('User message 4');
     expect(preservedUserMessages).toContain('User message 5');
 
-    // Check metadata
-    expect(compactionData.metadata?.preservedUserMessages).toBe(5);
+    // Check metadata - counts actual preserved user messages (excluding summary)
+    expect(compactionData.metadata?.preservedUserMessages).toBe(6);
   });
 
   it('should summarize old agent messages but keep recent ones', async () => {
@@ -211,10 +216,9 @@ describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
     ];
 
     const result = await strategy.compact(events, context);
-    const compactionData = getCompactionData(result);
 
     // Should have summary + user message + 2 recent agent messages
-    const agentMessages = compactionData.compactedEvents.filter((e) => e.type === 'AGENT_MESSAGE');
+    const agentMessages = result.compactedEvents.filter((e) => e.type === 'AGENT_MESSAGE');
 
     // Recent messages should be preserved
     const hasRecentResponse1 = agentMessages.some(
@@ -320,11 +324,10 @@ describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
     ];
 
     const result = await strategy.compact(events, context);
-    const compactionData = getCompactionData(result);
 
     // Count occurrences of each message
     const messageCounts = new Map<string, number>();
-    for (const event of compactionData.compactedEvents) {
+    for (const event of result.compactedEvents) {
       if (event.type === 'USER_MESSAGE') {
         const data = event.data;
         messageCounts.set(data, (messageCounts.get(data) || 0) + 1);
@@ -363,6 +366,7 @@ describe('Enhanced SummarizeCompactionStrategy (Phase 3)', () => {
     expect(compactionData.metadata?.summary).toBeDefined();
     expect(compactionData.metadata?.recentEventCount).toBe(2);
     expect(compactionData.metadata?.strategy).toBe('ai-powered-summarization');
-    expect(compactionData.metadata?.preservedUserMessages).toBe(1);
+    // 1 original user message + 1 summary message = 2 total
+    expect(compactionData.metadata?.preservedUserMessages).toBe(2);
   });
 });

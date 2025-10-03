@@ -17,12 +17,15 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 
 // Mock the logger to reduce noise
 vi.mock('~/utils/logger');
 
 describe('Session Permission Auto-Resolution', () => {
   const tempLaceDir = setupCoreTest();
+  let tempProjectDir: string;
   let session: Session;
   let agent: Agent;
   let project: Project;
@@ -39,8 +42,12 @@ describe('Session Permission Auto-Resolution', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create a separate project directory
+    tempProjectDir = join(tempLaceDir.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create a project with provider configuration
-    project = Project.create('Test Project', tempLaceDir.tempDir, 'Test project for auto-resolve', {
+    project = Project.create('Test Project', tempProjectDir, 'Test project for auto-resolve', {
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });

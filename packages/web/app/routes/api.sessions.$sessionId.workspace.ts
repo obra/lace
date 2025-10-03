@@ -19,7 +19,16 @@ export async function loader({ params }: { params: LoaderParams }) {
   }
 
   try {
-    const session = await Session.getById(asThreadId(sessionId));
+    // Validate session ID format before using asThreadId
+    let threadId;
+    try {
+      threadId = asThreadId(sessionId);
+    } catch {
+      // Invalid format is treated as "not found" rather than error
+      return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
+    }
+
+    const session = await Session.getById(threadId);
     if (!session) {
       return createErrorResponse('Session not found', 404, { code: 'RESOURCE_NOT_FOUND' });
     }
@@ -29,15 +38,16 @@ export async function loader({ params }: { params: LoaderParams }) {
 
     // Get workspace mode from effective configuration
     const config = session.getEffectiveConfiguration();
-    const defaultMode = process.platform === 'darwin' ? 'container' : 'worktree';
-    const mode = (config.workspaceMode as 'container' | 'worktree' | 'local') || defaultMode;
+    // Default to 'worktree' (matches DEFAULT_WORKSPACE_MODE in core)
+    const mode = (config.workspaceMode as 'container' | 'worktree' | 'local') || 'worktree';
 
     // Get workspace info (may be undefined if not initialized)
     const info = session.getWorkspaceInfo();
 
     return createSuperjsonResponse({ mode, info: info || null });
   } catch (error) {
-    logger.error('Failed to fetch workspace info', { error, sessionId });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error('Failed to fetch workspace info', { error, sessionId, errorMessage });
     return createErrorResponse('Failed to fetch workspace information', 500, {
       code: 'INTERNAL_ERROR',
     });

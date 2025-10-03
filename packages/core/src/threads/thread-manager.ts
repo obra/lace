@@ -10,7 +10,7 @@ import {
 import { Thread, LaceEvent, isTransientEventType } from '~/threads/types';
 import { logger } from '~/utils/logger';
 import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
-import type { CompactionStrategy, CompactionData } from '~/threads/compaction/types';
+import type { CompactionStrategy } from '~/threads/compaction/types';
 import { registerDefaultStrategies } from '~/threads/compaction/registry';
 
 export interface ThreadSessionInfo {
@@ -522,26 +522,58 @@ export class ThreadManager {
       ...(params as object),
     };
 
-    // Run compaction strategy
-    const compactionEvent = await strategy.compact(thread.events, context);
+    // Run compaction strategy on VISIBLE events only (not hidden ones)
+    // This ensures we only compact the current working conversation
+    const visibleEvents = thread.events.filter((e) => e.visibleToModel !== false);
+    const result = await strategy.compact(visibleEvents, context);
 
-    // Add the compaction event to the thread
-    // Extract the CompactionData from the strategy result and add as new event
-    //
-    // NOTE FOR REVIEWERS: addEvent() persistence failure is handled gracefully:
-    // 1. addEvent() logs errors but doesn't throw, preserving thread consistency
-    // 2. SQLite ACID properties ensure atomic persistence operations
-    // 3. If persistence fails, the in-memory thread remains unchanged
-    // 4. Subsequent operations will retry persistence, maintaining eventual consistency
-    // 5. The thread cache remains consistent with successful database state
-    const compactionData = compactionEvent.data as CompactionData;
+    // 1. Persist compacted events as first-class database rows (marked visible)
+    // Abort if any event fails to persist to prevent data loss
+    const compactedEventIds: string[] = [];
+    for (const event of result.compactedEvents) {
+      // Remove ID so addEvent generates a new one (avoids duplicates)
+      // Strategies may include IDs from the original events they're replacing.
+      // We strip them to ensure fresh IDs are generated, preventing conflicts.
+      const { id: _id, ...eventWithoutId } = event;
+      const addedEvent = this.addEvent({
+        ...eventWithoutId,
+        visibleToModel: true,
+        context: { ...event.context, threadId },
+      });
+
+      // Abort compaction if persistence fails
+      if (!addedEvent?.id) {
+        logger.error('THREADMANAGER: Compaction failed - could not persist compacted event', {
+          threadId,
+          strategyId,
+          eventType: event.type,
+        });
+        throw new Error(
+          `Compaction failed: unable to persist compacted event of type ${event.type}`
+        );
+      }
+
+      compactedEventIds.push(addedEvent.id);
+    }
+
+    // 2. Add the COMPACTION metadata event (marked not visible)
     const addedCompactionEvent = this.addEvent({
-      type: 'COMPACTION',
-      data: compactionData,
+      ...result.compactionEvent,
+      visibleToModel: false,
       context: { threadId },
-    } as LaceEvent);
+    });
 
-    // Mark pre-compaction events as not visible to model
+    // Abort if COMPACTION event fails to persist
+    if (!addedCompactionEvent?.id) {
+      logger.error('THREADMANAGER: Compaction failed - could not persist COMPACTION event', {
+        threadId,
+        strategyId,
+      });
+      throw new Error('Compaction failed: unable to persist COMPACTION event');
+    }
+
+    // At this point, addedCompactionEvent is guaranteed to have an id (we threw above if not)
+    // 3. Mark pre-compaction events as not visible to model
     const hiddenEventIds: string[] = [];
 
     // Invalidate cache FIRST to ensure we read fresh data and prevent race conditions
@@ -554,41 +586,51 @@ export class ThreadManager {
 
     if (updatedThread) {
       // Find the index of the compaction event we just added
+      // Safe to use .id directly - we verified it exists above with throw
       const compactionIndex = updatedThread.events.findIndex(
-        (e) => e.id === addedCompactionEvent?.id
+        (e) => e.id === addedCompactionEvent.id
       );
 
-      // Mark all events before the compaction as not visible
+      // Defensive check: ensure compaction event is in the thread
+      if (compactionIndex === -1) {
+        logger.error('THREADMANAGER: Compaction event not found in updated thread', {
+          threadId,
+          compactionEventId: addedCompactionEvent.id,
+        });
+        throw new Error('Compaction event not found after persistence');
+      }
+
+      // Mark all events before the compaction as not visible, EXCEPT:
+      // 1. The compacted replacement events we just created
+      // 2. Events that are already hidden
+      // Use Set for O(1) lookup instead of O(n) array includes
+      const compactedEventIdSet = new Set(compactedEventIds);
       for (let i = 0; i < compactionIndex; i++) {
         const event = updatedThread.events[i];
-        if (event.id) {
+        if (event.id && !compactedEventIdSet.has(event.id) && event.visibleToModel !== false) {
           this._persistence.updateEventVisibility(event.id, false);
           hiddenEventIds.push(event.id);
         }
       }
 
       // Mark the compaction event itself as not visible (it's metadata)
-      if (addedCompactionEvent?.id) {
-        this._persistence.updateEventVisibility(addedCompactionEvent.id, false);
-        hiddenEventIds.push(addedCompactionEvent.id);
-      }
+      // Safe to use .id directly - we verified it exists above with throw
+      this._persistence.updateEventVisibility(addedCompactionEvent.id, false);
+      hiddenEventIds.push(addedCompactionEvent.id);
 
       // Invalidate cache again after visibility updates to ensure fresh reads
       processLocalThreadCache.delete(threadId);
-
-      // Note: Compacted replacement events (in compactionData.compactedEvents)
-      // are virtual - they exist only in the COMPACTION event's data field,
-      // not as separate events in the thread
     }
 
     logger.info('THREADMANAGER: Compaction complete', {
       threadId,
       strategyId,
       hiddenEventCount: hiddenEventIds.length,
+      compactedEventCount: result.compactedEvents.length,
     });
 
     return {
-      compactionEvent: addedCompactionEvent!,
+      compactionEvent: addedCompactionEvent,
       hiddenEventIds,
     };
   }

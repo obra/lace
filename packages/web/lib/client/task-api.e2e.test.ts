@@ -8,6 +8,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TaskAPIClient } from '@/lib/client/task-api';
 import { setupWebTest } from '@/test-utils/web-test-setup';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
 import {
   createTestProviderInstance,
@@ -38,7 +40,7 @@ vi.mock('@/lib/server/approval-manager', () => ({
 }));
 
 describe('TaskAPIClient E2E Tests', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let client: TaskAPIClient;
   let sessionId: string;
   let projectId: string;
@@ -55,9 +57,11 @@ describe('TaskAPIClient E2E Tests', () => {
 
     // Create a real session using the session service
     const _sessionService = getSessionService();
+    const testDir = join(context.tempProjectDir, 'task-api');
+    await fs.mkdir(testDir, { recursive: true });
     const testProject = Project.create(
       'TaskAPIClient E2E Test Project',
-      '/test/path',
+      testDir,
       'Test project for TaskAPIClient E2E testing',
       {
         providerInstanceId,

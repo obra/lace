@@ -18,9 +18,12 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 
 describe('Agent System Prompt Refresh', () => {
   const tempLaceDirContext = setupCoreTest(); // Handles temp LACE_DIR + persistence automatically
+  let tempProjectDir: string;
   let providerInstanceId: string;
   let mockProvider: TestProvider;
   let toolExecutor: ToolExecutor;
@@ -42,11 +45,15 @@ describe('Agent System Prompt Refresh', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create a separate project directory
+    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create real project and session for proper context
     project = Project.create(
       'System Prompt Test Project',
+      tempProjectDir,
       'Project for system prompt testing',
-      tempLaceDirContext.tempDir,
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
@@ -218,10 +225,13 @@ describe('Agent System Prompt Refresh', () => {
     expect(projectCalls[0]?.session).toBe(project.getWorkingDirectory()); // Session working dir matches project working dir
 
     // Create a second project and session to simulate multi-project scenario
+    const tempProjectDir2 = join(tempLaceDirContext.tempDir, 'test-project-2');
+    mkdirSync(tempProjectDir2, { recursive: true });
+
     const project2 = Project.create(
       'Second Test Project',
+      tempProjectDir2,
       'Second project for testing',
-      tempLaceDirContext.tempDir + '/project2',
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',

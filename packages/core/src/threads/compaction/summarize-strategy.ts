@@ -2,7 +2,11 @@
 // ABOUTME: Uses AI to create concise summaries of older conversation parts while preserving recent context
 
 import type { LaceEvent } from '~/threads/types';
-import type { CompactionStrategy, CompactionContext } from '~/threads/compaction/types';
+import type {
+  CompactionStrategy,
+  CompactionContext,
+  CompactionResult,
+} from '~/threads/compaction/types';
 
 export class SummarizeCompactionStrategy implements CompactionStrategy {
   id = 'summarize';
@@ -10,20 +14,20 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
   // Keep the most recent N events to preserve immediate context
   private readonly RECENT_EVENT_COUNT = 2; // Last 2 events (usually 1 exchange)
 
-  async compact(events: LaceEvent[], context: CompactionContext): Promise<LaceEvent> {
+  async compact(events: LaceEvent[], context: CompactionContext): Promise<CompactionResult> {
     if (!context.agent && !context.provider) {
       throw new Error('SummarizeCompactionStrategy requires an Agent instance or AI provider');
     }
 
     if (events.length === 0) {
-      return this.createCompactionEvent([], context, undefined, 0);
+      return this.createCompactionResult([], context, undefined, 0);
     }
 
     // Filter out COMPACTION events (they're metadata, not conversation content)
     const conversationEvents = events.filter((event) => event.type !== 'COMPACTION');
 
     if (conversationEvents.length === 0) {
-      return this.createCompactionEvent([], context, undefined, 0);
+      return this.createCompactionResult([], context, undefined, 0);
     }
 
     // Separate events into categories
@@ -39,6 +43,13 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
     let summary: string | undefined;
     if (oldEvents.length > 0) {
       summary = await this.generateSummaryInConversation(oldEvents, recentEvents, context);
+
+      // Create summary as a USER_MESSAGE event
+      compactedEvents.push({
+        type: 'USER_MESSAGE',
+        data: `[Earlier in our conversation: ${summary}]`,
+        context: { threadId: context.threadId },
+      });
     }
 
     // Preserve ALL user messages (they provide essential context)
@@ -47,7 +58,7 @@ export class SummarizeCompactionStrategy implements CompactionStrategy {
     // Add recent non-user events unchanged
     compactedEvents.push(...recentEvents);
 
-    return this.createCompactionEvent(compactedEvents, context, summary, events.length);
+    return this.createCompactionResult(compactedEvents, context, summary, events.length);
   }
 
   private categorizeEventsByCount(events: LaceEvent[]) {
@@ -154,15 +165,13 @@ Provide ONLY the summary, no preamble or explanation.`;
       .join('\n');
   }
 
-  // Removed createSummaryEvent - summary is now part of COMPACTION event data
-
-  private createCompactionEvent(
+  private createCompactionResult(
     compactedEvents: LaceEvent[],
     context: CompactionContext,
     summary: string | undefined,
     originalEventCount: number
-  ): LaceEvent {
-    return {
+  ): CompactionResult {
+    const compactionEvent: LaceEvent = {
       id: this.generateEventId(),
       type: 'COMPACTION',
       timestamp: new Date(),
@@ -170,7 +179,7 @@ Provide ONLY the summary, no preamble or explanation.`;
       data: {
         strategyId: this.id,
         originalEventCount,
-        compactedEvents,
+        compactedEventCount: compactedEvents.length,
         metadata: {
           summary,
           recentEventCount: this.RECENT_EVENT_COUNT,
@@ -178,6 +187,11 @@ Provide ONLY the summary, no preamble or explanation.`;
           preservedUserMessages: compactedEvents.filter((e) => e.type === 'USER_MESSAGE').length,
         },
       },
+    };
+
+    return {
+      compactionEvent,
+      compactedEvents,
     };
   }
 

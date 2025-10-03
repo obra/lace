@@ -41,36 +41,53 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
       }
     }
 
-    // Clean up any remaining worktrees from workspace managers before resetting
+    // Close database connections BEFORE cleaning workspaces
+    // This releases file locks on lace.db files in worktrees
+    resetPersistence();
+
+    // Clean up workspaces before resetting factory
     const { WorkspaceManagerFactory } = await import('~/workspace/workspace-manager');
     try {
-      // Get all managers and clean up their workspaces
-      const managers = ['worktree', 'local', 'container'] as const;
-      for (const mode of managers) {
+      // Only clean up worktree mode (default) - it's fast and reliable
+      // Container mode tests should handle their own cleanup
+      const worktreeManager = WorkspaceManagerFactory.get('worktree');
+      const workspaces = await worktreeManager.listWorkspaces();
+
+      for (const workspace of workspaces) {
         try {
-          const manager = WorkspaceManagerFactory.get(mode);
-          const workspaces = await manager.listWorkspaces();
-          for (const workspace of workspaces) {
-            try {
-              await manager.destroyWorkspace(workspace.sessionId);
-            } catch (_error) {
-              // Ignore cleanup errors - best effort
-            }
-          }
-        } catch (_error) {
-          // Manager may not exist or may fail - ignore
+          // Worktree cleanup should be fast - 3s timeout
+          await Promise.race([
+            worktreeManager.destroyWorkspace(workspace.sessionId),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Worktree cleanup timeout')), 3000)
+            ),
+          ]);
+        } catch (error) {
+          // Log but continue - best effort cleanup
+          logger.warn('Failed to cleanup worktree workspace', {
+            sessionId: workspace.sessionId,
+            error,
+          });
         }
       }
-    } catch (_error) {
-      // Ignore any errors during workspace cleanup
+    } catch {
+      // Ignore errors - workspace manager may not exist
     }
 
-    // Reset workspace manager singletons AFTER all workspaces destroyed
+    // Reset workspace manager singletons
     WorkspaceManagerFactory.reset();
   });
 
   return {
-    ...tempLaceDir,
+    get tempDir() {
+      return tempLaceDir.tempDir;
+    },
+    get originalLaceDir() {
+      return tempLaceDir.originalLaceDir;
+    },
+    set originalLaceDir(value: string | undefined) {
+      tempLaceDir.originalLaceDir = value;
+    },
     registerCleanup: (fn: () => void | Promise<void>) => cleanupTasks.push(fn),
   };
 }

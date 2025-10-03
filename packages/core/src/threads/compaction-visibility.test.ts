@@ -135,7 +135,7 @@ describe('Compaction Visibility', () => {
     expect(result2.hiddenEventIds).toContain(result2.compactionEvent.id);
   });
 
-  it('should store compacted events in COMPACTION event data', async () => {
+  it('should persist compacted events as separate database rows', async () => {
     const threadId = manager.generateThreadId();
     manager.createThread(threadId);
 
@@ -149,18 +149,24 @@ describe('Compaction Visibility', () => {
     const result = await manager.compact(threadId, 'trim-tool-results');
     const compactionData = result.compactionEvent.data as any;
 
-    // Compacted events should exist in the COMPACTION event's data
-    expect(compactionData.compactedEvents).toBeDefined();
-    expect(compactionData.compactedEvents.length).toBeGreaterThan(0);
+    // Compacted events should NOT be in COMPACTION data (they're separate rows now)
+    expect(compactionData.compactedEvents).toBeUndefined();
+    expect(compactionData.compactedEventCount).toBeGreaterThan(0);
 
-    // Original events in thread.events are marked as not visible
+    // Original event should be marked as not visible
     const thread = manager.getThread(threadId);
     const originalInThread = thread!.events.find((e) => e.id === originalEvent!.id);
     expect(originalInThread!.visibleToModel).toBe(false);
 
-    // Compacted events in the COMPACTION data are virtual (don't have visibleToModel flag)
-    // They're used by buildWorkingConversation but aren't persisted separately
-    const compactedEvent = compactionData.compactedEvents[0];
-    expect(compactedEvent.visibleToModel).toBeUndefined(); // Virtual events don't need this flag
+    // Compacted replacement events should exist as separate database rows with visibleToModel !== false
+    const visibleEvents = thread!.events.filter((e) => e.visibleToModel !== false);
+    expect(visibleEvents.length).toBeGreaterThan(0);
+
+    // Find the compacted version of the user message
+    const compactedUserMessage = visibleEvents.find(
+      (e) => e.type === 'USER_MESSAGE' && e.data === 'Original message'
+    );
+    expect(compactedUserMessage).toBeDefined();
+    expect(compactedUserMessage!.visibleToModel).not.toBe(false);
   });
 });

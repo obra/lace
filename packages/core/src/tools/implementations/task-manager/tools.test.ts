@@ -2,6 +2,8 @@
 // ABOUTME: Validates task creation, queries, updates, and note management tools
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 import {
   TaskCreateTool,
   TaskListTool,
@@ -68,8 +70,9 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Enhanced Task Manager Tools', () => {
-  const _tempLaceDir = setupCoreTest();
-  let context: ToolContext;
+  const context = setupCoreTest();
+  let tempProjectDir: string;
+  let toolContext: ToolContext;
   let session: Session;
   let project: Project;
   let tools: Tool[];
@@ -104,10 +107,14 @@ describe('Enhanced Task Manager Tools', () => {
     // Mock AnthropicProvider to avoid real API calls during testing
     vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockImplementation(() => mockProvider);
 
+    // Create temp project directory
+    tempProjectDir = join(context.tempDir, 'test-tools');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create project with provider configuration
     project = Project.create(
       'Test Project',
-      '/tmp/test-tools',
+      tempProjectDir,
       'Test project for task manager tests',
       {
         providerInstanceId,
@@ -121,7 +128,7 @@ describe('Enhanced Task Manager Tools', () => {
       projectId: project.getId(),
     });
 
-    // Create tools that get TaskManager from context
+    // Create tools that get TaskManager from toolContext
     tools = [
       new TaskCreateTool(),
       new TaskListTool(),
@@ -142,7 +149,7 @@ describe('Enhanced Task Manager Tools', () => {
       throw new Error('Failed to get agent from session');
     }
 
-    context = {
+    toolContext = {
       signal: new AbortController().signal,
       agent,
     };
@@ -156,11 +163,11 @@ describe('Enhanced Task Manager Tools', () => {
       await cleanupSession(session); // This already calls removeAllListeners() on all agents
     }
 
-    // Clean up context AbortController if it exists
-    if (context?.signal && !context.signal.aborted) {
+    // Clean up toolContext AbortController if it exists
+    if (toolContext?.signal && !toolContext.signal.aborted) {
       try {
         // Manually trigger abort to clean up any pending operations
-        (context.signal as any).aborted = true;
+        (toolContext.signal as any).aborted = true;
       } catch (_error) {
         // Ignore errors when cleaning up AbortController
       }
@@ -174,7 +181,7 @@ describe('Enhanced Task Manager Tools', () => {
 
     // Clear references immediately instead of registering cleanup
     // (avoids timing issues with global setupCoreTest registry)
-    context = undefined as unknown as ToolContext;
+    toolContext = undefined as unknown as ToolContext;
     session = undefined as unknown as Session;
     project = undefined as unknown as Project;
   });
@@ -186,20 +193,20 @@ describe('Enhanced Task Manager Tools', () => {
       expect(taskCreateTool.name).toBe('task_create');
 
       // Test that tools can access TaskManager via agent
-      expect(context.agent).toBeDefined();
+      expect(toolContext.agent).toBeDefined();
       expect(session.getTaskManager()).toBeDefined();
 
-      // Test that task creation works with context-based TaskManager
+      // Test that task creation works with toolContext-based TaskManager
       const result = await taskCreateTool.execute(
         {
           tasks: [
             {
               title: 'Context Test Task',
-              prompt: 'Test task with context-based TaskManager',
+              prompt: 'Test task with toolContext-based TaskManager',
             },
           ],
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('completed');
@@ -219,7 +226,7 @@ describe('Enhanced Task Manager Tools', () => {
             },
           ],
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('completed');
@@ -240,7 +247,7 @@ describe('Enhanced Task Manager Tools', () => {
             },
           ],
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('completed');
@@ -265,7 +272,7 @@ describe('Enhanced Task Manager Tools', () => {
             },
           ],
         },
-        context
+        toolContext
       );
 
       if (result.status === 'failed') {
@@ -288,7 +295,7 @@ describe('Enhanced Task Manager Tools', () => {
           },
         ],
       };
-      const result = await taskCreateTool.execute(invalidInput, context);
+      const result = await taskCreateTool.execute(invalidInput, toolContext);
 
       expect(result.status).toBe('failed');
       expect(result.content?.[0]?.text).toContain('ValidationError');
@@ -304,7 +311,7 @@ describe('Enhanced Task Manager Tools', () => {
           },
         ],
       };
-      const result = await taskCreateTool.execute(invalidInput, context);
+      const result = await taskCreateTool.execute(invalidInput, toolContext);
 
       expect(result.status).toBe('failed');
       expect(result.content?.[0]?.text).toContain('Invalid assignee format');
@@ -325,7 +332,7 @@ describe('Enhanced Task Manager Tools', () => {
             },
           ],
         },
-        context
+        toolContext
       );
 
       await taskCreateTool.execute(
@@ -339,7 +346,7 @@ describe('Enhanced Task Manager Tools', () => {
             },
           ],
         },
-        context
+        toolContext
       );
 
       await taskCreateTool.execute(
@@ -354,12 +361,12 @@ describe('Enhanced Task Manager Tools', () => {
           ],
         },
         {
-          ...context,
+          ...toolContext,
           signal: new AbortController().signal,
           agent: {
-            ...context.agent!,
+            ...toolContext.agent!,
             threadId: agent2ThreadId,
-            getFullSession: context.agent!.getFullSession.bind(context.agent),
+            getFullSession: toolContext.agent!.getFullSession.bind(toolContext.agent),
           } as unknown as Agent,
         }
       );
@@ -371,12 +378,12 @@ describe('Enhanced Task Manager Tools', () => {
           filter: 'mine',
         },
         {
-          ...context,
+          ...toolContext,
           signal: new AbortController().signal,
           agent: {
-            ...context.agent!,
+            ...toolContext.agent!,
             threadId: agent1ThreadId,
-            getFullSession: context.agent!.getFullSession.bind(context.agent),
+            getFullSession: toolContext.agent!.getFullSession.bind(toolContext.agent),
           } as unknown as Agent,
         }
       );
@@ -392,7 +399,7 @@ describe('Enhanced Task Manager Tools', () => {
         {
           filter: 'thread',
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('completed');
@@ -407,7 +414,7 @@ describe('Enhanced Task Manager Tools', () => {
         {
           filter: 'all',
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('completed');
@@ -422,7 +429,7 @@ describe('Enhanced Task Manager Tools', () => {
         {
           filter: 'created',
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('completed');
@@ -434,7 +441,7 @@ describe('Enhanced Task Manager Tools', () => {
 
     it('should include completed tasks when requested', async () => {
       // Get task ID from list
-      const listResult = await taskListTool.execute({ filter: 'thread' }, context);
+      const listResult = await taskListTool.execute({ filter: 'thread' }, toolContext);
       const taskId = listResult.content?.[0]?.text?.match(/task_\d{8}_[a-z0-9]{6}/)?.[0];
 
       // Complete a task
@@ -443,7 +450,7 @@ describe('Enhanced Task Manager Tools', () => {
           taskId: taskId!,
           status: 'completed',
         },
-        context
+        toolContext
       );
 
       // List without completed
@@ -452,7 +459,7 @@ describe('Enhanced Task Manager Tools', () => {
           filter: 'thread',
           includeCompleted: false,
         },
-        context
+        toolContext
       );
 
       expect(withoutCompleted.content?.[0]?.text).not.toContain('[completed]');
@@ -463,7 +470,7 @@ describe('Enhanced Task Manager Tools', () => {
           filter: 'thread',
           includeCompleted: true,
         },
-        context
+        toolContext
       );
 
       expect(withCompleted.content?.[0]?.text).toContain('[completed]');
@@ -484,7 +491,7 @@ describe('Enhanced Task Manager Tools', () => {
             },
           ],
         },
-        context
+        toolContext
       );
 
       taskId = result.content?.[0]?.text?.match(/task_\d{8}_[a-z0-9]{6}/)?.[0] || '';
@@ -497,7 +504,7 @@ describe('Enhanced Task Manager Tools', () => {
           taskId,
           status: 'archived',
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('completed');
@@ -511,7 +518,7 @@ describe('Enhanced Task Manager Tools', () => {
           taskId,
           status: 'archived',
         },
-        context
+        toolContext
       );
       expect(archiveResult.status).toBe('completed');
 
@@ -521,12 +528,12 @@ describe('Enhanced Task Manager Tools', () => {
           taskId,
           note: 'Archived: Requirements changed, feature no longer needed',
         },
-        context
+        toolContext
       );
       expect(addNoteResult.status).toBe('completed');
 
       // Verify the task has the note
-      const viewResult = await taskViewTool.execute({ taskId }, context);
+      const viewResult = await taskViewTool.execute({ taskId }, toolContext);
       expect(viewResult.content?.[0]?.text).toContain('Archived: Requirements changed');
     });
 
@@ -536,14 +543,14 @@ describe('Enhanced Task Manager Tools', () => {
           taskId,
           status: 'in_progress',
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('completed');
       expect(result.content?.[0]?.text).toContain('in_progress');
 
       // Verify using TaskViewTool
-      const viewResult = await taskViewTool.execute({ taskId }, context);
+      const viewResult = await taskViewTool.execute({ taskId }, toolContext);
       expect(viewResult.status).toBe('completed');
       expect(viewResult.content?.[0]?.text).toContain('in_progress');
     });
@@ -554,7 +561,7 @@ describe('Enhanced Task Manager Tools', () => {
           taskId,
           status: 'invalid' as 'pending' | 'in_progress' | 'completed',
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('failed');
@@ -567,7 +574,7 @@ describe('Enhanced Task Manager Tools', () => {
           taskId: 'task_99999999_nonexist',
           status: 'completed',
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('failed');
@@ -580,14 +587,14 @@ describe('Enhanced Task Manager Tools', () => {
           taskId,
           assignTo: agent2ThreadId,
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('completed');
       expect(result.content?.[0]?.text).toContain('assigned to');
 
       // Verify reassignment using TaskViewTool
-      const viewResult = await taskViewTool.execute({ taskId }, context);
+      const viewResult = await taskViewTool.execute({ taskId }, toolContext);
       expect(viewResult.status).toBe('completed');
       expect(viewResult.content?.[0]?.text).toContain(agent2ThreadId);
     });
@@ -603,7 +610,7 @@ describe('Enhanced Task Manager Tools', () => {
           taskId,
           assignTo: newAgentSpec,
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('completed');
@@ -618,7 +625,7 @@ describe('Enhanced Task Manager Tools', () => {
           taskId,
           assignTo: 'invalid',
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('failed');
@@ -639,7 +646,7 @@ describe('Enhanced Task Manager Tools', () => {
             },
           ],
         },
-        context
+        toolContext
       );
 
       taskId = result.content?.[0]?.text?.match(/task_\d{8}_[a-z0-9]{6}/)?.[0] || '';
@@ -651,14 +658,14 @@ describe('Enhanced Task Manager Tools', () => {
           taskId,
           note: 'Started working on this task',
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('completed');
       expect(result.content?.[0]?.text).toContain('Added note');
 
       // Verify note was added using TaskViewTool
-      const viewResult = await taskViewTool.execute({ taskId }, context);
+      const viewResult = await taskViewTool.execute({ taskId }, toolContext);
       expect(viewResult.status).toBe('completed');
       const taskDetails = viewResult.content?.[0]?.text || '';
       expect(taskDetails).toContain('Started working on this task');
@@ -674,7 +681,7 @@ describe('Enhanced Task Manager Tools', () => {
           taskId,
           note: 'First note',
         },
-        context
+        toolContext
       );
 
       await taskAddNoteTool.execute(
@@ -683,18 +690,18 @@ describe('Enhanced Task Manager Tools', () => {
           note: 'Second note',
         },
         {
-          ...context,
+          ...toolContext,
           signal: new AbortController().signal,
           agent: {
-            ...context.agent!,
+            ...toolContext.agent!,
             threadId: agent2ThreadId,
-            getFullSession: context.agent!.getFullSession.bind(context.agent),
+            getFullSession: toolContext.agent!.getFullSession.bind(toolContext.agent),
           } as unknown as Agent,
         }
       );
 
       // Verify multiple notes using TaskViewTool
-      const viewResult = await taskViewTool.execute({ taskId }, context);
+      const viewResult = await taskViewTool.execute({ taskId }, toolContext);
       expect(viewResult.status).toBe('completed');
       const taskDetails = viewResult.content?.[0]?.text || '';
       expect(taskDetails).toContain('First note');
@@ -722,7 +729,7 @@ describe('Enhanced Task Manager Tools', () => {
             },
           ],
         },
-        context
+        toolContext
       );
 
       taskId = result.content?.[0]?.text?.match(/task_\d{8}_[a-z0-9]{6}/)?.[0] || '';
@@ -733,7 +740,7 @@ describe('Enhanced Task Manager Tools', () => {
           taskId,
           note: 'Starting analysis of requirements',
         },
-        context
+        toolContext
       );
 
       await taskAddNoteTool.execute(
@@ -742,19 +749,19 @@ describe('Enhanced Task Manager Tools', () => {
           note: 'Found some edge cases to consider',
         },
         {
-          ...context,
+          ...toolContext,
           signal: new AbortController().signal,
           agent: {
-            ...context.agent!,
+            ...toolContext.agent!,
             threadId: agent2ThreadId,
-            getFullSession: context.agent!.getFullSession.bind(context.agent),
+            getFullSession: toolContext.agent!.getFullSession.bind(toolContext.agent),
           } as unknown as Agent,
         }
       );
     });
 
     it('should view task details', async () => {
-      const result = await taskViewTool.execute({ taskId }, context);
+      const result = await taskViewTool.execute({ taskId }, toolContext);
 
       expect(result.status).toBe('completed');
       const text = result.content?.[0]?.text || '';
@@ -772,7 +779,7 @@ describe('Enhanced Task Manager Tools', () => {
         {
           taskId: 'task_99999999_nonexist',
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('failed');
@@ -793,7 +800,7 @@ describe('Enhanced Task Manager Tools', () => {
             },
           ],
         },
-        context
+        toolContext
       );
 
       taskId = result.content?.[0]?.text?.match(/task_\d{8}_[a-z0-9]{6}/)?.[0] || '';
@@ -805,14 +812,14 @@ describe('Enhanced Task Manager Tools', () => {
           id: taskId,
           message: 'Task completed successfully',
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('completed');
       expect(result.content?.[0]?.text).toContain('Completed task');
 
       // Verify completion using TaskViewTool
-      const viewResult = await taskViewTool.execute({ taskId }, context);
+      const viewResult = await taskViewTool.execute({ taskId }, toolContext);
       expect(viewResult.status).toBe('completed');
       expect(viewResult.content?.[0]?.text).toContain('completed');
     });
@@ -823,7 +830,7 @@ describe('Enhanced Task Manager Tools', () => {
           id: 'task_99999999_nonexist',
           message: 'This should fail',
         },
-        context
+        toolContext
       );
 
       expect(result.status).toBe('failed');
@@ -846,7 +853,7 @@ describe('Enhanced Task Manager Tools', () => {
               },
             ],
           },
-          context
+          toolContext
         );
 
         // Basic result validation
@@ -890,7 +897,7 @@ describe('Enhanced Task Manager Tools', () => {
               },
             ],
           },
-          context
+          toolContext
         );
 
         // Basic result validation
@@ -928,7 +935,7 @@ describe('Enhanced Task Manager Tools', () => {
               },
             ],
           },
-          context
+          toolContext
         );
 
         expect(result.status).toBe('completed');
@@ -954,7 +961,7 @@ describe('Enhanced Task Manager Tools', () => {
               },
             ],
           },
-          context
+          toolContext
         );
 
         const taskData = result.metadata?.task as Task;
@@ -987,7 +994,7 @@ describe('Enhanced Task Manager Tools', () => {
               },
             ],
           },
-          context
+          toolContext
         );
 
         // The old way: parsing text (should not be needed)
@@ -1022,7 +1029,7 @@ describe('Enhanced Task Manager Tools', () => {
               },
             ],
           },
-          context
+          toolContext
         );
 
         // Structured metadata should work for arrays

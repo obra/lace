@@ -14,12 +14,14 @@ import {
 import { Session } from '@/lib/server/lace-imports';
 import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
 import { EventStreamManager } from '@/lib/event-stream-manager';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 describe('Session API endpoints under projects', () => {
-  const _tempLaceDir = setupWebTest();
+  const context = setupWebTest();
   let providerInstanceId: string;
   let projectId: string;
 
@@ -36,7 +38,10 @@ describe('Session API endpoints under projects', () => {
 
     // Create a test project
     const { Project } = await import('~/projects/project');
-    const testProject = Project.create('Test Project', '/test/path', 'A test project', {
+    const testDir = join(context.tempProjectDir, 'sessions-test');
+    await fs.mkdir(testDir, { recursive: true });
+
+    const testProject = Project.create('Test Project', testDir, 'A test project', {
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });

@@ -26,7 +26,7 @@ export class MockSlowTool extends Tool {
 
     // Check if already aborted
     if (signal.aborted) {
-      return this.createCancellationResult();
+      return this.createCancellationResult('Processing interrupted at 0% (0ms of ' + delay + 'ms)');
     }
 
     // Simulate work with ability to capture partial output

@@ -2,6 +2,8 @@
 // ABOUTME: Tests end-to-end scenarios including task creation, assignment, and collaboration
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 import {
   TaskCreateTool,
   TaskListTool,
@@ -51,7 +53,8 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Multi-Agent Task Manager Integration', () => {
-  const _tempLaceDir = setupCoreTest();
+  const context = setupCoreTest();
+  let tempProjectDir: string;
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
@@ -96,10 +99,14 @@ describe('Multi-Agent Task Manager Integration', () => {
       }
     );
 
+    // Create temp project directory
+    tempProjectDir = join(context.tempDir, 'test-integration');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create project first with provider configuration
     project = Project.create(
       'Integration Test Project',
-      '/tmp/test-integration',
+      tempProjectDir,
       'Test project for task manager integration',
       {
         providerInstanceId, // Use real provider instance
@@ -384,10 +391,14 @@ describe('Multi-Agent Task Manager Integration', () => {
 
   describe('Session isolation', () => {
     it('should isolate tasks between different sessions', async () => {
+      // Create temp project directory for second project
+      const tempProjectDir2 = join(context.tempDir, 'test-session2');
+      mkdirSync(tempProjectDir2, { recursive: true });
+
       // Create a second session with different project (with provider config)
       const project2 = Project.create(
         'Session 2 Project',
-        '/tmp/test-session2',
+        tempProjectDir2,
         'Second test project for session isolation',
         {
           providerInstanceId,
