@@ -10,6 +10,19 @@ const __dirname = dirname(__filename);
 
 export default defineConfig({
   plugins: [reactRouter(), tsconfigPaths()],
+  optimizeDeps: {
+    entries: [
+      './app/entry.client.tsx',
+      './app/root.tsx',
+      './app/routes/**/*.tsx',
+      './app/routes/**/*.ts',
+    ],
+  },
+  server: {
+    warmup: {
+      clientFiles: ['./app/entry.client.tsx', './app/root.tsx', './app/routes/**/*.tsx'],
+    },
+  },
   build: {
     sourcemap: false,
     rollupOptions: {
@@ -27,6 +40,7 @@ export default defineConfig({
     alias: {
       '~': resolve(__dirname, '../core/src'),
       '@': resolve(__dirname, '.'),
+      '@lace/core': resolve(__dirname, '../core/src'),
     },
   },
   ssr: { noExternal: ['react-router'] },

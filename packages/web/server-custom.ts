@@ -1,6 +1,7 @@
 // ABOUTME: Custom React Router v7 server with enhanced CLI options and port detection
 // ABOUTME: Provides single-process server with Lace-specific startup logic and port selection
 
+import './instrument.server.mjs';
 import '@/lib/server/data-dir-init';
 import { parseArgs } from 'util';
 import type express from 'express';
