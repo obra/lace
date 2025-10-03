@@ -3041,22 +3041,22 @@ export class Agent extends EventEmitter {
         return workingDir;
       }
 
-      // Fallback to current working directory
-      logger.debug(
-        'Agent._getWorkingDirectory() - no session or project found, falling back to process.cwd()',
+      // No fallback - return undefined if we can't determine working directory
+      logger.warn(
+        'Agent._getWorkingDirectory() - no session or project found, cannot determine working directory',
         {
           threadId: this._threadId,
           processCwd: process.cwd(),
         }
       );
-      return process.cwd();
+      return undefined;
     } catch (error) {
       logger.warn('Failed to get working directory from session/project', {
         threadId: this._threadId,
         error: error instanceof Error ? error.message : String(error),
         processCwd: process.cwd(),
       });
-      return process.cwd();
+      return undefined;
     }
   }
 
@@ -3103,7 +3103,8 @@ export class Agent extends EventEmitter {
             }
           }
 
-          return process.cwd();
+          // Return undefined instead of throwing - caller will handle
+          return undefined as unknown as string;
         },
       };
     } catch (error) {
