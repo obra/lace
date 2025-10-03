@@ -2,6 +2,8 @@
 // ABOUTME: Tests end-to-end scenarios from task creation through delegation to completion
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 import {
   TaskCreateTool,
   TaskListTool,
@@ -113,7 +115,8 @@ class MockProvider extends BaseMockProvider {
 }
 
 describe('Task Management Workflow Integration', () => {
-  const _tempLaceDir = setupCoreTest();
+  const context = setupCoreTest();
+  let tempProjectDir: string;
   let session: Session;
   let project: Project;
   let mockProvider: MockProvider;
@@ -151,10 +154,14 @@ describe('Task Management Workflow Integration', () => {
     // @ts-expect-error – mocking private method for test
     vi.spyOn(Agent.prototype, '_createProviderInstance').mockResolvedValue(mockProvider);
 
+    // Create temp project directory
+    tempProjectDir = join(context.tempDir, 'test-workflow');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create project and session with provider configuration
     project = Project.create(
       'Task Workflow Integration Test Project',
-      '/tmp/test-workflow',
+      tempProjectDir,
       'Test project for task workflow integration',
       {
         providerInstanceId,

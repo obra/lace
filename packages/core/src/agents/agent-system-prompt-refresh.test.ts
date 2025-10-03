@@ -52,8 +52,8 @@ describe('Agent System Prompt Refresh', () => {
     // Create real project and session for proper context
     project = Project.create(
       'System Prompt Test Project',
-      'Project for system prompt testing',
       tempProjectDir,
+      'Project for system prompt testing',
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
@@ -230,8 +230,8 @@ describe('Agent System Prompt Refresh', () => {
 
     const project2 = Project.create(
       'Second Test Project',
-      'Second project for testing',
       tempProjectDir2,
+      'Second project for testing',
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',

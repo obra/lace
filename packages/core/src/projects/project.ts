@@ -7,6 +7,7 @@ import { getPersistence, ProjectData, SessionData } from '~/persistence/database
 import { logger } from '~/utils/logger';
 import { Session } from '~/sessions/session';
 import type { ThreadId } from '~/threads/types';
+import { existsSync, statSync, accessSync, constants } from 'fs';
 import { ThreadManager } from '~/threads/thread-manager';
 import type { SessionConfiguration } from '~/sessions/session-config';
 import { ProjectEnvironmentManager } from '~/projects/environment-variables';
@@ -57,6 +58,26 @@ export class Project {
       throw new Error(
         'Project workingDirectory cannot be empty. This usually means tempDir was accessed before beforeEach ran.'
       );
+    }
+
+    // Validate workingDirectory exists and is a real directory
+    if (!existsSync(workingDirectory)) {
+      throw new Error(
+        `Project workingDirectory does not exist: ${workingDirectory}. ` +
+          'In tests, use a temp directory from setupCoreTest().'
+      );
+    }
+
+    const stats = statSync(workingDirectory);
+    if (!stats.isDirectory()) {
+      throw new Error(`Project workingDirectory is not a directory: ${workingDirectory}`);
+    }
+
+    // Validate directory is writable
+    try {
+      accessSync(workingDirectory, constants.W_OK);
+    } catch {
+      throw new Error(`Project workingDirectory is not writable: ${workingDirectory}`);
     }
 
     const persistence = getPersistence();

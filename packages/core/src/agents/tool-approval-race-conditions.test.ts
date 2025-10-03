@@ -98,8 +98,8 @@ describe('Tool Approval Race Condition Integration Tests', () => {
     // Create real project and session for proper context
     project = Project.create(
       'Race Condition Test Project',
-      'Project for race condition testing',
       tempProjectDir,
+      'Project for race condition testing',
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',

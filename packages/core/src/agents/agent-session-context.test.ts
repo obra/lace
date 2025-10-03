@@ -47,8 +47,8 @@ describe('Agent Session Context', () => {
     // Create real project
     project = Project.create(
       'Test Project',
-      'Project for session context testing',
       tempProjectDir,
+      'Project for session context testing',
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',

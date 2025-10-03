@@ -3,6 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { writeFile, rm, mkdir } from 'fs/promises';
+import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { FileEditTool } from '~/tools/implementations/file_edit';
 import { setupCoreTest } from '~/test-utils/core-test-setup';
@@ -19,17 +20,22 @@ import { Project } from '~/projects/project';
 import type { ToolContext } from '~/tools/types';
 
 describe('FileEditTool Integration Tests', () => {
-  const _tempLaceDir = setupCoreTest();
+  const tempLaceDirContext = setupCoreTest();
   let tool: FileEditTool;
   let providerInstanceId: string;
   let session: Session;
   let agent: ReturnType<typeof session.getAgent>;
   let context: ToolContext;
+  let tempProjectDir: string;
   const testDir = join(process.cwd(), 'test-temp-file-edit-schema');
   const testFile = join(testDir, 'test.txt');
 
   beforeEach(async () => {
     setupTestProviderDefaults();
+
+    // Create temp project directory
+    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
 
     // Create provider instance
     providerInstanceId = await createTestProviderInstance({
@@ -40,7 +46,7 @@ describe('FileEditTool Integration Tests', () => {
     });
 
     // Create project and session
-    const project = Project.create('Test Project', process.cwd(), 'Test project for file edit', {
+    const project = Project.create('Test Project', tempProjectDir, 'Test project for file edit', {
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });

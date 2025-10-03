@@ -21,11 +21,14 @@ import {
   createDelegationTestSetup,
   DelegationTestSetup,
 } from '~/test-utils/delegation-test-helper';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 
 // Using shared delegation test utilities
 
 describe('Task-Based DelegateTool Integration', () => {
-  const _tempLaceDir = setupCoreTest();
+  const tempLaceDirContext = setupCoreTest();
+  let tempProjectDir: string;
   let testSetup: DelegationTestSetup;
   let delegateTool: DelegateTool;
   let context: ToolContext;
@@ -42,10 +45,15 @@ describe('Task-Based DelegateTool Integration', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create temp project directory
+    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-delegation');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Use shared delegation test setup with MSW
     testSetup = await createDelegationTestSetup({
       sessionName: 'Task-Based Delegate Test Session',
       projectName: 'Task-Based Test Project',
+      projectPath: tempProjectDir,
       model: 'claude-3-5-haiku-20241022',
     });
 

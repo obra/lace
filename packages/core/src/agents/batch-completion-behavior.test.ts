@@ -122,8 +122,8 @@ describe('Tool Batch Completion Behavior', () => {
     // Create real project and session for proper context
     project = Project.create(
       'Batch Completion Test Project',
-      'Project for batch completion testing',
       tempProjectDir,
+      'Project for batch completion testing',
       {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',

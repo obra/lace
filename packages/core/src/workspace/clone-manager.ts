@@ -45,6 +45,12 @@ export class CloneManager {
         !projectDir.includes('/tmp/') &&
         !projectDir.includes('/T/')
       ) {
+        const stack = new Error().stack;
+        console.error('🚨 WOULD GIT INIT IN NON-TEMP DIR (CloneManager):', {
+          projectDir,
+          cwd: process.cwd(),
+          stack,
+        });
         throw new Error(
           `Refusing to git init in non-temp directory during tests! ` +
             `projectDir: ${projectDir}, cwd: ${process.cwd()}. ` +

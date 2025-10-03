@@ -14,17 +14,22 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 import { mkdtempSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { getProcessTempDir } from '~/config/lace-dir';
 
 describe('Project', () => {
-  const _tempLaceDir = setupCoreTest();
+  const tempLaceDirContext = setupCoreTest();
   let providerInstanceId: string;
+  let tempProjectDir: string;
 
   beforeEach(async () => {
+    // Create a real temp directory for each test
+    tempProjectDir = join(tempLaceDirContext.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     setupTestProviderDefaults();
 
     // Create a real provider instance for testing
@@ -45,7 +50,7 @@ describe('Project', () => {
 
   describe('create', () => {
     it('should create a new project with required fields', () => {
-      const project = Project.create('Test Project', '/test/path', 'A test project', {
+      const project = Project.create('Test Project', tempProjectDir, 'A test project', {
         key: 'value',
       });
 
@@ -56,11 +61,11 @@ describe('Project', () => {
       const retrieved = Project.getById(project.getId());
       expect(retrieved).not.toBeNull();
       expect(retrieved!.getName()).toBe('Test Project');
-      expect(retrieved!.getWorkingDirectory()).toBe('/test/path');
+      expect(retrieved!.getWorkingDirectory()).toBe(tempProjectDir);
     });
 
     it('should create project with default values', () => {
-      const project = Project.create('Test Project', '/test/path');
+      const project = Project.create('Test Project', tempProjectDir);
 
       expect(project).toBeInstanceOf(Project);
 
@@ -68,13 +73,15 @@ describe('Project', () => {
       const retrieved = Project.getById(project.getId());
       expect(retrieved).not.toBeNull();
       expect(retrieved!.getName()).toBe('Test Project');
-      expect(retrieved!.getWorkingDirectory()).toBe('/test/path');
+      expect(retrieved!.getWorkingDirectory()).toBe(tempProjectDir);
     });
 
     it('should auto-generate name from directory path', () => {
+      const projectPath = join(tempLaceDirContext.tempDir, 'my-awesome-project');
+      mkdirSync(projectPath, { recursive: true });
       const project = Project.create(
         '', // empty name to trigger auto-generation
-        '/home/user/my-awesome-project',
+        projectPath,
         'Test description'
       );
 
@@ -83,21 +90,28 @@ describe('Project', () => {
     });
 
     it('should handle trailing slashes in directory path', () => {
-      const project = Project.create('', '/home/user/my-project/', 'Test description');
+      const projectPath = join(tempLaceDirContext.tempDir, 'my-project');
+      mkdirSync(projectPath, { recursive: true });
+      const project = Project.create('', projectPath + '/', 'Test description');
 
       const info = project.getInfo();
       expect(info?.name).toBe('my-project');
     });
 
     it('should handle root directory', () => {
-      const project = Project.create('', '/', 'Test description');
+      // Use a single-letter directory name to test the edge case behavior
+      const projectPath = join(tempLaceDirContext.tempDir, 'r');
+      mkdirSync(projectPath, { recursive: true });
+      const project = Project.create('', projectPath, 'Test description');
 
       const info = project.getInfo();
-      expect(info?.name).toBe('root');
+      expect(info?.name).toBe('r');
     });
 
     it('should use provided name when given', () => {
-      const project = Project.create('Custom Name', '/home/user/my-project', 'Test description');
+      const projectPath = join(tempLaceDirContext.tempDir, 'my-project');
+      mkdirSync(projectPath, { recursive: true });
+      const project = Project.create('Custom Name', projectPath, 'Test description');
 
       const info = project.getInfo();
       expect(info?.name).toBe('Custom Name');
@@ -107,8 +121,13 @@ describe('Project', () => {
   describe('getAll', () => {
     it('should return all projects', () => {
       // Create real projects in the database
-      const _project1 = Project.create('Project 1', '/path1', 'First project');
-      const _project2 = Project.create('Project 2', '/path2', 'Second project');
+      const path1 = join(tempLaceDirContext.tempDir, 'project1');
+      const path2 = join(tempLaceDirContext.tempDir, 'project2');
+      mkdirSync(path1, { recursive: true });
+      mkdirSync(path2, { recursive: true });
+
+      const _project1 = Project.create('Project 1', path1, 'First project');
+      const _project2 = Project.create('Project 2', path2, 'Second project');
 
       const projects = Project.getAll();
 
@@ -116,8 +135,8 @@ describe('Project', () => {
       expect(projects).toHaveLength(2);
       expect(projects.find((p) => p.name === 'Project 1')).toBeDefined();
       expect(projects.find((p) => p.name === 'Project 2')).toBeDefined();
-      expect(projects.find((p) => p.name === 'Project 1')?.workingDirectory).toBe('/path1');
-      expect(projects.find((p) => p.name === 'Project 2')?.workingDirectory).toBe('/path2');
+      expect(projects.find((p) => p.name === 'Project 1')?.workingDirectory).toBe(path1);
+      expect(projects.find((p) => p.name === 'Project 2')?.workingDirectory).toBe(path2);
     });
 
     it('should return empty list when no projects exist', () => {
@@ -130,7 +149,7 @@ describe('Project', () => {
 
   describe('getById', () => {
     it('should return project when found', () => {
-      const createdProject = Project.create('Test Project', '/test/path', 'A test project', {
+      const createdProject = Project.create('Test Project', tempProjectDir, 'A test project', {
         key: 'value',
       });
       const projectId = createdProject.getId();
@@ -153,7 +172,7 @@ describe('Project', () => {
     let project: Project;
 
     beforeEach(() => {
-      project = Project.create('Test Project', '/test/path', 'A test project', {
+      project = Project.create('Test Project', tempProjectDir, 'A test project', {
         providerInstanceId,
         modelId: 'claude-3-5-haiku-20241022',
         key: 'value',
@@ -168,7 +187,7 @@ describe('Project', () => {
           id: project.getId(),
           name: 'Test Project',
           description: 'A test project',
-          workingDirectory: '/test/path',
+          workingDirectory: tempProjectDir,
           isArchived: false,
           createdAt: expect.any(Date) as Date,
           lastUsedAt: expect.any(Date) as Date,
@@ -190,7 +209,7 @@ describe('Project', () => {
 
     describe('getWorkingDirectory', () => {
       it('should return working directory', () => {
-        expect(project.getWorkingDirectory()).toBe('/test/path');
+        expect(project.getWorkingDirectory()).toBe(tempProjectDir);
       });
     });
 
@@ -205,7 +224,9 @@ describe('Project', () => {
       });
 
       it('should return empty object when no configuration', () => {
-        const simpleProject = Project.create('Simple', '/path');
+        const simplePath = join(tempLaceDirContext.tempDir, 'simple-project');
+        mkdirSync(simplePath, { recursive: true });
+        const simpleProject = Project.create('Simple', simplePath);
         const config = simpleProject.getConfiguration();
         expect(config).toEqual({});
       });
@@ -227,10 +248,12 @@ describe('Project', () => {
       });
 
       it('should update working directory', () => {
-        project.updateInfo({ workingDirectory: '/new/path' });
+        const newPath = join(tempLaceDirContext.tempDir, 'new-path');
+        mkdirSync(newPath, { recursive: true });
+        project.updateInfo({ workingDirectory: newPath });
 
         const updated = Project.getById(project.getId());
-        expect(updated?.getWorkingDirectory()).toBe('/new/path');
+        expect(updated?.getWorkingDirectory()).toBe(newPath);
       });
 
       it('should update configuration', () => {
@@ -317,7 +340,9 @@ describe('Project', () => {
         });
 
         it('should not return sessions from other projects', () => {
-          const otherProject = Project.create('Other Project', '/other/path', 'Other project', {
+          const otherPath = join(tempLaceDirContext.tempDir, 'other-project');
+          mkdirSync(otherPath, { recursive: true });
+          const otherProject = Project.create('Other Project', otherPath, 'Other project', {
             providerInstanceId,
             modelId: 'claude-3-5-haiku-20241022',
           });
@@ -395,7 +420,9 @@ describe('Project', () => {
         });
 
         it('should return null when session belongs to different project', () => {
-          const otherProject = Project.create('Other Project', '/other/path', 'Other project', {
+          const otherPath = join(tempLaceDirContext.tempDir, 'other-project-2');
+          mkdirSync(otherPath, { recursive: true });
+          const otherProject = Project.create('Other Project', otherPath, 'Other project', {
             providerInstanceId,
             modelId: 'claude-3-5-haiku-20241022',
           });
@@ -441,7 +468,9 @@ describe('Project', () => {
         });
 
         it('should return null when session belongs to different project', () => {
-          const otherProject = Project.create('Other Project', '/other/path', 'Other project', {
+          const otherPath = join(tempLaceDirContext.tempDir, 'other-project-3');
+          mkdirSync(otherPath, { recursive: true });
+          const otherProject = Project.create('Other Project', otherPath, 'Other project', {
             providerInstanceId,
             modelId: 'claude-3-5-haiku-20241022',
           });
@@ -491,7 +520,9 @@ describe('Project', () => {
         });
 
         it('should return false when session belongs to different project', () => {
-          const otherProject = Project.create('Other Project', '/other/path', 'Other project', {
+          const otherPath = join(tempLaceDirContext.tempDir, 'other-project-4');
+          mkdirSync(otherPath, { recursive: true });
+          const otherProject = Project.create('Other Project', otherPath, 'Other project', {
             providerInstanceId,
             modelId: 'claude-3-5-haiku-20241022',
           });
@@ -583,11 +614,14 @@ describe('Project', () => {
   describe('Project data caching', () => {
     it('should cache ProjectData after first load to avoid duplicate database queries', () => {
       // Arrange: Create project data in database
+      const cachePath = join(tempLaceDirContext.tempDir, 'cache-project');
+      mkdirSync(cachePath, { recursive: true });
+
       const projectData: ProjectData = {
         id: 'test-project-cache',
         name: 'Cached Project',
         description: 'Test project for caching',
-        workingDirectory: '/tmp/test',
+        workingDirectory: cachePath,
         configuration: { testSetting: 'value' },
         isArchived: false,
         createdAt: new Date(),
@@ -618,7 +652,9 @@ describe('Project', () => {
 
     it('should refresh ProjectData from database when explicitly requested', () => {
       // Create project
-      const project = Project.create('Original Name', '/tmp/original', 'Original description', {});
+      const originalPath = join(tempLaceDirContext.tempDir, 'original-project');
+      mkdirSync(originalPath, { recursive: true });
+      const project = Project.create('Original Name', originalPath, 'Original description', {});
 
       // Simulate external update in database
       const persistence = getPersistence();

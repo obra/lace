@@ -2,6 +2,8 @@
 // ABOUTME: Verifies the full flow from task creation through agent spawning with flexible model specs
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 import { TaskManager } from '~/tasks/task-manager';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
@@ -12,7 +14,8 @@ import { setupCoreTest } from '~/test-utils/core-test-setup';
 vi.mock('~/config/user-settings');
 
 describe('Task Assignment Model Resolution Integration', () => {
-  const _tempLaceDir = setupCoreTest();
+  const context = setupCoreTest();
+  let tempProjectDir: string;
   let session: Session;
   let taskManager: TaskManager;
 
@@ -24,8 +27,12 @@ describe('Task Assignment Model Resolution Integration', () => {
       throw new Error('Unknown tier');
     });
 
+    // Create temp project directory
+    tempProjectDir = join(context.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create project with default provider config
-    const project = Project.create('Test Project', '/tmp/test', 'Test project', {
+    const project = Project.create('Test Project', tempProjectDir, 'Test project', {
       providerInstanceId: 'default-instance',
       modelId: 'default-model',
     });

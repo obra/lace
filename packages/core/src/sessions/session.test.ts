@@ -15,7 +15,8 @@ import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
 } from '~/test-utils/provider-instances';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
 
 // Mock external dependencies that don't affect core functionality
 vi.mock('server-only', () => ({}));
@@ -39,15 +40,20 @@ vi.mock('fs/promises', () => ({
 vi.mock('node-fetch', () => vi.fn());
 
 describe('Session', () => {
-  const _tempLaceDir = setupCoreTest();
+  const context = setupCoreTest();
   let testProject: Project;
   let providerInstanceId: string;
   let openaiProviderInstanceId: string;
+  let tempProjectDir: string;
 
   beforeEach(async () => {
     setupTestProviderDefaults();
     vi.clearAllMocks();
     process.env.LACE_DB_PATH = ':memory:';
+
+    // Create temp directory for test project
+    tempProjectDir = join(context.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
 
     // Create real provider instances for testing
     providerInstanceId = await createTestProviderInstance({
@@ -65,7 +71,7 @@ describe('Session', () => {
     });
 
     // Create a test project for all tests with default provider configuration
-    testProject = Project.create('Test Project', '/test/path', 'Test project', {
+    testProject = Project.create('Test Project', tempProjectDir, 'Test project', {
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });
@@ -584,12 +590,17 @@ describe('Session', () => {
 
   describe('Session class project support', () => {
     let testProjectId: string;
+    let tempProjectDir2: string;
 
     beforeEach(() => {
+      // Create temp directory for second test project
+      tempProjectDir2 = join(context.tempDir, 'test-project-2');
+      mkdirSync(tempProjectDir2, { recursive: true });
+
       // Create the project that tests expect to exist
       const testProject = Project.create(
         'Test Project',
-        '/project/path',
+        tempProjectDir2,
         'Test project for session tests',
         {
           providerInstanceId,
@@ -606,7 +617,7 @@ describe('Session', () => {
       });
 
       expect(session.getProjectId()).toBe(testProjectId);
-      expect(session.getWorkingDirectory()).toBe('/project/path');
+      expect(session.getWorkingDirectory()).toBe(tempProjectDir2);
     });
 
     it('should spawn agents with project working directory', () => {
@@ -616,7 +627,7 @@ describe('Session', () => {
       });
 
       const _agent = session.spawnAgent({ name: 'Worker Agent' });
-      expect(session.getWorkingDirectory()).toBe('/project/path');
+      expect(session.getWorkingDirectory()).toBe(tempProjectDir2);
     });
 
     it('should store session in sessions table not metadata', () => {

@@ -2,6 +2,8 @@
 // ABOUTME: Tests agent-specific configuration, role-based settings, and capability management
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
@@ -17,7 +19,8 @@ import {
 import { ApprovalDecision } from '~/tools/types';
 
 describe('Agent Configuration', () => {
-  const _tempLaceDir = setupCoreTest();
+  const context = setupCoreTest();
+  let tempProjectDir: string;
   let testProject: Project;
   let testSession: Session;
   let projectId: string;
@@ -34,8 +37,12 @@ describe('Agent Configuration', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create temp project directory
+    tempProjectDir = join(context.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create test project
-    testProject = Project.create('Test Project', '/test/path', 'Test project for agent config', {
+    testProject = Project.create('Test Project', tempProjectDir, 'Test project for agent config', {
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
       maxTokens: 4000,

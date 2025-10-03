@@ -24,6 +24,19 @@ POLLUTERS=()
 CLEAN_TESTS=()
 
 for test_file in $TEST_FILES; do
+    # Stop when we reach the validation test - we want to catch pollution before it
+    if [[ "$test_file" == *"workspace-cleanup-validation"* ]]; then
+        echo "Reached validation test - checking for pollution..."
+        if [ -d "$GIT_DIR" ]; then
+            echo "❌ .git EXISTS before validation test!"
+            echo "Last test before validation: ${CLEAN_TESTS[-1]:-none}"
+            exit 1
+        else
+            echo "✅ No .git before validation test"
+            break
+        fi
+    fi
+
     # Check if .git exists before test
     if [ -d "$GIT_DIR" ]; then
         echo "⚠️  .git already exists before $test_file - skipping"

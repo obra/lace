@@ -2,6 +2,8 @@
 // ABOUTME: Validates both single task and tasks array formats with proper validation
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 import { TaskCreateTool } from '~/tools/implementations/task-manager/tools';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
@@ -16,7 +18,8 @@ import {
 } from '~/test-utils/provider-defaults';
 
 describe('Bulk Task Creation', () => {
-  const _tempLaceDir = setupCoreTest();
+  const context = setupCoreTest();
+  let tempProjectDir: string;
   let tool: TaskCreateTool;
   let session: Session;
   let project: Project;
@@ -33,8 +36,12 @@ describe('Bulk Task Creation', () => {
       apiKey: 'test-anthropic-key',
     });
 
+    // Create temp project directory
+    tempProjectDir = join(context.tempDir, 'test-bulk-tasks');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create session with TaskManager like real usage
-    project = Project.create('Test Project', 'Test project description', '/tmp/test-bulk-tasks', {
+    project = Project.create('Test Project', tempProjectDir, 'Test project description', {
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });

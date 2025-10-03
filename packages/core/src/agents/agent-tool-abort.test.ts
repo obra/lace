@@ -88,7 +88,7 @@ describe('Agent Tool Abort Functionality', () => {
     mkdirSync(tempProjectDir, { recursive: true });
 
     // Create project and session for proper context
-    project = Project.create('Abort Test Project', 'Project for abort testing', tempProjectDir, {
+    project = Project.create('Abort Test Project', tempProjectDir, 'Project for abort testing', {
       providerInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
     });

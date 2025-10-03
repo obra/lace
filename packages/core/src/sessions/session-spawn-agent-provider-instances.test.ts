@@ -2,6 +2,8 @@
 // ABOUTME: Verifies spawnAgent() accepts provider instance parameters, inheritance, and configuration patterns
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { join } from 'path';
+import { mkdirSync } from 'fs';
 import { Session } from '~/sessions/session';
 import { Project } from '~/projects/project';
 import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
@@ -15,7 +17,8 @@ import {
 } from '~/test-utils/provider-instances';
 
 describe('Session.spawnAgent() with Provider Instances', () => {
-  const _tempLaceDir = setupCoreTest();
+  const context = setupCoreTest();
+  let tempProjectDir: string;
   let testProject: Project;
   let testSession: Session;
   let providerInstanceId: string;
@@ -39,10 +42,14 @@ describe('Session.spawnAgent() with Provider Instances', () => {
       apiKey: 'test-openai-key',
     });
 
+    // Create temp project directory
+    tempProjectDir = join(context.tempDir, 'test-project');
+    mkdirSync(tempProjectDir, { recursive: true });
+
     // Create a test project with provider configuration using defaults
     testProject = Project.create(
       'Test Project',
-      '/test/path',
+      tempProjectDir,
       'Test project for spawn agent tests',
       {
         providerInstanceId,
