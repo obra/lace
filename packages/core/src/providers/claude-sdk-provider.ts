@@ -87,15 +87,6 @@ export class ClaudeSDKProvider extends AIProvider {
   private sessionId?: string;
   private lastHistoryFingerprint?: string;
 
-  // Map of pending tool approvals waiting for user decision
-  private pendingApprovals = new Map<
-    string,
-    {
-      resolve: (decision: ApprovalDecision) => void;
-      reject: (error: Error) => void;
-    }
-  >();
-
   constructor(config: ClaudeSDKProviderConfig) {
     super(config);
   }
@@ -689,46 +680,24 @@ export class ClaudeSDKProvider extends AIProvider {
             };
 
           case 'ask': {
-            // Need user approval - create promise and emit event
-            const toolCallId = `approval-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            // Request approval through ToolExecutor
+            logger.debug('Requesting tool approval', { toolName });
 
-            logger.debug('Requesting tool approval', { toolName, toolCallId });
-
-            const approvalPromise = new Promise<ApprovalDecision>((resolve, reject) => {
-              this.pendingApprovals.set(toolCallId, { resolve, reject });
-
-              // Emit event for external approval system
-              this.emit('approval_request', {
-                toolName,
-                input,
-                isReadOnly: tool?.annotations?.readOnlySafe || false,
-                requestId: toolCallId,
-                resolve, // Pass resolve directly so emitter can resolve
-              });
-
-              // Handle abort
-              signal.addEventListener(
-                'abort',
-                () => {
-                  this.pendingApprovals.delete(toolCallId);
-                  reject(new Error('Tool approval aborted'));
-                },
-                { once: true }
-              );
+            const approvalResult = await toolExecutor.requestApproval({
+              toolName,
+              parameters: input,
+              readOnly: tool?.annotations?.readOnlySafe || false,
             });
 
-            // Wait for approval decision
-            const decision = await approvalPromise;
+            logger.debug('Approval received', { toolName, decision: approvalResult.decision });
 
-            logger.debug('Approval received', { toolName, toolCallId, decision });
-
-            // Check if approval was granted
+            // Map Lace approval decision to SDK permission result
             const isAllowed = [
               ApprovalDecision.ALLOW_ONCE,
               ApprovalDecision.ALLOW_SESSION,
               ApprovalDecision.ALLOW_PROJECT,
               ApprovalDecision.ALLOW_ALWAYS,
-            ].includes(decision);
+            ].includes(approvalResult.decision);
 
             if (isAllowed) {
               return { behavior: 'allow', updatedInput: input };
