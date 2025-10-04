@@ -21,6 +21,8 @@ import {
 } from '@anthropic-ai/claude-agent-sdk';
 import type { ToolResult, PermissionOverrideMode } from '~/tools/types';
 import { ApprovalDecision } from '~/tools/types';
+import { existsSync } from 'fs';
+import { tmpdir } from 'os';
 
 // SDK permission mode types (SDK doesn't export these)
 type SDKPermissionMode = 'default' | 'bypassPermissions' | 'plan';
@@ -164,14 +166,19 @@ export class ClaudeSDKProvider extends AIProvider {
       process.env.CLAUDE_CODE_OAUTH_TOKEN = oauthToken;
     }
 
+    // Use valid cwd - fallback to tmpdir if working directory doesn't exist
+    const nonStreamingCwd = existsSync(context.workingDirectory)
+      ? context.workingDirectory
+      : tmpdir();
+
     // Build SDK query options
     const queryOptions: SDKQueryOptions = {
       resume: canResume ? this.sessionId : undefined,
       forkSession: !canResume && this.sessionId !== undefined,
       model,
       systemPrompt: this._systemPrompt,
-      cwd: context.workingDirectory,
-      env: undefined as unknown as NodeJS.ProcessEnv, // Don't pass env - let subprocess inherit naturally to enable PATH search
+      cwd: nonStreamingCwd,
+      env: process.env, // Pass full parent environment to ensure SDK subprocess has all required vars
       includePartialMessages: false, // Disable for non-streaming
       settingSources: [], // Don't load filesystem settings
       mcpServers: {
@@ -333,7 +340,7 @@ export class ClaudeSDKProvider extends AIProvider {
     const config = this._config as ClaudeSDKProviderConfig;
     const oauthToken = config.sessionToken;
 
-    logger.info('SDK Provider createStreamingResponse', {
+    logger.info('SDK Provider createStreamingResponse [VERSION: v5-FINAL-cwd-tmpdir-fix]', {
       messageCount: messages.length,
       toolCount: tools.length,
       model,
@@ -367,14 +374,17 @@ export class ClaudeSDKProvider extends AIProvider {
       process.env.CLAUDE_CODE_OAUTH_TOKEN = oauthToken;
     }
 
+    // Use valid cwd - fallback to tmpdir if working directory doesn't exist
+    const cwd = existsSync(context.workingDirectory) ? context.workingDirectory : tmpdir();
+
     // Build query options with streaming enabled
     const queryOptions: SDKQueryOptions = {
       resume: canResume ? this.sessionId : undefined,
       forkSession: !canResume && this.sessionId !== undefined,
       model,
       systemPrompt: this._systemPrompt,
-      cwd: context.workingDirectory,
-      env: undefined as unknown as NodeJS.ProcessEnv, // Don't pass env - let subprocess inherit naturally to enable PATH search
+      cwd,
+      env: process.env, // Pass full parent environment to ensure SDK subprocess has all required vars
       includePartialMessages: true, // Enable streaming
       settingSources: [],
       mcpServers: {
@@ -390,26 +400,30 @@ export class ClaudeSDKProvider extends AIProvider {
 
     // EXTENSIVE logging for debugging subprocess spawn issues
     logger.info('==== SDK SUBPROCESS SPAWN DEBUG ====');
-    logger.info('Environment Analysis:', {
-      contextPATH: context.processEnv?.PATH || 'undefined',
-      processPATH: process.env.PATH,
-      parentTokenSet: !!process.env.CLAUDE_CODE_OAUTH_TOKEN,
-      pathsMatch: context.processEnv?.PATH === process.env.PATH,
-      nodeLocation: process.execPath,
-      cwd: context.workingDirectory,
+    logger.info('Context env object:', {
+      isUndefined: context.processEnv === undefined,
+      isNull: context.processEnv === null,
+      keys: context.processEnv ? Object.keys(context.processEnv).length : 0,
+      sample: context.processEnv
+        ? Object.keys(context.processEnv)
+            .slice(0, 10)
+            .map((k) => `${k}=${String(context.processEnv![k]).substring(0, 30)}`)
+        : [],
+    });
+    logger.info('Env passed to SDK:', {
+      envValue: queryOptions.env === undefined ? 'undefined' : typeof queryOptions.env,
+      envIsProcessEnv: queryOptions.env === process.env,
+      envIsContextEnv: queryOptions.env === context.processEnv,
+    });
+    logger.info('CWD Status:', {
+      cwd: queryOptions.cwd,
+      cwdExists: existsSync(queryOptions.cwd),
+      processCwd: process.cwd(),
     });
     logger.info('Token Status:', {
       hasToken: !!oauthToken,
       tokenPrefix: oauthToken?.substring(0, 20),
       tokenSetInParent: !!process.env.CLAUDE_CODE_OAUTH_TOKEN,
-    });
-    logger.info('Query Options:', {
-      model: queryOptions.model,
-      cwd: queryOptions.cwd,
-      hasSystemPrompt: !!queryOptions.systemPrompt,
-      systemPromptLength: queryOptions.systemPrompt?.length,
-      mcpServers: Object.keys(queryOptions.mcpServers),
-      permissionMode: queryOptions.permissionMode,
     });
     logger.info('==== END DEBUG ====');
 
