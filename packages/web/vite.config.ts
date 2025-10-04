@@ -21,6 +21,7 @@ export default defineConfig({
   server: {
     warmup: {
       clientFiles: ['./app/entry.client.tsx', './app/root.tsx', './app/routes/**/*.tsx'],
+    },
     watch: {
       ignored: ['!**/node_modules/@lace/core/**'],
     },
