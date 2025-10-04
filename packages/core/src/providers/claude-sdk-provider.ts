@@ -157,13 +157,12 @@ export class ClaudeSDKProvider extends AIProvider {
       ? this.mapPermissionMode(context.session.getPermissionOverrideMode())
       : 'default';
 
-    // Build environment with OAuth token for SDK subprocess
-    // Start with context.processEnv, then add system PATH and OAuth token
-    const sdkEnv = {
-      ...context.processEnv,
-      PATH: process.env.PATH, // Use system PATH, not context PATH
-      ...(oauthToken && { CLAUDE_CODE_OAUTH_TOKEN: oauthToken }),
-    };
+    // Set OAuth token in parent process env so SDK subprocess inherits it naturally
+    // This avoids passing custom env which prevents PATH search in spawn()
+    const originalToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    if (oauthToken) {
+      process.env.CLAUDE_CODE_OAUTH_TOKEN = oauthToken;
+    }
 
     // Build SDK query options
     const queryOptions: SDKQueryOptions = {
@@ -172,7 +171,7 @@ export class ClaudeSDKProvider extends AIProvider {
       model,
       systemPrompt: this._systemPrompt,
       cwd: context.workingDirectory,
-      env: sdkEnv,
+      env: undefined as unknown as NodeJS.ProcessEnv, // Don't pass env - let subprocess inherit naturally to enable PATH search
       includePartialMessages: false, // Disable for non-streaming
       settingSources: [], // Don't load filesystem settings
       mcpServers: {
@@ -309,6 +308,13 @@ export class ClaudeSDKProvider extends AIProvider {
         errorType: error instanceof Error ? error.constructor.name : typeof error,
       });
       throw error;
+    } finally {
+      // Restore original token state
+      if (originalToken !== undefined) {
+        process.env.CLAUDE_CODE_OAUTH_TOKEN = originalToken;
+      } else {
+        delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+      }
     }
   }
 
@@ -354,13 +360,12 @@ export class ClaudeSDKProvider extends AIProvider {
       ? this.mapPermissionMode(context.session.getPermissionOverrideMode())
       : 'default';
 
-    // Build environment with OAuth token for SDK subprocess
-    // Start with context.processEnv, then add system PATH and OAuth token
-    const sdkEnv = {
-      ...context.processEnv,
-      PATH: process.env.PATH, // Use system PATH, not context PATH
-      ...(oauthToken && { CLAUDE_CODE_OAUTH_TOKEN: oauthToken }),
-    };
+    // Set OAuth token in parent process env so SDK subprocess inherits it naturally
+    // This avoids passing custom env which prevents PATH search in spawn()
+    const originalToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    if (oauthToken) {
+      process.env.CLAUDE_CODE_OAUTH_TOKEN = oauthToken;
+    }
 
     // Build query options with streaming enabled
     const queryOptions: SDKQueryOptions = {
@@ -369,7 +374,7 @@ export class ClaudeSDKProvider extends AIProvider {
       model,
       systemPrompt: this._systemPrompt,
       cwd: context.workingDirectory,
-      env: sdkEnv,
+      env: undefined as unknown as NodeJS.ProcessEnv, // Don't pass env - let subprocess inherit naturally to enable PATH search
       includePartialMessages: true, // Enable streaming
       settingSources: [],
       mcpServers: {
@@ -383,24 +388,30 @@ export class ClaudeSDKProvider extends AIProvider {
       abortController: signal ? ({ signal } as unknown as AbortController) : undefined,
     };
 
-    // Log query options for debugging
-    logger.debug('SDK query options (streaming)', {
-      prompt: latestMessage.content.substring(0, 100),
-      resume: queryOptions.resume,
+    // EXTENSIVE logging for debugging subprocess spawn issues
+    logger.info('==== SDK SUBPROCESS SPAWN DEBUG ====');
+    logger.info('Environment Analysis:', {
+      contextPATH: context.processEnv?.PATH || 'undefined',
+      processPATH: process.env.PATH,
+      parentTokenSet: !!process.env.CLAUDE_CODE_OAUTH_TOKEN,
+      pathsMatch: context.processEnv?.PATH === process.env.PATH,
+      nodeLocation: process.execPath,
+      cwd: context.workingDirectory,
+    });
+    logger.info('Token Status:', {
+      hasToken: !!oauthToken,
+      tokenPrefix: oauthToken?.substring(0, 20),
+      tokenSetInParent: !!process.env.CLAUDE_CODE_OAUTH_TOKEN,
+    });
+    logger.info('Query Options:', {
       model: queryOptions.model,
       cwd: queryOptions.cwd,
+      hasSystemPrompt: !!queryOptions.systemPrompt,
       systemPromptLength: queryOptions.systemPrompt?.length,
-      mcpServerCount: Object.keys(queryOptions.mcpServers).length,
-      mcpServerNames: Object.keys(queryOptions.mcpServers),
-      hasCanUseTool: !!queryOptions.canUseTool,
+      mcpServers: Object.keys(queryOptions.mcpServers),
       permissionMode: queryOptions.permissionMode,
-      hasToken: !!oauthToken,
-      envHasPATH: !!(sdkEnv as NodeJS.ProcessEnv).PATH,
-      envPATH: (sdkEnv as NodeJS.ProcessEnv).PATH?.substring(0, 200),
-      envHasOAuthToken: !!sdkEnv.CLAUDE_CODE_OAUTH_TOKEN,
-      processExecPath: process.execPath,
-      envKeys: Object.keys(sdkEnv).length,
     });
+    logger.info('==== END DEBUG ====');
 
     const query = sdkQuery({
       prompt: latestMessage.content,
@@ -519,6 +530,13 @@ export class ClaudeSDKProvider extends AIProvider {
         errorType: error instanceof Error ? error.constructor.name : typeof error,
       });
       throw error;
+    } finally {
+      // Restore original token state
+      if (originalToken !== undefined) {
+        process.env.CLAUDE_CODE_OAUTH_TOKEN = originalToken;
+      } else {
+        delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+      }
     }
   }
 
