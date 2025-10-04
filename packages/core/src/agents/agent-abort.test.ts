@@ -2,13 +2,13 @@
 // ABOUTME: Validates that abort mechanism works correctly with providers and events
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent, AgentConfig, CurrentTurnMetrics } from '~/agents/agent';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Agent, AgentConfig, CurrentTurnMetrics } from './agent';
+import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from '@lace/core/providers/base-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 // Mock provider for testing that can simulate abort behavior
 class MockAbortableProvider extends BaseMockProvider {

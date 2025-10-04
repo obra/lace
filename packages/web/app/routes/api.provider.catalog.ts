@@ -1,10 +1,10 @@
 // ABOUTME: Provider catalog API endpoint
 // ABOUTME: Returns available providers from Catwalk catalog data with models and metadata
 
-import { ProviderRegistry } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import type { CatalogProvider } from '@/lib/server/lace-imports';
+import { ProviderRegistry } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import type { CatalogProvider } from '@lace/web/lib/server/lace-imports';
 import type { Route } from './+types/api.provider.catalog';
 
 export interface CatalogResponse {

@@ -4,14 +4,14 @@
 import type { Route } from './+types/api.sessions.$sessionId.files';
 import { promises as fs, constants as fsConstants } from 'fs';
 import { join, resolve, relative, basename } from 'path';
-import { createSuccessResponse, createErrorResponse } from '@/lib/server/api-utils';
-import { SessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/types/core';
+import { createSuccessResponse, createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { SessionService } from '@lace/web/lib/server/session-service';
+import { asThreadId } from '@lace/web/types/core';
 import {
   ListSessionDirectoryRequestSchema,
   type SessionDirectoryResponse,
   type SessionFileEntry,
-} from '@/types/session-files';
+} from '@lace/web/types/session-files';
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   try {

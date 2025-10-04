@@ -18,7 +18,7 @@ never directly with business logic classes.
 
 ```typescript
 // ❌ BAD - API route directly imports business logic
-import { Session, Project } from '@/lib/server/lace-imports';
+import { Session, Project } from '@lace/web/lib/server/lace-imports';
 
 export function GET() {
   const session = Session.getSession(id); // Direct business logic call
@@ -30,7 +30,7 @@ export function GET() {
 
 ```typescript
 // ✅ GOOD - API route uses service layer
-import { getSessionService } from '@/lib/server/session-service';
+import { getSessionService } from '@lace/web/lib/server/session-service';
 
 export function GET() {
   const sessionService = getSessionService();
@@ -262,7 +262,7 @@ describe('SessionService', () => {
 **Before (current broken code)**:
 
 ```typescript
-import { Session, Project } from '@/lib/server/lace-imports';
+import { Session, Project } from '@lace/web/lib/server/lace-imports';
 
 export function GET(
   request: NextRequest,
@@ -279,7 +279,7 @@ export function GET(
 **After (target code)**:
 
 ```typescript
-import { getSessionService } from '@/lib/server/session-service';
+import { getSessionService } from '@lace/web/lib/server/session-service';
 
 export function GET(
   request: NextRequest,
@@ -355,7 +355,7 @@ curl -X GET http://localhost:3000/api/sessions/test-session-id/configuration
 ### Changes Made
 
 1. **Updated route imports** -
-   `import { getSessionService } from '@/lib/server/session-service'` instead of
+   `import { getSessionService } from '@lace/web/lib/server/session-service'` instead of
    direct business logic
 2. **Refactored GET endpoint** - Uses
    `sessionService.getEffectiveConfiguration()` with proper error handling
@@ -371,12 +371,12 @@ curl -X GET http://localhost:3000/api/sessions/test-session-id/configuration
 
 ```typescript
 // Before (Direct business logic calls)
-import { Session, Project } from '@/lib/server/lace-imports';
+import { Session, Project } from '@lace/web/lib/server/lace-imports';
 const sessionData = Session.getSession(params.sessionId);
 const project = Project.getById(sessionData.projectId);
 
 // After (Service layer calls)
-import { getSessionService } from '@/lib/server/session-service';
+import { getSessionService } from '@lace/web/lib/server/session-service';
 const sessionService = getSessionService();
 const configuration = await sessionService.getEffectiveConfiguration(
   params.sessionId
@@ -466,7 +466,7 @@ logic
 
 ```bash
 # Find all API routes that import business logic
-find packages/web/app/api -name "*.ts" -exec grep -l "from '@/lib/server/lace-imports'" {} \;
+find packages/web/app/api -name "*.ts" -exec grep -l "from '@lace/web/lib/server/lace-imports'" {} \;
 ```
 
 **For each file found**:
@@ -479,14 +479,14 @@ find packages/web/app/api -name "*.ts" -exec grep -l "from '@/lib/server/lace-im
 **Before**:
 
 ```typescript
-import { Session, Project, Agent } from '@/lib/server/lace-imports';
-import { getSessionService } from '@/lib/server/session-service';
+import { Session, Project, Agent } from '@lace/web/lib/server/lace-imports';
+import { getSessionService } from '@lace/web/lib/server/session-service';
 ```
 
 **After**:
 
 ```typescript
-import { getSessionService } from '@/lib/server/session-service';
+import { getSessionService } from '@lace/web/lib/server/session-service';
 ```
 
 **Testing each file**:
@@ -557,10 +557,10 @@ npm run test:run
 **Current exports to evaluate**:
 
 ```typescript
-export { Agent } from '~/agents/agent';
-export { Session } from '~/sessions/session';
-export { Project } from '~/projects/project';
-export { ThreadManager } from '~/threads/thread-manager';
+export { Agent } from '@lace/core/agents/agent';
+export { Session } from '@lace/core/sessions/session';
+export { Project } from '@lace/core/projects/project';
+export { ThreadManager } from '@lace/core/threads/thread-manager';
 ```
 
 **Decision matrix**:
@@ -573,9 +573,9 @@ export { ThreadManager } from '~/threads/thread-manager';
 
 ```typescript
 // Only keep what SessionService actually needs
-export { Agent } from '~/agents/agent'; // ✅ Keep - SessionService uses this
-export { Session } from '~/sessions/session'; // ✅ Keep - SessionService uses this
-export { Project } from '~/projects/project'; // ✅ Keep - SessionService uses this
+export { Agent } from '@lace/core/agents/agent'; // ✅ Keep - SessionService uses this
+export { Session } from '@lace/core/sessions/session'; // ✅ Keep - SessionService uses this
+export { Project } from '@lace/core/projects/project'; // ✅ Keep - SessionService uses this
 // Remove anything that was only used by API routes
 ```
 
@@ -679,7 +679,7 @@ npm run typecheck
 
 ```typescript
 // API routes directly import business logic
-import { Session, Project } from '@/lib/server/lace-imports';
+import { Session, Project } from '@lace/web/lib/server/lace-imports';
 
 export function GET() {
   const session = Session.getSession(id); // ❌ Direct coupling
@@ -691,7 +691,7 @@ export function GET() {
 
 ```typescript
 // API routes only use service layer
-import { getSessionService } from '@/lib/server/session-service';
+import { getSessionService } from '@lace/web/lib/server/session-service';
 
 export function GET() {
   const sessionService = getSessionService();
@@ -733,7 +733,7 @@ npm run build
 ```typescript
 // pages/web/app/api/sessions/[sessionId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionService } from '@/lib/server/session-service';
+import { getSessionService } from '@lace/web/lib/server/session-service';
 
 export async function GET(
   request: NextRequest,

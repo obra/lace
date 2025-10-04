@@ -13,15 +13,15 @@ import {
   faFile,
   faFolderPlus,
   faExclamationTriangle,
-} from '@/lib/fontawesome';
-import { api } from '@/lib/api-client';
+} from '@lace/web/lib/fontawesome';
+import { api } from '@lace/web/lib/api-client';
 import type {
   ListDirectoryResponse,
   DirectoryEntry,
   CreateDirectoryResponse,
-} from '@/types/filesystem';
-import { DIRECTORY_BROWSER } from '@/lib/constants/ui';
-import { NewFolderDialog } from '@/components/ui/NewFolderDialog';
+} from '@lace/web/types/filesystem';
+import { DIRECTORY_BROWSER } from '@lace/web/lib/constants/ui';
+import { NewFolderDialog } from '@lace/web/components/ui/NewFolderDialog';
 
 interface DirectoryFieldProps {
   label?: string;

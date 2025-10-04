@@ -118,7 +118,7 @@ describe('EventStreamFirehose', () => {
 
 ```typescript
 // event-stream-firehose.ts
-import type { LaceEvent } from '@/types/core';
+import type { LaceEvent } from '@lace/web/types/core';
 
 // No 'any' types allowed - define specific interfaces
 interface EventFilter {
@@ -861,7 +861,7 @@ private disconnect(): void {
 // useEventStream.test.ts
 import { renderHook, cleanup } from '@testing-library/react';
 import { useEventStream } from './useEventStream';
-import { EventStreamFirehose } from '@/lib/event-stream-firehose';
+import { EventStreamFirehose } from '@lace/web/lib/event-stream-firehose';
 
 // Mock the firehose
 vi.mock('@/lib/event-stream-firehose');
@@ -987,8 +987,8 @@ describe('useEventStream', () => {
 ```typescript
 // useEventStream.ts - Complete replacement of existing file
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { EventStreamFirehose } from '@/lib/event-stream-firehose';
-import type { LaceEvent } from '@/types/core';
+import { EventStreamFirehose } from '@lace/web/lib/event-stream-firehose';
+import type { LaceEvent } from '@lace/web/types/core';
 
 interface UseEventStreamOptions {
   // Filters - specify what events you want
@@ -1167,8 +1167,8 @@ approach.
 ```typescript
 // app/api/events/stream/route.ts - Simplified version
 import { NextRequest, NextResponse } from 'next/server';
-import { EventStreamManager } from '@/lib/event-stream-manager';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {

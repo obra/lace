@@ -56,7 +56,7 @@ const config = [
       'no-console': ['error', { allow: ['warn', 'error'] }],
       'no-relative-import-paths/no-relative-import-paths': [
         'error',
-        { allowSameFolder: true, rootDir: '.', prefix: '@' },
+        { allowSameFolder: true, rootDir: '.', prefix: '@lace/web' },
       ],
       'no-restricted-imports': [
         'error',
@@ -64,7 +64,7 @@ const config = [
           patterns: [
             {
               group: ['../*'],
-              message: 'Use @ alias instead of relative parent imports',
+              message: 'Use @lace/web/* alias instead of relative parent imports',
             },
           ],
         },
@@ -74,7 +74,7 @@ const config = [
         {
           name: 'fetch',
           message:
-            'Use api.get/post/put/delete from @/lib/api-client instead of direct fetch() to ensure proper error handling',
+            'Use api.get/post/put/delete from @lace/web/lib/api-client instead of direct fetch() to ensure proper error handling',
         },
       ],
       'no-var': 'error',

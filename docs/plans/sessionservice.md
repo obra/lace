@@ -182,7 +182,7 @@ For each route found, write TDD test for direct usage.
 
 ```typescript
 import { GET, PUT } from '../route';
-import { Session, Project } from '@/lib/server/lace-imports';
+import { Session, Project } from '@lace/web/lib/server/lace-imports';
 
 // Mock the core classes
 jest.mock('@/lib/server/lace-imports', () => ({
@@ -243,7 +243,7 @@ npm test -- --testPathPattern="configuration.*route.test.ts"
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
-import { Session, Project } from '@/lib/server/lace-imports';
+import { Session, Project } from '@lace/web/lib/server/lace-imports';
 
 export async function GET(
   request: NextRequest,
@@ -572,7 +572,7 @@ it('should call Session.getSession() directly', async () => {
 #### Step 3: Green Phase - Update Route
 
 ```typescript
-import { Session } from '@/lib/server/lace-imports';
+import { Session } from '@lace/web/lib/server/lace-imports';
 
 export async function GET(
   request: NextRequest,
@@ -615,7 +615,7 @@ git commit -m "refactor: remove getSessionData() - use Session.getSession() dire
 
 ```typescript
 import { setupAgentApprovals } from '../agent-utils';
-import { Agent } from '@/lib/server/lace-imports';
+import { Agent } from '@lace/web/lib/server/lace-imports';
 
 describe('Agent Utilities', () => {
   it('should setup approval callback on agent', () => {
@@ -646,8 +646,8 @@ describe('Agent Utilities', () => {
 // ABOUTME: Utilities for agent-specific web concerns
 // ABOUTME: Handles tool approval and SSE setup for individual agents
 
-import { Agent } from '@/lib/server/lace-imports';
-import { ThreadId } from '@/lib/server/core-types';
+import { Agent } from '@lace/web/lib/server/lace-imports';
+import { ThreadId } from '@lace/web/lib/server/core-types';
 import { getApprovalManager } from './approval-manager';
 
 export function setupAgentApprovals(agent: Agent, sessionId: ThreadId): void {
@@ -755,7 +755,7 @@ it('should spawn agent using session.spawnAgent() directly', async () => {
 #### Step 4: Green Phase - Update Route
 
 ```typescript
-import { setupAgentApprovals } from '@/lib/server/agent-utils';
+import { setupAgentApprovals } from '@lace/web/lib/server/agent-utils';
 
 export async function POST(
   request: NextRequest,
@@ -808,7 +808,7 @@ ls packages/web/app/api/projects/[projectId]/
 
 ```typescript
 import { GET } from '../route';
-import { Project } from '@/lib/server/lace-imports';
+import { Project } from '@lace/web/lib/server/lace-imports';
 
 jest.mock('@/lib/server/lace-imports', () => ({
   Project: {
@@ -841,7 +841,7 @@ describe('Project Configuration Route - Direct Usage', () => {
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
-import { Project } from '@/lib/server/lace-imports';
+import { Project } from '@lace/web/lib/server/lace-imports';
 
 export async function GET(
   request: NextRequest,
@@ -890,7 +890,7 @@ git commit -m "refactor: project configuration route - use Project.getById() dir
 
 ```typescript
 import { GET } from '../route';
-import { ProviderRegistry } from '@/lib/server/lace-imports';
+import { ProviderRegistry } from '@lace/web/lib/server/lace-imports';
 
 jest.mock('@/lib/server/lace-imports', () => ({
   ProviderRegistry: {
@@ -920,7 +920,7 @@ describe('Providers Route - Direct Usage', () => {
 
 ```typescript
 import { NextResponse } from 'next/server';
-import { ProviderRegistry } from '@/lib/server/lace-imports';
+import { ProviderRegistry } from '@lace/web/lib/server/lace-imports';
 
 export async function GET() {
   const registry = ProviderRegistry.createWithAutoDiscovery();

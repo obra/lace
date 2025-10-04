@@ -3,9 +3,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { getLaceDir, ensureLaceDir } from '~/config/lace-dir';
-import { PromptManager } from '~/config/prompt-manager';
-import { logger } from '~/utils/logger';
+import { getLaceDir, ensureLaceDir } from './lace-dir';
+import { PromptManager } from './prompt-manager';
+import { logger } from '@lace/core/utils/logger';
 
 export interface PromptConfig {
   systemPrompt: string;

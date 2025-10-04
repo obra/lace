@@ -3,10 +3,10 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { checkReleaseNotesStatus, markReleaseNotesAsSeen } from './release-notes-service';
-import { api } from '@/lib/api-client';
+import { api } from '@lace/web/lib/api-client';
 
 // Mock the api client
-vi.mock('@/lib/api-client', () => ({
+vi.mock('@lace/web/lib/api-client', () => ({
   api: {
     patch: vi.fn(),
   },

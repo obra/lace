@@ -244,7 +244,7 @@ private _currentThread: Thread | null = null;
 
 ```typescript
 // REMOVE this line:
-import { SummarizeStrategy } from '~/threads/compaction/summarize-strategy';
+import { SummarizeStrategy } from '@lace/core/threads/compaction/summarize-strategy';
 ```
 
 3. **Remove compaction strategy property** (line 28):

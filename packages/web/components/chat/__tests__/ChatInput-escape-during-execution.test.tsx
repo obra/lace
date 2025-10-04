@@ -3,7 +3,7 @@
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
-import { ChatInput } from '@/components/chat/ChatInput';
+import { ChatInput } from '@lace/web/components/chat/ChatInput';
 import React from 'react';
 
 describe('ChatInput during agent execution', () => {

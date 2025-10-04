@@ -5,9 +5,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faUser, faRobot } from '@/lib/fontawesome';
-import { Modal } from '@/components/ui/Modal';
-import type { Task, AssigneeId, TaskPriority, AgentInfo } from '@/types/core';
+import { faPlus, faUser, faRobot } from '@lace/web/lib/fontawesome';
+import { Modal } from '@lace/web/components/ui/Modal';
+import type { Task, AssigneeId, TaskPriority, AgentInfo } from '@lace/web/types/core';
 
 interface TaskCreationModalProps {
   isOpen: boolean;

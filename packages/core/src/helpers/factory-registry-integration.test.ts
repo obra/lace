@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HelperRegistry } from './helper-registry';
 import { InfrastructureHelper } from './infrastructure-helper';
 import { SessionHelper } from './session-helper';
-import type { Agent } from '~/agents/agent';
+import type { Agent } from '@lace/core/agents/agent';
 
 // Test integration between helper constructors and registry
 describe('Helper and HelperRegistry Integration', () => {

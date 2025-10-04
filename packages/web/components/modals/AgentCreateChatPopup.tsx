@@ -4,10 +4,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { PersonaSelector } from '@/components/ui/PersonaSelector';
+import { PersonaSelector } from '@lace/web/components/ui/PersonaSelector';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane, faTimes } from '@/lib/fontawesome';
-import type { PersonaInfo } from '@/types/core';
+import { faPaperPlane, faTimes } from '@lace/web/lib/fontawesome';
+import type { PersonaInfo } from '@lace/web/types/core';
 
 interface AgentCreateChatPopupProps {
   isOpen: boolean;

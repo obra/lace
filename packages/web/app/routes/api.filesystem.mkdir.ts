@@ -4,10 +4,10 @@
 import { promises as fs } from 'fs';
 import { join, resolve, sep } from 'path';
 import { homedir } from 'os';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import { CreateDirectoryRequestSchema } from '@/types/filesystem';
-import type { CreateDirectoryResponse } from '@/types/filesystem';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { CreateDirectoryRequestSchema } from '@lace/web/types/filesystem';
+import type { CreateDirectoryResponse } from '@lace/web/types/filesystem';
 import type { Route } from './+types/api.filesystem.mkdir';
 
 export async function action({ request }: Route.ActionArgs) {

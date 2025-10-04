@@ -2,7 +2,11 @@
 // ABOUTME: Handles async loading and error states for meta data scraping
 
 import { useState, useEffect } from 'react';
-import { scrapeMetaData, isScrapingError, type MetaScrapingResult } from '@/lib/metaScraper';
+import {
+  scrapeMetaData,
+  isScrapingError,
+  type MetaScrapingResult,
+} from '@lace/web/lib/metaScraper';
 
 interface UseOgImageResult {
   imageUrl: string | null;

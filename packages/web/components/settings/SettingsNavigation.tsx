@@ -6,7 +6,7 @@
 import React from 'react';
 import { NavLink } from 'react-router';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { SETTINGS_TAB_CONFIGS, type SettingsTab } from '@/lib/settings-config';
+import { SETTINGS_TAB_CONFIGS, type SettingsTab } from '@lace/web/lib/settings-config';
 
 interface SettingsNavigationProps {
   activeTab: SettingsTab;

@@ -1,8 +1,8 @@
 // ABOUTME: Provider instance connection testing endpoint
 // ABOUTME: Tests connection to configured provider instance and returns status
 
-import { ProviderRegistry } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
+import { ProviderRegistry } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import type { Route } from './+types/api.provider.instances.$instanceId.test';
 
 export interface TestConnectionResponse {

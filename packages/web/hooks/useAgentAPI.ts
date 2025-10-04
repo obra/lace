@@ -2,8 +2,8 @@
 // ABOUTME: Handles messaging and control of individual agents
 
 import { useState, useCallback } from 'react';
-import type { ThreadId } from '@/types/core';
-import { api } from '@/lib/api-client';
+import type { ThreadId } from '@lace/web/types/core';
+import { api } from '@lace/web/lib/api-client';
 
 interface AgentAPIState {
   error: string | null;

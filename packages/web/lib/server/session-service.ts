@@ -1,13 +1,13 @@
 // ABOUTME: Server-side session management service
 // ABOUTME: Provides high-level API for managing sessions and agents using the Session class
 
-import { Agent, Session } from '@/lib/server/lace-imports';
-import type { LaceEvent, ToolResult, CombinedTokenUsage } from '@/types/core';
-import { ApprovalDecision } from '@/types/core';
-import { asThreadId } from '@/types/core';
-import type { ThreadId } from '@/types/core';
-import { EventStreamManager } from '@/lib/event-stream-manager';
-import { logger } from '~/utils/logger';
+import { Agent, Session } from '@lace/web/lib/server/lace-imports';
+import type { LaceEvent, ToolResult, CombinedTokenUsage } from '@lace/web/types/core';
+import { ApprovalDecision } from '@lace/web/types/core';
+import { asThreadId } from '@lace/web/types/core';
+import type { ThreadId } from '@lace/web/types/core';
+import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
+import { logger } from '@lace/core/utils/logger';
 
 export class SessionService {
   // Track agents that already have event handlers set up to prevent duplicates across HMR

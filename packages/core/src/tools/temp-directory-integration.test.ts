@@ -2,25 +2,25 @@
 // ABOUTME: Tests the complete flow from process temp to tool-call directories
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { getProcessTempDir, clearProcessTempDirCache } from '~/config/lace-dir';
-import { Project } from '~/projects/project';
-import { Session } from '~/sessions/session';
-import { Tool } from '~/tools/tool';
-import { ToolExecutor } from '~/tools/executor';
+import { getProcessTempDir, clearProcessTempDirCache } from '@lace/core/config/lace-dir';
+import { Project } from '@lace/core/projects/project';
+import { Session } from '@lace/core/sessions/session';
+import { Tool } from './tool';
+import { ToolExecutor } from './executor';
 import { z } from 'zod';
 import { existsSync, mkdirSync } from 'fs';
 import { writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
-import type { ToolContext, ToolResult } from '~/tools/types';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import type { ToolContext, ToolResult } from './types';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 
 // Test tool for integration testing
 class IntegrationTestTool extends Tool {

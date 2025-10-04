@@ -1,11 +1,11 @@
 // ABOUTME: Global traffic logging system for debugging AI provider communications
 // ABOUTME: Abstracts HAR recording implementation details from CLI and other components
 
-import { initializeHARRecording } from '~/utils/har-recorder';
-import { enableFetchInterception } from '~/utils/fetch-interceptor';
-import { enableNodeFetchInterception } from '~/utils/node-fetch-interceptor';
-import { enableWebSocketInterception } from '~/utils/websocket-interceptor';
-import { logger } from '~/utils/logger';
+import { initializeHARRecording } from './har-recorder';
+import { enableFetchInterception } from './fetch-interceptor';
+import { enableNodeFetchInterception } from './node-fetch-interceptor';
+import { enableWebSocketInterception } from './websocket-interceptor';
+import { logger } from './logger';
 
 let trafficLoggingEnabled = false;
 

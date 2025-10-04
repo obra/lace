@@ -3,10 +3,10 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Agent } from './agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { ToolExecutor } from '~/tools/executor';
-import { DatabasePersistence } from '~/persistence/database';
-import type { ToolCall } from '~/tools/types';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { DatabasePersistence } from '@lace/core/persistence/database';
+import type { ToolCall } from '@lace/core/tools/types';
 
 // Mock Session for policy checking
 const mockSession = {

@@ -2,11 +2,11 @@
 // ABOUTME: Verifies profiler captures timing data and logs correctly
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SQLProfiler } from '~/persistence/sql-profiler';
-import { logger } from '~/utils/logger';
+import { SQLProfiler } from './sql-profiler';
+import { logger } from '@lace/core/utils/logger';
 
 // Mock the logger
-vi.mock('~/utils/logger', () => ({
+vi.mock('@lace/core/utils/logger', () => ({
   logger: {
     debug: vi.fn(),
     info: vi.fn(),

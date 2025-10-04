@@ -1,14 +1,14 @@
 // ABOUTME: REST API endpoints for session configuration - GET, PUT for configuration management
 // ABOUTME: Handles session configuration retrieval and updates with validation and inheritance
 
-import { getSessionService } from '@/lib/server/session-service';
-import { ToolCatalog, Project } from '@/lib/server/lace-imports';
-import { ToolPolicyResolver } from '@/lib/tool-policy-resolver';
-import type { ToolPolicy } from '@/types/core';
-import { ThreadId } from '@/types/core';
-import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { ToolCatalog, Project } from '@lace/web/lib/server/lace-imports';
+import { ToolPolicyResolver } from '@lace/web/lib/tool-policy-resolver';
+import type { ToolPolicy } from '@lace/web/types/core';
+import { ThreadId } from '@lace/web/types/core';
+import { isValidThreadId as isClientValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
 import type { Route } from './+types/api.sessions.$sessionId.configuration';
 

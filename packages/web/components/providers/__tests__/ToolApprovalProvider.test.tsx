@@ -12,22 +12,22 @@ import '@testing-library/jest-dom/vitest';
 import {
   ToolApprovalProvider,
   useToolApprovalContext,
-} from '@/components/providers/ToolApprovalProvider';
-import type { ThreadId } from '@/types/core';
-import type { PendingApproval, SessionPendingApproval } from '@/types/api';
-import type { ToolApprovalRequestData } from '@/types/web-events';
+} from '@lace/web/components/providers/ToolApprovalProvider';
+import type { ThreadId } from '@lace/web/types/core';
+import type { PendingApproval, SessionPendingApproval } from '@lace/web/types/api';
+import type { ToolApprovalRequestData } from '@lace/web/types/web-events';
 
 // Mock the serialization utility
-vi.mock('@/lib/serialization', () => ({
+vi.mock('@lace/web/lib/serialization', () => ({
   parseResponse: vi.fn(),
 }));
 
-vi.mock('@/types/api', () => ({
+vi.mock('@lace/web/types/api', () => ({
   isApiError: vi.fn(),
 }));
 
-import { parseResponse } from '@/lib/serialization';
-import { isApiError } from '@/types/api';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { isApiError } from '@lace/web/types/api';
 const mockParseResponse = vi.mocked(parseResponse);
 const mockIsApiError = vi.mocked(isApiError);
 

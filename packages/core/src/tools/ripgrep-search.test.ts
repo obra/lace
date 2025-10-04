@@ -4,8 +4,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { RipgrepSearchTool } from '~/tools/implementations/ripgrep_search';
-import { createTestTempDir } from '~/test-utils/temp-directory';
+import { RipgrepSearchTool } from '@lace/core/tools/implementations/ripgrep_search';
+import { createTestTempDir } from '@lace/core/test-utils/temp-directory';
 
 describe('RipgrepSearchTool with schema validation', () => {
   let tool: RipgrepSearchTool;

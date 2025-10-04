@@ -1,8 +1,8 @@
 // ABOUTME: Centralized API client that enforces correct error handling patterns
 // ABOUTME: Prevents JSON parsing of HTML error pages by checking HTTP status first
 
-import { parseResponse } from '@/lib/serialization';
-import { isApiError } from '@/types/api';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { isApiError } from '@lace/web/types/api';
 import { HttpError, NetworkError, AbortError, ParseError, BusinessError } from './api-errors';
 import { withRetry } from './retry-logic';
 

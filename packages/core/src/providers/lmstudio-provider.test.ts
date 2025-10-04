@@ -2,9 +2,9 @@
 // ABOUTME: Verifies native tool calling, response formatting, and provider configuration
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { LMStudioProvider } from '~/providers/lmstudio-provider';
-import { Tool } from '~/tools/tool';
-import { ToolResult, ToolContext } from '~/tools/types';
+import { LMStudioProvider } from './lmstudio-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolResult, ToolContext } from '@lace/core/tools/types';
 import { z } from 'zod';
 
 // Mock external LMStudio SDK to avoid dependency on LMStudio being installed/running locally

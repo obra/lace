@@ -2,18 +2,24 @@
 // ABOUTME: Uses real sessions and projects to test progressive restriction without mocking
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { loader as GET, action as PUT } from '@/app/routes/api.sessions.$sessionId.configuration';
-import { getSessionService } from '@/lib/server/session-service';
-import { Project, Session } from '@/lib/server/lace-imports';
-import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  loader as GET,
+  action as PUT,
+} from '@lace/web/app/routes/api.sessions.$sessionId.configuration';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { Project, Session } from '@lace/web/lib/server/lace-imports';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '@lace/web/lib/server/lace-imports';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
-import { parseResponse } from '@/lib/serialization';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
-import type { ToolPolicy } from '@/types/core';
+} from '@lace/web/lib/server/lace-imports';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import type { ToolPolicy } from '@lace/web/types/core';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 

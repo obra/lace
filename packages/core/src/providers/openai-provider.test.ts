@@ -2,11 +2,11 @@
 // ABOUTME: Tests streaming vs non-streaming responses, configuration, and error handling
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { OpenAIProvider } from '~/providers/openai-provider';
-import { Tool } from '~/tools/tool';
-import { ToolResult, ToolContext } from '~/tools/types';
+import { OpenAIProvider } from './openai-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolResult, ToolContext } from '@lace/core/tools/types';
 import { z } from 'zod';
-import { StreamingEvents } from '~/providers/types';
+import { StreamingEvents } from './types';
 
 // Mock external OpenAI SDK to avoid real API calls during tests
 // Tests focus on provider logic, not OpenAI API implementation

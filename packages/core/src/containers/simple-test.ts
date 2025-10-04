@@ -1,8 +1,8 @@
 // ABOUTME: Manual test script for Apple Container runtime without volume mounts
 // ABOUTME: Can be run directly with `npx tsx src/containers/simple-test.ts` for debugging
 
-import { AppleContainerRuntime } from '~/containers/apple-container';
-import { logger } from '~/utils/logger';
+import { AppleContainerRuntime } from './apple-container';
+import { logger } from '@lace/core/utils/logger';
 
 async function test() {
   const runtime = new AppleContainerRuntime();

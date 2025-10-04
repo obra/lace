@@ -1,8 +1,8 @@
 // ABOUTME: Event stream endpoint for all real-time events
 // ABOUTME: Multi-project, multi-session notifications via single stream
 
-import { EventStreamManager } from '@/lib/event-stream-manager';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import type { Route } from './+types/api.events.stream';
 
 export async function loader({ request }: Route.LoaderArgs) {

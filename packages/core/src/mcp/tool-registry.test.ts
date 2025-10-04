@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 import { MCPToolRegistry } from './tool-registry';
 import type { MCPServerManager } from './server-manager';
-import type { MCPConfig } from '~/config/mcp-types';
+import type { MCPConfig } from '@lace/core/config/mcp-types';
 
 // Minimal interface for test tool mocks
 interface MinimalTool {

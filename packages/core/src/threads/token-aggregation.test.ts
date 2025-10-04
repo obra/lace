@@ -2,9 +2,9 @@
 // ABOUTME: Validates token counting and estimation across conversation events
 
 import { describe, it, expect } from 'vitest';
-import { aggregateTokenUsage, estimateConversationTokens } from '~/threads/token-aggregation';
-import type { LaceEvent } from '~/threads/types';
-import type { CombinedTokenUsage } from '~/token-management/types';
+import { aggregateTokenUsage, estimateConversationTokens } from './token-aggregation';
+import type { LaceEvent } from './types';
+import type { CombinedTokenUsage } from '@lace/core/token-management/types';
 
 describe('Token aggregation', () => {
   it('should aggregate token usage from events', () => {

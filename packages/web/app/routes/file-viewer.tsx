@@ -4,11 +4,17 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFile, faDownload, faCopy, faSpinner, faExclamationTriangle } from '@/lib/fontawesome';
-import { api } from '@/lib/api-client';
-import { formatFileSize } from '@/lib/format-file-size';
-import { encodePathSegments } from '@/lib/path-utils';
-import type { SessionFileContentResponse } from '@/types/session-files';
+import {
+  faFile,
+  faDownload,
+  faCopy,
+  faSpinner,
+  faExclamationTriangle,
+} from '@lace/web/lib/fontawesome';
+import { api } from '@lace/web/lib/api-client';
+import { formatFileSize } from '@lace/web/lib/format-file-size';
+import { encodePathSegments } from '@lace/web/lib/path-utils';
+import type { SessionFileContentResponse } from '@lace/web/types/session-files';
 import hljs from 'highlight.js';
 import DOMPurify from 'dompurify';
 

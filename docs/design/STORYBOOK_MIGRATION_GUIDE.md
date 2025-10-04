@@ -39,7 +39,7 @@ Use the AgentBadge template as reference for each CONVERT story:
 2. **Add component to playground** (`/app/play/page.tsx`):
 
    ```tsx
-   import TokenUsageDisplay from '@/components/ui/TokenUsageDisplay';
+   import TokenUsageDisplay from '@lace/web/components/ui/TokenUsageDisplay';
 
    // Add section with usage examples
    ```

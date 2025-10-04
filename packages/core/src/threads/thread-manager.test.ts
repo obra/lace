@@ -2,10 +2,10 @@
 // ABOUTME: Tests verify ThreadManager operates as pure data persistence layer
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ThreadManager } from '~/threads/thread-manager';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { expectEventAdded } from '~/test-utils/event-helpers';
-import { ApprovalDecision } from '~/tools/types';
+import { ThreadManager } from './thread-manager';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { expectEventAdded } from '@lace/core/test-utils/event-helpers';
+import { ApprovalDecision } from '@lace/core/tools/types';
 
 describe('ThreadManager', () => {
   const _tempLaceDir = setupCoreTest();

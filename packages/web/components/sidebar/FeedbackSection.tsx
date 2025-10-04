@@ -5,10 +5,10 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faComments } from '@/lib/fontawesome';
+import { faComments } from '@lace/web/lib/fontawesome';
 import * as Sentry from '@sentry/react';
-import { api } from '@/lib/api-client';
-import { Alert } from '@/components/ui/Alert';
+import { api } from '@lace/web/lib/api-client';
+import { Alert } from '@lace/web/components/ui/Alert';
 
 interface FeedbackSectionProps {
   isMobile?: boolean;

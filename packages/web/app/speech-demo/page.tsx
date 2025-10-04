@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { NativeSpeechInput, useSpeechRecognition } from '@/components/ui';
-import { ChatInput } from '@/components/chat/ChatInput';
-import { Alert } from '@/components/ui/Alert';
+import { NativeSpeechInput, useSpeechRecognition } from '@lace/web/components/ui';
+import { ChatInput } from '@lace/web/components/chat/ChatInput';
+import { Alert } from '@lace/web/components/ui/Alert';
 
 export default function SpeechDemoPage() {
   const [messages, setMessages] = useState<string[]>([]);

@@ -2,8 +2,8 @@
 // ABOUTME: Handles session loading, creation, and project configuration
 
 import { useState, useEffect, useCallback } from 'react';
-import type { SessionInfo } from '@/types/core';
-import { api } from '@/lib/api-client';
+import type { SessionInfo } from '@lace/web/types/core';
+import { api } from '@lace/web/lib/api-client';
 
 interface UseSessionManagementResult {
   sessions: SessionInfo[];

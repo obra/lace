@@ -3,8 +3,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { WorkspaceContainerManager } from './workspace-container-manager';
-import { AppleContainerRuntime } from '~/containers/apple-container';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { AppleContainerRuntime } from '@lace/core/containers/apple-container';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';

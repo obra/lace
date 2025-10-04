@@ -61,6 +61,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js"
+    },
     "./agents/agent": {
       "types": "./dist/agents/agent.d.ts",
       "import": "./dist/agents/agent.js"

@@ -9,9 +9,9 @@ import type {
   AgentInfo,
   ThreadTokenUsage,
   ToolPolicy,
-} from '@/types/core';
+} from '@lace/web/types/core';
 
-import type { ToolApprovalRequestData } from '@/types/web-events';
+import type { ToolApprovalRequestData } from '@lace/web/types/web-events';
 
 // Tool policy information structure
 interface ToolPolicyInfo {

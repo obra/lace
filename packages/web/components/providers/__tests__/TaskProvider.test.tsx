@@ -9,12 +9,12 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { TaskProvider, useTaskContext } from '@/components/providers/TaskProvider';
-import type { Task, AgentInfo, ThreadId } from '@/types/core';
-import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
+import { TaskProvider, useTaskContext } from '@lace/web/components/providers/TaskProvider';
+import type { Task, AgentInfo, ThreadId } from '@lace/web/types/core';
+import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
 
 // Only mock external API calls - let everything else use real implementation
-vi.mock('@/hooks/useTaskManager', () => ({
+vi.mock('@lace/web/hooks/useTaskManager', () => ({
   useTaskManager: vi.fn(() => ({
     tasks: [
       {
@@ -49,7 +49,7 @@ vi.mock('@/hooks/useTaskManager', () => ({
 }));
 
 // Simple modal mocks that just show when open - focus on TaskProvider logic, not modal internals
-vi.mock('@/components/modals/TaskBoardModal', () => ({
+vi.mock('@lace/web/components/modals/TaskBoardModal', () => ({
   TaskBoardModal: ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) =>
     isOpen ? (
       <div data-testid="task-board-modal">
@@ -60,7 +60,7 @@ vi.mock('@/components/modals/TaskBoardModal', () => ({
     ) : null,
 }));
 
-vi.mock('@/components/modals/TaskCreationModal', () => ({
+vi.mock('@lace/web/components/modals/TaskCreationModal', () => ({
   TaskCreationModal: ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) =>
     isOpen ? (
       <div data-testid="task-creation-modal">
@@ -71,7 +71,7 @@ vi.mock('@/components/modals/TaskCreationModal', () => ({
     ) : null,
 }));
 
-vi.mock('@/components/modals/TaskDisplayModal', () => ({
+vi.mock('@lace/web/components/modals/TaskDisplayModal', () => ({
   TaskDisplayModal: ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) =>
     isOpen ? (
       <div data-testid="task-display-modal">

@@ -7,14 +7,14 @@ import { render, waitFor } from '@testing-library/react';
 import {
   ToolApprovalProvider,
   useToolApprovalContext,
-} from '@/components/providers/ToolApprovalProvider';
-import { api } from '@/lib/api-client';
-import type { ThreadId } from '@/types/core';
-import { ApprovalDecision } from '@/types/core';
-import type { SessionPendingApproval } from '@/types/api';
+} from '@lace/web/components/providers/ToolApprovalProvider';
+import { api } from '@lace/web/lib/api-client';
+import type { ThreadId } from '@lace/web/types/core';
+import { ApprovalDecision } from '@lace/web/types/core';
+import type { SessionPendingApproval } from '@lace/web/types/api';
 
 // Mock the api client
-vi.mock('@/lib/api-client', () => ({
+vi.mock('@lace/web/lib/api-client', () => ({
   api: {
     get: vi.fn(),
     post: vi.fn(),

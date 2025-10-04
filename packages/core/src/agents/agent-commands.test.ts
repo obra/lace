@@ -2,11 +2,11 @@
 // ABOUTME: Validates slash command detection and processing in agent sendMessage
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { ToolExecutor } from '~/tools/executor';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Agent } from './agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 // Mock provider for testing command handling
 class MockProvider extends BaseMockProvider {

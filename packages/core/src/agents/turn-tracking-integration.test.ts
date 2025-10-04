@@ -2,15 +2,15 @@
 // ABOUTME: Tests complete turn lifecycle, abort functionality, and performance with real providers
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent, CurrentTurnMetrics } from '~/agents/agent';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
-import { ToolResult, ToolContext } from '~/tools/types';
+import { Agent, CurrentTurnMetrics } from './agent';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from '@lace/core/providers/base-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolResult, ToolContext } from '@lace/core/tools/types';
 import { z } from 'zod';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 // Mock provider for controlled testing
 class MockIntegrationProvider extends BaseMockProvider {

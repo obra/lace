@@ -1,8 +1,8 @@
 // ABOUTME: Base class for mock providers that implements required metadata methods
 // ABOUTME: Extend this class in tests to avoid boilerplate
 
-import { AIProvider } from '~/providers/base-provider';
-import { mockProviderMethods } from '~/test-utils/mock-provider-methods';
+import { AIProvider } from '@lace/core/providers/base-provider';
+import { mockProviderMethods } from './mock-provider-methods';
 
 export abstract class BaseMockProvider extends AIProvider {
   // Add mock provider methods as bound arrow functions

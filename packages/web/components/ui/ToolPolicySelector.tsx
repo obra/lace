@@ -4,7 +4,7 @@
 'use client';
 
 import React from 'react';
-import type { ToolPolicy } from '@/types/core';
+import type { ToolPolicy } from '@lace/web/types/core';
 
 interface ToolPolicySelectorProps {
   value: ToolPolicy;

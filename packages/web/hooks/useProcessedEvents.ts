@@ -2,7 +2,7 @@
 // ABOUTME: Handles filtering, token aggregation, and tool call/result pairing
 
 import { useMemo } from 'react';
-import type { LaceEvent, ThreadId, ToolCall, ToolResult } from '@/types/core';
+import type { LaceEvent, ThreadId, ToolCall, ToolResult } from '@lace/web/types/core';
 
 interface ProcessedToolEvent extends Omit<LaceEvent, 'type' | 'data'> {
   type: 'TOOL_AGGREGATED';

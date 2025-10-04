@@ -1,7 +1,7 @@
 // ABOUTME: Zero-overhead SQL query profiler for SQLite operations
 // ABOUTME: Logs query performance data only when LACE_SQL_PROFILING=true
 
-import { logger } from '~/utils/logger';
+import { logger } from '@lace/core/utils/logger';
 
 interface QueryProfile {
   query: string;

@@ -2,10 +2,10 @@
 // ABOUTME: Validates that each provider correctly accepts and handles AbortSignal for cancellation
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AnthropicProvider } from '~/providers/anthropic-provider';
-import { OpenAIProvider } from '~/providers/openai-provider';
-import { LMStudioProvider } from '~/providers/lmstudio-provider';
-import { OllamaProvider } from '~/providers/ollama-provider';
+import { AnthropicProvider } from './anthropic-provider';
+import { OpenAIProvider } from './openai-provider';
+import { LMStudioProvider } from './lmstudio-provider';
+import { OllamaProvider } from './ollama-provider';
 
 // Mock all provider dependencies to avoid actual API calls
 vi.mock('@anthropic-ai/sdk');

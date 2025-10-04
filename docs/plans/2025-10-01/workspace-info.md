@@ -104,9 +104,9 @@
 ## Key Implementation Learnings
 
 ### Import Patterns Discovered
-- ✅ WorkspaceInfo type: `import type { WorkspaceInfo } from '~/workspace/workspace-container-manager'`
+- ✅ WorkspaceInfo type: `import type { WorkspaceInfo } from '@lace/core/workspace/workspace-container-manager'`
   - NOT `@lace/core/workspace/...` - that path doesn't resolve in web package
-- ✅ API client: `import { api } from '@/lib/api-client'` then use `api.get<T>(url)`
+- ✅ API client: `import { api } from '@lace/web/lib/api-client'` then use `api.get<T>(url)`
 - ✅ Response parsing: `await parseResponse<T>(response)` not `.json()`
 - ✅ Error responses: `createErrorResponse(message, status, { code })` - uses `error` field not `message`
 
@@ -309,7 +309,7 @@ import { loader } from '../api.sessions.$sessionId.workspace';
 import { Session } from '@lace/core/sessions/session';
 import { Project } from '@lace/core/projects/project';
 import { getPersistence } from '@lace/core/persistence/database';
-import { setupTestEnvironment, cleanupTestEnvironment } from '@/test-utils/test-helpers';
+import { setupTestEnvironment, cleanupTestEnvironment } from '@lace/web/test-utils/test-helpers';
 
 describe('GET /api/sessions/:sessionId/workspace', () => {
   beforeEach(() => {
@@ -617,7 +617,7 @@ Add these tests:
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { SessionProvider, useSessionContext } from '../SessionProvider';
-import { api } from '@/lib/api-client';
+import { api } from '@lace/web/lib/api-client';
 import type { WorkspaceInfo } from '@lace/core/workspace/workspace-container-manager';
 
 // Mock api client
@@ -850,7 +850,7 @@ workspace info to all consuming components.
 
 1. Import necessary items at the top of SessionSection.tsx:
 ```typescript
-import { faBox, faFolder } from '@/lib/fontawesome'; // Add these icons
+import { faBox, faFolder } from '@lace/web/lib/fontawesome'; // Add these icons
 ```
 
 2. Get workspace data from context (add after line 35 where other context is accessed):
@@ -924,9 +924,9 @@ Update test file: `packages/web/components/sidebar/__tests__/SessionSection.test
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SessionSection } from '../SessionSection';
-import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useURLState } from '@/hooks/useURLState';
+import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
+import { useURLState } from '@lace/web/hooks/useURLState';
 
 // Mock all the hooks
 vi.mock('@/components/providers/SessionProvider');
@@ -1097,7 +1097,7 @@ Add clickable badge to SessionSection showing workspace mode
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBox, faFolder, faCircle } from '@/lib/fontawesome';
+import { faBox, faFolder, faCircle } from '@lace/web/lib/fontawesome';
 import type { WorkspaceInfo } from '@lace/core/workspace/workspace-container-manager';
 
 interface WorkspaceDetailsPanelProps {
@@ -1537,7 +1537,7 @@ information with conditional rendering based on mode.
 1. Import necessary items at the top:
 ```typescript
 import { WorkspaceDetailsPanel } from './WorkspaceDetailsPanel';
-import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
 ```
 
 2. Get workspace data from context (add where other data is accessed):
@@ -1599,7 +1599,7 @@ Since SessionConfigPanel likely has existing tests, update them:
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SessionConfigPanel } from '../SessionConfigPanel';
-import { useSessionContext } from '@/components/providers/SessionProvider';
+import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
 
 vi.mock('@/components/providers/SessionProvider');
 
@@ -1943,7 +1943,7 @@ No unit tests needed for icon registration, but verify:
 
 1. Component imports work:
 ```typescript
-import { faBox, faFolder } from '@/lib/fontawesome';
+import { faBox, faFolder } from '@lace/web/lib/fontawesome';
 ```
 
 2. Icons render without console errors

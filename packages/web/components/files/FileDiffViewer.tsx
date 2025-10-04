@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEye, faColumns, faList, faCopy, faExpand, faCompress } from '@/lib/fontawesome';
+import { faEye, faColumns, faList, faCopy, faExpand, faCompress } from '@lace/web/lib/fontawesome';
 import DOMPurify from 'dompurify';
 import hljs from 'highlight.js';
 

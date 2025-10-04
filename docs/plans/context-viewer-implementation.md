@@ -132,8 +132,8 @@ Build the core token analysis engine.
 
 2. Import dependencies:
    ```typescript
-   import type { ThreadId } from '~/threads/types';
-   import type { Agent } from '~/agents/agent';
+   import type { ThreadId } from '@lace/core/threads/types';
+   import type { Agent } from '@lace/core/agents/agent';
    import type { ContextBreakdown } from './context-breakdown-types';
    ```
 
@@ -254,9 +254,9 @@ Create `packages/core/src/token-management/context-analyzer.test.ts`:
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ContextAnalyzer } from './context-analyzer';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { createTestThreadManager } from '~/utils/test-utils';
+import { Agent } from '@lace/core/agents/agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { createTestThreadManager } from '@lace/core/utils/test-utils';
 
 describe('ContextAnalyzer', () => {
   let threadManager: ThreadManager;
@@ -985,7 +985,7 @@ Expose context data through a REST API endpoint.
    import { json } from 'react-router';
    import type { Route } from './+types/api.agents.$agentId.context';
    import { ContextAnalyzer } from '@lace/core/token-management';
-   import { getSessionService } from '@/lib/server/session-service';
+   import { getSessionService } from '@lace/web/lib/server/session-service';
 
    export async function loader({ params }: Route.LoaderArgs) {
      const { agentId } = params;
@@ -1225,8 +1225,8 @@ Build the UI components to display context breakdown.
    'use client';
 
    import React from 'react';
-   import type { ContextBreakdown } from '@/types/context';
-   import { Badge } from '@/components/ui/Badge';
+   import type { ContextBreakdown } from '@lace/web/types/context';
+   import { Badge } from '@lace/web/components/ui/Badge';
 
    interface ContextBreakdownListProps {
      breakdown: ContextBreakdown;
@@ -1404,7 +1404,7 @@ Build the UI components to display context breakdown.
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ContextBreakdownList } from './ContextBreakdownList';
-import type { ContextBreakdown } from '@/types/context';
+import type { ContextBreakdown } from '@lace/web/types/context';
 
 describe('ContextBreakdownList', () => {
   const mockBreakdown: ContextBreakdown = {
@@ -1513,10 +1513,10 @@ describe('ContextBreakdownList', () => {
    'use client';
 
    import React, { useEffect, useState } from 'react';
-   import type { ContextBreakdown } from '@/types/context';
+   import type { ContextBreakdown } from '@lace/web/types/context';
    import { ContextBreakdownList } from './ContextBreakdownList';
-   import { api } from '@/lib/api-client';
-   import type { ThreadId } from '@/types/core';
+   import { api } from '@lace/web/lib/api-client';
+   import type { ThreadId } from '@lace/web/types/core';
 
    interface ContextViewerModalProps {
      agentId: ThreadId;
@@ -1652,7 +1652,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ContextViewerModal } from './ContextViewerModal';
-import { api } from '@/lib/api-client';
+import { api } from '@lace/web/lib/api-client';
 
 // Mock API client
 vi.mock('@/lib/api-client', () => ({
@@ -1846,7 +1846,7 @@ describe('ContextViewerModal', () => {
 1. Add modal state and click handler:
    ```typescript
    // At the top, add import
-   import { ContextViewerModal } from '@/components/context/ContextViewerModal';
+   import { ContextViewerModal } from '@lace/web/components/context/ContextViewerModal';
 
    // Inside CompactTokenUsage component
    export const CompactTokenUsage = memo(function CompactTokenUsage({
@@ -1962,7 +1962,7 @@ Add treemap visualization (if feasible) or enhance with progress bars.
 
 import React from 'react';
 import { Treemap, ResponsiveContainer } from 'recharts';
-import type { ContextBreakdown } from '@/types/context';
+import type { ContextBreakdown } from '@lace/web/types/context';
 
 export function TreemapPrototype({ breakdown }: { breakdown: ContextBreakdown }) {
   // Transform breakdown into recharts format
@@ -2045,7 +2045,7 @@ export function TreemapPrototype({ breakdown }: { breakdown: ContextBreakdown })
 
    import React from 'react';
    import { Treemap, ResponsiveContainer, Tooltip } from 'recharts';
-   import type { ContextBreakdown } from '@/types/context';
+   import type { ContextBreakdown } from '@lace/web/types/context';
 
    export function ContextTreemap({ breakdown }: { breakdown: ContextBreakdown }) {
      // Transform data
@@ -2160,7 +2160,7 @@ export function TreemapPrototype({ breakdown }: { breakdown: ContextBreakdown })
    'use client';
 
    import React from 'react';
-   import type { ContextBreakdown } from '@/types/context';
+   import type { ContextBreakdown } from '@lace/web/types/context';
 
    export function ContextProgressBars({ breakdown }: { breakdown: ContextBreakdown }) {
      const { categories, contextLimit } = breakdown;
@@ -2452,7 +2452,7 @@ Main modal dialog that fetches and displays context breakdown.
 
 **Usage:**
 ```tsx
-import { ContextViewerModal } from '@/components/context/ContextViewerModal';
+import { ContextViewerModal } from '@lace/web/components/context/ContextViewerModal';
 
 function MyComponent() {
   const [isOpen, setIsOpen] = useState(false);
@@ -2487,7 +2487,7 @@ Detailed list view of token usage by category.
 
 **Usage:**
 ```tsx
-import { ContextBreakdownList } from '@/components/context/ContextBreakdownList';
+import { ContextBreakdownList } from '@lace/web/components/context/ContextBreakdownList';
 
 <ContextBreakdownList breakdown={breakdown} />
 ```
@@ -2501,9 +2501,9 @@ Visual representation of context usage (one or the other is used).
 
 **Usage:**
 ```tsx
-import { ContextTreemap } from '@/components/context/ContextTreemap';
+import { ContextTreemap } from '@lace/web/components/context/ContextTreemap';
 // OR
-import { ContextProgressBars } from '@/components/context/ContextProgressBars';
+import { ContextProgressBars } from '@lace/web/components/context/ContextProgressBars';
 
 <ContextTreemap breakdown={breakdown} />
 ```

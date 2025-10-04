@@ -1,11 +1,11 @@
 // ABOUTME: Stop endpoint for halting agent processing while keeping agent alive
 // ABOUTME: Calls agent.abort() to stop current generation but preserves agent state
 
-import { getSessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/types/core';
-import { isValidThreadId } from '@/lib/validation/thread-id-validation';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { asThreadId } from '@lace/web/types/core';
+import { isValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import type { Route } from './+types/api.agents.$agentId.stop';
 
 export async function action({ request, params }: Route.ActionArgs) {

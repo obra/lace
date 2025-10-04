@@ -1,17 +1,21 @@
 // ABOUTME: Provider registry for managing available AI providers and their discovery
 // ABOUTME: Handles provider registration and provides providers for agent execution
 
-import { AIProvider, ProviderConfig, ProviderInfo, ModelInfo } from '~/providers/base-provider';
-import { AnthropicProvider } from '~/providers/anthropic-provider';
-import { OpenAIProvider } from '~/providers/openai-provider';
-import { LMStudioProvider } from '~/providers/lmstudio-provider';
-import { OllamaProvider } from '~/providers/ollama-provider';
-import { GeminiProvider } from '~/providers/gemini-provider';
-import { ProviderCatalogManager } from '~/providers/catalog/manager';
-import { ProviderInstanceManager } from '~/providers/instance/manager';
-import type { CatalogProvider, CatalogModel, ModelConfig } from '~/providers/catalog/types';
-import { OpenRouterDynamicProvider } from '~/providers/openrouter/dynamic-provider';
-import { logger } from '~/utils/logger';
+import { AIProvider, ProviderConfig, ProviderInfo, ModelInfo } from './base-provider';
+import { AnthropicProvider } from './anthropic-provider';
+import { OpenAIProvider } from './openai-provider';
+import { LMStudioProvider } from './lmstudio-provider';
+import { OllamaProvider } from './ollama-provider';
+import { GeminiProvider } from './gemini-provider';
+import { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
+import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
+import type {
+  CatalogProvider,
+  CatalogModel,
+  ModelConfig,
+} from '@lace/core/providers/catalog/types';
+import { OpenRouterDynamicProvider } from '@lace/core/providers/openrouter/dynamic-provider';
+import { logger } from '@lace/core/utils/logger';
 
 /**
  * Expand environment variables in provider configuration values

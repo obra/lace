@@ -4,15 +4,15 @@
 'use client';
 
 import React, { memo } from 'react';
-import { ThreadId } from '@/types/core';
-import { ProjectSection } from '@/components/sidebar/ProjectSection';
-import { SessionSection } from '@/components/sidebar/SessionSection';
-import { AgentsSection } from '@/components/sidebar/AgentsSection';
-import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
-import { FeedbackSection } from '@/components/sidebar/FeedbackSection';
-import { FileBrowserSection } from '@/components/sidebar/FileBrowserSection';
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useOptionalSessionContext } from '@/components/providers/SessionProvider';
+import { ThreadId } from '@lace/web/types/core';
+import { ProjectSection } from '@lace/web/components/sidebar/ProjectSection';
+import { SessionSection } from '@lace/web/components/sidebar/SessionSection';
+import { AgentsSection } from '@lace/web/components/sidebar/AgentsSection';
+import { TaskSidebarSection } from '@lace/web/components/sidebar/TaskSidebarSection';
+import { FeedbackSection } from '@lace/web/components/sidebar/FeedbackSection';
+import { FileBrowserSection } from '@lace/web/components/sidebar/FileBrowserSection';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
+import { useOptionalSessionContext } from '@lace/web/components/providers/SessionProvider';
 
 interface SidebarContentProps {
   // Mobile behavior

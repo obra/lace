@@ -5,14 +5,14 @@
 
 import React, { memo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTasks } from '@/lib/fontawesome';
-import { SidebarSection } from '@/components/layout/Sidebar';
-import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
-import { useOptionalTaskContext } from '@/components/providers/TaskProvider';
-import { useOptionalProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useOptionalProjectContext } from '@/components/providers/ProjectProvider';
-import { useOptionalSessionContext } from '@/components/providers/SessionProvider';
-import type { Task } from '@/types/core';
+import { faPlus, faTasks } from '@lace/web/lib/fontawesome';
+import { SidebarSection } from '@lace/web/components/layout/Sidebar';
+import { TaskListSidebar } from '@lace/web/components/tasks/TaskListSidebar';
+import { useOptionalTaskContext } from '@lace/web/components/providers/TaskProvider';
+import { useOptionalProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
+import { useOptionalProjectContext } from '@lace/web/components/providers/ProjectProvider';
+import { useOptionalSessionContext } from '@lace/web/components/providers/SessionProvider';
+import type { Task } from '@lace/web/types/core';
 
 interface TaskSidebarSectionProps {
   onCloseMobileNav?: () => void;

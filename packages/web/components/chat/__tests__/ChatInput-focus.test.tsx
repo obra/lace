@@ -9,10 +9,10 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { ChatInput } from '@/components/chat/ChatInput';
+import { ChatInput } from '@lace/web/components/chat/ChatInput';
 
 // Mock FontAwesome components
-vi.mock('@/lib/fontawesome', () => ({
+vi.mock('@lace/web/lib/fontawesome', () => ({
   faPaperPlane: 'faPaperPlane',
   faStop: 'faStop',
   faPlus: 'faPlus',
@@ -23,7 +23,7 @@ vi.mock('@fortawesome/react-fontawesome', () => ({
 }));
 
 // Mock speech recognition components
-vi.mock('@/components/ui/NativeSpeechInput', () => ({
+vi.mock('@lace/web/components/ui/NativeSpeechInput', () => ({
   NativeSpeechInput: () => <div data-testid="speech-input" />,
   useSpeechRecognition: () => ({
     transcript: '',
@@ -40,11 +40,11 @@ vi.mock('@/components/ui/NativeSpeechInput', () => ({
 }));
 
 // Mock file attachment components
-vi.mock('@/components/ui/FileAttachment', () => ({
+vi.mock('@lace/web/components/ui/FileAttachment', () => ({
   FileAttachment: () => <div data-testid="file-attachment" />,
 }));
 
-vi.mock('@/components/ui/Alert', () => ({
+vi.mock('@lace/web/components/ui/Alert', () => ({
   Alert: () => <div data-testid="alert" />,
 }));
 

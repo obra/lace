@@ -14,17 +14,17 @@ import {
   faEllipsisV,
   faEdit,
   faTrash,
-} from '@/lib/fontawesome';
-import type { ProjectInfo, ToolPolicy } from '@/types/core';
-import { AddInstanceModal } from '@/components/providers/AddInstanceModal';
-import { ProjectEditModal } from '@/components/config/ProjectEditModal';
-import { ProjectCreateModal } from '@/components/config/ProjectCreateModal';
-import { AnimatedModal } from '@/components/ui/AnimatedModal';
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useUIContext } from '@/components/providers/UIProvider';
-import { useOnboarding } from '@/hooks/useOnboarding';
-import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
+} from '@lace/web/lib/fontawesome';
+import type { ProjectInfo, ToolPolicy } from '@lace/web/types/core';
+import { AddInstanceModal } from '@lace/web/components/providers/AddInstanceModal';
+import { ProjectEditModal } from '@lace/web/components/config/ProjectEditModal';
+import { ProjectCreateModal } from '@lace/web/components/config/ProjectCreateModal';
+import { AnimatedModal } from '@lace/web/components/ui/AnimatedModal';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
+import { useProjectContext } from '@lace/web/components/providers/ProjectProvider';
+import { useUIContext } from '@lace/web/components/providers/UIProvider';
+import { useOnboarding } from '@lace/web/hooks/useOnboarding';
+import { useProviderInstances } from '@lace/web/components/providers/ProviderInstanceProvider';
 
 interface ProjectSelectorPanelProps {
   // No props needed - all data comes from providers

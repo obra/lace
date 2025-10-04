@@ -4,18 +4,18 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
-import { TaskCreateTool } from '~/tools/implementations/task-manager/tools';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
+import { TaskCreateTool } from './tools';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import { setupCoreTest, cleanupSession } from '@lace/core/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 
 describe('Bulk Task Creation', () => {
   const context = setupCoreTest();

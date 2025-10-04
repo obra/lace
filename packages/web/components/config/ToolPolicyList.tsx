@@ -4,8 +4,8 @@
 'use client';
 
 import React from 'react';
-import { ToolPolicyToggle } from '@/components/ui/ToolPolicyToggle';
-import type { ToolPolicy } from '@/types/core';
+import { ToolPolicyToggle } from '@lace/web/components/ui/ToolPolicyToggle';
+import type { ToolPolicy } from '@lace/web/types/core';
 
 // Clean API structure with explicit policy information
 interface ToolPolicyInfo {

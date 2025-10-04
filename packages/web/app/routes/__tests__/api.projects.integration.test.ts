@@ -2,25 +2,28 @@
 // ABOUTME: Tests actual behavior without mocking the Project class - uses real database operations
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 
 // CRITICAL: Setup test isolation BEFORE any imports that might initialize persistence
 const context = setupWebTest();
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '@lace/web/lib/server/lace-imports';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
-import { parseResponse } from '@/lib/serialization';
-import type { ProjectInfo } from '@/types/core';
+} from '@lace/web/lib/server/lace-imports';
+import { parseResponse } from '@lace/web/lib/serialization';
+import type { ProjectInfo } from '@lace/web/types/core';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
 
-import { loader, action } from '@/app/routes/api.projects';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
+import { loader, action } from '@lace/web/app/routes/api.projects';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 
 interface ErrorResponse {
   error: string;
@@ -35,7 +38,7 @@ describe('Projects API Integration Tests', () => {
     setupTestProviderDefaults();
 
     // Force persistence reset to ensure clean database state
-    const { resetPersistence } = await import('~/persistence/database');
+    const { resetPersistence } = await import('@lace/core/persistence/database');
     resetPersistence();
 
     // Create test provider instance
@@ -56,7 +59,7 @@ describe('Projects API Integration Tests', () => {
   describe('GET /api/projects', () => {
     it('should return all projects with session counts', async () => {
       // Create some test projects directly using the real Project class
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@lace/core/projects/project');
 
       const project1Dir = join(context.tempProjectDir, 'project1');
       const project2Dir = join(context.tempProjectDir, 'project2');
@@ -73,7 +76,7 @@ describe('Projects API Integration Tests', () => {
       });
 
       // Create sessions in project1 to test session counting
-      const { Session } = await import('~/sessions/session');
+      const { Session } = await import('@lace/core/sessions/session');
       Session.create({
         name: 'Session 1',
         projectId: project1.getId(),
@@ -151,7 +154,7 @@ describe('Projects API Integration Tests', () => {
       expect(data.lastUsedAt).toBeDefined();
 
       // Verify the project was actually created in the database
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@lace/core/projects/project');
       const createdProject = Project.getById(data.id);
       expect(createdProject).not.toBeNull();
       expect(createdProject!.getName()).toBe('New Project');
@@ -184,7 +187,7 @@ describe('Projects API Integration Tests', () => {
       expect(data.id).toBeDefined();
 
       // Verify the project was actually created in the database
-      const { Project } = await import('~/projects/project');
+      const { Project } = await import('@lace/core/projects/project');
       const createdProject = Project.getById(data.id);
       expect(createdProject).not.toBeNull();
       expect(createdProject!.getName()).toBe('Minimal Project');

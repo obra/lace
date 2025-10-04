@@ -2,10 +2,10 @@
 // ABOUTME: Tests basic functionality and tool calling with local Ollama server
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { OllamaProvider } from '~/providers/ollama-provider';
-import { Tool } from '~/tools/tool';
-import { ToolContext, ToolResult } from '~/tools/types';
-import { checkProviderAvailability } from '~/test-utils/provider-test-helpers';
+import { OllamaProvider } from './ollama-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolContext, ToolResult } from '@lace/core/tools/types';
+import { checkProviderAvailability } from '@lace/core/test-utils/provider-test-helpers';
 import { z } from 'zod';
 
 // Mock tool for testing without side effects

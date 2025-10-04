@@ -2,7 +2,7 @@
 // ABOUTME: Tests sidebar integration, search functionality, file selection, and modal interactions
 
 // Mock child components
-vi.mock('@/components/files/SessionFileTree', () => ({
+vi.mock('@lace/web/components/files/SessionFileTree', () => ({
   SessionFileTree: vi.fn(({ onFileSelect, searchTerm }) => (
     <div data-testid="session-file-tree">
       <div>Search: {searchTerm}</div>
@@ -11,7 +11,7 @@ vi.mock('@/components/files/SessionFileTree', () => ({
   )),
 }));
 
-vi.mock('@/components/modals/FileViewerModal', () => ({
+vi.mock('@lace/web/components/modals/FileViewerModal', () => ({
   FileViewerModal: vi.fn(({ isOpen, filePath, fileName, onClose }) =>
     isOpen ? (
       <div data-testid="file-viewer-modal">
@@ -28,7 +28,7 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { FileBrowserSection } from '@/components/sidebar/FileBrowserSection';
+import { FileBrowserSection } from '@lace/web/components/sidebar/FileBrowserSection';
 
 describe('FileBrowserSection', () => {
   const defaultProps = {

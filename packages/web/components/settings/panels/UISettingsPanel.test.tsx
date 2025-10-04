@@ -10,7 +10,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { expect, describe, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { UISettingsPanel } from './UISettingsPanel';
-import { SettingsProvider } from '@/components/providers/SettingsProvider';
+import { SettingsProvider } from '@lace/web/components/providers/SettingsProvider';
 
 describe('UISettingsPanel', () => {
   it('renders theme selector', () => {

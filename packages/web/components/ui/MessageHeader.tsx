@@ -1,7 +1,7 @@
 import React from 'react';
 import { ReactNode } from 'react';
-import { Avatar } from '@/components/ui';
-import { formatTime } from '@/lib/format';
+import { Avatar } from '@lace/web/components/ui';
+import { formatTime } from '@lace/web/lib/format';
 import LLMModelBadge from './LLMModelBadge';
 
 interface MessageHeaderProps {

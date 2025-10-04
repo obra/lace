@@ -5,8 +5,8 @@
 
 import React, { memo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFolder } from '@/lib/fontawesome';
-import type { ProjectInfo } from '@/types/core';
+import { faFolder } from '@lace/web/lib/fontawesome';
+import type { ProjectInfo } from '@lace/web/types/core';
 
 interface SessionHeaderProps {
   project: ProjectInfo;

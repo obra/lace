@@ -1,11 +1,11 @@
 // ABOUTME: Session MCP server list with runtime status from session's MCPServerManager
 // ABOUTME: Shows which servers are actually running in this session context
 
-import { Project } from '@/lib/server/lace-imports';
-import { getSessionService } from '@/lib/server/session-service';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import { isValidThreadId } from '@/lib/validation/thread-id-validation';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { isValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
 import { z } from 'zod';
 
 const RouteParamsSchema = z.object({

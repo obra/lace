@@ -3,8 +3,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { z } from 'zod';
-import { Tool } from '~/tools/tool';
-import { ToolContext, ToolResult } from '~/tools/types';
+import { Tool } from './tool';
+import { ToolContext, ToolResult } from './types';
 import { join } from 'path';
 
 // Test implementation of new Tool class

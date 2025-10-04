@@ -239,7 +239,7 @@ System continues working when non-critical components fail:
 
 - Use `~/*` for internal imports (maps to `src/`)
 - Omit file extensions in imports
-- Example: `import { Agent } from '~/agents/agent'`
+- Example: `import { Agent } from '@lace/core/agents/agent'`
 
 ## Common Pitfalls
 

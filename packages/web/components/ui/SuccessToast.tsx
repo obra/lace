@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faTimes } from '@/lib/fontawesome';
+import { faCheck, faTimes } from '@lace/web/lib/fontawesome';
 
 interface SuccessToastProps {
   message: string;

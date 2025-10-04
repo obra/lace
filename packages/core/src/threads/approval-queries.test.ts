@@ -2,10 +2,10 @@
 // ABOUTME: Validates pending approval queries and approval status checks
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DatabasePersistence, getPersistence } from '~/persistence/database';
-import { LaceEvent } from '~/threads/types';
-import { ApprovalDecision } from '~/tools/types';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { DatabasePersistence, getPersistence } from '@lace/core/persistence/database';
+import { LaceEvent } from './types';
+import { ApprovalDecision } from '@lace/core/tools/types';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 describe('Approval Database Queries', () => {
   const _tempLaceDir = setupCoreTest();

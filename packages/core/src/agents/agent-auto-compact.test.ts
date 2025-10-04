@@ -2,17 +2,17 @@
 // ABOUTME: Validates auto-compaction triggers and cooldown behavior
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { AIProvider } from '~/providers/base-provider';
-import { ToolExecutor } from '~/tools/executor';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Agent } from './agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { AIProvider } from '@lace/core/providers/base-provider';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 import type {
   ProviderResponse,
   ProviderMessage,
   ModelInfo,
   ProviderInfo,
-} from '~/providers/base-provider';
+} from '@lace/core/providers/base-provider';
 
 // Mock provider with configurable responses
 class MockAutoCompactProvider extends AIProvider {

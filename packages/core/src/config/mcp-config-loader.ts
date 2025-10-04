@@ -4,9 +4,9 @@
 import { readFileSync, existsSync, writeFileSync, mkdirSync, renameSync } from 'fs';
 import { join, dirname } from 'path';
 import { z } from 'zod';
-import { getLaceDir } from '~/config/lace-dir';
-import { logger } from '~/utils/logger';
-import type { MCPConfig, MCPServerConfig } from '~/config/mcp-types';
+import { getLaceDir } from './lace-dir';
+import { logger } from '@lace/core/utils/logger';
+import type { MCPConfig, MCPServerConfig } from './mcp-types';
 
 // Zod schemas for validation
 const ToolPolicySchema = z.enum(['allow', 'ask', 'deny', 'disable']);

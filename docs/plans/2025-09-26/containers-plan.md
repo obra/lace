@@ -411,8 +411,8 @@ git commit -m "Add containers feature flag"
 import { execSync } from 'child_process';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { getLaceDir } from '~/config/lace-dir';
-import { logger } from '~/utils/logger';
+import { getLaceDir } from '@lace/core/config/lace-dir';
+import { logger } from '@lace/core/utils/logger';
 
 export class CloneManager {
   /**
@@ -775,8 +775,8 @@ git commit -m "Add mock container for testing"
 
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import type { DevcontainerConfig } from '~/containers/types';
-import { logger } from '~/utils/logger';
+import type { DevcontainerConfig } from '@lace/core/containers/types';
+import { logger } from '@lace/core/utils/logger';
 
 export class DevcontainerParser {
   /**
@@ -967,10 +967,10 @@ git commit -m "Add devcontainer.json parser"
 import { execSync } from 'child_process';
 import { existsSync } from 'fs';
 import { join } from 'path';
-import { getLaceDir } from '~/config/lace-dir';
-import { getPersistence } from '~/persistence/database';
-import { Project } from '~/projects/project';
-import { logger } from '~/utils/logger';
+import { getLaceDir } from '@lace/core/config/lace-dir';
+import { getPersistence } from '@lace/core/persistence/database';
+import { Project } from '@lace/core/projects/project';
+import { logger } from '@lace/core/utils/logger';
 
 export class OrphanCleanup {
   /**
@@ -1080,7 +1080,7 @@ export class OrphanCleanup {
 // packages/core/src/containers/orphan-cleanup.test.ts
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { OrphanCleanup } from './orphan-cleanup';
-import { getPersistence } from '~/persistence/database';
+import { getPersistence } from '@lace/core/persistence/database';
 
 vi.mock('~/persistence/database');
 
@@ -1127,11 +1127,11 @@ git commit -m "Add orphan cleanup system for containers and session clones"
 
 1. Add imports at the top:
 ```typescript
-import { WorktreeManager } from '~/workspace/worktree-manager';
-import { DevcontainerParser } from '~/workspace/devcontainer-parser';
-import { MockContainer } from '~/containers/mock-container';
-import type { Container } from '~/containers/types';
-import { isContainersEnabled } from '~/config/features';
+import { WorktreeManager } from '@lace/core/workspace/worktree-manager';
+import { DevcontainerParser } from '@lace/core/workspace/devcontainer-parser';
+import { MockContainer } from '@lace/core/containers/mock-container';
+import type { Container } from '@lace/core/containers/types';
+import { isContainersEnabled } from '@lace/core/config/features';
 ```
 
 2. Add properties to Session class:
@@ -1249,8 +1249,8 @@ if (isContainersEnabled()) {
 // packages/core/src/sessions/session-containers.test.ts
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session } from './session';
-import { Project } from '~/projects/project';
-import * as features from '~/config/features';
+import { Project } from '@lace/core/projects/project';
+import * as features from '@lace/core/config/features';
 
 describe('Session container support', () => {
   let project: Project;
@@ -1352,8 +1352,8 @@ git commit -m "Add container support to Session class"
 
 1. Import Session at the top:
 ```typescript
-import { Session } from '~/sessions/session';
-import { isContainersEnabled } from '~/config/features';
+import { Session } from '@lace/core/sessions/session';
+import { isContainersEnabled } from '@lace/core/config/features';
 ```
 
 2. Modify `executeTool()` method to check for containers:
@@ -1395,9 +1395,9 @@ async executeTool(
 // packages/core/src/tools/executor-containers.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ToolExecutor } from './executor';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import * as features from '~/config/features';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import * as features from '@lace/core/config/features';
 import { Tool } from './tool';
 import { z } from 'zod';
 
@@ -1577,8 +1577,8 @@ private async executeCommand(command: string, context: ToolContext): Promise<Too
 // packages/core/src/tools/implementations/bash-container.test.ts
 import { describe, it, expect, vi } from 'vitest';
 import { BashTool } from './bash';
-import type { ToolContext } from '~/tools/types';
-import { MockContainer } from '~/containers/mock-container';
+import type { ToolContext } from '@lace/core/tools/types';
+import { MockContainer } from '@lace/core/containers/mock-container';
 
 describe('BashTool container support', () => {
   let tool: BashTool;
@@ -1681,7 +1681,7 @@ git commit -m "Add container support to BashTool"
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import type { Container, ContainerConfig, ExecOptions, ExecResult } from './types';
-import { logger } from '~/utils/logger';
+import { logger } from '@lace/core/utils/logger';
 
 const execAsync = promisify(exec);
 
@@ -1911,8 +1911,8 @@ git commit -m "Add Apple Container implementation"
 import type { Container, ContainerConfig } from './types';
 import { AppleContainer } from './apple-container';
 import { MockContainer } from './mock-container';
-import { getFeatures } from '~/config/features';
-import { logger } from '~/utils/logger';
+import { getFeatures } from '@lace/core/config/features';
+import { logger } from '@lace/core/utils/logger';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -2014,7 +2014,7 @@ export class ContainerFactory {
 // packages/core/src/containers/factory.test.ts
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ContainerFactory } from './factory';
-import * as features from '~/config/features';
+import * as features from '@lace/core/config/features';
 
 describe('ContainerFactory', () => {
   beforeEach(() => {
@@ -2085,9 +2085,9 @@ git commit -m "Add container factory for runtime selection"
 
 Replace the import:
 ```typescript
-// Remove: import { MockContainer } from '~/containers/mock-container';
+// Remove: import { MockContainer } from '@lace/core/containers/mock-container';
 // Add:
-import { ContainerFactory } from '~/containers/factory';
+import { ContainerFactory } from '@lace/core/containers/factory';
 ```
 
 Update `getOrStartContainer()`:
@@ -2208,11 +2208,11 @@ git commit -m "Add container status to session info"
 ```typescript
 // packages/core/src/integration/containers.integration.test.ts
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { ToolExecutor } from '~/tools/executor';
-import { BashTool } from '~/tools/implementations/bash';
-import * as features from '~/config/features';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { BashTool } from '@lace/core/tools/implementations/bash';
+import * as features from '@lace/core/config/features';
 import { mkdtempSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';

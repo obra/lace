@@ -2,21 +2,21 @@
 // ABOUTME: Validates that Agent can reliably get Session objects for tool execution
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { ToolExecutor } from '~/tools/executor';
-import { TestProvider } from '~/test-utils/test-provider';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Agent } from './agent';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
-import { asThreadId } from '~/threads/types';
+} from '@lace/core/test-utils/provider-defaults';
+import { asThreadId } from '@lace/core/threads/types';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
 

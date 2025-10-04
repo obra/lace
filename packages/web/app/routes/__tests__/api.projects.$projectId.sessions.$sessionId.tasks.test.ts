@@ -9,19 +9,22 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   loader as GET,
   action as POST,
-} from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks';
-import { asThreadId } from '@/types/core';
-import { Project, Session } from '@/lib/server/lace-imports';
-import { getSessionService } from '@/lib/server/session-service';
-import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+} from '@lace/web/app/routes/api.projects.$projectId.sessions.$sessionId.tasks';
+import { asThreadId } from '@lace/web/types/core';
+import { Project, Session } from '@lace/web/lib/server/lace-imports';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '@lace/web/lib/server/lace-imports';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
-import type { Task } from '@/types/core';
-import { parseResponse } from '@/lib/serialization';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
+} from '@lace/web/lib/server/lace-imports';
+import type { Task } from '@lace/web/types/core';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 
 // Mock external dependencies only
 vi.mock('server-only', () => ({}));

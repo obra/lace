@@ -3,16 +3,16 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Agent } from './agent';
-import { ToolExecutor } from '~/tools/executor';
-import { Tool } from '~/tools/tool';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { Tool } from '@lace/core/tools/tool';
 import { z } from 'zod';
-import type { ToolResult, ToolContext, ToolAnnotations, ToolCall } from '~/tools/types';
-import type { ThreadId } from '~/threads/types';
-import { getPersistence, type DatabasePersistence } from '~/persistence/database';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { Session } from '~/sessions/session';
-import { ThreadManager } from '~/threads/thread-manager';
-import type { ProjectId } from '~/projects/types';
+import type { ToolResult, ToolContext, ToolAnnotations, ToolCall } from '@lace/core/tools/types';
+import type { ThreadId } from '@lace/core/threads/types';
+import { getPersistence, type DatabasePersistence } from '@lace/core/persistence/database';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { Session } from '@lace/core/sessions/session';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import type { ProjectId } from '@lace/core/projects/types';
 
 // Test tool that can be configured with different annotations
 class TestTool extends Tool {
@@ -270,7 +270,7 @@ describe('Agent Tool Permissions', () => {
   it('should correctly check safeInternal for real task management tools', async () => {
     // Import real task tools to ensure they work correctly
     const { TaskCreateTool, TaskListTool } = await import(
-      '~/tools/implementations/task-manager/index'
+      '@lace/core/tools/implementations/task-manager/index'
     );
 
     const taskCreateTool = new TaskCreateTool();

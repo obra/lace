@@ -5,12 +5,18 @@
 
 import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRobot, faSquare, faChevronRight, faChevronDown, faPlus } from '@/lib/fontawesome';
-import { SidebarItem, SidebarSection } from '@/components/layout/Sidebar';
-import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useOptionalTaskContext } from '@/components/providers/TaskProvider';
-import { getStatusBgColor } from '@/lib/task-status-ui';
-import type { ThreadId, AgentInfo, Task } from '@/types/core';
+import {
+  faRobot,
+  faSquare,
+  faChevronRight,
+  faChevronDown,
+  faPlus,
+} from '@lace/web/lib/fontawesome';
+import { SidebarItem, SidebarSection } from '@lace/web/components/layout/Sidebar';
+import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
+import { useOptionalTaskContext } from '@lace/web/components/providers/TaskProvider';
+import { getStatusBgColor } from '@lace/web/lib/task-status-ui';
+import type { ThreadId, AgentInfo, Task } from '@lace/web/types/core';
 
 interface AgentsSectionProps {
   isMobile?: boolean;

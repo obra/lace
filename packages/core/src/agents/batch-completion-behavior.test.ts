@@ -2,29 +2,29 @@
 // ABOUTME: Verifies tool execution errors continue conversation while user denials pause it
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { ToolExecutor } from '~/tools/executor';
-import { TestProvider } from '~/test-utils/test-provider';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { expectEventAdded } from '~/test-utils/event-helpers';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
-import { ToolResult, ToolContext, ApprovalDecision } from '~/tools/types';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
+import { Agent } from './agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { expectEventAdded } from '@lace/core/test-utils/event-helpers';
+import { ProviderMessage, ProviderResponse } from '@lace/core/providers/base-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolResult, ToolContext, ApprovalDecision } from '@lace/core/tools/types';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import { z } from 'zod';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
-import { waitForEvent, waitForEventCount } from '~/test-utils/event-waiters';
+import { waitForEvent, waitForEventCount } from '@lace/core/test-utils/event-waiters';
 
 // Test tool that can be configured to fail or succeed
 class ConfigurableTool extends Tool {

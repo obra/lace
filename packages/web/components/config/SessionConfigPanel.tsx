@@ -5,21 +5,21 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTrash } from '@/lib/fontawesome';
+import { faTrash } from '@lace/web/lib/fontawesome';
 import { SessionHeader } from './SessionHeader';
 import { SessionsList } from './SessionsList';
 import { SessionEditModal } from './SessionEditModal';
 import { AgentCreateModal } from './AgentCreateModal';
 import { AgentEditModal } from './AgentEditModal';
-import { AnimatedModal } from '@/components/ui/AnimatedModal';
-import type { SessionConfiguration } from '@/types/api';
-import type { SessionInfo, ProjectInfo, ToolPolicy } from '@/types/core';
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useURLState } from '@/hooks/useURLState';
-import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
-import { asThreadId } from '@/types/core';
+import { AnimatedModal } from '@lace/web/components/ui/AnimatedModal';
+import type { SessionConfiguration } from '@lace/web/types/api';
+import type { SessionInfo, ProjectInfo, ToolPolicy } from '@lace/web/types/core';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
+import { useProjectContext } from '@lace/web/components/providers/ProjectProvider';
+import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
+import { useURLState } from '@lace/web/hooks/useURLState';
+import { useProviderInstances } from '@lace/web/components/providers/ProviderInstanceProvider';
+import { asThreadId } from '@lace/web/types/core';
 
 const DEFAULT_CONFIG: SessionConfiguration = {
   // Note: providerInstanceId and modelId should be set by user selection, not defaults

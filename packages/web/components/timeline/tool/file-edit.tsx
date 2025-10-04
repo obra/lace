@@ -11,15 +11,15 @@ import {
   faChevronDown,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import FileDiffViewer from '@/components/files/FileDiffViewer';
+import FileDiffViewer from '@lace/web/components/files/FileDiffViewer';
 import {
   createFileDiffFromText,
   detectLanguageFromPath,
-} from '@/components/files/FileDiffViewer.utils';
-import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
-import type { ToolAggregatedEventData } from '@/types/web-events';
-import type { FileEditDiffContext } from '@/types/core';
-import { Alert } from '@/components/ui/Alert';
+} from '@lace/web/components/files/FileDiffViewer.utils';
+import type { ToolRenderer, ToolResult } from '@lace/web/components/timeline/tool/types';
+import type { ToolAggregatedEventData } from '@lace/web/types/web-events';
+import type { FileEditDiffContext } from '@lace/web/types/core';
+import { Alert } from '@lace/web/components/ui/Alert';
 
 /**
  * Compact error display that expands to show full details

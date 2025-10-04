@@ -5,19 +5,19 @@
 
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTrash, faServer, faUser, faCog, faTools } from '@/lib/fontawesome';
-import { Modal } from '@/components/ui/Modal';
-import { DirectoryField } from '@/components/ui';
-import { ModelSelector } from '@/components/ui/ModelSelector';
-import { ToolPolicyList } from '@/components/config/ToolPolicyList';
-import { MCPProjectConfig } from '@/components/mcp/MCPProjectConfig';
-import { AddMCPServerModal } from '@/components/modals/AddMCPServerModal';
-import type { ProjectInfo, MCPServerConfig } from '@/types/core';
-import type { ToolPolicy } from '@/types/core';
-import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
-import type { SessionConfiguration } from '@/types/api';
-import { isToolPolicyData, type ToolPolicyInfo } from '@/lib/type-guards';
-import { api } from '@/lib/api-client';
+import { faPlus, faTrash, faServer, faUser, faCog, faTools } from '@lace/web/lib/fontawesome';
+import { Modal } from '@lace/web/components/ui/Modal';
+import { DirectoryField } from '@lace/web/components/ui';
+import { ModelSelector } from '@lace/web/components/ui/ModelSelector';
+import { ToolPolicyList } from '@lace/web/components/config/ToolPolicyList';
+import { MCPProjectConfig } from '@lace/web/components/mcp/MCPProjectConfig';
+import { AddMCPServerModal } from '@lace/web/components/modals/AddMCPServerModal';
+import type { ProjectInfo, MCPServerConfig } from '@lace/web/types/core';
+import type { ToolPolicy } from '@lace/web/types/core';
+import { useProviderInstances } from '@lace/web/components/providers/ProviderInstanceProvider';
+import type { SessionConfiguration } from '@lace/web/types/api';
+import { isToolPolicyData, type ToolPolicyInfo } from '@lace/web/lib/type-guards';
+import { api } from '@lace/web/lib/api-client';
 
 interface ProjectConfiguration {
   providerInstanceId?: string;

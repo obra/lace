@@ -2,8 +2,8 @@
 // ABOUTME: Verifies retry logic works correctly with Ollama SDK
 
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
-import { OllamaProvider } from '~/providers/ollama-provider';
-import { ProviderMessage } from '~/providers/base-provider';
+import { OllamaProvider } from './ollama-provider';
+import { ProviderMessage } from './base-provider';
 
 // Test helper to capture retry behavior
 interface RetryCapture {

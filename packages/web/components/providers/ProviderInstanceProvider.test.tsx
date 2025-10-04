@@ -7,10 +7,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import {
   ProviderInstanceProvider,
   useProviderInstances,
-} from '@/components/providers/ProviderInstanceProvider';
+} from '@lace/web/components/providers/ProviderInstanceProvider';
 
 // Mock the API client
-vi.mock('@/lib/api-client', () => ({
+vi.mock('@lace/web/lib/api-client', () => ({
   api: {
     get: vi.fn(),
     post: vi.fn(),
@@ -19,7 +19,7 @@ vi.mock('@/lib/api-client', () => ({
   },
 }));
 
-import { api as apiClient } from '@/lib/api-client';
+import { api as apiClient } from '@lace/web/lib/api-client';
 const mockApi = vi.mocked(apiClient);
 
 // Test component that uses the provider context

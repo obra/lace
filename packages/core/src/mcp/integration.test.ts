@@ -6,12 +6,12 @@ import { rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtempSync } from 'fs';
-import { Project } from '~/projects/project';
-import { Session } from '~/sessions/session';
-import { ApprovalDecision } from '~/tools/types';
-import type { ToolCall, ApprovalCallback } from '~/tools/types';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { cleanupSession } from '~/test-utils/core-test-setup';
+import { Project } from '@lace/core/projects/project';
+import { Session } from '@lace/core/sessions/session';
+import { ApprovalDecision } from '@lace/core/tools/types';
+import type { ToolCall, ApprovalCallback } from '@lace/core/tools/types';
+import { useTempLaceDir } from '@lace/core/test-utils/temp-lace-dir';
+import { cleanupSession } from '@lace/core/test-utils/core-test-setup';
 
 // Mock the MCP SDK to avoid spawning real processes
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({

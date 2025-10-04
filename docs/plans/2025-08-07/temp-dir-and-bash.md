@@ -241,7 +241,7 @@ export abstract class Tool {
 Add temp directory management to ToolExecutor:
 
 ```typescript
-import { Session } from '~/sessions/session';
+import { Session } from '@lace/core/sessions/session';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 
@@ -799,7 +799,7 @@ feat: add process-scoped temporary directory management
 Add import at the top:
 
 ```typescript
-import { getProcessTempDir } from '~/config/lace-dir';
+import { getProcessTempDir } from '@lace/core/config/lace-dir';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 ```
@@ -866,7 +866,7 @@ describe('temp directory management', () => {
 
 ```typescript
 import { existsSync } from 'fs';
-import { getProcessTempDir } from '~/config/lace-dir';
+import { getProcessTempDir } from '@lace/core/config/lace-dir';
 ```
 
 ### How to Test
@@ -901,7 +901,7 @@ feat(projects): add project temp directory management
 Add imports at the top (check if they already exist):
 
 ```typescript
-import { getProcessTempDir } from '~/config/lace-dir';
+import { getProcessTempDir } from '@lace/core/config/lace-dir';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 ```
@@ -993,8 +993,8 @@ describe('temp directory management', () => {
 
 ```typescript
 import { existsSync } from 'fs';
-import { getProcessTempDir } from '~/config/lace-dir';
-import { Project } from '~/projects/project';
+import { getProcessTempDir } from '@lace/core/config/lace-dir';
+import { Project } from '@lace/core/projects/project';
 ```
 
 ### How to Test
@@ -1030,7 +1030,7 @@ feat(sessions): add session temp directory management
 Add imports at the top:
 
 ```typescript
-import { Session } from '~/sessions/session';
+import { Session } from '@lace/core/sessions/session';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 ```
@@ -1093,7 +1093,7 @@ import { Tool } from './tool';
 import { z } from 'zod';
 import { existsSync } from 'fs';
 import { join } from 'path';
-import { clearProcessTempDirCache } from '~/config/lace-dir';
+import { clearProcessTempDirCache } from '@lace/core/config/lace-dir';
 import type { ToolContext, ToolResult } from './types';
 
 // Test tool implementation for testing base class functionality
@@ -1294,9 +1294,9 @@ feat(tools): add temp directory support to Tool base class
 // ABOUTME: Tests the complete flow from process temp to tool-call directories
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getProcessTempDir, clearProcessTempDirCache } from '~/config/lace-dir';
-import { Project } from '~/projects/project';
-import { Session } from '~/sessions/session';
+import { getProcessTempDir, clearProcessTempDirCache } from '@lace/core/config/lace-dir';
+import { Project } from '@lace/core/projects/project';
+import { Session } from '@lace/core/sessions/session';
 import { Tool } from './tool';
 import { z } from 'zod';
 import { existsSync } from 'fs';
@@ -1479,7 +1479,7 @@ npm run build
 **TypeScript Errors**:
 
 - Never use `any` type - use `unknown` and type guards instead
-- Import types properly: `import type { Session } from '~/sessions/session'`
+- Import types properly: `import type { Session } from '@lace/core/sessions/session'`
 - Use proper type assertions: `as string` not `as any`
 
 **Test Failures**:
@@ -1925,7 +1925,7 @@ Create comprehensive tests for large output scenarios:
 import { describe, it, expect, beforeEach } from 'vitest';
 import { BashTool } from './implementations/bash';
 import { existsSync, readFileSync } from 'fs';
-import { clearProcessTempDirCache } from '~/config/lace-dir';
+import { clearProcessTempDirCache } from '@lace/core/config/lace-dir';
 import type { ToolContext } from './types';
 
 describe('BashTool Large Output Handling', () => {

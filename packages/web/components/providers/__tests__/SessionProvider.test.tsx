@@ -9,20 +9,20 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { SessionProvider, useSessionContext } from '@/components/providers/SessionProvider';
-import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
-import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
+import { SessionProvider, useSessionContext } from '@lace/web/components/providers/SessionProvider';
+import type { SessionInfo, AgentInfo, ThreadId } from '@lace/web/types/core';
+import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
 
 const TEST_SESSION_ID = 'test-session';
 
 // Mock the hooks
-vi.mock('@/hooks/useAgentManagement', () => ({
+vi.mock('@lace/web/hooks/useAgentManagement', () => ({
   useAgentManagement: vi.fn(),
 }));
 
 // SessionProvider now uses selectedAgentId prop instead of hash router
 
-import { useAgentManagement } from '@/hooks/useAgentManagement';
+import { useAgentManagement } from '@lace/web/hooks/useAgentManagement';
 
 const mockUseAgentManagement = vi.mocked(useAgentManagement);
 

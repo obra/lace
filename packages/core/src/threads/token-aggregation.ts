@@ -1,7 +1,7 @@
 // ABOUTME: Utilities for aggregating token usage across thread events
 // ABOUTME: Calculates current token counts from last API turn
 
-import type { LaceEvent } from '~/threads/types';
+import type { LaceEvent } from './types';
 
 interface TokenSummary {
   totalPromptTokens: number;

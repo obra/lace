@@ -5,10 +5,10 @@
 
 import React from 'react';
 import { useState } from 'react';
-import { MessageHeader } from '@/components/ui';
-import type { CompactionData } from '@/types/core';
+import { MessageHeader } from '@lace/web/components/ui';
+import type { CompactionData } from '@lace/web/types/core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown, faChevronRight, faFolder } from '@/lib/fontawesome';
+import { faChevronDown, faChevronRight, faFolder } from '@lace/web/lib/fontawesome';
 
 interface CompactionEntryProps {
   data: CompactionData;

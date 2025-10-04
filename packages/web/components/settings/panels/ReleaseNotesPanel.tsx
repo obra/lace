@@ -7,7 +7,7 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { getCurrentReleaseNotes } from '@/lib/services/release-notes-service';
+import { getCurrentReleaseNotes } from '@lace/web/lib/services/release-notes-service';
 
 export function ReleaseNotesPanel() {
   const releaseNotesData = getCurrentReleaseNotes();

@@ -3,18 +3,21 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SessionService, getSessionService } from './session-service';
-import { Project, Session } from '@/lib/server/lace-imports';
-import { setupWebTest } from '@/test-utils/web-test-setup';
-import type { LaceEvent } from '@/types/core';
-import { asThreadId } from '@/types/core';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import { Project, Session } from '@lace/web/lib/server/lace-imports';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
+import type { LaceEvent } from '@lace/web/types/core';
+import { asThreadId } from '@lace/web/types/core';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '@lace/web/lib/server/lace-imports';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
+} from '@lace/web/lib/server/lace-imports';
 
 // Import real EventStreamManager for integration testing
-import { EventStreamManager } from '@/lib/event-stream-manager';
+import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 
 describe('SessionService TaskManager Event Forwarding', () => {
   const _tempLaceDir = setupWebTest();

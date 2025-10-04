@@ -5,8 +5,8 @@
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBox, faFolder, faCircle } from '@/lib/fontawesome';
-import type { WorkspaceInfo } from '~/workspace/workspace-container-manager';
+import { faBox, faFolder, faCircle } from '@lace/web/lib/fontawesome';
+import type { WorkspaceInfo } from '@lace/core/workspace/workspace-container-manager';
 
 interface WorkspaceDetailsPanelProps {
   mode: 'container' | 'worktree' | 'local';

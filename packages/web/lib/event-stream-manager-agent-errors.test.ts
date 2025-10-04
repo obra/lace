@@ -2,7 +2,7 @@
 // ABOUTME: Verifies error events reach frontend with correct data structure and broadcasting
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EventStreamManager } from '@/lib/event-stream-manager';
+import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import {
   Session,
   Project,
@@ -10,10 +10,10 @@ import {
   cleanupTestProviderInstances,
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '@/lib/server/lace-imports';
-import { cleanupSession } from '@/lib/server/lace-test-imports';
-import { setupWebTest } from '@/test-utils/web-test-setup';
-import type { LaceEvent, AgentErrorData } from '@/types/core';
+} from '@lace/web/lib/server/lace-imports';
+import { cleanupSession } from '@lace/web/lib/server/lace-test-imports';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
+import type { LaceEvent, AgentErrorData } from '@lace/web/types/core';
 
 describe('EventStreamManager Agent Error Handling', () => {
   const tempLaceDir = setupWebTest(); // Handles temp LACE_DIR + persistence automatically

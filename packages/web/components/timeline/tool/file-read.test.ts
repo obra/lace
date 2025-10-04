@@ -3,7 +3,7 @@
 
 import { describe, test, expect } from 'vitest';
 import { faFileCode } from '@fortawesome/free-solid-svg-icons';
-import type { ToolResult } from '@/types/core';
+import type { ToolResult } from '@lace/web/types/core';
 import { fileReadRenderer } from './file-read';
 
 describe('fileReadRenderer', () => {

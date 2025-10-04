@@ -2,16 +2,16 @@
 // ABOUTME: Agent chat page with all providers and context setup
 
 import { useParams } from 'react-router';
-import { UIProvider } from '@/components/providers/UIProvider';
-import { ProjectsProvider } from '@/components/providers/ProjectsProvider';
-import { ProjectProvider } from '@/components/providers/ProjectProvider';
-import { SessionProvider } from '@/components/providers/SessionProvider';
-import { EventStreamProvider } from '@/components/providers/EventStreamProvider';
-import { ToolApprovalProvider } from '@/components/providers/ToolApprovalProvider';
-import { TaskProvider } from '@/components/providers/TaskProvider';
-import { ScrollProvider } from '@/components/providers/ScrollProvider';
-import { AgentPageContent } from '@/components/pages/AgentPageContent';
-import type { ThreadId } from '@/types/core';
+import { UIProvider } from '@lace/web/components/providers/UIProvider';
+import { ProjectsProvider } from '@lace/web/components/providers/ProjectsProvider';
+import { ProjectProvider } from '@lace/web/components/providers/ProjectProvider';
+import { SessionProvider } from '@lace/web/components/providers/SessionProvider';
+import { EventStreamProvider } from '@lace/web/components/providers/EventStreamProvider';
+import { ToolApprovalProvider } from '@lace/web/components/providers/ToolApprovalProvider';
+import { TaskProvider } from '@lace/web/components/providers/TaskProvider';
+import { ScrollProvider } from '@lace/web/components/providers/ScrollProvider';
+import { AgentPageContent } from '@lace/web/components/pages/AgentPageContent';
+import type { ThreadId } from '@lace/web/types/core';
 
 // Define stable callback functions outside component to prevent re-renders
 const noOpCallback = () => {};

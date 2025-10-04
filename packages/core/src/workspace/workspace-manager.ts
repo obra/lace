@@ -1,12 +1,12 @@
 // ABOUTME: Common interface and factory for workspace managers
 // ABOUTME: Supports both containerized and local (null-container) execution modes
 
-import { ExecOptions, ExecResult } from '~/containers/types';
-import { WorkspaceContainerManager, WorkspaceInfo } from '~/workspace/workspace-container-manager';
-import { LocalWorkspaceManager } from '~/workspace/local-workspace-manager';
-import { WorktreeWorkspaceManager } from '~/workspace/worktree-workspace-manager';
-import { AppleContainerRuntime } from '~/containers/apple-container';
-import { logger } from '~/utils/logger';
+import { ExecOptions, ExecResult } from '@lace/core/containers/types';
+import { WorkspaceContainerManager, WorkspaceInfo } from './workspace-container-manager';
+import { LocalWorkspaceManager } from './local-workspace-manager';
+import { WorktreeWorkspaceManager } from './worktree-workspace-manager';
+import { AppleContainerRuntime } from '@lace/core/containers/apple-container';
+import { logger } from '@lace/core/utils/logger';
 
 /**
  * Common interface for all workspace managers.

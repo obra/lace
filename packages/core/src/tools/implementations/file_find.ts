@@ -4,9 +4,9 @@
 import { z } from 'zod';
 import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
-import { Tool } from '~/tools/tool';
-import { NonEmptyString, FilePath } from '~/tools/schemas/common';
-import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import { NonEmptyString, FilePath } from '@lace/core/tools/schemas/common';
+import type { ToolResult, ToolContext, ToolAnnotations } from '@lace/core/tools/types';
 
 const MIN_DEPTH = 1;
 const MAX_DEPTH = 20;

@@ -1,8 +1,8 @@
 // ABOUTME: Type definitions for the helper system
 // ABOUTME: Includes result types and options for different helper modes
 
-import { ToolCall, ToolResult } from '~/tools/types';
-import { CombinedTokenUsage } from '~/token-management/types';
+import { ToolCall, ToolResult } from '@lace/core/tools/types';
+import { CombinedTokenUsage } from '@lace/core/token-management/types';
 
 /**
  * Result returned from a helper execution

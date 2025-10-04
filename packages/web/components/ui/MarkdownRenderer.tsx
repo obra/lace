@@ -9,7 +9,7 @@ import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import DOMPurify from 'dompurify';
-import { useFoldableContent } from '@/hooks/useFoldableContent';
+import { useFoldableContent } from '@lace/web/hooks/useFoldableContent';
 
 interface MarkdownRendererProps {
   content: string;

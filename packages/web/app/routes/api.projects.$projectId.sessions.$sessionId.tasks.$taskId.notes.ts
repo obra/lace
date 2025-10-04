@@ -3,9 +3,9 @@
 
 import type { Route } from './+types/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.notes';
 import { z } from 'zod';
-import { asThreadId } from '@/types/core';
-import { Project } from '@/lib/server/lace-imports';
-import { getSessionService } from '@/lib/server/session-service';
+import { asThreadId } from '@lace/web/types/core';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import { getSessionService } from '@lace/web/lib/server/session-service';
 import {
   ProjectIdSchema,
   SessionIdSchema,
@@ -15,7 +15,7 @@ import {
   validateRequestBody,
   createErrorResponse,
   createSuccessResponse,
-} from '@/lib/server/api-utils';
+} from '@lace/web/lib/server/api-utils';
 
 const NotesRouteParamsSchema = z.object({
   projectId: ProjectIdSchema,

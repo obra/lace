@@ -2,20 +2,20 @@
 // ABOUTME: Tests GET, PATCH, DELETE operations on specific projects without mocking behavior
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
+} from '@lace/web/lib/server/lace-imports';
 
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
 
-import { loader, action } from '@/app/routes/api.projects.$projectId';
-import { parseResponse } from '@/lib/serialization';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
-import { Session } from '@/lib/server/lace-imports';
-import type { ProjectInfo } from '@/types/core';
+import { loader, action } from '@lace/web/app/routes/api.projects.$projectId';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import { Session } from '@lace/web/lib/server/lace-imports';
+import type { ProjectInfo } from '@lace/web/types/core';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
@@ -30,7 +30,7 @@ interface SuccessResponse {
 
 describe('Individual Project API Integration Tests', () => {
   const context = setupWebTest();
-  let testProject: import('@/lib/server/lace-imports').Project;
+  let testProject: import('@lace/web/lib/server/lace-imports').Project;
   let testProjectDir: string;
   let anthropicInstanceId: string;
   let openaiInstanceId: string;
@@ -56,7 +56,7 @@ describe('Individual Project API Integration Tests', () => {
     await fs.mkdir(testProjectDir, { recursive: true });
 
     // Create a test project for each test
-    const { Project } = await import('@/lib/server/lace-imports');
+    const { Project } = await import('@lace/web/lib/server/lace-imports');
     testProject = Project.create('Test Project', testProjectDir, 'A test project', {
       providerInstanceId: anthropicInstanceId,
       modelId: 'claude-3-5-haiku-20241022',
@@ -134,7 +134,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.workingDirectory).toBe(testProjectDir); // Should remain unchanged
 
       // Verify the update was persisted
-      const { Project } = await import('@/lib/server/lace-imports');
+      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getName()).toBe('Updated Project Name');
     });
@@ -155,7 +155,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.name).toBe('Test Project'); // Should remain unchanged
 
       // Verify the update was persisted
-      const { Project } = await import('@/lib/server/lace-imports');
+      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getInfo()!.description).toBe('Updated description');
     });
@@ -178,7 +178,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.workingDirectory).toBe(updatedDir);
 
       // Verify the update was persisted
-      const { Project } = await import('@/lib/server/lace-imports');
+      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getWorkingDirectory()).toBe(updatedDir);
     });
@@ -197,7 +197,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(response.status).toBe(200);
 
       // Verify the update was persisted
-      const { Project } = await import('@/lib/server/lace-imports');
+      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getConfiguration()).toEqual({ newKey: 'newValue', another: 'config' });
     });
@@ -217,7 +217,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.isArchived).toBe(true);
 
       // Verify the update was persisted
-      const { Project } = await import('@/lib/server/lace-imports');
+      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getInfo()!.isArchived).toBe(true);
     });
@@ -240,7 +240,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.isArchived).toBe(false);
 
       // Verify the update was persisted
-      const { Project } = await import('@/lib/server/lace-imports');
+      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getInfo()!.isArchived).toBe(false);
     });
@@ -273,7 +273,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.isArchived).toBe(true);
 
       // Verify all updates were persisted
-      const { Project } = await import('@/lib/server/lace-imports');
+      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const updatedProject = Project.getById(testProject.getId());
       expect(updatedProject!.getName()).toBe('Multi-Update Project');
       expect(updatedProject!.getInfo()!.description).toBe('Multiple fields updated');
@@ -329,7 +329,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.success).toBe(true);
 
       // Verify the project was actually deleted
-      const { Project } = await import('@/lib/server/lace-imports');
+      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const deletedProject = Project.getById(projectId);
       expect(deletedProject).toBeNull();
     });
@@ -365,7 +365,7 @@ describe('Individual Project API Integration Tests', () => {
       expect(data.success).toBe(true);
 
       // Verify the project was actually deleted
-      const { Project } = await import('@/lib/server/lace-imports');
+      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const deletedProject = Project.getById(projectId);
       expect(deletedProject).toBeNull();
     });

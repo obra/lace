@@ -355,7 +355,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
 
    ```typescript
    import { OpenRouterResponse, OpenRouterResponseSchema } from './types';
-   import { logger } from '~/utils/logger';
+   import { logger } from '@lace/core/utils/logger';
 
    export class OpenRouterClient {
      private baseUrl = 'https://openrouter.ai/api/v1';
@@ -461,7 +461,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```typescript
    import * as fs from 'fs';
    import * as path from 'path';
-   import { logger } from '~/utils/logger';
+   import { logger } from '@lace/core/utils/logger';
 
    export interface CachedCatalog {
      _meta: {
@@ -724,7 +724,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    import type { OpenRouterModel } from './types';
    import type { ModelConfig } from '../catalog/types';
    import { extractProvider, convertPricing } from './utils';
-   import { logger } from '~/utils/logger';
+   import { logger } from '@lace/core/utils/logger';
 
    export class ModelFilterService {
      filterModels(
@@ -822,7 +822,7 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    ```typescript
    import { describe, it, expect, vi, beforeEach } from 'vitest';
    import { OpenRouterDynamicProvider } from './dynamic-provider';
-   import { getLaceDir } from '~/config/lace-dir';
+   import { getLaceDir } from '@lace/core/config/lace-dir';
 
    vi.mock('~/config/lace-dir');
 
@@ -926,8 +926,8 @@ npx vitest --run src/path/to/specific.test.ts  # Run specific test
    import { ModelFilterService } from './filter-service';
    import type { ModelConfig } from '../catalog/types';
    import type { CatalogProvider } from '../catalog/types';
-   import { getLaceDir } from '~/config/lace-dir';
-   import { logger } from '~/utils/logger';
+   import { getLaceDir } from '@lace/core/config/lace-dir';
+   import { logger } from '@lace/core/utils/logger';
 
    export class OpenRouterDynamicProvider {
      private client: OpenRouterClient;

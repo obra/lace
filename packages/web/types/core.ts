@@ -13,15 +13,15 @@ export type {
   ErrorType,
   ErrorPhase,
   AgentErrorData,
-} from '~/threads/types';
+} from '@lace/core/threads/types';
 
-export { isAgentSummaryUpdatedData } from '~/threads/types';
+export { isAgentSummaryUpdatedData } from '@lace/core/threads/types';
 
-export type { CombinedTokenUsage, ThreadTokenUsage } from '~/token-management/types';
+export type { CombinedTokenUsage, ThreadTokenUsage } from '@lace/core/token-management/types';
 
-export type { ToolCall, ToolResult, ToolAnnotations, ToolPolicy } from '~/tools/types';
+export type { ToolCall, ToolResult, ToolAnnotations, ToolPolicy } from '@lace/core/tools/types';
 
-export type { FileEditDiffContext } from '~/tools/implementations/file_edit';
+export type { FileEditDiffContext } from '@lace/core/tools/implementations/file_edit';
 
 export type {
   Task,
@@ -30,23 +30,23 @@ export type {
   TaskPriority,
   TaskContext,
   TaskFilters,
-} from '~/tasks/types';
+} from '@lace/core/tasks/types';
 
-export type { AgentState, AgentInfo } from '~/agents/agent';
+export type { AgentState, AgentInfo } from '@lace/core/agents/agent';
 
-export type { ProviderInfo, ProviderResponse, ModelInfo } from '~/providers/base-provider';
+export type { ProviderInfo, ProviderResponse, ModelInfo } from '@lace/core/providers/base-provider';
 
-export { ApprovalDecision } from '~/tools/types';
+export { ApprovalDecision } from '@lace/core/tools/types';
 
-export type { ProjectInfo } from '~/projects/project';
+export type { ProjectInfo } from '@lace/core/projects/project';
 
-export type { SessionInfo } from '~/sessions/session';
+export type { SessionInfo } from '@lace/core/sessions/session';
 
-export type { MCPServerConfig, DiscoveredTool, MCPConfig } from '~/config/mcp-types';
+export type { MCPServerConfig, DiscoveredTool, MCPConfig } from '@lace/core/config/mcp-types';
 
-export type { CompactionData } from '~/threads/compaction/types';
+export type { CompactionData } from '@lace/core/threads/compaction/types';
 
-export type { PersonaInfo } from '~/config/persona-registry';
+export type { PersonaInfo } from '@lace/core/config/persona-registry';
 
 // Re-export utility functions
 export {
@@ -57,4 +57,4 @@ export {
   isTransientEventType,
   isInternalWorkflowEvent,
   isConversationEvent,
-} from '~/threads/types';
+} from '@lace/core/threads/types';

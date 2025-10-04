@@ -1,7 +1,7 @@
 // ABOUTME: Shared mock Agent utilities for web tests
 // ABOUTME: Provides complete Agent mocks with getFullSession() method for SessionService tests
 
-import type { Session } from '@/lib/server/lace-imports';
+import type { Session } from '@lace/web/lib/server/lace-imports';
 
 /**
  * Creates a mock Agent with proper getFullSession() method for testing SessionService

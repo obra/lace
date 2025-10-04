@@ -3,20 +3,20 @@
 
 import { randomUUID } from 'crypto';
 import { basename } from 'path';
-import { getPersistence, ProjectData, SessionData } from '~/persistence/database';
-import { logger } from '~/utils/logger';
-import { Session } from '~/sessions/session';
-import type { ThreadId } from '~/threads/types';
+import { getPersistence, ProjectData, SessionData } from '@lace/core/persistence/database';
+import { logger } from '@lace/core/utils/logger';
+import { Session } from '@lace/core/sessions/session';
+import type { ThreadId } from '@lace/core/threads/types';
 import { existsSync, statSync, accessSync, constants } from 'fs';
-import { ThreadManager } from '~/threads/thread-manager';
-import type { SessionConfiguration } from '~/sessions/session-config';
-import { ProjectEnvironmentManager } from '~/projects/environment-variables';
-import { getProcessTempDir } from '~/config/lace-dir';
-import { MCPConfigLoader } from '~/config/mcp-config-loader';
-import type { MCPServerConfig } from '~/config/mcp-types';
-import { ToolExecutor } from '~/tools/executor';
-import { ToolCatalog } from '~/tools/tool-catalog';
-import { MCPServerManager } from '~/mcp/server-manager';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import type { SessionConfiguration } from '@lace/core/sessions/session-config';
+import { ProjectEnvironmentManager } from './environment-variables';
+import { getProcessTempDir } from '@lace/core/config/lace-dir';
+import { MCPConfigLoader } from '@lace/core/config/mcp-config-loader';
+import type { MCPServerConfig } from '@lace/core/config/mcp-types';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ToolCatalog } from '@lace/core/tools/tool-catalog';
+import { MCPServerManager } from '@lace/core/mcp/server-manager';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 

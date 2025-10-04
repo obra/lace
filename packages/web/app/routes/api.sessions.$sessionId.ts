@@ -1,12 +1,12 @@
 // ABOUTME: Session detail API endpoint for getting specific session information
 // ABOUTME: Returns session metadata and list of agents within the session
 
-import { getSessionService } from '@/lib/server/session-service';
-import { ThreadId } from '@/types/core';
-import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import { Session } from '@/lib/server/lace-imports';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { ThreadId } from '@lace/web/types/core';
+import { isValidThreadId as isClientValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { Session } from '@lace/web/lib/server/lace-imports';
 import { z } from 'zod';
 import type { Route } from './+types/api.sessions.$sessionId';
 

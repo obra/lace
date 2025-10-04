@@ -2,12 +2,12 @@
 // ABOUTME: Project dashboard page with all providers and context setup
 
 import { useParams } from 'react-router';
-import { ProjectsProvider } from '@/components/providers/ProjectsProvider';
-import { ProjectProvider } from '@/components/providers/ProjectProvider';
-import { SessionProvider } from '@/components/providers/SessionProvider';
-import { TaskProvider } from '@/components/providers/TaskProvider';
-import { UIProvider } from '@/components/providers/UIProvider';
-import { ProjectPageContent } from '@/components/pages/ProjectPageContent';
+import { ProjectsProvider } from '@lace/web/components/providers/ProjectsProvider';
+import { ProjectProvider } from '@lace/web/components/providers/ProjectProvider';
+import { SessionProvider } from '@lace/web/components/providers/SessionProvider';
+import { TaskProvider } from '@lace/web/components/providers/TaskProvider';
+import { UIProvider } from '@lace/web/components/providers/UIProvider';
+import { ProjectPageContent } from '@lace/web/components/pages/ProjectPageContent';
 
 // Define stable callback functions outside component to prevent re-renders
 const noOpCallback = () => {};

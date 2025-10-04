@@ -2,12 +2,12 @@
 // ABOUTME: Loads token data from agent API + real-time updates from SSE events
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useSessionEvents } from '@/components/providers/EventStreamProvider';
-import type { ThreadId, CombinedTokenUsage, ThreadTokenUsage } from '@/types/core';
-import type { LaceEvent } from '@/types/core';
-import type { AgentWithTokenUsage } from '@/types/api';
-import { api } from '@/lib/api-client';
-import { AbortError } from '@/lib/api-errors';
+import { useSessionEvents } from '@lace/web/components/providers/EventStreamProvider';
+import type { ThreadId, CombinedTokenUsage, ThreadTokenUsage } from '@lace/web/types/core';
+import type { LaceEvent } from '@lace/web/types/core';
+import type { AgentWithTokenUsage } from '@lace/web/types/api';
+import { api } from '@lace/web/lib/api-client';
+import { AbortError } from '@lace/web/lib/api-errors';
 
 // Use the same type structure as the API
 type AgentTokenUsage = ThreadTokenUsage;

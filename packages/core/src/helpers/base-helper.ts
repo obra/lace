@@ -1,14 +1,14 @@
 // ABOUTME: Base class for helper agents providing common multi-turn execution logic
 // ABOUTME: Extended by InfrastructureHelper and SessionHelper for specific use cases
 
-import { HelperResult } from '~/helpers/types';
-import { ToolCall, ToolResult } from '~/tools/types';
-import { Tool } from '~/tools/tool';
-import { ToolExecutor } from '~/tools/executor';
-import { AIProvider, ProviderMessage } from '~/providers/base-provider';
-import { CombinedTokenUsage } from '~/token-management/types';
-import { logger } from '~/utils/logger';
-import { loadPromptConfig } from '~/config/prompts';
+import { HelperResult } from './types';
+import { ToolCall, ToolResult } from '@lace/core/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { AIProvider, ProviderMessage } from '@lace/core/providers/base-provider';
+import { CombinedTokenUsage } from '@lace/core/token-management/types';
+import { logger } from '@lace/core/utils/logger';
+import { loadPromptConfig } from '@lace/core/config/prompts';
 
 /**
  * Base class for helper agents

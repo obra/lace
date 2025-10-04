@@ -1,7 +1,7 @@
 // ABOUTME: Shared mock implementations for provider metadata methods
 // ABOUTME: Used by test providers to satisfy the abstract base class requirements
 
-import type { ProviderInfo, ModelInfo } from '~/providers/base-provider';
+import type { ProviderInfo, ModelInfo } from '@lace/core/providers/base-provider';
 
 const mockProviderInfo: ProviderInfo = {
   name: 'test',

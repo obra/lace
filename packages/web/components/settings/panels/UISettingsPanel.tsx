@@ -4,15 +4,15 @@
 'use client';
 
 import React from 'react';
-import { ThemeSelector } from '@/components/ui/ThemeSelector';
-import { SettingsPanel } from '@/components/settings/SettingsPanel';
-import { SettingField } from '@/components/settings/SettingField';
-import { Alert } from '@/components/ui/Alert';
+import { ThemeSelector } from '@lace/web/components/ui/ThemeSelector';
+import { SettingsPanel } from '@lace/web/components/settings/SettingsPanel';
+import { SettingField } from '@lace/web/components/settings/SettingField';
+import { Alert } from '@lace/web/components/ui/Alert';
 import {
   useTheme,
   useDebuggingSettings,
   TIMELINE_WIDTHS,
-} from '@/components/providers/SettingsProvider';
+} from '@lace/web/components/providers/SettingsProvider';
 
 interface UISettingsPanelProps {
   currentTheme?: string;

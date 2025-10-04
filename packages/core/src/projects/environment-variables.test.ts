@@ -2,7 +2,7 @@
 // ABOUTME: Tests variable storage, validation, inheritance, and secure handling
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ProjectEnvironmentManager } from '~/projects/environment-variables';
+import { ProjectEnvironmentManager } from './environment-variables';
 
 describe('Project environment variables', () => {
   let envManager: ProjectEnvironmentManager;

@@ -5,9 +5,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faServer, faPlus } from '@/lib/fontawesome';
-import { Modal } from '@/components/ui/Modal';
-import type { MCPServerConfig } from '@/types/core';
+import { faServer, faPlus } from '@lace/web/lib/fontawesome';
+import { Modal } from '@lace/web/components/ui/Modal';
+import type { MCPServerConfig } from '@lace/web/types/core';
 
 interface AddMCPServerModalProps {
   isOpen: boolean;

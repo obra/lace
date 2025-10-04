@@ -1,11 +1,11 @@
 // ABOUTME: Task notification routing system for notifying agents about task updates
 // ABOUTME: Handles completion, assignment, status change, and note notifications
 
-import type { ThreadId } from '~/threads/types';
-import { isNewAgentSpec } from '~/threads/types';
-import type { Task, TaskContext, TaskNote } from '~/tasks/types';
-import type { Agent } from '~/agents/agent';
-import { logger } from '~/utils/logger';
+import type { ThreadId } from '@lace/core/threads/types';
+import { isNewAgentSpec } from '@lace/core/threads/types';
+import type { Task, TaskContext, TaskNote } from '@lace/core/tasks/types';
+import type { Agent } from '@lace/core/agents/agent';
+import { logger } from './logger';
 
 export interface TaskNotification {
   threadId: ThreadId;
@@ -304,5 +304,5 @@ export interface TaskManagerEvent {
 }
 
 // Re-export core types this utility needs
-export type { Task, TaskNote, TaskContext } from '~/tasks/types';
-export type { ThreadId } from '~/threads/types';
+export type { Task, TaskNote, TaskContext } from '@lace/core/tasks/types';
+export type { ThreadId } from '@lace/core/threads/types';

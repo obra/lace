@@ -3,7 +3,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ToolCatalog } from './tool-catalog';
-import type { MCPServerConfig } from '~/config/mcp-types';
+import type { MCPServerConfig } from '@lace/core/config/mcp-types';
 
 // Mock dependencies
 const mockProject = {
@@ -21,11 +21,11 @@ const mockClient = {
   listTools: vi.fn(),
 };
 
-vi.mock('~/mcp/server-manager', () => ({
+vi.mock('@lace/core/mcp/server-manager', () => ({
   MCPServerManager: vi.fn(() => mockServerManager),
 }));
 
-vi.mock('~/config/mcp-config-loader', () => ({
+vi.mock('@lace/core/config/mcp-config-loader', () => ({
   MCPConfigLoader: {
     updateServerConfig: vi.fn(),
     loadConfig: vi.fn(),
@@ -112,7 +112,7 @@ describe('ToolCatalog', () => {
     });
 
     it('should update config with discovering status immediately', async () => {
-      const { MCPConfigLoader } = vi.mocked(await import('~/config/mcp-config-loader'));
+      const { MCPConfigLoader } = vi.mocked(await import('@lace/core/config/mcp-config-loader'));
 
       await ToolCatalog.discoverAndCacheTools('test-server', testConfig, '/test/project');
 
@@ -153,7 +153,7 @@ describe('ToolCatalog', () => {
       // Wait for background discovery
       await new Promise((resolve) => setTimeout(resolve, 20));
 
-      const { MCPConfigLoader } = vi.mocked(await import('~/config/mcp-config-loader'));
+      const { MCPConfigLoader } = vi.mocked(await import('@lace/core/config/mcp-config-loader'));
       expect(MCPConfigLoader.updateServerConfig).toHaveBeenLastCalledWith(
         'filesystem',
         expect.objectContaining({
@@ -175,7 +175,7 @@ describe('ToolCatalog', () => {
       // Wait for background discovery
       await new Promise((resolve) => setTimeout(resolve, 20));
 
-      const { MCPConfigLoader } = vi.mocked(await import('~/config/mcp-config-loader'));
+      const { MCPConfigLoader } = vi.mocked(await import('@lace/core/config/mcp-config-loader'));
       // Check for call with 'broken-server' specifically, not last call
       expect(MCPConfigLoader.updateServerConfig).toHaveBeenCalledWith(
         'broken-server',
@@ -199,7 +199,7 @@ describe('ToolCatalog', () => {
       // Wait for background discovery
       await new Promise((resolve) => setTimeout(resolve, 20));
 
-      const { MCPConfigLoader } = vi.mocked(await import('~/config/mcp-config-loader'));
+      const { MCPConfigLoader } = vi.mocked(await import('@lace/core/config/mcp-config-loader'));
 
       // Check if any call was made for broken-server with failed status
       const brokenServerCalls = MCPConfigLoader.updateServerConfig.mock.calls.filter(

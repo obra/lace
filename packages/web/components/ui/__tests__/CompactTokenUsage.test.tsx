@@ -9,19 +9,19 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { CompactTokenUsage } from '@/components/ui/CompactTokenUsage';
-import type { ThreadId } from '@/types/core';
+import { CompactTokenUsage } from '@lace/web/components/ui/CompactTokenUsage';
+import type { ThreadId } from '@lace/web/types/core';
 
 // Use vi.hoisted to ensure mock functions are available during hoisting
 const mockUseAgentTokenUsage = vi.hoisted(() => vi.fn());
 
 // Mock the useAgentTokenUsage hook
-vi.mock('@/hooks/useAgentTokenUsage', () => ({
+vi.mock('@lace/web/hooks/useAgentTokenUsage', () => ({
   useAgentTokenUsage: mockUseAgentTokenUsage,
 }));
 
 // Mock TokenUsageDisplay component
-vi.mock('@/components/ui', () => ({
+vi.mock('@lace/web/components/ui', () => ({
   TokenUsageDisplay: ({
     tokenUsage,
   }: {

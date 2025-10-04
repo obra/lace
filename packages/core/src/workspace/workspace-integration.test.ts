@@ -2,16 +2,16 @@
 // ABOUTME: Verifies BashTool and FileTools work correctly with containerized workspaces
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { BashTool } from '~/tools/implementations/bash';
-import { FileReadTool } from '~/tools/implementations/file_read';
-import { FileWriteTool } from '~/tools/implementations/file_write';
-import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import { BashTool } from '@lace/core/tools/implementations/bash';
+import { FileReadTool } from '@lace/core/tools/implementations/file_read';
+import { FileWriteTool } from '@lace/core/tools/implementations/file_write';
+import { setupCoreTest, cleanupSession } from '@lace/core/test-utils/core-test-setup';
 import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import type { ToolContext } from '~/tools/types';
+import type { ToolContext } from '@lace/core/tools/types';
 
 describe('Workspace Integration', () => {
   const _testContext = setupCoreTest();

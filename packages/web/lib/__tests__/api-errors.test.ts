@@ -11,7 +11,7 @@ import {
   isRetryableError,
   isApiError,
   getErrorDetails,
-} from '@/lib/api-errors';
+} from '@lace/web/lib/api-errors';
 
 describe('ApiError Types', () => {
   describe('HttpError', () => {

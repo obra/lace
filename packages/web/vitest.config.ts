@@ -18,8 +18,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './'),
-      '~': path.resolve(__dirname, '../../packages/core/src'),
+      '@lace/web': path.resolve(__dirname, './'),
+      '@lace/core': path.resolve(__dirname, '../../packages/core/src'),
     },
   },
 });

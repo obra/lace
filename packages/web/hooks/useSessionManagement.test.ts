@@ -3,20 +3,20 @@
 
 import { renderHook, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SessionInfo, ThreadId } from '@/types/core';
+import type { SessionInfo, ThreadId } from '@lace/web/types/core';
 import { useSessionManagement } from './useSessionManagement';
-import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
+import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
 // Mock parseResponse
-vi.mock('@/lib/serialization', () => ({
+vi.mock('@lace/web/lib/serialization', () => ({
   parseResponse: vi.fn(),
 }));
 
-import { parseResponse } from '@/lib/serialization';
+import { parseResponse } from '@lace/web/lib/serialization';
 const mockParseResponse = vi.mocked(parseResponse);
 
 const mockSessions: SessionInfo[] = [

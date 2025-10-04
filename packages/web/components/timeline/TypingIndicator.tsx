@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRobot } from '@/lib/fontawesome';
+import { faRobot } from '@lace/web/lib/fontawesome';
 
 interface TypingIndicatorProps {
   agent: string;

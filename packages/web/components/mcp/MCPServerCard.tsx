@@ -5,8 +5,8 @@
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faTrash } from '@/lib/fontawesome';
-import type { MCPServerConfig } from '@/types/core';
+import { faEdit, faTrash } from '@lace/web/lib/fontawesome';
+import type { MCPServerConfig } from '@lace/web/types/core';
 
 interface MCPServerCardProps {
   serverId: string;

@@ -2,28 +2,28 @@
 // ABOUTME: Tests real agent scenarios with concurrent approvals using actual components
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { ToolExecutor } from '~/tools/executor';
-import { ApprovalDecision } from '~/tools/types';
-import { TestProvider } from '~/test-utils/test-provider';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { BashTool } from '~/tools/implementations/bash';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
+import { Agent } from './agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ApprovalDecision } from '@lace/core/tools/types';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { BashTool } from '@lace/core/tools/implementations/bash';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
-import type { ProviderResponse, ProviderMessage } from '~/providers/base-provider';
-import type { Tool } from '~/tools/tool';
+} from '@lace/core/test-utils/provider-defaults';
+import type { ProviderResponse, ProviderMessage } from '@lace/core/providers/base-provider';
+import type { Tool } from '@lace/core/tools/tool';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
-import { waitForEvent, waitForEventMatch } from '~/test-utils/event-waiters';
+import { waitForEvent, waitForEventMatch } from '@lace/core/test-utils/event-waiters';
 
 // Mock provider that can return tool calls once then regular responses
 class MockProviderWithToolCalls extends TestProvider {

@@ -191,9 +191,9 @@ import {
 } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from './route';
-import { Project } from '@/lib/server/lace-imports';
-import { parseResponse } from '@/lib/serialization';
-import type { SessionResponse } from '@/types/api';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import { parseResponse } from '@lace/web/lib/serialization';
+import type { SessionResponse } from '@lace/web/types/api';
 
 // Add to existing describe block
 it('should return session metadata without tokenUsage field', async () => {
@@ -246,9 +246,9 @@ npm run test:run packages/web/app/api/projects/[projectId]/sessions/[sessionId]/
 ```typescript
 // packages/web/app/api/projects/[projectId]/sessions/[sessionId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { Project } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 
 export async function GET(
   _request: NextRequest,
@@ -452,10 +452,10 @@ import {
   cleanupTestProviderInstances,
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '@/lib/server/lace-imports';
-import { parseResponse } from '@/lib/serialization';
-import type { AgentResponse } from '@/types/api';
-import type { ThreadEvent } from '~/threads/types';
+} from '@lace/web/lib/server/lace-imports';
+import { parseResponse } from '@lace/web/lib/serialization';
+import type { AgentResponse } from '@lace/web/types/api';
+import type { ThreadEvent } from '@lace/core/threads/types';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -762,8 +762,8 @@ describe('useAgentTokens', () => {
 ```typescript
 // packages/web/hooks/useAgentTokens.ts
 import { useState, useEffect } from 'react';
-import { parseResponse } from '@/lib/serialization';
-import type { AgentResponse } from '@/types/api';
+import { parseResponse } from '@lace/web/lib/serialization';
+import type { AgentResponse } from '@lace/web/types/api';
 
 interface TokenUsage {
   totalPromptTokens: number;
@@ -862,14 +862,14 @@ export function useAgentTokens(agentId: string | undefined): TokenUsage | null {
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TokenBadge } from './TokenBadge';
-import type { TokenUsage } from '@/hooks/useAgentTokens';
+import type { TokenUsage } from '@lace/web/hooks/useAgentTokens';
 
 // Mock the hook
 vi.mock('@/hooks/useAgentTokens', () => ({
   useAgentTokens: vi.fn(),
 }));
 
-import { useAgentTokens } from '@/hooks/useAgentTokens';
+import { useAgentTokens } from '@lace/web/hooks/useAgentTokens';
 
 describe('TokenBadge', () => {
   it('should display token usage from hook', () => {
@@ -923,8 +923,8 @@ describe('TokenBadge', () => {
 
 ```typescript
 // packages/web/components/TokenBadge.tsx
-import { useAgentTokens } from '@/hooks/useAgentTokens';
-import { Badge } from '@/components/ui/badge';
+import { useAgentTokens } from '@lace/web/hooks/useAgentTokens';
+import { Badge } from '@lace/web/components/ui/badge';
 
 interface TokenBadgeProps {
   agentId: string;
@@ -957,15 +957,15 @@ export function TokenBadge({ agentId, className }: TokenBadgeProps) {
 ```typescript
 // packages/web/__tests__/integration/token-flow.e2e.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { parseResponse } from '@/lib/serialization';
+import { parseResponse } from '@lace/web/lib/serialization';
 import {
   Project,
   Session,
   cleanupTestProviderInstances,
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '@/lib/server/lace-imports';
-import type { SessionResponse, AgentResponse } from '@/types/api';
+} from '@lace/web/lib/server/lace-imports';
+import type { SessionResponse, AgentResponse } from '@lace/web/types/api';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';

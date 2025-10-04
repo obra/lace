@@ -12,9 +12,9 @@ import React, {
   useRef,
   type ReactNode,
 } from 'react';
-import { useSessionManagement } from '@/hooks/useSessionManagement';
-import { useEventStream, type AgentEvent } from '@/hooks/useEventStream';
-import type { SessionInfo } from '@/types/core';
+import { useSessionManagement } from '@lace/web/hooks/useSessionManagement';
+import { useEventStream, type AgentEvent } from '@lace/web/hooks/useEventStream';
+import type { SessionInfo } from '@lace/web/types/core';
 
 // Types for project context
 export interface ProjectContextType {

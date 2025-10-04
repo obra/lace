@@ -80,6 +80,7 @@
     "msw": "^2.10.4",
     "playwright": "^1.49.0",
     "prettier": "^3.5.3",
+    "ts-morph": "^27.0.0",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.20.3",
     "typescript": "^5.6.0",

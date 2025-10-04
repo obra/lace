@@ -167,8 +167,8 @@ const MCPServerConfigSchema = z.object({
 // packages/core/src/tools/__tests__/tool-catalog.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ToolCatalog } from '../tool-catalog';
-import type { Project } from '~/projects/project';
-import type { MCPServerConfig } from '~/config/mcp-types';
+import type { Project } from '@lace/core/projects/project';
+import type { MCPServerConfig } from '@lace/core/config/mcp-types';
 
 // Mock dependencies
 const mockProject = {
@@ -399,11 +399,11 @@ describe('ToolCatalog', () => {
 
 ```typescript
 // packages/core/src/tools/tool-catalog.ts
-import { MCPServerManager } from '~/mcp/server-manager';
-import { MCPConfigLoader } from '~/config/mcp-config-loader';
-import { logger } from '~/utils/logger';
-import type { Project } from '~/projects/project';
-import type { MCPServerConfig, DiscoveredTool } from '~/config/mcp-types';
+import { MCPServerManager } from '@lace/core/mcp/server-manager';
+import { MCPConfigLoader } from '@lace/core/config/mcp-config-loader';
+import { logger } from '@lace/core/utils/logger';
+import type { Project } from '@lace/core/projects/project';
+import type { MCPServerConfig, DiscoveredTool } from '@lace/core/config/mcp-types';
 
 export class ToolCatalog {
   /**
@@ -560,7 +560,7 @@ export { ToolCatalog } from './tool-catalog';
 
 ```typescript
 // Add to packages/core/src/projects/__tests__/project.test.ts
-import { ToolCatalog } from '~/tools/tool-catalog';
+import { ToolCatalog } from '@lace/core/tools/tool-catalog';
 
 describe('Project MCP Server Management', () => {
   it('should start async discovery when adding MCP server', async () => {
@@ -609,7 +609,7 @@ describe('Project MCP Server Management', () => {
 
 ```typescript
 // In packages/core/src/projects/project.ts
-import { ToolCatalog } from '~/tools/tool-catalog';
+import { ToolCatalog } from '@lace/core/tools/tool-catalog';
 
 async addMCPServer(serverId: string, serverConfig: MCPServerConfig): Promise<void> {
   // Check for duplicates
@@ -657,8 +657,8 @@ reads.
 
 ```typescript
 // In packages/web/app/routes/api.projects.$projectId.configuration.ts
-import { Project, ProviderRegistry } from '@/lib/server/lace-imports';
-import { ToolCatalog } from '@/lib/server/lace-imports'; // Add this import
+import { Project, ProviderRegistry } from '@lace/web/lib/server/lace-imports';
+import { ToolCatalog } from '@lace/web/lib/server/lace-imports'; // Add this import
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {
   try {
@@ -699,7 +699,7 @@ export async function loader({ request: _request, params }: Route.LoaderArgs) {
 
 ```typescript
 // In packages/web/app/routes/api.sessions.$sessionId.configuration.ts
-import { ToolCatalog } from '@/lib/server/lace-imports'; // Add this import
+import { ToolCatalog } from '@lace/web/lib/server/lace-imports'; // Add this import
 
 // In loader function, replace ToolExecutor creation with:
 const availableTools = ToolCatalog.getAvailableTools(session.getProject());
@@ -739,7 +739,7 @@ servers.
 
 ```typescript
 // Add to packages/core/src/sessions/__tests__/session.test.ts
-import { ToolCatalog } from '~/tools/tool-catalog';
+import { ToolCatalog } from '@lace/core/tools/tool-catalog';
 
 describe('Session MCP Tool Cache', () => {
   it('should refresh tool cache when starting MCP servers', async () => {
@@ -810,7 +810,7 @@ static async refreshCacheForRunningServer(
 
 ```typescript
 // In packages/core/src/sessions/session.ts
-import { ToolCatalog } from '~/tools/tool-catalog';
+import { ToolCatalog } from '@lace/core/tools/tool-catalog';
 
 private async initializeMCPServers(): Promise<void> {
   const projectDir = this.getProject().getWorkingDirectory();
@@ -862,9 +862,9 @@ npm install --save-dev @modelcontextprotocol/server-filesystem
 ```typescript
 // packages/web/app/routes/__tests__/mcp-discovery-integration.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { setupWebTest, cleanupWebTest } from '@/test-utils/web-test-setup';
-import { Project, ToolCatalog } from '@/lib/server/lace-imports';
-import { parseResponse } from '@/lib/serialization';
+import { setupWebTest, cleanupWebTest } from '@lace/web/test-utils/web-test-setup';
+import { Project, ToolCatalog } from '@lace/web/lib/server/lace-imports';
+import { parseResponse } from '@lace/web/lib/serialization';
 
 describe('MCP Tool Discovery Integration', () => {
   let project: Project;

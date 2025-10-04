@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import {
   checkReleaseNotesStatus,
   markReleaseNotesAsSeen,
-} from '@/lib/services/release-notes-service';
+} from '@lace/web/lib/services/release-notes-service';
 
 interface UseReleaseNotesResult {
   shouldShowModal: boolean;

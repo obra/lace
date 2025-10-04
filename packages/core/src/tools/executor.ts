@@ -1,17 +1,17 @@
 // ABOUTME: Simplified callback-free tool execution engine
 // ABOUTME: Handles tool registration and execution - Agent owns approval flow
 
-import { ToolResult, ToolContext, ToolCall, PermissionOverrideMode } from '~/tools/types';
-import { Tool } from '~/tools/tool';
-import { ProjectEnvironmentManager } from '~/projects/environment-variables';
+import { ToolResult, ToolContext, ToolCall, PermissionOverrideMode } from './types';
+import { Tool } from './tool';
+import { ProjectEnvironmentManager } from '@lace/core/projects/environment-variables';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
-import { BashTool } from '~/tools/implementations/bash';
-import { FileReadTool } from '~/tools/implementations/file_read';
-import { FileWriteTool } from '~/tools/implementations/file_write';
-import { FileEditTool } from '~/tools/implementations/file_edit';
-import { RipgrepSearchTool } from '~/tools/implementations/ripgrep_search';
-import { FileFindTool } from '~/tools/implementations/file_find';
+import { BashTool } from '@lace/core/tools/implementations/bash';
+import { FileReadTool } from '@lace/core/tools/implementations/file_read';
+import { FileWriteTool } from '@lace/core/tools/implementations/file_write';
+import { FileEditTool } from '@lace/core/tools/implementations/file_edit';
+import { RipgrepSearchTool } from '@lace/core/tools/implementations/ripgrep_search';
+import { FileFindTool } from '@lace/core/tools/implementations/file_find';
 import {
   TaskCreateTool,
   TaskListTool,
@@ -19,14 +19,14 @@ import {
   TaskUpdateTool,
   TaskAddNoteTool,
   TaskViewTool,
-} from '~/tools/implementations/task-manager/index';
-import { DelegateTool } from '~/tools/implementations/delegate';
-import { UrlFetchTool } from '~/tools/implementations/url_fetch';
-import { MCPServerManager } from '~/mcp/server-manager';
-import type { MCPServerConnection } from '~/config/mcp-types';
-import { MCPToolAdapter } from '~/mcp/tool-adapter';
-import { logger } from '~/utils/logger';
-import type { Session } from '~/sessions/session';
+} from '@lace/core/tools/implementations/task-manager/index';
+import { DelegateTool } from '@lace/core/tools/implementations/delegate';
+import { UrlFetchTool } from '@lace/core/tools/implementations/url_fetch';
+import { MCPServerManager } from '@lace/core/mcp/server-manager';
+import type { MCPServerConnection } from '@lace/core/config/mcp-types';
+import { MCPToolAdapter } from '@lace/core/mcp/tool-adapter';
+import { logger } from '@lace/core/utils/logger';
+import type { Session } from '@lace/core/sessions/session';
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();

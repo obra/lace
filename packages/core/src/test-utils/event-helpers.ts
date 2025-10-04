@@ -1,7 +1,7 @@
 // ABOUTME: Test utilities for handling nullable LaceEvent returns from addEvent()
 // ABOUTME: Provides type-safe helpers for tests that expect events to be added successfully
 
-import type { LaceEvent } from '~/threads/types';
+import type { LaceEvent } from '@lace/core/threads/types';
 
 /**
  * Helper function for tests that expect events to be added successfully.

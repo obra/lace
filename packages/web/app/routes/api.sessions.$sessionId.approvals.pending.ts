@@ -2,13 +2,13 @@
 // ABOUTME: Collects pending approvals from ALL agents in a session and presents unified view
 
 import { z } from 'zod';
-import { getSessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/types/core';
-import { ThreadIdSchema } from '@/lib/validation/schemas';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import { logger } from '~/utils/logger';
-import type { SessionPendingApproval } from '@/types/api';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { asThreadId } from '@lace/web/types/core';
+import { ThreadIdSchema } from '@lace/web/lib/validation/schemas';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { logger } from '@lace/core/utils/logger';
+import type { SessionPendingApproval } from '@lace/web/types/api';
 import type { Route } from './+types/api.sessions.$sessionId.approvals.pending';
 
 // Validation schema

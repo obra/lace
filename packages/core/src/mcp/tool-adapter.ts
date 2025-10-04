@@ -2,10 +2,10 @@
 // ABOUTME: Uses MCP SDK client for tool execution, converts schemas from JSON to Zod
 
 import { z, ZodType } from 'zod';
-import { Tool } from '~/tools/tool';
-import type { ToolResult, ToolContext, ContentBlock } from '~/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import type { ToolResult, ToolContext, ContentBlock } from '@lace/core/tools/types';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { MCPTool } from '~/config/mcp-types';
+import type { MCPTool } from '@lace/core/config/mcp-types';
 
 /**
  * Converts MCP JSON Schema to Zod schema

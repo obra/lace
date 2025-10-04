@@ -2,10 +2,10 @@
 // ABOUTME: Validates misspelling detection and fuzzy matching accuracy
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { findSimilarPaths } from '~/tools/utils/file-suggestions';
+import { findSimilarPaths } from './file-suggestions';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
-import { createTestTempDir } from '~/test-utils/temp-directory';
+import { createTestTempDir } from '@lace/core/test-utils/temp-directory';
 
 describe('File suggestions utility', () => {
   const tempDir = createTestTempDir();

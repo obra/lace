@@ -2,26 +2,29 @@
 // ABOUTME: Tests createSession with providerInstanceId and modelId parameters
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getSessionService, SessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/types/core';
-import { Agent, Session } from '@/lib/server/lace-imports';
-import { setupWebTest } from '@/test-utils/web-test-setup';
-import { TestProvider } from '@/lib/server/lace-imports';
-import type { LaceEvent, ProviderResponse } from '@/types/core';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import { getSessionService, SessionService } from '@lace/web/lib/server/session-service';
+import { asThreadId } from '@lace/web/types/core';
+import { Agent, Session } from '@lace/web/lib/server/lace-imports';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
+import { TestProvider } from '@lace/web/lib/server/lace-imports';
+import type { LaceEvent, ProviderResponse } from '@lace/web/types/core';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '@lace/web/lib/server/lace-imports';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
+} from '@lace/web/lib/server/lace-imports';
 
 describe('SessionService with Provider Instances', () => {
   const _tempLaceDir = setupWebTest();
   let sessionService: SessionService;
-  let testProject: import('@/lib/server/lace-imports').Project;
+  let testProject: import('@lace/web/lib/server/lace-imports').Project;
 
   beforeEach(async () => {
     // Create a real test project with provider configuration
-    const { Project } = await import('@/lib/server/lace-imports');
+    const { Project } = await import('@lace/web/lib/server/lace-imports');
     testProject = Project.create(
       'Test Project',
       process.cwd(),
@@ -42,7 +45,9 @@ describe('SessionService with Provider Instances', () => {
 
   it('should create session using providerInstanceId and modelId', async () => {
     // Set up a configured provider instance
-    const { ProviderRegistry, ProviderInstanceManager } = await import('@/lib/server/lace-imports');
+    const { ProviderRegistry, ProviderInstanceManager } = await import(
+      '@lace/web/lib/server/lace-imports'
+    );
     const _registry = ProviderRegistry.getInstance();
 
     // Create a test provider instance
@@ -84,8 +89,8 @@ describe('SessionService with Provider Instances', () => {
 describe('SessionService Missing Methods', () => {
   const _tempDirContext = setupWebTest();
   let sessionService: ReturnType<typeof getSessionService>;
-  let Session: typeof import('@/lib/server/lace-imports').Session;
-  let testProject: import('@/lib/server/lace-imports').Project;
+  let Session: typeof import('@lace/web/lib/server/lace-imports').Session;
+  let testProject: import('@lace/web/lib/server/lace-imports').Project;
   let providerInstanceId: string;
 
   beforeEach(async () => {
@@ -95,7 +100,7 @@ describe('SessionService Missing Methods', () => {
     setupTestProviderDefaults();
 
     // Import Session for use in tests
-    const imports = await import('@/lib/server/lace-imports');
+    const imports = await import('@lace/web/lib/server/lace-imports');
     Session = imports.Session;
 
     // Create real provider instance
@@ -107,7 +112,7 @@ describe('SessionService Missing Methods', () => {
     });
 
     // Create a real test project with provider configuration
-    const { Project } = await import('@/lib/server/lace-imports');
+    const { Project } = await import('@lace/web/lib/server/lace-imports');
     testProject = Project.create(
       'Test Project',
       _tempDirContext.tempDir,
@@ -186,7 +191,7 @@ describe('SessionService approval event forwarding', () => {
   let sessionService: SessionService;
   let session: Session;
   let agent: Agent;
-  let testProject: import('@/lib/server/lace-imports').Project;
+  let testProject: import('@lace/web/lib/server/lace-imports').Project;
   let providerInstanceId: string;
 
   // Mock provider that returns tool calls to trigger approval flow
@@ -249,12 +254,12 @@ describe('SessionService approval event forwarding', () => {
 
   it('should forward TOOL_APPROVAL_REQUEST events to EventStreamManager when tool requires approval', async () => {
     // Instrument real EventStreamManager to capture broadcasts
-    const { EventStreamManager } = await import('@/lib/event-stream-manager');
+    const { EventStreamManager } = await import('@lace/web/lib/event-stream-manager');
     const realEventStreamManager = EventStreamManager.getInstance();
     const broadcastSpy = vi.spyOn(realEventStreamManager, 'broadcast');
 
     // Create a real test project using temp directory with provider configuration
-    const { Project } = await import('@/lib/server/lace-imports');
+    const { Project } = await import('@lace/web/lib/server/lace-imports');
     testProject = Project.create(
       'Test Project',
       _tempDirContext.tempDir,
@@ -277,7 +282,7 @@ describe('SessionService approval event forwarding', () => {
     // TODO: Update this test to use real provider instances with mocked responses
     // instead of mocking the internal createProvider method
     // Mock ProviderRegistry to return our mock provider
-    const { ProviderRegistry } = await import('@/lib/server/lace-imports');
+    const { ProviderRegistry } = await import('@lace/web/lib/server/lace-imports');
     vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockReturnValue(mockProvider);
     vi.spyOn(ProviderRegistry.prototype, 'getProvider').mockReturnValue(mockProvider);
 
@@ -335,7 +340,7 @@ describe('SessionService agent state change broadcasting', () => {
   let sessionService: SessionService;
   let session: Session;
   let agent: Agent;
-  let testProject: import('@/lib/server/lace-imports').Project;
+  let testProject: import('@lace/web/lib/server/lace-imports').Project;
   let providerInstanceId: string;
   let broadcastSpy: ReturnType<typeof vi.spyOn>;
 
@@ -349,7 +354,7 @@ describe('SessionService agent state change broadcasting', () => {
     setupTestProviderDefaults();
 
     // Clear provider cache for test isolation
-    const { Session } = await import('@/lib/server/lace-imports');
+    const { Session } = await import('@lace/web/lib/server/lace-imports');
 
     // Create provider instance using the documented pattern
     providerInstanceId = await createTestProviderInstance({
@@ -360,7 +365,7 @@ describe('SessionService agent state change broadcasting', () => {
     });
 
     // Create a real test project using temp directory
-    const { Project } = await import('@/lib/server/lace-imports');
+    const { Project } = await import('@lace/web/lib/server/lace-imports');
     testProject = Project.create(
       'Test Project',
       _tempLaceDir.tempDir,
@@ -372,7 +377,7 @@ describe('SessionService agent state change broadcasting', () => {
     );
 
     // Instrument real EventStreamManager to capture broadcasts
-    const { EventStreamManager } = await import('@/lib/event-stream-manager');
+    const { EventStreamManager } = await import('@lace/web/lib/event-stream-manager');
     const realEventStreamManager = EventStreamManager.getInstance();
     broadcastSpy = vi.spyOn(realEventStreamManager, 'broadcast');
 

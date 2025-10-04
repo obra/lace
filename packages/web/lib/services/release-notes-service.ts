@@ -1,10 +1,10 @@
 // ABOUTME: Service for managing release notes display logic and user settings integration
 // ABOUTME: Handles checking if release notes should be shown and updating seen status
 
-import { api } from '@/lib/api-client';
+import { api } from '@lace/web/lib/api-client';
 
 // Static import of release notes content
-import { RELEASE_NOTES } from '@/app/release-notes';
+import { RELEASE_NOTES } from '@lace/web/app/release-notes';
 
 export interface ReleaseNotesStatus {
   shouldShow: boolean;

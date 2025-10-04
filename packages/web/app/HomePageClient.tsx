@@ -3,9 +3,9 @@
 
 'use client';
 
-import { UIProvider } from '@/components/providers/UIProvider';
-import { ProjectsProvider } from '@/components/providers/ProjectsProvider';
-import { ProjectProvider } from '@/components/providers/ProjectProvider';
+import { UIProvider } from '@lace/web/components/providers/UIProvider';
+import { ProjectsProvider } from '@lace/web/components/providers/ProjectsProvider';
+import { ProjectProvider } from '@lace/web/components/providers/ProjectProvider';
 import { HomePage } from './HomePage';
 
 const noop = () => {};

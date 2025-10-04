@@ -6,7 +6,7 @@ import { join, resolve, normalize } from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { homedir, tmpdir } from 'os';
-import { logger } from '~/utils/logger';
+import { logger } from '@lace/core/utils/logger';
 
 const execFileAsync = promisify(execFile);
 

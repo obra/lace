@@ -6,12 +6,12 @@ import {
   SessionData,
   ProjectData,
   getPersistence,
-} from '~/persistence/database';
-import { Thread, LaceEvent, isTransientEventType } from '~/threads/types';
-import { logger } from '~/utils/logger';
-import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
-import type { CompactionStrategy } from '~/threads/compaction/types';
-import { registerDefaultStrategies } from '~/threads/compaction/registry';
+} from '@lace/core/persistence/database';
+import { Thread, LaceEvent, isTransientEventType } from './types';
+import { logger } from '@lace/core/utils/logger';
+import { buildWorkingConversation, buildCompleteHistory } from './conversation-builder';
+import type { CompactionStrategy } from '@lace/core/threads/compaction/types';
+import { registerDefaultStrategies } from '@lace/core/threads/compaction/registry';
 
 export interface ThreadSessionInfo {
   threadId: string;

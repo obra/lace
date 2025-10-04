@@ -4,9 +4,9 @@
 import { z } from 'zod';
 import { writeFile, mkdir } from 'fs/promises';
 import { dirname } from 'path';
-import { Tool } from '~/tools/tool';
-import { FilePath } from '~/tools/schemas/common';
-import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import { FilePath } from '@lace/core/tools/schemas/common';
+import type { ToolResult, ToolContext, ToolAnnotations } from '@lace/core/tools/types';
 
 const fileWriteSchema = z.object({
   path: FilePath,

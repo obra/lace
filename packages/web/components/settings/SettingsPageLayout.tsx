@@ -5,14 +5,14 @@
 
 import React, { useCallback } from 'react';
 import { motion } from 'motion/react';
-import { UIProvider } from '@/components/providers/UIProvider';
-import { ProjectsProvider } from '@/components/providers/ProjectsProvider';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { SidebarContent } from '@/components/sidebar/SidebarContent';
-import { useUIContext } from '@/components/providers/UIProvider';
+import { UIProvider } from '@lace/web/components/providers/UIProvider';
+import { ProjectsProvider } from '@lace/web/components/providers/ProjectsProvider';
+import { Sidebar } from '@lace/web/components/layout/Sidebar';
+import { SidebarContent } from '@lace/web/components/sidebar/SidebarContent';
+import { useUIContext } from '@lace/web/components/providers/UIProvider';
 import { useNavigate } from 'react-router';
 import { SettingsLayout } from './SettingsLayout';
-import type { SettingsTab } from '@/lib/settings-config';
+import type { SettingsTab } from '@lace/web/lib/settings-config';
 
 interface SettingsPageLayoutProps {
   children: React.ReactNode;

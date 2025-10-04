@@ -221,7 +221,7 @@ interface LaceMessageListProps {
 **Add import:**
 
 ```typescript
-import { LaceMessageList } from '@/components/ui/LaceMessageList';
+import { LaceMessageList } from '@lace/web/components/ui/LaceMessageList';
 ```
 
 **Test migration:**
@@ -643,10 +643,10 @@ interface LaceToolApprovalModalProps {
 
 ```typescript
 // Replace:
-import { ToolApprovalModal } from '@/components/old/ToolApprovalModal';
+import { ToolApprovalModal } from '@lace/web/components/old/ToolApprovalModal';
 
 // With:
-import { LaceToolApprovalModal } from '@/components/ui/LaceToolApprovalModal';
+import { LaceToolApprovalModal } from '@lace/web/components/ui/LaceToolApprovalModal';
 ```
 
 **Component change:**

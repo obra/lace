@@ -1,10 +1,10 @@
 // ABOUTME: Test utilities for creating real provider instances for tests
 // ABOUTME: Provides factory functions to set up actual provider instances instead of mocks
 
-import { ProviderInstanceManager } from '~/providers/instance/manager';
-import { ProviderCatalogManager } from '~/providers/catalog/manager';
-import type { ProviderInstance, Credential } from '~/providers/catalog/types';
-import { logger } from '~/utils/logger';
+import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
+import { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
+import type { ProviderInstance, Credential } from '@lace/core/providers/catalog/types';
+import { logger } from '@lace/core/utils/logger';
 
 interface TestProviderConfig {
   catalogId: string; // Use specific catalog ID instead of type

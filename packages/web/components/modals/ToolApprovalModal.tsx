@@ -3,21 +3,21 @@
 
 import React, { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import type { PendingApproval } from '@/types/api';
-import { ApprovalDecision } from '@/types/core';
-import { getToolRenderer } from '@/components/timeline/tool';
-import { getToolIcon, createDefaultToolSummary } from '@/components/ui/ToolCallDisplay';
-import FileDiffViewer from '@/components/files/FileDiffViewer';
+import type { PendingApproval } from '@lace/web/types/api';
+import { ApprovalDecision } from '@lace/web/types/core';
+import { getToolRenderer } from '@lace/web/components/timeline/tool';
+import { getToolIcon, createDefaultToolSummary } from '@lace/web/components/ui/ToolCallDisplay';
+import FileDiffViewer from '@lace/web/components/files/FileDiffViewer';
 import {
   createPartialDiff,
   createPreviewResult,
   shouldShowPartialDiff,
 } from './tool-approval-preview';
-import { api } from '@/lib/api-client';
-import { encodePathSegments } from '@/lib/path-utils';
-import type { SessionFileContentResponse } from '@/types/session-files';
-import type { ToolResult } from '@/components/timeline/tool/types';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { api } from '@lace/web/lib/api-client';
+import { encodePathSegments } from '@lace/web/lib/path-utils';
+import type { SessionFileContentResponse } from '@lace/web/types/session-files';
+import type { ToolResult } from '@lace/web/components/timeline/tool/types';
+import { useProjectContext } from '@lace/web/components/providers/ProjectProvider';
 
 interface ToolApprovalModalProps {
   approvals: PendingApproval[];

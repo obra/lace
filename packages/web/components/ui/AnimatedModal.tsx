@@ -4,7 +4,7 @@
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { DismissButton } from '@/components/ui/DismissButton';
+import { DismissButton } from '@lace/web/components/ui/DismissButton';
 import {
   modalOverlay,
   modalContent,
@@ -12,7 +12,7 @@ import {
   springConfig,
   fadeInUp,
   scaleIn,
-} from '@/lib/animations';
+} from '@lace/web/lib/animations';
 
 interface AnimatedModalProps {
   isOpen: boolean;

@@ -2,11 +2,11 @@
 // ABOUTME: Web-specific route that delegates to core event system
 
 import { z } from 'zod';
-import { getSessionService } from '@/lib/server/session-service';
-import { asThreadId, ApprovalDecision } from '@/types/core';
-import { ThreadIdSchema, ToolCallIdSchema } from '@/lib/validation/schemas';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { asThreadId, ApprovalDecision } from '@lace/web/types/core';
+import { ThreadIdSchema, ToolCallIdSchema } from '@lace/web/lib/validation/schemas';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import type { Route } from './+types/api.threads.$threadId.approvals.$toolCallId';
 
 // Validation schemas

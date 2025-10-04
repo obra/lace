@@ -6,37 +6,37 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
-import { Project, Session } from '@/lib/server/lace-imports';
-import { TaskAPIClient } from '@/lib/client/task-api';
+} from '@lace/core/test-utils/provider-instances';
+import { Project, Session } from '@lace/web/lib/server/lace-imports';
+import { TaskAPIClient } from '@lace/web/lib/client/task-api';
 
 // Import API routes to test against
 import {
   loader as listTasks,
   action as createTask,
-} from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks';
+} from '@lace/web/app/routes/api.projects.$projectId.sessions.$sessionId.tasks';
 import {
   loader as getTask,
   action as updateTask,
   action as deleteTask,
-} from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId';
-import { action as addNote } from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.notes';
+} from '@lace/web/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId';
+import { action as addNote } from '@lace/web/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.notes';
 // Use standard Request instead of Request
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 
 // Mock external dependencies only
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/server/approval-manager', () => ({
+vi.mock('@lace/web/lib/server/approval-manager', () => ({
   getApprovalManager: () => ({
     requestApproval: vi.fn().mockResolvedValue('allow_once'),
   }),

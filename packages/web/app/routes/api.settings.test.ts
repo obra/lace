@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { loader, action } from './api.settings';
-import { UserSettingsManager } from '@/lib/server/lace-imports';
-import { parseResponse } from '@/lib/serialization';
+import { UserSettingsManager } from '@lace/web/lib/server/lace-imports';
+import { parseResponse } from '@lace/web/lib/serialization';
 
 describe('api.settings', () => {
   let tempDir: string;

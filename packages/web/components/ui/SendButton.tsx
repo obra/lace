@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane, faStop } from '@/lib/fontawesome';
+import { faPaperPlane, faStop } from '@lace/web/lib/fontawesome';
 
 interface SendButtonProps {
   onSubmit?: () => void;

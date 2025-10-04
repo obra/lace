@@ -2,13 +2,13 @@
 // ABOUTME: Verifies delegate accepts array format and NewAgentSpec assignedTo parameter
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { DelegateTool } from '~/tools/implementations/delegate';
-import { ToolContext } from '~/tools/types';
-import { Agent } from '~/agents/agent';
-import { Session } from '~/sessions/session';
-import { TaskManager } from '~/tasks/task-manager';
-import { asThreadId } from '~/threads/types';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { DelegateTool } from './delegate';
+import { ToolContext } from '@lace/core/tools/types';
+import { Agent } from '@lace/core/agents/agent';
+import { Session } from '@lace/core/sessions/session';
+import { TaskManager } from '@lace/core/tasks/task-manager';
+import { asThreadId } from '@lace/core/threads/types';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 describe('Unified Delegate API', () => {
   const _tempLaceDir = setupCoreTest();

@@ -2,9 +2,9 @@
 // ABOUTME: Handles coordinated state updates and navigation after onboarding completion
 
 import { useCallback } from 'react';
-import { useURLState } from '@/hooks/useURLState';
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { asThreadId } from '@/types/core';
+import { useURLState } from '@lace/web/hooks/useURLState';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
+import { asThreadId } from '@lace/web/types/core';
 
 interface UseOnboardingResult {
   handleOnboardingComplete: (

@@ -4,8 +4,8 @@
 'use client';
 
 import React, { memo } from 'react';
-import { Modal } from '@/components/ui/Modal';
-import type { ProviderInfo } from '@/types/api';
+import { Modal } from '@lace/web/components/ui/Modal';
+import type { ProviderInfo } from '@lace/web/types/api';
 
 interface EditingAgent {
   threadId: string;

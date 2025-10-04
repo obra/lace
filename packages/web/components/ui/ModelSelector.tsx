@@ -4,7 +4,7 @@
 'use client';
 
 import React, { type ChangeEvent } from 'react';
-import type { ProviderInfo } from '@/types/api';
+import type { ProviderInfo } from '@lace/web/types/api';
 
 interface ModelSelectorProps {
   providers: ProviderInfo[];

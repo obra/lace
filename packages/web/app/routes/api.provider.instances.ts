@@ -5,11 +5,11 @@ import {
   ProviderRegistry,
   ProviderInstanceManager,
   ProviderCatalogManager,
-} from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+} from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
-import type { ConfiguredInstance } from '@/lib/server/lace-imports';
+import type { ConfiguredInstance } from '@lace/web/lib/server/lace-imports';
 import type { Route } from './+types/api.provider.instances';
 
 export interface InstancesResponse {

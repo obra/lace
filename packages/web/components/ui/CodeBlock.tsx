@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCopy, faCheck, faExpand, faCompress } from '@/lib/fontawesome';
+import { faCopy, faCheck, faExpand, faCompress } from '@lace/web/lib/fontawesome';
 import DOMPurify from 'dompurify';
 import hljs from 'highlight.js';
 

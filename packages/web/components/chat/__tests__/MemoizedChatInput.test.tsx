@@ -9,8 +9,8 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { MemoizedChatInput } from '@/components/chat/MemoizedChatInput';
-import type { ThreadId } from '@/types/core';
+import { MemoizedChatInput } from '@lace/web/components/chat/MemoizedChatInput';
+import type { ThreadId } from '@lace/web/types/core';
 
 // Use vi.hoisted to ensure mock functions are available during hoisting
 const mockCompactTokenUsage = vi.hoisted(() => {
@@ -55,11 +55,11 @@ const mockChatInput = vi.hoisted(() => {
 });
 
 // Mock dependencies
-vi.mock('@/components/ui/CompactTokenUsage', () => ({
+vi.mock('@lace/web/components/ui/CompactTokenUsage', () => ({
   CompactTokenUsage: mockCompactTokenUsage,
 }));
 
-vi.mock('@/components/chat/ChatInput', () => ({
+vi.mock('@lace/web/components/chat/ChatInput', () => ({
   ChatInput: mockChatInput,
 }));
 
@@ -74,7 +74,7 @@ vi.mock('motion/react', () => ({
 }));
 
 // Mock SessionProvider context with proper typing
-import type { useSessionContext } from '@/components/providers/SessionProvider';
+import type { useSessionContext } from '@lace/web/components/providers/SessionProvider';
 
 const mockSessionContext: Pick<
   ReturnType<typeof useSessionContext>,
@@ -91,7 +91,7 @@ const mockSessionContext: Pick<
   updateAgent: vi.fn(),
 };
 
-vi.mock('@/components/providers/SessionProvider', () => ({
+vi.mock('@lace/web/components/providers/SessionProvider', () => ({
   useSessionContext: () => mockSessionContext,
 }));
 
@@ -113,12 +113,12 @@ const mockProviderContext = {
   ],
 };
 
-vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
+vi.mock('@lace/web/components/providers/ProviderInstanceProvider', () => ({
   useProviderInstances: () => mockProviderContext,
 }));
 
 // Mock ModelSelector
-vi.mock('@/components/ui/ModelSelector', () => ({
+vi.mock('@lace/web/components/ui/ModelSelector', () => ({
   ModelSelector: ({ className }: { className?: string }) => (
     <select data-testid="model-selector" className={className}>
       <option>Test Model</option>

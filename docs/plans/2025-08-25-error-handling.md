@@ -548,7 +548,7 @@ import {
   faRedo,
   faInfo,
 } from '@fortawesome/free-solid-svg-icons';
-import type { ErrorLogEntry } from '@/types/web-events';
+import type { ErrorLogEntry } from '@lace/web/types/web-events';
 
 interface ErrorDisplayProps {
   error: ErrorLogEntry;
@@ -650,7 +650,7 @@ export function ErrorDisplay({
 
 import React, { useState } from 'react';
 import { ErrorDisplay } from './ErrorDisplay';
-import type { ErrorLogEntry as ErrorLogEntryType } from '@/types/web-events';
+import type { ErrorLogEntry as ErrorLogEntryType } from '@lace/web/types/web-events';
 
 interface ErrorLogEntryProps {
   error: ErrorLogEntryType;
@@ -727,7 +727,7 @@ export function ErrorLogEntry({
 
 import React, { useEffect, useState } from 'react';
 import { ErrorDisplay } from './ErrorDisplay';
-import type { ErrorLogEntry } from '@/types/web-events';
+import type { ErrorLogEntry } from '@lace/web/types/web-events';
 
 interface ErrorToastProps {
   error: ErrorLogEntry;
@@ -805,7 +805,7 @@ import {
   faRefresh,
 } from '@fortawesome/free-solid-svg-icons';
 import { ErrorLogEntry } from './ErrorLogEntry';
-import type { ErrorLogEntry as ErrorLogEntryType } from '@/types/web-events';
+import type { ErrorLogEntry as ErrorLogEntryType } from '@lace/web/types/web-events';
 
 interface ErrorLogProps {
   errors: ErrorLogEntryType[];
@@ -1615,7 +1615,7 @@ Create a notification system for error events:
 
 import { useEffect, useState, useCallback } from 'react';
 import { useEventStream } from './useEventStream';
-import type { LaceEvent, ErrorLogEntry } from '@/types/core';
+import type { LaceEvent, ErrorLogEntry } from '@lace/web/types/core';
 
 interface ErrorNotificationConfig {
   showToasts: boolean;
@@ -1863,8 +1863,8 @@ providing users with visibility into all system errors and recovery options.
 ## Component Usage
 
 ```tsx
-import { useErrorNotifications } from '@/hooks/useErrorNotifications';
-import { ErrorLog } from '@/components/errors/ErrorLog';
+import { useErrorNotifications } from '@lace/web/hooks/useErrorNotifications';
+import { ErrorLog } from '@lace/web/components/errors/ErrorLog';
 
 function MyComponent() {
   const { notifications, errorLog } = useErrorNotifications(sessionId);

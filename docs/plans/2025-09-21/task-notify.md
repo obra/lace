@@ -54,15 +54,15 @@ export type NotificationTarget =
   | 'creator_unless_author';    // Notify creator if they didn't author the change
 
 // Re-export core types this utility needs
-export type { Task, TaskNote, TaskContext } from '~/tasks/types';
-export type { ThreadId } from '~/threads/types';
+export type { Task, TaskNote, TaskContext } from '@lace/core/tasks/types';
+export type { ThreadId } from '@lace/core/threads/types';
 ```
 
 **Imports needed:**
 ```typescript
-import type { ThreadId } from '~/threads/types';
-import type { Task, TaskNote, TaskContext } from '~/tasks/types';
-import type { Agent } from '~/agents/agent';
+import type { ThreadId } from '@lace/core/threads/types';
+import type { Task, TaskNote, TaskContext } from '@lace/core/tasks/types';
+import type { Agent } from '@lace/core/agents/agent';
 ```
 
 **How to test**: Create a simple test file that imports these types and verifies they compile. No runtime tests yet.
@@ -102,7 +102,7 @@ describe('Task Notification Types', () => {
 ```typescript
 import { vi } from 'vitest';
 import { routeTaskNotifications } from './task-notifications';
-import { asThreadId } from '~/threads/types';
+import { asThreadId } from '@lace/core/threads/types';
 
 describe('Task Notification Routing', () => {
   const sessionId = asThreadId('lace_20250922_test01');
@@ -222,7 +222,7 @@ export interface TaskManagerEvent {
 
 **Imports needed:**
 ```typescript
-import type { Agent } from '~/agents/agent';
+import type { Agent } from '@lace/core/agents/agent';
 ```
 
 **Expected result**: Test passes
@@ -586,9 +586,9 @@ Title: "${task.title}"`;
 
 **Test setup needed**:
 ```typescript
-import { Session } from '~/sessions/session';
-import { Agent } from '~/agents/agent';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Session } from '@lace/core/sessions/session';
+import { Agent } from '@lace/core/agents/agent';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 describe('Task Notification Integration', () => {
   let session: Session;

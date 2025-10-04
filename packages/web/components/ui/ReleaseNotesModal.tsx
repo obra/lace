@@ -7,7 +7,7 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { Modal } from '@/components/ui/Modal';
+import { Modal } from '@lace/web/components/ui/Modal';
 
 interface ReleaseNotesModalProps {
   isOpen: boolean;

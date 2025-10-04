@@ -6,23 +6,26 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { getSessionService } from '@/lib/server/session-service';
-import { Project, Session, ThreadManager } from '@/lib/server/lace-imports';
-import type { ThreadId } from '@/types/core';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { Project, Session, ThreadManager } from '@lace/web/lib/server/lace-imports';
+import type { ThreadId } from '@lace/web/types/core';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '@lace/web/lib/server/lace-imports';
 import {
   cleanupTestProviderInstances,
   createTestProviderInstance,
-} from '@/lib/server/lace-imports';
+} from '@lace/web/lib/server/lace-imports';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 // Mock EventStreamManager
-vi.mock('@/lib/event-stream-manager', () => ({
+vi.mock('@lace/web/lib/event-stream-manager', () => ({
   EventStreamManager: {
     getInstance: () => ({
       broadcast: vi.fn(),
@@ -34,7 +37,7 @@ vi.mock('@/lib/event-stream-manager', () => ({
 }));
 
 // Mock approval manager
-vi.mock('@/lib/server/approval-manager', () => ({
+vi.mock('@lace/web/lib/server/approval-manager', () => ({
   getApprovalManager: () => ({
     requestApproval: vi.fn().mockResolvedValue('allow_once'),
   }),

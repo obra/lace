@@ -2,11 +2,11 @@
 // ABOUTME: Provides CRUD operations, filtering, and note management for tasks
 
 import { EventEmitter } from 'events';
-import { DatabasePersistence } from '~/persistence/database';
-import { Task, CreateTaskRequest, TaskFilters, TaskContext, TaskSummary } from '~/tasks/types';
-import { ThreadId, AssigneeId, isNewAgentSpec, parseNewAgentSpec } from '~/threads/types';
-import { resolveModelSpec, type ModelResolutionContext } from '~/providers/provider-utils';
-import { logger } from '~/utils/logger';
+import { DatabasePersistence } from '@lace/core/persistence/database';
+import { Task, CreateTaskRequest, TaskFilters, TaskContext, TaskSummary } from './types';
+import { ThreadId, AssigneeId, isNewAgentSpec, parseNewAgentSpec } from '@lace/core/threads/types';
+import { resolveModelSpec, type ModelResolutionContext } from '@lace/core/providers/provider-utils';
+import { logger } from '@lace/core/utils/logger';
 
 // Type for agent creation callback
 export type AgentCreationCallback = (

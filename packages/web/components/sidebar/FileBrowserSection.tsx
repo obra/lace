@@ -5,11 +5,11 @@
 
 import React, { useState, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch, faFolder } from '@/lib/fontawesome';
-import { SidebarSection } from '@/components/layout/Sidebar';
-import { AccentInput } from '@/components/ui/AccentInput';
-import { SessionFileTree } from '@/components/files/SessionFileTree';
-import { FileViewerModal } from '@/components/modals/FileViewerModal';
+import { faSearch, faFolder } from '@lace/web/lib/fontawesome';
+import { SidebarSection } from '@lace/web/components/layout/Sidebar';
+import { AccentInput } from '@lace/web/components/ui/AccentInput';
+import { SessionFileTree } from '@lace/web/components/files/SessionFileTree';
+import { FileViewerModal } from '@lace/web/components/modals/FileViewerModal';
 
 interface FileBrowserSectionProps {
   sessionId: string;

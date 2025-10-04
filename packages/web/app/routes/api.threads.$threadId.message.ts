@@ -3,13 +3,13 @@
 
 // React Router v7 uses standard Response.json()
 import { randomUUID } from 'crypto';
-import { getSessionService } from '@/lib/server/session-service';
-import { MessageResponse } from '@/types/api';
-import { asThreadId, type ThreadId } from '@/types/core';
-import { ThreadIdSchema, MessageRequestSchema } from '@/lib/validation/schemas';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import { logger } from '~/utils/logger';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { MessageResponse } from '@lace/web/types/api';
+import { asThreadId, type ThreadId } from '@lace/web/types/core';
+import { ThreadIdSchema, MessageRequestSchema } from '@lace/web/lib/validation/schemas';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { logger } from '@lace/core/utils/logger';
 import type { Route } from './+types/api.threads.$threadId.message';
 
 // Type guard for unknown error values

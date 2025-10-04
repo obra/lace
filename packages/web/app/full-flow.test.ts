@@ -8,27 +8,30 @@ vi.mock('server-only', () => ({}));
 
 // Note: ApprovalManager has been removed and replaced with event-based approval system
 
-import { action as createProjectSession } from '@/app/routes/api.projects.$projectId.sessions';
+import { action as createProjectSession } from '@lace/web/app/routes/api.projects.$projectId.sessions';
 import {
   action as spawnAgent,
   loader as listAgents,
-} from '@/app/routes/api.sessions.$sessionId.agents';
-import { action as sendMessage } from '@/app/routes/api.threads.$threadId.message';
-import { loader as streamEvents } from '@/app/routes/api.events.stream';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
-import type { SessionInfo, ThreadId } from '@/types/core';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+} from '@lace/web/app/routes/api.sessions.$sessionId.agents';
+import { action as sendMessage } from '@lace/web/app/routes/api.threads.$threadId.message';
+import { loader as streamEvents } from '@lace/web/app/routes/api.events.stream';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import type { SessionInfo, ThreadId } from '@lace/web/types/core';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
-import { parseResponse } from '@/lib/serialization';
-import { Project } from '@/lib/server/lace-imports';
-import { getSessionService } from '@/lib/server/session-service';
+} from '@lace/web/lib/server/lace-imports';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '@lace/web/lib/server/lace-imports';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import { getSessionService } from '@lace/web/lib/server/session-service';
 
 // Use real EventStreamManager for integration testing
-import { EventStreamManager } from '@/lib/event-stream-manager';
+import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 

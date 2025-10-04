@@ -1,11 +1,11 @@
 // ABOUTME: API endpoint for agent context breakdown
 // ABOUTME: Returns detailed token usage categorization for an agent's thread
 
-import { getSessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/types/core';
-import { isValidThreadId } from '@/lib/validation/thread-id-validation';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { asThreadId } from '@lace/web/types/core';
+import { isValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import type { Route } from './+types/api.agents.$agentId.context';
 import { ContextAnalyzer } from '@lace/core/token-management';
 import type { Agent } from '@lace/core/agents/agent';

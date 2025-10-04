@@ -1,9 +1,9 @@
 // ABOUTME: Individual project MCP server management following established project API patterns
 // ABOUTME: Handles CRUD operations for project-specific MCP server configurations
 
-import { Project } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
 
 const RouteParamsSchema = z.object({

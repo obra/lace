@@ -5,12 +5,12 @@ import { useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBars } from '@/lib/fontawesome';
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { SessionConfigPanel } from '@/components/config/SessionConfigPanel';
-import { useUIContext } from '@/components/providers/UIProvider';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { SidebarContent } from '@/components/sidebar/SidebarContent';
+import { faBars } from '@lace/web/lib/fontawesome';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
+import { SessionConfigPanel } from '@lace/web/components/config/SessionConfigPanel';
+import { useUIContext } from '@lace/web/components/providers/UIProvider';
+import { Sidebar } from '@lace/web/components/layout/Sidebar';
+import { SidebarContent } from '@lace/web/components/sidebar/SidebarContent';
 
 interface ProjectPageContentProps {
   projectId: string;

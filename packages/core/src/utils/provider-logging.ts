@@ -1,7 +1,7 @@
 // ABOUTME: Utility functions for pretty-printing provider payloads in debug logs
 // ABOUTME: Handles message truncation and formatting for better readability
 
-import { logger } from '~/utils/logger';
+import { logger } from './logger';
 
 /**
  * Truncates messages array to show only preamble (first few) and recent messages

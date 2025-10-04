@@ -12,13 +12,13 @@ import React, {
   useRef,
   type ReactNode,
 } from 'react';
-import { useAgentManagement } from '@/hooks/useAgentManagement';
-import { useEventStream, type AgentEvent } from '@/hooks/useEventStream';
-import { useWorkspaceDetails } from '@/hooks/useWorkspaceDetails';
-import type { SessionInfo, AgentInfo, ThreadId } from '@/types/core';
-import { asThreadId } from '@/types/core';
-import type { CreateAgentRequest } from '@/types/api';
-import type { WorkspaceInfo } from '~/workspace/workspace-container-manager';
+import { useAgentManagement } from '@lace/web/hooks/useAgentManagement';
+import { useEventStream, type AgentEvent } from '@lace/web/hooks/useEventStream';
+import { useWorkspaceDetails } from '@lace/web/hooks/useWorkspaceDetails';
+import type { SessionInfo, AgentInfo, ThreadId } from '@lace/web/types/core';
+import { asThreadId } from '@lace/web/types/core';
+import type { CreateAgentRequest } from '@lace/web/types/api';
+import type { WorkspaceInfo } from '@lace/core/workspace/workspace-container-manager';
 
 // Types for session context
 export interface SessionContextType {

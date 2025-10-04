@@ -2,8 +2,8 @@
 // ABOUTME: Centralizes all task CRUD operations and modal state management
 
 import { useCallback } from 'react';
-import type { Task } from '@/types/core';
-import { useTaskManager } from '@/hooks/useTaskManager';
+import type { Task } from '@lace/web/types/core';
+import { useTaskManager } from '@lace/web/hooks/useTaskManager';
 
 type TaskManager = ReturnType<typeof useTaskManager>;
 

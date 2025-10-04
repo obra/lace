@@ -2,12 +2,12 @@
 // ABOUTME: Tests queueMessage, getQueueStats, clearQueue functionality
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { TestProvider } from '~/test-utils/test-provider';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { createMockThreadManager } from '~/test-utils/thread-manager-mock';
+import { Agent } from './agent';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { createMockThreadManager } from '@lace/core/test-utils/thread-manager-mock';
 
 describe('Agent Queue Methods', () => {
   const _tempLaceDir = setupCoreTest();

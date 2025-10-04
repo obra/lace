@@ -4,17 +4,17 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
-import { Project } from '~/projects/project';
-import { Session } from '~/sessions/session';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Project } from './project';
+import { Session } from '@lace/core/sessions/session';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 describe('Project configuration', () => {
   const context = setupCoreTest();
   let tempProjectDir: string;

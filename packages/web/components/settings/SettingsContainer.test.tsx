@@ -10,14 +10,14 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { vi, beforeEach, afterEach, expect, describe, it } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { SettingsContainer } from './SettingsContainer';
-import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
-import { SettingsProvider } from '@/components/providers/SettingsProvider';
-import { stringify } from '@/lib/serialization';
-import { api } from '@/lib/api-client';
-import { providerService } from '@/lib/server/provider-service';
+import { ProviderInstanceProvider } from '@lace/web/components/providers/ProviderInstanceProvider';
+import { SettingsProvider } from '@lace/web/components/providers/SettingsProvider';
+import { stringify } from '@lace/web/lib/serialization';
+import { api } from '@lace/web/lib/api-client';
+import { providerService } from '@lace/web/lib/server/provider-service';
 
 // Mock the API client
-vi.mock('@/lib/api-client', () => ({
+vi.mock('@lace/web/lib/api-client', () => ({
   api: {
     get: vi.fn(),
     patch: vi.fn(),
@@ -25,7 +25,7 @@ vi.mock('@/lib/api-client', () => ({
 }));
 
 // Mock the provider service
-vi.mock('@/lib/server/provider-service', () => ({
+vi.mock('@lace/web/lib/server/provider-service', () => ({
   providerService: {
     getCatalog: vi.fn(),
     refreshCatalog: vi.fn(),

@@ -2,18 +2,18 @@
 // ABOUTME: Uses native tool calling via low-level channel API for proper tool execution
 
 import { LMStudioClient } from '@lmstudio/sdk';
-import { AIProvider } from '~/providers/base-provider';
+import { AIProvider } from './base-provider';
 import {
   ProviderMessage,
   ProviderResponse,
   ProviderConfig,
   ProviderInfo,
   ModelInfo,
-} from '~/providers/base-provider';
-import { ToolCall } from '~/tools/types';
-import { Tool } from '~/tools/tool';
-import { logger } from '~/utils/logger';
-import { logProviderRequest, logProviderResponse } from '~/utils/provider-logging';
+} from './base-provider';
+import { ToolCall } from '@lace/core/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import { logger } from '@lace/core/utils/logger';
+import { logProviderRequest, logProviderResponse } from '@lace/core/utils/provider-logging';
 
 // Interface for LMStudio model objects
 interface LMStudioModel {

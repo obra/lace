@@ -8,7 +8,7 @@ import {
   SessionFileContentResponseSchema,
   ListSessionDirectoryRequestSchema,
   GetSessionFileRequestSchema,
-} from '@/types/session-files';
+} from '@lace/web/types/session-files';
 
 describe('Session File Types', () => {
   describe('SessionFileEntry validation', () => {

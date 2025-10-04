@@ -1,8 +1,8 @@
 // ABOUTME: Provider-specific format conversion functions for enhanced ProviderMessage format
 // ABOUTME: Converts generic tool call format to provider-specific native formats
 
-import { ProviderMessage } from '~/providers/base-provider';
-import { ToolCall } from '~/tools/types';
+import { ProviderMessage } from './base-provider';
+import { ToolCall } from '@lace/core/tools/types';
 import Anthropic from '@anthropic-ai/sdk';
 import type { Content, Part } from '@google/genai';
 

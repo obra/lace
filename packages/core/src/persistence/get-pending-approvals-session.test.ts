@@ -3,8 +3,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { DatabasePersistence, getPersistence } from './database';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import type { LaceEvent } from '~/threads/types';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import type { LaceEvent } from '@lace/core/threads/types';
 
 describe('getPendingApprovals Session-wide Query', () => {
   const _tempLaceDir = setupCoreTest();

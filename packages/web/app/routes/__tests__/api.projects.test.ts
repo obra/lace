@@ -2,11 +2,11 @@
 // ABOUTME: Covers GET all projects, POST new project with validation and error scenarios
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { setupWebTest } from '@/test-utils/web-test-setup';
-import { loader, action } from '@/app/routes/api.projects';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
-import { parseResponse } from '@/lib/serialization';
-import type { ProjectInfo } from '@/types/core';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
+import { loader, action } from '@lace/web/app/routes/api.projects';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import { parseResponse } from '@lace/web/lib/serialization';
+import type { ProjectInfo } from '@lace/web/types/core';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
@@ -22,7 +22,7 @@ const context = setupWebTest();
 const projectStore = new Map<string, Record<string, unknown>>();
 const sessionStore = new Map<string, Record<string, unknown>>();
 
-vi.mock('~/persistence/database', () => {
+vi.mock('@lace/core/persistence/database', () => {
   return {
     getPersistence: vi.fn(() => ({
       // Mock the persistence layer to use in-memory storage for testing
@@ -54,7 +54,7 @@ vi.mock('~/persistence/database', () => {
 });
 
 // Mock ThreadManager for session counting - external dependency
-vi.mock('~/threads/thread-manager', () => ({
+vi.mock('@lace/core/threads/thread-manager', () => ({
   ThreadManager: vi.fn(() => ({
     getSessionsForProject: vi.fn(() => []), // Empty array for clean tests
     generateThreadId: vi.fn(() => {
@@ -95,7 +95,7 @@ describe('Projects API', () => {
   describe('GET /api/projects', () => {
     it('should return all projects', async () => {
       // Arrange: Create test projects using real Project class
-      const { Project } = await import('@/lib/server/lace-imports');
+      const { Project } = await import('@lace/web/lib/server/lace-imports');
 
       // Create temp project directories
       const dir1 = join(context.tempProjectDir, 'project1');
@@ -187,7 +187,7 @@ describe('Projects API', () => {
       expect(data.lastUsedAt).toBeTruthy();
 
       // Verify the project can be retrieved via Project.getAll() (tests persistence)
-      const { Project } = await import('@/lib/server/lace-imports');
+      const { Project } = await import('@lace/web/lib/server/lace-imports');
       const allProjects = Project.getAll();
       const createdProject = allProjects.find((p) => p.name === 'New Project');
       expect(createdProject).toBeTruthy();
@@ -286,7 +286,7 @@ describe('Projects API', () => {
       };
 
       // Override the persistence mock for this test
-      const { getPersistence } = await import('~/persistence/database');
+      const { getPersistence } = await import('@lace/core/persistence/database');
       vi.mocked(getPersistence).mockReturnValue(
         mockPersistence as unknown as ReturnType<typeof getPersistence>
       );

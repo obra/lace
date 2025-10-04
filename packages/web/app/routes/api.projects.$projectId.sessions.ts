@@ -1,11 +1,11 @@
 // ABOUTME: Session API endpoints under projects hierarchy - GET sessions by project, POST new session
 // ABOUTME: Uses Project class methods for session management with proper project-session relationships
 
-import { Project, Session, ProviderRegistry } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import { generateSessionName } from '@/lib/server/session-naming-helper';
-import { EventStreamManager } from '@/lib/event-stream-manager';
+import { Project, Session, ProviderRegistry } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { generateSessionName } from '@lace/web/lib/server/session-naming-helper';
+import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.sessions';
 

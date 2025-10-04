@@ -5,8 +5,8 @@
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheckCircle, faExclamationTriangle, faInfoCircle } from '@/lib/fontawesome';
-import { DismissButton } from '@/components/ui/DismissButton';
+import { faCheckCircle, faExclamationTriangle, faInfoCircle } from '@lace/web/lib/fontawesome';
+import { DismissButton } from '@lace/web/components/ui/DismissButton';
 
 export type AlertVariant = 'success' | 'warning' | 'error' | 'info';
 export type AlertLayout = 'vertical' | 'horizontal';

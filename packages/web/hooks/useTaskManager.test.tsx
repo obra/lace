@@ -4,13 +4,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { act } from 'react';
-import { useTaskManager } from '@/hooks/useTaskManager';
-import { TaskAPIClient } from '@/lib/client/task-api';
-import type { Task } from '@/types/core';
-import { asThreadId } from '@/types/core';
+import { useTaskManager } from '@lace/web/hooks/useTaskManager';
+import { TaskAPIClient } from '@lace/web/lib/client/task-api';
+import type { Task } from '@lace/web/types/core';
+import { asThreadId } from '@lace/web/types/core';
 
 // Mock TaskAPIClient for isolated hook testing
-vi.mock('@/lib/client/task-api');
+vi.mock('@lace/web/lib/client/task-api');
 
 // Mock EventSource for isolated testing
 class MockEventSource {

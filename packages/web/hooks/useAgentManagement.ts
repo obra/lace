@@ -2,9 +2,9 @@
 // ABOUTME: Handles agent creation, selection, and state updates
 
 import { useState, useEffect, useCallback } from 'react';
-import type { SessionInfo, AgentState } from '@/types/core';
-import type { CreateAgentRequest } from '@/types/api';
-import { api } from '@/lib/api-client';
+import type { SessionInfo, AgentState } from '@lace/web/types/core';
+import type { CreateAgentRequest } from '@lace/web/types/api';
+import { api } from '@lace/web/lib/api-client';
 
 interface UseAgentManagementResult {
   sessionDetails: SessionInfo | null;

@@ -3,7 +3,7 @@
 
 import { renderHook, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ProjectInfo } from '@/types/core';
+import type { ProjectInfo } from '@lace/web/types/core';
 import { useProjectManagement } from './useProjectManagement';
 
 // Mock fetch globally
@@ -11,11 +11,11 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
 // Mock parseResponse to return parsed data directly
-vi.mock('@/lib/serialization', () => ({
+vi.mock('@lace/web/lib/serialization', () => ({
   parseResponse: vi.fn(),
 }));
 
-import { parseResponse } from '@/lib/serialization';
+import { parseResponse } from '@lace/web/lib/serialization';
 const mockParseResponse = vi.mocked(parseResponse);
 
 const mockProjects: ProjectInfo[] = [

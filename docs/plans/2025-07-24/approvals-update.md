@@ -254,10 +254,10 @@ queries and database methods work correctly with real SQLite data.
 // ABOUTME: Event-based approval callback that uses ThreadManager for persistence
 // ABOUTME: Replaces Promise-based approval system with durable event storage
 
-import { ApprovalCallback, ApprovalDecision } from '~/tools/types';
-import { ThreadManager } from '~/threads/thread-manager';
-import { Agent } from '~/agents/agent';
-import { ToolCall } from '~/tools/types';
+import { ApprovalCallback, ApprovalDecision } from '@lace/core/tools/types';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { Agent } from '@lace/core/agents/agent';
+import { ToolCall } from '@lace/core/tools/types';
 
 export class EventApprovalCallback implements ApprovalCallback {
   constructor(
@@ -429,8 +429,8 @@ getApprovalDecision(toolCallId: string): ApprovalDecision | null {
 // ABOUTME: Thin web integration layer for core approval system
 // ABOUTME: Sets up event-based approval callback from core tools system
 
-import { Agent, EventApprovalCallback } from '@/lib/server/lace-imports';
-import type { ThreadId } from '@/lib/server/core-types';
+import { Agent, EventApprovalCallback } from '@lace/web/lib/server/lace-imports';
+import type { ThreadId } from '@lace/web/lib/server/core-types';
 
 export function setupAgentApprovals(agent: Agent, _sessionId: ThreadId): void {
   // Use core event-based approval callback
@@ -852,7 +852,7 @@ export {
   Agent,
   EventApprovalCallback, // New core approval system
   ApprovalDecision,
-} from '@/../../../src/tools'; // Adjust path as needed
+} from '@lace/web/../../../src/tools'; // Adjust path as needed
 ```
 
 ## Testing Strategy

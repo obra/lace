@@ -6,8 +6,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ThreadManager } from '@/lib/server/lace-imports';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { ThreadManager } from '@lace/web/lib/server/lace-imports';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));

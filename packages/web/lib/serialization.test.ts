@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { serialize, deserialize } from './serialization';
-import type { ThreadId } from '@/types/core';
+import type { ThreadId } from '@lace/web/types/core';
 
 // Define NewAgentSpec locally for testing (it's defined in serialization.ts)
 type NewAgentSpec = string & { readonly __brand: 'NewAgentSpec' };

@@ -5,10 +5,10 @@
 
 import React, { memo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRobot, faEdit, faTrash, faEllipsisV } from '@/lib/fontawesome';
-import { CondensedChatInput } from '@/components/ui/CondensedChatInput';
-import { Alert } from '@/components/ui/Alert';
-import type { SessionInfo, AgentInfo } from '@/types/core';
+import { faRobot, faEdit, faTrash, faEllipsisV } from '@lace/web/lib/fontawesome';
+import { CondensedChatInput } from '@lace/web/components/ui/CondensedChatInput';
+import { Alert } from '@lace/web/components/ui/Alert';
+import type { SessionInfo, AgentInfo } from '@lace/web/types/core';
 
 interface SessionsListProps {
   sessions: SessionInfo[];

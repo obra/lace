@@ -103,7 +103,7 @@ automatically have token data tracked.
 
 ```typescript
 import { describe, it, expect } from 'vitest';
-import type { ThreadEvent } from '~/threads/types';
+import type { ThreadEvent } from '@lace/core/threads/types';
 
 describe('ThreadEvent token usage', () => {
   it('should allow AGENT_MESSAGE with token usage', () => {
@@ -191,10 +191,10 @@ this._threadManager.addEvent(this._threadId, 'AGENT_MESSAGE', {
 
 ```typescript
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { MockProvider } from '~/test-utils/mock-provider';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Agent } from '@lace/core/agents/agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { MockProvider } from '@lace/core/test-utils/mock-provider';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 describe('Agent token tracking', () => {
   setupCoreTest();
@@ -265,7 +265,7 @@ describe('Agent token tracking', () => {
 // ABOUTME: Utilities for aggregating token usage across thread events
 // ABOUTME: Calculates cumulative token counts from conversation history
 
-import type { ThreadEvent } from '~/threads/types';
+import type { ThreadEvent } from '@lace/core/threads/types';
 
 export interface TokenSummary {
   totalPromptTokens: number;
@@ -330,8 +330,8 @@ import { describe, it, expect } from 'vitest';
 import {
   aggregateTokenUsage,
   estimateConversationTokens,
-} from '~/threads/token-aggregation';
-import type { ThreadEvent } from '~/threads/types';
+} from '@lace/core/threads/token-aggregation';
+import type { ThreadEvent } from '@lace/core/threads/types';
 
 describe('Token aggregation', () => {
   it('should aggregate token usage from events', () => {
@@ -492,10 +492,10 @@ private async handleCompactCommand(): Promise<void> {
 
 ```typescript
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { MockProvider } from '~/test-utils/mock-provider';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Agent } from '@lace/core/agents/agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { MockProvider } from '@lace/core/test-utils/mock-provider';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 describe('Agent command handling', () => {
   setupCoreTest();
@@ -845,10 +845,10 @@ await this._checkAutoCompaction();
 
 ```typescript
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { MockProvider } from '~/test-utils/mock-provider';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Agent } from '@lace/core/agents/agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { MockProvider } from '@lace/core/test-utils/mock-provider';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 describe('Agent auto-compaction', () => {
   setupCoreTest();

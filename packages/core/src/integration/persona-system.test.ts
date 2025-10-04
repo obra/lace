@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Agent, AgentConfig } from '~/agents/agent';
-import { TaskManager, AgentCreationCallback } from '~/tasks/task-manager';
-import { createNewAgentSpec, asThreadId } from '~/threads/types';
-import { personaRegistry } from '~/config/persona-registry';
-import { PromptManager } from '~/config/prompt-manager';
-import { loadPromptConfig } from '~/config/prompts';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import { DatabasePersistence } from '~/persistence/database';
+import { Agent, AgentConfig } from '@lace/core/agents/agent';
+import { TaskManager, AgentCreationCallback } from '@lace/core/tasks/task-manager';
+import { createNewAgentSpec, asThreadId } from '@lace/core/threads/types';
+import { personaRegistry } from '@lace/core/config/persona-registry';
+import { PromptManager } from '@lace/core/config/prompt-manager';
+import { loadPromptConfig } from '@lace/core/config/prompts';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { DatabasePersistence } from '@lace/core/persistence/database';
 
 describe('Persona System Integration', () => {
   let mockToolExecutor: ToolExecutor;

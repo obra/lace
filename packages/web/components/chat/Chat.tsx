@@ -5,19 +5,19 @@
 
 import React, { memo, useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { TimelineView } from '@/components/timeline/TimelineView';
-import type { SessionNavigationState } from '@/types/navigation';
-import { MemoizedChatInput } from '@/components/chat/MemoizedChatInput';
-import { useTimelineAutoscroll } from '@/hooks/useSmartAutoscroll';
+import { TimelineView } from '@lace/web/components/timeline/TimelineView';
+import type { SessionNavigationState } from '@lace/web/types/navigation';
+import { MemoizedChatInput } from '@lace/web/components/chat/MemoizedChatInput';
+import { useTimelineAutoscroll } from '@lace/web/hooks/useSmartAutoscroll';
 import {
   useSessionEvents,
   useAgentAPI,
   useCompactionState,
-} from '@/components/providers/EventStreamProvider';
-import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useScrollContext } from '@/components/providers/ScrollProvider';
-import { useTheme } from '@/components/providers/SettingsProvider';
-import type { ThreadId } from '@/types/core';
+} from '@lace/web/components/providers/EventStreamProvider';
+import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
+import { useScrollContext } from '@lace/web/components/providers/ScrollProvider';
+import { useTheme } from '@lace/web/components/providers/SettingsProvider';
+import type { ThreadId } from '@lace/web/types/core';
 
 export const Chat = memo(function Chat(): React.JSX.Element {
   // Get data from providers

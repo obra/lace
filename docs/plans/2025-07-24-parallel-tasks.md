@@ -623,16 +623,16 @@ tests
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { ToolExecutor } from '~/tools/executor';
-import { EventApprovalCallback } from '~/tools/event-approval-callback';
-import { ApprovalDecision } from '~/tools/types';
-import { BashTool } from '~/tools/implementations/bash';
+import { Agent } from '@lace/core/agents/agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { EventApprovalCallback } from '@lace/core/tools/event-approval-callback';
+import { ApprovalDecision } from '@lace/core/tools/types';
+import { BashTool } from '@lace/core/tools/implementations/bash';
 import {
   setupTestPersistence,
   teardownTestPersistence,
-} from '~/test-utils/persistence-helper';
+} from '@lace/core/test-utils/persistence-helper';
 
 // Test provider that returns multiple tool calls
 class MultiToolProvider extends TestProvider {

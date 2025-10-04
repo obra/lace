@@ -1,8 +1,8 @@
 // ABOUTME: Utilities for waiting on specific events in tests
 // ABOUTME: Provides event-based synchronization instead of arbitrary timeouts
 
-import type { ThreadManager } from '~/threads/thread-manager';
-import type { LaceEvent, LaceEventType } from '~/threads/types';
+import type { ThreadManager } from '@lace/core/threads/thread-manager';
+import type { LaceEvent, LaceEventType } from '@lace/core/threads/types';
 
 /**
  * Wait for a specific event type to appear in thread

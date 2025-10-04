@@ -95,7 +95,7 @@ sensible defaults
 // packages/web/components/modals/__tests__/TaskBoardModal.test.tsx
 import { render, screen } from '@testing-library/react';
 import { TaskBoardModal } from '../TaskBoardModal';
-import type { Task } from '@/types/api';
+import type { Task } from '@lace/web/types/api';
 
 const mockTask: Task = {
   id: 'test-task-1',
@@ -431,9 +431,9 @@ npm test -- packages/web/components/pages/__tests__/LaceApp-tasks.test.tsx
 ```typescript
 // packages/web/components/pages/LaceApp.tsx
 // Add to imports
-import { faTasks } from '@/lib/fontawesome';
-import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
-import { useTaskManager } from '@/hooks/useTaskManager';
+import { faTasks } from '@lace/web/lib/fontawesome';
+import { TaskBoardModal } from '@lace/web/components/modals/TaskBoardModal';
+import { useTaskManager } from '@lace/web/hooks/useTaskManager';
 
 // Add to state declarations (around line 67)
 const [showTaskBoard, setShowTaskBoard] = useState(false);
@@ -597,7 +597,7 @@ status-based filtering, and comprehensive test coverage
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TaskListSidebar } from '../TaskListSidebar';
-import type { Task } from '@/types/api';
+import type { Task } from '@lace/web/types/api';
 
 // Mock the useTaskManager hook
 jest.mock('@/hooks/useTaskManager', () => ({
@@ -753,11 +753,11 @@ npm test -- packages/web/components/tasks/__tests__/TaskListSidebar.test.tsx
 
 import React, { useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTasks } from '@/lib/fontawesome';
-import { SidebarButton } from '@/components/layout/Sidebar';
-import { useTaskManager } from '@/hooks/useTaskManager';
+import { faTasks } from '@lace/web/lib/fontawesome';
+import { SidebarButton } from '@lace/web/components/layout/Sidebar';
+import { useTaskManager } from '@lace/web/hooks/useTaskManager';
 import { TaskSidebarItem } from './TaskSidebarItem';
-import type { Task } from '@/types/api';
+import type { Task } from '@lace/web/types/api';
 
 interface TaskListSidebarProps {
   projectId: string;
@@ -913,7 +913,7 @@ grouping and actions" ✅
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TaskSidebarItem } from '../TaskSidebarItem';
-import type { Task } from '@/types/api';
+import type { Task } from '@lace/web/types/api';
 
 const mockTask: Task = {
   id: 'task-1',
@@ -1003,8 +1003,8 @@ npm test -- packages/web/components/tasks/__tests__/TaskSidebarItem.test.tsx
 'use client';
 
 import React from 'react';
-import { StatusDot } from '@/components/ui/StatusDot';
-import type { Task } from '@/types/api';
+import { StatusDot } from '@lace/web/components/ui/StatusDot';
+import type { Task } from '@lace/web/types/api';
 
 interface TaskSidebarItemProps {
   task: Task;
@@ -1193,7 +1193,7 @@ npm test -- packages/web/components/pages/__tests__/LaceApp-tasks.test.tsx
 ```typescript
 // packages/web/components/pages/LaceApp.tsx
 // Add to imports
-import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
+import { TaskListSidebar } from '@lace/web/components/tasks/TaskListSidebar';
 ```
 
 2. **Add Tasks section to desktop sidebar** (around line 556-612):

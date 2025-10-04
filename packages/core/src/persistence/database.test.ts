@@ -2,9 +2,9 @@
 // ABOUTME: Tests database schema creation, migrations, and data integrity
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DatabasePersistence, getPersistence } from '~/persistence/database';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { ApprovalDecision } from '~/tools/types';
+import { DatabasePersistence, getPersistence } from './database';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { ApprovalDecision } from '@lace/core/tools/types';
 import { vi } from 'vitest';
 
 describe('Project and Session database schema', () => {

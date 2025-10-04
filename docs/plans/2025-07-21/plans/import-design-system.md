@@ -864,17 +864,17 @@ The design system includes 35+ UI components organized into:
 
 ```typescript
 // Import individual components
-import { Button, Card, Input } from '@/components/ui';
+import { Button, Card, Input } from '@lace/web/components/ui';
 
 // Or import everything
-import * from '@/components';
+import * from '@lace/web/components';
 ```
 ````
 
 ### Example Usage
 
 ```typescript
-import { Button } from '@/components/ui';
+import { Button } from '@lace/web/components/ui';
 
 export function MyComponent() {
   return (

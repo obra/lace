@@ -4,8 +4,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Modal } from '@/components/ui/Modal';
-import { AccentButton } from '@/components/ui/AccentButton';
+import { Modal } from '@lace/web/components/ui/Modal';
+import { AccentButton } from '@lace/web/components/ui/AccentButton';
 
 interface NewFolderDialogProps {
   isOpen: boolean;

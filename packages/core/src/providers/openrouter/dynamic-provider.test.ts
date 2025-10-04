@@ -5,7 +5,7 @@ import * as path from 'path';
 import { tmpdir } from 'os';
 
 // Mock the getLaceDir function
-vi.mock('~/config/lace-dir', () => ({
+vi.mock('@lace/core/config/lace-dir', () => ({
   getLaceDir: vi.fn(() => '/tmp/lace-test'),
 }));
 
@@ -15,7 +15,7 @@ describe('OpenRouterDynamicProvider', () => {
   beforeEach(async () => {
     tempDir = fs.mkdtempSync(path.join(tmpdir(), 'lace-test-'));
     // Update the mock to return our temp directory
-    const { getLaceDir } = await import('~/config/lace-dir');
+    const { getLaceDir } = await import('@lace/core/config/lace-dir');
     (getLaceDir as any).mockReturnValue(tempDir);
 
     global.fetch = vi.fn();

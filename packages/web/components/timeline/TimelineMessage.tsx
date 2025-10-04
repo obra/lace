@@ -4,16 +4,16 @@
 'use client';
 
 import React from 'react';
-import type { LaceEvent, AgentInfo } from '@/types/core';
-import type { ProcessedEvent } from '@/hooks/useProcessedEvents';
-import { MessageHeader, MessageText } from '@/components/ui';
-import { ToolCallDisplay } from '@/components/ui/ToolCallDisplay';
-import { Alert } from '@/components/ui/Alert';
-import { SystemPromptEntry } from '@/components/timeline/SystemPromptEntry';
-import { UserSystemPromptEntry } from '@/components/timeline/UserSystemPromptEntry';
-import { CompactionEntry } from '@/components/timeline/CompactionEntry';
-import { AgentErrorEntry } from '@/components/timeline/AgentErrorEntry';
-import { formatTime } from '@/lib/format';
+import type { LaceEvent, AgentInfo } from '@lace/web/types/core';
+import type { ProcessedEvent } from '@lace/web/hooks/useProcessedEvents';
+import { MessageHeader, MessageText } from '@lace/web/components/ui';
+import { ToolCallDisplay } from '@lace/web/components/ui/ToolCallDisplay';
+import { Alert } from '@lace/web/components/ui/Alert';
+import { SystemPromptEntry } from '@lace/web/components/timeline/SystemPromptEntry';
+import { UserSystemPromptEntry } from '@lace/web/components/timeline/UserSystemPromptEntry';
+import { CompactionEntry } from '@lace/web/components/timeline/CompactionEntry';
+import { AgentErrorEntry } from '@lace/web/components/timeline/AgentErrorEntry';
+import { formatTime } from '@lace/web/lib/format';
 
 interface TimelineMessageProps {
   event: ProcessedEvent;

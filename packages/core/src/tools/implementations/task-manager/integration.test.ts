@@ -10,24 +10,24 @@ import {
   TaskUpdateTool,
   TaskAddNoteTool,
   TaskViewTool,
-} from '~/tools/implementations/task-manager/tools';
-import { ToolContext } from '~/tools/types';
-import { asThreadId, createNewAgentSpec } from '~/threads/types';
-import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
+} from './tools';
+import { ToolContext } from '@lace/core/tools/types';
+import { asThreadId, createNewAgentSpec } from '@lace/core/threads/types';
+import { setupCoreTest, cleanupSession } from '@lace/core/test-utils/core-test-setup';
 import {
   cleanupTestProviderInstances,
   createTestProviderInstance,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
-import { ProviderRegistry } from '~/providers/registry';
+} from '@lace/core/test-utils/provider-defaults';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from '@lace/core/providers/base-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ProviderRegistry } from '@lace/core/providers/registry';
 
 // Mock provider for testing integration
 class MockProvider extends BaseMockProvider {

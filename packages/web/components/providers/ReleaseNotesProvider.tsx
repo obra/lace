@@ -4,9 +4,9 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { ReleaseNotesModal } from '@/components/ui/ReleaseNotesModal';
-import { useReleaseNotes } from '@/hooks/useReleaseNotes';
-import { api } from '@/lib/api-client';
+import { ReleaseNotesModal } from '@lace/web/components/ui/ReleaseNotesModal';
+import { useReleaseNotes } from '@lace/web/hooks/useReleaseNotes';
+import { api } from '@lace/web/lib/api-client';
 
 interface ReleaseNotesContextType {
   isReleaseNotesAvailable: boolean;

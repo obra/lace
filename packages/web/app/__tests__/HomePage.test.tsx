@@ -10,42 +10,42 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { BrowserRouter } from 'react-router';
-import { HomePage } from '@/app/HomePage';
-import { SettingsProvider } from '@/components/providers/SettingsProvider';
+import { HomePage } from '@lace/web/app/HomePage';
+import { SettingsProvider } from '@lace/web/components/providers/SettingsProvider';
 
 // Mock the providers
-vi.mock('@/components/providers/ProjectsProvider', () => ({
+vi.mock('@lace/web/components/providers/ProjectsProvider', () => ({
   useProjectsContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/UIProvider', () => ({
+vi.mock('@lace/web/components/providers/UIProvider', () => ({
   useUIContext: () => ({
     autoOpenCreateProject: false,
     setAutoOpenCreateProject: vi.fn(),
   }),
 }));
 
-vi.mock('@/components/providers/ProjectProvider', () => ({
+vi.mock('@lace/web/components/providers/ProjectProvider', () => ({
   useProjectContext: () => ({
     enableAgentAutoSelection: vi.fn(),
     deleteSession: vi.fn(),
   }),
 }));
 
-vi.mock('@/hooks/useOnboarding', () => ({
+vi.mock('@lace/web/hooks/useOnboarding', () => ({
   useOnboarding: () => ({
     handleAutoOpenProjectCreation: vi.fn(),
   }),
 }));
 
 // Mock child components
-vi.mock('@/components/config/ProjectSelectorPanel', () => ({
+vi.mock('@lace/web/components/config/ProjectSelectorPanel', () => ({
   ProjectSelectorPanel: () => (
     <div data-testid="project-selector-panel">Project Selector Panel</div>
   ),
 }));
 
-vi.mock('@/components/onboarding/FirstProjectHero', () => ({
+vi.mock('@lace/web/components/onboarding/FirstProjectHero', () => ({
   FirstProjectHero: ({ onCreateFirstProject }: { onCreateFirstProject: () => void }) => (
     <div data-testid="first-project-hero">
       <button data-testid="create-first-project" onClick={onCreateFirstProject}>
@@ -55,11 +55,11 @@ vi.mock('@/components/onboarding/FirstProjectHero', () => ({
   ),
 }));
 
-vi.mock('@/components/pages/views/LoadingView', () => ({
+vi.mock('@lace/web/components/pages/views/LoadingView', () => ({
   LoadingView: () => <div data-testid="loading-view">Loading...</div>,
 }));
 
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
 
 describe('HomePage', () => {
   beforeEach(() => {

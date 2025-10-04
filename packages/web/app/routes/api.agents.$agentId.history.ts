@@ -1,12 +1,12 @@
 // ABOUTME: API endpoint for loading conversation history for a specific agent
 // ABOUTME: Returns events only for the requested agent, enabling per-agent conversation views
 
-import { getSessionService } from '@/lib/server/session-service';
-import type { LaceEvent } from '@/types/core';
-import { asThreadId, isConversationEvent } from '@/types/core';
-import { isValidThreadId } from '@/lib/validation/thread-id-validation';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import type { LaceEvent } from '@lace/web/types/core';
+import { asThreadId, isConversationEvent } from '@lace/web/types/core';
+import { isValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import type { Route } from './+types/api.agents.$agentId.history';
 
 export async function loader({ request: _request, params }: Route.LoaderArgs) {

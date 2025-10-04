@@ -2,8 +2,8 @@
 // ABOUTME: Tests that real-time and persistence TOOL_RESULT events have identical structure
 
 import { describe, it, expect } from 'vitest';
-import type { LaceEvent } from '@/types/core';
-import type { ToolResult, ThreadId } from '@/types/core';
+import type { LaceEvent } from '@lace/web/types/core';
+import type { ToolResult, ThreadId } from '@lace/web/types/core';
 
 describe('Task Metadata Event Format', () => {
   it('should have correct TOOL_RESULT format for task metadata', () => {

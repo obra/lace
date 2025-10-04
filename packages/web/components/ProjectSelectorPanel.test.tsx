@@ -7,38 +7,38 @@ import { render, screen, cleanup, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { MemoryRouter } from 'react-router';
-import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
-import type { ProjectInfo } from '@/types/core';
+import { ProjectSelectorPanel } from '@lace/web/components/config/ProjectSelectorPanel';
+import type { ProjectInfo } from '@lace/web/types/core';
 import {
   createMockProjectsContext,
   createMockProjectContext,
   createMockUIContext,
-} from '@/__tests__/utils/provider-mocks';
-import { stringify } from '@/lib/serialization';
+} from '@lace/web/__tests__/utils/provider-mocks';
+import { stringify } from '@lace/web/lib/serialization';
 
 // Mock all the providers
-vi.mock('@/components/providers/ProjectsProvider', () => ({
+vi.mock('@lace/web/components/providers/ProjectsProvider', () => ({
   useProjectsContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/ProjectProvider', () => ({
+vi.mock('@lace/web/components/providers/ProjectProvider', () => ({
   useProjectContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/UIProvider', () => ({
+vi.mock('@lace/web/components/providers/UIProvider', () => ({
   useUIContext: vi.fn(),
 }));
 
-vi.mock('@/hooks/useOnboarding', () => ({
+vi.mock('@lace/web/hooks/useOnboarding', () => ({
   useOnboarding: vi.fn(),
 }));
 
-vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
+vi.mock('@lace/web/components/providers/ProviderInstanceProvider', () => ({
   useProviderInstances: vi.fn(),
   ProviderInstanceProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-vi.mock('@/components/providers/SettingsProvider', () => ({
+vi.mock('@lace/web/components/providers/SettingsProvider', () => ({
   useSettings: vi.fn(),
   SettingsProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -55,12 +55,12 @@ vi.mock('react-router', async () => {
 });
 
 // Import mocked hooks
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { useUIContext } from '@/components/providers/UIProvider';
-import { useOnboarding } from '@/hooks/useOnboarding';
-import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
-import { useSettings } from '@/components/providers/SettingsProvider';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
+import { useProjectContext } from '@lace/web/components/providers/ProjectProvider';
+import { useUIContext } from '@lace/web/components/providers/UIProvider';
+import { useOnboarding } from '@lace/web/hooks/useOnboarding';
+import { useProviderInstances } from '@lace/web/components/providers/ProviderInstanceProvider';
+import { useSettings } from '@lace/web/components/providers/SettingsProvider';
 
 const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseProjectContext = vi.mocked(useProjectContext);

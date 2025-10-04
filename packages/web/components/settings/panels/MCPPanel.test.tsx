@@ -5,8 +5,8 @@ import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MCPPanel } from './MCPPanel';
-import { api } from '@/lib/api-client';
-import type { MCPServerConfig } from '@/types/core';
+import { api } from '@lace/web/lib/api-client';
+import type { MCPServerConfig } from '@lace/web/types/core';
 
 // Test data
 const mockGlobalServers = [
@@ -36,7 +36,7 @@ const mockGlobalServers = [
 ];
 
 // Mock api calls
-vi.mock('@/lib/api-client', () => ({
+vi.mock('@lace/web/lib/api-client', () => ({
   api: {
     get: vi.fn(),
     put: vi.fn(),
@@ -46,7 +46,7 @@ vi.mock('@/lib/api-client', () => ({
 }));
 
 // Mock the modal component
-vi.mock('@/components/modals/AddMCPServerModal', () => ({
+vi.mock('@lace/web/components/modals/AddMCPServerModal', () => ({
   AddMCPServerModal: (props: {
     isOpen: boolean;
     onAddServer: (id: string, config: MCPServerConfig) => void;

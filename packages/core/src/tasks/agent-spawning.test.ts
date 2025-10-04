@@ -2,10 +2,10 @@
 // ABOUTME: Verifies that tasks assigned to "new:persona:provider/model" trigger agent creation
 
 import { describe, it, expect, beforeEach, afterEach, vi, type MockedFunction } from 'vitest';
-import { TaskManager, type AgentCreationCallback } from '~/tasks/task-manager';
-import { DatabasePersistence } from '~/persistence/database';
-import { asThreadId, asAssigneeId, createNewAgentSpec } from '~/threads/types';
-import { TaskContext, CreateTaskRequest } from '~/tasks/types';
+import { TaskManager, type AgentCreationCallback } from './task-manager';
+import { DatabasePersistence } from '@lace/core/persistence/database';
+import { asThreadId, asAssigneeId, createNewAgentSpec } from '@lace/core/threads/types';
+import { TaskContext, CreateTaskRequest } from './types';
 
 describe('Agent Spawning', () => {
   let taskManager: TaskManager;

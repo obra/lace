@@ -5,7 +5,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { ToolPolicyToggle } from './ToolPolicyToggle';
-import type { ToolPolicy } from '@/types/core';
+import type { ToolPolicy } from '@lace/web/types/core';
 
 describe('ToolPolicyToggle', () => {
   const mockOnChange = vi.fn();

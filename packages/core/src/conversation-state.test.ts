@@ -2,14 +2,14 @@
 // ABOUTME: Tests the full conversation flow to catch context truncation bugs using event-driven Agent
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { ToolExecutor } from '~/tools/executor';
-import { ProviderResponse } from '~/providers/base-provider';
-import { logger } from '~/utils/logger';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { EVENT_TYPES } from '~/threads/types';
+import { Agent } from '@lace/core/agents/agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ProviderResponse } from '@lace/core/providers/base-provider';
+import { logger } from '@lace/core/utils/logger';
+import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { EVENT_TYPES } from '@lace/core/threads/types';
 
 // Helper function to wait for agent to return to idle state
 async function waitForAgentIdle(agent: Agent, timeout = 5000): Promise<void> {

@@ -2,17 +2,17 @@
 // ABOUTME: Validates tool blocking, bypass approval, custom working directory, and graceful error handling
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { InfrastructureHelper } from './infrastructure-helper';
-import { UserSettingsManager } from '~/config/user-settings';
-import { ProviderInstanceManager } from '~/providers/instance/manager';
-import { ToolExecutor } from '~/tools/executor';
-import { TestProvider } from '~/test-utils/test-provider';
-import { Tool } from '~/tools/tool';
-import type { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import { UserSettingsManager } from '@lace/core/config/user-settings';
+import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
+import { Tool } from '@lace/core/tools/tool';
+import type { ProviderMessage, ProviderResponse } from '@lace/core/providers/base-provider';
 import { z } from 'zod';
 
 // Mock modules
-vi.mock('~/config/user-settings');
-vi.mock('~/providers/instance/manager');
+vi.mock('@lace/core/config/user-settings');
+vi.mock('@lace/core/providers/instance/manager');
 
 // Create a mock provider that supports multiple queued responses
 class QueuedMockProvider extends TestProvider {

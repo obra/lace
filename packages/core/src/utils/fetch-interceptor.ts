@@ -1,8 +1,8 @@
 // ABOUTME: Global fetch interceptor for HAR recording
 // ABOUTME: Monkey patches fetch to capture all HTTP requests for Ollama and Anthropic providers
 
-import { getHARRecorder } from '~/utils/har-recorder';
-import { logger } from '~/utils/logger';
+import { getHARRecorder } from './har-recorder';
+import { logger } from './logger';
 
 let originalFetch: typeof fetch | null = null;
 let interceptorEnabled = false;

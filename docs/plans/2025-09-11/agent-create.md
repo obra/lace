@@ -75,10 +75,10 @@ consumption
 // ABOUTME: Persona catalog API endpoint
 // ABOUTME: Returns available personas from PersonaRegistry for agent creation
 
-import { personaRegistry } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import type { PersonaInfo } from '@/lib/server/lace-imports';
+import { personaRegistry } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import type { PersonaInfo } from '@lace/web/lib/server/lace-imports';
 import type { Route } from './+types/api.persona.catalog';
 
 export interface PersonaCatalogResponse {
@@ -155,8 +155,8 @@ Tasks section pattern
 1. Import necessary components:
 
 ```typescript
-import { SidebarSection } from '@/components/layout/Sidebar';
-import { faPlus } from '@/lib/fontawesome';
+import { SidebarSection } from '@lace/web/components/layout/Sidebar';
+import { faPlus } from '@lace/web/lib/fontawesome';
 ```
 
 2. Add props for modal control:
@@ -266,8 +266,8 @@ search/autocomplete
 
 import { useState, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown, faUser } from '@/lib/fontawesome';
-import type { PersonaInfo } from '@/types/core';
+import { faChevronDown, faUser } from '@lace/web/lib/fontawesome';
+import type { PersonaInfo } from '@lace/web/types/core';
 
 interface PersonaSelectorProps {
   personas: PersonaInfo[];
@@ -537,13 +537,13 @@ selection, model selection, and chat input
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Modal } from '@/components/ui/Modal';
-import { PersonaSelector } from '@/components/ui/PersonaSelector';
-import { ModelSelector } from '@/components/ui/ModelSelector';
-import { CondensedChatInput } from '@/components/ui/CondensedChatInput';
+import { Modal } from '@lace/web/components/ui/Modal';
+import { PersonaSelector } from '@lace/web/components/ui/PersonaSelector';
+import { ModelSelector } from '@lace/web/components/ui/ModelSelector';
+import { CondensedChatInput } from '@lace/web/components/ui/CondensedChatInput';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane } from '@/lib/fontawesome';
-import type { ProviderInfo, PersonaInfo } from '@/types/api';
+import { faPaperPlane } from '@lace/web/lib/fontawesome';
+import type { ProviderInfo, PersonaInfo } from '@lace/web/types/api';
 
 interface AgentCreateChatModalProps {
   isOpen: boolean;

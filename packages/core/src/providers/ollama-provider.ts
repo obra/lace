@@ -2,18 +2,18 @@
 // ABOUTME: Supports tool calling with models that have native tool support (like qwen3:32b)
 
 import { Ollama, ChatResponse, Tool as OllamaTool } from 'ollama';
-import { AIProvider } from '~/providers/base-provider';
+import { AIProvider } from './base-provider';
 import {
   ProviderMessage,
   ProviderResponse,
   ProviderConfig,
   ProviderInfo,
   ModelInfo,
-} from '~/providers/base-provider';
-import { ToolCall } from '~/tools/types';
-import { Tool } from '~/tools/tool';
-import { logger } from '~/utils/logger';
-import { logProviderRequest, logProviderResponse } from '~/utils/provider-logging';
+} from './base-provider';
+import { ToolCall } from '@lace/core/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import { logger } from '@lace/core/utils/logger';
+import { logProviderRequest, logProviderResponse } from '@lace/core/utils/provider-logging';
 
 interface OllamaProviderConfig extends ProviderConfig {
   host?: string;

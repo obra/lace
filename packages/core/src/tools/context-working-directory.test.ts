@@ -2,9 +2,9 @@
 // ABOUTME: Tests that tools receive correct working directory from session/project context
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ToolExecutor } from '~/tools/executor';
-import { FileReadTool } from '~/tools/implementations/file_read';
-import { createMockToolContext } from '~/test-utils/mock-session';
+import { ToolExecutor } from './executor';
+import { FileReadTool } from '@lace/core/tools/implementations/file_read';
+import { createMockToolContext } from '@lace/core/test-utils/mock-session';
 
 describe('ToolContext working directory', () => {
   let executor: ToolExecutor;

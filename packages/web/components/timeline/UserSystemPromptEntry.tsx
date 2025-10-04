@@ -5,9 +5,9 @@
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFileText } from '@/lib/fontawesome';
-import { formatTime } from '@/lib/format';
-import MarkdownRenderer from '@/components/ui/MarkdownRenderer';
+import { faFileText } from '@lace/web/lib/fontawesome';
+import { formatTime } from '@lace/web/lib/format';
+import MarkdownRenderer from '@lace/web/components/ui/MarkdownRenderer';
 
 interface UserSystemPromptEntryProps {
   content: string;

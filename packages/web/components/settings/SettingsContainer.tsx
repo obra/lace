@@ -4,10 +4,10 @@
 'use client';
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { Modal } from '@/components/ui/Modal';
+import { Modal } from '@lace/web/components/ui/Modal';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRobot, faUser, faCog, faServer } from '@/lib/fontawesome';
-import { useTheme } from '@/components/providers/SettingsProvider';
+import { faRobot, faUser, faCog, faServer } from '@lace/web/lib/fontawesome';
+import { useTheme } from '@lace/web/components/providers/SettingsProvider';
 import { SettingsTabs } from './SettingsTabs';
 import { UISettingsPanel } from './panels/UISettingsPanel';
 import { UserSettingsPanel } from './panels/UserSettingsPanel';

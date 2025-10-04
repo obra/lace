@@ -6,8 +6,8 @@ import {
   enableFetchInterception,
   disableFetchInterception,
   isFetchInterceptionEnabled,
-} from '~/utils/fetch-interceptor';
-import { initializeHARRecording, disableHARRecording, getHARRecorder } from '~/utils/har-recorder';
+} from './fetch-interceptor';
+import { initializeHARRecording, disableHARRecording, getHARRecorder } from './har-recorder';
 import { existsSync, unlinkSync } from 'fs';
 
 const TEST_HAR_FILE = '/tmp/test-fetch-recording.har';

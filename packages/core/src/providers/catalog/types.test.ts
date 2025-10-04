@@ -8,7 +8,7 @@ import {
   ProviderInstanceSchema,
   ProviderInstancesConfigSchema,
   CredentialSchema,
-} from '~/providers/catalog/types';
+} from './types';
 
 describe('CatalogModelSchema', () => {
   it('validates a basic model from Catwalk data', () => {

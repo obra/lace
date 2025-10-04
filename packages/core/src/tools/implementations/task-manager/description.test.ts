@@ -9,9 +9,9 @@ import {
   TaskUpdateTool,
   TaskAddNoteTool,
   TaskViewTool,
-} from '~/tools/implementations/task-manager/tools';
-import { DelegateTool } from '~/tools/implementations/delegate';
-import type { TaskStatus } from '~/tasks/types';
+} from './tools';
+import { DelegateTool } from '@lace/core/tools/implementations/delegate';
+import type { TaskStatus } from '@lace/core/tasks/types';
 
 describe('Tool Descriptions', () => {
   it('should include usage examples in descriptions', () => {

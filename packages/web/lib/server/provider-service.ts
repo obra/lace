@@ -1,7 +1,7 @@
 // ABOUTME: Provider domain service that handles provider-specific operations
 // ABOUTME: Separates provider business logic from the pure HTTP api-client
 
-import { api } from '@/lib/api-client';
+import { api } from '@lace/web/lib/api-client';
 
 export interface ProviderCatalogResponse {
   providers: unknown[];

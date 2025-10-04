@@ -7,7 +7,7 @@ import React, { useState, useMemo } from 'react';
 import CodeBlock from './CodeBlock';
 import { AnimatedModal } from './AnimatedModal';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExpand, faCompress, faCopy, faCheck } from '@/lib/fontawesome';
+import { faExpand, faCompress, faCopy, faCheck } from '@lace/web/lib/fontawesome';
 
 interface FileRendererProps {
   content: string;

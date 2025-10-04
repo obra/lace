@@ -2,8 +2,8 @@
 // ABOUTME: Stores settings in ~/.lace/user-settings.json with no validation
 
 import * as fs from 'fs';
-import { getLaceFilePath, ensureLaceDir } from '~/config/lace-dir';
-import { logger } from '~/utils/logger';
+import { getLaceFilePath, ensureLaceDir } from './lace-dir';
+import { logger } from '@lace/core/utils/logger';
 
 /**
  * Manages user settings stored in ~/.lace/user-settings.json

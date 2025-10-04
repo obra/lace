@@ -2,17 +2,20 @@
 // ABOUTME: Validates endpoint behavior for container and local workspace modes
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { loader } from '@/app/routes/api.sessions.$sessionId.workspace';
-import { Session } from '@/lib/server/lace-imports';
-import { Project } from '@/lib/server/lace-imports';
-import { setupWebTest } from '@/test-utils/web-test-setup';
-import { createLoaderArgs } from '@/test-utils/route-test-helpers';
-import { parseResponse } from '@/lib/serialization';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import { loader } from '@lace/web/app/routes/api.sessions.$sessionId.workspace';
+import { Session } from '@lace/web/lib/server/lace-imports';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
+import { createLoaderArgs } from '@lace/web/test-utils/route-test-helpers';
+import { parseResponse } from '@lace/web/lib/serialization';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '@lace/web/lib/server/lace-imports';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
+} from '@lace/web/lib/server/lace-imports';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
@@ -20,7 +23,7 @@ import { join } from 'path';
 vi.mock('server-only', () => ({}));
 
 // Mock URL fetch tool to avoid external HTTP requests
-vi.mock('~/tools/implementations/url-fetch', () => ({
+vi.mock('@lace/core/tools/implementations/url-fetch', () => ({
   UrlFetchTool: vi.fn(() => ({
     name: 'url-fetch',
     description: 'Fetch content from a URL (mocked)',
@@ -33,7 +36,7 @@ vi.mock('~/tools/implementations/url-fetch', () => ({
 }));
 
 // Mock bash tool to avoid system command execution
-vi.mock('~/tools/implementations/bash', () => ({
+vi.mock('@lace/core/tools/implementations/bash', () => ({
   BashTool: vi.fn(() => ({
     name: 'bash',
     description: 'Execute bash commands (mocked)',

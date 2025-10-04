@@ -76,7 +76,7 @@ export default [
       'no-console': ['error', { allow: ['warn', 'error'] }],
       'no-relative-import-paths/no-relative-import-paths': [
         'error',
-        { allowSameFolder: false, rootDir: 'src', prefix: '~' },
+        { allowSameFolder: true, rootDir: 'src', prefix: '@lace/core' },
       ],
       'no-restricted-imports': [
         'error',
@@ -84,7 +84,7 @@ export default [
           patterns: [
             {
               group: ['../*'],
-              message: 'Use ~ alias instead of relative parent imports',
+              message: 'Use @lace/core/* alias instead of relative parent imports',
             },
           ],
         },

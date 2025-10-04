@@ -2,7 +2,7 @@
 // ABOUTME: Provides runtime type validation for API endpoints
 
 import { z } from 'zod';
-import { isValidThreadId } from '@/lib/validation/thread-id-validation';
+import { isValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
 
 // Thread ID schema using client-safe validation with transform
 export const ThreadIdSchema = z

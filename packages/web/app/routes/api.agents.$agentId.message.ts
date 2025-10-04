@@ -1,17 +1,20 @@
 // ABOUTME: API endpoint for sending messages to a specific agent
 // ABOUTME: Cleaner agent-focused API instead of thread-based messaging
 
-import { getSessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/types/core';
-import { isValidThreadId } from '@/lib/validation/thread-id-validation';
-import { createErrorResponse, createSuccessResponse } from '@/lib/server/api-utils';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { asThreadId } from '@lace/web/types/core';
+import { isValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
+import { createErrorResponse, createSuccessResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
-import { logger } from '~/utils/logger';
+import { logger } from '@lace/core/utils/logger';
 import type { Route } from './+types/api.agents.$agentId.message';
-import { EventStreamManager } from '@/lib/event-stream-manager';
-import { generateAgentSummary, getLastAgentResponse } from '@/lib/server/agent-summary-helper';
-import type { ErrorType, ErrorPhase, AgentSummaryUpdatedData } from '@/types/core';
+import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
+import {
+  generateAgentSummary,
+  getLastAgentResponse,
+} from '@lace/web/lib/server/agent-summary-helper';
+import type { ErrorType, ErrorPhase, AgentSummaryUpdatedData } from '@lace/web/types/core';
 
 // Helper to sanitize error text by redacting sensitive info and truncating
 function sanitizeErrorText(text?: string): string {

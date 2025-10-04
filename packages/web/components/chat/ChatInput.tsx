@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { NativeSpeechInput, useSpeechRecognition } from '@/components/ui/NativeSpeechInput';
-import { FileAttachment, AttachedFile } from '@/components/ui/FileAttachment';
-import { Alert } from '@/components/ui/Alert';
+import { NativeSpeechInput, useSpeechRecognition } from '@lace/web/components/ui/NativeSpeechInput';
+import { FileAttachment, AttachedFile } from '@lace/web/components/ui/FileAttachment';
+import { Alert } from '@lace/web/components/ui/Alert';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane, faStop, faPlus } from '@/lib/fontawesome';
+import { faPaperPlane, faStop, faPlus } from '@lace/web/lib/fontawesome';
 
 interface ChatInputProps {
   value: string;

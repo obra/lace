@@ -1,9 +1,9 @@
 // ABOUTME: Release notes settings page route component
 // ABOUTME: Displays release notes content in settings with manual access option
 
-import { SettingsPageLayout } from '@/components/settings/SettingsPageLayout';
-import { ReleaseNotesPanel } from '@/components/settings/panels/ReleaseNotesPanel';
-import { SETTINGS_TABS } from '@/lib/settings-config';
+import { SettingsPageLayout } from '@lace/web/components/settings/SettingsPageLayout';
+import { ReleaseNotesPanel } from '@lace/web/components/settings/panels/ReleaseNotesPanel';
+import { SETTINGS_TABS } from '@lace/web/lib/settings-config';
 
 export default function ReleaseNotesSettingsPage() {
   return (

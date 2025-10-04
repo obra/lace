@@ -959,7 +959,7 @@ describe('Project configuration endpoints', () => {
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
-import { Project, Session } from '@/lib/server/lace-imports';
+import { Project, Session } from '@lace/web/lib/server/lace-imports';
 import { z } from 'zod';
 
 const ConfigurationSchema = z.object({
@@ -1045,7 +1045,7 @@ export async function PATCH(
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
-import { Project, Session } from '@/lib/server/lace-imports';
+import { Project, Session } from '@lace/web/lib/server/lace-imports';
 import { z } from 'zod';
 
 const SessionConfigurationSchema = z.object({
@@ -1310,7 +1310,7 @@ describe('Session update endpoints', () => {
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
-import { Project, Session } from '@/lib/server/lace-imports';
+import { Project, Session } from '@lace/web/lib/server/lace-imports';
 import { z } from 'zod';
 
 const UpdateSessionSchema = z.object({
@@ -1376,7 +1376,7 @@ export async function PATCH(
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
-import { Project, Session } from '@/lib/server/lace-imports';
+import { Project, Session } from '@lace/web/lib/server/lace-imports';
 import { z } from 'zod';
 import fs from 'fs';
 import path from 'path';

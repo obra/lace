@@ -2,7 +2,7 @@
 // ABOUTME: Tests file content loading, syntax highlighting, action buttons, and error handling
 
 // Mock the API client
-vi.mock('@/lib/api-client', () => ({
+vi.mock('@lace/web/lib/api-client', () => ({
   api: {
     get: vi.fn(),
   },
@@ -26,8 +26,8 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { FileViewerModal } from '@/components/modals/FileViewerModal';
-import * as apiClient from '@/lib/api-client';
+import { FileViewerModal } from '@lace/web/components/modals/FileViewerModal';
+import * as apiClient from '@lace/web/lib/api-client';
 
 const mockApiGet = vi.mocked(apiClient.api.get);
 

@@ -1,7 +1,7 @@
 // ABOUTME: Utility functions for provider operations
 // ABOUTME: Model string parsing and validation helpers
 
-import { UserSettingsManager } from '~/config/user-settings';
+import { UserSettingsManager } from '@lace/core/config/user-settings';
 
 interface ParsedProviderModel {
   instanceId: string;

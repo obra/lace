@@ -270,7 +270,7 @@ schema support"
 
 import fs from 'fs';
 import path from 'path';
-import { getLaceDir } from '~/config/lace-dir';
+import { getLaceDir } from '@lace/core/config/lace-dir';
 import {
   CatalogProvider,
   CatalogProviderSchema,
@@ -363,7 +363,7 @@ export class ProviderCatalogManager {
 // src/providers/provider-config-manager.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ProviderConfigManager } from './provider-config-manager';
-import { tempLaceDir } from '~/test-utils/temp-lace-dir';
+import { tempLaceDir } from '@lace/core/test-utils/temp-lace-dir';
 
 describe('ProviderConfigManager', () => {
   let manager: ProviderConfigManager;
@@ -423,7 +423,7 @@ support"
 
 import fs from 'fs';
 import path from 'path';
-import { getLaceDir } from '~/config/lace-dir';
+import { getLaceDir } from '@lace/core/config/lace-dir';
 import {
   ProviderInstancesConfig,
   ProviderInstancesConfigSchema,
@@ -705,7 +705,7 @@ The API endpoints are ready for frontend integration.
 // ABOUTME: Layout for provider management section with navigation
 // ABOUTME: Provides consistent header and navigation structure
 
-import { SectionHeader } from '@/components/ui/SectionHeader';
+import { SectionHeader } from '@lace/web/components/ui/SectionHeader';
 
 export default function ProvidersLayout({
   children,
@@ -728,8 +728,8 @@ export default function ProvidersLayout({
 // ABOUTME: Main provider instances dashboard
 // ABOUTME: Shows configured instances with status and management actions
 
-import { ProviderInstanceList } from '@/components/providers/ProviderInstanceList';
-import { AddInstanceButton } from '@/components/providers/AddInstanceButton';
+import { ProviderInstanceList } from '@lace/web/components/providers/ProviderInstanceList';
+import { AddInstanceButton } from '@lace/web/components/providers/AddInstanceButton';
 
 export default function ProvidersPage() {
   return (
@@ -766,7 +766,7 @@ router"
 
 import { useEffect, useState } from 'react';
 import { ProviderCatalogCard } from './ProviderCatalogCard';
-import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
+import { LoadingSkeleton } from '@lace/web/components/ui/LoadingSkeleton';
 
 interface CatalogProvider {
   id: string;
@@ -814,7 +814,7 @@ export function ProviderCatalogGrid() {
 // ABOUTME: Individual provider card showing models and pricing
 // ABOUTME: Uses design system cards, badges, and buttons
 
-import { Badge } from '@/components/ui/Badge';
+import { Badge } from '@lace/web/components/ui/Badge';
 
 interface ProviderCatalogCardProps {
   provider: {
@@ -970,7 +970,7 @@ export function ProviderInstanceList() {
 // ABOUTME: Individual instance card with status, actions, and details
 // ABOUTME: Uses StatusDot, Badge, and card components from design system
 
-import { StatusDot } from '@/components/ui/StatusDot';
+import { StatusDot } from '@lace/web/components/ui/StatusDot';
 
 interface ProviderInstanceCardProps {
   instance: {
@@ -1051,8 +1051,8 @@ export function ProviderInstanceCard({ instance, onTest, onDelete }: ProviderIns
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Modal } from '@/components/ui/Modal';
-import { Badge } from '@/components/ui/Badge';
+import { Modal } from '@lace/web/components/ui/Modal';
+import { Badge } from '@lace/web/components/ui/Badge';
 
 interface AddInstanceModalProps {
   isOpen: boolean;
@@ -1256,8 +1256,8 @@ form"
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Badge } from '@/components/ui/Badge';
-import { StatusDot } from '@/components/ui/StatusDot';
+import { Badge } from '@lace/web/components/ui/Badge';
+import { StatusDot } from '@lace/web/components/ui/StatusDot';
 
 interface Model {
   id: string;
@@ -1527,8 +1527,8 @@ export function useProviderStatus(instanceId: string) {
 // ABOUTME: Shows loading states, success/error messages, and retry options
 
 import { useState } from 'react';
-import { StatusDot } from '@/components/ui/StatusDot';
-import { useProviderStatus } from '@/hooks/useProviderStatus';
+import { StatusDot } from '@lace/web/components/ui/StatusDot';
+import { useProviderStatus } from '@lace/web/hooks/useProviderStatus';
 
 interface ConnectionTestProps {
   instanceId: string;

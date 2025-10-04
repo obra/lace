@@ -4,8 +4,8 @@
 'use client';
 
 import React from 'react';
-import type { LaceEvent } from '@/types/core';
-import { Alert } from '@/components/ui/Alert';
+import type { LaceEvent } from '@lace/web/types/core';
+import { Alert } from '@lace/web/components/ui/Alert';
 
 interface AgentErrorEntryProps {
   event: LaceEvent;

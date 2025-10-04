@@ -4,8 +4,8 @@
 'use client';
 
 import React, { createContext, useContext, useMemo, useCallback, type ReactNode } from 'react';
-import { useProjectManagement } from '@/hooks/useProjectManagement';
-import type { ProjectInfo } from '@/types/core';
+import { useProjectManagement } from '@lace/web/hooks/useProjectManagement';
+import type { ProjectInfo } from '@lace/web/types/core';
 
 // Types for projects context
 export interface ProjectsContextType {

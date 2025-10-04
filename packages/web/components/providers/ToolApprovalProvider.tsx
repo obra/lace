@@ -13,11 +13,11 @@ import React, {
   useRef,
   type ReactNode,
 } from 'react';
-import type { ThreadId } from '@/types/core';
-import type { SessionPendingApproval } from '@/types/api';
-import { api } from '@/lib/api-client';
-import { AbortError } from '@/lib/api-errors';
-import type { ApprovalDecision } from '@/types/core';
+import type { ThreadId } from '@lace/web/types/core';
+import type { SessionPendingApproval } from '@lace/web/types/api';
+import { api } from '@lace/web/lib/api-client';
+import { AbortError } from '@lace/web/lib/api-errors';
+import type { ApprovalDecision } from '@lace/web/types/core';
 
 // Types for tool approval context
 interface ToolApprovalContextType {

@@ -2,9 +2,9 @@
 // ABOUTME: Provides methods for CRUD operations on sessions and agents
 
 import { useState, useCallback } from 'react';
-import { CreateSessionRequest, CreateAgentRequest } from '@/types/api';
-import type { ThreadId, SessionInfo, AgentInfo } from '@/types/core';
-import { api } from '@/lib/api-client';
+import { CreateSessionRequest, CreateAgentRequest } from '@lace/web/types/api';
+import type { ThreadId, SessionInfo, AgentInfo } from '@lace/web/types/core';
+import { api } from '@lace/web/lib/api-client';
 
 interface APIState {
   error: string | null;

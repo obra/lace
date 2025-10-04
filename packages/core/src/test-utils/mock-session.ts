@@ -1,10 +1,10 @@
 // ABOUTME: Mock session and context utilities for testing
 // ABOUTME: Provides standardized mock objects for session-based tests
 
-import { ToolContext } from '~/tools/types';
-import { Session } from '~/sessions/session';
-import type { Agent } from '~/agents/agent';
-import type { ToolPolicy } from '~/tools/types';
+import { ToolContext } from '@lace/core/tools/types';
+import { Session } from '@lace/core/sessions/session';
+import type { Agent } from '@lace/core/agents/agent';
+import type { ToolPolicy } from '@lace/core/tools/types';
 
 interface MockSession {
   getToolPolicy: (toolName: string) => ToolPolicy;

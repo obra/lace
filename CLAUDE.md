@@ -98,26 +98,35 @@ architecture. If you EVER see back-compat code, stop and ask me what to do.
 
 ### Import Style
 
+**Hybrid Import Strategy:**
+
+We use a **hybrid approach** that balances maintainability with readability:
+- **Same-folder imports**: Use relative paths (`./file`)
+- **Cross-directory imports**: Use absolute package paths (`@lace/core/*` or `@lace/web/*`)
+- **Cross-package imports**: Always use absolute package paths
+
 **Core Package (`packages/core`):**
 
-- Use `~/*` path aliases for internal imports:
-  `import { Agent } from '~/agents/agent'`
+- Same folder: `import { AgentConfig } from './agent-config'`
+- Different folder, same package: `import { ThreadManager } from '@lace/core/threads/thread-manager'`
 - **Omit file extensions** in source code
-- The `~` prefix maps to the `packages/core/src/` directory
+- The `@lace/core/*` prefix maps to `packages/core/src/*`
 
 **Web Package (`packages/web`):**
 
-- Use `@/` path aliases for internal imports:
-  `import { Button } from '@/components/ui/button'`
-- Import from core package using workspace reference:
-  `import { Agent } from '@lace/core/agents/agent'`
+- Same folder: `import { Button } from './Button'`
+- Different folder, same package: `import { Modal } from '@lace/web/components/modals/Modal'`
+- Import from core package: `import { Agent } from '@lace/core/agents/agent'`
 - React Router v7 file-based routing in `app/routes/`
+
+**ESLint enforces these rules:**
+- ✅ Same-folder relative imports allowed
+- ❌ Parent directory imports (`../`) forbidden - use absolute paths instead
 
 **Never use inline imports** - always declare at the top:
 
-- <bad>`const taskTool = tool as { getTaskManager?: () => import('~/tasks/task-manager').TaskManager }`</bad>
-- <good>`import type { TaskManager } from '~/tasks/task-manager'` (at
-  top)</good>
+- <bad>`const taskTool = tool as { getTaskManager?: () => import('@lace/core/tasks/task-manager').TaskManager }`</bad>
+- <good>`import type { TaskManager } from '@lace/core/tasks/task-manager'` (at top)</good>
 
 ## Core Architecture
 

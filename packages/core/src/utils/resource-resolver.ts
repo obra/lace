@@ -4,7 +4,7 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as fs from 'fs';
-import { logger } from '~/utils/logger';
+import { logger } from './logger';
 
 /**
  * Resolves paths to bundled resources (data files, templates, etc.) that work in both

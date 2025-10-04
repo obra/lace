@@ -6,8 +6,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EventStreamManager } from '@/lib/event-stream-manager';
-import { getSessionService } from '@/lib/server/session-service';
+import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
+import { getSessionService } from '@lace/web/lib/server/session-service';
 import {
   Project,
   Session,
@@ -15,17 +15,17 @@ import {
   cleanupTestProviderDefaults,
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
-import { cleanupSession } from '@/lib/server/lace-test-imports';
+} from '@lace/web/lib/server/lace-imports';
+import { cleanupSession } from '@lace/web/lib/server/lace-test-imports';
 
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { parseResponse } from '@/lib/serialization';
-import { loader as getAgent } from '@/app/routes/api.agents.$agentId';
-import { createLoaderArgs } from '@/test-utils/route-test-helpers';
-import type { AgentWithTokenUsage } from '@/types/api';
-import type { ThreadId } from '@/types/core';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { loader as getAgent } from '@lace/web/app/routes/api.agents.$agentId';
+import { createLoaderArgs } from '@lace/web/test-utils/route-test-helpers';
+import type { AgentWithTokenUsage } from '@lace/web/types/api';
+import type { ThreadId } from '@lace/web/types/core';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));

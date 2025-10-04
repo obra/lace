@@ -5,4 +5,4 @@
 export * from './lace-imports';
 
 // Test-only utilities
-export { cleanupSession } from '~/test-utils/core-test-setup';
+export { cleanupSession } from '@lace/core/test-utils/core-test-setup';

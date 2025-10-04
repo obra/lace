@@ -2,22 +2,22 @@
 // ABOUTME: Ensures agents regenerate system prompts with correct project context when provider instances are shared
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import { TestProvider } from '~/test-utils/test-provider';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import * as promptsModule from '~/config/prompts';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Agent } from './agent';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import * as promptsModule from '@lace/core/config/prompts';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
 

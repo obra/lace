@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes } from '@/lib/fontawesome';
+import { faTimes } from '@lace/web/lib/fontawesome';
 
 export interface DismissButtonProps {
   onClick: () => void;

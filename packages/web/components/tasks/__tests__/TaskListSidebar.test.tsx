@@ -10,17 +10,17 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { TaskListSidebar } from '@/components/tasks/TaskListSidebar';
-import type { Task } from '@/types/core';
-import { asThreadId, asAssigneeId } from '@/types/core';
+import { TaskListSidebar } from '@lace/web/components/tasks/TaskListSidebar';
+import type { Task } from '@lace/web/types/core';
+import { asThreadId, asAssigneeId } from '@lace/web/types/core';
 
 // Mock the useTaskManager hook
-vi.mock('@/hooks/useTaskManager', () => ({
+vi.mock('@lace/web/hooks/useTaskManager', () => ({
   useTaskManager: vi.fn(),
 }));
 
 // Import the mock after setting up the mock
-import { useTaskManager } from '@/hooks/useTaskManager';
+import { useTaskManager } from '@lace/web/hooks/useTaskManager';
 const mockUseTaskManager = vi.mocked(useTaskManager);
 
 // Mock FontAwesome icons
@@ -31,7 +31,7 @@ vi.mock('@fortawesome/react-fontawesome', () => ({
 }));
 
 // Mock Sidebar components
-vi.mock('@/components/layout/Sidebar', () => ({
+vi.mock('@lace/web/components/layout/Sidebar', () => ({
   SidebarButton: ({
     children,
     onClick,

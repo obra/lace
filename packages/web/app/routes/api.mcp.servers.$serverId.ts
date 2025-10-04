@@ -1,9 +1,9 @@
 // ABOUTME: Individual global MCP server management API with CRUD operations
 // ABOUTME: Handles GET, PUT, DELETE for specific global MCP servers
 
-import { MCPConfigLoader } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { MCPConfigLoader } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
 
 const ServerIdSchema = z.string().min(1, 'Server ID is required');

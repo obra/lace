@@ -230,7 +230,7 @@ approach:
    'use client';
 
    import React from 'react';
-   import { ThemeSelector } from '@/components/ui/ThemeSelector';
+   import { ThemeSelector } from '@lace/web/components/ui/ThemeSelector';
    import { SettingsPanel } from '../SettingsPanel';
    import { SettingField } from '../SettingField';
 

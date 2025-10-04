@@ -236,7 +236,7 @@ export interface ProviderToolCall {
 }
 
 // UPDATE ProviderResponse to use ToolCall:
-import { ToolCall } from '~/tools/types';
+import { ToolCall } from '@lace/core/tools/types';
 
 export interface ProviderResponse {
   content: string;
@@ -264,7 +264,7 @@ In `packages/core/src/providers/anthropic-provider.ts`:
 let toolCalls: ProviderToolCall[] = [];
 
 // To:
-import { ToolCall } from '~/tools/types';
+import { ToolCall } from '@lace/core/tools/types';
 let toolCalls: ToolCall[] = [];
 
 // When creating tool calls, change from:
@@ -297,7 +297,7 @@ const toolCalls: ProviderToolCall[] =
     // ...
 
 // To:
-import { ToolCall } from '~/tools/types';
+import { ToolCall } from '@lace/core/tools/types';
 const toolCalls: ToolCall[] =
   choice.message.tool_calls?.map((toolCall: OpenAI.Chat.ChatCompletionMessageToolCall) => {
     try {
@@ -459,7 +459,7 @@ Update existing code to use the utility:
 In `packages/core/src/tools/implementations/delegate.ts`:
 
 ```typescript
-import { parseProviderModel } from '~/utils/provider-utils';
+import { parseProviderModel } from '@lace/core/utils/provider-utils';
 
 // Replace:
 const [providerInstanceId, modelName] = value.split(':');
@@ -496,7 +496,7 @@ Create `packages/core/src/config/global-config.test.ts`:
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GlobalConfigManager } from './global-config';
 import * as fs from 'fs';
-import { getLaceFilePath } from '~/config/lace-dir';
+import { getLaceFilePath } from '@lace/core/config/lace-dir';
 
 // Mock fs module
 vi.mock('fs');
@@ -613,7 +613,7 @@ Now implement `packages/core/src/config/global-config.ts`:
 // ABOUTME: Manages ~/.lace/config.json including default model configurations
 
 import * as fs from 'fs';
-import { getLaceFilePath } from '~/config/lace-dir';
+import { getLaceFilePath } from '@lace/core/config/lace-dir';
 
 interface GlobalConfig {
   defaultModels: {
@@ -742,8 +742,8 @@ Create `packages/core/src/helpers/types.ts`:
 // ABOUTME: Type definitions for the helper system
 // ABOUTME: Includes result types and options for different helper modes
 
-import { ToolCall, ToolResult } from '~/tools/types';
-import { CombinedTokenUsage } from '~/token-management/types';
+import { ToolCall, ToolResult } from '@lace/core/tools/types';
+import { CombinedTokenUsage } from '@lace/core/token-management/types';
 
 /**
  * Result returned from a helper execution
@@ -789,10 +789,10 @@ Create `packages/core/src/helpers/base-helper.test.ts`:
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BaseHelper } from './base-helper';
 import { HelperResult } from './types';
-import { Tool } from '~/tools/tool';
-import { ToolExecutor } from '~/tools/executor';
-import { AIProvider } from '~/providers/base-provider';
-import { TestProvider } from '~/test-utils/test-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { AIProvider } from '@lace/core/providers/base-provider';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
 import { z } from 'zod';
 
 // Create a simple test tool
@@ -1001,12 +1001,12 @@ Now implement `packages/core/src/helpers/base-helper.ts`:
 // ABOUTME: Extended by InfrastructureHelper and SessionHelper for specific use cases
 
 import { HelperResult } from './types';
-import { ToolCall, ToolResult } from '~/tools/types';
-import { Tool } from '~/tools/tool';
-import { ToolExecutor } from '~/tools/executor';
-import { AIProvider, ProviderMessage } from '~/providers/base-provider';
-import { CombinedTokenUsage } from '~/token-management/types';
-import { logger } from '~/utils/logger';
+import { ToolCall, ToolResult } from '@lace/core/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { AIProvider, ProviderMessage } from '@lace/core/providers/base-provider';
+import { CombinedTokenUsage } from '@lace/core/token-management/types';
+import { logger } from '@lace/core/utils/logger';
 
 /**
  * Base class for helper agents
@@ -1186,11 +1186,11 @@ Create `packages/core/src/helpers/infrastructure-helper.test.ts`:
 ```typescript
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { InfrastructureHelper } from './infrastructure-helper';
-import { GlobalConfigManager } from '~/config/global-config';
-import { ProviderInstanceManager } from '~/providers/instance/manager';
-import { ToolExecutor } from '~/tools/executor';
-import { TestProvider } from '~/test-utils/test-provider';
-import { Tool } from '~/tools/tool';
+import { GlobalConfigManager } from '@lace/core/config/global-config';
+import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
+import { Tool } from '@lace/core/tools/tool';
 import { z } from 'zod';
 import * as fs from 'fs';
 
@@ -1482,19 +1482,19 @@ Now implement `packages/core/src/helpers/infrastructure-helper.ts`:
 // ABOUTME: Bypasses user approval with programmatic tool whitelist for trusted operations
 
 import { BaseHelper } from './base-helper';
-import { GlobalConfigManager } from '~/config/global-config';
-import { ProviderInstanceManager } from '~/providers/instance/manager';
-import { parseProviderModel } from '~/utils/provider-utils';
-import { ToolExecutor } from '~/tools/executor';
-import { Tool } from '~/tools/tool';
+import { GlobalConfigManager } from '@lace/core/config/global-config';
+import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
+import { parseProviderModel } from '@lace/core/utils/provider-utils';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { Tool } from '@lace/core/tools/tool';
 import {
   ToolCall,
   ToolResult,
   ToolContext,
   createErrorResult,
-} from '~/tools/types';
-import { AIProvider } from '~/providers/base-provider';
-import { logger } from '~/utils/logger';
+} from '@lace/core/tools/types';
+import { AIProvider } from '@lace/core/providers/base-provider';
+import { logger } from '@lace/core/utils/logger';
 
 export interface InfrastructureHelperOptions {
   /** Model tier to use - 'fast' or 'smart' */
@@ -1693,12 +1693,12 @@ Create `packages/core/src/helpers/session-helper.test.ts`:
 ```typescript
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SessionHelper } from './session-helper';
-import { Agent } from '~/agents/agent';
-import { Session } from '~/sessions/session';
-import { GlobalConfigManager } from '~/config/global-config';
-import { TestProvider } from '~/test-utils/test-provider';
-import { Tool } from '~/tools/tool';
-import { ToolExecutor } from '~/tools/executor';
+import { Agent } from '@lace/core/agents/agent';
+import { Session } from '@lace/core/sessions/session';
+import { GlobalConfigManager } from '@lace/core/config/global-config';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolExecutor } from '@lace/core/tools/executor';
 import { z } from 'zod';
 
 // Mock modules
@@ -1957,20 +1957,20 @@ Now implement `packages/core/src/helpers/session-helper.ts`:
 // ABOUTME: Inherits session policies and approval workflow from parent agent
 
 import { BaseHelper } from './base-helper';
-import { Agent } from '~/agents/agent';
-import { GlobalConfigManager } from '~/config/global-config';
-import { parseProviderModel } from '~/utils/provider-utils';
-import { ProviderInstanceManager } from '~/providers/instance/manager';
-import { ToolExecutor } from '~/tools/executor';
-import { Tool } from '~/tools/tool';
+import { Agent } from '@lace/core/agents/agent';
+import { GlobalConfigManager } from '@lace/core/config/global-config';
+import { parseProviderModel } from '@lace/core/utils/provider-utils';
+import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { Tool } from '@lace/core/tools/tool';
 import {
   ToolCall,
   ToolResult,
   ToolContext,
   createErrorResult,
-} from '~/tools/types';
-import { AIProvider } from '~/providers/base-provider';
-import { logger } from '~/utils/logger';
+} from '@lace/core/tools/types';
+import { AIProvider } from '@lace/core/providers/base-provider';
+import { logger } from '@lace/core/utils/logger';
 
 export interface SessionHelperOptions {
   /** Model tier to use - 'fast' or 'smart' */
@@ -2196,15 +2196,15 @@ Create `packages/core/src/helpers/integration.test.ts`:
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { InfrastructureHelper } from './infrastructure-helper';
 import { SessionHelper } from './session-helper';
-import { GlobalConfigManager } from '~/config/global-config';
-import { ProviderInstanceManager } from '~/providers/instance/manager';
-import { Session } from '~/sessions/session';
-import { Agent } from '~/agents/agent';
-import { Tool } from '~/tools/tool';
+import { GlobalConfigManager } from '@lace/core/config/global-config';
+import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
+import { Session } from '@lace/core/sessions/session';
+import { Agent } from '@lace/core/agents/agent';
+import { Tool } from '@lace/core/tools/tool';
 import { z } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
-import { getTempDir } from '~/test-utils/temp-directory';
+import { getTempDir } from '@lace/core/test-utils/temp-directory';
 
 // Create real test tools
 class CountFilesTool extends Tool {
@@ -2511,8 +2511,8 @@ Create an example in `docs/examples/agent-with-helper.ts`:
 ```typescript
 // Example: How an agent might use SessionHelper
 
-import { Agent } from '~/agents/agent';
-import { SessionHelper } from '~/helpers/session-helper';
+import { Agent } from '@lace/core/agents/agent';
+import { SessionHelper } from '@lace/core/helpers/session-helper';
 
 class EnhancedAgent extends Agent {
   /**

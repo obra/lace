@@ -5,19 +5,19 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { writeFile, rm, mkdir } from 'fs/promises';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
-import { FileEditTool } from '~/tools/implementations/file_edit';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { FileEditTool } from './file_edit';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import type { ToolContext } from '~/tools/types';
+} from '@lace/core/test-utils/provider-defaults';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import type { ToolContext } from '@lace/core/tools/types';
 
 describe('FileEditTool Integration Tests', () => {
   const tempLaceDirContext = setupCoreTest();

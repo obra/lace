@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatTime } from '@/lib/format';
+import { formatTime } from '@lace/web/lib/format';
 
 interface TimestampDisplayProps {
   timestamp: Date | string;

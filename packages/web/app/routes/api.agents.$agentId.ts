@@ -1,13 +1,13 @@
 // ABOUTME: REST API endpoints for individual agent management - GET, PUT for agent updates
 // ABOUTME: Handles agent configuration updates including provider and model changes
 
-import { getSessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/types/core';
-import { isValidThreadId } from '@/lib/validation/thread-id-validation';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { asThreadId } from '@lace/web/types/core';
+import { isValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
-import { ProviderRegistry } from '@/lib/server/lace-imports';
+import { ProviderRegistry } from '@lace/web/lib/server/lace-imports';
 import type { Route } from './+types/api.agents.$agentId';
 
 const AgentUpdateSchema = z

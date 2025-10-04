@@ -3,7 +3,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CloneManager } from './clone-manager';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
