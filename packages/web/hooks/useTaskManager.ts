@@ -4,11 +4,11 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { TaskAPIClient } from '@/lib/client/task-api';
-import type { TaskEvent } from '@/hooks/useEventStream';
-import type { Task } from '@/types/core';
-import type { TaskFilters } from '@/types/core';
-import type { CreateTaskRequest, UpdateTaskRequest } from '@/lib/client/task-api';
+import { TaskAPIClient } from '@lace/web/lib/client/task-api';
+import type { TaskEvent } from '@lace/web/hooks/useEventStream';
+import type { Task } from '@lace/web/types/core';
+import type { TaskFilters } from '@lace/web/types/core';
+import type { CreateTaskRequest, UpdateTaskRequest } from '@lace/web/lib/client/task-api';
 
 interface TaskEventHandlers {
   onTaskCreated?: (event: TaskEvent) => void;

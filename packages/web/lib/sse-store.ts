@@ -3,8 +3,8 @@
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { LaceEvent } from '@/types/core';
-import { parseTyped } from '@/lib/serialization';
+import type { LaceEvent } from '@lace/web/types/core';
+import { parseTyped } from '@lace/web/lib/serialization';
 
 interface EventFilter {
   threadIds?: string[];

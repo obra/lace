@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMicrophone, faStop } from '@/lib/fontawesome';
+import { faMicrophone, faStop } from '@lace/web/lib/fontawesome';
 import { WaveformIcon } from './WaveformIcon';
 
 interface NativeSpeechInputProps {

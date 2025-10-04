@@ -4,15 +4,15 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ProviderInstanceList } from '@/components/providers/ProviderInstanceList';
-import { SettingsPanel } from '@/components/settings/SettingsPanel';
-import { SettingField } from '@/components/settings/SettingField';
-import { ModelSelector } from '@/components/ui/ModelSelector';
-import { Alert } from '@/components/ui/Alert';
+import { ProviderInstanceList } from '@lace/web/components/providers/ProviderInstanceList';
+import { SettingsPanel } from '@lace/web/components/settings/SettingsPanel';
+import { SettingField } from '@lace/web/components/settings/SettingField';
+import { ModelSelector } from '@lace/web/components/ui/ModelSelector';
+import { Alert } from '@lace/web/components/ui/Alert';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRocket, faBrain, faPlug } from '@/lib/fontawesome';
-import { api } from '@/lib/api-client';
-import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
+import { faRocket, faBrain, faPlug } from '@lace/web/lib/fontawesome';
+import { api } from '@lace/web/lib/api-client';
+import { useProviderInstances } from '@lace/web/components/providers/ProviderInstanceProvider';
 
 interface DefaultModels {
   fast?: string;

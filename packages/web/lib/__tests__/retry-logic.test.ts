@@ -2,8 +2,8 @@
 // ABOUTME: Validates retry strategies, timing, and proper error handling
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { withRetry, createRetryable, type RetryConfig } from '@/lib/retry-logic';
-import { HttpError, NetworkError, AbortError } from '@/lib/api-errors';
+import { withRetry, createRetryable, type RetryConfig } from '@lace/web/lib/retry-logic';
+import { HttpError, NetworkError, AbortError } from '@lace/web/lib/api-errors';
 
 describe('Retry Logic', () => {
   beforeEach(() => {

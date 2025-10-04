@@ -6,14 +6,14 @@ import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ProviderRegistry } from '~/providers/registry';
-import { ProviderInstanceManager } from '~/providers/instance/manager';
-import { ProviderCatalogManager } from '~/providers/catalog/manager';
+import { ProviderRegistry } from './registry';
+import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
+import { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
 // import { Session } from '~/sessions/session';
 // import { Project } from '~/projects/project';
 // import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import type { ProviderInstancesConfig, CatalogProvider } from '~/providers/catalog/types';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import type { ProviderInstancesConfig, CatalogProvider } from '@lace/core/providers/catalog/types';
 
 // Mock OpenAI-compatible server factory
 function createMockOpenAIServer(baseUrl: string, expectedApiKey: string) {

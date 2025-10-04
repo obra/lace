@@ -9,15 +9,18 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { ProjectsProvider, useProjectsContext } from '@/components/providers/ProjectsProvider';
-import type { ProjectInfo } from '@/types/core';
+import {
+  ProjectsProvider,
+  useProjectsContext,
+} from '@lace/web/components/providers/ProjectsProvider';
+import type { ProjectInfo } from '@lace/web/types/core';
 
 // Mock the hooks
-vi.mock('@/hooks/useProjectManagement', () => ({
+vi.mock('@lace/web/hooks/useProjectManagement', () => ({
   useProjectManagement: vi.fn(),
 }));
 
-import { useProjectManagement } from '@/hooks/useProjectManagement';
+import { useProjectManagement } from '@lace/web/hooks/useProjectManagement';
 
 const mockUseProjectManagement = vi.mocked(useProjectManagement);
 

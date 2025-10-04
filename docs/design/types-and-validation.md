@@ -44,8 +44,8 @@ export type {
   EventType,
   ThreadEvent,
   Thread,
-} from '~/threads/types';
-export type { CompactionData } from '~/threads/compaction/types';
+} from '@lace/core/threads/types';
+export type { CompactionData } from '@lace/core/threads/compaction/types';
 
 // Tool system
 export type {
@@ -53,18 +53,18 @@ export type {
   ToolResult,
   ToolContext,
   ToolAnnotations,
-} from '~/tools/types';
-export { ApprovalDecision } from '~/tools/types';
+} from '@lace/core/tools/types';
+export { ApprovalDecision } from '@lace/core/tools/types';
 
 // Task management
-export type { Task, TaskNote, TaskStatus, TaskPriority } from '~/tasks/types';
+export type { Task, TaskNote, TaskStatus, TaskPriority } from '@lace/core/tasks/types';
 
 // Agent and provider system
-export type { AgentState } from '~/agents/agent';
-export type { ProviderInfo, ModelInfo } from '~/providers/base-provider';
+export type { AgentState } from '@lace/core/agents/agent';
+export type { ProviderInfo, ModelInfo } from '@lace/core/providers/base-provider';
 
 // Project management
-export type { ProjectInfo } from '~/projects/project';
+export type { ProjectInfo } from '@lace/core/projects/project';
 
 // Utility functions
 export {
@@ -72,13 +72,13 @@ export {
   createThreadId,
   isThreadId,
   EVENT_TYPES,
-} from '~/threads/types';
+} from '@lace/core/threads/types';
 ```
 
 **Usage**: Import for any type that exists in the core business logic
 
 ```typescript
-import type { ThreadId, Task, ToolResult } from '@/lib/core';
+import type { ThreadId, Task, ToolResult } from '@lace/web/lib/core';
 ```
 
 ### Web-Specific Types (`@/types/web`)
@@ -136,7 +136,7 @@ export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 **Usage**: Import for web-specific models and API contracts
 
 ```typescript
-import type { Session, Agent, MessageRequest } from '@/types/web';
+import type { Session, Agent, MessageRequest } from '@lace/web/types/web';
 ```
 
 ### Event Types (`@/types/events`)
@@ -148,7 +148,7 @@ import type { Session, Agent, MessageRequest } from '@/types/web';
 
 ```typescript
 // Persisted events (stored in database)
-export { EVENT_TYPES, type EventType } from '@/lib/core';
+export { EVENT_TYPES, type EventType } from '@lace/web/lib/core';
 
 // UI-only events (ephemeral, not persisted)
 export const UI_EVENT_TYPES = [
@@ -194,8 +194,8 @@ export type SessionEvent =
 **Usage**: Import for all event handling
 
 ```typescript
-import type { SessionEvent, SessionEventType } from '@/types/events';
-import { getAllEventTypes, isPersistedEvent } from '@/types/events';
+import type { SessionEvent, SessionEventType } from '@lace/web/types/events';
+import { getAllEventTypes, isPersistedEvent } from '@lace/web/types/events';
 ```
 
 ### Server-Only Classes (`@/lib/server/lace-imports`)
@@ -208,11 +208,11 @@ components
 
 ```typescript
 // Business logic classes
-export { Agent, type AgentEvents } from '~/agents/agent';
-export { ThreadManager } from '~/threads/thread-manager';
-export { ToolExecutor } from '~/tools/executor';
-export { Session } from '~/sessions/session';
-export { Project } from '~/projects/project';
+export { Agent, type AgentEvents } from '@lace/core/agents/agent';
+export { ThreadManager } from '@lace/core/threads/thread-manager';
+export { ToolExecutor } from '@lace/core/tools/executor';
+export { Session } from '@lace/core/sessions/session';
+export { Project } from '@lace/core/projects/project';
 ```
 
 **Restriction**: These imports are marked with `'server-only'` and must never be
@@ -319,8 +319,8 @@ export const CreateTaskRequestSchema = z.object({
 **Core Types** (shared business logic):
 
 ```typescript
-import type { ThreadId, Task, ToolResult, ApprovalDecision } from '@/lib/core';
-import { isThreadId, asThreadId, EVENT_TYPES } from '@/lib/core';
+import type { ThreadId, Task, ToolResult, ApprovalDecision } from '@lace/web/lib/core';
+import { isThreadId, asThreadId, EVENT_TYPES } from '@lace/web/lib/core';
 ```
 
 **Web Types** (API contracts, UI models):
@@ -331,27 +331,27 @@ import type {
   Agent,
   MessageRequest,
   ToolApprovalRequestData,
-} from '@/types/web';
-import { isApiError, isApiSuccess } from '@/types/web';
+} from '@lace/web/types/web';
+import { isApiError, isApiSuccess } from '@lace/web/types/web';
 ```
 
 **Event Types** (streaming, UI updates):
 
 ```typescript
-import type { SessionEvent, SessionEventType } from '@/types/events';
-import { getAllEventTypes, isPersistedEvent } from '@/types/events';
+import type { SessionEvent, SessionEventType } from '@lace/web/types/events';
+import { getAllEventTypes, isPersistedEvent } from '@lace/web/types/events';
 ```
 
 **Server Classes** (API routes only):
 
 ```typescript
-import { Agent, ThreadManager, Session } from '@/lib/server/lace-imports';
+import { Agent, ThreadManager, Session } from '@lace/web/lib/server/lace-imports';
 ```
 
 **Validation** (runtime checking):
 
 ```typescript
-import { MessageRequestSchema, ThreadIdSchema } from '@/lib/validation/schemas';
+import { MessageRequestSchema, ThreadIdSchema } from '@lace/web/lib/validation/schemas';
 ```
 
 ### ❌ Forbidden Patterns
@@ -360,16 +360,16 @@ import { MessageRequestSchema, ThreadIdSchema } from '@/lib/validation/schemas';
 
 ```typescript
 // Don't do this - creates confusion and potential conflicts
-import { ThreadId } from '@/lib/server/core-types'; // OLD PATH
-import { ThreadId } from '@/types/api'; // OLD PATH
-import { ThreadId } from '@/lib/core-types-import'; // OLD PATH
+import { ThreadId } from '@lace/web/lib/server/core-types'; // OLD PATH
+import { ThreadId } from '@lace/web/types/api'; // OLD PATH
+import { ThreadId } from '@lace/web/lib/core-types-import'; // OLD PATH
 ```
 
 **Business logic in client components**:
 
 ```typescript
 // Don't do this - violates server-only boundary
-import { Agent, ThreadManager } from '@/lib/server/lace-imports'; // Server-only!
+import { Agent, ThreadManager } from '@lace/web/lib/server/lace-imports'; // Server-only!
 ```
 
 **Type duplication**:
@@ -384,7 +384,7 @@ export type ThreadId = z.infer<typeof ThreadIdSchema>; // Use branded type inste
 
 ```typescript
 // Don't do this - schemas are for validation, not type definitions
-import type { MessageRequest } from '@/lib/validation/schemas'; // Use @/types/web instead
+import type { MessageRequest } from '@lace/web/lib/validation/schemas'; // Use @/types/web instead
 ```
 
 ## File Organization

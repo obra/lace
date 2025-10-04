@@ -1,13 +1,13 @@
 // ABOUTME: Session class for managing collections of agents and session-level operations
 // ABOUTME: Handles session creation, agent spawning, and session metadata management
 
-import { Agent, type AgentInfo } from '~/agents/agent';
-import { ThreadId, asThreadId } from '~/threads/types';
-import { ThreadManager } from '~/threads/thread-manager';
-import { ProviderInstanceManager } from '~/providers/instance/manager';
-import { ToolExecutor } from '~/tools/executor';
-import { TaskManager, AgentCreationCallback } from '~/tasks/task-manager';
-import { getPersistence, SessionData } from '~/persistence/database';
+import { Agent, type AgentInfo } from '@lace/core/agents/agent';
+import { ThreadId, asThreadId } from '@lace/core/threads/types';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { TaskManager, AgentCreationCallback } from '@lace/core/tasks/task-manager';
+import { getPersistence, SessionData } from '@lace/core/persistence/database';
 import {
   TaskCreateTool,
   TaskListTool,
@@ -15,32 +15,36 @@ import {
   TaskUpdateTool,
   TaskAddNoteTool,
   TaskViewTool,
-} from '~/tools/implementations/task-manager';
-import { BashTool } from '~/tools/implementations/bash';
-import { FileReadTool } from '~/tools/implementations/file_read';
-import { FileWriteTool } from '~/tools/implementations/file_write';
-import { Project } from '~/projects/project';
-import { FileEditTool } from '~/tools/implementations/file_edit';
-import { RipgrepSearchTool } from '~/tools/implementations/ripgrep_search';
-import { FileFindTool } from '~/tools/implementations/file_find';
-import { DelegateTool } from '~/tools/implementations/delegate';
-import { UrlFetchTool } from '~/tools/implementations/url_fetch';
-import { logger } from '~/utils/logger';
-import { ApprovalDecision, type ToolPolicy, type PermissionOverrideMode } from '~/tools/types';
-import { SessionConfiguration, ConfigurationValidator } from '~/sessions/session-config';
-import { MCPServerManager } from '~/mcp/server-manager';
-import type { MCPServerConnection, MCPServerConfig } from '~/config/mcp-types';
+} from '@lace/core/tools/implementations/task-manager';
+import { BashTool } from '@lace/core/tools/implementations/bash';
+import { FileReadTool } from '@lace/core/tools/implementations/file_read';
+import { FileWriteTool } from '@lace/core/tools/implementations/file_write';
+import { Project } from '@lace/core/projects/project';
+import { FileEditTool } from '@lace/core/tools/implementations/file_edit';
+import { RipgrepSearchTool } from '@lace/core/tools/implementations/ripgrep_search';
+import { FileFindTool } from '@lace/core/tools/implementations/file_find';
+import { DelegateTool } from '@lace/core/tools/implementations/delegate';
+import { UrlFetchTool } from '@lace/core/tools/implementations/url_fetch';
+import { logger } from '@lace/core/utils/logger';
+import {
+  ApprovalDecision,
+  type ToolPolicy,
+  type PermissionOverrideMode,
+} from '@lace/core/tools/types';
+import { SessionConfiguration, ConfigurationValidator } from './session-config';
+import { MCPServerManager } from '@lace/core/mcp/server-manager';
+import type { MCPServerConnection, MCPServerConfig } from '@lace/core/config/mcp-types';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
-import type { TaskManagerEvent } from '~/utils/task-notifications';
-import { routeTaskNotifications } from '~/utils/task-notifications';
+import type { TaskManagerEvent } from '@lace/core/utils/task-notifications';
+import { routeTaskNotifications } from '@lace/core/utils/task-notifications';
 import {
   WorkspaceManagerFactory,
   DEFAULT_WORKSPACE_MODE,
   type IWorkspaceManager,
   type WorkspaceMode,
-} from '~/workspace/workspace-manager';
-import type { WorkspaceInfo } from '~/workspace/workspace-container-manager';
+} from '@lace/core/workspace/workspace-manager';
+import type { WorkspaceInfo } from '@lace/core/workspace/workspace-container-manager';
 
 export interface SessionInfo {
   id: ThreadId;

@@ -5,13 +5,13 @@
 
 import React, { useState, useCallback, memo, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ChatInput } from '@/components/chat/ChatInput';
-import { CompactTokenUsage } from '@/components/ui/CompactTokenUsage';
-import { ModelSelector } from '@/components/ui/ModelSelector';
-import { Alert } from '@/components/ui/Alert';
-import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
-import type { ThreadId } from '@/types/core';
+import { ChatInput } from '@lace/web/components/chat/ChatInput';
+import { CompactTokenUsage } from '@lace/web/components/ui/CompactTokenUsage';
+import { ModelSelector } from '@lace/web/components/ui/ModelSelector';
+import { Alert } from '@lace/web/components/ui/Alert';
+import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
+import { useProviderInstances } from '@lace/web/components/providers/ProviderInstanceProvider';
+import type { ThreadId } from '@lace/web/types/core';
 
 // Stop requested feedback timing constants
 const STOP_FEEDBACK_DURATION = {

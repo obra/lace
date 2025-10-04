@@ -3,9 +3,9 @@
 
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { Tool } from '~/tools/tool';
+import { Tool } from './tool';
 import { join } from 'path';
-import type { ToolResult, ToolContext } from '~/tools/types';
+import type { ToolResult, ToolContext } from './types';
 
 // Test tool implementation for testing base class functionality
 class TestTool extends Tool {

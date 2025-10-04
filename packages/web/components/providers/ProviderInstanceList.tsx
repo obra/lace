@@ -6,13 +6,13 @@
 import React, { useState, useEffect } from 'react';
 import { ProviderInstanceCard } from './ProviderInstanceCard';
 import { AddInstanceModal } from './AddInstanceModal';
-import { Alert } from '@/components/ui/Alert';
-import { SuccessToast } from '@/components/ui/SuccessToast';
-import { ErrorToast } from '@/components/errors/ErrorToast';
+import { Alert } from '@lace/web/components/ui/Alert';
+import { SuccessToast } from '@lace/web/components/ui/SuccessToast';
+import { ErrorToast } from '@lace/web/components/errors/ErrorToast';
 import { GlobalModelSearch, type GlobalModelFilters } from './GlobalModelSearch';
 import { useProviderInstances } from './ProviderInstanceProvider';
-import { providerService } from '@/lib/server/provider-service';
-import type { CatalogProvider } from '@/lib/server/lace-imports';
+import { providerService } from '@lace/web/lib/server/provider-service';
+import type { CatalogProvider } from '@lace/web/lib/server/lace-imports';
 
 export function ProviderInstanceList() {
   const {

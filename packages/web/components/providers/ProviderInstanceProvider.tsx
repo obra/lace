@@ -4,8 +4,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
-import { api } from '@/lib/api-client';
-import type { ProviderInfo, ModelInfo } from '@/types/api';
+import { api } from '@lace/web/lib/api-client';
+import type { ProviderInfo, ModelInfo } from '@lace/web/types/api';
 
 // Provider Instance Types
 interface ProviderInstance {

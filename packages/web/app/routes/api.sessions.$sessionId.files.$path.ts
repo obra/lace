@@ -15,14 +15,14 @@ interface LoaderArgs {
 import { promises as fs, constants as fsConstants } from 'fs';
 import { resolve, relative } from 'path';
 import mime from 'mime-types';
-import { createSuccessResponse, createErrorResponse } from '@/lib/server/api-utils';
-import { logger } from '~/utils/logger';
-import { SessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/types/core';
+import { createSuccessResponse, createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { logger } from '@lace/core/utils/logger';
+import { SessionService } from '@lace/web/lib/server/session-service';
+import { asThreadId } from '@lace/web/types/core';
 import {
   GetSessionFileRequestSchema,
   type SessionFileContentResponse,
-} from '@/types/session-files';
+} from '@lace/web/types/session-files';
 
 // File size limits as constants
 export const MAX_FILE_SIZE = 1024 * 1024; // 1MB

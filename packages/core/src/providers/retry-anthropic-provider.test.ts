@@ -2,8 +2,8 @@
 // ABOUTME: Verifies retry logic works correctly with Anthropic SDK
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AnthropicProvider } from '~/providers/anthropic-provider';
-import { ProviderMessage } from '~/providers/base-provider';
+import { AnthropicProvider } from './anthropic-provider';
+import { ProviderMessage } from './base-provider';
 
 // Create mock functions that we'll reference
 const mockCreate = vi.fn();

@@ -3,8 +3,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useTaskHandlers } from '@/hooks/useTaskHandlers';
-import type { Task } from '@/types/core';
+import { useTaskHandlers } from '@lace/web/hooks/useTaskHandlers';
+import type { Task } from '@lace/web/types/core';
 
 // Mock task manager
 const createMockTaskManager = () => ({

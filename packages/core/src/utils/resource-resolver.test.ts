@@ -8,7 +8,7 @@ import {
   resolveDataDirectory,
   resolveTemplateDirectory,
   isStandaloneMode,
-} from '~/utils/resource-resolver';
+} from './resource-resolver';
 
 describe('resource-resolver', () => {
   const originalNodeEnv = process.env.NODE_ENV;

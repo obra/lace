@@ -2,11 +2,11 @@
 // ABOUTME: Reproduces issue where path resolution fails due to working directory mismatch
 
 import { describe, it, expect } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { ToolExecutor } from '~/tools/executor';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import type { LaceEvent } from '~/threads/types';
+import { Agent } from './agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import type { LaceEvent } from '@lace/core/threads/types';
 
 describe('hasFileBeenRead working directory bug', () => {
   const _tempLaceDir = setupCoreTest();

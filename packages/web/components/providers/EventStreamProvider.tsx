@@ -11,16 +11,16 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import { useAgentEvents as useAgentEventsHook } from '@/hooks/useAgentEvents';
-import { useEventStream as useEventStreamHook } from '@/hooks/useEventStream';
-import { useSessionAPI as useSessionAPIHook } from '@/hooks/useSessionAPI';
-import { useAgentAPI as useAgentAPIHook } from '@/hooks/useAgentAPI';
+import { useAgentEvents as useAgentEventsHook } from '@lace/web/hooks/useAgentEvents';
+import { useEventStream as useEventStreamHook } from '@lace/web/hooks/useEventStream';
+import { useSessionAPI as useSessionAPIHook } from '@lace/web/hooks/useSessionAPI';
+import { useAgentAPI as useAgentAPIHook } from '@lace/web/hooks/useAgentAPI';
 import { useToolApprovalContext } from './ToolApprovalProvider';
 import { useSessionContext } from './SessionProvider';
-import type { ThreadId } from '@/types/core';
-import type { LaceEvent } from '~/threads/types';
-import type { StreamConnection } from '@/types/stream-events';
-import type { PendingApproval } from '@/types/api';
+import type { ThreadId } from '@lace/web/types/core';
+import type { LaceEvent } from '@lace/core/threads/types';
+import type { StreamConnection } from '@lace/web/types/stream-events';
+import type { PendingApproval } from '@lace/web/types/api';
 
 // Types for the context
 interface EventStreamConnection {

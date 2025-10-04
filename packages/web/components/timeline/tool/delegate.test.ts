@@ -3,7 +3,7 @@
 
 import { describe, test, expect } from 'vitest';
 import { faUserFriends } from '@fortawesome/free-solid-svg-icons';
-import type { ToolResult } from '@/types/core';
+import type { ToolResult } from '@lace/web/types/core';
 import { delegateRenderer } from './delegate';
 
 describe('Delegate Tool Renderer', () => {

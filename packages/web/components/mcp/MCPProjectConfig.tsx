@@ -5,11 +5,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faServer } from '@/lib/fontawesome';
-import { api } from '@/lib/api-client';
-import type { MCPServerConfig } from '@/types/core';
+import { faPlus, faServer } from '@lace/web/lib/fontawesome';
+import { api } from '@lace/web/lib/api-client';
+import type { MCPServerConfig } from '@lace/web/types/core';
 import { MCPServerCard } from './MCPServerCard';
-import { AddMCPServerModal } from '@/components/modals/AddMCPServerModal';
+import { AddMCPServerModal } from '@lace/web/components/modals/AddMCPServerModal';
 
 interface MCPProjectConfigProps {
   projectId: string;

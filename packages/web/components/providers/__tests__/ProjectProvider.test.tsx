@@ -9,17 +9,17 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { ProjectProvider, useProjectContext } from '@/components/providers/ProjectProvider';
-import type { SessionInfo, ThreadId } from '@/types/core';
+import { ProjectProvider, useProjectContext } from '@lace/web/components/providers/ProjectProvider';
+import type { SessionInfo, ThreadId } from '@lace/web/types/core';
 
 // Mock the hooks
-vi.mock('@/hooks/useSessionManagement', () => ({
+vi.mock('@lace/web/hooks/useSessionManagement', () => ({
   useSessionManagement: vi.fn(),
 }));
 
 // ProjectProvider now uses selectedSessionId prop instead of hash router
 
-import { useSessionManagement } from '@/hooks/useSessionManagement';
+import { useSessionManagement } from '@lace/web/hooks/useSessionManagement';
 
 const mockUseSessionManagement = vi.mocked(useSessionManagement);
 

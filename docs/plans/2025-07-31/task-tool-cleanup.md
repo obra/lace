@@ -592,9 +592,9 @@ creates maintenance burden and potential drift between definitions.
 
 ```typescript
 // Add to packages/web/lib/core-types-import.ts
-export type { Task, TaskNote, TaskStatus, TaskPriority } from '~/tasks/types';
-export type { ThreadId, AssigneeId } from '~/threads/types';
-export type { ToolResult } from '~/tools/types';
+export type { Task, TaskNote, TaskStatus, TaskPriority } from '@lace/core/tasks/types';
+export type { ThreadId, AssigneeId } from '@lace/core/threads/types';
+export type { ToolResult } from '@lace/core/tools/types';
 ```
 
 3. **Update api.ts to re-export instead of duplicate:**
@@ -606,8 +606,8 @@ export type {
   TaskNote,
   TaskStatus,
   TaskPriority,
-} from '@/lib/core-types-import';
-export type { ThreadId, AssigneeId } from '@/lib/core-types-import';
+} from '@lace/web/lib/core-types-import';
+export type { ThreadId, AssigneeId } from '@lace/web/lib/core-types-import';
 ```
 
 4. **Update all component imports systematically**

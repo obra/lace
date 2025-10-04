@@ -2,7 +2,7 @@
 // ABOUTME: Verifies visible_to_model column is added and works correctly
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DatabasePersistence } from '~/persistence/database';
+import { DatabasePersistence } from './database';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';

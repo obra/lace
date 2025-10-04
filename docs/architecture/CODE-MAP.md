@@ -191,14 +191,14 @@ packages/web/
 
 ```typescript
 // Internal imports use ~/
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { getPersistence } from '~/persistence/database';
-import type { LaceEvent, ThreadId } from '~/threads/types';
+import { Agent } from '@lace/core/agents/agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { getPersistence } from '@lace/core/persistence/database';
+import type { LaceEvent, ThreadId } from '@lace/core/threads/types';
 
 // Web package uses @/
-import { Component } from '@/components/component';
-import { useHook } from '@/hooks/hook';
+import { Component } from '@lace/web/components/component';
+import { useHook } from '@lace/web/hooks/hook';
 ```
 
 ## 🏃 Navigation Tips

@@ -17,7 +17,7 @@ found" errors and flaky tests.
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 
 describe('My Test Suite', () => {
   let providerInstanceId: string;
@@ -57,7 +57,7 @@ describe('My Test Suite', () => {
 import {
   setupTestProviderInstances,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 
 describe('My Test Suite', () => {
   let testProviderInstances: {
@@ -125,15 +125,15 @@ For core Lace tests, use the unified setup that handles both temp LACE_DIR and
 persistence automatically:
 
 ```typescript
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 
 describe('Core Integration Test', () => {
   const _tempLaceDir = setupCoreTest(); // Handles temp LACE_DIR + persistence automatically
@@ -166,15 +166,15 @@ describe('Core Integration Test', () => {
 For web package tests, use the web-specific setup:
 
 ```typescript
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 
 describe('Web Integration Test', () => {
   const _tempLaceDir = setupWebTest(); // Handles temp LACE_DIR + persistence automatically
@@ -513,7 +513,7 @@ TypeScript `@typescript-eslint/no-unsafe-call` errors.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { ComponentName } from '@/path/to/ComponentName';
+import { ComponentName } from '@lace/web/path/to/ComponentName';
 
 describe('ComponentName', () => {
   // Your tests here

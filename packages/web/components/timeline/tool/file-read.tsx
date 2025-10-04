@@ -5,11 +5,11 @@
 
 import React from 'react';
 import { faFileCode } from '@fortawesome/free-solid-svg-icons';
-import FileRenderer from '@/components/ui/FileRenderer';
-import FileModalButton from '@/components/ui/FileModalButton';
-import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
-import type { ToolAggregatedEventData } from '@/types/web-events';
-import { Alert } from '@/components/ui/Alert';
+import FileRenderer from '@lace/web/components/ui/FileRenderer';
+import FileModalButton from '@lace/web/components/ui/FileModalButton';
+import type { ToolRenderer, ToolResult } from '@lace/web/components/timeline/tool/types';
+import type { ToolAggregatedEventData } from '@lace/web/types/web-events';
+import { Alert } from '@lace/web/components/ui/Alert';
 
 /**
  * File read-specific tool renderer providing content-centric formatting

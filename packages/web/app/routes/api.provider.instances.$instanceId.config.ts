@@ -2,10 +2,10 @@
 // ABOUTME: Saves filtering settings like disabled models, required capabilities, etc.
 
 import type { Route } from './+types/api.provider.instances.$instanceId.config';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import { ProviderRegistry, ModelConfigSchema } from '@/lib/server/lace-imports';
-import { logger } from '~/utils/logger';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { ProviderRegistry, ModelConfigSchema } from '@lace/web/lib/server/lace-imports';
+import { logger } from '@lace/core/utils/logger';
 
 export async function action({ params, request }: Route.ActionArgs) {
   try {

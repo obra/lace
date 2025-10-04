@@ -2,10 +2,10 @@
 // ABOUTME: Ensures assignment triggers spawning consistently across create and update operations
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { TaskManager } from '~/tasks/task-manager';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { asThreadId, createNewAgentSpec } from '~/threads/types';
-import { getPersistence, type DatabasePersistence } from '~/persistence/database';
+import { TaskManager } from './task-manager';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { asThreadId, createNewAgentSpec } from '@lace/core/threads/types';
+import { getPersistence, type DatabasePersistence } from '@lace/core/persistence/database';
 
 describe('Agent Spawning on Assignment', () => {
   const _tempLaceDir = setupCoreTest();

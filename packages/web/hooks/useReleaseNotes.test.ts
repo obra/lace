@@ -10,7 +10,7 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
 
 // Mock parseResponse
-vi.mock('@/lib/serialization', () => ({
+vi.mock('@lace/web/lib/serialization', () => ({
   parseResponse: vi.fn(),
 }));
 

@@ -6,13 +6,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 
 // Mock the API client
-vi.mock('@/lib/api-client', () => ({
+vi.mock('@lace/web/lib/api-client', () => ({
   api: {
     get: vi.fn(),
   },
 }));
 
-import { api as apiClient } from '@/lib/api-client';
+import { api as apiClient } from '@lace/web/lib/api-client';
 const mockApi = vi.mocked(apiClient);
 
 describe('ProviderInstanceProvider Mounted Ref Regression', () => {

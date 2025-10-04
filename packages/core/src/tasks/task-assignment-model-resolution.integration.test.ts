@@ -4,14 +4,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
-import { TaskManager } from '~/tasks/task-manager';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { UserSettingsManager } from '~/config/user-settings';
-import { createNewAgentSpec } from '~/threads/types';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { TaskManager } from './task-manager';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import { UserSettingsManager } from '@lace/core/config/user-settings';
+import { createNewAgentSpec } from '@lace/core/threads/types';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
-vi.mock('~/config/user-settings');
+vi.mock('@lace/core/config/user-settings');
 
 describe('Task Assignment Model Resolution Integration', () => {
   const context = setupCoreTest();

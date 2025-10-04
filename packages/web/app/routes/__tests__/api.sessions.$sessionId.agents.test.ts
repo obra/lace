@@ -6,32 +6,32 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
-import { parseResponse } from '@/lib/serialization';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
+} from '@lace/web/lib/server/lace-imports';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 // Mock only external dependencies, not core functionality
-vi.mock('@/lib/server/approval-manager', () => ({
+vi.mock('@lace/web/lib/server/approval-manager', () => ({
   getApprovalManager: () => ({
     requestApproval: vi.fn().mockResolvedValue('allow_once'),
   }),
 }));
 
 // Import the real API route handlers after mocks
-import { action as POST, loader as GET } from '@/app/routes/api.sessions.$sessionId.agents';
-import { getSessionService, SessionService } from '@/lib/server/session-service';
-import { Project, Session } from '@/lib/server/lace-imports';
-import type { ThreadId, AgentInfo } from '@/types/core';
-import type { AgentWithTokenUsage } from '@/types/api';
+import { action as POST, loader as GET } from '@lace/web/app/routes/api.sessions.$sessionId.agents';
+import { getSessionService, SessionService } from '@lace/web/lib/server/session-service';
+import { Project, Session } from '@lace/web/lib/server/lace-imports';
+import type { ThreadId, AgentInfo } from '@lace/web/types/core';
+import type { AgentWithTokenUsage } from '@lace/web/types/api';
 
 // Helper to escape special regex characters to prevent injection
 function escapeRegExp(string: string): string {

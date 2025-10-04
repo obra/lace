@@ -1,10 +1,10 @@
 // ABOUTME: Persona catalog API endpoint
 // ABOUTME: Returns available personas from PersonaRegistry for agent creation
 
-import { personaRegistry } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import type { PersonaInfo } from '@/lib/server/lace-imports';
+import { personaRegistry } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import type { PersonaInfo } from '@lace/web/lib/server/lace-imports';
 import type { Route } from './+types/api.persona.catalog';
 
 export interface PersonaCatalogResponse {

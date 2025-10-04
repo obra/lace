@@ -2,8 +2,8 @@
 // ABOUTME: Provides complete mock with all required methods and proper ThreadId handling
 
 import { vi } from 'vitest';
-import { ThreadManager } from '~/threads/thread-manager';
-import { asThreadId } from '~/threads/types';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { asThreadId } from '@lace/core/threads/types';
 
 export function createMockThreadManager(threadId?: string) {
   const testThreadId = threadId ? asThreadId(threadId) : asThreadId('lace_20250723_abc123');

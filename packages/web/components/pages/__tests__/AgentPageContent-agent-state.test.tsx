@@ -9,11 +9,11 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { AgentPageContent } from '@/components/pages/AgentPageContent';
-import { asThreadId } from '@/types/core';
+import { AgentPageContent } from '@lace/web/components/pages/AgentPageContent';
+import { asThreadId } from '@lace/web/types/core';
 
 // Mock the providers
-vi.mock('@/components/providers/UIProvider', () => ({
+vi.mock('@lace/web/components/providers/UIProvider', () => ({
   useUIContext: () => ({
     sidebarOpen: true,
     setSidebarOpen: vi.fn(),
@@ -25,14 +25,14 @@ vi.mock('@/components/providers/UIProvider', () => ({
   }),
 }));
 
-vi.mock('@/components/providers/ProjectsProvider', () => ({
+vi.mock('@lace/web/components/providers/ProjectsProvider', () => ({
   useProjectsContext: () => ({
     currentProject: { id: 'test-project', name: 'Test Project' },
     projects: [],
   }),
 }));
 
-vi.mock('@/components/providers/ProjectProvider', () => ({
+vi.mock('@lace/web/components/providers/ProjectProvider', () => ({
   useProjectContext: () => ({
     currentSession: {
       id: 'lace_20250101_sess01',
@@ -44,7 +44,7 @@ vi.mock('@/components/providers/ProjectProvider', () => ({
   }),
 }));
 
-vi.mock('@/components/providers/EventStreamProvider', () => ({
+vi.mock('@lace/web/components/providers/EventStreamProvider', () => ({
   useEventStreamContext: () => ({
     agentEvents: {
       events: [],
@@ -60,7 +60,7 @@ vi.mock('@/components/providers/EventStreamProvider', () => ({
   }),
 }));
 
-vi.mock('@/components/providers/SessionProvider', () => ({
+vi.mock('@lace/web/components/providers/SessionProvider', () => ({
   useSessionContext: () => ({
     currentAgent: {
       id: asThreadId('lace_20250101_agent1'),
@@ -71,7 +71,7 @@ vi.mock('@/components/providers/SessionProvider', () => ({
   }),
 }));
 
-vi.mock('@/components/providers/ToolApprovalProvider', () => ({
+vi.mock('@lace/web/components/providers/ToolApprovalProvider', () => ({
   useToolApprovalContext: () => ({
     pendingApprovals: [{ id: 'test-approval', toolName: 'bash', args: {} }], // Add mock pending approval
     handleApprovalDecision: vi.fn(),
@@ -80,7 +80,7 @@ vi.mock('@/components/providers/ToolApprovalProvider', () => ({
 
 // Mock useURLState to provide navigation
 const mockNavigateToAgent = vi.fn();
-vi.mock('@/hooks/useURLState', () => ({
+vi.mock('@lace/web/hooks/useURLState', () => ({
   useURLState: () => ({
     navigateToAgent: mockNavigateToAgent,
     navigateToSession: vi.fn(),
@@ -88,7 +88,7 @@ vi.mock('@/hooks/useURLState', () => ({
   }),
 }));
 
-vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
+vi.mock('@lace/web/components/providers/ProviderInstanceProvider', () => ({
   useProviderInstances: () => ({
     availableProviders: [],
     instances: [],
@@ -125,37 +125,37 @@ vi.mock('motion/react', () => ({
 }));
 
 // Mock complex child components
-vi.mock('@/components/layout/Sidebar', () => ({
+vi.mock('@lace/web/components/layout/Sidebar', () => ({
   Sidebar: ({ children }: { children?: React.ReactNode }) => (
     <div data-testid="sidebar-mock">{children}</div>
   ),
 }));
 
-vi.mock('@/components/layout/MobileSidebar', () => ({
+vi.mock('@lace/web/components/layout/MobileSidebar', () => ({
   MobileSidebar: ({ children }: { children?: React.ReactNode }) => (
     <div data-testid="mobile-sidebar">{children}</div>
   ),
 }));
 
-vi.mock('@/components/chat/Chat', () => ({
+vi.mock('@lace/web/components/chat/Chat', () => ({
   Chat: () => <div data-testid="chat">Chat Component</div>,
 }));
 
-vi.mock('@/components/sidebar/SidebarContent', () => ({
+vi.mock('@lace/web/components/sidebar/SidebarContent', () => ({
   SidebarContent: () => <div data-testid="sidebar-content">Sidebar Content</div>,
 }));
 
-vi.mock('@/components/modals/ToolApprovalModal', () => ({
+vi.mock('@lace/web/components/modals/ToolApprovalModal', () => ({
   ToolApprovalModal: () => <div data-testid="tool-approval-modal">Tool Approval Modal</div>,
 }));
 
 // SettingsContainer removed - settings are now separate routes
 
-vi.mock('@/components/config/AgentEditModal', () => ({
+vi.mock('@lace/web/components/config/AgentEditModal', () => ({
   AgentEditModal: () => <div data-testid="agent-edit-modal">Agent Edit Modal</div>,
 }));
 
-vi.mock('@/components/config/SessionEditModal', () => ({
+vi.mock('@lace/web/components/config/SessionEditModal', () => ({
   SessionEditModal: () => <div data-testid="session-edit-modal">Session Edit Modal</div>,
 }));
 

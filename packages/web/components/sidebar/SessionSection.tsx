@@ -5,18 +5,18 @@
 
 import React, { memo, useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faComments, faCog } from '@/lib/fontawesome';
-import { SidebarSection } from '@/components/layout/Sidebar';
-import { SwitchIcon } from '@/components/ui/SwitchIcon';
+import { faComments, faCog } from '@lace/web/lib/fontawesome';
+import { SidebarSection } from '@lace/web/components/layout/Sidebar';
+import { SwitchIcon } from '@lace/web/components/ui/SwitchIcon';
 import {
   PermissionModeSelector,
   PermissionModeBadge,
-} from '@/components/ui/PermissionModeSelector';
-import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useURLState } from '@/hooks/useURLState';
-import { api } from '@/lib/api-client';
-import type { PermissionOverrideMode } from '~/tools/types';
+} from '@lace/web/components/ui/PermissionModeSelector';
+import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
+import { useURLState } from '@lace/web/hooks/useURLState';
+import { api } from '@lace/web/lib/api-client';
+import type { PermissionOverrideMode } from '@lace/core/tools/types';
 
 interface SessionSectionProps {
   isMobile?: boolean;

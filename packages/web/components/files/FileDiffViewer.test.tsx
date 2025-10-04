@@ -15,7 +15,7 @@ import {
 import type { FileDiff } from './FileDiffViewer';
 
 // Mock FontAwesome icons
-vi.mock('@/lib/fontawesome', () => ({
+vi.mock('@lace/web/lib/fontawesome', () => ({
   faEye: {},
   faColumns: {},
   faList: {},

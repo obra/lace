@@ -12,7 +12,7 @@ import {
   getLaceDbPath,
   getProcessTempDir,
   clearProcessTempDirCache,
-} from '~/config/lace-dir';
+} from './lace-dir';
 
 describe('Lace Directory Management', () => {
   let tempDir: string;

@@ -9,7 +9,7 @@ and generate insights.
 
 ```typescript
 // packages/core/src/memory/conversation-analyzer.ts
-import { InfrastructureHelper } from '~/helpers';
+import { InfrastructureHelper } from '@lace/core/helpers';
 
 export class ConversationAnalyzer {
   async analyzeUserPatterns(
@@ -48,8 +48,8 @@ Agents use session helpers for specialized sub-tasks during conversations.
 
 ```typescript
 // packages/core/src/agents/enhanced-agent.ts
-import { Agent } from '~/agents/agent';
-import { SessionHelper } from '~/helpers';
+import { Agent } from '@lace/core/agents/agent';
+import { SessionHelper } from '@lace/core/helpers';
 
 export class WebAwareAgent extends Agent {
   /**
@@ -100,8 +100,8 @@ analysis.
 
 ```typescript
 // packages/core/src/tasks/smart-task-creator.ts
-import { InfrastructureHelper } from '~/helpers';
-import { TaskManager } from '~/tasks/task-manager';
+import { InfrastructureHelper } from '@lace/core/helpers';
+import { TaskManager } from '@lace/core/tasks/task-manager';
 
 export class SmartTaskCreator {
   constructor(private taskManager: TaskManager) {}
@@ -154,7 +154,7 @@ diagnosis.
 
 ```typescript
 // packages/core/src/diagnostics/error-analyzer.ts
-import { InfrastructureHelper } from '~/helpers';
+import { InfrastructureHelper } from '@lace/core/helpers';
 
 export class SystemDiagnostics {
   async analyzeSystemHealth(logDirectory: string): Promise<HealthReport> {
@@ -434,7 +434,7 @@ Example of how to test systems that use helpers.
 // packages/core/src/memory/__tests__/conversation-analyzer.test.ts
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ConversationAnalyzer } from '../conversation-analyzer';
-import { InfrastructureHelper } from '~/helpers';
+import { InfrastructureHelper } from '@lace/core/helpers';
 
 // Don't mock the helper - test real behavior with controlled inputs
 describe('ConversationAnalyzer Integration', () => {

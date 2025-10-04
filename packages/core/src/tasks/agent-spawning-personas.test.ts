@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
-import { TaskManager, type AgentCreationCallback } from '~/tasks/task-manager';
-import { DatabasePersistence } from '~/persistence/database';
-import { createNewAgentSpec, asNewAgentSpec, asThreadId } from '~/threads/types';
-import { TaskContext } from '~/tasks/types';
-import { parseProviderModel } from '~/providers/provider-utils';
+import { TaskManager, type AgentCreationCallback } from './task-manager';
+import { DatabasePersistence } from '@lace/core/persistence/database';
+import { createNewAgentSpec, asNewAgentSpec, asThreadId } from '@lace/core/threads/types';
+import { TaskContext } from './types';
+import { parseProviderModel } from '@lace/core/providers/provider-utils';
 
 describe('Task Agent Spawning with Personas', () => {
   let taskManager: TaskManager;

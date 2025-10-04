@@ -2,8 +2,8 @@
 // ABOUTME: Verifies events are marked as not visible during compaction
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ThreadManager } from '~/threads/thread-manager';
-import type { LaceEvent } from '~/threads/types';
+import { ThreadManager } from './thread-manager';
+import type { LaceEvent } from './types';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { MCPServerConfig } from './types';
-import type { ToolPolicy } from '~/tools/types';
+import type { ToolPolicy } from '@lace/core/tools/types';
 
 describe('MCP Types', () => {
   it('should define valid approval levels', () => {

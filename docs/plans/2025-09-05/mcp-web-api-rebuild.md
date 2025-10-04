@@ -189,9 +189,9 @@ export class MCPConfigLoader {
 **Import updates:**
 
 ```typescript
-import { MCPConfigLoader } from '~/config/mcp-config-loader';
-import type { MCPServerConfig } from '~/config/mcp-types';
-import { ThreadManager } from '~/threads/thread-manager';
+import { MCPConfigLoader } from '@lace/core/config/mcp-config-loader';
+import type { MCPServerConfig } from '@lace/core/config/mcp-types';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
 ```
 
 **Methods to add:**
@@ -303,12 +303,12 @@ class Session {
 
 ```typescript
 // OLD
-import { MCPConfigLoader } from '~/mcp/config-loader';
-import type { MCPConfig } from '~/mcp/types';
+import { MCPConfigLoader } from '@lace/core/mcp/config-loader';
+import type { MCPConfig } from '@lace/core/mcp/types';
 
 // NEW
-import { MCPConfigLoader } from '~/config/mcp-config-loader';
-import type { MCPConfig } from '~/config/mcp-types';
+import { MCPConfigLoader } from '@lace/core/config/mcp-config-loader';
+import type { MCPConfig } from '@lace/core/config/mcp-types';
 ```
 
 **Testing:**
@@ -358,8 +358,8 @@ with proper ToolExecutor lifecycle management.
 **Import additions:**
 
 ```typescript
-import { MCPServerManager } from '~/mcp/server-manager';
-import type { MCPServerConnection } from '~/mcp/types';
+import { MCPServerManager } from '@lace/core/mcp/server-manager';
+import type { MCPServerConnection } from '@lace/core/mcp/types';
 ```
 
 **Add to Session class:**
@@ -636,7 +636,7 @@ class ToolExecutor {
 ```typescript
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session } from './session';
-import { Project } from '~/projects/project';
+import { Project } from '@lace/core/projects/project';
 
 // Mock dependencies
 vi.mock('~/mcp/server-manager');
@@ -723,13 +723,13 @@ describe('Session MCP Integration', () => {
 **Files to Update:**
 
 - `src/mcp/server-manager.ts` →
-  `import type { MCPServerConfig } from '~/config/mcp-types'`
+  `import type { MCPServerConfig } from '@lace/core/config/mcp-types'`
 - `src/mcp/tool-registry.ts` →
-  `import type { MCPConfig } from '~/config/mcp-types'`
+  `import type { MCPConfig } from '@lace/core/config/mcp-types'`
 - `src/mcp/tool-adapter.ts` →
-  `import type { MCPTool } from '~/config/mcp-types'`
+  `import type { MCPTool } from '@lace/core/config/mcp-types'`
 - `src/tools/executor.ts` →
-  `import { MCPConfigLoader } from '~/config/mcp-config-loader'`
+  `import { MCPConfigLoader } from '@lace/core/config/mcp-config-loader'`
 
 **Testing:**
 
@@ -764,9 +764,9 @@ design.
 // ABOUTME: Global MCP server list API for discovering available servers
 // ABOUTME: Provides read-only list of global MCP server configurations
 
-import { MCPConfigLoader } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { MCPConfigLoader } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import type { Route } from './+types/api.mcp.servers';
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -832,9 +832,9 @@ describe('Global MCP Server List API', () => {
 // ABOUTME: Individual global MCP server management API with CRUD operations
 // ABOUTME: Handles GET, PUT, DELETE for specific global MCP servers
 
-import { MCPConfigLoader } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { MCPConfigLoader } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
 import type { Route } from './+types/api.mcp.servers.$serverId';
 
@@ -1038,9 +1038,9 @@ Lace's established project API patterns.
 // ABOUTME: Project-scoped MCP server list API following Lace project hierarchy patterns
 // ABOUTME: Provides project MCP server configurations with inheritance from global config
 
-import { Project } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.mcp.servers';
 
@@ -1097,9 +1097,9 @@ export async function loader({ params }: Route.LoaderArgs) {
 // ABOUTME: Individual project MCP server management following established project API patterns
 // ABOUTME: Handles CRUD operations for project-specific MCP server configurations
 
-import { Project } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.mcp.servers.$serverId';
 
@@ -1301,10 +1301,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 // ABOUTME: Session MCP server list with runtime status from session's MCPServerManager
 // ABOUTME: Shows which servers are actually running in this session context
 
-import { Project, getSessionService } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import { isValidThreadId } from '@/lib/validation/thread-id-validation';
+import { Project, getSessionService } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { isValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.sessions.$sessionId.mcp.servers';
 
@@ -1392,10 +1392,10 @@ export async function loader({ params }: Route.LoaderArgs) {
 // ABOUTME: Session MCP server control API for runtime server management
 // ABOUTME: Handles start/stop/restart operations on session's running MCP servers
 
-import { Project, getSessionService } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import { isValidThreadId } from '@/lib/validation/thread-id-validation';
+import { Project, getSessionService } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { isValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.sessions.$sessionId.mcp.servers.$serverId.control';
 
@@ -1867,9 +1867,9 @@ rm -rf packages/web/lib/mcp/
 
 ```typescript
 // REMOVE these imports:
-// import { MCPToolRegistry } from '~/mcp/tool-registry';
-// import { MCPServerManager } from '~/mcp/server-manager';
-// import { MCPConfigLoader } from '~/config/mcp-config-loader';
+// import { MCPToolRegistry } from '@lace/core/mcp/tool-registry';
+// import { MCPServerManager } from '@lace/core/mcp/server-manager';
+// import { MCPConfigLoader } from '@lace/core/config/mcp-config-loader';
 
 // REMOVE these fields:
 // private mcpRegistry?: MCPToolRegistry;
@@ -1918,8 +1918,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { Project } from '~/projects/project';
-import { Session } from '~/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import { Session } from '@lace/core/sessions/session';
 
 describe('Complete MCP Integration System Test', () => {
   let tempDir: string;
@@ -2148,7 +2148,7 @@ handling, validation, and response formats.
 // ABOUTME: Tests global, project, and session MCP APIs with real data flow
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createTestProject, createTestSession } from '@/test-utils';
+import { createTestProject, createTestSession } from '@lace/web/test-utils';
 
 describe('MCP API Contract Tests', () => {
   let project: Project;

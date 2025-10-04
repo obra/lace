@@ -1,17 +1,17 @@
 // ABOUTME: Session helper for agent-spawned LLM operations during conversations
 // ABOUTME: Inherits tool policies and approval workflow from parent session
 
-import { BaseHelper } from '~/helpers/base-helper';
-import { UserSettingsManager } from '~/config/user-settings';
-import { ProviderRegistry } from '~/providers/registry';
-import { parseProviderModel } from '~/providers/provider-utils';
-import { ToolExecutor } from '~/tools/executor';
-import { Tool } from '~/tools/tool';
-import { ToolCall, ToolResult, ToolContext, createErrorResult } from '~/tools/types';
-import type { AIProvider } from '~/providers/base-provider';
+import { BaseHelper } from './base-helper';
+import { UserSettingsManager } from '@lace/core/config/user-settings';
+import { ProviderRegistry } from '@lace/core/providers/registry';
+import { parseProviderModel } from '@lace/core/providers/provider-utils';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolCall, ToolResult, ToolContext, createErrorResult } from '@lace/core/tools/types';
+import type { AIProvider } from '@lace/core/providers/base-provider';
 
-import { Agent } from '~/agents/agent';
-import { logger } from '~/utils/logger';
+import { Agent } from '@lace/core/agents/agent';
+import { logger } from '@lace/core/utils/logger';
 
 export interface SessionHelperOptions {
   /** Model tier to use - 'fast' or 'smart' */

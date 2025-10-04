@@ -9,31 +9,31 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { ProjectSection } from '@/components/sidebar/ProjectSection';
-import type { ProjectInfo } from '@/types/core';
-import { createMockProjectsContext } from '@/__tests__/utils/provider-mocks';
+import { ProjectSection } from '@lace/web/components/sidebar/ProjectSection';
+import type { ProjectInfo } from '@lace/web/types/core';
+import { createMockProjectsContext } from '@lace/web/__tests__/utils/provider-mocks';
 
 // Mock the providers
-vi.mock('@/components/providers/ProjectsProvider', () => ({
+vi.mock('@lace/web/components/providers/ProjectsProvider', () => ({
   useProjectsContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/ProviderInstanceProvider', () => ({
+vi.mock('@lace/web/components/providers/ProviderInstanceProvider', () => ({
   useProviderInstances: vi.fn(),
 }));
 
-vi.mock('@/hooks/useURLState', () => ({
+vi.mock('@lace/web/hooks/useURLState', () => ({
   useURLState: vi.fn(),
 }));
 
-vi.mock('@/components/config/ProjectEditModal', () => ({
+vi.mock('@lace/web/components/config/ProjectEditModal', () => ({
   ProjectEditModal: ({ isOpen }: { isOpen: boolean }) =>
     isOpen ? <div data-testid="project-edit-modal">Project Edit Modal</div> : null,
 }));
 
 // Import mocked hooks
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
+import { useProviderInstances } from '@lace/web/components/providers/ProviderInstanceProvider';
 
 const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseProviderInstances = vi.mocked(useProviderInstances);

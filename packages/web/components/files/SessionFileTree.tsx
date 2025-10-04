@@ -12,10 +12,10 @@ import {
   faChevronRight,
   faChevronDown,
   faSpinner,
-} from '@/lib/fontawesome';
-import { api } from '@/lib/api-client';
-import { formatFileSize } from '@/lib/format-file-size';
-import type { SessionDirectoryResponse, SessionFileEntry } from '@/types/session-files';
+} from '@lace/web/lib/fontawesome';
+import { api } from '@lace/web/lib/api-client';
+import { formatFileSize } from '@lace/web/lib/format-file-size';
+import type { SessionDirectoryResponse, SessionFileEntry } from '@lace/web/types/session-files';
 
 interface FileTreeNode extends SessionFileEntry {
   children?: FileTreeNode[];

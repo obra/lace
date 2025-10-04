@@ -83,9 +83,9 @@ Different compaction approaches implemented as pluggable strategies:
 // ABOUTME: Core interfaces for the compaction event system
 // ABOUTME: Defines strategy pattern and event types for conversation compaction
 
-import type { ThreadEvent } from '~/threads/types';
-import type { AIProvider } from '~/providers/base-provider';
-import type { ToolExecutor } from '~/tools/tool-executor';
+import type { ThreadEvent } from '@lace/core/threads/types';
+import type { AIProvider } from '@lace/core/providers/base-provider';
+import type { ToolExecutor } from '@lace/core/tools/tool-executor';
 
 export interface CompactionData {
   strategyId: string;
@@ -172,8 +172,8 @@ npm run build
 // ABOUTME: Builds working conversations from thread events, handling compaction
 // ABOUTME: Core logic for reconstructing conversations post-compaction
 
-import type { ThreadEvent } from '~/threads/types';
-import type { CompactionData } from '~/threads/compaction/types';
+import type { ThreadEvent } from '@lace/core/threads/types';
+import type { CompactionData } from '@lace/core/threads/compaction/types';
 
 export function buildWorkingConversation(events: ThreadEvent[]): ThreadEvent[] {
   const lastCompaction = findLastCompactionEvent(events);
@@ -504,7 +504,7 @@ npm run build
 // ABOUTME: Compaction strategy that truncates tool results to save token space
 // ABOUTME: Preserves conversation flow while reducing tool output size
 
-import type { ThreadEvent } from '~/threads/types';
+import type { ThreadEvent } from '@lace/core/threads/types';
 import type { CompactionStrategy, CompactionContext } from './types';
 
 export class TrimToolResultsStrategy implements CompactionStrategy {
@@ -631,7 +631,7 @@ npm run build
 ```typescript
 import { describe, it, expect } from 'vitest';
 import { TrimToolResultsStrategy } from './trim-tool-results-strategy';
-import type { ThreadEvent } from '~/threads/types';
+import type { ThreadEvent } from '@lace/core/threads/types';
 import type { CompactionContext } from './types';
 
 describe('TrimToolResultsStrategy', () => {
@@ -1075,8 +1075,8 @@ npm run test:unit
 // ABOUTME: CLI command for manually triggering conversation compaction
 // ABOUTME: Useful for testing and manual conversation maintenance
 
-import { ThreadManager } from '~/threads/thread-manager';
-import { logger } from '~/utils/logger';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { logger } from '@lace/core/utils/logger';
 
 export interface CompactOptions {
   threadId: string;

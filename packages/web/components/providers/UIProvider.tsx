@@ -4,8 +4,8 @@
 'use client';
 
 import React, { createContext, useContext, type ReactNode } from 'react';
-import { useUIState } from '@/hooks/useUIState';
-import type { UseUIStateResult } from '@/hooks/useUIState';
+import { useUIState } from '@lace/web/hooks/useUIState';
+import type { UseUIStateResult } from '@lace/web/hooks/useUIState';
 
 interface UIProviderProps {
   children: ReactNode;

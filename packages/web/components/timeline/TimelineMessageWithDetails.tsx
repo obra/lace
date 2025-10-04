@@ -4,10 +4,10 @@
 'use client';
 
 import React from 'react';
-import type { ProcessedEvent } from '@/hooks/useProcessedEvents';
-import type { AgentInfo } from '@/types/core';
+import type { ProcessedEvent } from '@lace/web/hooks/useProcessedEvents';
+import type { AgentInfo } from '@lace/web/types/core';
 import { TimelineMessage } from './TimelineMessage';
-import { TechnicalDetailsToggle } from '@/components/ui/TechnicalDetailsToggle';
+import { TechnicalDetailsToggle } from '@lace/web/components/ui/TechnicalDetailsToggle';
 
 interface TimelineMessageWithDetailsProps {
   event: ProcessedEvent;

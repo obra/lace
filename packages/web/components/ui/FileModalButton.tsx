@@ -8,7 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExpand, faCopy, faCheck, faCompress } from '@fortawesome/free-solid-svg-icons';
 import { AnimatedModal } from './AnimatedModal';
 import CodeBlock from './CodeBlock';
-import type { ToolResult } from '@/components/timeline/tool/types';
+import type { ToolResult } from '@lace/web/components/timeline/tool/types';
 
 interface FileModalButtonProps {
   content: string;

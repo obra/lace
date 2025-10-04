@@ -11,24 +11,24 @@ import {
   TaskUpdateTool,
   TaskAddNoteTool,
   TaskViewTool,
-} from '~/tools/implementations/task-manager/tools';
-import { DelegateTool } from '~/tools/implementations/delegate';
-import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
+} from './tools';
+import { DelegateTool } from '@lace/core/tools/implementations/delegate';
+import { setupCoreTest, cleanupSession } from '@lace/core/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
-import { ApprovalDecision } from '~/tools/types';
-import { createNewAgentSpec } from '~/threads/types';
+} from '@lace/core/test-utils/provider-defaults';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from '@lace/core/providers/base-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ApprovalDecision } from '@lace/core/tools/types';
+import { createNewAgentSpec } from '@lace/core/threads/types';
 
 // Mock provider for testing
 class MockProvider extends BaseMockProvider {
@@ -149,7 +149,7 @@ describe('Task Management Workflow Integration', () => {
     // For now, we're using direct agent mocking for provider creation
 
     // Import Agent dynamically to avoid circular imports in test setup
-    const { Agent } = await import('~/agents/agent');
+    const { Agent } = await import('@lace/core/agents/agent');
     // TODO(ts): Private method mock for test seam (no public hook available)
     // @ts-expect-error – mocking private method for test
     vi.spyOn(Agent.prototype, '_createProviderInstance').mockResolvedValue(mockProvider);

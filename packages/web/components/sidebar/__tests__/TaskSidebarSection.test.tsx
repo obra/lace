@@ -9,16 +9,16 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { TaskSidebarSection } from '@/components/sidebar/TaskSidebarSection';
-import { TaskProvider } from '@/components/providers/TaskProvider';
-import type { SessionInfo, ThreadId, Task, AgentInfo } from '@/types/core';
-import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
-import { asAssigneeId } from '@/types/core';
+import { TaskSidebarSection } from '@lace/web/components/sidebar/TaskSidebarSection';
+import { TaskProvider } from '@lace/web/components/providers/TaskProvider';
+import type { SessionInfo, ThreadId, Task, AgentInfo } from '@lace/web/types/core';
+import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
+import { asAssigneeId } from '@lace/web/types/core';
 import {
   createMockProjectContext,
   createMockSessionContext,
   createMockProjectsContext,
-} from '@/__tests__/utils/provider-mocks';
+} from '@lace/web/__tests__/utils/provider-mocks';
 
 // Mock TaskProvider context to control behavior
 const mockTaskContext = vi.hoisted(() => ({
@@ -33,23 +33,23 @@ const mockTaskContext = vi.hoisted(() => ({
   handleTaskAddNote: vi.fn(),
 }));
 
-vi.mock('@/components/providers/TaskProvider', () => ({
+vi.mock('@lace/web/components/providers/TaskProvider', () => ({
   TaskProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   useTaskContext: () => mockTaskContext,
   useOptionalTaskContext: () => mockTaskContext,
 }));
 
-vi.mock('@/components/providers/ProjectsProvider', () => ({
+vi.mock('@lace/web/components/providers/ProjectsProvider', () => ({
   useProjectsContext: vi.fn(),
   useOptionalProjectsContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/ProjectProvider', () => ({
+vi.mock('@lace/web/components/providers/ProjectProvider', () => ({
   useProjectContext: vi.fn(),
   useOptionalProjectContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/SessionProvider', () => ({
+vi.mock('@lace/web/components/providers/SessionProvider', () => ({
   useOptionalSessionContext: vi.fn(),
 }));
 
@@ -57,12 +57,12 @@ vi.mock('@/components/providers/SessionProvider', () => ({
 import {
   useProjectsContext,
   useOptionalProjectsContext,
-} from '@/components/providers/ProjectsProvider';
+} from '@lace/web/components/providers/ProjectsProvider';
 import {
   useProjectContext,
   useOptionalProjectContext,
-} from '@/components/providers/ProjectProvider';
-import { useOptionalSessionContext } from '@/components/providers/SessionProvider';
+} from '@lace/web/components/providers/ProjectProvider';
+import { useOptionalSessionContext } from '@lace/web/components/providers/SessionProvider';
 
 const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseOptionalProjectsContext = vi.mocked(useOptionalProjectsContext);
@@ -77,7 +77,7 @@ const setProjectsContexts = (value: ReturnType<typeof createMockProjectsContext>
 };
 
 // Mock child components
-vi.mock('@/components/layout/Sidebar', () => ({
+vi.mock('@lace/web/components/layout/Sidebar', () => ({
   SidebarSection: ({
     title,
     children,
@@ -94,7 +94,7 @@ vi.mock('@/components/layout/Sidebar', () => ({
   ),
 }));
 
-vi.mock('@/components/tasks/TaskListSidebar', () => ({
+vi.mock('@lace/web/components/tasks/TaskListSidebar', () => ({
   TaskListSidebar: ({
     taskManager,
     onOpenTaskBoard,
@@ -124,7 +124,7 @@ vi.mock('@fortawesome/react-fontawesome', () => ({
   ),
 }));
 
-vi.mock('@/lib/fontawesome', () => ({
+vi.mock('@lace/web/lib/fontawesome', () => ({
   faPlus: { iconName: 'plus' },
   faTasks: { iconName: 'tasks' },
 }));

@@ -2,8 +2,8 @@
 // ABOUTME: Verifies retry logic works correctly with OpenAI SDK
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { OpenAIProvider } from '~/providers/openai-provider';
-import { ProviderMessage } from '~/providers/base-provider';
+import { OpenAIProvider } from './openai-provider';
+import { ProviderMessage } from './base-provider';
 
 // Test helper to capture retry behavior
 interface RetryCapture {

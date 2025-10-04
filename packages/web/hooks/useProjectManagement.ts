@@ -2,8 +2,8 @@
 // ABOUTME: Handles project fetching, caching, and CRUD operations - no selection state
 
 import { useState, useEffect, useCallback } from 'react';
-import type { ProjectInfo } from '@/types/core';
-import { api } from '@/lib/api-client';
+import type { ProjectInfo } from '@lace/web/types/core';
+import { api } from '@lace/web/lib/api-client';
 
 interface UseProjectManagementResult {
   projects: ProjectInfo[];

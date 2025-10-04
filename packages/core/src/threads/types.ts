@@ -1,12 +1,12 @@
 // ABOUTME: Type definitions for thread events and thread management
 // ABOUTME: Events include user messages, agent messages, tool calls, and tool results
 
-import type { ToolCall, ToolResult } from '~/tools/types';
-import type { CompactionData } from '~/threads/compaction/types';
-import type { ApprovalDecision } from '~/tools/types';
-import type { CombinedTokenUsage } from '~/token-management/types';
-import type { Task, TaskContext } from '~/tasks/types';
-import type { MCPServerConfig } from '~/config/mcp-types';
+import type { ToolCall, ToolResult } from '@lace/core/tools/types';
+import type { CompactionData } from '@lace/core/threads/compaction/types';
+import type { ApprovalDecision } from '@lace/core/tools/types';
+import type { CombinedTokenUsage } from '@lace/core/token-management/types';
+import type { Task, TaskContext } from '@lace/core/tasks/types';
+import type { MCPServerConfig } from '@lace/core/config/mcp-types';
 
 // Single source of truth for all event types
 export const EVENT_TYPES = [

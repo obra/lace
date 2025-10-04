@@ -2,8 +2,8 @@
 // ABOUTME: Uses Project class methods for session management with proper validation
 
 import type { Route } from './+types/api.projects.$projectId.sessions.$sessionId';
-import { Project } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { z } from 'zod';
 
 const UpdateSessionSchema = z.object({

@@ -2,10 +2,10 @@
 // ABOUTME: Verifies that both auto and manual compaction trigger proper SSE events
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { getSessionService } from '@/lib/server/session-service';
-import { EventStreamManager } from '@/lib/event-stream-manager';
-import type { Agent, Session } from '@/lib/server/lace-imports';
-import { createMockAgent, createMockSession } from '@/test-utils/mock-agent';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
+import type { Agent, Session } from '@lace/web/lib/server/lace-imports';
+import { createMockAgent, createMockSession } from '@lace/web/test-utils/mock-agent';
 
 describe('Compaction SSE Events', () => {
   let sseManager: EventStreamManager;

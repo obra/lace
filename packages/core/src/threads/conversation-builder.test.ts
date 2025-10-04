@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildWorkingConversation, buildCompleteHistory } from '~/threads/conversation-builder';
-import type { LaceEvent } from '~/threads/types';
+import { buildWorkingConversation, buildCompleteHistory } from './conversation-builder';
+import type { LaceEvent } from './types';
 
 describe('conversation-builder', () => {
   const mockEvents: LaceEvent[] = [

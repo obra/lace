@@ -5,7 +5,7 @@
 
 import { useParams, useNavigate } from 'react-router';
 import { useCallback } from 'react';
-import type { ThreadId } from '@/types/core';
+import type { ThreadId } from '@lace/web/types/core';
 
 export interface URLState {
   project: string | null;

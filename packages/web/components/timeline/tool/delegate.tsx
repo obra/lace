@@ -16,8 +16,8 @@ import {
   faStopwatch,
   faCode,
 } from '@fortawesome/free-solid-svg-icons';
-import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
-import { Alert } from '@/components/ui/Alert';
+import type { ToolRenderer, ToolResult } from '@lace/web/components/timeline/tool/types';
+import { Alert } from '@lace/web/components/ui/Alert';
 
 /**
  * Status badge component for delegation status display

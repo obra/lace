@@ -1,17 +1,17 @@
 // ABOUTME: Context analyzer that breaks down token usage by category
 // ABOUTME: Analyzes thread events and agent state to calculate context breakdown
 
-import type { ThreadId } from '~/threads/types';
-import type { Agent } from '~/agents/agent';
+import type { ThreadId } from '@lace/core/threads/types';
+import type { Agent } from '@lace/core/agents/agent';
 import type {
   ContextBreakdown,
   CategoryDetail,
   ItemDetail,
   MessageCategoryDetail,
-} from '~/token-management/context-breakdown-types';
-import { estimateTokens } from '~/utils/token-estimation';
-import { MCPToolAdapter } from '~/mcp/tool-adapter';
-import { logger } from '~/utils/logger';
+} from './context-breakdown-types';
+import { estimateTokens } from '@lace/core/utils/token-estimation';
+import { MCPToolAdapter } from '@lace/core/mcp/tool-adapter';
+import { logger } from '@lace/core/utils/logger';
 
 export class ContextAnalyzer {
   /**

@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
-import { buttonTap, springConfig, focusRing } from '@/lib/animations';
+import { buttonTap, springConfig, focusRing } from '@lace/web/lib/animations';
 
 interface AnimatedButtonProps {
   children: React.ReactNode;

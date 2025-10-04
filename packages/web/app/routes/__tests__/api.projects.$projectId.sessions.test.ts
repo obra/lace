@@ -2,18 +2,24 @@
 // ABOUTME: Tests CRUD operations with real Project and Session classes, not mocks
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { loader as GET, action as POST } from '@/app/routes/api.projects.$projectId.sessions';
-import { parseResponse } from '@/lib/serialization';
-import type { SessionInfo } from '@/types/core';
-import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  loader as GET,
+  action as POST,
+} from '@lace/web/app/routes/api.projects.$projectId.sessions';
+import { parseResponse } from '@lace/web/lib/serialization';
+import type { SessionInfo } from '@lace/web/types/core';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '@lace/web/lib/server/lace-imports';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
-import { Session } from '@/lib/server/lace-imports';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
-import { EventStreamManager } from '@/lib/event-stream-manager';
+} from '@lace/web/lib/server/lace-imports';
+import { Session } from '@lace/web/lib/server/lace-imports';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
@@ -37,7 +43,7 @@ describe('Session API endpoints under projects', () => {
     });
 
     // Create a test project
-    const { Project } = await import('~/projects/project');
+    const { Project } = await import('@lace/core/projects/project');
     const testDir = join(context.tempProjectDir, 'sessions-test');
     await fs.mkdir(testDir, { recursive: true });
 

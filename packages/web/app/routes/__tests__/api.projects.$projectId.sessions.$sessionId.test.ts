@@ -5,14 +5,14 @@ import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vites
 import {
   loader as GET,
   action as PATCH,
-} from '@/app/routes/api.projects.$projectId.sessions.$sessionId';
+} from '@lace/web/app/routes/api.projects.$projectId.sessions.$sessionId';
 const DELETE = PATCH; // Both PATCH and DELETE use the same action function
-import { Project } from '@/lib/server/lace-imports';
-import { parseResponse } from '@/lib/serialization';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 
 // Mock Project
-vi.mock('@/lib/server/lace-imports', () => ({
+vi.mock('@lace/web/lib/server/lace-imports', () => ({
   Project: {
     getById: vi.fn(),
   },

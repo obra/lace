@@ -2,13 +2,13 @@
 // ABOUTME: Provides task creation, querying, updates, and note management capabilities
 
 import { z } from 'zod';
-import { Tool } from '~/tools/tool';
-import { NonEmptyString } from '~/tools/schemas/common';
-import type { ToolResult, ToolContext } from '~/tools/types';
-import { Task } from '~/tasks/types';
-import { isAssigneeId, AssigneeId } from '~/threads/types';
-import { logger } from '~/utils/logger';
-import { TaskStatusSchema } from '~/tasks/task-status';
+import { Tool } from '@lace/core/tools/tool';
+import { NonEmptyString } from '@lace/core/tools/schemas/common';
+import type { ToolResult, ToolContext } from '@lace/core/tools/types';
+import { Task } from '@lace/core/tasks/types';
+import { isAssigneeId, AssigneeId } from '@lace/core/threads/types';
+import { logger } from '@lace/core/utils/logger';
+import { TaskStatusSchema } from '@lace/core/tasks/task-status';
 
 // Simple schema that always takes an array of tasks
 const createTaskSchema = z
@@ -86,7 +86,7 @@ Bulk planning: task_create({ tasks: [
   // Get TaskManager from session context
   private async getTaskManagerFromContext(
     context?: ToolContext
-  ): Promise<import('~/tasks/task-manager').TaskManager | null> {
+  ): Promise<import('@lace/core/tasks/task-manager').TaskManager | null> {
     const session = await context?.agent?.getFullSession();
     return session?.getTaskManager() || null;
   }
@@ -206,7 +206,7 @@ Example: task_list({ filter: "mine", includeCompleted: false })`;
   // Get TaskManager from session context
   private async getTaskManagerFromContext(
     context?: ToolContext
-  ): Promise<import('~/tasks/task-manager').TaskManager | null> {
+  ): Promise<import('@lace/core/tasks/task-manager').TaskManager | null> {
     const session = await context?.agent?.getFullSession();
     return session?.getTaskManager() || null;
   }
@@ -314,7 +314,7 @@ Example: task_complete({ id: "task_123", message: "Fixed authentication bug in a
   // Get TaskManager from session context
   private async getTaskManagerFromContext(
     context?: ToolContext
-  ): Promise<import('~/tasks/task-manager').TaskManager | null> {
+  ): Promise<import('@lace/core/tasks/task-manager').TaskManager | null> {
     const session = await context?.agent?.getFullSession();
     return session?.getTaskManager() || null;
   }
@@ -417,7 +417,7 @@ Other examples:
   // Get TaskManager from session context
   private async getTaskManagerFromContext(
     context?: ToolContext
-  ): Promise<import('~/tasks/task-manager').TaskManager | null> {
+  ): Promise<import('@lace/core/tasks/task-manager').TaskManager | null> {
     const session = await context?.agent?.getFullSession();
     return session?.getTaskManager() || null;
   }
@@ -522,7 +522,7 @@ Notes become part of permanent task history - write for future readers.`;
   // Get TaskManager from session context
   private async getTaskManagerFromContext(
     context?: ToolContext
-  ): Promise<import('~/tasks/task-manager').TaskManager | null> {
+  ): Promise<import('@lace/core/tasks/task-manager').TaskManager | null> {
     const session = await context?.agent?.getFullSession();
     return session?.getTaskManager() || null;
   }
@@ -593,7 +593,7 @@ Example: task_view({ taskId: "task_123" })`;
   // Get TaskManager from session context
   private async getTaskManagerFromContext(
     context?: ToolContext
-  ): Promise<import('~/tasks/task-manager').TaskManager | null> {
+  ): Promise<import('@lace/core/tasks/task-manager').TaskManager | null> {
     const session = await context?.agent?.getFullSession();
     return session?.getTaskManager() || null;
   }

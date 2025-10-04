@@ -79,8 +79,8 @@ npm run lint        # Check code style
 // ABOUTME: Provides server status info and handles server creation with validation
 
 import { MCPConfigLoader, MCPServerManager } from '@lace/core/mcp';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
 import type { Route } from './+types/api.mcp.servers';
 
@@ -597,8 +597,8 @@ tools)
 // ABOUTME: Handles server configuration updates and deletion with proper validation
 
 import { MCPConfigLoader, MCPServerManager } from '@lace/core/mcp';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
 import type { Route } from './+types/api.mcp.servers.$serverId';
 
@@ -742,8 +742,8 @@ export async function action({ request, params }: Route.ActionArgs) {
 // ABOUTME: Handles server lifecycle management with proper error handling and status updates
 
 import { MCPConfigLoader, MCPServerManager } from '@lace/core/mcp';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
 import type { Route } from './+types/api.mcp.servers.$serverId.control';
 
@@ -847,8 +847,8 @@ export async function action({ request, params }: Route.ActionArgs) {
 // ABOUTME: Handles granular tool permission management with validation
 
 import { MCPConfigLoader } from '@lace/core/mcp';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import { z } from 'zod';
 import type { Route } from './+types/api.mcp.servers.$serverId.tools.$toolId.policy';
 
@@ -1032,10 +1032,10 @@ npm run test app/routes/__tests__/api.mcp.servers.$serverId.control.test.ts
 // ABOUTME: Provides overview of all MCP servers with status and quick actions
 
 import { json, useLoaderData, useFetcher } from '@remix-run/react';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
 import { MCPConfigLoader } from '@lace/core/mcp';
-import { ServerList } from '@/components/mcp/ServerList';
-import { AddServerModal } from '@/components/mcp/AddServerModal';
+import { ServerList } from '@lace/web/components/mcp/ServerList';
+import { AddServerModal } from '@lace/web/components/mcp/AddServerModal';
 import { useState } from 'react';
 import type { Route } from './+types/settings.mcp';
 
@@ -1731,8 +1731,8 @@ describe('PolicySelector', () => {
 // ABOUTME: Provides server health monitoring and status change notifications
 
 import { MCPServerManager } from '@lace/core/mcp';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 import type { Route } from './+types/api.mcp.servers.$serverId.status';
 
 let globalServerManager: MCPServerManager | undefined;
@@ -2049,7 +2049,7 @@ export function createServerFromTemplate(
 
 import { useState } from 'react';
 import { useFetcher } from '@remix-run/react';
-import { SERVER_TEMPLATES, createServerFromTemplate } from '@/lib/mcp/server-templates';
+import { SERVER_TEMPLATES, createServerFromTemplate } from '@lace/web/lib/mcp/server-templates';
 import { PolicySelector } from './PolicySelector';
 
 interface TemplateModalProps {

@@ -3,8 +3,8 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExclamationTriangle, faRedo, faTimes, faInfo } from '@/lib/fontawesome';
-import type { ErrorType } from '@/types/core';
+import { faExclamationTriangle, faRedo, faTimes, faInfo } from '@lace/web/lib/fontawesome';
+import type { ErrorType } from '@lace/web/types/core';
 
 interface ErrorToastProps {
   errorType: ErrorType;

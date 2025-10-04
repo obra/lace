@@ -2,10 +2,10 @@
 // ABOUTME: Validates that retry components work together correctly
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Agent } from '@lace/core/agents/agent';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 describe('Retry System Integration Tests', () => {
   const _tempLaceDir = setupCoreTest();

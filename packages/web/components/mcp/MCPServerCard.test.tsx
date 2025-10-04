@@ -5,7 +5,7 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MCPServerCard } from './MCPServerCard';
-import type { MCPServerConfig } from '@/types/core';
+import type { MCPServerConfig } from '@lace/web/types/core';
 
 // Mock FontAwesome icons
 vi.mock('@fortawesome/react-fontawesome', () => ({

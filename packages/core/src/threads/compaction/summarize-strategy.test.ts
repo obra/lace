@@ -2,18 +2,14 @@
 // ABOUTME: Validates summarization logic and event replacement behavior
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SummarizeCompactionStrategy } from '~/threads/compaction/summarize-strategy';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { ToolExecutor } from '~/tools/executor';
-import type { LaceEvent } from '~/threads/types';
-import type {
-  CompactionContext,
-  CompactionData,
-  CompactionResult,
-} from '~/threads/compaction/types';
+import { SummarizeCompactionStrategy } from './summarize-strategy';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
+import { Agent } from '@lace/core/agents/agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import type { LaceEvent } from '@lace/core/threads/types';
+import type { CompactionContext, CompactionData, CompactionResult } from './types';
 
 // Helper to cast result data to CompactionData
 function getCompactionData(result: CompactionResult): CompactionData {

@@ -7,23 +7,26 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 // Use standard Request instead of NextRequest
-import { loader as sseStream } from '@/app/routes/api.events.stream';
-import { action as createProjectSession } from '@/app/routes/api.projects.$projectId.sessions';
-import { action as spawnAgent } from '@/app/routes/api.sessions.$sessionId.agents';
-import { action as sendMessage } from '@/app/routes/api.threads.$threadId.message';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
-import { getSessionService } from '@/lib/server/session-service';
-import { Project } from '@/lib/server/lace-imports';
-import type { SessionInfo } from '@/types/core';
-import { parseResponse } from '@/lib/serialization';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { loader as sseStream } from '@lace/web/app/routes/api.events.stream';
+import { action as createProjectSession } from '@lace/web/app/routes/api.projects.$projectId.sessions';
+import { action as spawnAgent } from '@lace/web/app/routes/api.sessions.$sessionId.agents';
+import { action as sendMessage } from '@lace/web/app/routes/api.threads.$threadId.message';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import type { SessionInfo } from '@lace/web/types/core';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '@lace/web/lib/server/lace-imports';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
+} from '@lace/web/lib/server/lace-imports';
 
 describe('SSE Stream E2E Tests', () => {
   const context = setupWebTest();

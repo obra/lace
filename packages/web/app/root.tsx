@@ -2,14 +2,14 @@
 // ABOUTME: Sets up global providers, styles, and outlet for route rendering
 
 import { Outlet, Scripts, Links, Meta } from 'react-router';
-import '@/app/globals.css';
-import '@/app/fonts';
-import { ErrorBoundary } from '@/components/old/ErrorBoundary';
-import { SettingsProvider } from '@/components/providers/SettingsProvider';
-import { ProviderInstanceProvider } from '@/components/providers/ProviderInstanceProvider';
-import { ReleaseNotesProvider } from '@/components/providers/ReleaseNotesProvider';
-import { ConsoleForwardScript } from '@/lib/console-forward/script';
-import { DebugPanel } from '@/components/debug/DebugPanel';
+import '@lace/web/app/globals.css';
+import '@lace/web/app/fonts';
+import { ErrorBoundary } from '@lace/web/components/old/ErrorBoundary';
+import { SettingsProvider } from '@lace/web/components/providers/SettingsProvider';
+import { ProviderInstanceProvider } from '@lace/web/components/providers/ProviderInstanceProvider';
+import { ReleaseNotesProvider } from '@lace/web/components/providers/ReleaseNotesProvider';
+import { ConsoleForwardScript } from '@lace/web/lib/console-forward/script';
+import { DebugPanel } from '@lace/web/components/debug/DebugPanel';
 
 export default function Root() {
   return (

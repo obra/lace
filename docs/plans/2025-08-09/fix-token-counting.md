@@ -146,7 +146,7 @@ recalculate tokens correctly.
 ```typescript
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TokenBudgetManager } from './token-budget-manager';
-import type { ThreadEvent } from '~/threads/types';
+import type { ThreadEvent } from '@lace/core/threads/types';
 
 describe('TokenBudgetManager compaction handling', () => {
   let manager: TokenBudgetManager;
@@ -256,8 +256,8 @@ The test should fail because `handleCompaction` doesn't exist yet.
 Add these to the imports at the top:
 
 ```typescript
-import type { CompactionData } from '~/threads/compaction/types';
-import type { ThreadEvent } from '~/threads/types';
+import type { CompactionData } from '@lace/core/threads/compaction/types';
+import type { ThreadEvent } from '@lace/core/threads/types';
 ```
 
 Add this method to the TokenBudgetManager class:
@@ -331,11 +331,11 @@ tracking only the summary tokens plus any new events after compaction."
 // ABOUTME: Ensures token counts are properly reset after compaction
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { MockProvider } from '~/test-utils/mock-provider';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { ToolExecutor } from '~/tools/tool-executor';
+import { Agent } from '@lace/core/agents/agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { MockProvider } from '@lace/core/test-utils/mock-provider';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { ToolExecutor } from '@lace/core/tools/tool-executor';
 
 describe('Agent compaction token management', () => {
   setupCoreTest();
@@ -482,11 +482,11 @@ TokenBudgetManager.
 // ABOUTME: Ensures agents properly expose their token usage information
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { MockProvider } from '~/test-utils/mock-provider';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { ToolExecutor } from '~/tools/tool-executor';
+import { Agent } from '@lace/core/agents/agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { MockProvider } from '@lace/core/test-utils/mock-provider';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { ToolExecutor } from '@lace/core/tools/tool-executor';
 
 describe('Agent getTokenUsage API', () => {
   setupCoreTest();
@@ -729,7 +729,7 @@ Remove the import:
 
 ```typescript
 // DELETE THIS LINE:
-import { aggregateTokenUsage } from '~/threads/token-aggregation';
+import { aggregateTokenUsage } from '@lace/core/threads/token-aggregation';
 ```
 
 Replace the token calculation section:

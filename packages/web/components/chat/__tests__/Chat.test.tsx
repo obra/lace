@@ -10,12 +10,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import '@testing-library/jest-dom/vitest';
-import { Chat } from '@/components/chat/Chat';
-import { ScrollProvider } from '@/components/providers/ScrollProvider';
-import { SettingsProvider } from '@/components/providers/SettingsProvider';
-import type { ThreadId, AgentInfo, LaceEvent } from '@/types/core';
-import { createMockSessionContext } from '@/__tests__/utils/provider-mocks';
-import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
+import { Chat } from '@lace/web/components/chat/Chat';
+import { ScrollProvider } from '@lace/web/components/providers/ScrollProvider';
+import { SettingsProvider } from '@lace/web/components/providers/SettingsProvider';
+import type { ThreadId, AgentInfo, LaceEvent } from '@lace/web/types/core';
+import { createMockSessionContext } from '@lace/web/__tests__/utils/provider-mocks';
+import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
 
 // Use vi.hoisted to ensure mock functions are available during hoisting
 const mockTimelineView = vi.hoisted(() => {
@@ -74,27 +74,27 @@ const mockMemoizedChatInput = vi.hoisted(() => {
 });
 
 // Mock dependencies
-vi.mock('@/components/timeline/TimelineView', () => ({
+vi.mock('@lace/web/components/timeline/TimelineView', () => ({
   TimelineView: mockTimelineView,
 }));
 
-vi.mock('@/components/chat/MemoizedChatInput', () => ({
+vi.mock('@lace/web/components/chat/MemoizedChatInput', () => ({
   MemoizedChatInput: mockMemoizedChatInput,
 }));
 
 // Mock providers
-vi.mock('@/components/providers/EventStreamProvider', () => ({
+vi.mock('@lace/web/components/providers/EventStreamProvider', () => ({
   useSessionEvents: vi.fn(),
   useAgentAPI: vi.fn(),
   useEventStreamContext: vi.fn(),
   useCompactionState: vi.fn(),
 }));
 
-vi.mock('@/components/providers/SessionProvider', () => ({
+vi.mock('@lace/web/components/providers/SessionProvider', () => ({
   useSessionContext: vi.fn(),
 }));
 
-vi.mock('@/lib/api-client', () => ({
+vi.mock('@lace/web/lib/api-client', () => ({
   api: {
     get: vi.fn(),
     patch: vi.fn(),
@@ -107,9 +107,9 @@ import {
   useAgentAPI,
   useEventStreamContext,
   useCompactionState,
-} from '@/components/providers/EventStreamProvider';
-import { useSessionContext } from '@/components/providers/SessionProvider';
-import { api } from '@/lib/api-client';
+} from '@lace/web/components/providers/EventStreamProvider';
+import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
+import { api } from '@lace/web/lib/api-client';
 
 const mockUseSessionEvents = vi.mocked(useSessionEvents);
 const mockUseAgentAPI = vi.mocked(useAgentAPI);

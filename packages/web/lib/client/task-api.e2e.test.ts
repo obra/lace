@@ -6,34 +6,37 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { TaskAPIClient } from '@/lib/client/task-api';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { TaskAPIClient } from '@lace/web/lib/client/task-api';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '@lace/web/lib/server/lace-imports';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
-import { getSessionService } from '@/lib/server/session-service';
-import { Project, Session } from '@/lib/server/lace-imports';
+} from '@lace/web/lib/server/lace-imports';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { Project, Session } from '@lace/web/lib/server/lace-imports';
 
 // Import API routes to test against
 import {
   loader as listTasks,
   action as createTask,
-} from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks';
+} from '@lace/web/app/routes/api.projects.$projectId.sessions.$sessionId.tasks';
 import {
   loader as getTask,
   action as updateTask,
   action as deleteTask,
-} from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId';
-import { action as addNote } from '@/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.notes';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
+} from '@lace/web/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId';
+import { action as addNote } from '@lace/web/app/routes/api.projects.$projectId.sessions.$sessionId.tasks.$taskId.notes';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 
 // Mock external dependencies only
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/server/approval-manager', () => ({
+vi.mock('@lace/web/lib/server/approval-manager', () => ({
   getApprovalManager: () => ({
     requestApproval: vi.fn().mockResolvedValue('allow_once'),
   }),

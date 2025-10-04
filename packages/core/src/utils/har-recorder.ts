@@ -3,7 +3,7 @@
 
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
-import { logger } from '~/utils/logger';
+import { logger } from './logger';
 
 interface HAREntry {
   startedDateTime: string;

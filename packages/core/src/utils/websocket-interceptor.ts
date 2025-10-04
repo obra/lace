@@ -1,8 +1,8 @@
 // ABOUTME: WebSocket interceptor for HAR recording
 // ABOUTME: Captures WebSocket connections and messages for LMStudio provider debugging
 
-import { getHARRecorder } from '~/utils/har-recorder';
-import { logger } from '~/utils/logger';
+import { getHARRecorder } from './har-recorder';
+import { logger } from './logger';
 
 interface WebSocketTracker {
   url: string;

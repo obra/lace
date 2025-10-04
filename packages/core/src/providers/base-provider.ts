@@ -2,9 +2,9 @@
 // ABOUTME: Defines the common interface and provides base functionality for providers
 
 import { EventEmitter } from 'events';
-import { ToolResult, ToolCall } from '~/tools/types';
-import { Tool } from '~/tools/tool';
-import type { CatalogProvider } from '~/providers/catalog/types';
+import { ToolResult, ToolCall } from '@lace/core/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import type { CatalogProvider } from '@lace/core/providers/catalog/types';
 
 export interface ProviderConfig {
   maxTokens?: number;

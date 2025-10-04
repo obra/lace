@@ -1,13 +1,17 @@
 // ABOUTME: Dynamic provider for OpenRouter that fetches fresh model data
 // ABOUTME: Combines API client, caching, and filtering into a complete catalog provider
 
-import { OpenRouterClient } from '~/providers/openrouter/client';
-import { CatalogCacheManager } from '~/providers/openrouter/cache-manager';
-import { ModelFilterService } from '~/providers/openrouter/filter-service';
-import type { ModelConfig, CatalogProvider, CatalogModel } from '~/providers/catalog/types';
-import type { OpenRouterModel } from '~/providers/openrouter/types';
-import { getLaceDir } from '~/config/lace-dir';
-import { convertPricing } from '~/providers/openrouter/utils';
+import { OpenRouterClient } from './client';
+import { CatalogCacheManager } from './cache-manager';
+import { ModelFilterService } from './filter-service';
+import type {
+  ModelConfig,
+  CatalogProvider,
+  CatalogModel,
+} from '@lace/core/providers/catalog/types';
+import type { OpenRouterModel } from './types';
+import { getLaceDir } from '@lace/core/config/lace-dir';
+import { convertPricing } from './utils';
 
 export class OpenRouterDynamicProvider {
   private client: OpenRouterClient;

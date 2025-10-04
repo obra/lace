@@ -5,13 +5,13 @@
 
 import React, { useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import type { LaceEvent, AgentInfo, ThreadId } from '@/types/core';
-import type { CompactionState } from '@/components/providers/EventStreamProvider';
-import { asThreadId, isThreadId } from '@/types/core';
+import type { LaceEvent, AgentInfo, ThreadId } from '@lace/web/types/core';
+import type { CompactionState } from '@lace/web/components/providers/EventStreamProvider';
+import { asThreadId, isThreadId } from '@lace/web/types/core';
 import { TimelineMessageWithDetails } from './TimelineMessageWithDetails';
 import { TypingIndicator } from './TypingIndicator';
 import { CompactionIndicator } from './CompactionIndicator';
-import { useProcessedEvents, type ProcessedEvent } from '@/hooks/useProcessedEvents';
+import { useProcessedEvents, type ProcessedEvent } from '@lace/web/hooks/useProcessedEvents';
 import TimelineEntryErrorBoundary from './TimelineEntryErrorBoundary';
 
 // Placeholder for when currentAgent is not available - use valid thread ID format

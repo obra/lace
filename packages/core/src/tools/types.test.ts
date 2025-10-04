@@ -3,14 +3,14 @@
 
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { Tool } from '~/tools/tool';
+import { Tool } from './tool';
 import {
   ToolResult,
   ToolAnnotations,
   createToolResult,
   createSuccessResult,
   createErrorResult,
-} from '~/tools/types';
+} from './types';
 
 // Test tool class for testing annotations and schema generation
 class TestTool extends Tool {
@@ -29,7 +29,7 @@ class TestTool extends Tool {
 
   protected async executeValidated(
     _args: z.infer<typeof this.schema>,
-    _context: import('~/tools/types').ToolContext
+    _context: import('@lace/core/tools/types').ToolContext
   ): Promise<ToolResult> {
     return await Promise.resolve({
       content: [{ type: 'text', text: 'test' }],
@@ -48,7 +48,7 @@ class SimpleTool extends Tool {
 
   protected async executeValidated(
     _args: z.infer<typeof this.schema>,
-    _context: import('~/tools/types').ToolContext
+    _context: import('@lace/core/tools/types').ToolContext
   ): Promise<ToolResult> {
     return await Promise.resolve({
       content: [{ type: 'text', text: 'simple' }],

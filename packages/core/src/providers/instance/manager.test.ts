@@ -5,8 +5,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { ProviderInstanceManager } from '~/providers/instance/manager';
-import type { ProviderInstancesConfig, Credential } from '~/providers/catalog/types';
+import { ProviderInstanceManager } from './manager';
+import type { ProviderInstancesConfig, Credential } from '@lace/core/providers/catalog/types';
 
 describe('ProviderInstanceManager', () => {
   let tempDir: string;

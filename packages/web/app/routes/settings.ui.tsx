@@ -1,9 +1,9 @@
 // ABOUTME: UI settings page route component
 // ABOUTME: Displays UI preferences and theme settings in full-page layout
 
-import { SettingsPageLayout } from '@/components/settings/SettingsPageLayout';
-import { UISettingsPanel } from '@/components/settings/panels/UISettingsPanel';
-import { useTheme } from '@/components/providers/SettingsProvider';
+import { SettingsPageLayout } from '@lace/web/components/settings/SettingsPageLayout';
+import { UISettingsPanel } from '@lace/web/components/settings/panels/UISettingsPanel';
+import { useTheme } from '@lace/web/components/providers/SettingsProvider';
 
 export default function UISettingsPage() {
   const { theme, setDaisyUITheme } = useTheme();

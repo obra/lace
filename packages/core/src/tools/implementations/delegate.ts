@@ -2,12 +2,12 @@
 // ABOUTME: Enables efficient token usage by delegating to cheaper models with enhanced parameter validation
 
 import { z } from 'zod';
-import { Tool } from '~/tools/tool';
-import { NonEmptyString } from '~/tools/schemas/common';
-import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
-import type { TaskManager } from '~/tasks/task-manager';
-import type { Task, TaskContext } from '~/tasks/types';
-import { logger } from '~/utils/logger';
+import { Tool } from '@lace/core/tools/tool';
+import { NonEmptyString } from '@lace/core/tools/schemas/common';
+import type { ToolResult, ToolContext, ToolAnnotations } from '@lace/core/tools/types';
+import type { TaskManager } from '@lace/core/tasks/task-manager';
+import type { Task, TaskContext } from '@lace/core/tasks/types';
+import { logger } from '@lace/core/utils/logger';
 
 // Schema for bulk delegation - matches task_create format
 const delegateSchema = z

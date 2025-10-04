@@ -7,10 +7,17 @@
     "rootDir": "./src",
     "baseUrl": ".",
     "paths": {
-      "~/*": ["src/*"]
+      "@lace/core/*": [
+        "src/*"
+      ]
     },
-    "typeRoots": ["./node_modules/@types", "../../node_modules/@types"],
-    "types": ["bun"],
+    "typeRoots": [
+      "./node_modules/@types",
+      "../../node_modules/@types"
+    ],
+    "types": [
+      "bun"
+    ],
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -21,6 +28,14 @@
     "sourceMap": true,
     "composite": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/*.spec.ts", "src/**/__tests__/**"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts",
+    "src/**/__tests__/**"
+  ]
 }

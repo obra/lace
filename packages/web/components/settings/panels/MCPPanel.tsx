@@ -4,10 +4,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AddMCPServerModal } from '@/components/modals/AddMCPServerModal';
-import { MCPServerCard } from '@/components/mcp/MCPServerCard';
-import { api } from '@/lib/api-client';
-import type { MCPServerConfig } from '@/types/core';
+import { AddMCPServerModal } from '@lace/web/components/modals/AddMCPServerModal';
+import { MCPServerCard } from '@lace/web/components/mcp/MCPServerCard';
+import { api } from '@lace/web/lib/api-client';
+import type { MCPServerConfig } from '@lace/web/types/core';
 
 interface GlobalMCPServersResponse {
   servers: Array<MCPServerConfig & { id: string }>;

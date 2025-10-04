@@ -5,15 +5,15 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus } from '@/lib/fontawesome';
-import { Modal } from '@/components/ui/Modal';
-import { AccentButton } from '@/components/ui/AccentButton';
-import { DirectoryField } from '@/components/ui';
-import { ModelSelector } from '@/components/ui/ModelSelector';
-import type { ToolPolicy } from '@/types/core';
-import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
-import { useSettings } from '@/components/providers/SettingsProvider';
-import { DIRECTORY_BROWSER, WIZARD_PROGRESS } from '@/lib/constants/ui';
+import { faPlus } from '@lace/web/lib/fontawesome';
+import { Modal } from '@lace/web/components/ui/Modal';
+import { AccentButton } from '@lace/web/components/ui/AccentButton';
+import { DirectoryField } from '@lace/web/components/ui';
+import { ModelSelector } from '@lace/web/components/ui/ModelSelector';
+import type { ToolPolicy } from '@lace/web/types/core';
+import { useProviderInstances } from '@lace/web/components/providers/ProviderInstanceProvider';
+import { useSettings } from '@lace/web/components/providers/SettingsProvider';
+import { DIRECTORY_BROWSER, WIZARD_PROGRESS } from '@lace/web/lib/constants/ui';
 
 interface ProjectConfiguration {
   providerInstanceId?: string;

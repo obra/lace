@@ -1,11 +1,11 @@
 // ABOUTME: Shared test setup for core Lace tests
 // ABOUTME: Provides unified setup that handles temp LACE_DIR and persistence automatically
 
-import { useTempLaceDir, type TempLaceDirContext } from '~/test-utils/temp-lace-dir';
-import { resetPersistence } from '~/persistence/database';
+import { useTempLaceDir, type TempLaceDirContext } from './temp-lace-dir';
+import { resetPersistence } from '@lace/core/persistence/database';
 import { beforeEach, afterEach } from 'vitest';
-import { Session } from '~/sessions/session';
-import { logger } from '~/utils/logger';
+import { Session } from '@lace/core/sessions/session';
+import { logger } from '@lace/core/utils/logger';
 
 export interface EnhancedTempLaceDirContext extends TempLaceDirContext {
   /** Register a cleanup function to be called in afterEach */
@@ -46,7 +46,7 @@ export function setupCoreTest(): EnhancedTempLaceDirContext {
     resetPersistence();
 
     // Clean up workspaces before resetting factory
-    const { WorkspaceManagerFactory } = await import('~/workspace/workspace-manager');
+    const { WorkspaceManagerFactory } = await import('@lace/core/workspace/workspace-manager');
     try {
       // Only clean up worktree mode (default) - it's fast and reliable
       // Container mode tests should handle their own cleanup

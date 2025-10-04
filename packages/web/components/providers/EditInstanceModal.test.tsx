@@ -7,25 +7,25 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { EditInstanceModal } from './EditInstanceModal';
 import { ProviderInstanceProvider } from './ProviderInstanceProvider';
-import { stringify } from '@/lib/serialization';
+import { stringify } from '@lace/web/lib/serialization';
 
 // Mock the serialization utility
-vi.mock('@/lib/serialization', () => ({
+vi.mock('@lace/web/lib/serialization', () => ({
   parseResponse: vi.fn(),
   stringify: vi.fn((data) => JSON.stringify(data)),
 }));
 
 // Mock UI components to focus on logic
-vi.mock('@/components/ui/Modal', () => ({
+vi.mock('@lace/web/components/ui/Modal', () => ({
   Modal: ({ children, isOpen }: { children: React.ReactNode; isOpen: boolean }) =>
     isOpen ? <div role="dialog">{children}</div> : null,
 }));
 
-vi.mock('@/components/ui/Badge', () => ({
+vi.mock('@lace/web/components/ui/Badge', () => ({
   default: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
 
-const mockParseResponse = vi.mocked((await import('@/lib/serialization')).parseResponse);
+const mockParseResponse = vi.mocked((await import('@lace/web/lib/serialization')).parseResponse);
 
 interface MockInstance {
   id: string;

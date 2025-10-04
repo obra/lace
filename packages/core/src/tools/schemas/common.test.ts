@@ -3,13 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { ZodError } from 'zod';
-import {
-  NonEmptyString,
-  FilePath,
-  LineNumber,
-  MaxResults,
-  FilePattern,
-} from '~/tools/schemas/common';
+import { NonEmptyString, FilePath, LineNumber, MaxResults, FilePattern } from './common';
 
 describe('Common schema patterns', () => {
   describe('NonEmptyString', () => {

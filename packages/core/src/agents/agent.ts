@@ -3,12 +3,12 @@
 
 import { EventEmitter } from 'events';
 import { resolve } from 'path';
-import { AIProvider, ProviderMessage } from '~/providers/base-provider';
-import { ToolCall, ToolResult } from '~/tools/types';
-import { Tool } from '~/tools/tool';
-import { ToolExecutor } from '~/tools/executor';
-import { ApprovalDecision, ToolPolicy } from '~/tools/types';
-import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
+import { AIProvider, ProviderMessage } from '@lace/core/providers/base-provider';
+import { ToolCall, ToolResult } from '@lace/core/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ApprovalDecision, ToolPolicy } from '@lace/core/tools/types';
+import { ThreadManager, ThreadSessionInfo } from '@lace/core/threads/thread-manager';
 import {
   LaceEvent,
   ToolApprovalResponseData,
@@ -16,22 +16,22 @@ import {
   asThreadId,
   isTransientEventType,
   type ErrorType,
-} from '~/threads/types';
-import { logger } from '~/utils/logger';
-import { StopReasonHandler } from '~/token-management/stop-reason-handler';
+} from '@lace/core/threads/types';
+import { logger } from '@lace/core/utils/logger';
+import { StopReasonHandler } from '@lace/core/token-management/stop-reason-handler';
 import type {
   ThreadTokenUsage,
   CombinedTokenUsage,
   TokenUsageMetrics,
-} from '~/token-management/types';
-import { loadPromptConfig } from '~/config/prompts';
-import type { PromptConfig } from '~/config/prompts';
-import { estimateTokens } from '~/utils/token-estimation';
-import { QueuedMessage, MessageQueueStats } from '~/agents/types';
-import { Project } from '~/projects/project';
-import { Session } from '~/sessions/session';
-import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
-import { ProviderRegistry } from '~/providers/registry';
+} from '@lace/core/token-management/types';
+import { loadPromptConfig } from '@lace/core/config/prompts';
+import type { PromptConfig } from '@lace/core/config/prompts';
+import { estimateTokens } from '@lace/core/utils/token-estimation';
+import { QueuedMessage, MessageQueueStats } from './types';
+import { Project } from '@lace/core/projects/project';
+import { Session } from '@lace/core/sessions/session';
+import { AgentConfiguration, ConfigurationValidator } from '@lace/core/sessions/session-config';
+import { ProviderRegistry } from '@lace/core/providers/registry';
 
 export interface AgentConfig {
   toolExecutor: ToolExecutor;

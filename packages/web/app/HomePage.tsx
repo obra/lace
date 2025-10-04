@@ -6,16 +6,16 @@
 import React, { useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBars } from '@/lib/fontawesome';
-import { ProjectSelectorPanel } from '@/components/config/ProjectSelectorPanel';
-import { FirstProjectHero } from '@/components/onboarding/FirstProjectHero';
-import { LoadingView } from '@/components/pages/views/LoadingView';
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useUIContext } from '@/components/providers/UIProvider';
-import { useOnboarding } from '@/hooks/useOnboarding';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { SidebarContent } from '@/components/sidebar/SidebarContent';
+import { faBars } from '@lace/web/lib/fontawesome';
+import { ProjectSelectorPanel } from '@lace/web/components/config/ProjectSelectorPanel';
+import { FirstProjectHero } from '@lace/web/components/onboarding/FirstProjectHero';
+import { LoadingView } from '@lace/web/components/pages/views/LoadingView';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
+import { useUIContext } from '@lace/web/components/providers/UIProvider';
+import { useOnboarding } from '@lace/web/hooks/useOnboarding';
+import { useProjectContext } from '@lace/web/components/providers/ProjectProvider';
+import { Sidebar } from '@lace/web/components/layout/Sidebar';
+import { SidebarContent } from '@lace/web/components/sidebar/SidebarContent';
 
 export function HomePage() {
   const { projects, loading: loadingProjects } = useProjectsContext();

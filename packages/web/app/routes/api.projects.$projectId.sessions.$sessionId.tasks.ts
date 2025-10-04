@@ -3,9 +3,9 @@
 
 import type { Route } from './+types/api.projects.$projectId.sessions.$sessionId.tasks';
 import { z } from 'zod';
-import { asThreadId } from '@/types/core';
-import { Project } from '@/lib/server/lace-imports';
-import { getSessionService } from '@/lib/server/session-service';
+import { asThreadId } from '@lace/web/types/core';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import { getSessionService } from '@lace/web/lib/server/session-service';
 import {
   ProjectIdSchema,
   SessionIdSchema,
@@ -14,9 +14,9 @@ import {
   validateRequestBody,
   createErrorResponse,
   createSuccessResponse,
-} from '@/lib/server/api-utils';
-import type { TaskFilters } from '@/types/core';
-import type { TaskStatus, TaskPriority } from '@/types/core';
+} from '@lace/web/lib/server/api-utils';
+import type { TaskFilters } from '@lace/web/types/core';
+import type { TaskStatus, TaskPriority } from '@lace/web/types/core';
 
 const RouteParamsSchema = z.object({
   projectId: ProjectIdSchema,

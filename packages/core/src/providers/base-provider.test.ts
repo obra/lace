@@ -2,9 +2,9 @@
 // ABOUTME: Tests error classification, backoff calculation, and retry logic
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from './base-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
 
 // Mock implementation for testing
 class TestProvider extends BaseMockProvider {

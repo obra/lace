@@ -2,7 +2,7 @@ import React from 'react';
 import { ReactNode, MouseEvent } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import { Badge, StatusDot } from '@/components/ui';
+import { Badge, StatusDot } from '@lace/web/components/ui';
 
 interface NavigationItemProps {
   icon?: IconDefinition;

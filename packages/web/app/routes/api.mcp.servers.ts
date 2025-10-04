@@ -1,12 +1,12 @@
 // ABOUTME: Global MCP server management API for listing and creating servers
 // ABOUTME: Provides CRUD operations for global MCP server configurations
 
-import { MCPConfigLoader, ToolCatalog } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import { logger } from '~/utils/logger';
+import { MCPConfigLoader, ToolCatalog } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { logger } from '@lace/core/utils/logger';
 import { z } from 'zod';
-import type { MCPServerConfig } from '@/types/core';
+import type { MCPServerConfig } from '@lace/web/types/core';
 
 const CreateServerSchema = z.object({
   id: z.string().min(1, 'Server ID is required'),

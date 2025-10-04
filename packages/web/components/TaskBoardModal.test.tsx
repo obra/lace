@@ -6,9 +6,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
-import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
-import type { Task } from '@/types/core';
-import { asThreadId, type ThreadId, type AssigneeId } from '@/types/core';
+import { TaskBoardModal } from '@lace/web/components/modals/TaskBoardModal';
+import type { Task } from '@lace/web/types/core';
+import { asThreadId, type ThreadId, type AssigneeId } from '@lace/web/types/core';
 
 const mockTasks: Task[] = [
   {

@@ -442,8 +442,8 @@ base class
 // ABOUTME: Handles schema conversion from MCP JSON Schema to Zod and tool execution
 
 import { z, ZodType } from 'zod';
-import { Tool } from '~/tools/tool';
-import type { ToolResult, ToolContext } from '~/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import type { ToolResult, ToolContext } from '@lace/core/tools/types';
 import type { MCPTool, JSONRPCRequest, JSONRPCResponse } from './types';
 
 /**
@@ -1119,7 +1119,7 @@ interface
 // ABOUTME: Provides unified interface to ToolExecutor for MCP tool registration and execution
 
 import { EventEmitter } from 'events';
-import { Tool } from '~/tools/tool';
+import { Tool } from '@lace/core/tools/tool';
 import { MCPToolAdapter } from './tool-adapter';
 import { MCPServerManager } from './server-manager';
 import type {
@@ -1618,9 +1618,9 @@ workflow
 
 ```typescript
 // Add to ToolExecutor constructor and imports
-import { MCPToolRegistry } from '~/mcp/tool-registry';
-import { MCPServerManager } from '~/mcp/server-manager';
-import { MCPConfigLoader } from '~/mcp/config-loader';
+import { MCPToolRegistry } from '@lace/core/mcp/tool-registry';
+import { MCPServerManager } from '@lace/core/mcp/server-manager';
+import { MCPConfigLoader } from '@lace/core/mcp/config-loader';
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
@@ -1721,8 +1721,8 @@ async executeTool(toolCall: ToolCall, context?: ToolContext): Promise<ToolResult
 ```typescript
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ToolExecutor } from './executor';
-import { MCPConfigLoader } from '~/mcp/config-loader';
-import { createTempDir, cleanup } from '~/test-utils/temp-dir';
+import { MCPConfigLoader } from '@lace/core/mcp/config-loader';
+import { createTempDir, cleanup } from '@lace/core/test-utils/temp-dir';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
@@ -2633,8 +2633,8 @@ import { join } from 'path';
 import { MCPConfigLoader } from './config-loader';
 import { MCPServerManager } from './server-manager';
 import { MCPToolRegistry } from './tool-registry';
-import { ToolExecutor } from '~/tools/executor';
-import { createTempDir } from '~/test-utils/temp-dir';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { createTempDir } from '@lace/core/test-utils/temp-dir';
 
 describe('MCP Integration E2E', () => {
   let tempDir: string;

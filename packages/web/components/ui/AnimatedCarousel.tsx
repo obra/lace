@@ -11,7 +11,7 @@ import {
   fadeInUp,
   staggerContainer,
   staggerItem,
-} from '@/lib/animations';
+} from '@lace/web/lib/animations';
 
 interface AnimatedCarouselProps {
   children: React.ReactNode[];

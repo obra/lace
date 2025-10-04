@@ -1,8 +1,8 @@
 // ABOUTME: API route handler for receiving browser console logs
 // ABOUTME: Outputs forwarded console messages to server terminal with proper formatting
 
-import { deserialize, stringify } from '@/lib/serialization';
-import type { ConsoleLogEntry } from '@/lib/console-forward';
+import { deserialize, stringify } from '@lace/web/lib/serialization';
+import type { ConsoleLogEntry } from '@lace/web/lib/console-forward';
 import type { Route } from './+types/api.debug.console';
 
 /**

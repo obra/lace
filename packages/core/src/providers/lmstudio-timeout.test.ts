@@ -2,7 +2,7 @@
 // ABOUTME: Ensures LMStudio provider doesn't hang indefinitely when server is unavailable
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { LMStudioProvider } from '~/providers/lmstudio-provider';
+import { LMStudioProvider } from './lmstudio-provider';
 
 // Console capture for verifying error output
 let consoleLogs: string[] = [];

@@ -2,19 +2,19 @@
 // ABOUTME: Verifies session creation, agent spawning, and session management
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { asThreadId } from '~/threads/types';
-import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
-import { getPersistence, SessionData } from '~/persistence/database';
+import { Session } from './session';
+import { Project } from '@lace/core/projects/project';
+import { asThreadId } from '@lace/core/threads/types';
+import { setupCoreTest, cleanupSession } from '@lace/core/test-utils/core-test-setup';
+import { getPersistence, SessionData } from '@lace/core/persistence/database';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 

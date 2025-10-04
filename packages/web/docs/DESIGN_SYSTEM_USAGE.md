@@ -22,16 +22,16 @@ The design system includes 72+ UI components organized into:
 
 ```typescript
 // Import individual components
-import { Avatar, Badge, CodeBlock } from '@/components/ui';
+import { Avatar, Badge, CodeBlock } from '@lace/web/components/ui';
 
 // Or import everything
-import * from '@/components';
+import * from '@lace/web/components';
 ```
 
 ### Example Usage
 
 ```typescript
-import { Badge, Avatar } from '@/components/ui';
+import { Badge, Avatar } from '@lace/web/components/ui';
 
 export function UserDisplay({ user }) {
   return (

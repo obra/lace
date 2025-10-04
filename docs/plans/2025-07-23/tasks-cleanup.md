@@ -226,9 +226,9 @@ npm test -- packages/web/app/api/projects
 // ABOUTME: Provides proper nested route structure for task CRUD operations
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Project } from '@/lib/server/lace-imports';
-import type { TaskFilters } from '@/lib/server/core-types';
-import type { Task, TaskStatus, TaskPriority } from '@/types/api';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import type { TaskFilters } from '@lace/web/lib/server/core-types';
+import type { Task, TaskStatus, TaskPriority } from '@lace/web/types/api';
 
 interface RouteContext {
   params: Promise<{

@@ -2,12 +2,12 @@
 // ABOUTME: Thin web layer over core approval system
 
 import { z } from 'zod';
-import { getSessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/types/core';
-import { ThreadIdSchema } from '@/lib/validation/schemas';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import { logger } from '~/utils/logger';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { asThreadId } from '@lace/web/types/core';
+import { ThreadIdSchema } from '@lace/web/lib/validation/schemas';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { logger } from '@lace/core/utils/logger';
 import type { Route } from './+types/api.threads.$threadId.approvals.pending';
 
 // Validation schema

@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // Mock must be hoisted - create a shared broadcast mock
 const mockBroadcast = vi.fn();
-vi.mock('@/lib/event-stream-manager', () => ({
+vi.mock('@lace/web/lib/event-stream-manager', () => ({
   EventStreamManager: {
     getInstance: () => ({
       broadcast: mockBroadcast,
@@ -13,7 +13,7 @@ vi.mock('@/lib/event-stream-manager', () => ({
   },
 }));
 
-vi.mock('~/utils/logger', () => ({
+vi.mock('@lace/core/utils/logger', () => ({
   logger: {
     error: vi.fn(),
     warn: vi.fn(),
@@ -23,10 +23,10 @@ vi.mock('~/utils/logger', () => ({
 }));
 
 import { SessionService } from './session-service';
-import { asThreadId } from '@/types/core';
-import { logger } from '~/utils/logger';
-import type { Agent, Session } from '@/lib/server/lace-imports';
-import { createMockAgent } from '@/test-utils/mock-agent';
+import { asThreadId } from '@lace/web/types/core';
+import { logger } from '@lace/core/utils/logger';
+import type { Agent, Session } from '@lace/web/lib/server/lace-imports';
+import { createMockAgent } from '@lace/web/test-utils/mock-agent';
 
 describe('SessionService abort error filtering', () => {
   let sessionService: SessionService;

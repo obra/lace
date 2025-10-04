@@ -2,17 +2,17 @@
 // ABOUTME: Validates subagent creation, execution, and tool approval flow
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { DelegateTool } from '~/tools/implementations/delegate';
-import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
-import type { ToolContext } from '~/tools/types';
+import { DelegateTool } from '@lace/core/tools/implementations/delegate';
+import { setupCoreTest, cleanupSession } from '@lace/core/test-utils/core-test-setup';
+import type { ToolContext } from './types';
 import {
   createDelegationTestSetup,
   DelegationTestSetup,
-} from '~/test-utils/delegation-test-helper';
+} from '@lace/core/test-utils/delegation-test-helper';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
 

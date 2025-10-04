@@ -8,7 +8,7 @@ import {
   navigateProjectWizardSteps,
   submitProjectCreation,
   createProject as createProjectHelper,
-} from '@/e2e/helpers/ui-interactions';
+} from '@lace/web/e2e/helpers/ui-interactions';
 
 export class ProjectSelector {
   private readonly page: Page;

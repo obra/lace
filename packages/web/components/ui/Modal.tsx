@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { DismissButton } from '@/components/ui/DismissButton';
+import { DismissButton } from '@lace/web/components/ui/DismissButton';
 
 interface ModalProps {
   isOpen: boolean;

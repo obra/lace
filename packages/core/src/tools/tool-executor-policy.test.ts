@@ -2,10 +2,10 @@
 // ABOUTME: Tests Agent tool policy enforcement with allow/ask/deny logic
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import type { ToolCall } from '~/tools/types';
+import { Agent } from '@lace/core/agents/agent';
+import { ToolExecutor } from './executor';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import type { ToolCall } from './types';
 
 describe('Agent policy enforcement', () => {
   let agent: Agent;

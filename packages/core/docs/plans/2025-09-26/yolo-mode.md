@@ -162,7 +162,7 @@ git commit -am "feat(tools): mark tools with readOnlySafe annotation"
 **What to do**:
 1. Import the new type at the top:
 ```typescript
-import type { ToolPolicy, PermissionOverrideMode } from '~/tools/types';
+import type { ToolPolicy, PermissionOverrideMode } from '@lace/core/tools/types';
 ```
 
 2. Add private field to the Session class (around line 60):
@@ -229,7 +229,7 @@ git commit -am "feat(session): add permission override mode to Session class"
 ```typescript
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Session } from './session';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 describe('Session Permission Override', () => {
   beforeEach(() => {
@@ -632,7 +632,7 @@ git add -A && git commit -m "feat(session): integrate permission mode into confi
 **File**: Create `packages/web/components/ui/segmented-control.tsx`
 
 ```typescript
-import { cn } from '@/lib/utils';
+import { cn } from '@lace/web/lib/utils';
 
 export interface SegmentedControlOption<T extends string> {
   value: T;
@@ -687,7 +687,7 @@ git add -A && git commit -m "feat(ui): add SegmentedControl component"
 **What to add**:
 1. Import the component and types:
 ```typescript
-import { SegmentedControl } from '@/components/ui/segmented-control';
+import { SegmentedControl } from '@lace/web/components/ui/segmented-control';
 import type { PermissionOverrideMode } from '@lace/core/tools/types';
 ```
 
@@ -860,8 +860,8 @@ git commit -am "feat(session): auto-resolve pending approvals on mode change"
 ```typescript
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Session } from './session';
-import { Agent } from '~/agents/agent';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Agent } from '@lace/core/agents/agent';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 describe('Permission Override E2E', () => {
   let session: Session;

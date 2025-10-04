@@ -2,8 +2,8 @@
 // ABOUTME: Uses superjson to preserve types across API boundaries and SSE
 
 import superjson from 'superjson';
-import type { ThreadId } from '@/types/core';
-import { isThreadId } from '@/types/core';
+import type { ThreadId } from '@lace/web/types/core';
+import { isThreadId } from '@lace/web/types/core';
 
 // Import NewAgentSpec type for branded type registration
 type NewAgentSpec = string & { readonly __brand: 'NewAgentSpec' };

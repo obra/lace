@@ -4,16 +4,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { loader as GET, action as POST } from '@/app/routes/api.provider.instances';
-import { parseResponse } from '@/lib/serialization';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
-import type { ProviderInstancesConfig } from '@/lib/server/lace-imports';
-import type { ConfiguredInstance } from '@/lib/server/lace-imports';
+import { loader as GET, action as POST } from '@lace/web/app/routes/api.provider.instances';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import type { ProviderInstancesConfig } from '@lace/web/lib/server/lace-imports';
+import type { ConfiguredInstance } from '@lace/web/lib/server/lace-imports';
 import type {
   InstancesResponse,
   CreateInstanceResponse,
-} from '@/app/routes/api.provider.instances';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+} from '@lace/web/app/routes/api.provider.instances';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 
 describe('Provider Instances API', () => {
   const tempContext = setupWebTest();

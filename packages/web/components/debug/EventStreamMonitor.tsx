@@ -5,11 +5,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCircle, faTrash, faPause, faPlay, faFilter } from '@/lib/fontawesome';
-import { parseTyped } from '@/lib/serialization';
-import { useEventStream } from '@/hooks/useEventStream';
-import { useSSEStore } from '@/lib/sse-store';
-import type { LaceEvent } from '@/types/core';
+import { faCircle, faTrash, faPause, faPlay, faFilter } from '@lace/web/lib/fontawesome';
+import { parseTyped } from '@lace/web/lib/serialization';
+import { useEventStream } from '@lace/web/hooks/useEventStream';
+import { useSSEStore } from '@lace/web/lib/sse-store';
+import type { LaceEvent } from '@lace/web/types/core';
 interface EventStreamMonitorProps {
   maxEvents?: number;
 }

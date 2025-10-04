@@ -2,13 +2,13 @@
 // ABOUTME: Verifies recovery query integration with core ThreadManager
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { loader as GET } from '@/app/routes/api.threads.$threadId.approvals.pending';
-import { getSessionService } from '@/lib/server/session-service';
-import { parseResponse } from '@/lib/serialization';
-import { createLoaderArgs } from '@/test-utils/route-test-helpers';
+import { loader as GET } from '@lace/web/app/routes/api.threads.$threadId.approvals.pending';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { createLoaderArgs } from '@lace/web/test-utils/route-test-helpers';
 
 // Mock the session service
-vi.mock('@/lib/server/session-service');
+vi.mock('@lace/web/lib/server/session-service');
 const mockGetSessionService = vi.mocked(getSessionService);
 
 interface MockToolExecutor {

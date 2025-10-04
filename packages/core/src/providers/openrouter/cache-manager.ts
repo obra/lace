@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { OpenRouterModel } from '~/providers/openrouter/types';
+import type { OpenRouterModel } from './types';
 
 export interface CachedCatalog {
   _meta: {

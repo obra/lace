@@ -4,11 +4,11 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { SettingsPanel } from '@/components/settings/SettingsPanel';
-import { SettingField } from '@/components/settings/SettingField';
-import { Alert } from '@/components/ui/Alert';
-import { validateUserName, validateEmail } from '@/lib/validation';
-import { api } from '@/lib/api-client';
+import { SettingsPanel } from '@lace/web/components/settings/SettingsPanel';
+import { SettingField } from '@lace/web/components/settings/SettingField';
+import { Alert } from '@lace/web/components/ui/Alert';
+import { validateUserName, validateEmail } from '@lace/web/lib/validation';
+import { api } from '@lace/web/lib/api-client';
 
 interface UserSettingsPanelProps {
   // Props for controlled mode (optional)

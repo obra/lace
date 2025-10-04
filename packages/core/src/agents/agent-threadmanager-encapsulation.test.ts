@@ -2,14 +2,14 @@
 // ABOUTME: Verifies that ThreadManager is properly encapsulated and not exposed publicly
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { ToolExecutor } from '~/tools/executor';
-import { TestProvider } from '~/test-utils/test-provider';
+import { Agent } from './agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 describe('Agent ThreadManager Encapsulation', () => {
   const _tempLaceDir = setupCoreTest();

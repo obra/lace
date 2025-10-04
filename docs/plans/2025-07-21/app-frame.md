@@ -246,12 +246,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBars } from '@/lib/fontawesome';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { MobileSidebar } from '@/components/layout/MobileSidebar';
-import { TimelineView } from '@/components/timeline/TimelineView';
-import { EnhancedChatInput } from '@/components/chat/EnhancedChatInput';
-import { useTheme } from '@/app/layout';
+import { faBars } from '@lace/web/lib/fontawesome';
+import { Sidebar } from '@lace/web/components/layout/Sidebar';
+import { MobileSidebar } from '@lace/web/components/layout/MobileSidebar';
+import { TimelineView } from '@lace/web/components/timeline/TimelineView';
+import { EnhancedChatInput } from '@lace/web/components/chat/EnhancedChatInput';
+import { useTheme } from '@lace/web/app/layout';
 import type {
   Session,
   ThreadId,
@@ -262,7 +262,7 @@ import type {
   SessionsResponse,
   SessionResponse,
   ProjectInfo,
-} from '@/types/api';
+} from '@lace/web/types/api';
 // Add other imports as needed
 
 export function LaceAppWithDesignSystem() {
@@ -711,7 +711,7 @@ const timelineEntries = useMemo(() => {
 
 ```typescript
 // Import the modal
-import { ToolApprovalModal } from '@/components/old/ToolApprovalModal';
+import { ToolApprovalModal } from '@lace/web/components/old/ToolApprovalModal';
 
 // Copy approval handling functions from current app
 const handleApprovalDecision = async (decision: ApprovalDecision) => {
@@ -833,7 +833,7 @@ describe('LaceAppWithDesignSystem', () => {
 
 ```typescript
 // Replaced entire contents with:
-import { LaceApp } from '@/components/pages/LaceApp';
+import { LaceApp } from '@lace/web/components/pages/LaceApp';
 
 export default function Home() {
   return <LaceApp />;

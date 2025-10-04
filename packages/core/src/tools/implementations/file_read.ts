@@ -3,10 +3,10 @@
 
 import { z } from 'zod';
 import { readFile, stat } from 'fs/promises';
-import { Tool } from '~/tools/tool';
-import { FilePath, LineNumber } from '~/tools/schemas/common';
-import type { ToolResult, ToolContext } from '~/tools/types';
-import { findSimilarPaths } from '~/tools/utils/file-suggestions';
+import { Tool } from '@lace/core/tools/tool';
+import { FilePath, LineNumber } from '@lace/core/tools/schemas/common';
+import type { ToolResult, ToolContext } from '@lace/core/tools/types';
+import { findSimilarPaths } from '@lace/core/tools/utils/file-suggestions';
 
 const MAX_FILE_SIZE = 64 * 1024; // 64KB limit for whole file reads
 const MAX_RANGE_SIZE = 2000; // Maximum lines in a ranged read

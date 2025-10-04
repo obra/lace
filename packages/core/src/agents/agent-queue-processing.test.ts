@@ -2,11 +2,11 @@
 // ABOUTME: Ensures messages are processed when agent returns to idle
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { TestProvider } from '~/test-utils/test-provider';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Agent } from './agent';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 // Type helper for accessing private methods in tests
 type _AgentWithPrivateMethods = Agent & {

@@ -2,7 +2,7 @@
 // ABOUTME: Tests file tree rendering, expand/collapse functionality, search filtering, and API integration
 
 // Mock the API client
-vi.mock('@/lib/api-client', () => ({
+vi.mock('@lace/web/lib/api-client', () => ({
   api: {
     get: vi.fn(),
   },
@@ -12,8 +12,8 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { SessionFileTree } from '@/components/files/SessionFileTree';
-import * as apiClient from '@/lib/api-client';
+import { SessionFileTree } from '@lace/web/components/files/SessionFileTree';
+import * as apiClient from '@lace/web/lib/api-client';
 
 const mockApiGet = vi.mocked(apiClient.api.get);
 

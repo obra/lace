@@ -3,9 +3,9 @@
 
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { useSmartAutoscroll, useTimelineAutoscroll } from '@/hooks/useSmartAutoscroll';
-import { ScrollProvider } from '@/components/providers/ScrollProvider';
-import type { LaceEvent } from '@/types/core';
+import { useSmartAutoscroll, useTimelineAutoscroll } from '@lace/web/hooks/useSmartAutoscroll';
+import { ScrollProvider } from '@lace/web/components/providers/ScrollProvider';
+import type { LaceEvent } from '@lace/web/types/core';
 import React from 'react';
 
 // Mock scroll behavior

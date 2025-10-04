@@ -3,9 +3,9 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { parseProviderModel, resolveModelSpec } from './provider-utils';
-import { UserSettingsManager } from '~/config/user-settings';
+import { UserSettingsManager } from '@lace/core/config/user-settings';
 
-vi.mock('~/config/user-settings');
+vi.mock('@lace/core/config/user-settings');
 
 describe('Provider Utils', () => {
   describe('parseProviderModel', () => {

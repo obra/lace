@@ -9,33 +9,33 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { SidebarContent } from '@/components/sidebar/SidebarContent';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { SidebarContent } from '@lace/web/components/sidebar/SidebarContent';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 
 // Mock external dependencies only
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/server/approval-manager', () => ({
+vi.mock('@lace/web/lib/server/approval-manager', () => ({
   getApprovalManager: () => ({
     requestApproval: vi.fn().mockResolvedValue('allow_once'),
   }),
 }));
 
 // Mock context providers with complete interfaces
-vi.mock('@/components/providers/ProjectsProvider', () => ({
+vi.mock('@lace/web/components/providers/ProjectsProvider', () => ({
   useProjectsContext: () => ({
     selectedProject: { id: 'project-1', name: 'Test Project' },
   }),
 }));
 
-vi.mock('@/components/providers/SessionProvider', () => ({
+vi.mock('@lace/web/components/providers/SessionProvider', () => ({
   useOptionalSessionContext: () => ({
     sessionDetails: {
       id: 'session-1',
@@ -66,7 +66,7 @@ vi.mock('@/components/providers/SessionProvider', () => ({
 }));
 
 // Mock the child components to isolate SidebarContent testing
-vi.mock('@/components/sidebar/ProjectSection', () => ({
+vi.mock('@lace/web/components/sidebar/ProjectSection', () => ({
   ProjectSection: ({ onSwitchProject }: { onSwitchProject: () => void }) => (
     <div data-testid="project-section">
       <button onClick={onSwitchProject}>Switch Project</button>
@@ -74,24 +74,24 @@ vi.mock('@/components/sidebar/ProjectSection', () => ({
   ),
 }));
 
-vi.mock('@/components/sidebar/SessionSection', () => ({
+vi.mock('@lace/web/components/sidebar/SessionSection', () => ({
   SessionSection: () => <div data-testid="session-section">Session Section</div>,
 }));
 
-vi.mock('@/components/sidebar/TaskSidebarSection', () => ({
+vi.mock('@lace/web/components/sidebar/TaskSidebarSection', () => ({
   TaskSidebarSection: () => <div data-testid="task-section">Task Section</div>,
 }));
 
-vi.mock('@/components/sidebar/FeedbackSection', () => ({
+vi.mock('@lace/web/components/sidebar/FeedbackSection', () => ({
   FeedbackSection: () => <div data-testid="feedback-section">Feedback Section</div>,
 }));
 
-vi.mock('@/components/sidebar/FileBrowserSection', () => ({
+vi.mock('@lace/web/components/sidebar/FileBrowserSection', () => ({
   FileBrowserSection: () => <div data-testid="file-browser-section">File Browser Section</div>,
 }));
 
 // Mock AgentsSection with the onCreateAgent prop
-vi.mock('@/components/sidebar/AgentsSection', () => ({
+vi.mock('@lace/web/components/sidebar/AgentsSection', () => ({
   AgentsSection: ({ onCreateAgent }: { onCreateAgent?: () => void }) => (
     <div data-testid="agents-section">
       {onCreateAgent && (

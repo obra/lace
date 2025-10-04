@@ -2,19 +2,19 @@
 // ABOUTME: Validates working directory inheritance, tool approval workflow, and error handling
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SessionHelper } from './session-helper';
-import type { Agent } from '~/agents/agent';
-import type { Session } from '~/sessions/session';
-import { UserSettingsManager } from '~/config/user-settings';
-import { ProviderRegistry } from '~/providers/registry';
-import { TestProvider } from '~/test-utils/test-provider';
-import { Tool } from '~/tools/tool';
-import { ToolExecutor } from '~/tools/executor';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
+import type { Agent } from '@lace/core/agents/agent';
+import type { Session } from '@lace/core/sessions/session';
+import { UserSettingsManager } from '@lace/core/config/user-settings';
+import { ProviderRegistry } from '@lace/core/providers/registry';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ProviderMessage, ProviderResponse } from '@lace/core/providers/base-provider';
 import { z } from 'zod';
 
 // Mock modules
-vi.mock('~/config/user-settings');
-vi.mock('~/providers/registry');
+vi.mock('@lace/core/config/user-settings');
+vi.mock('@lace/core/providers/registry');
 
 // Create a mock provider that supports multiple queued responses
 class QueuedMockProvider extends TestProvider {

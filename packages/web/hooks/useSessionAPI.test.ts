@@ -3,9 +3,9 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useSessionAPI } from '@/hooks/useSessionAPI';
-import type { ThreadId } from '@/types/core';
-import { createMockResponse, createMockErrorResponse } from '@/test-utils/mock-fetch';
+import { useSessionAPI } from '@lace/web/hooks/useSessionAPI';
+import type { ThreadId } from '@lace/web/types/core';
+import { createMockResponse, createMockErrorResponse } from '@lace/web/test-utils/mock-fetch';
 
 // ✅ ESSENTIAL MOCK - Mock fetch to avoid network calls in tests
 // Tests focus on hook state management behavior, not API implementation

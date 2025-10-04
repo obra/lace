@@ -2,12 +2,19 @@
 // ABOUTME: Manages global event distribution with client-side filtering
 
 // StreamEvent removed - using LaceEvent directly
-import type { Task, TaskContext, ThreadId, LaceEvent, ErrorType, ErrorPhase } from '@/types/core';
-import { asThreadId } from '@/types/core';
-import type { Session, Agent } from '@/lib/server/lace-imports';
+import type {
+  Task,
+  TaskContext,
+  ThreadId,
+  LaceEvent,
+  ErrorType,
+  ErrorPhase,
+} from '@lace/web/types/core';
+import { asThreadId } from '@lace/web/types/core';
+import type { Session, Agent } from '@lace/web/lib/server/lace-imports';
 import { randomUUID } from 'crypto';
-import { logger } from '~/utils/logger';
-import { stringify } from '@/lib/serialization';
+import { logger } from '@lace/core/utils/logger';
+import { stringify } from '@lace/web/lib/serialization';
 
 // Interface for AGENT_ERROR event data
 interface AgentErrorEventData {

@@ -179,9 +179,9 @@ git commit -m "test: add test structure for file-edit-v2 tool"
 // ABOUTME: Supports atomic multi-edit operations with precise occurrence counting
 
 import { z } from 'zod';
-import { Tool } from '~/tools/tool';
-import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
-import { FilePath } from '~/tools/schemas/common';
+import { Tool } from '@lace/core/tools/tool';
+import type { ToolResult, ToolContext, ToolAnnotations } from '@lace/core/tools/types';
+import { FilePath } from '@lace/core/tools/schemas/common';
 
 // Define schemas for input validation
 const editOperationSchema = z.object({

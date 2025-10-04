@@ -3,7 +3,7 @@
 import React from 'react';
 import { useState } from 'react';
 import { motion, PanInfo, useMotionValue, useTransform } from 'motion/react';
-import { springConfig } from '@/lib/animations';
+import { springConfig } from '@lace/web/lib/animations';
 
 interface SwipeableCardProps {
   children: React.ReactNode;

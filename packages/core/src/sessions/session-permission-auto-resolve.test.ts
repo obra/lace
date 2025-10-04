@@ -2,26 +2,26 @@
 // ABOUTME: Verifies that switching to yolo/read-only modes auto-resolves pending tool approvals
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Session } from '~/sessions/session';
-import { Agent } from '~/agents/agent';
-import { ToolExecutor } from '~/tools/executor';
-import { ApprovalDecision } from '~/tools/types';
-import { ThreadManager } from '~/threads/thread-manager';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { Project } from '~/projects/project';
+import { Session } from './session';
+import { Agent } from '@lace/core/agents/agent';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ApprovalDecision } from '@lace/core/tools/types';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { Project } from '@lace/core/projects/project';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
 
 // Mock the logger to reduce noise
-vi.mock('~/utils/logger');
+vi.mock('@lace/core/utils/logger');
 
 describe('Session Permission Auto-Resolution', () => {
   const tempLaceDir = setupCoreTest();

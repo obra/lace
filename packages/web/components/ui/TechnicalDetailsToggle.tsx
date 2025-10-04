@@ -6,8 +6,8 @@
 import React from 'react';
 import { useState, ReactNode } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCopy, faCheck, faChevronDown, faChevronUp } from '@/lib/fontawesome';
-import { safeStringify } from '@/lib/utils/safeStringify';
+import { faCopy, faCheck, faChevronDown, faChevronUp } from '@lace/web/lib/fontawesome';
+import { safeStringify } from '@lace/web/lib/utils/safeStringify';
 
 interface TechnicalDetailsToggleProps {
   details: unknown;

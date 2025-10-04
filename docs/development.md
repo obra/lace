@@ -110,9 +110,9 @@ Use `~/*` path aliases for all internal imports instead of relative paths:
 
 ```typescript
 // ✅ Good: Use ~ alias
-import { Agent } from '~/agents/agent.js';
-import { ToolExecutor } from '~/tools/executor.js';
-import { TimelineEntry } from '~/interfaces/terminal/components/ui/TimelineEntry.js';
+import { Agent } from '@lace/core/agents/agent.js';
+import { ToolExecutor } from '@lace/core/tools/executor.js';
+import { TimelineEntry } from '@lace/core/interfaces/terminal/components/ui/TimelineEntry.js';
 
 // ❌ Bad: Relative paths
 import { Agent } from '../../agents/agent.js';

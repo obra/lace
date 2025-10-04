@@ -2,14 +2,14 @@
 // ABOUTME: Prevents regressions during type cleanup refactoring
 
 import { describe, it, expect } from 'vitest';
-import type { SessionInfo, AgentInfo } from '@/types/core';
-import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
+import type { SessionInfo, AgentInfo } from '@lace/web/types/core';
+import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
 
 // Test that all key types can be imported from current paths
 describe('Type Integrity - Current State', () => {
   describe('ThreadId imports', () => {
     it('should import ThreadId from @/types/core', async () => {
-      const coreTypes = await import('@/types/core');
+      const coreTypes = await import('@lace/web/types/core');
       expect(coreTypes.asThreadId).toBeDefined(); // asThreadId is a function, not ThreadId type
 
       // But we can test that the type exists by using it
@@ -19,7 +19,7 @@ describe('Type Integrity - Current State', () => {
     });
 
     it('should import ThreadId from @/types/core', async () => {
-      const { asThreadId, isThreadId } = await import('@/types/core');
+      const { asThreadId, isThreadId } = await import('@lace/web/types/core');
 
       const testId = 'lace_20250731_abc123';
       expect(isThreadId(testId)).toBe(true);
@@ -29,7 +29,7 @@ describe('Type Integrity - Current State', () => {
     });
 
     it('should import ThreadId from @/lib/validation/schemas', async () => {
-      const { ThreadIdSchema } = await import('@/lib/validation/schemas');
+      const { ThreadIdSchema } = await import('@lace/web/lib/validation/schemas');
 
       const testId = 'lace_20250731_abc123';
       const result = ThreadIdSchema.safeParse(testId);
@@ -37,7 +37,7 @@ describe('Type Integrity - Current State', () => {
     });
 
     it('should import ThreadId from @/types/core', async () => {
-      const coreImports = await import('@/types/core');
+      const coreImports = await import('@lace/web/types/core');
       // ThreadId is a type export, so we test it exists in the import
       expect(coreImports).toBeDefined();
     });
@@ -45,7 +45,7 @@ describe('Type Integrity - Current State', () => {
 
   describe('ApprovalDecision imports', () => {
     it('should import ApprovalDecision from @/types/core', async () => {
-      const { ApprovalDecision } = await import('@/types/core');
+      const { ApprovalDecision } = await import('@lace/web/types/core');
 
       expect(ApprovalDecision.ALLOW_ONCE).toBe('allow_once');
       expect(ApprovalDecision.ALLOW_SESSION).toBe('allow_session');
@@ -53,7 +53,7 @@ describe('Type Integrity - Current State', () => {
     });
 
     it('should import ApprovalDecision from @/types/core', async () => {
-      const { ApprovalDecision } = await import('@/types/core');
+      const { ApprovalDecision } = await import('@lace/web/types/core');
 
       expect(ApprovalDecision.ALLOW_ONCE).toBe('allow_once');
       expect(ApprovalDecision.ALLOW_SESSION).toBe('allow_session');
@@ -63,7 +63,7 @@ describe('Type Integrity - Current State', () => {
 
   describe('Core type functionality', () => {
     it('should validate ThreadId correctly', async () => {
-      const { isValidThreadId } = await import('@/lib/validation/thread-id-validation');
+      const { isValidThreadId } = await import('@lace/web/lib/validation/thread-id-validation');
 
       // Valid formats
       expect(isValidThreadId('lace_20250731_abc123')).toBe(true);
@@ -77,7 +77,7 @@ describe('Type Integrity - Current State', () => {
     });
 
     it('should create SessionInfo types correctly', async () => {
-      const { asThreadId } = await import('@/types/core');
+      const { asThreadId } = await import('@lace/web/types/core');
 
       // Test SessionInfo creation with proper ThreadId
       const sessionId = asThreadId('lace_20250731_abc123');
@@ -93,7 +93,7 @@ describe('Type Integrity - Current State', () => {
     });
 
     it('should create AgentInfo types correctly', async () => {
-      const { asThreadId } = await import('@/types/core');
+      const { asThreadId } = await import('@lace/web/types/core');
 
       // Test AgentInfo creation with proper ThreadId
       const agentThreadId = asThreadId('lace_20250731_abc123.1');
@@ -112,8 +112,8 @@ describe('Type Integrity - Current State', () => {
 
   describe('Type compatibility', () => {
     it('should have compatible ThreadId types across imports', async () => {
-      const { asThreadId: asThreadIdCore } = await import('@/types/core');
-      const { asValidThreadId } = await import('@/lib/validation/thread-id-validation');
+      const { asThreadId: asThreadIdCore } = await import('@lace/web/types/core');
+      const { asValidThreadId } = await import('@lace/web/lib/validation/thread-id-validation');
 
       const testId = 'lace_20250731_abc123';
       const coreThreadId = asThreadIdCore(testId);
@@ -124,8 +124,8 @@ describe('Type Integrity - Current State', () => {
     });
 
     it('should have compatible ApprovalDecision enums', async () => {
-      const { ApprovalDecision: CoreApproval } = await import('@/types/core');
-      const { ApprovalDecision: ServerApproval } = await import('@/types/core');
+      const { ApprovalDecision: CoreApproval } = await import('@lace/web/types/core');
+      const { ApprovalDecision: ServerApproval } = await import('@lace/web/types/core');
 
       // Values should be identical
       expect(CoreApproval.ALLOW_ONCE).toBe(ServerApproval.ALLOW_ONCE);
@@ -136,7 +136,7 @@ describe('Type Integrity - Current State', () => {
 
   describe('Event type imports', () => {
     it('should import EVENT_TYPES from core', async () => {
-      const { EVENT_TYPES } = await import('@/types/core');
+      const { EVENT_TYPES } = await import('@lace/web/types/core');
 
       expect(EVENT_TYPES).toContain('USER_MESSAGE');
       expect(EVENT_TYPES).toContain('AGENT_MESSAGE');
@@ -145,7 +145,7 @@ describe('Type Integrity - Current State', () => {
     });
 
     it('should import LaceEventType from core', async () => {
-      const coreModule = await import('@/types/core');
+      const coreModule = await import('@lace/web/types/core');
       // LaceEventType is a type, not a value, so we just check the module exists
       expect(coreModule).toBeDefined();
       expect(coreModule.EVENT_TYPES).toBeDefined(); // This is a value export
@@ -156,11 +156,11 @@ describe('Type Integrity - Current State', () => {
     it('should resolve all current import paths without errors', async () => {
       // Test that all current import paths can be resolved
       const imports = [
-        () => import('@/types/api'),
-        () => import('@/types/core'),
-        () => import('@/lib/server/lace-imports'),
-        () => import('@/lib/validation/schemas'),
-        () => import('@/lib/validation/thread-id-validation'),
+        () => import('@lace/web/types/api'),
+        () => import('@lace/web/types/core'),
+        () => import('@lace/web/lib/server/lace-imports'),
+        () => import('@lace/web/lib/validation/schemas'),
+        () => import('@lace/web/lib/validation/thread-id-validation'),
       ];
 
       // All imports should resolve successfully

@@ -2,9 +2,9 @@
 // ABOUTME: Validates simple execute() interface and tool registry functionality
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ToolExecutor } from '~/tools/executor';
-import { FileReadTool } from '~/tools/implementations/file_read';
-import type { ToolCall, ToolContext } from '~/tools/types';
+import { ToolExecutor } from './executor';
+import { FileReadTool } from '@lace/core/tools/implementations/file_read';
+import type { ToolCall, ToolContext } from './types';
 
 describe('Simplified ToolExecutor', () => {
   let executor: ToolExecutor;

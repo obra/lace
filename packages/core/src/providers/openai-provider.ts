@@ -17,18 +17,13 @@ if (process.env.NODE_ENV !== 'test') {
 
 // Dynamic tiktoken import to handle WASM loading failures gracefully
 type Tiktoken = import('tiktoken').Tiktoken;
-import { AIProvider } from '~/providers/base-provider';
-import {
-  ProviderMessage,
-  ProviderResponse,
-  ProviderConfig,
-  ProviderInfo,
-} from '~/providers/base-provider';
-import { ToolCall } from '~/tools/types';
-import { Tool } from '~/tools/tool';
-import { logger } from '~/utils/logger';
-import { logProviderRequest, logProviderResponse } from '~/utils/provider-logging';
-import { convertToOpenAIFormat } from '~/providers/format-converters';
+import { AIProvider } from './base-provider';
+import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderInfo } from './base-provider';
+import { ToolCall } from '@lace/core/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import { logger } from '@lace/core/utils/logger';
+import { logProviderRequest, logProviderResponse } from '@lace/core/utils/provider-logging';
+import { convertToOpenAIFormat } from './format-converters';
 
 interface OpenAIProviderConfig extends ProviderConfig {
   apiKey: string | null;

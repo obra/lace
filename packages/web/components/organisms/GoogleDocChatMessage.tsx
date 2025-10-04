@@ -12,10 +12,10 @@ import {
   faComment,
   faEdit,
 } from '@fortawesome/free-solid-svg-icons';
-import { useOgImage } from '@/hooks/useOgImage';
-import { isGoogleDocsUrl } from '@/lib/urlUtils';
-import { DocumentSkeleton } from '@/components/ui/SkeletonLoader';
-import type { Message } from '@/types/design-system';
+import { useOgImage } from '@lace/web/hooks/useOgImage';
+import { isGoogleDocsUrl } from '@lace/web/lib/urlUtils';
+import { DocumentSkeleton } from '@lace/web/components/ui/SkeletonLoader';
+import type { Message } from '@lace/web/types/design-system';
 
 interface GoogleDocAttachment {
   id: string;

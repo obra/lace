@@ -2,7 +2,7 @@
 // ABOUTME: Replaces hardcoded AVAILABLE_TOOLS with API-driven tool discovery
 
 import { useState, useEffect } from 'react';
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
 
 // Type guard to check if value is a string array
 function isStringArray(value: unknown): value is string[] {

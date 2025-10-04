@@ -5,12 +5,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFile, faDownload, faExternalLinkAlt, faCopy, faSpinner } from '@/lib/fontawesome';
-import { Modal } from '@/components/ui/Modal';
-import { api } from '@/lib/api-client';
-import { formatFileSize } from '@/lib/format-file-size';
-import { encodePathSegments } from '@/lib/path-utils';
-import type { SessionFileContentResponse } from '@/types/session-files';
+import {
+  faFile,
+  faDownload,
+  faExternalLinkAlt,
+  faCopy,
+  faSpinner,
+} from '@lace/web/lib/fontawesome';
+import { Modal } from '@lace/web/components/ui/Modal';
+import { api } from '@lace/web/lib/api-client';
+import { formatFileSize } from '@lace/web/lib/format-file-size';
+import { encodePathSegments } from '@lace/web/lib/path-utils';
+import type { SessionFileContentResponse } from '@lace/web/types/session-files';
 import hljs from 'highlight.js';
 import DOMPurify from 'dompurify';
 

@@ -4,18 +4,18 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { ConfigurationPresetManager, SessionConfiguration } from '~/sessions/session-config';
-import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
+import { Session } from './session';
+import { Project } from '@lace/core/projects/project';
+import { ConfigurationPresetManager, SessionConfiguration } from './session-config';
+import { setupCoreTest, cleanupSession } from '@lace/core/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 
 // No mocking for integration tests - use real filesystem access
 

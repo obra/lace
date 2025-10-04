@@ -1,7 +1,7 @@
 // ABOUTME: Server-only serialization helpers for API routes
 // ABOUTME: Creates standard Response objects with SuperJSON serialization
 
-import { stringify } from '@/lib/serialization';
+import { stringify } from '@lace/web/lib/serialization';
 
 // Standard Response helper with SuperJSON serialization
 export function createSuperjsonResponse<T>(data: T, init?: ResponseInit) {

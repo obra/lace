@@ -9,7 +9,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { AgentCreateChatPopup } from '@/components/modals/AgentCreateChatPopup';
+import { AgentCreateChatPopup } from '@lace/web/components/modals/AgentCreateChatPopup';
 
 const mockPersonas = [
   { name: 'lace', isUserDefined: false, path: 'lace.md' },

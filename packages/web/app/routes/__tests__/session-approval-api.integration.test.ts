@@ -6,15 +6,15 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setupWebTest } from '@/test-utils/web-test-setup';
-import { Session, Project, TestProvider } from '@/lib/server/lace-imports';
-import { createTestProviderInstance } from '@/lib/server/lace-imports';
-import { cleanupSession } from '@/lib/server/lace-test-imports';
-import { parseResponse } from '@/lib/serialization';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
-import { loader as pendingApprovalsLoader } from '@/app/routes/api.sessions.$sessionId.approvals.pending';
-import { action as approvalDecisionAction } from '@/app/routes/api.sessions.$sessionId.approvals.$toolCallId';
-import type { SessionPendingApproval } from '@/types/api';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
+import { Session, Project, TestProvider } from '@lace/web/lib/server/lace-imports';
+import { createTestProviderInstance } from '@lace/web/lib/server/lace-imports';
+import { cleanupSession } from '@lace/web/lib/server/lace-test-imports';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import { loader as pendingApprovalsLoader } from '@lace/web/app/routes/api.sessions.$sessionId.approvals.pending';
+import { action as approvalDecisionAction } from '@lace/web/app/routes/api.sessions.$sessionId.approvals.$toolCallId';
+import type { SessionPendingApproval } from '@lace/web/types/api';
 import type { ProviderResponse } from '@lace/core/providers/base-provider';
 
 // Mock server-only module
@@ -51,7 +51,7 @@ describe('Session Approval API Integration (Real Components)', () => {
 
   beforeEach(async () => {
     // Set up test provider defaults (following agent-utils.test.ts pattern)
-    const { setupTestProviderDefaults } = await import('@/lib/server/lace-imports');
+    const { setupTestProviderDefaults } = await import('@lace/web/lib/server/lace-imports');
     setupTestProviderDefaults();
 
     // Create test provider instance
@@ -76,7 +76,7 @@ describe('Session Approval API Integration (Real Components)', () => {
     mockProvider = new MockProviderWithToolCalls();
 
     // Mock ProviderRegistry to return our mock provider
-    const { ProviderRegistry } = await import('@/lib/server/lace-imports');
+    const { ProviderRegistry } = await import('@lace/web/lib/server/lace-imports');
     vi.spyOn(ProviderRegistry.prototype, 'createProvider').mockReturnValue(mockProvider);
     vi.spyOn(ProviderRegistry.prototype, 'getProvider').mockReturnValue(mockProvider);
 
@@ -88,7 +88,7 @@ describe('Session Approval API Integration (Real Components)', () => {
   });
 
   afterEach(async () => {
-    const { cleanupTestProviderDefaults } = await import('@/lib/server/lace-imports');
+    const { cleanupTestProviderDefaults } = await import('@lace/web/lib/server/lace-imports');
     cleanupTestProviderDefaults();
 
     // Provider instances cleanup is handled by setupWebTest

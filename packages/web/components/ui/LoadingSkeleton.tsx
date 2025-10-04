@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'motion/react';
-import { shimmer, staggerContainer, staggerItem } from '@/lib/animations';
+import { shimmer, staggerContainer, staggerItem } from '@lace/web/lib/animations';
 
 interface LoadingSkeletonProps {
   variant?: 'text' | 'card' | 'avatar' | 'timeline' | 'carousel';

@@ -2,12 +2,12 @@
 // ABOUTME: Tests streaming vs non-streaming responses, configuration, and error handling
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AnthropicProvider } from '~/providers/anthropic-provider';
-import { Tool } from '~/tools/tool';
-import { ToolResult, ToolContext } from '~/tools/types';
+import { AnthropicProvider } from './anthropic-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolResult, ToolContext } from '@lace/core/tools/types';
 import { z } from 'zod';
 import type Anthropic from '@anthropic-ai/sdk';
-import { StreamingEvents } from '~/providers/types';
+import { StreamingEvents } from './types';
 
 // Mock external Anthropic SDK to avoid real API calls during tests
 // Tests focus on provider logic, not Anthropic API implementation

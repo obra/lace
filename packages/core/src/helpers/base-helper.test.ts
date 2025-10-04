@@ -2,11 +2,15 @@
 // ABOUTME: Validates provider resolution, conversation building, tool result processing, and execution limits
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BaseHelper } from './base-helper';
-import { Tool } from '~/tools/tool';
-import { ToolExecutor } from '~/tools/executor';
-import type { AIProvider, ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { TestProvider } from '~/test-utils/test-provider';
-import { ToolCall, ToolResult } from '~/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import type {
+  AIProvider,
+  ProviderMessage,
+  ProviderResponse,
+} from '@lace/core/providers/base-provider';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
+import { ToolCall, ToolResult } from '@lace/core/tools/types';
 import { z } from 'zod';
 
 // Create a simple test tool

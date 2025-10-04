@@ -3,11 +3,11 @@
 
 import { useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
-import type { SessionNavigationState } from '@/types/navigation';
-import { ProjectsProvider } from '@/components/providers/ProjectsProvider';
-import { ProjectProvider } from '@/components/providers/ProjectProvider';
-import { SessionProvider, useSessionContext } from '@/components/providers/SessionProvider';
-import { UIProvider } from '@/components/providers/UIProvider';
+import type { SessionNavigationState } from '@lace/web/types/navigation';
+import { ProjectsProvider } from '@lace/web/components/providers/ProjectsProvider';
+import { ProjectProvider } from '@lace/web/components/providers/ProjectProvider';
+import { SessionProvider, useSessionContext } from '@lace/web/components/providers/SessionProvider';
+import { UIProvider } from '@lace/web/components/providers/UIProvider';
 
 // Define stable callback functions outside component to prevent re-renders
 const noOpCallback = () => {};

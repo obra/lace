@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { ToolPolicyList } from './ToolPolicyList';
-import type { ToolPolicy } from '@/types/core';
+import type { ToolPolicy } from '@lace/web/types/core';
 
 // Tool policy info structure
 interface ToolPolicyInfo {
@@ -16,7 +16,7 @@ interface ToolPolicyInfo {
 }
 
 // Mock the ToolPolicyToggle component
-vi.mock('@/components/ui/ToolPolicyToggle', () => ({
+vi.mock('@lace/web/components/ui/ToolPolicyToggle', () => ({
   ToolPolicyToggle: ({
     value,
     onChange,

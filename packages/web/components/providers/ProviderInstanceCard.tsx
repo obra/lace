@@ -2,12 +2,12 @@
 // ABOUTME: Uses StatusDot, Badge, and card components from design system
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import StatusDot from '@/components/ui/StatusDot';
-import Badge from '@/components/ui/Badge';
+import StatusDot from '@lace/web/components/ui/StatusDot';
+import Badge from '@lace/web/components/ui/Badge';
 import { EditInstanceModal } from './EditInstanceModal';
 import { ProviderModelGroup } from './ProviderModelGroup';
-import { providerService } from '@/lib/server/provider-service';
-import type { CatalogProvider, CatalogModel, ModelConfig } from '@/lib/server/lace-imports';
+import { providerService } from '@lace/web/lib/server/provider-service';
+import type { CatalogProvider, CatalogModel, ModelConfig } from '@lace/web/lib/server/lace-imports';
 import type { GlobalModelFilters } from './GlobalModelSearch';
 
 interface ProviderInstanceCardProps {

@@ -9,7 +9,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { SwitchIcon } from '@/components/ui/SwitchIcon';
+import { SwitchIcon } from '@lace/web/components/ui/SwitchIcon';
 
 describe('SwitchIcon', () => {
   const mockOnClick = vi.fn();

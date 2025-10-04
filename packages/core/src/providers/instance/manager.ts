@@ -3,17 +3,17 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { getLaceDir } from '~/config/lace-dir';
-import { getEnvVar } from '~/config/env-loader';
+import { getLaceDir } from '@lace/core/config/lace-dir';
+import { getEnvVar } from '@lace/core/config/env-loader';
 import {
   ProviderInstancesConfig,
   ProviderInstancesConfigSchema,
   Credential,
   CredentialSchema,
   ProviderInstance,
-} from '~/providers/catalog/types';
-import { ProviderRegistry } from '~/providers/registry';
-import type { AIProvider } from '~/providers/base-provider';
+} from '@lace/core/providers/catalog/types';
+import { ProviderRegistry } from '@lace/core/providers/registry';
+import type { AIProvider } from '@lace/core/providers/base-provider';
 
 export class ProviderInstanceManager {
   private configPath: string;
@@ -137,7 +137,7 @@ export class ProviderInstanceManager {
   async updateInstance(
     instanceId: string,
     updates: Partial<
-      Omit<import('~/providers/catalog/types').ProviderInstance, 'catalogProviderId'>
+      Omit<import('@lace/core/providers/catalog/types').ProviderInstance, 'catalogProviderId'>
     >
   ): Promise<void> {
     const config = await this.loadInstances();

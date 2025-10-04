@@ -4,19 +4,19 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { AgentConfiguration, ConfigurationValidator } from '~/sessions/session-config';
-import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import { AgentConfiguration, ConfigurationValidator } from '@lace/core/sessions/session-config';
+import { setupCoreTest, cleanupSession } from '@lace/core/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
-import { ApprovalDecision } from '~/tools/types';
+} from '@lace/core/test-utils/provider-instances';
+import { ApprovalDecision } from '@lace/core/tools/types';
 
 describe('Agent Configuration', () => {
   const context = setupCoreTest();

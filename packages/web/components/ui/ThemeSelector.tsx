@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useTheme } from '@/components/providers/SettingsProvider';
+import { useTheme } from '@lace/web/components/providers/SettingsProvider';
 
 // Limit app-visible themes to core options for now. Others retained for quick restore.
 const availableThemes = [

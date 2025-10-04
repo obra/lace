@@ -1,8 +1,8 @@
 // ABOUTME: Client-side API for task management operations
 // ABOUTME: Provides type-safe methods for interacting with task API endpoints
 
-import type { Task, TaskStatus, TaskPriority, TaskFilters } from '@/types/core';
-import { api } from '@/lib/api-client';
+import type { Task, TaskStatus, TaskPriority, TaskFilters } from '@lace/web/types/core';
+import { api } from '@lace/web/lib/api-client';
 
 export interface CreateTaskRequest {
   title: string;

@@ -2,8 +2,8 @@
 // ABOUTME: Verifies retry logic works correctly with LMStudio SDK
 
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
-import { LMStudioProvider } from '~/providers/lmstudio-provider';
-import { ProviderMessage } from '~/providers/base-provider';
+import { LMStudioProvider } from './lmstudio-provider';
+import { ProviderMessage } from './base-provider';
 
 // Test helper to capture retry behavior
 interface RetryCapture {

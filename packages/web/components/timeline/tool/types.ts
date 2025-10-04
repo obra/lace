@@ -3,8 +3,8 @@
 
 import type { ReactNode } from 'react';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import type { ToolResult } from '@/types/core';
-import type { ToolAggregatedEventData } from '@/types/web-events';
+import type { ToolResult } from '@lace/web/types/core';
+import type { ToolAggregatedEventData } from '@lace/web/types/web-events';
 
 export interface ToolRenderer {
   getDisplayName?: (toolName: string, result?: ToolResult) => string;

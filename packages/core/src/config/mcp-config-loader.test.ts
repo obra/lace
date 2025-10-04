@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { MCPConfigLoader } from './mcp-config-loader';
-import { useTempLaceDir } from '~/test-utils/temp-lace-dir';
+import { useTempLaceDir } from '@lace/core/test-utils/temp-lace-dir';
 
 describe('MCPConfigLoader', () => {
   const tempLaceContext = useTempLaceDir();

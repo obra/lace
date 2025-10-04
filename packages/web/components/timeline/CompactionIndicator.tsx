@@ -4,7 +4,7 @@
 'use client';
 
 import React from 'react';
-import type { CompactionState } from '@/components/providers/EventStreamProvider';
+import type { CompactionState } from '@lace/web/components/providers/EventStreamProvider';
 
 interface CompactionIndicatorProps {
   compactionState: CompactionState;

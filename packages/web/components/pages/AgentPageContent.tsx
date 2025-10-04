@@ -6,27 +6,27 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBars } from '@/lib/fontawesome';
+import { faBars } from '@lace/web/lib/fontawesome';
 
-import { Sidebar } from '@/components/layout/Sidebar';
-import { Chat } from '@/components/chat/Chat';
-import { SidebarContent } from '@/components/sidebar/SidebarContent';
-import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
-import { SessionEditModal } from '@/components/config/SessionEditModal';
-import { AgentCreateChatPopup } from '@/components/modals/AgentCreateChatPopup';
-import { PermissionModeBadge } from '@/components/ui/PermissionModeSelector';
-import type { PermissionOverrideMode } from '~/tools/types';
+import { Sidebar } from '@lace/web/components/layout/Sidebar';
+import { Chat } from '@lace/web/components/chat/Chat';
+import { SidebarContent } from '@lace/web/components/sidebar/SidebarContent';
+import { ToolApprovalModal } from '@lace/web/components/modals/ToolApprovalModal';
+import { SessionEditModal } from '@lace/web/components/config/SessionEditModal';
+import { AgentCreateChatPopup } from '@lace/web/components/modals/AgentCreateChatPopup';
+import { PermissionModeBadge } from '@lace/web/components/ui/PermissionModeSelector';
+import type { PermissionOverrideMode } from '@lace/core/tools/types';
 
-import { useUIContext } from '@/components/providers/UIProvider';
-import { asThreadId, isAgentSummaryUpdatedData } from '@/types/core';
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useToolApprovalContext } from '@/components/providers/ToolApprovalProvider';
-import { useProviderInstances } from '@/components/providers/ProviderInstanceProvider';
-import { useURLState } from '@/hooks/useURLState';
-import { useEventStreamContext } from '@/components/providers/EventStreamProvider';
-import { api } from '@/lib/api-client';
-import type { PersonaCatalogResponse } from '@/app/routes/api.persona.catalog';
+import { useUIContext } from '@lace/web/components/providers/UIProvider';
+import { asThreadId, isAgentSummaryUpdatedData } from '@lace/web/types/core';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
+import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
+import { useToolApprovalContext } from '@lace/web/components/providers/ToolApprovalProvider';
+import { useProviderInstances } from '@lace/web/components/providers/ProviderInstanceProvider';
+import { useURLState } from '@lace/web/hooks/useURLState';
+import { useEventStreamContext } from '@lace/web/components/providers/EventStreamProvider';
+import { api } from '@lace/web/lib/api-client';
+import type { PersonaCatalogResponse } from '@lace/web/app/routes/api.persona.catalog';
 
 interface AgentPageContentProps {
   projectId: string;

@@ -831,8 +831,8 @@ base class
 // ABOUTME: Uses MCP SDK client for tool execution, converts schemas from JSON to Zod
 
 import { z, ZodType } from 'zod';
-import { Tool } from '~/tools/tool';
-import type { ToolResult, ToolContext } from '~/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import type { ToolResult, ToolContext } from '@lace/core/tools/types';
 import type { Client } from '../../vendor/typescript-sdk/src/client/index.js';
 import type { MCPTool } from './types';
 
@@ -1132,7 +1132,7 @@ interface
 // ABOUTME: Uses MCP SDK's listTools() method and provides unified interface to ToolExecutor
 
 import { EventEmitter } from 'events';
-import { Tool } from '~/tools/tool';
+import { Tool } from '@lace/core/tools/tool';
 import { MCPToolAdapter } from './tool-adapter';
 import { MCPServerManager } from './server-manager';
 import type { MCPConfig, MCPServerConnection, ApprovalLevel } from './types';
@@ -1562,9 +1562,9 @@ workflow
 
 ```typescript
 // Add MCP imports
-import { MCPToolRegistry } from '~/mcp/tool-registry';
-import { MCPServerManager } from '~/mcp/server-manager';
-import { MCPConfigLoader } from '~/mcp/config-loader';
+import { MCPToolRegistry } from '@lace/core/mcp/tool-registry';
+import { MCPServerManager } from '@lace/core/mcp/server-manager';
+import { MCPConfigLoader } from '@lace/core/mcp/config-loader';
 
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
@@ -1768,7 +1768,7 @@ import { join } from 'path';
 import { MCPConfigLoader } from './config-loader';
 import { MCPServerManager } from './server-manager';
 import { MCPToolRegistry } from './tool-registry';
-import { ToolExecutor } from '~/tools/executor';
+import { ToolExecutor } from '@lace/core/tools/executor';
 import { tmpdir } from 'os';
 import { mkdtempSync } from 'fs';
 

@@ -5,12 +5,12 @@
 
 import React, { useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faChevronRight, faChevronDown } from '@/lib/fontawesome';
-import { SidebarButton } from '@/components/layout/Sidebar';
-import type { useTaskManager } from '@/hooks/useTaskManager';
+import { faPlus, faChevronRight, faChevronDown } from '@lace/web/lib/fontawesome';
+import { SidebarButton } from '@lace/web/components/layout/Sidebar';
+import type { useTaskManager } from '@lace/web/hooks/useTaskManager';
 import { TaskSidebarItem } from './TaskSidebarItem';
-import { getStatusBgColor } from '@/lib/task-status-ui';
-import type { Task } from '@/types/core';
+import { getStatusBgColor } from '@lace/web/lib/task-status-ui';
+import type { Task } from '@lace/web/types/core';
 
 // Task display limits for each status section
 const TASK_DISPLAY_LIMITS = {

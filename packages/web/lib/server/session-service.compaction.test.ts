@@ -3,13 +3,13 @@
 
 import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
 import { SessionService } from './session-service';
-import { EventStreamManager } from '@/lib/event-stream-manager';
-import { Session, Agent } from '@/lib/server/lace-imports';
-import type { ThreadId } from '@/types/core';
-import { createMockAgent } from '@/test-utils/mock-agent';
+import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
+import { Session, Agent } from '@lace/web/lib/server/lace-imports';
+import type { ThreadId } from '@lace/web/types/core';
+import { createMockAgent } from '@lace/web/test-utils/mock-agent';
 
 // Mock dependencies
-vi.mock('@/lib/server/lace-imports', () => ({
+vi.mock('@lace/web/lib/server/lace-imports', () => ({
   Session: {
     create: vi.fn(),
     getByIdSync: vi.fn(),
@@ -18,7 +18,7 @@ vi.mock('@/lib/server/lace-imports', () => ({
   ThreadManager: vi.fn(),
 }));
 
-vi.mock('@/lib/event-stream-manager', () => ({
+vi.mock('@lace/web/lib/event-stream-manager', () => ({
   EventStreamManager: {
     getInstance: vi.fn(),
   },

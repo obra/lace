@@ -3,13 +3,13 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { z } from 'zod';
-import { Tool } from '~/tools/tool';
-import { ToolExecutor } from '~/tools/executor';
-import { ToolContext, ToolResult } from '~/tools/types';
-import { ThreadManager } from '~/threads/thread-manager';
-import { asThreadId } from '~/threads/types';
-import { Agent } from '~/agents/agent';
-import { DatabasePersistence } from '~/persistence/database';
+import { Tool } from './tool';
+import { ToolExecutor } from './executor';
+import { ToolContext, ToolResult } from './types';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { asThreadId } from '@lace/core/threads/types';
+import { Agent } from '@lace/core/agents/agent';
+import { DatabasePersistence } from '@lace/core/persistence/database';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';

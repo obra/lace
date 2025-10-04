@@ -13,7 +13,7 @@ import React, {
   ReactNode,
 } from 'react';
 import { z } from 'zod';
-import { api } from '@/lib/api-client';
+import { api } from '@lace/web/lib/api-client';
 
 const DaisyUIThemeSchema = z.enum(['light', 'dark']);
 const TIMELINE_WIDTHS = ['narrow', 'medium', 'wide', 'full'] as const;

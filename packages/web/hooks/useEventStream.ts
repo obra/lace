@@ -2,9 +2,9 @@
 // ABOUTME: Maintains same API as original but uses shared EventSource connection
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { useSSEStore } from '@/lib/sse-store';
-import type { LaceEvent, Task, AgentErrorData } from '@/types/core';
-import type { SessionPendingApproval } from '@/types/api';
+import { useSSEStore } from '@lace/web/lib/sse-store';
+import type { LaceEvent, Task, AgentErrorData } from '@lace/web/types/core';
+import type { SessionPendingApproval } from '@lace/web/types/api';
 
 // Runtime type guard for AgentErrorData
 function isAgentErrorData(value: unknown): value is AgentErrorData {

@@ -17,11 +17,11 @@ import {
   faGlobe,
   faChevronDown,
   faChevronRight,
-} from '@/lib/fontawesome';
-import { MessageHeader } from '@/components/ui';
-import { getToolRenderer, type ToolResult } from '@/components/timeline/tool';
-import type { ToolAggregatedEventData } from '@/types/web-events';
-import type { ToolCall } from '@/types/core';
+} from '@lace/web/lib/fontawesome';
+import { MessageHeader } from '@lace/web/components/ui';
+import { getToolRenderer, type ToolResult } from '@lace/web/components/timeline/tool';
+import type { ToolAggregatedEventData } from '@lace/web/types/web-events';
+import type { ToolCall } from '@lace/web/types/core';
 
 interface ToolCallDisplayProps {
   tool: string;

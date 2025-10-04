@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFile, rm, stat } from 'fs/promises';
 import { join, dirname } from 'path';
-import { FileWriteTool } from '~/tools/implementations/file_write';
+import { FileWriteTool } from '@lace/core/tools/implementations/file_write';
 
 describe('FileWriteTool with schema validation', () => {
   let tool: FileWriteTool;

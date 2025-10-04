@@ -5,12 +5,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { ProviderRegistry } from '~/providers/registry';
-import { AnthropicProvider } from '~/providers/anthropic-provider';
-import { LMStudioProvider } from '~/providers/lmstudio-provider';
-import { OpenAIProvider } from '~/providers/openai-provider';
-import { OllamaProvider } from '~/providers/ollama-provider';
-import type { ProviderInstancesConfig, Credential } from '~/providers/catalog/types';
+import { ProviderRegistry } from './registry';
+import { AnthropicProvider } from './anthropic-provider';
+import { LMStudioProvider } from './lmstudio-provider';
+import { OpenAIProvider } from './openai-provider';
+import { OllamaProvider } from './ollama-provider';
+import type { ProviderInstancesConfig, Credential } from '@lace/core/providers/catalog/types';
 
 describe('ProviderRegistry', () => {
   let registry: ProviderRegistry;

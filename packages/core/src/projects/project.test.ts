@@ -2,23 +2,23 @@
 // ABOUTME: Covers project creation, persistence, updates, and cleanup with proper database isolation
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Project } from '~/projects/project';
-import { Session } from '~/sessions/session';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { getPersistence, ProjectData } from '~/persistence/database';
+import { Project } from './project';
+import { Session } from '@lace/core/sessions/session';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { getPersistence, ProjectData } from '@lace/core/persistence/database';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import { existsSync, mkdirSync } from 'fs';
 import { mkdtempSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { getProcessTempDir } from '~/config/lace-dir';
+import { getProcessTempDir } from '@lace/core/config/lace-dir';
 
 describe('Project', () => {
   const tempLaceDirContext = setupCoreTest();
@@ -678,7 +678,7 @@ describe('Project', () => {
       return mkdtempSync(join(tmpdir(), 'lace-project-test-'));
     }
     it('should start async discovery when adding MCP server', async () => {
-      const { ToolCatalog } = await import('~/tools/tool-catalog');
+      const { ToolCatalog } = await import('@lace/core/tools/tool-catalog');
       const discoverSpy = vi.spyOn(ToolCatalog, 'discoverAndCacheTools').mockResolvedValue(void 0);
 
       // Use temp directory that exists
@@ -700,7 +700,7 @@ describe('Project', () => {
     });
 
     it('should not block on tool discovery', async () => {
-      const { ToolCatalog } = await import('~/tools/tool-catalog');
+      const { ToolCatalog } = await import('@lace/core/tools/tool-catalog');
 
       let resolveDiscovery: (() => void) | undefined;
       const discoveryPromise = new Promise<void>((resolve) => {
@@ -744,14 +744,14 @@ describe('Project', () => {
     it('should throw error for duplicate server IDs', async () => {
       // This test verifies that the duplicate check works correctly
       // We'll mock ToolCatalog to avoid server startup but allow testing the duplicate logic
-      const { ToolCatalog } = await import('~/tools/tool-catalog');
+      const { ToolCatalog } = await import('@lace/core/tools/tool-catalog');
 
       // Mock with spy to track calls and avoid actual discovery
       const discoverSpy = vi
         .spyOn(ToolCatalog, 'discoverAndCacheTools')
         .mockImplementation(async (serverId, config, projectDir) => {
           // Simulate the immediate config save that the real method does
-          const { MCPConfigLoader } = await import('~/config/mcp-config-loader');
+          const { MCPConfigLoader } = await import('@lace/core/config/mcp-config-loader');
           const pendingConfig = {
             ...config,
             discoveryStatus: 'discovering' as const,

@@ -1,12 +1,12 @@
 // ABOUTME: Local workspace manager that runs directly on host without containers
 // ABOUTME: Provides same interface as WorkspaceContainerManager for null-container mode
 
-import { ExecOptions, ExecResult } from '~/containers/types';
-import { logger } from '~/utils/logger';
+import { ExecOptions, ExecResult } from '@lace/core/containers/types';
+import { logger } from '@lace/core/utils/logger';
 import { exec, execFile, ExecFileOptions } from 'child_process';
 import { promisify } from 'util';
-import type { WorkspaceInfo } from '~/workspace/workspace-container-manager';
-import type { IWorkspaceManager } from '~/workspace/workspace-manager';
+import type { WorkspaceInfo } from './workspace-container-manager';
+import type { IWorkspaceManager } from './workspace-manager';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);

@@ -105,7 +105,7 @@ types"
 ```typescript
 // lib/serialization.test.ts
 import { serialize, deserialize } from './serialization';
-import type { ThreadId } from '@/types/core';
+import type { ThreadId } from '@lace/web/types/core';
 
 // Define NewAgentSpec locally for testing (it's defined in serialization.ts)
 type NewAgentSpec = string & { readonly __brand: 'NewAgentSpec' };
@@ -185,7 +185,7 @@ rg "ApiSession|ApiAgent|ApiProject" app/api/  # Find type usage
 
 ```typescript
 // BEFORE (BROKEN after Task 1):
-import { transformSessionInfo } from '@/lib/validation/api-schemas'; // DELETED
+import { transformSessionInfo } from '@lace/web/lib/validation/api-schemas'; // DELETED
 export async function GET() {
   const sessions = await sessionService.listSessions();
   const apiSessions = sessions.map(transformSessionInfo); // BROKEN
@@ -193,7 +193,7 @@ export async function GET() {
 }
 
 // AFTER (SUPERJSON with NextResponse):
-import { createSuperjsonResponse } from '@/lib/serialization';
+import { createSuperjsonResponse } from '@lace/web/lib/serialization';
 export async function GET() {
   const sessions = await sessionService.listSessions(); // Returns SessionInfo[]
   return createSuperjsonResponse({ sessions });
@@ -207,12 +207,12 @@ export async function GET() {
 ```typescript
 // hooks/useSessionAPI.ts
 // BEFORE:
-import type { ApiSession } from '@/types/api';
+import type { ApiSession } from '@lace/web/types/api';
 const data = (await response.json()) as { sessions: ApiSession[] };
 
 // AFTER:
-import type { SessionInfo } from '@/types/core';
-import { parse } from '@/lib/serialization';
+import type { SessionInfo } from '@lace/web/types/core';
+import { parse } from '@lace/web/lib/serialization';
 const responseText = await response.text();
 const data = parse(responseText) as { sessions: SessionInfo[] };
 ```
@@ -229,8 +229,8 @@ Find components importing `ApiSession` and change to `SessionInfo`:
 ```typescript
 // app/api/sessions/route.test.ts
 import { GET } from './route';
-import { parse } from '@/lib/serialization';
-import type { SessionInfo } from '@/types/core';
+import { parse } from '@lace/web/lib/serialization';
+import type { SessionInfo } from '@lace/web/types/core';
 
 describe('/api/sessions', () => {
   it('should return sessions with preserved types', async () => {
@@ -278,7 +278,7 @@ superjson for event serialization instead of JSON.stringify
 const data = `data: ${JSON.stringify(event)}\n\n`;
 
 // AFTER:
-import { stringify } from '@/lib/serialization';
+import { stringify } from '@lace/web/lib/serialization';
 const data = `data: ${stringify(event)}\n\n`;
 ```
 
@@ -287,15 +287,15 @@ const data = `data: ${stringify(event)}\n\n`;
 ```typescript
 // hooks/useEventStream.ts
 // BEFORE:
-import type { SessionEvent } from '@/types/web-sse';
+import type { SessionEvent } from '@lace/web/types/web-sse';
 eventSource.onmessage = (event) => {
   const sessionEvent: SessionEvent = JSON.parse(event.data);
   // ...
 };
 
 // AFTER:
-import type { SessionEvent } from '@/types/web-sse';
-import { parse } from '@/lib/serialization';
+import type { SessionEvent } from '@lace/web/types/web-sse';
+import { parse } from '@lace/web/lib/serialization';
 eventSource.onmessage = (event) => {
   const sessionEvent = parse(event.data) as SessionEvent;
   // sessionEvent.timestamp is now a Date object!
@@ -316,8 +316,8 @@ eventSource.onmessage = (event) => {
 
 ```typescript
 // e2e/sse-superjson.test.ts
-import { createSSEConnection } from '@/test-utils/sse-helpers';
-import { parse } from '@/lib/serialization';
+import { createSSEConnection } from '@lace/web/test-utils/sse-helpers';
+import { parse } from '@lace/web/lib/serialization';
 
 describe('SSE with Superjson', () => {
   it('should preserve event types over SSE', async () => {
@@ -379,13 +379,13 @@ rg "ApiSession|ApiAgent|ApiProject" hooks/  # Find type usage
 
 ```typescript
 // BEFORE (BROKEN after Task 1):
-import type { ApiSession } from '@/types/api'; // DELETED TYPE
+import type { ApiSession } from '@lace/web/types/api'; // DELETED TYPE
 const response = await fetch('/api/sessions');
 const data = (await response.json()) as { sessions: ApiSession[] }; // BROKEN
 
 // AFTER (SUPERJSON):
-import type { SessionInfo } from '@/types/core';
-import { parse } from '@/lib/serialization';
+import type { SessionInfo } from '@lace/web/types/core';
+import { parse } from '@lace/web/lib/serialization';
 const response = await fetch('/api/sessions');
 const data = parse(await response.text()) as { sessions: SessionInfo[] };
 ```
@@ -414,13 +414,13 @@ rg "ApiSession|ApiAgent|ApiProject" --type ts
 
 ```typescript
 // BEFORE:
-import type { ApiSession } from '@/types/api';
+import type { ApiSession } from '@lace/web/types/api';
 const response = await fetch('/api/sessions');
 const data = (await response.json()) as { sessions: ApiSession[] };
 
 // AFTER:
-import type { SessionInfo } from '@/types/core';
-import { parse } from '@/lib/serialization';
+import type { SessionInfo } from '@lace/web/types/core';
+import { parse } from '@lace/web/lib/serialization';
 const response = await fetch('/api/sessions');
 const data = parse(await response.text()) as { sessions: SessionInfo[] };
 ```

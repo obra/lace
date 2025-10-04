@@ -10,8 +10,8 @@ import type {
   ToolInputSchema,
   ToolAnnotations,
   ToolResultStatus,
-} from '~/tools/types';
-import { logger } from '~/utils/logger';
+} from './types';
+import { logger } from '@lace/core/utils/logger';
 
 export abstract class Tool {
   abstract name: string;

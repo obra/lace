@@ -2,14 +2,14 @@
 // ABOUTME: Tests complex queueing behavior, priority handling, and error recovery
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { createMockThreadManager } from '~/test-utils/thread-manager-mock';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Agent } from './agent';
+import { ProviderMessage, ProviderResponse } from '@lace/core/providers/base-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
+import { createMockThreadManager } from '@lace/core/test-utils/thread-manager-mock';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 // Mock provider with configurable delay for testing long operations
 class LongOperationProvider extends BaseMockProvider {

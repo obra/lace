@@ -3,8 +3,8 @@
 
 import { describe, it, expect } from 'vitest';
 import type { AgentWithTokenUsage } from './api';
-import { asThreadId } from '@/types/core';
-import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
+import { asThreadId } from '@lace/web/types/core';
+import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
 
 describe('API Type Definitions', () => {
   it('should include tokenUsage in AgentWithTokenUsage', () => {

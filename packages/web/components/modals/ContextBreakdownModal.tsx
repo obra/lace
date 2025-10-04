@@ -5,10 +5,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner } from '@/lib/fontawesome';
-import { Modal } from '@/components/ui/Modal';
-import { api } from '@/lib/api-client';
-import type { ContextBreakdown } from '@/types/context';
+import { faSpinner } from '@lace/web/lib/fontawesome';
+import { Modal } from '@lace/web/components/ui/Modal';
+import { api } from '@lace/web/lib/api-client';
+import type { ContextBreakdown } from '@lace/web/types/context';
 import { ContextTreemap } from './ContextTreemap';
 
 interface ContextBreakdownModalProps {

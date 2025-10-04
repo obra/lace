@@ -3,22 +3,22 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
-import { Project } from '~/projects/project';
-import { Session } from '@/lib/server/lace-imports';
-import { action } from '@/app/routes/api.agents.$agentId.message';
-import { EventStreamManager } from '@/lib/event-stream-manager';
+} from '@lace/core/test-utils/provider-defaults';
+import { Project } from '@lace/core/projects/project';
+import { Session } from '@lace/web/lib/server/lace-imports';
+import { action } from '@lace/web/app/routes/api.agents.$agentId.message';
+import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import type { LaceEvent, AgentSummaryUpdatedData } from '@/types/core';
+import type { LaceEvent, AgentSummaryUpdatedData } from '@lace/web/types/core';
 
 // Mock the AI provider HTTP responses
 const server = setupServer(

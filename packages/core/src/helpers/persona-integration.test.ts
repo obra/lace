@@ -2,8 +2,8 @@
 // ABOUTME: Ensures session summary agent uses session-summary persona correctly
 
 import { describe, it, expect } from 'vitest';
-import { SessionHelper } from '~/helpers/session-helper';
-import { Agent } from '~/agents/agent';
+import { SessionHelper } from './session-helper';
+import { Agent } from '@lace/core/agents/agent';
 
 // Simple test to verify persona integration works
 describe('SessionHelper Persona Integration', () => {

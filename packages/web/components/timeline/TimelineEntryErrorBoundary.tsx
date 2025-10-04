@@ -4,9 +4,9 @@
 'use client';
 
 import React, { Component, ReactNode } from 'react';
-import type { ProcessedEvent } from '@/hooks/useProcessedEvents';
-import CodeBlock from '@/components/ui/CodeBlock';
-import { safeStringify } from '@/lib/utils/safeStringify';
+import type { ProcessedEvent } from '@lace/web/hooks/useProcessedEvents';
+import CodeBlock from '@lace/web/components/ui/CodeBlock';
+import { safeStringify } from '@lace/web/lib/utils/safeStringify';
 
 interface Props {
   children: ReactNode;

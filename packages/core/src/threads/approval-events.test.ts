@@ -2,7 +2,7 @@
 // ABOUTME: Validates TOOL_APPROVAL_REQUEST and TOOL_APPROVAL_RESPONSE event creation
 
 import { describe, it, expect } from 'vitest';
-import { EVENT_TYPES, LaceEventType } from '~/threads/types';
+import { EVENT_TYPES, LaceEventType } from './types';
 
 describe('Approval Event Types', () => {
   it('should include TOOL_APPROVAL_REQUEST in EVENT_TYPES', () => {

@@ -1,9 +1,9 @@
 // ABOUTME: Tool system type definitions and interfaces
 // ABOUTME: Model-agnostic tool definitions compatible with multiple AI SDKs and MCP
 
-import type { Agent } from '~/agents/agent';
-import type { CombinedTokenUsage } from '~/token-management/types';
-import type { IWorkspaceManager } from '~/workspace/workspace-manager';
+import type { Agent } from '@lace/core/agents/agent';
+import type { CombinedTokenUsage } from '@lace/core/token-management/types';
+import type { IWorkspaceManager } from '@lace/core/workspace/workspace-manager';
 
 export interface ToolContext {
   // Execution control - required for cancellation

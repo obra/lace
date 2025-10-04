@@ -2,9 +2,9 @@
 // ABOUTME: Covers configuration retrieval, updates with validation and error handling
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { loader, action } from '@/app/routes/api.projects.$projectId.configuration';
-import { parseResponse } from '@/lib/serialization';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
+import { loader, action } from '@lace/web/app/routes/api.projects.$projectId.configuration';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 
 // Type interfaces for API responses
 interface ConfigurationResponse {
@@ -53,7 +53,7 @@ const mockProject = {
   createToolExecutor: vi.fn().mockResolvedValue(mockToolExecutor),
 };
 
-vi.mock('@/lib/server/lace-imports', () => ({
+vi.mock('@lace/web/lib/server/lace-imports', () => ({
   Project: {
     getById: vi.fn(),
   },
@@ -74,7 +74,7 @@ describe('Project Configuration API', () => {
 
   describe('GET /api/projects/:projectId/configuration', () => {
     it('should return project configuration when found', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
       const request = new Request('http://localhost/api/projects/test-project/configuration');
@@ -101,7 +101,7 @@ describe('Project Configuration API', () => {
     });
 
     it('should return 404 when project not found', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(null);
 
       const request = new Request('http://localhost/api/projects/nonexistent/configuration');
@@ -113,7 +113,7 @@ describe('Project Configuration API', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockImplementation(() => {
         throw new Error('Database error');
       });
@@ -129,7 +129,7 @@ describe('Project Configuration API', () => {
 
   describe('PUT /api/projects/:projectId/configuration', () => {
     it('should update project configuration successfully', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
       const updates = {
@@ -158,7 +158,7 @@ describe('Project Configuration API', () => {
     });
 
     it('should return 404 when project not found', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(null);
 
       const request = new Request('http://localhost/api/projects/nonexistent/configuration', {
@@ -175,7 +175,7 @@ describe('Project Configuration API', () => {
     });
 
     it('should validate configuration data', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
 
       const invalidUpdates = {
@@ -200,7 +200,7 @@ describe('Project Configuration API', () => {
     });
 
     it('should handle update errors', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
       mockProject.updateConfiguration = vi.fn().mockImplementation(() => {
         throw new Error('Update failed');

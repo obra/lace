@@ -67,11 +67,11 @@ Replace the entire implementation:
 
 ```typescript
 import { z } from 'zod';
-import { Tool } from '~/tools/tool';
-import { NonEmptyString } from '~/tools/schemas/common';
-import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
-import { TaskManager } from '~/tasks/task-manager';
-import { logger } from '~/utils/logger';
+import { Tool } from '@lace/core/tools/tool';
+import { NonEmptyString } from '@lace/core/tools/schemas/common';
+import type { ToolResult, ToolContext, ToolAnnotations } from '@lace/core/tools/types';
+import { TaskManager } from '@lace/core/tasks/task-manager';
+import { logger } from '@lace/core/utils/logger';
 
 // Model format validation
 const ModelFormat = z.string().refine(

@@ -4,10 +4,10 @@
 'use client';
 
 import React, { memo } from 'react';
-import { Modal } from '@/components/ui/Modal';
-import { ModelSelector } from '@/components/ui/ModelSelector';
-import type { ProviderInfo } from '@/types/api';
-import type { SessionInfo } from '@/types/core';
+import { Modal } from '@lace/web/components/ui/Modal';
+import { ModelSelector } from '@lace/web/components/ui/ModelSelector';
+import type { ProviderInfo } from '@lace/web/types/api';
+import type { SessionInfo } from '@lace/web/types/core';
 
 interface AgentCreateModalProps {
   isOpen: boolean;

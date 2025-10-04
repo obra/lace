@@ -3,8 +3,8 @@
 
 import { render, screen, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
-import { ChatInput } from '@/components/chat/ChatInput';
-import { ScrollProvider } from '@/components/providers/ScrollProvider';
+import { ChatInput } from '@lace/web/components/chat/ChatInput';
+import { ScrollProvider } from '@lace/web/components/providers/ScrollProvider';
 import React, { type ComponentProps } from 'react';
 
 type Props = ComponentProps<typeof ChatInput>;

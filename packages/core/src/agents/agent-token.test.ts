@@ -2,14 +2,14 @@
 // ABOUTME: Tests internal token tracking mechanics and public getTokenUsage() API
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Agent, CurrentTurnMetrics } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { TestProvider } from '~/test-utils/test-provider';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
-import { ToolResult, ToolContext } from '~/tools/types';
-import { ToolExecutor } from '~/tools/executor';
+import { Agent, CurrentTurnMetrics } from './agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { ProviderMessage, ProviderResponse } from '@lace/core/providers/base-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolResult, ToolContext } from '@lace/core/tools/types';
+import { ToolExecutor } from '@lace/core/tools/executor';
 import { z } from 'zod';
 
 // Mock provider for streaming token tests

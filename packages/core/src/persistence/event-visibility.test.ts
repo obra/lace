@@ -2,8 +2,8 @@
 // ABOUTME: Verifies visibleToModel field is persisted and read correctly
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DatabasePersistence } from '~/persistence/database';
-import type { LaceEvent } from '~/threads/types';
+import { DatabasePersistence } from './database';
+import type { LaceEvent } from '@lace/core/threads/types';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';

@@ -132,10 +132,10 @@ import { NextRequest } from 'next/server';
 import { promises as fs } from 'fs';
 import { join, resolve, relative } from 'path';
 import { homedir } from 'os';
-import { createSuperjsonResponse } from '@/lib/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import { ListDirectoryRequestSchema } from '@/types/filesystem';
-import type { DirectoryEntry, ListDirectoryResponse } from '@/types/filesystem';
+import { createSuperjsonResponse } from '@lace/web/lib/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { ListDirectoryRequestSchema } from '@lace/web/types/filesystem';
+import type { DirectoryEntry, ListDirectoryResponse } from '@lace/web/types/filesystem';
 
 export async function GET(request: NextRequest) {
   try {
@@ -253,8 +253,8 @@ import { GET } from './route';
 import { NextRequest } from 'next/server';
 import { homedir } from 'os';
 import { join } from 'path';
-import { parseResponse } from '@/lib/serialization';
-import type { ListDirectoryResponse } from '@/types/filesystem';
+import { parseResponse } from '@lace/web/lib/serialization';
+import type { ListDirectoryResponse } from '@lace/web/types/filesystem';
 
 describe('/api/filesystem/list', () => {
   it('should list home directory contents', async () => {
@@ -340,7 +340,7 @@ COMPLETED
 
 import React, { useState, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFolder, faSpinner } from '@/lib/fontawesome';
+import { faFolder, faSpinner } from '@lace/web/lib/fontawesome';
 
 interface DirectoryFieldProps {
   label?: string;
@@ -687,8 +687,8 @@ DirectoryField" ✅ COMPLETED
 
 ```typescript
 // Add imports
-import { parseResponse } from '@/lib/serialization';
-import type { ListDirectoryResponse, DirectoryEntry } from '@/types/filesystem';
+import { parseResponse } from '@lace/web/lib/serialization';
+import type { ListDirectoryResponse, DirectoryEntry } from '@lace/web/types/filesystem';
 import { homedir } from 'os';
 
 // Add to component state:
@@ -908,7 +908,7 @@ COMPLETED
 
 ```typescript
 // Add imports
-import { faChevronLeft, faHome } from '@/lib/fontawesome';
+import { faChevronLeft, faHome } from '@lace/web/lib/fontawesome';
 
 // Add to component state:
 const [parentPath, setParentPath] = useState<string | null>(null);
@@ -1124,7 +1124,7 @@ COMPLETED
 
 ```typescript
 // Add import at top of file
-import { DirectoryField } from '@/components/ui';
+import { DirectoryField } from '@lace/web/components/ui';
 
 // Replace the simplified mode directory input (around line 988-995):
 // OLD CODE:

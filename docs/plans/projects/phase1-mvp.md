@@ -592,7 +592,7 @@ describe('ThreadManager session support', () => {
 **Implementation** (`src/threads/thread-manager.ts`):
 
 ```typescript
-import { SessionData } from '~/persistence/database';
+import { SessionData } from '@lace/core/persistence/database';
 
 export class ThreadManager {
   // ... existing methods ...
@@ -1463,12 +1463,12 @@ import { NextRequest } from 'next/server';
 import {
   setupTestPersistence,
   teardownTestPersistence,
-} from '~/__tests__/setup/persistence-helper';
+} from '@lace/core/__tests__/setup/persistence-helper';
 
 // Mock server-only before importing API routes
 vi.mock('server-only', () => ({}));
 
-import { GET, POST } from '@/app/api/projects/route';
+import { GET, POST } from '@lace/web/app/api/projects/route';
 
 describe('Projects API Integration Tests', () => {
   beforeEach(() => {
@@ -1679,8 +1679,8 @@ describe('Session API endpoints', () => {
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
-import { Project } from '@/lib/server/lace-imports';
-import { generateId } from '@/lib/utils/id-generator';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import { generateId } from '@lace/web/lib/utils/id-generator';
 import { z } from 'zod';
 
 const CreateSessionSchema = z.object({
@@ -1758,7 +1758,7 @@ export async function POST(
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
-import { Session } from '@/lib/server/lace-imports';
+import { Session } from '@lace/web/lib/server/lace-imports';
 import { z } from 'zod';
 
 const UpdateSessionSchema = z.object({
@@ -2009,8 +2009,8 @@ export function ProjectSelector({ projects, selectedProject, onSelectProject }: 
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ProjectSelector } from '@/components/ProjectSelector';
-import { SessionList } from '@/components/SessionList';
+import { ProjectSelector } from '@lace/web/components/ProjectSelector';
+import { SessionList } from '@lace/web/components/SessionList';
 
 interface Project {
   id: string;

@@ -2,7 +2,7 @@
 // ABOUTME: Uses Project class environment manager for business logic and secure handling
 
 import type { Route } from './+types/api.projects.$projectId.environment';
-import { Project } from '@/lib/server/lace-imports';
+import { Project } from '@lace/web/lib/server/lace-imports';
 import { z } from 'zod';
 
 const SetEnvironmentVariablesSchema = z.object({

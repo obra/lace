@@ -14,10 +14,10 @@ import {
   cleanupTestProviderInstances,
   ApprovalDecision,
   TestProvider,
-} from '@/lib/server/lace-imports';
-import { cleanupSession } from '@/lib/server/lace-test-imports';
-import { asThreadId, type ThreadId } from '@/types/core';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+} from '@lace/web/lib/server/lace-imports';
+import { cleanupSession } from '@lace/web/lib/server/lace-test-imports';
+import { asThreadId, type ThreadId } from '@lace/web/types/core';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 
 describe('Callback-Free Agent Approval Flow', () => {
   const _tempLaceDir = setupWebTest();

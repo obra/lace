@@ -3,22 +3,22 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ContextAnalyzer } from './context-analyzer';
-import { Agent, AgentConfig } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { ToolExecutor } from '~/tools/executor';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { Tool } from '~/tools/tool';
+import { Agent, AgentConfig } from '@lace/core/agents/agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { Tool } from '@lace/core/tools/tool';
 import { z } from 'zod';
-import type { ToolResult, ToolContext } from '~/tools/types';
+import type { ToolResult, ToolContext } from '@lace/core/tools/types';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
-import type { ThreadId } from '~/threads/types';
+} from '@lace/core/test-utils/provider-defaults';
+import type { ThreadId } from '@lace/core/threads/types';
 
 // Mock tool for testing
 class TestTool extends Tool {

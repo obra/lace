@@ -2,9 +2,9 @@
 // ABOUTME: Tests client-side parameter handling and RESTful URL building - see task-api.e2e.test.ts for full integration
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { TaskAPIClient } from '@/lib/client/task-api';
-import { asThreadId } from '@/types/core';
-import { createMockResponse, createMockErrorResponse } from '@/test-utils/mock-fetch';
+import { TaskAPIClient } from '@lace/web/lib/client/task-api';
+import { asThreadId } from '@lace/web/types/core';
+import { createMockResponse, createMockErrorResponse } from '@lace/web/test-utils/mock-fetch';
 
 // Mock fetch to capture requests without making real calls
 global.fetch = vi.fn() as unknown as typeof fetch;

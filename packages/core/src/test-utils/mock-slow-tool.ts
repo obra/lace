@@ -2,8 +2,8 @@
 // ABOUTME: Delays execution with configurable timeout and handles abort signals properly
 
 import { z } from 'zod';
-import { Tool } from '~/tools/tool';
-import type { ToolResult, ToolContext } from '~/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import type { ToolResult, ToolContext } from '@lace/core/tools/types';
 
 const mockSlowSchema = z.object({
   delay: z.number().min(0).describe('Delay in milliseconds'),

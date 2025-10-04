@@ -40,7 +40,7 @@ new:persona;instanceId:modelId        -> Explicit specification
 ```typescript
 // Add to provider-utils.ts, after the existing parseProviderModel function
 
-import { UserSettingsManager } from '~/config/user-settings';
+import { UserSettingsManager } from '@lace/core/config/user-settings';
 
 export interface ResolvedModel {
   providerInstanceId: string;
@@ -109,7 +109,7 @@ export function resolveModelSpec(
 // Add these tests to the existing test file
 
 import { vi } from 'vitest';
-import { UserSettingsManager } from '~/config/user-settings';
+import { UserSettingsManager } from '@lace/core/config/user-settings';
 
 vi.mock('~/config/user-settings');
 
@@ -372,7 +372,7 @@ npx vitest run packages/core/src/threads/new-agent-spec.test.ts
 
 1. Update imports (add at top):
 ```typescript
-import { resolveModelSpec, type ModelResolutionContext } from '~/providers/provider-utils';
+import { resolveModelSpec, type ModelResolutionContext } from '@lace/core/providers/provider-utils';
 ```
 
 2. Update the `handleAgentSpawning` method (around line 296):
@@ -670,12 +670,12 @@ it('should accept explicit provider:model format', async () => {
 
 ```typescript
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TaskManager } from '~/tasks/task-manager';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { UserSettingsManager } from '~/config/user-settings';
-import { createNewAgentSpec } from '~/threads/types';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { TaskManager } from '@lace/core/tasks/task-manager';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import { UserSettingsManager } from '@lace/core/config/user-settings';
+import { createNewAgentSpec } from '@lace/core/threads/types';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 vi.mock('~/config/user-settings');
 

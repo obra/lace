@@ -2,7 +2,7 @@
 // ABOUTME: Handles autoscroll logic based on user scroll position and message events
 
 import { useEffect, useRef, useCallback, useMemo } from 'react';
-import { useScrollContext } from '@/components/providers/ScrollProvider';
+import { useScrollContext } from '@lace/web/components/providers/ScrollProvider';
 
 interface UseSmartAutoscrollOptions {
   // Threshold in pixels from bottom to consider "near bottom"

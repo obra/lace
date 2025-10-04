@@ -2,19 +2,22 @@
 // ABOUTME: Tests getting specific session information using real functionality
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { loader as GET, action as PATCH } from '@/app/routes/api.sessions.$sessionId';
-import type { SessionInfo } from '@/types/core';
-import { parseResponse } from '@/lib/serialization';
-import { setupWebTest } from '@/test-utils/web-test-setup';
-import { setupTestProviderDefaults, cleanupTestProviderDefaults } from '@/lib/server/lace-imports';
+import { loader as GET, action as PATCH } from '@lace/web/app/routes/api.sessions.$sessionId';
+import type { SessionInfo } from '@lace/web/types/core';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
+import {
+  setupTestProviderDefaults,
+  cleanupTestProviderDefaults,
+} from '@lace/web/lib/server/lace-imports';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
-import { getSessionService } from '@/lib/server/session-service';
-import { Project } from '@/lib/server/lace-imports';
-import { Session } from '@/lib/server/lace-imports';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
+} from '@lace/web/lib/server/lace-imports';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { Project } from '@lace/web/lib/server/lace-imports';
+import { Session } from '@lace/web/lib/server/lace-imports';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
@@ -24,7 +27,7 @@ vi.mock('server-only', () => ({}));
 
 // Mock only external dependencies while using real tools
 // URL fetch tool might make external HTTP requests
-vi.mock('~/tools/implementations/url-fetch', () => ({
+vi.mock('@lace/core/tools/implementations/url-fetch', () => ({
   UrlFetchTool: vi.fn(() => ({
     name: 'url-fetch',
     description: 'Fetch content from a URL (mocked)',
@@ -37,7 +40,7 @@ vi.mock('~/tools/implementations/url-fetch', () => ({
 }));
 
 // Bash tool executes system commands - mock to avoid side effects
-vi.mock('~/tools/implementations/bash', () => ({
+vi.mock('@lace/core/tools/implementations/bash', () => ({
   BashTool: vi.fn(() => ({
     name: 'bash',
     description: 'Execute bash commands (mocked)',
@@ -340,7 +343,7 @@ describe('Session Detail API Route', () => {
       // instead of going through sessionService.getSessionData()
 
       // Mock the Session class directly
-      const { Session } = await import('~/sessions/session');
+      const { Session } = await import('@lace/core/sessions/session');
       const mockDirectSessionData = {
         id: 'lace_20250101_sess01',
         name: 'Updated Session',

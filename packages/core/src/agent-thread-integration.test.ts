@@ -2,11 +2,11 @@
 // ABOUTME: Verifies Agent correctly emits events for thread operations
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { ToolExecutor } from '~/tools/executor';
-import { createMockProvider } from '~/test-utils/mock-provider';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Agent } from '@lace/core/agents/agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { createMockProvider } from '@lace/core/test-utils/mock-provider';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 describe('Agent Single Event Source Integration', () => {
   const _tempLaceDir = setupCoreTest();

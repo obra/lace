@@ -3,10 +3,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { useWorkspaceDetails } from '@/hooks/useWorkspaceDetails';
-import { api } from '@/lib/api-client';
+import { useWorkspaceDetails } from '@lace/web/hooks/useWorkspaceDetails';
+import { api } from '@lace/web/lib/api-client';
 
-vi.mock('@/lib/api-client', () => ({
+vi.mock('@lace/web/lib/api-client', () => ({
   api: {
     get: vi.fn(),
   },

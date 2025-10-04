@@ -8,7 +8,7 @@ import {
   ConfigurationValidator,
   SessionConfigurationSchema,
   AgentConfigurationSchema,
-} from '~/sessions/session-config';
+} from './session-config';
 
 describe('Session configuration', () => {
   let presetManager: ConfigurationPresetManager;

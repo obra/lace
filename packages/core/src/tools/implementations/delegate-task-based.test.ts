@@ -6,21 +6,21 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { DelegateTool } from '~/tools/implementations/delegate';
-import { ToolContext } from '~/tools/types';
-import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
+import { DelegateTool } from './delegate';
+import { ToolContext } from '@lace/core/tools/types';
+import { setupCoreTest, cleanupSession } from '@lace/core/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import {
   createDelegationTestSetup,
   DelegationTestSetup,
-} from '~/test-utils/delegation-test-helper';
+} from '@lace/core/test-utils/delegation-test-helper';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
 

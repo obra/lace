@@ -1,5 +1,11 @@
 import React from 'react';
-import { MessageHeader, MessageText, Avatar, AgentBadge, TimestampDisplay } from '@/components/ui';
+import {
+  MessageHeader,
+  MessageText,
+  Avatar,
+  AgentBadge,
+  TimestampDisplay,
+} from '@lace/web/components/ui';
 
 interface MessageDisplayProps {
   type: 'human' | 'ai' | 'admin' | 'tool';

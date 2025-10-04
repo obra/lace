@@ -2,14 +2,14 @@
 // ABOUTME: Tests verify Agent emits thread_event_added after ThreadManager operations
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { ToolExecutor } from '~/tools/executor';
-import { TestProvider } from '~/test-utils/test-provider';
-import { LaceEvent } from '~/threads/types';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { expectEventAdded } from '~/test-utils/event-helpers';
-import { createTestTempDir } from '~/test-utils/temp-directory';
+import { Agent } from './agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
+import { LaceEvent } from '@lace/core/threads/types';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { expectEventAdded } from '@lace/core/test-utils/event-helpers';
+import { createTestTempDir } from '@lace/core/test-utils/temp-directory';
 
 describe('Agent Thread Events', () => {
   const _tempLaceDir = setupCoreTest();

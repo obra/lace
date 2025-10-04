@@ -3,8 +3,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { TemplateEngine } from '~/config/template-engine';
-import { resolveResourcePath } from '~/utils/resource-resolver';
+import { TemplateEngine } from './template-engine';
+import { resolveResourcePath } from '@lace/core/utils/resource-resolver';
 import {
   VariableProviderManager,
   SystemVariableProvider,
@@ -12,10 +12,10 @@ import {
   ProjectVariableProvider,
   ToolVariableProvider,
   ContextDisclaimerProvider,
-} from '~/config/variable-providers';
-import { getLaceDir } from '~/config/lace-dir';
-import { personaRegistry } from '~/config/persona-registry';
-import { logger } from '~/utils/logger';
+} from './variable-providers';
+import { getLaceDir } from './lace-dir';
+import { personaRegistry } from './persona-registry';
+import { logger } from '@lace/core/utils/logger';
 
 interface PromptManagerOptions {
   tools?: Array<{ name: string; description: string }>;

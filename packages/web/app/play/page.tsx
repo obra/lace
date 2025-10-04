@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { faUser } from '@/lib/fontawesome';
+import { faUser } from '@lace/web/lib/fontawesome';
 
 // Import all migrated components organized by category
 // ATOMS - Single-purpose UI building blocks
-import { Alert } from '@/components/ui/Alert';
-import { DismissButton } from '@/components/ui/DismissButton';
+import { Alert } from '@lace/web/components/ui/Alert';
+import { DismissButton } from '@lace/web/components/ui/DismissButton';
 import {
   AgentBadge,
   TokenUsageDisplay,
@@ -21,65 +21,70 @@ import {
   MessageText,
   TimestampDisplay,
   MessageHeader,
-} from '@/components/ui';
+} from '@lace/web/components/ui';
 
 // ATOMS - Named exports from individual files
-import { AnimatedButton } from '@/components/ui/AnimatedButton';
-import { AccentInput } from '@/components/ui/AccentInput';
-import { AccentSelect } from '@/components/ui/AccentSelect';
-import { StreamingIndicator } from '@/components/ui/StreamingIndicator';
-import { GlassCard } from '@/components/ui/GlassCard';
-import { SwipeableCard } from '@/components/ui/SwipeableCard';
-import { DragDropOverlay } from '@/components/ui/DragDropOverlay';
+import { AnimatedButton } from '@lace/web/components/ui/AnimatedButton';
+import { AccentInput } from '@lace/web/components/ui/AccentInput';
+import { AccentSelect } from '@lace/web/components/ui/AccentSelect';
+import { StreamingIndicator } from '@lace/web/components/ui/StreamingIndicator';
+import { GlassCard } from '@lace/web/components/ui/GlassCard';
+import { SwipeableCard } from '@lace/web/components/ui/SwipeableCard';
+import { DragDropOverlay } from '@lace/web/components/ui/DragDropOverlay';
 
 // ATOMS - Named exports continued
-import { FileAttachment } from '@/components/ui/FileAttachment';
-import { AnimatedCarousel } from '@/components/ui/AnimatedCarousel';
-import MessageDisplay from '@/components/ui/MessageDisplay';
-import { VoiceRecognitionUI, CompactVoiceButton } from '@/components/ui/VoiceRecognitionUI';
-import { NativeSpeechInput } from '@/components/ui';
-import { AccountDropdown } from '@/components/ui/AccountDropdown';
-import { Sidebar, SidebarSection, SidebarItem, SidebarButton } from '@/components/layout/Sidebar';
-import NavigationItem from '@/components/ui/NavigationItem';
-import { AnimatedModal } from '@/components/ui/AnimatedModal';
-import NavigationButton from '@/components/ui/NavigationButton';
-import { AdvancedSettingsCollapse } from '@/components/ui/AdvancedSettingsCollapse';
-import { ThemeSelector } from '@/components/ui/ThemeSelector';
-import ExpandableHeader from '@/components/ui/ExpandableHeader';
-import { InfoSection } from '@/components/ui/InfoSection';
-import { InfoIconButton } from '@/components/ui/InfoIconButton';
-import { OnboardingHero } from '@/components/ui/OnboardingHero';
-import MessageBubble from '@/components/ui/MessageBubble';
-import { OnboardingActions } from '@/components/ui/OnboardingActions';
+import { FileAttachment } from '@lace/web/components/ui/FileAttachment';
+import { AnimatedCarousel } from '@lace/web/components/ui/AnimatedCarousel';
+import MessageDisplay from '@lace/web/components/ui/MessageDisplay';
+import { VoiceRecognitionUI, CompactVoiceButton } from '@lace/web/components/ui/VoiceRecognitionUI';
+import { NativeSpeechInput } from '@lace/web/components/ui';
+import { AccountDropdown } from '@lace/web/components/ui/AccountDropdown';
+import {
+  Sidebar,
+  SidebarSection,
+  SidebarItem,
+  SidebarButton,
+} from '@lace/web/components/layout/Sidebar';
+import NavigationItem from '@lace/web/components/ui/NavigationItem';
+import { AnimatedModal } from '@lace/web/components/ui/AnimatedModal';
+import NavigationButton from '@lace/web/components/ui/NavigationButton';
+import { AdvancedSettingsCollapse } from '@lace/web/components/ui/AdvancedSettingsCollapse';
+import { ThemeSelector } from '@lace/web/components/ui/ThemeSelector';
+import ExpandableHeader from '@lace/web/components/ui/ExpandableHeader';
+import { InfoSection } from '@lace/web/components/ui/InfoSection';
+import { InfoIconButton } from '@lace/web/components/ui/InfoIconButton';
+import { OnboardingHero } from '@lace/web/components/ui/OnboardingHero';
+import MessageBubble from '@lace/web/components/ui/MessageBubble';
+import { OnboardingActions } from '@lace/web/components/ui/OnboardingActions';
 
 // ADDITIONAL MISSING COMPONENTS
-import { AccentButton } from '@/components/ui/AccentButton';
-import IconButton from '@/components/ui/IconButton';
-import LoadingDots from '@/components/ui/LoadingDots';
-import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
-import SkeletonLoader from '@/components/ui/SkeletonLoader';
-import InlineCode from '@/components/ui/InlineCode';
-import { Modal } from '@/components/ui/Modal';
-import { Carousel } from '@/components/ui/Carousel';
-import CodeBlock from '@/components/ui/CodeBlock';
+import { AccentButton } from '@lace/web/components/ui/AccentButton';
+import IconButton from '@lace/web/components/ui/IconButton';
+import LoadingDots from '@lace/web/components/ui/LoadingDots';
+import { LoadingSkeleton } from '@lace/web/components/ui/LoadingSkeleton';
+import SkeletonLoader from '@lace/web/components/ui/SkeletonLoader';
+import InlineCode from '@lace/web/components/ui/InlineCode';
+import { Modal } from '@lace/web/components/ui/Modal';
+import { Carousel } from '@lace/web/components/ui/Carousel';
+import CodeBlock from '@lace/web/components/ui/CodeBlock';
 // import MarkdownRenderer from '@/components/ui/MarkdownRenderer';
 // import FileRenderer from '@/components/ui/FileRenderer';
-import LLMModelBadge from '@/components/ui/LLMModelBadge';
-import { TechnicalDetailsToggle } from '@/components/ui/TechnicalDetailsToggle';
-import { ToolCallDisplay } from '@/components/ui/ToolCallDisplay';
-import { TextAreaField } from '@/components/ui/TextAreaField';
+import LLMModelBadge from '@lace/web/components/ui/LLMModelBadge';
+import { TechnicalDetailsToggle } from '@lace/web/components/ui/TechnicalDetailsToggle';
+import { ToolCallDisplay } from '@lace/web/components/ui/ToolCallDisplay';
+import { TextAreaField } from '@lace/web/components/ui/TextAreaField';
 
 // MOLECULES - Composed UI patterns
-import { UISettingsPanel } from '@/components/settings/panels/UISettingsPanel';
-import { ChatInput } from '@/components/chat/ChatInput';
+import { UISettingsPanel } from '@lace/web/components/settings/panels/UISettingsPanel';
+import { ChatInput } from '@lace/web/components/chat/ChatInput';
 // Removed unused feedback and files imports to satisfy lints
 
 // ORGANISMS - Complex interactive components
-import GoogleDocChatMessage from '@/components/organisms/GoogleDocChatMessage';
-import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
-import { ToolApprovalModal } from '@/components/modals/ToolApprovalModal';
-import type { PendingApproval } from '@/types/api';
-import { ApprovalDecision } from '@/types/core';
+import GoogleDocChatMessage from '@lace/web/components/organisms/GoogleDocChatMessage';
+import { TaskBoardModal } from '@lace/web/components/modals/TaskBoardModal';
+import { ToolApprovalModal } from '@lace/web/components/modals/ToolApprovalModal';
+import type { PendingApproval } from '@lace/web/types/api';
+import { ApprovalDecision } from '@lace/web/types/core';
 
 type ComponentCategory = 'atoms' | 'molecules' | 'organisms' | 'all';
 

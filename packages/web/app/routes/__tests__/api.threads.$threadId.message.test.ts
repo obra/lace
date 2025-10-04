@@ -6,18 +6,18 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { action as POST } from '@/app/routes/api.threads.$threadId.message';
-import { createActionArgs } from '@/test-utils/route-test-helpers';
-import type { MessageResponse } from '@/types/api';
-import { Project, Session } from '@/lib/server/lace-imports';
-import { asThreadId } from '@/types/core';
-import { getSessionService } from '@/lib/server/session-service';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { action as POST } from '@lace/web/app/routes/api.threads.$threadId.message';
+import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import type { MessageResponse } from '@lace/web/types/api';
+import { Project, Session } from '@lace/web/lib/server/lace-imports';
+import { asThreadId } from '@lace/web/types/core';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
-import { parseResponse } from '@/lib/serialization';
+} from '@lace/web/lib/server/lace-imports';
+import { parseResponse } from '@lace/web/lib/serialization';
 
 // Console capture for verifying error output
 let consoleLogs: string[] = [];

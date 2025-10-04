@@ -14,11 +14,11 @@ import {
   faEdit,
   faComment,
   faPlus,
-} from '@/lib/fontawesome';
-import { Modal } from '@/components/ui/Modal';
-import type { AgentInfo } from '@/types/core';
-import type { Task, AssigneeId, TaskPriority, TaskNote } from '@/types/core';
-import { getStatusBadgeColor, getStatusOptions } from '@/lib/task-status-ui';
+} from '@lace/web/lib/fontawesome';
+import { Modal } from '@lace/web/components/ui/Modal';
+import type { AgentInfo } from '@lace/web/types/core';
+import type { Task, AssigneeId, TaskPriority, TaskNote } from '@lace/web/types/core';
+import { getStatusBadgeColor, getStatusOptions } from '@lace/web/lib/task-status-ui';
 
 interface TaskDisplayModalProps {
   isOpen: boolean;

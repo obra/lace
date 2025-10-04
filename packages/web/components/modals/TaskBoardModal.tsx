@@ -2,10 +2,10 @@
 
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTasks, faUser } from '@/lib/fontawesome';
-import { Modal } from '@/components/ui/Modal';
-import { Task } from '@/types/core';
-import { getKanbanColumns } from '@/lib/task-status-ui';
+import { faPlus, faTasks, faUser } from '@lace/web/lib/fontawesome';
+import { Modal } from '@lace/web/components/ui/Modal';
+import { Task } from '@lace/web/types/core';
+import { getKanbanColumns } from '@lace/web/lib/task-status-ui';
 
 interface TaskBoardModalProps {
   isOpen: boolean;

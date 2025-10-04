@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ThreadManager } from '~/threads/thread-manager';
-import { expectEventAdded } from '~/test-utils/event-helpers';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { ThreadManager } from './thread-manager';
+import { expectEventAdded } from '@lace/core/test-utils/event-helpers';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 describe('Compaction Integration', () => {
   const _tempLaceDir = setupCoreTest();

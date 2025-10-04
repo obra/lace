@@ -1,9 +1,13 @@
 // ABOUTME: Mock provider for testing that returns predictable responses
 // ABOUTME: Avoids expensive LLM calls during test execution
 
-import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
+import {
+  ProviderMessage,
+  ProviderResponse,
+  ProviderConfig,
+} from '@lace/core/providers/base-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { BaseMockProvider } from './base-mock-provider';
 
 interface TestProviderConfig extends ProviderConfig {
   mockResponse?: string;

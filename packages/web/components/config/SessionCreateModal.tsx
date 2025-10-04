@@ -4,9 +4,9 @@
 'use client';
 
 import React, { memo, useState, useRef, useEffect } from 'react';
-import { Modal } from '@/components/ui/Modal';
-import { CondensedChatInput } from '@/components/ui/CondensedChatInput';
-import type { ProjectInfo } from '@/types/core';
+import { Modal } from '@lace/web/components/ui/Modal';
+import { CondensedChatInput } from '@lace/web/components/ui/CondensedChatInput';
+import type { ProjectInfo } from '@lace/web/types/core';
 
 interface SessionCreateModalProps {
   isOpen: boolean;

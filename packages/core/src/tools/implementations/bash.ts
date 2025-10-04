@@ -4,10 +4,10 @@
 import { spawn } from 'child_process';
 import { createWriteStream } from 'fs';
 import { z } from 'zod';
-import { Tool } from '~/tools/tool';
-import { NonEmptyString } from '~/tools/schemas/common';
-import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
-import { logger } from '~/utils/logger';
+import { Tool } from '@lace/core/tools/tool';
+import { NonEmptyString } from '@lace/core/tools/schemas/common';
+import type { ToolResult, ToolContext, ToolAnnotations } from '@lace/core/tools/types';
+import { logger } from '@lace/core/utils/logger';
 
 export interface BashOutput {
   command: string;

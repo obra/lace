@@ -2,28 +2,32 @@
 // ABOUTME: Tests conversation processing, tool execution, state management, and event emissions
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent, AgentConfig, AgentState } from '~/agents/agent';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse, ProviderConfig } from '~/providers/base-provider';
-import { ToolCall, ToolResult, ToolContext, ApprovalDecision } from '~/tools/types';
-import { Tool } from '~/tools/tool';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { expectEventAdded } from '~/test-utils/event-helpers';
-import { BashTool } from '~/tools/implementations/bash';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
+import { Agent, AgentConfig, AgentState } from './agent';
+import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
+import {
+  ProviderMessage,
+  ProviderResponse,
+  ProviderConfig,
+} from '@lace/core/providers/base-provider';
+import { ToolCall, ToolResult, ToolContext, ApprovalDecision } from '@lace/core/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { expectEventAdded } from '@lace/core/test-utils/event-helpers';
+import { BashTool } from '@lace/core/tools/implementations/bash';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 
 // Type for AGENT_MESSAGE event data
 type AgentMessageData = {

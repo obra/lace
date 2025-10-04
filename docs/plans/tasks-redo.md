@@ -544,7 +544,7 @@ npm test packages/web/app/api/tasks/__tests__/route.test.ts
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionService } from '@/lib/server/session-service';
+import { getSessionService } from '@lace/web/lib/server/session-service';
 import { z } from 'zod';
 
 const CreateTaskSchema = z.object({
@@ -635,7 +635,7 @@ npm run build
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionService } from '@/lib/server/session-service';
+import { getSessionService } from '@lace/web/lib/server/session-service';
 
 export async function GET(
   request: NextRequest,
@@ -741,7 +741,7 @@ curl -X POST "http://localhost:3000/api/tasks" \
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionService } from '@/lib/server/session-service';
+import { getSessionService } from '@lace/web/lib/server/session-service';
 
 export async function GET(
   request: NextRequest,
@@ -802,7 +802,7 @@ export async function POST(
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionService } from '@/lib/server/session-service';
+import { getSessionService } from '@lace/web/lib/server/session-service';
 
 export async function GET(
   request: NextRequest,

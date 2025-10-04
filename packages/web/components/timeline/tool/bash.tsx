@@ -5,9 +5,9 @@
 
 import React, { useState } from 'react';
 import { faTerminal } from '@fortawesome/free-solid-svg-icons';
-import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
-import type { ToolAggregatedEventData } from '@/types/web-events';
-import { Alert } from '@/components/ui/Alert';
+import type { ToolRenderer, ToolResult } from '@lace/web/components/timeline/tool/types';
+import type { ToolAggregatedEventData } from '@lace/web/types/web-events';
+import { Alert } from '@lace/web/components/ui/Alert';
 
 // Type for structured bash output
 interface BashOutput {

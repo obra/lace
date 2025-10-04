@@ -1,4 +1,4 @@
-// ABOUTME: Vitest configuration for @lace/core; sets up alias (~), Node test env, coverage, and setup files
+// ABOUTME: Vitest configuration for @lace/core; sets up alias (@lace/core), Node test env, coverage, and setup files
 // ABOUTME: Configures test environment, path aliases, and coverage settings for the core package
 import { defineConfig } from 'vitest/config';
 import { resolve, dirname } from 'node:path';
@@ -9,7 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
-      '~': resolve(__dirname, 'src'),
+      '@lace/core': resolve(__dirname, 'src'),
     },
   },
   test: {

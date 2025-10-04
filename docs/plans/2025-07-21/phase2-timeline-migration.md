@@ -269,11 +269,11 @@ function getAgentName(threadId: ThreadId, agents: Agent[]): string {
 
 ```typescript
 // Remove custom imports
-import { LaceMessageList } from '@/components/ui/LaceMessageList';
+import { LaceMessageList } from '@lace/web/components/ui/LaceMessageList';
 
 // Add design system imports
-import { TimelineView } from '@/components/timeline/TimelineView';
-import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
+import { TimelineView } from '@lace/web/components/timeline/TimelineView';
+import { convertSessionEventsToTimeline } from '@lace/web/lib/timeline-converter';
 
 // In component
 const timelineEntries = useMemo(() => {

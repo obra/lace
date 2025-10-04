@@ -7,9 +7,9 @@ import { unlinkSync } from 'fs';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import TurndownService from 'turndown';
-import { Tool } from '~/tools/tool';
-import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
-import { logger } from '~/utils/logger';
+import { Tool } from '@lace/core/tools/tool';
+import type { ToolResult, ToolContext, ToolAnnotations } from '@lace/core/tools/types';
+import { logger } from '@lace/core/utils/logger';
 
 // Constants for configuration and validation
 const INLINE_CONTENT_LIMIT = 32 * 1024; // 32KB

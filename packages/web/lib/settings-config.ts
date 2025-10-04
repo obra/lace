@@ -1,7 +1,7 @@
 // ABOUTME: Centralized configuration for settings tabs and navigation
 // ABOUTME: Single source of truth for settings tab definitions, types, and metadata
 
-import { faRobot, faUser, faCog, faServer, faNewspaper } from '@/lib/fontawesome';
+import { faRobot, faUser, faCog, faServer, faNewspaper } from '@lace/web/lib/fontawesome';
 
 export const SETTINGS_TABS = {
   PROVIDERS: 'providers',

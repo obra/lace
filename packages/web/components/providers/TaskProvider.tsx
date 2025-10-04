@@ -4,14 +4,14 @@
 'use client';
 
 import React, { createContext, useContext, useState, useMemo, useCallback, ReactNode } from 'react';
-import { useTaskManager } from '@/hooks/useTaskManager';
-import { useTaskHandlers } from '@/hooks/useTaskHandlers';
-import { useEventStream } from '@/hooks/useEventStream';
-import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
-import { TaskCreationModal } from '@/components/modals/TaskCreationModal';
-import { TaskDisplayModal } from '@/components/modals/TaskDisplayModal';
-import { useOptionalSessionContext } from '@/components/providers/SessionProvider';
-import type { Task, AgentInfo } from '@/types/core';
+import { useTaskManager } from '@lace/web/hooks/useTaskManager';
+import { useTaskHandlers } from '@lace/web/hooks/useTaskHandlers';
+import { useEventStream } from '@lace/web/hooks/useEventStream';
+import { TaskBoardModal } from '@lace/web/components/modals/TaskBoardModal';
+import { TaskCreationModal } from '@lace/web/components/modals/TaskCreationModal';
+import { TaskDisplayModal } from '@lace/web/components/modals/TaskDisplayModal';
+import { useOptionalSessionContext } from '@lace/web/components/providers/SessionProvider';
+import type { Task, AgentInfo } from '@lace/web/types/core';
 
 // Task context interface
 interface TaskContextValue {

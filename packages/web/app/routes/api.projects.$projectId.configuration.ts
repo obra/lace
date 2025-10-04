@@ -1,11 +1,11 @@
 // ABOUTME: REST API endpoints for project configuration - GET, PUT for configuration management
 // ABOUTME: Handles project configuration retrieval and updates with validation and error handling
 
-import { Project, ProviderRegistry, ToolCatalog } from '@/lib/server/lace-imports';
-import { ToolPolicyResolver } from '@/lib/tool-policy-resolver';
-import type { ToolPolicy } from '@/types/core';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
+import { Project, ProviderRegistry, ToolCatalog } from '@lace/web/lib/server/lace-imports';
+import { ToolPolicyResolver } from '@lace/web/lib/tool-policy-resolver';
+import type { ToolPolicy } from '@lace/web/types/core';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
 // Using ToolCatalog instead of toolCacheService for better performance
 import { z } from 'zod';
 import type { Route } from './+types/api.projects.$projectId.configuration';

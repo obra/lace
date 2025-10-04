@@ -2,8 +2,8 @@
 // ABOUTME: Ensures error UI types are properly structured for frontend display
 
 import { describe, it, expect, vi } from 'vitest';
-import type { ErrorEntry, AgentErrorLogEntry, TimelineEntry } from '@/types/web-events';
-import { getErrorOrigin } from '@/types/web-events';
+import type { ErrorEntry, AgentErrorLogEntry, TimelineEntry } from '@lace/web/types/web-events';
+import { getErrorOrigin } from '@lace/web/types/web-events';
 
 describe('Error Web Event Types', () => {
   describe('ErrorEntry', () => {

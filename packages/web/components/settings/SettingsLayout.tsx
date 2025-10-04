@@ -6,9 +6,9 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes } from '@/lib/fontawesome';
+import { faTimes } from '@lace/web/lib/fontawesome';
 import { SettingsNavigation } from './SettingsNavigation';
-import type { SettingsTab } from '@/lib/settings-config';
+import type { SettingsTab } from '@lace/web/lib/settings-config';
 
 interface SettingsLayoutProps {
   children: React.ReactNode;

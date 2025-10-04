@@ -2,23 +2,20 @@
 // ABOUTME: Uses MSW HTTP mocking for realistic AI provider interaction testing
 
 import { vi } from 'vitest';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import {
-  createTestProviderInstance,
-  cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
-import { ProviderRegistry } from '~/providers/registry';
-import { AIProvider } from '~/providers/base-provider';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import { createTestProviderInstance, cleanupTestProviderInstances } from './provider-instances';
+import { ProviderRegistry } from '@lace/core/providers/registry';
+import { AIProvider } from '@lace/core/providers/base-provider';
 import type {
   ProviderInfo,
   ModelInfo,
   ProviderMessage,
   ProviderResponse,
   ProviderConfig,
-} from '~/providers/base-provider';
-import type { ToolCall } from '~/tools/types';
-import type { Tool } from '~/tools/tool';
+} from '@lace/core/providers/base-provider';
+import type { ToolCall } from '@lace/core/tools/types';
+import type { Tool } from '@lace/core/tools/tool';
 
 export interface DelegationTestSetup {
   session: Session;
@@ -199,7 +196,7 @@ export async function createDelegationTestSetup(options?: {
   }
 
   // Mock Agent._createProviderInstance to handle dynamic agent creation in delegation
-  const { Agent } = await import('~/agents/agent');
+  const { Agent } = await import('@lace/core/agents/agent');
 
   // Type-safe spy to ensure auto-restore via vi.restoreAllMocks()
   type AgentPrivate = {

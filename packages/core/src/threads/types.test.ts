@@ -2,12 +2,7 @@
 // ABOUTME: Validates that events can store token usage data correctly
 
 import { describe, it, expect } from 'vitest';
-import {
-  isTransientEventType,
-  EVENT_TYPES,
-  type LaceEvent,
-  type LaceEventType,
-} from '~/threads/types';
+import { isTransientEventType, EVENT_TYPES, type LaceEvent, type LaceEventType } from './types';
 
 describe('LaceEvent token usage', () => {
   it('should allow AGENT_MESSAGE with token usage', () => {

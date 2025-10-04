@@ -316,7 +316,7 @@ npm run test:unit src/sessions
 
 ```typescript
 // REPLACE entire SessionEvent definition with:
-import type { ThreadEvent } from '@/../../src/threads/types';
+import type { ThreadEvent } from '@lace/web/../../src/threads/types';
 
 export type SessionEvent = ThreadEvent;
 
@@ -344,7 +344,7 @@ if (event.type === 'AGENT_MESSAGE' && event.data?.tokenUsage) {
 
 ```typescript
 // The event is now ThreadEvent, update type imports:
-import type { ThreadEvent } from '@/../../src/threads/types';
+import type { ThreadEvent } from '@lace/web/../../src/threads/types';
 
 // Update callback signatures:
 export interface UseEventStreamOptions {
@@ -369,7 +369,7 @@ npm run test:unit
 **File:** `packages/web/components/timeline-direct.tsx` (NEW)
 
 ```typescript
-import type { ThreadEvent } from '@/../../src/threads/types';
+import type { ThreadEvent } from '@lace/web/../../src/threads/types';
 
 export function TimelineDirect({ events }: { events: ThreadEvent[] }) {
   // Filter out events we don't show in timeline
@@ -442,14 +442,14 @@ function TimelineEventRenderer({ event }: { event: ThreadEvent }) {
 
 ```typescript
 // FIND:
-import { Timeline } from '@/components/timeline';
-import { convertSessionEventsToTimeline } from '@/lib/timeline-converter';
+import { Timeline } from '@lace/web/components/timeline';
+import { convertSessionEventsToTimeline } from '@lace/web/lib/timeline-converter';
 
 const timelineEntries = convertSessionEventsToTimeline(events, context);
 <Timeline entries={timelineEntries} />
 
 // REPLACE with:
-import { TimelineDirect } from '@/components/timeline-direct';
+import { TimelineDirect } from '@lace/web/components/timeline-direct';
 
 <TimelineDirect events={events} />
 ```

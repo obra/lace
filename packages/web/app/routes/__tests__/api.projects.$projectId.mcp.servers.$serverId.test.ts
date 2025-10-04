@@ -2,9 +2,9 @@
 // ABOUTME: Validates CRUD operations for project-specific MCP server configurations
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { loader, action } from '@/app/routes/api.projects.$projectId.mcp.servers.$serverId';
-import { parseResponse } from '@/lib/serialization';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
+import { loader, action } from '@lace/web/app/routes/api.projects.$projectId.mcp.servers.$serverId';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 
 interface ServerResponse {
   id: string;
@@ -33,7 +33,7 @@ const mockProject = {
   deleteMCPServer: vi.fn(),
 };
 
-vi.mock('@/lib/server/lace-imports', () => ({
+vi.mock('@lace/web/lib/server/lace-imports', () => ({
   Project: {
     getById: vi.fn(),
   },
@@ -46,7 +46,7 @@ describe('Individual Project MCP Server Management API', () => {
 
   describe('GET /api/projects/:projectId/mcp/servers/:serverId', () => {
     it('should return specific project MCP server configuration', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
       mockProject.getMCPServer = vi.fn().mockReturnValue({
         command: 'npx',
@@ -72,7 +72,7 @@ describe('Individual Project MCP Server Management API', () => {
     });
 
     it('should return 404 for non-existent project', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(null);
 
       const request = new Request(
@@ -88,7 +88,7 @@ describe('Individual Project MCP Server Management API', () => {
     });
 
     it('should return 404 for non-existent server', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
       mockProject.getMCPServer = vi.fn().mockReturnValue(null);
 
@@ -107,7 +107,7 @@ describe('Individual Project MCP Server Management API', () => {
 
   describe('POST /api/projects/:projectId/mcp/servers/:serverId', () => {
     it('should create new project MCP server', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
       mockProject.getMCPServer = vi.fn().mockReturnValue(null); // Server doesn't exist
 
@@ -139,7 +139,7 @@ describe('Individual Project MCP Server Management API', () => {
     });
 
     it('should prevent duplicate server creation', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
       mockProject.getMCPServer = vi.fn().mockReturnValue({
         command: 'existing',
@@ -168,7 +168,7 @@ describe('Individual Project MCP Server Management API', () => {
     });
 
     it('should return 404 for non-existent project', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(null);
 
       const request = new Request('http://localhost/api/projects/nonexistent/mcp/servers/test', {
@@ -193,7 +193,7 @@ describe('Individual Project MCP Server Management API', () => {
 
   describe('PUT /api/projects/:projectId/mcp/servers/:serverId', () => {
     it('should update existing project MCP server', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
       mockProject.getMCPServer = vi.fn().mockReturnValue({
         command: 'npx',
@@ -230,7 +230,7 @@ describe('Individual Project MCP Server Management API', () => {
     });
 
     it('should return 404 for non-existent server', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
       mockProject.getMCPServer = vi.fn().mockReturnValue(null);
 
@@ -257,7 +257,7 @@ describe('Individual Project MCP Server Management API', () => {
 
   describe('DELETE /api/projects/:projectId/mcp/servers/:serverId', () => {
     it('should delete existing project MCP server', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
       mockProject.getMCPServer = vi.fn().mockReturnValue({
         command: 'npx',
@@ -283,7 +283,7 @@ describe('Individual Project MCP Server Management API', () => {
     });
 
     it('should return 404 for non-existent server', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
       mockProject.getMCPServer = vi.fn().mockReturnValue(null);
 
@@ -324,7 +324,7 @@ describe('Individual Project MCP Server Management API', () => {
     });
 
     it('should validate invalid request data for POST', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(mockProject);
       mockProject.getMCPServer = vi.fn().mockReturnValue(null);
 

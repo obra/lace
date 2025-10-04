@@ -6,31 +6,31 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '@/lib/server/lace-imports';
-import { createActionArgs } from '@/test-utils/route-test-helpers';
-import * as promptsModule from '~/config/prompts';
+} from '@lace/web/lib/server/lace-imports';
+import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import * as promptsModule from '@lace/core/config/prompts';
 
 // Mock server-only module
 vi.mock('server-only', () => ({}));
 
 // Mock external dependencies
-vi.mock('@/lib/server/approval-manager', () => ({
+vi.mock('@lace/web/lib/server/approval-manager', () => ({
   getApprovalManager: () => ({
     requestApproval: vi.fn().mockResolvedValue('allow_once'),
   }),
 }));
 
 // Import after mocks
-import { action as POST } from '@/app/routes/api.sessions.$sessionId.agents';
-import { getSessionService, SessionService } from '@/lib/server/session-service';
-import { Project, Session } from '@/lib/server/lace-imports';
-import { asThreadId } from '@/types/core';
+import { action as POST } from '@lace/web/app/routes/api.sessions.$sessionId.agents';
+import { getSessionService, SessionService } from '@lace/web/lib/server/session-service';
+import { Project, Session } from '@lace/web/lib/server/lace-imports';
+import { asThreadId } from '@lace/web/types/core';
 
 describe('Agent Creation API - Persona System Prompt Generation', () => {
   const context = setupWebTest();

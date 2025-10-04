@@ -6,8 +6,8 @@
 import React, { useState } from 'react';
 import { Treemap, ResponsiveContainer, Tooltip } from 'recharts';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronLeft } from '@/lib/fontawesome';
-import type { ContextBreakdown } from '@/types/context';
+import { faChevronLeft } from '@lace/web/lib/fontawesome';
+import type { ContextBreakdown } from '@lace/web/types/context';
 
 interface TreemapData {
   name: string;

@@ -1,9 +1,9 @@
 // ABOUTME: Tool approval preview utilities for creating mock results and partial diffs
 // ABOUTME: Transforms tool arguments into visual previews using existing renderer infrastructure
 
-import type { FileDiff, DiffChunk, DiffLine } from '@/components/files/FileDiffViewer';
-import type { ToolResult } from '@/components/timeline/tool/types';
-import { detectLanguageFromPath } from '@/components/files/FileDiffViewer.utils';
+import type { FileDiff, DiffChunk, DiffLine } from '@lace/web/components/files/FileDiffViewer';
+import type { ToolResult } from '@lace/web/components/timeline/tool/types';
+import { detectLanguageFromPath } from '@lace/web/components/files/FileDiffViewer.utils';
 
 /**
  * Creates a partial diff from file_edit arguments showing each edit operation
@@ -164,7 +164,7 @@ export function shouldShowPartialDiff(toolName: string): boolean {
 }
 
 // Extend FileDiff interface to support preview metadata
-declare module '@/components/files/FileDiffViewer' {
+declare module '@lace/web/components/files/FileDiffViewer' {
   interface FileDiff {
     isPartialPreview?: boolean;
   }

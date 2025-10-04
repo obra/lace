@@ -9,31 +9,31 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { SidebarContent } from '@/components/sidebar/SidebarContent';
-import type { SessionInfo, ThreadId, AgentInfo, ProjectInfo } from '@/types/core';
-import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
+import { SidebarContent } from '@lace/web/components/sidebar/SidebarContent';
+import type { SessionInfo, ThreadId, AgentInfo, ProjectInfo } from '@lace/web/types/core';
+import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
 import {
   createMockProjectContext,
   createMockSessionContext,
   createMockProjectsContext,
-} from '@/__tests__/utils/provider-mocks';
+} from '@lace/web/__tests__/utils/provider-mocks';
 
 // Mock all the providers
-vi.mock('@/components/providers/ProjectsProvider', () => ({
+vi.mock('@lace/web/components/providers/ProjectsProvider', () => ({
   useProjectsContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/ProjectProvider', () => ({
+vi.mock('@lace/web/components/providers/ProjectProvider', () => ({
   useProjectContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/SessionProvider', () => ({
+vi.mock('@lace/web/components/providers/SessionProvider', () => ({
   useOptionalSessionContext: vi.fn(),
   useSessionContext: vi.fn(),
 }));
 
 // Mock the child components to verify they receive correct props
-vi.mock('@/components/sidebar/ProjectSection', () => ({
+vi.mock('@lace/web/components/sidebar/ProjectSection', () => ({
   ProjectSection: ({
     isMobile,
     onSwitchProject,
@@ -57,7 +57,7 @@ vi.mock('@/components/sidebar/ProjectSection', () => ({
   ),
 }));
 
-vi.mock('@/components/sidebar/SessionSection', () => ({
+vi.mock('@lace/web/components/sidebar/SessionSection', () => ({
   SessionSection: ({
     isMobile,
     onCloseMobileNav,
@@ -76,7 +76,7 @@ vi.mock('@/components/sidebar/SessionSection', () => ({
   ),
 }));
 
-vi.mock('@/components/sidebar/AgentsSection', () => ({
+vi.mock('@lace/web/components/sidebar/AgentsSection', () => ({
   AgentsSection: ({
     isMobile,
     onAgentSelect,
@@ -100,7 +100,7 @@ vi.mock('@/components/sidebar/AgentsSection', () => ({
   ),
 }));
 
-vi.mock('@/components/sidebar/TaskSidebarSection', () => ({
+vi.mock('@lace/web/components/sidebar/TaskSidebarSection', () => ({
   TaskSidebarSection: ({ onCloseMobileNav }: { onCloseMobileNav?: () => void }) => (
     <div data-testid="task-section">
       {onCloseMobileNav && (
@@ -113,12 +113,12 @@ vi.mock('@/components/sidebar/TaskSidebarSection', () => ({
 }));
 
 // Import mocked hooks
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
+import { useProjectContext } from '@lace/web/components/providers/ProjectProvider';
 import {
   useOptionalSessionContext,
   useSessionContext,
-} from '@/components/providers/SessionProvider';
+} from '@lace/web/components/providers/SessionProvider';
 
 const mockUseProjectsContext = vi.mocked(useProjectsContext);
 const mockUseProjectContext = vi.mocked(useProjectContext);

@@ -7,8 +7,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { ChevronRightIcon } from '@/lib/heroicons';
-import { faCog, faTimes, faBars } from '@/lib/fontawesome';
+import { ChevronRightIcon } from '@lace/web/lib/heroicons';
+import { faCog, faTimes, faBars } from '@lace/web/lib/fontawesome';
 
 interface SidebarProps {
   open: boolean;

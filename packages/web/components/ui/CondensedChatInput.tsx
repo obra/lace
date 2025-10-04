@@ -5,7 +5,7 @@
 
 import React, { useRef, useEffect, useImperativeHandle, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane } from '@/lib/fontawesome';
+import { faPaperPlane } from '@lace/web/lib/fontawesome';
 
 interface CondensedChatInputProps {
   id?: string;

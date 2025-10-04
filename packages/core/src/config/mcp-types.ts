@@ -3,7 +3,7 @@
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import type { ToolPolicy } from '~/tools/types';
+import type { ToolPolicy } from '@lace/core/tools/types';
 
 // Discovered tool information from MCP server
 export interface DiscoveredTool {

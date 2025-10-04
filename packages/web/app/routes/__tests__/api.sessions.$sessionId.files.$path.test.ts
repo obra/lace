@@ -2,25 +2,25 @@
 // ABOUTME: Tests secure file access, MIME type detection, size limits, and security controls
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { loader } from '@/app/routes/api.sessions.$sessionId.files.$path';
-import { createLoaderArgs } from '@/test-utils/route-test-helpers';
+import { loader } from '@lace/web/app/routes/api.sessions.$sessionId.files.$path';
+import { createLoaderArgs } from '@lace/web/test-utils/route-test-helpers';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { parseResponse } from '@/lib/serialization';
-import type { SessionFileContentResponse } from '@/types/session-files';
-import type { ApiErrorResponse } from '@/types/api';
+import { parseResponse } from '@lace/web/lib/serialization';
+import type { SessionFileContentResponse } from '@lace/web/types/session-files';
+import type { ApiErrorResponse } from '@lace/web/types/api';
 
 // Mock session service with dependency injection approach
 const mockGetSession = vi.fn();
 
-vi.mock('@/lib/server/session-service', () => ({
+vi.mock('@lace/web/lib/server/session-service', () => ({
   SessionService: vi.fn().mockImplementation(() => ({
     getSession: mockGetSession,
   })),
 }));
 
-vi.mock('@/types/core', () => ({
+vi.mock('@lace/web/types/core', () => ({
   asThreadId: vi.fn().mockImplementation((id) => id),
   isThreadId: vi.fn().mockReturnValue(true),
 }));

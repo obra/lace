@@ -6,10 +6,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SettingsProvider, useTheme } from './SettingsProvider';
-import { api } from '@/lib/api-client';
+import { api } from '@lace/web/lib/api-client';
 
 // Mock the API client
-vi.mock('@/lib/api-client', () => ({
+vi.mock('@lace/web/lib/api-client', () => ({
   api: {
     get: vi.fn(),
     patch: vi.fn(),

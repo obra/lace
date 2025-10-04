@@ -1,19 +1,31 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
-    "rootDirs": [".", "./.react-router/types"],
+    "rootDirs": [
+      ".",
+      "./.react-router/types"
+    ],
     "paths": {
-      "@/*": ["./*"],
-      "~/*": ["../../packages/core/src/*"],
-      "./+types/*": ["./.react-router/types/app/routes/+types/*"]
+      "@lace/core/*": [
+        "../../packages/core/src/*"
+      ],
+      "./+types/*": [
+        "./.react-router/types/app/routes/+types/*"
+      ],
+      "@lace/web/*": [
+        "./*"
+      ]
     },
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "noEmit": true,
     "incremental": true,
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": false,
-
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
@@ -26,6 +38,15 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["**/*.ts", "**/*.tsx", ".react-router/types/**/*"],
-  "exclude": ["node_modules", ".next", "stories_parked", "scripts/**"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".react-router/types/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    "stories_parked",
+    "scripts/**"
+  ]
 }

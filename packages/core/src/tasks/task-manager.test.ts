@@ -2,11 +2,11 @@
 // ABOUTME: Validates task CRUD, filtering, session scoping, and multi-agent scenarios
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { TaskManager } from '~/tasks/task-manager';
-import { DatabasePersistence, getPersistence } from '~/persistence/database';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { Task, CreateTaskRequest, TaskContext } from '~/tasks/types';
-import { asThreadId } from '~/threads/types';
+import { TaskManager } from './task-manager';
+import { DatabasePersistence, getPersistence } from '@lace/core/persistence/database';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { Task, CreateTaskRequest, TaskContext } from './types';
+import { asThreadId } from '@lace/core/threads/types';
 
 describe('TaskManager', () => {
   const _tempLaceDir = setupCoreTest();

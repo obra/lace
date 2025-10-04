@@ -2,15 +2,15 @@
 // ABOUTME: Ensures containers are fully removed after test completion
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { AppleContainerRuntime } from '~/containers/apple-container';
+import { AppleContainerRuntime } from './apple-container';
 import { mkdirSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
-import type { ContainerConfig } from '~/containers/types';
+import type { ContainerConfig } from './types';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { logger } from '~/utils/logger';
+import { logger } from '@lace/core/utils/logger';
 
 const execFileAsync = promisify(execFile);
 

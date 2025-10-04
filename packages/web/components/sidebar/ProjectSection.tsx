@@ -5,10 +5,10 @@
 
 import React, { memo, useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFolder, faCog } from '@/lib/fontawesome';
-import { ProjectEditModal } from '@/components/config/ProjectEditModal';
-import { SwitchIcon } from '@/components/ui/SwitchIcon';
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
+import { faFolder, faCog } from '@lace/web/lib/fontawesome';
+import { ProjectEditModal } from '@lace/web/components/config/ProjectEditModal';
+import { SwitchIcon } from '@lace/web/components/ui/SwitchIcon';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
 
 interface ProjectSectionProps {
   isMobile?: boolean;

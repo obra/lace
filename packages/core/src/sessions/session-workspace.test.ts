@@ -3,8 +3,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Session } from './session';
-import { Project } from '~/projects/project';
-import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
+import { Project } from '@lace/core/projects/project';
+import { setupCoreTest, cleanupSession } from '@lace/core/test-utils/core-test-setup';
 import { join } from 'path';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';

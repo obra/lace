@@ -1,7 +1,7 @@
 import React from 'react';
 import { useRef, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus } from '@/lib/fontawesome';
+import { faPlus } from '@lace/web/lib/fontawesome';
 
 interface FileAttachButtonProps {
   onFilesSelected: (files: FileList) => void;

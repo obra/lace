@@ -2,8 +2,8 @@
 // ABOUTME: Ensures event types are correctly structured and utilities work
 
 import { describe, it, expect } from 'vitest';
-import type { LaceEvent } from '@/types/core';
-import { EVENT_TYPES, isTransientEventType, asThreadId } from '@/types/core';
+import type { LaceEvent } from '@lace/web/types/core';
+import { EVENT_TYPES, isTransientEventType, asThreadId } from '@lace/web/types/core';
 
 describe('Event Types', () => {
   it('should export core EVENT_TYPES', () => {

@@ -1,7 +1,7 @@
 // ABOUTME: Apple Container runtime using the macOS 'container' CLI tool
 // ABOUTME: Provides real container isolation using Apple's container platform
 
-import { BaseContainerRuntime } from '~/containers/runtime';
+import { BaseContainerRuntime } from './runtime';
 import {
   ContainerConfig,
   ContainerInfo,
@@ -9,8 +9,8 @@ import {
   ExecResult,
   ContainerError,
   ContainerExecError,
-} from '~/containers/types';
-import { logger } from '~/utils/logger';
+} from './types';
+import { logger } from '@lace/core/utils/logger';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { v4 as uuidv4 } from 'uuid';

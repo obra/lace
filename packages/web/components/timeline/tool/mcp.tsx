@@ -4,9 +4,9 @@
 'use client';
 
 import React from 'react';
-import { faServer } from '@/lib/fontawesome';
-import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
-import type { ToolAggregatedEventData } from '@/types/web-events';
+import { faServer } from '@lace/web/lib/fontawesome';
+import type { ToolRenderer, ToolResult } from '@lace/web/components/timeline/tool/types';
+import type { ToolAggregatedEventData } from '@lace/web/types/web-events';
 
 /**
  * MCP Parameters display component for the body

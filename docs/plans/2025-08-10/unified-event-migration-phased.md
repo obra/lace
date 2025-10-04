@@ -85,7 +85,7 @@ rm -rf src/stream-events/
 **File:** `packages/web/types/web-sse.ts`
 
 ```typescript
-import type { ThreadEvent } from '@/../../src/threads/types';
+import type { ThreadEvent } from '@lace/web/../../src/threads/types';
 export type SessionEvent = ThreadEvent;
 ```
 

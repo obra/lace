@@ -16,13 +16,13 @@ import {
   faUser,
   faArrowRight,
 } from '@fortawesome/free-solid-svg-icons';
-import type { ToolRenderer, ToolResult } from '@/components/timeline/tool/types';
-import type { ToolAggregatedEventData } from '@/types/web-events';
-import type { Task } from '@/types/core';
-import { Badge } from '@/components/ui';
-import { Alert } from '@/components/ui/Alert';
-import InlineCode from '@/components/ui/InlineCode';
-import MarkdownRenderer from '@/components/ui/MarkdownRenderer';
+import type { ToolRenderer, ToolResult } from '@lace/web/components/timeline/tool/types';
+import type { ToolAggregatedEventData } from '@lace/web/types/web-events';
+import type { Task } from '@lace/web/types/core';
+import { Badge } from '@lace/web/components/ui';
+import { Alert } from '@lace/web/components/ui/Alert';
+import InlineCode from '@lace/web/components/ui/InlineCode';
+import MarkdownRenderer from '@lace/web/components/ui/MarkdownRenderer';
 
 /**
  * Priority badge component using design system Badge

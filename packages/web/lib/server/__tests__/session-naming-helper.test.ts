@@ -2,12 +2,12 @@
 // ABOUTME: Validates session name generation with proper constraints and helper integration
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generateSessionName } from '@/lib/server/session-naming-helper';
-import { InfrastructureHelper } from '@/lib/server/lace-imports';
-import type { AIProvider } from '@/lib/server/lace-imports';
+import { generateSessionName } from '@lace/web/lib/server/session-naming-helper';
+import { InfrastructureHelper } from '@lace/web/lib/server/lace-imports';
+import type { AIProvider } from '@lace/web/lib/server/lace-imports';
 
 // Mock the lace-imports module
-vi.mock('@/lib/server/lace-imports', () => ({
+vi.mock('@lace/web/lib/server/lace-imports', () => ({
   InfrastructureHelper: vi.fn(),
 }));
 

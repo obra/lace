@@ -1,7 +1,7 @@
 // ABOUTME: Consolidated SQLite persistence layer for threads, events, and tasks
 // ABOUTME: Handles database schema, CRUD operations, and data serialization for all entities
 
-import { getTaskStatusDBConstraint } from '~/tasks/task-status';
+import { getTaskStatusDBConstraint } from '@lace/core/tasks/task-status';
 
 // Custom error for transient event persistence attempts
 export class TransientEventError extends Error {
@@ -89,7 +89,7 @@ if (process?.versions?.bun) {
   Database = betterSqlite3.default as DatabaseConstructor;
 }
 
-import { getLaceDbPath } from '~/config/lace-dir';
+import { getLaceDbPath } from '@lace/core/config/lace-dir';
 import {
   Thread,
   LaceEvent,
@@ -98,13 +98,13 @@ import {
   AssigneeId,
   AgentMessageData,
   isTransientEventType,
-} from '~/threads/types';
-import type { ToolCall, ToolResult } from '~/tools/types';
-import type { Task, TaskNote, TaskStatus, TaskPriority } from '~/tasks/types';
-import { logger } from '~/utils/logger';
-import type { CompactionData } from '~/threads/compaction/types';
-import type { ToolApprovalRequestData, ToolApprovalResponseData } from '~/threads/types';
-import { SQLProfiler } from '~/persistence/sql-profiler';
+} from '@lace/core/threads/types';
+import type { ToolCall, ToolResult } from '@lace/core/tools/types';
+import type { Task, TaskNote, TaskStatus, TaskPriority } from '@lace/core/tasks/types';
+import { logger } from '@lace/core/utils/logger';
+import type { CompactionData } from '@lace/core/threads/compaction/types';
+import type { ToolApprovalRequestData, ToolApprovalResponseData } from '@lace/core/threads/types';
+import { SQLProfiler } from './sql-profiler';
 
 // Helper function to create properly typed LaceEvent from database row
 function createLaceEventFromDb(

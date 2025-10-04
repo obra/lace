@@ -4,7 +4,7 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import CodeBlock from '@/components/ui/CodeBlock';
+import CodeBlock from '@lace/web/components/ui/CodeBlock';
 
 // Mock only external side effects, not the behavior under test
 Object.assign(navigator, {

@@ -1,15 +1,15 @@
 // ABOUTME: Infrastructure helper for Lace's internal systems to execute LLM tasks
 // ABOUTME: Bypasses user approval with programmatic tool whitelist for trusted operations
 
-import { BaseHelper } from '~/helpers/base-helper';
-import { UserSettingsManager } from '~/config/user-settings';
-import { ProviderInstanceManager } from '~/providers/instance/manager';
-import { parseProviderModel } from '~/providers/provider-utils';
-import { ToolExecutor } from '~/tools/executor';
-import { Tool } from '~/tools/tool';
-import { ToolCall, ToolResult, ToolContext, createErrorResult } from '~/tools/types';
-import type { AIProvider } from '~/providers/base-provider';
-import { logger } from '~/utils/logger';
+import { BaseHelper } from './base-helper';
+import { UserSettingsManager } from '@lace/core/config/user-settings';
+import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
+import { parseProviderModel } from '@lace/core/providers/provider-utils';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { Tool } from '@lace/core/tools/tool';
+import { ToolCall, ToolResult, ToolContext, createErrorResult } from '@lace/core/tools/types';
+import type { AIProvider } from '@lace/core/providers/base-provider';
+import { logger } from '@lace/core/utils/logger';
 
 export interface InfrastructureHelperOptions {
   /** Model tier to use - 'fast' or 'smart' */

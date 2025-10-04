@@ -1,15 +1,15 @@
 // ABOUTME: Agent spawning API endpoints for creating and listing agents within a session
 // ABOUTME: Agents are child threads (sessionId.N) that run within a session
 
-import { getSessionService } from '@/lib/server/session-service';
-import { CreateAgentRequest } from '@/types/api';
-import { asThreadId, ThreadId } from '@/types/core';
-import { isValidThreadId as isClientValidThreadId } from '@/lib/validation/thread-id-validation';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import { EventStreamManager } from '@/lib/event-stream-manager';
-import type { Agent } from '@/lib/server/lace-imports';
-import { logger } from '~/utils/logger';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { CreateAgentRequest } from '@lace/web/types/api';
+import { asThreadId, ThreadId } from '@lace/web/types/core';
+import { isValidThreadId as isClientValidThreadId } from '@lace/web/lib/validation/thread-id-validation';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { EventStreamManager } from '@lace/web/lib/event-stream-manager';
+import type { Agent } from '@lace/web/lib/server/lace-imports';
+import { logger } from '@lace/core/utils/logger';
 import type { Route } from './+types/api.sessions.$sessionId.agents';
 
 // Type guard for unknown error values

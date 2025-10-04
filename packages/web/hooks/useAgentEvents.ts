@@ -2,10 +2,10 @@
 // ABOUTME: Loads historical events for a specific agent and handles real-time updates
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { LaceEvent } from '@/types/core';
-import type { ThreadId } from '@/types/core';
-import { isInternalWorkflowEvent } from '@/types/core';
-import { api } from '@/lib/api-client';
+import type { LaceEvent } from '@lace/web/types/core';
+import type { ThreadId } from '@lace/web/types/core';
+import { isInternalWorkflowEvent } from '@lace/web/types/core';
+import { api } from '@lace/web/lib/api-client';
 
 interface UseAgentEventsReturn {
   events: LaceEvent[];

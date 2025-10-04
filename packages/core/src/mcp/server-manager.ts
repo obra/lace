@@ -4,8 +4,8 @@
 import { EventEmitter } from 'events';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { logger } from '~/utils/logger';
-import type { MCPServerConfig, MCPServerConnection } from '~/config/mcp-types';
+import { logger } from '@lace/core/utils/logger';
+import type { MCPServerConfig, MCPServerConnection } from '@lace/core/config/mcp-types';
 
 export class MCPServerManager extends EventEmitter {
   private servers = new Map<string, MCPServerConnection>();

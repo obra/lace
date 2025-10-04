@@ -222,7 +222,7 @@ fallbacks to the default implementations.
 Add the import at the top:
 
 ```typescript
-import { getToolRenderer } from '@/components/timeline/tool';
+import { getToolRenderer } from '@lace/web/components/timeline/tool';
 ```
 
 **Step 3.2**: Update the main component logic

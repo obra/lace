@@ -6,7 +6,7 @@ import {
   enableTrafficLogging,
   isTrafficLoggingEnabled,
   resetTrafficLogging,
-} from '~/utils/traffic-logger';
+} from './traffic-logger';
 
 // Mock all the underlying modules
 vi.mock('./har-recorder.js', () => ({

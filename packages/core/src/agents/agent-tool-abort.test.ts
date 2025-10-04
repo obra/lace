@@ -2,29 +2,29 @@
 // ABOUTME: Validates that tool execution can be cancelled mid-execution
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Agent, AgentConfig } from '~/agents/agent';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { MockSlowTool } from '~/test-utils/mock-slow-tool';
-import { BashTool } from '~/tools/implementations/bash';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
-import type { ToolResult, ToolCall } from '~/tools/types';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
+import { Agent, AgentConfig } from './agent';
+import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
+import { MockSlowTool } from '@lace/core/test-utils/mock-slow-tool';
+import { BashTool } from '@lace/core/tools/implementations/bash';
+import { ProviderMessage, ProviderResponse } from '@lace/core/providers/base-provider';
+import { Tool } from '@lace/core/tools/tool';
+import type { ToolResult, ToolCall } from '@lace/core/tools/types';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
-import { waitForEventCount } from '~/test-utils/event-waiters';
+import { waitForEventCount } from '@lace/core/test-utils/event-waiters';
 
 class MockProviderWithTools extends BaseMockProvider {
   private mockToolCalls: ToolCall[];

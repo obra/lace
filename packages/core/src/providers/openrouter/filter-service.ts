@@ -1,9 +1,9 @@
 // ABOUTME: Service for filtering OpenRouter models based on user configuration
 // ABOUTME: Applies provider, model, capability, cost, and context length filters
 
-import type { OpenRouterModel } from '~/providers/openrouter/types';
-import type { ModelConfig } from '~/providers/catalog/types';
-import { extractProvider, convertPricing } from '~/providers/openrouter/utils';
+import type { OpenRouterModel } from './types';
+import type { ModelConfig } from '@lace/core/providers/catalog/types';
+import { extractProvider, convertPricing } from './utils';
 
 export class ModelFilterService {
   filterModels(models: OpenRouterModel[], config: ModelConfig): OpenRouterModel[] {

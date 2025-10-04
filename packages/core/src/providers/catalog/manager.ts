@@ -3,10 +3,10 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { getLaceDir } from '~/config/lace-dir';
-import { CatalogProvider, CatalogProviderSchema, CatalogModel } from '~/providers/catalog/types';
-import { resolveDataDirectory } from '~/utils/resource-resolver';
-import { logger } from '~/utils/logger';
+import { getLaceDir } from '@lace/core/config/lace-dir';
+import { CatalogProvider, CatalogProviderSchema, CatalogModel } from './types';
+import { resolveDataDirectory } from '@lace/core/utils/resource-resolver';
+import { logger } from '@lace/core/utils/logger';
 
 // Helper function to read and validate provider catalog JSON
 async function readProviderCatalog(filePath: string): Promise<CatalogProvider> {

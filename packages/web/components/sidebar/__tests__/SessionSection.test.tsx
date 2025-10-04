@@ -9,31 +9,31 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { SessionSection } from '@/components/sidebar/SessionSection';
-import type { SessionInfo, ThreadId, AgentInfo } from '@/types/core';
+import { SessionSection } from '@lace/web/components/sidebar/SessionSection';
+import type { SessionInfo, ThreadId, AgentInfo } from '@lace/web/types/core';
 import {
   createMockSessionContext,
   createMockProjectsContext,
-} from '@/__tests__/utils/provider-mocks';
-import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
+} from '@lace/web/__tests__/utils/provider-mocks';
+import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
 
 // Mock the providers
-vi.mock('@/components/providers/SessionProvider', () => ({
+vi.mock('@lace/web/components/providers/SessionProvider', () => ({
   useSessionContext: vi.fn(),
 }));
 
-vi.mock('@/components/providers/ProjectsProvider', () => ({
+vi.mock('@lace/web/components/providers/ProjectsProvider', () => ({
   useProjectsContext: vi.fn(),
 }));
 
-vi.mock('@/hooks/useURLState', () => ({
+vi.mock('@lace/web/hooks/useURLState', () => ({
   useURLState: vi.fn(),
 }));
 
 // Import the mocked hooks
-import { useSessionContext } from '@/components/providers/SessionProvider';
-import { useProjectsContext } from '@/components/providers/ProjectsProvider';
-import { useURLState } from '@/hooks/useURLState';
+import { useSessionContext } from '@lace/web/components/providers/SessionProvider';
+import { useProjectsContext } from '@lace/web/components/providers/ProjectsProvider';
+import { useURLState } from '@lace/web/hooks/useURLState';
 
 const mockUseSessionContext = vi.mocked(useSessionContext);
 const mockUseProjectsContext = vi.mocked(useProjectsContext);

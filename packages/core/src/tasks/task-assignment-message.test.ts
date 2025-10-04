@@ -4,22 +4,22 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
-import { TaskManager } from '~/tasks/task-manager';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
-import { asThreadId, createNewAgentSpec } from '~/threads/types';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
+import { TaskManager } from './task-manager';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import { setupCoreTest, cleanupSession } from '@lace/core/test-utils/core-test-setup';
+import { asThreadId, createNewAgentSpec } from '@lace/core/threads/types';
+import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from '@lace/core/providers/base-provider';
+import { Tool } from '@lace/core/tools/tool';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 
 // Enhanced mock provider that captures messages
 class MessageCapturingProvider extends BaseMockProvider {
@@ -115,7 +115,7 @@ describe('Task Assignment Message Sending', () => {
     mockProvider = new MessageCapturingProvider();
 
     // Mock the Agent's internal provider creation to use our message-capturing provider
-    const { Agent } = await import('~/agents/agent');
+    const { Agent } = await import('@lace/core/agents/agent');
     // @ts-expect-error: accessing private method for test-only provider injection
     vi.spyOn(
       Agent.prototype as unknown as { _createProviderInstance: () => Promise<unknown> },

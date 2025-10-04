@@ -1,9 +1,9 @@
 // ABOUTME: Helper for generating agent summaries using SessionHelper
 // ABOUTME: Called after user messages to create real-time activity summaries
 
-import { SessionHelper } from '@/lib/server/lace-imports';
-import type { Agent } from '@/lib/server/lace-imports';
-import type { LaceEvent } from '@/types/core';
+import { SessionHelper } from '@lace/web/lib/server/lace-imports';
+import type { Agent } from '@lace/web/lib/server/lace-imports';
+import type { LaceEvent } from '@lace/web/types/core';
 
 class SummaryHelperError extends Error {
   public readonly code: string;

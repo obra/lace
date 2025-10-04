@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { TrimToolResultsStrategy } from '~/threads/compaction/trim-tool-results-strategy';
-import type { LaceEvent } from '~/threads/types';
-import type { CompactionContext, CompactionData } from '~/threads/compaction/types';
-import type { ToolResult } from '~/tools/types';
+import { TrimToolResultsStrategy } from './trim-tool-results-strategy';
+import type { LaceEvent } from '@lace/core/threads/types';
+import type { CompactionContext, CompactionData } from './types';
+import type { ToolResult } from '@lace/core/tools/types';
 
 describe('TrimToolResultsStrategy', () => {
   const strategy = new TrimToolResultsStrategy();

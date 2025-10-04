@@ -1,9 +1,9 @@
 // ABOUTME: Builds working conversations from thread events, handling compaction
 // ABOUTME: Core logic for reconstructing conversations post-compaction
 
-import type { LaceEvent } from '~/threads/types';
-import type { ToolResult } from '~/tools/types';
-import { logger } from '~/utils/logger';
+import type { LaceEvent } from './types';
+import type { ToolResult } from '@lace/core/tools/types';
+import { logger } from '@lace/core/utils/logger';
 
 /**
  * Status precedence for deduplication (higher number = higher priority)

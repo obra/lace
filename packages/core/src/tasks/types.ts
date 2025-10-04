@@ -1,8 +1,8 @@
 // ABOUTME: Type definitions for the task management system
 // ABOUTME: Used by both agent tools and human-facing web APIs
 
-import type { ThreadId, AssigneeId } from '~/threads/types';
-import type { TaskStatus } from '~/tasks/task-status';
+import type { ThreadId, AssigneeId } from '@lace/core/threads/types';
+import type { TaskStatus } from './task-status';
 
 export type { TaskStatus };
 export type TaskPriority = 'high' | 'medium' | 'low';

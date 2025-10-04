@@ -4,11 +4,11 @@
 'use client';
 
 import React, { memo, useState } from 'react';
-import { TokenUsageDisplay } from '@/components/ui';
-import { useAgentTokenUsage } from '@/hooks/useAgentTokenUsage';
-import type { UseAgentTokenUsageResult } from '@/hooks/useAgentTokenUsage';
-import type { ThreadId } from '@/types/core';
-import { ContextBreakdownModal } from '@/components/modals/ContextBreakdownModal';
+import { TokenUsageDisplay } from '@lace/web/components/ui';
+import { useAgentTokenUsage } from '@lace/web/hooks/useAgentTokenUsage';
+import type { UseAgentTokenUsageResult } from '@lace/web/hooks/useAgentTokenUsage';
+import type { ThreadId } from '@lace/web/types/core';
+import { ContextBreakdownModal } from '@lace/web/components/modals/ContextBreakdownModal';
 
 export const CompactTokenUsage = memo(function CompactTokenUsage({
   agentId,

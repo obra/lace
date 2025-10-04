@@ -1,10 +1,10 @@
 // ABOUTME: Handles provider stop reasons and filters incomplete tool calls
 // ABOUTME: Prevents broken tool calls from crashing the system when max_tokens is reached
 
-import { ProviderResponse } from '~/providers/base-provider';
-import { ToolCall } from '~/tools/types';
-import { Tool } from '~/tools/tool';
-import { logger } from '~/utils/logger';
+import { ProviderResponse } from '@lace/core/providers/base-provider';
+import { ToolCall } from '@lace/core/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import { logger } from '@lace/core/utils/logger';
 
 interface StopReasonHandlerConfig {
   logTokenExhaustion?: boolean;

@@ -2,9 +2,9 @@
 // ABOUTME: Encapsulates all session editing logic to eliminate duplication across components
 
 import { useState, useCallback } from 'react';
-import type { SessionInfo } from '@/types/core';
-import type { SessionConfiguration } from '@/types/api';
-import { useProjectContext } from '@/components/providers/ProjectProvider';
+import type { SessionInfo } from '@lace/web/types/core';
+import type { SessionConfiguration } from '@lace/web/types/api';
+import { useProjectContext } from '@lace/web/components/providers/ProjectProvider';
 
 export interface UseSessionEditModalReturn {
   // Modal state

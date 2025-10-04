@@ -5,9 +5,9 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { TaskBoardModal } from '@/components/modals/TaskBoardModal';
-import type { Task } from '@/types/core';
-import { asThreadId, type ThreadId } from '@/types/core';
+import { TaskBoardModal } from '@lace/web/components/modals/TaskBoardModal';
+import type { Task } from '@lace/web/types/core';
+import { asThreadId, type ThreadId } from '@lace/web/types/core';
 
 const mockTask: Task = {
   id: 'test-task-1',

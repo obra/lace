@@ -4,24 +4,24 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
-import { ThreadManager } from '~/threads/thread-manager';
-import { DelegateTool } from '~/tools/implementations/delegate';
-import { logger } from '~/utils/logger';
-import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { DelegateTool } from '@lace/core/tools/implementations/delegate';
+import { logger } from '@lace/core/utils/logger';
+import { setupCoreTest, cleanupSession } from '@lace/core/test-utils/core-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
-import { ProviderRegistry } from '~/providers/registry';
+} from '@lace/core/test-utils/provider-defaults';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
+import { ProviderMessage, ProviderResponse } from '@lace/core/providers/base-provider';
+import { Tool } from '@lace/core/tools/tool';
+import { ProviderRegistry } from '@lace/core/providers/registry';
 
 // Mock provider that responds with task completion tool calls
 class MockProvider extends BaseMockProvider {

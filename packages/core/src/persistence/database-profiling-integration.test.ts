@@ -2,13 +2,13 @@
 // ABOUTME: Verifies that DatabasePersistence works with SQL profiling enabled
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { DatabasePersistence } from '~/persistence/database';
-import { logger } from '~/utils/logger';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { getLaceDbPath } from '~/config/lace-dir';
+import { DatabasePersistence } from './database';
+import { logger } from '@lace/core/utils/logger';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { getLaceDbPath } from '@lace/core/config/lace-dir';
 
 // Mock the logger
-vi.mock('~/utils/logger', () => ({
+vi.mock('@lace/core/utils/logger', () => ({
   logger: {
     debug: vi.fn(),
     info: vi.fn(),
@@ -70,7 +70,7 @@ describe('Database with SQL Profiling', () => {
     // Need to reload modules to pick up env change
     vi.resetModules();
     const { DatabasePersistence: ProfiledDB } = await import('./database');
-    const { getLaceDbPath: getDbPath } = await import('~/config/lace-dir');
+    const { getLaceDbPath: getDbPath } = await import('@lace/core/config/lace-dir');
 
     db = new ProfiledDB(getDbPath());
 
@@ -111,7 +111,7 @@ describe('Database with SQL Profiling', () => {
     // Need to reload modules to pick up env change
     vi.resetModules();
     const { DatabasePersistence: ProfiledDB } = await import('./database');
-    const { getLaceDbPath: getDbPath } = await import('~/config/lace-dir');
+    const { getLaceDbPath: getDbPath } = await import('@lace/core/config/lace-dir');
 
     db = new ProfiledDB(getDbPath());
 

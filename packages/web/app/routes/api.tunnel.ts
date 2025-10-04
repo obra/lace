@@ -1,7 +1,7 @@
 // ABOUTME: Sentry tunnel endpoint to avoid CORS issues in development
 // ABOUTME: Routes Sentry requests through our domain to prevent cross-origin blocking
 
-import { logger } from '~/utils/logger';
+import { logger } from '@lace/core/utils/logger';
 import type { Route } from './+types/api.tunnel';
 
 const SENTRY_HOST = 'o4508888512331776.ingest.us.sentry.io';

@@ -4,22 +4,22 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { Agent } from '~/agents/agent';
-import type { CreateTaskRequest, TaskContext } from '~/tasks/types';
-import { setupCoreTest, cleanupSession } from '~/test-utils/core-test-setup';
-import { TestProvider } from '~/test-utils/test-provider';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import { Agent } from '@lace/core/agents/agent';
+import type { CreateTaskRequest, TaskContext } from './types';
+import { setupCoreTest, cleanupSession } from '@lace/core/test-utils/core-test-setup';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
-import type { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import type { Tool } from '~/tools/tool';
+} from '@lace/core/test-utils/provider-instances';
+import type { ProviderMessage, ProviderResponse } from '@lace/core/providers/base-provider';
+import type { Tool } from '@lace/core/tools/tool';
 
 // Create a mock provider that responds based on message content
 class ScriptedMockProvider extends TestProvider {

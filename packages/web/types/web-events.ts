@@ -1,8 +1,8 @@
 // ABOUTME: Shared event data structures used by both API and SSE streaming
 // ABOUTME: Single source of truth for event payloads - no duplicates
 
-import type { ToolResult, ToolAnnotations, ToolCall, ErrorType } from '@/types/core';
-import type { CarouselItem, GoogleDocAttachment } from '@/types/design-system';
+import type { ToolResult, ToolAnnotations, ToolCall, ErrorType } from '@lace/web/types/core';
+import type { CarouselItem, GoogleDocAttachment } from '@lace/web/types/design-system';
 
 // Helper to derive origin from errorType
 export function getErrorOrigin(errorType: ErrorType): 'agent' | 'tool' | 'provider' | 'system' {

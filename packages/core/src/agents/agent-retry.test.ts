@@ -2,15 +2,15 @@
 // ABOUTME: Tests retry event forwarding and retry metrics tracking from providers
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent, CurrentTurnMetrics } from '~/agents/agent';
-import { ProviderMessage, ProviderResponse } from '~/providers/base-provider';
-import type { AIProvider } from '~/providers/base-provider';
-import { BaseMockProvider } from '~/test-utils/base-mock-provider';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import { Tool } from '~/tools/tool';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
-import { createMockThreadManager } from '~/test-utils/thread-manager-mock';
+import { Agent, CurrentTurnMetrics } from './agent';
+import { ProviderMessage, ProviderResponse } from '@lace/core/providers/base-provider';
+import type { AIProvider } from '@lace/core/providers/base-provider';
+import { BaseMockProvider } from '@lace/core/test-utils/base-mock-provider';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { Tool } from '@lace/core/tools/tool';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
+import { createMockThreadManager } from '@lace/core/test-utils/thread-manager-mock';
 
 // Helper to safely spy on private method without 'as any'
 interface AgentWithCreateProvider {

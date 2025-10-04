@@ -2,19 +2,19 @@
 // ABOUTME: Covers agent retrieval, updates with validation and error handling
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { loader, action } from '@/app/routes/api.agents.$agentId';
-import { parseResponse } from '@/lib/serialization';
-import { createLoaderArgs, createActionArgs } from '@/test-utils/route-test-helpers';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { loader, action } from '@lace/web/app/routes/api.agents.$agentId';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { createLoaderArgs, createActionArgs } from '@lace/web/test-utils/route-test-helpers';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '@/lib/server/lace-imports';
+} from '@lace/web/lib/server/lace-imports';
 
 // Import enhanced agent type
-import type { AgentWithTokenUsage } from '@/types/api';
+import type { AgentWithTokenUsage } from '@lace/web/types/api';
 
 interface ErrorResponse {
   error: string;
@@ -53,11 +53,11 @@ const mockSessionService = {
   getSession: vi.fn().mockResolvedValue(mockSession),
 };
 
-vi.mock('@/lib/server/session-service', () => ({
+vi.mock('@lace/web/lib/server/session-service', () => ({
   getSessionService: vi.fn(() => mockSessionService),
 }));
 
-vi.mock('@/types/core', () => ({
+vi.mock('@lace/web/types/core', () => ({
   asThreadId: vi.fn((id: string) => id),
   isThreadId: vi.fn((id: string) => id.match(/^lace_\d{8}_[a-z0-9]{6}(\.\d+)?$/)),
 }));

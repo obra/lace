@@ -2,13 +2,13 @@
 // ABOUTME: Validates security restrictions, error handling, and directory listing functionality
 
 import { describe, it, expect } from 'vitest';
-import { loader } from '@/app/routes/api.filesystem.list';
-import { createLoaderArgs } from '@/test-utils/route-test-helpers';
+import { loader } from '@lace/web/app/routes/api.filesystem.list';
+import { createLoaderArgs } from '@lace/web/test-utils/route-test-helpers';
 import { homedir } from 'os';
 import { join } from 'path';
 import { promises as fs } from 'fs';
-import { parseResponse } from '@/lib/serialization';
-import type { ListDirectoryResponse } from '@/types/filesystem';
+import { parseResponse } from '@lace/web/lib/serialization';
+import type { ListDirectoryResponse } from '@lace/web/types/filesystem';
 
 describe('/api/filesystem/list', () => {
   it('should list home directory contents', async () => {

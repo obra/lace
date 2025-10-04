@@ -251,7 +251,7 @@ git commit -m "feat: upgrade default Anthropic model to Sonnet 4
 // src/projects/project.test.ts (new file)
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Project } from './project';
-import { getPersistence } from '~/persistence/database';
+import { getPersistence } from '@lace/core/persistence/database';
 
 describe('Project', () => {
   beforeEach(() => {

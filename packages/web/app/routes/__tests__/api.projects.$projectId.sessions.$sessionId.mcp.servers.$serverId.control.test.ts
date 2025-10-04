@@ -2,9 +2,9 @@
 // ABOUTME: Validates start/stop/restart operations on session's running MCP servers
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { action } from '@/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.$serverId.control';
-import { parseResponse } from '@/lib/serialization';
-import { createActionArgs } from '@/test-utils/route-test-helpers';
+import { action } from '@lace/web/app/routes/api.projects.$projectId.sessions.$sessionId.mcp.servers.$serverId.control';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 
 interface ServerControlResponse {
   message: string;
@@ -55,17 +55,17 @@ const mockSessionService = {
   clearActiveSessions: vi.fn(),
 };
 
-vi.mock('@/lib/server/lace-imports', () => ({
+vi.mock('@lace/web/lib/server/lace-imports', () => ({
   Project: {
     getById: vi.fn(),
   },
 }));
 
-vi.mock('@/lib/server/session-service', () => ({
+vi.mock('@lace/web/lib/server/session-service', () => ({
   getSessionService: vi.fn(),
 }));
 
-vi.mock('@/lib/validation/thread-id-validation', () => ({
+vi.mock('@lace/web/lib/validation/thread-id-validation', () => ({
   isValidThreadId: vi.fn(),
 }));
 
@@ -77,9 +77,11 @@ describe('Session MCP Server Control API', () => {
 
   describe('POST /api/projects/:projectId/sessions/:sessionId/mcp/servers/:serverId/control', () => {
     it('should start MCP server', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
-      const { getSessionService } = vi.mocked(await import('@/lib/server/session-service'));
-      const { isValidThreadId } = vi.mocked(await import('@/lib/validation/thread-id-validation'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
+      const { getSessionService } = vi.mocked(await import('@lace/web/lib/server/session-service'));
+      const { isValidThreadId } = vi.mocked(
+        await import('@lace/web/lib/validation/thread-id-validation')
+      );
 
       Project.getById = vi.fn().mockReturnValue(mockProject);
       getSessionService.mockReturnValue(mockSessionService);
@@ -118,9 +120,11 @@ describe('Session MCP Server Control API', () => {
     });
 
     it('should stop MCP server', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
-      const { getSessionService } = vi.mocked(await import('@/lib/server/session-service'));
-      const { isValidThreadId } = vi.mocked(await import('@/lib/validation/thread-id-validation'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
+      const { getSessionService } = vi.mocked(await import('@lace/web/lib/server/session-service'));
+      const { isValidThreadId } = vi.mocked(
+        await import('@lace/web/lib/validation/thread-id-validation')
+      );
 
       Project.getById = vi.fn().mockReturnValue(mockProject);
       getSessionService.mockReturnValue(mockSessionService);
@@ -154,9 +158,11 @@ describe('Session MCP Server Control API', () => {
     });
 
     it('should restart MCP server', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
-      const { getSessionService } = vi.mocked(await import('@/lib/server/session-service'));
-      const { isValidThreadId } = vi.mocked(await import('@/lib/validation/thread-id-validation'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
+      const { getSessionService } = vi.mocked(await import('@lace/web/lib/server/session-service'));
+      const { isValidThreadId } = vi.mocked(
+        await import('@lace/web/lib/validation/thread-id-validation')
+      );
 
       Project.getById = vi.fn().mockReturnValue(mockProject);
       getSessionService.mockReturnValue(mockSessionService);
@@ -197,7 +203,7 @@ describe('Session MCP Server Control API', () => {
     });
 
     it('should return 404 when project not found', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
       Project.getById = vi.fn().mockReturnValue(null);
 
       const request = new Request(
@@ -223,8 +229,10 @@ describe('Session MCP Server Control API', () => {
     });
 
     it('should return 400 for invalid session ID', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
-      const { isValidThreadId } = vi.mocked(await import('@/lib/validation/thread-id-validation'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
+      const { isValidThreadId } = vi.mocked(
+        await import('@lace/web/lib/validation/thread-id-validation')
+      );
 
       Project.getById = vi.fn().mockReturnValue(mockProject);
       isValidThreadId.mockReturnValue(false);
@@ -252,9 +260,11 @@ describe('Session MCP Server Control API', () => {
     });
 
     it('should return 404 when session not found', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
-      const { getSessionService } = vi.mocked(await import('@/lib/server/session-service'));
-      const { isValidThreadId } = vi.mocked(await import('@/lib/validation/thread-id-validation'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
+      const { getSessionService } = vi.mocked(await import('@lace/web/lib/server/session-service'));
+      const { isValidThreadId } = vi.mocked(
+        await import('@lace/web/lib/validation/thread-id-validation')
+      );
 
       Project.getById = vi.fn().mockReturnValue(mockProject);
       getSessionService.mockReturnValue(mockSessionService);
@@ -284,9 +294,11 @@ describe('Session MCP Server Control API', () => {
     });
 
     it('should return 404 when server config not found', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
-      const { getSessionService } = vi.mocked(await import('@/lib/server/session-service'));
-      const { isValidThreadId } = vi.mocked(await import('@/lib/validation/thread-id-validation'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
+      const { getSessionService } = vi.mocked(await import('@lace/web/lib/server/session-service'));
+      const { isValidThreadId } = vi.mocked(
+        await import('@lace/web/lib/validation/thread-id-validation')
+      );
 
       const projectWithoutServer = {
         ...mockProject,
@@ -320,9 +332,11 @@ describe('Session MCP Server Control API', () => {
     });
 
     it('should validate invalid action', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
-      const { getSessionService } = vi.mocked(await import('@/lib/server/session-service'));
-      const { isValidThreadId } = vi.mocked(await import('@/lib/validation/thread-id-validation'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
+      const { getSessionService } = vi.mocked(await import('@lace/web/lib/server/session-service'));
+      const { isValidThreadId } = vi.mocked(
+        await import('@lace/web/lib/validation/thread-id-validation')
+      );
 
       Project.getById = vi.fn().mockReturnValue(mockProject);
       getSessionService.mockReturnValue(mockSessionService);
@@ -352,9 +366,11 @@ describe('Session MCP Server Control API', () => {
     });
 
     it('should handle server control errors', async () => {
-      const { Project } = vi.mocked(await import('@/lib/server/lace-imports'));
-      const { getSessionService } = vi.mocked(await import('@/lib/server/session-service'));
-      const { isValidThreadId } = vi.mocked(await import('@/lib/validation/thread-id-validation'));
+      const { Project } = vi.mocked(await import('@lace/web/lib/server/lace-imports'));
+      const { getSessionService } = vi.mocked(await import('@lace/web/lib/server/session-service'));
+      const { isValidThreadId } = vi.mocked(
+        await import('@lace/web/lib/validation/thread-id-validation')
+      );
 
       Project.getById = vi.fn().mockReturnValue(mockProject);
       getSessionService.mockReturnValue(mockSessionService);

@@ -98,7 +98,7 @@ Create `packages/core/src/persistence/database-migration-v14.test.ts`:
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DatabasePersistence } from '~/persistence/database';
+import { DatabasePersistence } from '@lace/core/persistence/database';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -422,8 +422,8 @@ Create `packages/core/src/persistence/event-visibility.test.ts`:
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DatabasePersistence } from '~/persistence/database';
-import type { LaceEvent } from '~/threads/types';
+import { DatabasePersistence } from '@lace/core/persistence/database';
+import type { LaceEvent } from '@lace/core/threads/types';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -669,8 +669,8 @@ Create `packages/core/src/threads/compaction-visibility.test.ts`:
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ThreadManager } from '~/threads/thread-manager';
-import type { LaceEvent } from '~/threads/types';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import type { LaceEvent } from '@lace/core/threads/types';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -961,8 +961,8 @@ Create `packages/core/src/agents/agent-compaction-events.test.ts`:
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Agent } from '~/agents/agent';
-import type { LaceEvent } from '~/threads/types';
+import { Agent } from '@lace/core/agents/agent';
+import type { LaceEvent } from '@lace/core/threads/types';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -1143,8 +1143,8 @@ Add to `packages/web/lib/event-stream-manager.test.ts` (or create if doesn't exi
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { EventStreamManager } from '~/lib/event-stream-manager';
-import type { LaceEvent } from '@/types/core';
+import { EventStreamManager } from '@lace/core/lib/event-stream-manager';
+import type { LaceEvent } from '@lace/web/types/core';
 
 describe('EventStreamManager EVENT_UPDATED handling', () => {
   let manager: EventStreamManager;
@@ -1312,8 +1312,8 @@ Create `packages/web/hooks/useEventStream.test.tsx`:
 ```typescript
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { EventStreamProvider } from '@/components/providers/EventStreamProvider';
-import type { LaceEvent } from '@/types/core';
+import { EventStreamProvider } from '@lace/web/components/providers/EventStreamProvider';
+import type { LaceEvent } from '@lace/web/types/core';
 
 describe('useEventStream EVENT_UPDATED handling', () => {
   it('should update event visibility when EVENT_UPDATED is received', async () => {
@@ -1542,7 +1542,7 @@ Create `packages/web/components/timeline/TimelineMessageWithDetails.test.tsx`:
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TimelineMessageWithDetails } from './TimelineMessageWithDetails';
-import type { LaceEvent } from '@/types/core';
+import type { LaceEvent } from '@lace/web/types/core';
 
 describe('TimelineMessageWithDetails visibility styling', () => {
   it('should render visible events with normal opacity', () => {

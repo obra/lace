@@ -1,11 +1,11 @@
 // ABOUTME: Individual provider instance API endpoint
 // ABOUTME: Handles getting and deleting specific provider instances
 
-import { ProviderRegistry, ProviderInstanceManager } from '@/lib/server/lace-imports';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import type { ConfiguredInstance } from '@/lib/server/lace-imports';
-import { ProviderInstanceSchema, CredentialSchema } from '@/lib/server/lace-imports';
+import { ProviderRegistry, ProviderInstanceManager } from '@lace/web/lib/server/lace-imports';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import type { ConfiguredInstance } from '@lace/web/lib/server/lace-imports';
+import { ProviderInstanceSchema, CredentialSchema } from '@lace/web/lib/server/lace-imports';
 import type { Route } from './+types/api.provider.instances.$instanceId';
 
 export interface InstanceDetailResponse {

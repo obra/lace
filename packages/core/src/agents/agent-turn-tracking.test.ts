@@ -2,11 +2,11 @@
 // ABOUTME: Validates turn metrics, event emissions, and timing behavior
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent, AgentConfig, CurrentTurnMetrics } from '~/agents/agent';
-import { TestProvider } from '~/test-utils/test-provider';
-import { ToolExecutor } from '~/tools/executor';
-import { ThreadManager } from '~/threads/thread-manager';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Agent, AgentConfig, CurrentTurnMetrics } from './agent';
+import { TestProvider } from '@lace/core/test-utils/test-provider';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 
 describe('Agent Turn Tracking', () => {
   const _tempLaceDir = setupCoreTest();

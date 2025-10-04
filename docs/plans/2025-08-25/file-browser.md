@@ -228,14 +228,14 @@ import { join, resolve, relative, dirname } from 'path';
 import {
   createSuperjsonResponse,
   createErrorResponse,
-} from '@/lib/server/api-utils';
-import { SessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/types/core';
+} from '@lace/web/lib/server/api-utils';
+import { SessionService } from '@lace/web/lib/server/session-service';
+import { asThreadId } from '@lace/web/types/core';
 import {
   ListSessionDirectoryRequestSchema,
   type SessionDirectoryResponse,
   type SessionFileEntry,
-} from '@/types/session-files';
+} from '@lace/web/types/session-files';
 
 export async function GET(
   request: NextRequest,
@@ -380,8 +380,8 @@ import { GET } from './route';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { parseResponse } from '@/lib/serialization';
-import type { SessionDirectoryResponse } from '@/types/session-files';
+import { parseResponse } from '@lace/web/lib/serialization';
+import type { SessionDirectoryResponse } from '@lace/web/types/session-files';
 
 describe('/api/sessions/[sessionId]/files', () => {
   let testDir: string;
@@ -508,13 +508,13 @@ import { resolve, relative, extname } from 'path';
 import {
   createSuperjsonResponse,
   createErrorResponse,
-} from '@/lib/server/api-utils';
-import { SessionService } from '@/lib/server/session-service';
-import { asThreadId } from '@/types/core';
+} from '@lace/web/lib/server/api-utils';
+import { SessionService } from '@lace/web/lib/server/session-service';
+import { asThreadId } from '@lace/web/types/core';
 import {
   GetSessionFileRequestSchema,
   type SessionFileContentResponse,
-} from '@/types/session-files';
+} from '@lace/web/types/session-files';
 
 // Simple MIME type detection based on file extension
 function getMimeType(filePath: string): string {
@@ -691,8 +691,8 @@ import { GET } from './route';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { parseResponse } from '@/lib/serialization';
-import type { SessionFileContentResponse } from '@/types/session-files';
+import { parseResponse } from '@lace/web/lib/serialization';
+import type { SessionFileContentResponse } from '@lace/web/types/session-files';
 
 describe('/api/sessions/[sessionId]/files/[...path]', () => {
   let testDir: string;
@@ -815,9 +815,9 @@ import {
   faChevronRight,
   faChevronDown,
   faSpinner
-} from '@/lib/fontawesome';
-import { api } from '@/lib/api-client';
-import type { SessionDirectoryResponse, SessionFileEntry } from '@/types/session-files';
+} from '@lace/web/lib/fontawesome';
+import { api } from '@lace/web/lib/api-client';
+import type { SessionDirectoryResponse, SessionFileEntry } from '@lace/web/types/session-files';
 
 interface FileTreeNode extends SessionFileEntry {
   children?: FileTreeNode[];
@@ -1148,7 +1148,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SessionFileTree } from './SessionFileTree';
-import * as apiClient from '@/lib/api-client';
+import * as apiClient from '@lace/web/lib/api-client';
 
 // Mock the API client
 vi.mock('@/lib/api-client', () => ({
@@ -1378,10 +1378,10 @@ import {
   faExternalLinkAlt,
   faCopy,
   faSpinner
-} from '@/lib/fontawesome';
-import { Modal } from '@/components/ui/Modal';
-import { api } from '@/lib/api-client';
-import type { SessionFileContentResponse } from '@/types/session-files';
+} from '@lace/web/lib/fontawesome';
+import { Modal } from '@lace/web/components/ui/Modal';
+import { api } from '@lace/web/lib/api-client';
+import type { SessionFileContentResponse } from '@lace/web/types/session-files';
 import hljs from 'highlight.js';
 import DOMPurify from 'dompurify';
 
@@ -1654,7 +1654,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FileViewerModal } from './FileViewerModal';
-import * as apiClient from '@/lib/api-client';
+import * as apiClient from '@lace/web/lib/api-client';
 
 // Mock the API client
 vi.mock('@/lib/api-client', () => ({
@@ -1879,11 +1879,11 @@ actions"
 
 import React, { useState, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFolder, faSearch } from '@/lib/fontawesome';
-import { SidebarSection } from '@/components/ui/SidebarSection';
-import { AccentInput } from '@/components/ui/AccentInput';
-import { SessionFileTree } from '@/components/files/SessionFileTree';
-import { FileViewerModal } from '@/components/modals/FileViewerModal';
+import { faFolder, faSearch } from '@lace/web/lib/fontawesome';
+import { SidebarSection } from '@lace/web/components/ui/SidebarSection';
+import { AccentInput } from '@lace/web/components/ui/AccentInput';
+import { SessionFileTree } from '@lace/web/components/files/SessionFileTree';
+import { FileViewerModal } from '@lace/web/components/modals/FileViewerModal';
 
 interface FileBrowserSectionProps {
   sessionId: string;
@@ -2154,9 +2154,9 @@ import {
   faCopy,
   faSpinner,
   faExclamationTriangle
-} from '@/lib/fontawesome';
-import { api } from '@/lib/api-client';
-import type { SessionFileContentResponse } from '@/types/session-files';
+} from '@lace/web/lib/fontawesome';
+import { api } from '@lace/web/lib/api-client';
+import type { SessionFileContentResponse } from '@lace/web/types/session-files';
 import hljs from 'highlight.js';
 import DOMPurify from 'dompurify';
 

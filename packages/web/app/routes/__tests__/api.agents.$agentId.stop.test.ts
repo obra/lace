@@ -2,18 +2,18 @@
 // ABOUTME: Verifies stopping agent processing works correctly
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { action } from '@/app/routes/api.agents.$agentId.stop';
-import { createActionArgs } from '@/test-utils/route-test-helpers';
+import { action } from '@lace/web/app/routes/api.agents.$agentId.stop';
+import { createActionArgs } from '@lace/web/test-utils/route-test-helpers';
 
 // Mock only the external dependencies we need
-vi.mock('@/lib/server/session-service');
-vi.mock('@/lib/server/serialization');
-vi.mock('@/lib/server/api-utils');
+vi.mock('@lace/web/lib/server/session-service');
+vi.mock('@lace/web/lib/server/serialization');
+vi.mock('@lace/web/lib/server/api-utils');
 
-import { getSessionService } from '@/lib/server/session-service';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import type { ThreadId } from '@/types/core';
+import { getSessionService } from '@lace/web/lib/server/session-service';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import type { ThreadId } from '@lace/web/types/core';
 
 const mockGetSessionService = vi.mocked(getSessionService);
 const mockCreateSuperjsonResponse = vi.mocked(createSuperjsonResponse);

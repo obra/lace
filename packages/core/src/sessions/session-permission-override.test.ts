@@ -3,16 +3,16 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Session } from './session';
-import { Project } from '~/projects/project';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { Project } from '@lace/core/projects/project';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 
 describe('Session Permission Override', () => {
   let testProject: Project;

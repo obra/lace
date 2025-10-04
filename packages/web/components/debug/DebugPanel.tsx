@@ -5,8 +5,8 @@
 
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBug, faXmark, faStream } from '@/lib/fontawesome';
-import { useDebuggingSettings } from '@/components/providers/SettingsProvider';
+import { faBug, faXmark, faStream } from '@lace/web/lib/fontawesome';
+import { useDebuggingSettings } from '@lace/web/components/providers/SettingsProvider';
 import { EventStreamMonitor } from './EventStreamMonitor';
 
 interface DebugPanelProps {

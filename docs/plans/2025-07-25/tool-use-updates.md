@@ -169,7 +169,7 @@ made. Use the `if (this.getTaskManager)` pattern to locate the correct sections.
 After removing fallback code, you may be able to remove:
 
 ```typescript
-import { getPersistence } from '~/persistence/database';
+import { getPersistence } from '@lace/core/persistence/database';
 ```
 
 Only remove if no longer used anywhere in the file.
@@ -182,12 +182,12 @@ Test that tools work correctly with real session TaskManager:
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
 import {
   setupTestPersistence,
   teardownTestPersistence,
-} from '~/test-utils/persistence-helper';
+} from '@lace/core/test-utils/persistence-helper';
 
 describe('Task Tools Integration', () => {
   beforeEach(() => {
@@ -280,13 +280,13 @@ efficient work breakdown.
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TaskCreateTool } from './tools';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
-import { asThreadId } from '~/threads/types';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
+import { asThreadId } from '@lace/core/threads/types';
 import {
   setupTestPersistence,
   teardownTestPersistence,
-} from '~/test-utils/persistence-helper';
+} from '@lace/core/test-utils/persistence-helper';
 
 describe('Bulk Task Creation', () => {
   let tool: TaskCreateTool;
@@ -1026,12 +1026,12 @@ system.
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Session } from '~/sessions/session';
-import { Project } from '~/projects/project';
+import { Session } from '@lace/core/sessions/session';
+import { Project } from '@lace/core/projects/project';
 import {
   setupTestPersistence,
   teardownTestPersistence,
-} from '~/test-utils/persistence-helper';
+} from '@lace/core/test-utils/persistence-helper';
 
 describe('Task Management Workflow Integration', () => {
   let session: Session;

@@ -10,8 +10,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { ContextBreakdownModal } from './ContextBreakdownModal';
-import { api } from '@/lib/api-client';
-import type { ContextBreakdown } from '@/types/context';
+import { api } from '@lace/web/lib/api-client';
+import type { ContextBreakdown } from '@lace/web/types/context';
 
 // Mock ResizeObserver for Recharts
 global.ResizeObserver = vi.fn().mockImplementation(() => ({
@@ -20,7 +20,7 @@ global.ResizeObserver = vi.fn().mockImplementation(() => ({
   disconnect: vi.fn(),
 }));
 
-vi.mock('@/lib/api-client', () => ({
+vi.mock('@lace/web/lib/api-client', () => ({
   api: {
     get: vi.fn(),
   },

@@ -2,10 +2,10 @@
 // ABOUTME: Fetches latest models from OpenRouter API and updates cache
 
 import type { Route } from './+types/api.provider.instances.$instanceId.refresh';
-import { createSuperjsonResponse } from '@/lib/server/serialization';
-import { createErrorResponse } from '@/lib/server/api-utils';
-import { ProviderRegistry, OpenRouterDynamicProvider } from '@/lib/server/lace-imports';
-import { logger } from '~/utils/logger';
+import { createSuperjsonResponse } from '@lace/web/lib/server/serialization';
+import { createErrorResponse } from '@lace/web/lib/server/api-utils';
+import { ProviderRegistry, OpenRouterDynamicProvider } from '@lace/web/lib/server/lace-imports';
+import { logger } from '@lace/core/utils/logger';
 
 export async function action({ params, request }: Route.ActionArgs) {
   try {

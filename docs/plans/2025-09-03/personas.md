@@ -130,7 +130,7 @@ system.md to lace.md"
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { getLaceDir } from '~/config/lace-dir';
+import { getLaceDir } from '@lace/core/config/lace-dir';
 
 export interface PersonaInfo {
   name: string;
@@ -970,8 +970,8 @@ Update agent spawning logic to handle persona:
 ```typescript
 // In task-manager.ts or similar files
 
-import { parseNewAgentSpec, isNewAgentSpec } from '~/threads/types';
-import { personaRegistry } from '~/config/persona-registry';
+import { parseNewAgentSpec, isNewAgentSpec } from '@lace/core/threads/types';
+import { personaRegistry } from '@lace/core/config/persona-registry';
 
 // When creating agents from tasks
 private async spawnAgentForTask(assignedTo: AssigneeId): Promise<ThreadId> {
@@ -1026,7 +1026,7 @@ private async getProvider(providerName: string, modelId: string): Promise<AIProv
 ```typescript
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TaskManager } from './task-manager';
-import { createNewAgentSpec, asNewAgentSpec } from '~/threads/types';
+import { createNewAgentSpec, asNewAgentSpec } from '@lace/core/threads/types';
 import { createMockToolExecutor, createMockThreadManager } from '../test-utils';
 
 describe('Task Agent Spawning with Personas', () => {
@@ -1521,10 +1521,10 @@ npm run build:docs # if you have doc building
 
 ```typescript
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { TaskManager } from '~/tasks/task-manager';
-import { createNewAgentSpec } from '~/threads/types';
-import { personaRegistry } from '~/config/persona-registry';
+import { Agent } from '@lace/core/agents/agent';
+import { TaskManager } from '@lace/core/tasks/task-manager';
+import { createNewAgentSpec } from '@lace/core/threads/types';
+import { personaRegistry } from '@lace/core/config/persona-registry';
 
 describe('Persona System Integration', () => {
   it('creates agent with persona and loads correct prompt', async () => {

@@ -5,8 +5,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdtempSync, rmSync } from 'fs';
 import { join, resolve, dirname } from 'path';
 import { tmpdir } from 'os';
-import { WorktreeWorkspaceManager } from '~/workspace/worktree-workspace-manager';
-import { setupCoreTest } from '~/test-utils/core-test-setup';
+import { WorktreeWorkspaceManager } from './worktree-workspace-manager';
+import { setupCoreTest } from '@lace/core/test-utils/core-test-setup';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 

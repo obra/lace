@@ -4,9 +4,9 @@
 import { z } from 'zod';
 import * as childProcess from 'child_process';
 import { promisify } from 'util';
-import { Tool } from '~/tools/tool';
-import { NonEmptyString, FilePath } from '~/tools/schemas/common';
-import type { ToolResult, ToolContext, ToolAnnotations } from '~/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import { NonEmptyString, FilePath } from '@lace/core/tools/schemas/common';
+import type { ToolResult, ToolContext, ToolAnnotations } from '@lace/core/tools/types';
 
 const MIN_SEARCH_RESULTS = 1;
 const MAX_SEARCH_RESULTS = 1000;

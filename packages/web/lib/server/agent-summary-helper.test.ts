@@ -8,12 +8,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { generateAgentSummary, getLastAgentResponse } from './agent-summary-helper';
-import type { Agent } from '@/lib/server/lace-imports';
-import type { LaceEvent, ThreadId } from '@/types/core';
-import { createMockAgentInfo } from '@/__tests__/utils/agent-mocks';
+import type { Agent } from '@lace/web/lib/server/lace-imports';
+import type { LaceEvent, ThreadId } from '@lace/web/types/core';
+import { createMockAgentInfo } from '@lace/web/__tests__/utils/agent-mocks';
 
 // Mock logger to avoid console output and potential undefined errors
-vi.mock('~/utils/logger', () => ({
+vi.mock('@lace/core/utils/logger', () => ({
   logger: {
     debug: vi.fn(),
     info: vi.fn(),
@@ -27,7 +27,7 @@ const mockExecute = vi.fn();
 let capturedSessionHelperOptions:
   | { model: string; parentAgent: Agent; persona?: string }
   | undefined;
-vi.mock('@/lib/server/lace-imports', () => ({
+vi.mock('@lace/web/lib/server/lace-imports', () => ({
   SessionHelper: vi.fn().mockImplementation((options) => {
     capturedSessionHelperOptions = options;
     return {

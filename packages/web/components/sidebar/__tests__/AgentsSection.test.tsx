@@ -9,27 +9,27 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { AgentsSection } from '@/components/sidebar/AgentsSection';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { AgentsSection } from '@lace/web/components/sidebar/AgentsSection';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 import {
   setupTestProviderDefaults,
   cleanupTestProviderDefaults,
-} from '~/test-utils/provider-defaults';
+} from '@lace/core/test-utils/provider-defaults';
 import {
   createTestProviderInstance,
   cleanupTestProviderInstances,
-} from '~/test-utils/provider-instances';
+} from '@lace/core/test-utils/provider-instances';
 
 // Mock external dependencies only (following testing docs)
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/server/approval-manager', () => ({
+vi.mock('@lace/web/lib/server/approval-manager', () => ({
   getApprovalManager: () => ({
     requestApproval: vi.fn().mockResolvedValue('allow_once'),
   }),
 }));
 
 // Mock the context hooks since AgentsSection needs them but we're testing the component in isolation
-vi.mock('@/components/providers/SessionProvider', () => ({
+vi.mock('@lace/web/components/providers/SessionProvider', () => ({
   useSessionContext: () => ({
     sessionDetails: {
       id: 'session-1',
@@ -86,7 +86,7 @@ vi.mock('@/components/providers/SessionProvider', () => ({
   }),
 }));
 
-vi.mock('@/components/providers/TaskProvider', () => ({
+vi.mock('@lace/web/components/providers/TaskProvider', () => ({
   useOptionalTaskContext: () => ({
     taskManager: {
       tasks: [],

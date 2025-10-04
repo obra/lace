@@ -135,7 +135,7 @@ grep -r "ThreadId" packages/web --include="*.ts" --include="*.tsx" > docs/type-a
 grep -r "ApprovalDecision" packages/web --include="*.ts" --include="*.tsx" >> docs/type-audit.md
 
 # Search for core type imports
-grep -r "from '@/lib/.*core" packages/web --include="*.ts" --include="*.tsx" >> docs/type-audit.md
+grep -r "from '@lace/web/lib/.*core" packages/web --include="*.ts" --include="*.tsx" >> docs/type-audit.md
 ```
 
 #### Task 1.3: Create test to verify no regressions
@@ -197,26 +197,26 @@ export type {
   EventType,
   ThreadEvent,
   Thread,
-} from '~/threads/types';
+} from '@lace/core/threads/types';
 
 export type {
   ToolCall,
   ToolResult,
   ToolContext,
   ToolAnnotations,
-} from '~/tools/types';
+} from '@lace/core/tools/types';
 
-export type { Task, TaskNote, TaskStatus, TaskPriority } from '~/tasks/types';
+export type { Task, TaskNote, TaskStatus, TaskPriority } from '@lace/core/tasks/types';
 
-export type { AgentState } from '~/agents/agent';
+export type { AgentState } from '@lace/core/agents/agent';
 
-export type { ProviderInfo, ModelInfo } from '~/providers/base-provider';
+export type { ProviderInfo, ModelInfo } from '@lace/core/providers/base-provider';
 
-export { ApprovalDecision } from '~/tools/types';
+export { ApprovalDecision } from '@lace/core/tools/types';
 
-export type { ProjectInfo } from '~/projects/project';
+export type { ProjectInfo } from '@lace/core/projects/project';
 
-export type { SessionInfo } from '~/sessions/session';
+export type { SessionInfo } from '@lace/core/sessions/session';
 
 // Re-export utility functions
 export {
@@ -226,7 +226,7 @@ export {
   asNewAgentSpec,
   createNewAgentSpec,
   EVENT_TYPES,
-} from '~/threads/types';
+} from '@lace/core/threads/types';
 ```
 
 **Test**: Create `packages/web/lib/core.test.ts`
@@ -292,10 +292,10 @@ import {
   CreateSessionRequestSchema,
   SpawnAgentRequestSchema,
   ToolCallIdSchema,
-} from '@/lib/validation/schemas';
+} from '@lace/web/lib/validation/schemas';
 
 // Use core types for API responses - no duplication
-export type { SessionInfo as Session } from '@/lib/core';
+export type { SessionInfo as Session } from '@lace/web/lib/core';
 
 // Re-export core types
 export type {
@@ -308,7 +308,7 @@ export type {
   TaskPriority,
   ApprovalDecision,
   ToolResult,
-} from '@/lib/core';
+} from '@lace/web/lib/core';
 
 // Request types (inferred from validation schemas) - ONLY PLACE THESE EXIST
 export type ToolCallId = z.infer<typeof ToolCallIdSchema>;
@@ -396,7 +396,7 @@ export function isApiSuccess<T>(
 import { describe, it, expect } from 'vitest';
 import type { Session, Agent, MessageRequest } from './web';
 import { isApiError, isApiSuccess } from './web';
-import { asThreadId } from '@/lib/core';
+import { asThreadId } from '@lace/web/lib/core';
 
 describe('Web Types', () => {
   it('should create valid Session type', () => {
@@ -442,8 +442,8 @@ event-related types in one place
 // ABOUTME: Combined event type definitions for web interface
 // ABOUTME: Consolidates events and event constants into single file
 
-import type { EventType, ThreadId, ToolResult } from '@/lib/core';
-import { EVENT_TYPES } from '@/lib/core';
+import type { EventType, ThreadId, ToolResult } from '@lace/web/lib/core';
+import { EVENT_TYPES } from '@lace/web/lib/core';
 
 // Re-export core event types
 export { EVENT_TYPES, type EventType };
@@ -545,7 +545,7 @@ import {
   isPersistedEvent,
   type SessionEvent,
 } from './events';
-import { asThreadId } from '@/lib/core';
+import { asThreadId } from '@lace/web/lib/core';
 
 describe('Event Types', () => {
   it('should export core EVENT_TYPES', () => {
@@ -615,7 +615,7 @@ Then modify `packages/web/types/api.ts`:
 // export type ApprovalDecision = (typeof ApprovalDecision)[keyof typeof ApprovalDecision];
 
 // Replace with import:
-import type { ApprovalDecision } from '@/lib/core';
+import type { ApprovalDecision } from '@lace/web/lib/core';
 export type { ApprovalDecision };
 ```
 
@@ -673,10 +673,10 @@ For each file found, update imports:
 
 ```typescript
 // OLD (now broken):
-import type { MessageRequest } from '@/lib/validation/schemas';
+import type { MessageRequest } from '@lace/web/lib/validation/schemas';
 
 // NEW (correct):
-import type { MessageRequest } from '@/types/web';
+import type { MessageRequest } from '@lace/web/types/web';
 ```
 
 **BEFORE/AFTER**: Run verification commands ⬆️ **CRITICAL**: All imports must be
@@ -694,7 +694,7 @@ Replace entire file content:
 // ABOUTME: ThreadId validation using core functions
 // ABOUTME: Wrapper around core validation for web package convenience
 
-import { isThreadId, asThreadId } from '@/lib/core';
+import { isThreadId, asThreadId } from '@lace/web/lib/core';
 
 // Re-export core functions with web-friendly names
 export const isValidThreadId = isThreadId;
@@ -721,10 +721,10 @@ For each file found, replace:
 
 ```typescript
 // Old:
-import { ThreadId, AgentState } from '@/lib/server/core-types';
+import { ThreadId, AgentState } from '@lace/web/lib/server/core-types';
 
 // New:
-import type { ThreadId, AgentState } from '@/lib/core';
+import type { ThreadId, AgentState } from '@lace/web/lib/core';
 ```
 
 **Important**: Update imports in small batches (5-10 files), test after each
@@ -750,11 +750,11 @@ Replace:
 
 ```typescript
 // Old:
-import type { Session, Agent, ThreadId } from '@/types/api';
+import type { Session, Agent, ThreadId } from '@lace/web/types/api';
 
 // New:
-import type { Session, Agent } from '@/types/web';
-import type { ThreadId } from '@/lib/core';
+import type { Session, Agent } from '@lace/web/types/web';
+import type { ThreadId } from '@lace/web/lib/core';
 ```
 
 Example files:
@@ -810,14 +810,14 @@ grep -r "Agent\|ThreadManager\|ToolExecutor\|Session\|Project" packages/web/comp
 grep -r "Agent\|ThreadManager\|ToolExecutor\|Session\|Project" packages/web/hooks --include="*.ts" -A 1 -B 1
 
 # These should only be imports like:
-# import type { Agent } from '@/types/web'; // ✅ OK
+# import type { Agent } from '@lace/web/types/web'; // ✅ OK
 # NOT:
-# import { Agent } from '@/lib/server/lace-imports'; // ❌ BAD
+# import { Agent } from '@lace/web/lib/server/lace-imports'; // ❌ BAD
 ```
 
 Fix any violations by:
 
-1. Change to type-only imports: `import type { Agent } from '@/types/web'`
+1. Change to type-only imports: `import type { Agent } from '@lace/web/types/web'`
 2. Move business logic to API routes or server components
 
 **Test**: `npm run build` **Expected**: No server-only imports in client code
@@ -835,7 +835,7 @@ Replace content:
 // ABOUTME: Re-exports all type definitions from organized modules
 
 // Core types from main project
-export type * from '@/lib/core';
+export type * from '@lace/web/lib/core';
 
 // Web-specific types
 export * from './web';
@@ -900,10 +900,10 @@ import type {
   Task,
   AgentState,
   ToolResult,
-} from '@/lib/core';
-import type { Session, Agent, MessageRequest } from '@/types/web';
-import type { SessionEvent, SessionEventType } from '@/types/events';
-import { isThreadId, asThreadId } from '@/lib/core';
+} from '@lace/web/lib/core';
+import type { Session, Agent, MessageRequest } from '@lace/web/types/web';
+import type { SessionEvent, SessionEventType } from '@lace/web/types/events';
+import { isThreadId, asThreadId } from '@lace/web/lib/core';
 
 describe('Type Integrity - New Structure', () => {
   it('should import all core types correctly', () => {

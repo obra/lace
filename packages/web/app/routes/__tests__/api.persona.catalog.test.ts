@@ -2,11 +2,11 @@
 // ABOUTME: Verifies persona listing with real PersonaRegistry implementation
 
 import { describe, it, expect } from 'vitest';
-import { loader } from '@/app/routes/api.persona.catalog';
-import { parseResponse } from '@/lib/serialization';
-import { createLoaderArgs } from '@/test-utils/route-test-helpers';
-import type { PersonaCatalogResponse } from '@/app/routes/api.persona.catalog';
-import { setupWebTest } from '@/test-utils/web-test-setup';
+import { loader } from '@lace/web/app/routes/api.persona.catalog';
+import { parseResponse } from '@lace/web/lib/serialization';
+import { createLoaderArgs } from '@lace/web/test-utils/route-test-helpers';
+import type { PersonaCatalogResponse } from '@lace/web/app/routes/api.persona.catalog';
+import { setupWebTest } from '@lace/web/test-utils/web-test-setup';
 
 describe('Persona Catalog API', () => {
   const _tempContext = setupWebTest();

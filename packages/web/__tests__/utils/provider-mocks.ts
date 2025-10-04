@@ -2,10 +2,10 @@
 // ABOUTME: Provides factory functions to create properly typed mock provider contexts
 
 import { vi } from 'vitest';
-import type { ProjectContextType } from '@/components/providers/ProjectProvider';
-import type { SessionContextType } from '@/components/providers/SessionProvider';
-import type { ProjectsContextType } from '@/components/providers/ProjectsProvider';
-import type { UseUIStateResult } from '@/hooks/useUIState';
+import type { ProjectContextType } from '@lace/web/components/providers/ProjectProvider';
+import type { SessionContextType } from '@lace/web/components/providers/SessionProvider';
+import type { ProjectsContextType } from '@lace/web/components/providers/ProjectsProvider';
+import type { UseUIStateResult } from '@lace/web/hooks/useUIState';
 
 /**
  * Creates a mock ProjectContextType with all required methods

@@ -2,10 +2,10 @@
 // ABOUTME: Verifies that Agent emits EVENT_UPDATED events after compaction completes
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Agent } from '~/agents/agent';
-import { ThreadManager } from '~/threads/thread-manager';
-import { ToolExecutor } from '~/tools/executor';
-import type { LaceEvent } from '~/threads/types';
+import { Agent } from './agent';
+import { ThreadManager } from '@lace/core/threads/thread-manager';
+import { ToolExecutor } from '@lace/core/tools/executor';
+import type { LaceEvent } from '@lace/core/threads/types';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';

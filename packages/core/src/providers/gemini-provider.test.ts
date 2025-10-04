@@ -2,9 +2,9 @@
 // ABOUTME: Tests configuration, format conversion, responses, streaming, and error handling
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { GeminiProvider } from '~/providers/gemini-provider';
-import { ProviderMessage } from '~/providers/base-provider';
-import { Tool } from '~/tools/tool';
+import { GeminiProvider } from './gemini-provider';
+import { ProviderMessage } from './base-provider';
+import { Tool } from '@lace/core/tools/tool';
 
 // Mock the Google GenAI SDK
 const mockGenerateContent = vi.fn();

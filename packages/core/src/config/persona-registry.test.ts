@@ -17,7 +17,7 @@ describe('PersonaRegistry', () => {
     tempUserDir = fs.mkdtempSync(path.join(tmpdir(), 'user-personas-'));
 
     // Mock getLaceDir to return our temp directory parent
-    vi.doMock('~/config/lace-dir', () => ({
+    vi.doMock('@lace/core/config/lace-dir', () => ({
       getLaceDir: () => path.dirname(tempUserDir),
     }));
 

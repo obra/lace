@@ -5,8 +5,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown, faUser } from '@/lib/fontawesome';
-import type { PersonaInfo } from '@/types/core';
+import { faChevronDown, faUser } from '@lace/web/lib/fontawesome';
+import type { PersonaInfo } from '@lace/web/types/core';
 
 interface PersonaSelectorProps {
   personas: PersonaInfo[];

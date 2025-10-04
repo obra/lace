@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Badge, StatusDot } from '@/components/ui';
+import { Badge, StatusDot } from '@lace/web/components/ui';
 
 export interface TokenUsageData {
   totalPromptTokens: number;
