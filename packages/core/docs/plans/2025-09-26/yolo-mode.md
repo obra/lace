@@ -1,8 +1,12 @@
 # Permission Mode Override System - Implementation Plan
 
+**STATUS AS OF 2025-10-03:** SDK provider implementation blocked by Node.js module caching issue during dev server hot-reload. Core implementation complete, needs production test.
+
 ## Overview
 
-We're building a runtime permission override system that allows users to quickly switch between three permission modes without modifying their stored session configuration:
+We're building a runtime permission override system that allows users to quickly
+switch between three permission modes without modifying their stored session
+configuration:
 
 - **Normal Mode**: Uses configured tool policies as-is
 - **YOLO Mode**: All tools automatically approved (developer productivity mode)
@@ -29,10 +33,14 @@ Tool executes with modified permission
 ```
 
 **Key Design Decisions:**
-- Permission mode is set via the existing `/configuration` endpoint (not a separate endpoint)
-- Permission mode is stored in `SessionConfiguration.runtimeOverrides.permissionMode`
+
+- Permission mode is set via the existing `/configuration` endpoint (not a
+  separate endpoint)
+- Permission mode is stored in
+  `SessionConfiguration.runtimeOverrides.permissionMode`
 - Logic lives in `Session.updateConfiguration()`, not in the API layer
-- When permission mode changes, `Session` automatically calls `setPermissionOverrideMode()` which updates all agent tool executors
+- When permission mode changes, `Session` automatically calls
+  `setPermissionOverrideMode()` which updates all agent tool executors
 
 ## Prerequisites
 
@@ -70,27 +78,31 @@ npm run dev
 **File**: `packages/core/src/tools/types.ts`
 
 **What to do**:
+
 1. Find the `ToolAnnotations` interface (around line 25-30)
 2. Add a new optional property: `readOnlySafe?: boolean;`
 
 **Code to add**:
+
 ```typescript
 export interface ToolAnnotations {
   title?: string;
   destructiveHint?: boolean;
   openWorldHint?: boolean;
   safeInternal?: boolean;
-  readOnlySafe?: boolean;  // NEW: Indicates tool is safe in read-only mode
+  readOnlySafe?: boolean; // NEW: Indicates tool is safe in read-only mode
 }
 ```
 
 **Test this step**:
+
 ```bash
 npm run build
 # Should compile without errors
 ```
 
 **Commit**:
+
 ```bash
 git add -A && git commit -m "feat(tools): add readOnlySafe annotation to ToolAnnotations interface"
 ```
@@ -101,8 +113,7 @@ git add -A && git commit -m "feat(tools): add readOnlySafe annotation to ToolAnn
 
 **File**: `packages/core/src/tools/types.ts`
 
-**What to do**:
-Add a new type export at the end of the file:
+**What to do**: Add a new type export at the end of the file:
 
 ```typescript
 export type PermissionOverrideMode = 'normal' | 'yolo' | 'read-only';
@@ -111,6 +122,7 @@ export type PermissionOverrideMode = 'normal' | 'yolo' | 'read-only';
 **Test**: `npm run build`
 
 **Commit**:
+
 ```bash
 git commit -am "feat(tools): add PermissionOverrideMode type"
 ```
@@ -122,6 +134,7 @@ git commit -am "feat(tools): add PermissionOverrideMode type"
 **Files to update** (each tool has an `annotations` property):
 
 **SAFE tools** (add `readOnlySafe: true`):
+
 - `packages/core/src/tools/implementations/file_read.ts`
 - `packages/core/src/tools/implementations/file_list.ts`
 - `packages/core/src/tools/implementations/file_find.ts`
@@ -129,24 +142,28 @@ git commit -am "feat(tools): add PermissionOverrideMode type"
 - `packages/core/src/tools/implementations/url_fetch.ts`
 
 **Example change** for `file_read.ts`:
+
 ```typescript
 annotations: ToolAnnotations = {
   title: 'Read files',
-  readOnlySafe: true,  // ADD THIS LINE
+  readOnlySafe: true, // ADD THIS LINE
 };
 ```
 
 **UNSAFE tools** (add `readOnlySafe: false` or leave undefined):
+
 - `packages/core/src/tools/implementations/bash.ts`
 - `packages/core/src/tools/implementations/file_write.ts`
 - `packages/core/src/tools/implementations/file_edit.ts`
 
 **Test**: Build should still pass
+
 ```bash
 npm run build
 ```
 
 **Commit**:
+
 ```bash
 git commit -am "feat(tools): mark tools with readOnlySafe annotation"
 ```
@@ -160,12 +177,15 @@ git commit -am "feat(tools): mark tools with readOnlySafe annotation"
 **File**: `packages/core/src/sessions/session.ts`
 
 **What to do**:
+
 1. Import the new type at the top:
+
 ```typescript
 import type { ToolPolicy, PermissionOverrideMode } from '~/tools/types';
 ```
 
 2. Add private field to the Session class (around line 60):
+
 ```typescript
 export class Session {
   // ... existing fields ...
@@ -173,6 +193,7 @@ export class Session {
 ```
 
 3. Add getter and setter methods (add near other getters, around line 800):
+
 ```typescript
 getPermissionOverrideMode(): PermissionOverrideMode {
   return this._permissionOverrideMode;
@@ -201,21 +222,26 @@ setPermissionOverrideMode(mode: PermissionOverrideMode): void {
 }
 ```
 
-4. Load the override mode during session reconstruction (in `_performReconstruction` method):
+4. Load the override mode during session reconstruction (in
+   `_performReconstruction` method):
+
 ```typescript
 // After creating the session instance, restore override mode
-const overrideMode = sessionData.configuration?.runtimeOverrides?.permissionMode as PermissionOverrideMode;
+const overrideMode = sessionData.configuration?.runtimeOverrides
+  ?.permissionMode as PermissionOverrideMode;
 if (overrideMode && overrideMode !== 'normal') {
   session.setPermissionOverrideMode(overrideMode);
 }
 ```
 
 **Test with**:
+
 ```bash
 npm run build
 ```
 
 **Commit**:
+
 ```bash
 git commit -am "feat(session): add permission override mode to Session class"
 ```
@@ -224,7 +250,8 @@ git commit -am "feat(session): add permission override mode to Session class"
 
 #### Task 2.2: Write tests for Session permission mode
 
-**File**: Create `packages/core/src/sessions/session-permission-override.test.ts`
+**File**: Create
+`packages/core/src/sessions/session-permission-override.test.ts`
 
 ```typescript
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -274,11 +301,13 @@ describe('Session Permission Override', () => {
 ```
 
 **Run tests**:
+
 ```bash
 npm test -- session-permission-override
 ```
 
 **Commit**:
+
 ```bash
 git add -A && git commit -m "test(session): add tests for permission override mode"
 ```
@@ -292,12 +321,15 @@ git add -A && git commit -m "test(session): add tests for permission override mo
 **File**: `packages/core/src/tools/executor.ts`
 
 **What to do**:
+
 1. Import the type:
+
 ```typescript
 import type { PermissionOverrideMode } from './types';
 ```
 
 2. Add private field (around line 20):
+
 ```typescript
 export class ToolExecutor {
   private tools = new Map<string, Tool>();
@@ -306,6 +338,7 @@ export class ToolExecutor {
 ```
 
 3. Add setter method:
+
 ```typescript
 setPermissionOverrideMode(mode: PermissionOverrideMode): void {
   this.permissionOverrideMode = mode;
@@ -313,6 +346,7 @@ setPermissionOverrideMode(mode: PermissionOverrideMode): void {
 ```
 
 4. Add override logic method:
+
 ```typescript
 private getEffectivePolicy(tool: Tool, configuredPolicy: ToolPolicy): ToolPolicy {
   // Apply override mode
@@ -334,7 +368,9 @@ private getEffectivePolicy(tool: Tool, configuredPolicy: ToolPolicy): ToolPolicy
 }
 ```
 
-5. Update the `execute` method to use `getEffectivePolicy` when checking permissions:
+5. Update the `execute` method to use `getEffectivePolicy` when checking
+   permissions:
+
 ```typescript
 // In the execute method, find where it checks tool policies
 // Replace direct policy check with:
@@ -343,11 +379,13 @@ const effectivePolicy = this.getEffectivePolicy(tool, configuredPolicy);
 ```
 
 **Test**: Build should pass
+
 ```bash
 npm run build
 ```
 
 **Commit**:
+
 ```bash
 git commit -am "feat(executor): add permission override mode support to ToolExecutor"
 ```
@@ -445,11 +483,13 @@ describe('ToolExecutor Permission Override', () => {
 ```
 
 **Run tests**:
+
 ```bash
 npm test -- executor-override
 ```
 
 **Commit**:
+
 ```bash
 git add -A && git commit -m "test(executor): add tests for permission override modes"
 ```
@@ -458,9 +498,11 @@ git add -A && git commit -m "test(executor): add tests for permission override m
 
 ### Phase 3.5: Fix Circular Dependency (CRITICAL - BLOCKING)
 
-**STATUS**: Must complete before Phase 4. Tests are failing due to circular dependency.
+**STATUS**: Must complete before Phase 4. Tests are failing due to circular
+dependency.
 
 **Problem**: Circular dependency introduced in container work:
+
 ```
 tool.ts → Session → ToolExecutor → BashTool → tool.ts
 ```
@@ -471,7 +513,8 @@ tool.ts → Session → ToolExecutor → BashTool → tool.ts
 
 **File**: `packages/core/src/tools/executor.ts`
 
-**What to do**: In the `execute()` method, add workspace info to the context after line 301:
+**What to do**: In the `execute()` method, add workspace info to the context
+after line 301:
 
 ```typescript
 // Use the LLM-provided tool call ID and create temp directory
@@ -485,8 +528,8 @@ const workspaceManager = session?.getWorkspaceManager();
 toolContext = {
   ...toolContext,
   toolTempDir,
-  workspaceInfo,      // NEW
-  workspaceManager,   // NEW
+  workspaceInfo, // NEW
+  workspaceManager, // NEW
 };
 ```
 
@@ -495,7 +538,9 @@ toolContext = {
 **File**: `packages/core/src/tools/tool.ts`
 
 **What to do**:
-1. Remove the two helper methods: `getWorkspaceInfo()` and `getWorkspaceManager()` (they use require() for Session)
+
+1. Remove the two helper methods: `getWorkspaceInfo()` and
+   `getWorkspaceManager()` (they use require() for Session)
 2. Update `resolveWorkspacePath()` method to read from context instead:
 
 ```typescript
@@ -514,7 +559,8 @@ protected resolveWorkspacePath(path: string, context?: ToolContext): string {
 
 **File**: `packages/core/src/tools/implementations/bash.ts`
 
-**What to do**: Find any calls to `getSessionFromContext()` or `session?.getWorkspaceInfo()` and replace with context reads:
+**What to do**: Find any calls to `getSessionFromContext()` or
+`session?.getWorkspaceInfo()` and replace with context reads:
 
 ```typescript
 // OLD
@@ -541,6 +587,7 @@ npm run lint   # Should pass
 ```
 
 **Commit**:
+
 ```bash
 git add -A && git commit -m "fix(tools): eliminate circular dependency by enriching context in ToolExecutor
 
@@ -556,14 +603,17 @@ git add -A && git commit -m "fix(tools): eliminate circular dependency by enrich
 
 **ACTUAL IMPLEMENTATION:**
 
-No separate endpoint was created. Instead, permission mode is integrated into the existing configuration endpoint.
+No separate endpoint was created. Instead, permission mode is integrated into
+the existing configuration endpoint.
 
 #### Task 4.1: Add runtimeOverrides to configuration schema
 
 **File**: `packages/web/app/routes/api.sessions.$sessionId.configuration.ts`
 
 **Changes made**:
+
 1. Added `runtimeOverrides` to the `ConfigurationSchema`:
+
 ```typescript
 const ConfigurationSchema = z.object({
   // ... existing fields ...
@@ -575,7 +625,9 @@ const ConfigurationSchema = z.object({
 });
 ```
 
-2. Added to `SessionConfigurationSchema` in `packages/core/src/sessions/session-config.ts`:
+2. Added to `SessionConfigurationSchema` in
+   `packages/core/src/sessions/session-config.ts`:
+
 ```typescript
 export const SessionConfigurationSchema = z.object({
   // ... existing fields ...
@@ -587,7 +639,9 @@ export const SessionConfigurationSchema = z.object({
 });
 ```
 
-3. Updated `Session.updateConfiguration()` to automatically handle permission mode changes:
+3. Updated `Session.updateConfiguration()` to automatically handle permission
+   mode changes:
+
 ```typescript
 updateConfiguration(updates: Partial<SessionConfiguration>): void {
   // Validate configuration
@@ -607,6 +661,7 @@ updateConfiguration(updates: Partial<SessionConfiguration>): void {
 ```
 
 **Usage**:
+
 ```bash
 # Update permission mode via existing configuration endpoint
 curl -X PUT http://localhost:31339/api/sessions/SESSION_ID/configuration \
@@ -619,6 +674,7 @@ curl -X PUT http://localhost:31339/api/sessions/SESSION_ID/configuration \
 ```
 
 **Commit**:
+
 ```bash
 git add -A && git commit -m "feat(session): integrate permission mode into configuration system"
 ```
@@ -674,6 +730,7 @@ export function SegmentedControl<T extends string>({
 ```
 
 **Commit**:
+
 ```bash
 git add -A && git commit -m "feat(ui): add SegmentedControl component"
 ```
@@ -682,21 +739,27 @@ git add -A && git commit -m "feat(ui): add SegmentedControl component"
 
 #### Task 5.2: Add permission mode control to session sidebar
 
-**File**: Find the session sidebar component (likely in `packages/web/components/session/` or similar)
+**File**: Find the session sidebar component (likely in
+`packages/web/components/session/` or similar)
 
 **What to add**:
+
 1. Import the component and types:
+
 ```typescript
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import type { PermissionOverrideMode } from '@lace/core/tools/types';
 ```
 
 2. Add state for the permission mode:
+
 ```typescript
-const [permissionMode, setPermissionMode] = useState<PermissionOverrideMode>('normal');
+const [permissionMode, setPermissionMode] =
+  useState<PermissionOverrideMode>('normal');
 ```
 
 3. Add the control to the sidebar UI:
+
 ```typescript
 <div className="p-4 border-b">
   <label className="text-sm font-medium mb-2 block">
@@ -715,19 +778,17 @@ const [permissionMode, setPermissionMode] = useState<PermissionOverrideMode>('no
 ```
 
 4. Add the change handler:
+
 ```typescript
 const handlePermissionModeChange = async (mode: PermissionOverrideMode) => {
   setPermissionMode(mode);
 
   try {
-    const response = await fetch(
-      `/api/sessions/${sessionId}/permission-mode`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode })
-      }
-    );
+    const response = await fetch(`/api/sessions/${sessionId}/permission-mode`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    });
 
     if (!response.ok) {
       throw new Error('Failed to update permission mode');
@@ -741,6 +802,7 @@ const handlePermissionModeChange = async (mode: PermissionOverrideMode) => {
 ```
 
 **Commit**:
+
 ```bash
 git commit -am "feat(ui): add permission mode control to session sidebar"
 ```
@@ -754,6 +816,7 @@ git commit -am "feat(ui): add permission mode control to session sidebar"
 **What to add**:
 
 1. Conditionally apply border/background classes based on mode:
+
 ```typescript
 <div className={cn(
   "flex-1 overflow-y-auto",
@@ -765,6 +828,7 @@ git commit -am "feat(ui): add permission mode control to session sidebar"
 ```
 
 Or for background tint:
+
 ```typescript
 <div className={cn(
   "flex-1 overflow-y-auto",
@@ -774,12 +838,14 @@ Or for background tint:
 ```
 
 **Test visually**:
+
 - Start dev server: `npm run dev`
 - Open a session
 - Toggle between modes
 - Verify visual changes
 
 **Commit**:
+
 ```bash
 git commit -am "feat(ui): add visual indicators for permission modes"
 ```
@@ -845,6 +911,7 @@ private async autoResolvePendingApprovals(mode: PermissionOverrideMode): Promise
 ```
 
 **Commit**:
+
 ```bash
 git commit -am "feat(session): auto-resolve pending approvals on mode change"
 ```
@@ -877,9 +944,9 @@ describe('Permission Override E2E', () => {
         toolPolicies: {
           file_read: 'ask',
           file_write: 'ask',
-          bash: 'ask'
-        }
-      }
+          bash: 'ask',
+        },
+      },
     });
 
     agent = session.getCoordinatorAgent();
@@ -893,8 +960,8 @@ describe('Permission Override E2E', () => {
       name: 'file_write',
       arguments: {
         file_path: '/tmp/test.txt',
-        content: 'test content'
-      }
+        content: 'test content',
+      },
     });
 
     expect(writeResult.status).toBe('completed');
@@ -907,8 +974,8 @@ describe('Permission Override E2E', () => {
     const readResult = await agent.toolExecutor.execute({
       name: 'file_read',
       arguments: {
-        file_path: '/tmp/test.txt'
-      }
+        file_path: '/tmp/test.txt',
+      },
     });
     expect(readResult.status).toBe('completed');
 
@@ -917,8 +984,8 @@ describe('Permission Override E2E', () => {
       name: 'file_write',
       arguments: {
         file_path: '/tmp/test.txt',
-        content: 'new content'
-      }
+        content: 'new content',
+      },
     });
     expect(writeResult.status).toBe('denied');
   });
@@ -926,11 +993,13 @@ describe('Permission Override E2E', () => {
 ```
 
 **Run**:
+
 ```bash
 npm test -- permission-override-e2e
 ```
 
 **Commit**:
+
 ```bash
 git add -A && git commit -m "test(e2e): add end-to-end tests for permission override system"
 ```
@@ -940,6 +1009,7 @@ git add -A && git commit -m "test(e2e): add end-to-end tests for permission over
 ## Testing Checklist
 
 ### Manual Testing
+
 1. Start the dev server: `npm run dev`
 2. Create a new session
 3. Open the session in the web UI
@@ -958,6 +1028,7 @@ git add -A && git commit -m "test(e2e): add end-to-end tests for permission over
    - Verify mode is still YOLO
 
 ### Automated Testing
+
 ```bash
 # Run all tests
 npm test
@@ -977,30 +1048,46 @@ npm run lint
 ## Common Issues & Solutions
 
 ### Issue: TypeScript errors about missing types
-**Solution**: Make sure you've added all imports and exports correctly. Run `npm run build` to see specific errors.
+
+**Solution**: Make sure you've added all imports and exports correctly. Run
+`npm run build` to see specific errors.
 
 ### Issue: Tests failing with "Session not found"
-**Solution**: Make sure you're using `setupCoreTest()` in your test setup to initialize the test database.
+
+**Solution**: Make sure you're using `setupCoreTest()` in your test setup to
+initialize the test database.
 
 ### Issue: UI not updating when mode changes
-**Solution**: Check that the state is being updated and the API call is succeeding. Look at browser console for errors.
+
+**Solution**: Check that the state is being updated and the API call is
+succeeding. Look at browser console for errors.
 
 ### Issue: Permissions not being overridden
-**Solution**: Verify that `getEffectivePolicy` is being called in ToolExecutor instead of using the configured policy directly.
+
+**Solution**: Verify that `getEffectivePolicy` is being called in ToolExecutor
+instead of using the configured policy directly.
 
 ## Architecture Decision Records
 
 ### Why store override mode in session, not user preferences?
-Different sessions may need different permission levels. A production debugging session might need read-only, while a development session uses YOLO mode.
+
+Different sessions may need different permission levels. A production debugging
+session might need read-only, while a development session uses YOLO mode.
 
 ### Why use tool annotations instead of hardcoded lists?
-This makes the system extensible. New tools automatically work with the permission system by setting their `readOnlySafe` annotation.
+
+This makes the system extensible. New tools automatically work with the
+permission system by setting their `readOnlySafe` annotation.
 
 ### Why auto-resolve pending approvals?
-User expectation: switching to YOLO mode means "approve everything". Having to still manually approve queued items would be confusing.
+
+User expectation: switching to YOLO mode means "approve everything". Having to
+still manually approve queued items would be confusing.
 
 ### Why visual indicators?
-Safety. Users should always be aware when they're in a permissive (YOLO) or restrictive (Read-Only) mode to avoid surprises.
+
+Safety. Users should always be aware when they're in a permissive (YOLO) or
+restrictive (Read-Only) mode to avoid surprises.
 
 ## Next Steps & Future Enhancements
 
@@ -1024,6 +1111,7 @@ Safety. Users should always be aware when they're in a permissive (YOLO) or rest
 ## Commit History Guide
 
 Your commit history should look something like:
+
 ```
 feat(tools): add readOnlySafe annotation to ToolAnnotations interface
 feat(tools): add PermissionOverrideMode type
@@ -1040,7 +1128,8 @@ feat(session): auto-resolve pending approvals on mode change
 test(e2e): add end-to-end tests for permission override system
 ```
 
-This creates a clean, logical progression that's easy to review and potentially revert if needed.
+This creates a clean, logical progression that's easy to review and potentially
+revert if needed.
 
 ---
 
@@ -1048,17 +1137,24 @@ This creates a clean, logical progression that's easy to review and potentially 
 
 ### Problem Discovery
 
-While implementing yolo-mode, discovered that all tests are failing due to an async Session.create() change I made without permission. This broke 27 test files because tests aren't awaiting Session.create().
+While implementing yolo-mode, discovered that all tests are failing due to an
+async Session.create() change I made without permission. This broke 27 test
+files because tests aren't awaiting Session.create().
 
-**Root Cause**: In commit 3be3e3172, I made `Session.create()` async to support workspace creation, but didn't update any tests. Now `session` variables in tests are Promise objects instead of Session instances, causing "session.getId is not a function" errors.
+**Root Cause**: In commit 3be3e3172, I made `Session.create()` async to support
+workspace creation, but didn't update any tests. Now `session` variables in
+tests are Promise objects instead of Session instances, causing "session.getId
+is not a function" errors.
 
 **Example failure**:
+
 ```
 ❯ src/agents/agent.test.ts > Enhanced Agent > constructor and basic properties > should create agent with correct configuration
   → session.getId is not a function
 ```
 
-Line 196 in agent.test.ts calls `session.getId()` but session is a Promise because line 117 calls `Session.create({...})` without `await`.
+Line 196 in agent.test.ts calls `session.getId()` but session is a Promise
+because line 117 calls `Session.create({...})` without `await`.
 
 ### Agreed Solution: Make Session.create() Synchronous Again
 
@@ -1069,6 +1165,7 @@ Instead of making Session.create() async, we'll:
 3. Tools that need workspace wait for completion
 
 This approach:
+
 - ✅ Doesn't break existing tests
 - ✅ Still creates workspaces when needed
 - ✅ Doesn't block Session creation
@@ -1083,11 +1180,13 @@ This approach:
 **Changes needed**:
 
 1. Add workspace initialization promise field:
+
 ```typescript
 private _workspaceInitPromise?: Promise<void>;
 ```
 
 2. Change Session.create() signature:
+
 ```typescript
 // OLD
 static async create(options: {...}): Promise<Session> {
@@ -1097,6 +1196,7 @@ static create(options: {...}): Session {
 ```
 
 3. Start workspace creation in background:
+
 ```typescript
 // Create session instance first
 const session = new Session(
@@ -1117,6 +1217,7 @@ return session; // Return immediately
 ```
 
 4. Add private workspace initialization method:
+
 ```typescript
 private async initializeWorkspace(
   workspaceManager: IWorkspaceManager,
@@ -1143,6 +1244,7 @@ private async initializeWorkspace(
 **File**: `packages/core/src/sessions/session.ts`
 
 Add method for tools to wait for workspace:
+
 ```typescript
 async waitForWorkspace(): Promise<{ manager?: IWorkspaceManager; info?: WorkspaceInfo }> {
   if (this._workspaceInitPromise) {
@@ -1160,6 +1262,7 @@ async waitForWorkspace(): Promise<{ manager?: IWorkspaceManager; info?: Workspac
 **File**: `packages/core/src/tools/executor.ts`
 
 In the `execute()` method where we populate workspace context:
+
 ```typescript
 // Get workspace context from session - wait for it if needed
 const workspaceContext = session ? await session.waitForWorkspace() : undefined;
@@ -1188,6 +1291,7 @@ npm run lint   # Should pass
 ```
 
 **Commit**:
+
 ```bash
 git add -A && git commit -m "fix(session): make Session.create() synchronous with background workspace init
 
@@ -1207,4 +1311,5 @@ These tasks are critical and must be completed before any other work:
 - [ ] Task 5.4: Run all tests (should go from 292 failed → 0 failed)
 - [ ] Task 5.5: Verify build and lint
 
-Only after all tests are passing and build is clean should we continue with yolo-mode implementation.
+Only after all tests are passing and build is clean should we continue with
+yolo-mode implementation.

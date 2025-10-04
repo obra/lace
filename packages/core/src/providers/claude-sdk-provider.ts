@@ -121,15 +121,13 @@ export class ClaudeSDKProvider extends AIProvider {
       hasContext: !!context,
     });
 
-    // Get config
-    const config = this._config as ClaudeSDKProviderConfig;
-
-    // Session token is optional - SDK will use existing Claude authentication if available
-    // (from Claude Code CLI, browser session, or ANTHROPIC_API_KEY env var)
-
     if (!context) {
       throw new Error('SDK provider requires ProviderRequestContext');
     }
+
+    // Get config and OAuth token
+    const config = this._config as ClaudeSDKProviderConfig;
+    const oauthToken = config.sessionToken;
 
     // Check if we can resume previous session
     const canResume = this.canResumeSession(messages);
@@ -159,6 +157,14 @@ export class ClaudeSDKProvider extends AIProvider {
       ? this.mapPermissionMode(context.session.getPermissionOverrideMode())
       : 'default';
 
+    // Build environment with OAuth token for SDK subprocess
+    // Start with context.processEnv, then add system PATH and OAuth token
+    const sdkEnv = {
+      ...context.processEnv,
+      PATH: process.env.PATH, // Use system PATH, not context PATH
+      ...(oauthToken && { CLAUDE_CODE_OAUTH_TOKEN: oauthToken }),
+    };
+
     // Build SDK query options
     const queryOptions: SDKQueryOptions = {
       resume: canResume ? this.sessionId : undefined,
@@ -166,7 +172,7 @@ export class ClaudeSDKProvider extends AIProvider {
       model,
       systemPrompt: this._systemPrompt,
       cwd: context.workingDirectory,
-      env: context.processEnv,
+      env: sdkEnv,
       includePartialMessages: false, // Disable for non-streaming
       settingSources: [], // Don't load filesystem settings
       mcpServers: {
@@ -179,6 +185,19 @@ export class ClaudeSDKProvider extends AIProvider {
       // SDK accepts object with signal property, cast to satisfy type
       abortController: signal ? ({ signal } as unknown as AbortController) : undefined,
     };
+
+    // Log query options for debugging
+    logger.debug('SDK query options', {
+      prompt: latestMessage.content.substring(0, 100),
+      resume: queryOptions.resume,
+      model: queryOptions.model,
+      cwd: queryOptions.cwd,
+      systemPromptLength: queryOptions.systemPrompt?.length,
+      mcpServerCount: Object.keys(queryOptions.mcpServers).length,
+      mcpServerNames: Object.keys(queryOptions.mcpServers),
+      hasCanUseTool: !!queryOptions.canUseTool,
+      permissionMode: queryOptions.permissionMode,
+    });
 
     // Create SDK query
     const query = sdkQuery({
@@ -300,20 +319,20 @@ export class ClaudeSDKProvider extends AIProvider {
     signal?: AbortSignal,
     context?: ProviderRequestContext
   ): Promise<ProviderResponse> {
+    if (!context) {
+      throw new Error('SDK provider requires ProviderRequestContext');
+    }
+
+    // Get config and OAuth token
+    const config = this._config as ClaudeSDKProviderConfig;
+    const oauthToken = config.sessionToken;
+
     logger.info('SDK Provider createStreamingResponse', {
       messageCount: messages.length,
       toolCount: tools.length,
       model,
+      hasToken: !!oauthToken,
     });
-
-    const config = this._config as ClaudeSDKProviderConfig;
-
-    // Session token is optional - SDK will use existing Claude authentication if available
-    // (from Claude Code CLI, browser session, or ANTHROPIC_API_KEY env var)
-
-    if (!context) {
-      throw new Error('SDK provider requires ProviderRequestContext');
-    }
 
     const canResume = this.canResumeSession(messages);
     const latestMessage = messages[messages.length - 1];
@@ -335,6 +354,14 @@ export class ClaudeSDKProvider extends AIProvider {
       ? this.mapPermissionMode(context.session.getPermissionOverrideMode())
       : 'default';
 
+    // Build environment with OAuth token for SDK subprocess
+    // Start with context.processEnv, then add system PATH and OAuth token
+    const sdkEnv = {
+      ...context.processEnv,
+      PATH: process.env.PATH, // Use system PATH, not context PATH
+      ...(oauthToken && { CLAUDE_CODE_OAUTH_TOKEN: oauthToken }),
+    };
+
     // Build query options with streaming enabled
     const queryOptions: SDKQueryOptions = {
       resume: canResume ? this.sessionId : undefined,
@@ -342,7 +369,7 @@ export class ClaudeSDKProvider extends AIProvider {
       model,
       systemPrompt: this._systemPrompt,
       cwd: context.workingDirectory,
-      env: context.processEnv,
+      env: sdkEnv,
       includePartialMessages: true, // Enable streaming
       settingSources: [],
       mcpServers: {
@@ -355,6 +382,25 @@ export class ClaudeSDKProvider extends AIProvider {
       // SDK accepts object with signal property, cast to satisfy type
       abortController: signal ? ({ signal } as unknown as AbortController) : undefined,
     };
+
+    // Log query options for debugging
+    logger.debug('SDK query options (streaming)', {
+      prompt: latestMessage.content.substring(0, 100),
+      resume: queryOptions.resume,
+      model: queryOptions.model,
+      cwd: queryOptions.cwd,
+      systemPromptLength: queryOptions.systemPrompt?.length,
+      mcpServerCount: Object.keys(queryOptions.mcpServers).length,
+      mcpServerNames: Object.keys(queryOptions.mcpServers),
+      hasCanUseTool: !!queryOptions.canUseTool,
+      permissionMode: queryOptions.permissionMode,
+      hasToken: !!oauthToken,
+      envHasPATH: !!(sdkEnv as NodeJS.ProcessEnv).PATH,
+      envPATH: (sdkEnv as NodeJS.ProcessEnv).PATH?.substring(0, 200),
+      envHasOAuthToken: !!sdkEnv.CLAUDE_CODE_OAUTH_TOKEN,
+      processExecPath: process.execPath,
+      envKeys: Object.keys(sdkEnv).length,
+    });
 
     const query = sdkQuery({
       prompt: latestMessage.content,
@@ -515,9 +561,9 @@ export class ClaudeSDKProvider extends AIProvider {
   }
 
   isConfigured(): boolean {
-    // SDK provider is always "configured" - it will use existing Claude authentication
-    // Session token is optional - SDK auto-detects auth from Claude Code CLI, browser, or env vars
-    return true;
+    // SDK provider requires OAuth token from `claude setup-token`
+    const config = this._config as ClaudeSDKProviderConfig;
+    return !!config.sessionToken;
   }
 
   /**

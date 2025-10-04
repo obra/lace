@@ -178,10 +178,7 @@ export class ProviderRegistry {
 
     const credentials = this.instanceManager.loadCredential(instanceId);
 
-    // SDK provider can be created without credentials (OAuth flow happens later)
-    const allowsNullCredentials = instance.catalogProviderId === 'claude-agents-sdk';
-
-    if (credentials == null && !allowsNullCredentials) {
+    if (credentials == null) {
       throw new Error(`No credentials found for instance: ${instanceId}`);
     }
 
@@ -222,10 +219,7 @@ export class ProviderRegistry {
 
     const credentials = this.instanceManager.loadCredential(instanceId);
 
-    // SDK provider can be created without credentials (OAuth flow happens later)
-    const allowsNullCredentials = instance.catalogProviderId === 'claude-agents-sdk';
-
-    if (credentials == null && !allowsNullCredentials) {
+    if (credentials == null) {
       throw new Error(`No credentials found for instance: ${instanceId}`);
     }
 
