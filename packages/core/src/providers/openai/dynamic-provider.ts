@@ -33,16 +33,22 @@ export class OpenAIDynamicProvider {
     this.cacheDir = path.join(getLaceDir(), 'catalogs');
   }
 
-  async getCatalog(apiKey: string, staticCatalog: CatalogProvider): Promise<CatalogProvider> {
-    // Check cache first
+  async getCatalog(
+    apiKey: string,
+    staticCatalog: CatalogProvider,
+    forceRefresh = false
+  ): Promise<CatalogProvider> {
+    // Check cache first (unless force refresh)
     // Note: Potential race condition if multiple concurrent requests hit stale/missing cache.
     // Both will fetch from API simultaneously. This is acceptable because:
     // 1. Duplicate fetches are idempotent and infrequent (24hr TTL)
     // 2. File system writes are atomic (last write wins)
     // 3. Adding deduplication adds complexity for minimal benefit
-    const cached = await this.loadCache();
-    if (cached && !this.isCacheStale(cached)) {
-      return cached.provider;
+    if (!forceRefresh) {
+      const cached = await this.loadCache();
+      if (cached && !this.isCacheStale(cached)) {
+        return cached.provider;
+      }
     }
 
     // Fetch fresh data
@@ -64,7 +70,8 @@ export class OpenAIDynamicProvider {
       return filteredCatalog;
     } catch (error) {
       logger.warn('Failed to fetch OpenAI models, using cached or static catalog', { error });
-      // Fall back to cache if available, otherwise use full static catalog
+      // Fall back to cache if available (even if stale), otherwise use full static catalog
+      const cached = await this.loadCache();
       return cached?.provider ?? staticCatalog;
     }
   }

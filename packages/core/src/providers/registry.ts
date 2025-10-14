@@ -100,10 +100,25 @@ export class ProviderRegistry {
 
   async getCatalogProviders(): Promise<CatalogProvider[]> {
     await this.ensureInitialized();
-    return this.catalogManager.getAvailableProviders();
+
+    // Get static catalogs first
+    const staticProviders = this.catalogManager.getAvailableProviders();
+
+    // Replace with dynamic catalogs where available
+    const providers = await Promise.all(
+      staticProviders.map(async (provider) => {
+        const dynamic = await this.getCatalogProvider(provider.id);
+        return dynamic ?? provider;
+      })
+    );
+
+    return providers;
   }
 
-  async getCatalogProvider(providerId: string): Promise<CatalogProvider | null> {
+  async getCatalogProvider(
+    providerId: string,
+    forceRefresh = false
+  ): Promise<CatalogProvider | null> {
     await this.ensureInitialized();
 
     // Special handling for OpenRouter
@@ -153,7 +168,7 @@ export class ProviderRegistry {
 
           if (staticCatalog) {
             try {
-              return await provider.getCatalog(credential.apiKey, staticCatalog);
+              return await provider.getCatalog(credential.apiKey, staticCatalog, forceRefresh);
             } catch (error) {
               logger.warn('Failed to fetch OpenAI dynamic catalog, using static', { error });
             }
