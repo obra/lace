@@ -23,7 +23,9 @@ export class OpenAIDynamicProvider {
   private client: OpenAIClient;
   private cacheDir: string;
   private instanceId: string;
-  private static readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+  // Cache TTL: 24 hours - balances freshness with API rate limits.
+  // OpenAI model availability rarely changes, and we gracefully fall back to static catalog on errors.
+  private static readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
   constructor(instanceId: string) {
     this.instanceId = instanceId;
@@ -33,6 +35,11 @@ export class OpenAIDynamicProvider {
 
   async getCatalog(apiKey: string, staticCatalog: CatalogProvider): Promise<CatalogProvider> {
     // Check cache first
+    // Note: Potential race condition if multiple concurrent requests hit stale/missing cache.
+    // Both will fetch from API simultaneously. This is acceptable because:
+    // 1. Duplicate fetches are idempotent and infrequent (24hr TTL)
+    // 2. File system writes are atomic (last write wins)
+    // 3. Adding deduplication adds complexity for minimal benefit
     const cached = await this.loadCache();
     if (cached && !this.isCacheStale(cached)) {
       return cached.provider;
@@ -68,6 +75,11 @@ export class OpenAIDynamicProvider {
   ): CatalogProvider {
     const availableIds = new Set(availableModels.map((m) => m.id));
 
+    // Simple ID-based filtering is sufficient for OpenAI because:
+    // 1. OpenAI's API returns all models available to the account
+    // 2. Model capabilities (vision, reasoning, etc.) are static and defined in our catalog
+    // 3. Unlike OpenRouter which aggregates many providers, OpenAI's model IDs are stable
+    // 4. Access control happens at the API level (models not in /v1/models aren't available)
     const filteredModels = staticCatalog.models.filter((model) => availableIds.has(model.id));
 
     logger.info('Filtered OpenAI catalog by API availability', {
@@ -86,8 +98,22 @@ export class OpenAIDynamicProvider {
     try {
       const cachePath = this.getCachePath();
       const content = await fs.promises.readFile(cachePath, 'utf-8');
-      return JSON.parse(content) as CachedCatalog;
-    } catch {
+      const parsed = JSON.parse(content) as unknown;
+
+      // Basic validation of cache structure
+      if (
+        !parsed ||
+        typeof parsed !== 'object' ||
+        !('_meta' in parsed) ||
+        !('provider' in parsed)
+      ) {
+        logger.debug('Invalid OpenAI catalog cache structure', { instanceId: this.instanceId });
+        return null;
+      }
+
+      return parsed as CachedCatalog;
+    } catch (error) {
+      logger.debug('Failed to load OpenAI catalog cache', { error, instanceId: this.instanceId });
       return null;
     }
   }

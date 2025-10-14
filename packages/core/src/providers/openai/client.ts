@@ -14,7 +14,8 @@ export class OpenAIClient {
     const response = await fetch(`${this.baseUrl}/models`, { headers });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const text = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} - ${text}`);
     }
 
     const data = (await response.json()) as unknown;
