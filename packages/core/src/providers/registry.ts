@@ -15,6 +15,7 @@ import type {
   ModelConfig,
 } from '@lace/core/providers/catalog/types';
 import { OpenRouterDynamicProvider } from '@lace/core/providers/openrouter/dynamic-provider';
+import { OpenAIDynamicProvider } from '@lace/core/providers/openai/dynamic-provider';
 import { logger } from '@lace/core/utils/logger';
 
 /**
@@ -129,6 +130,33 @@ export class ProviderRegistry {
             return await provider.getCatalogWithConfig(credential.apiKey, config);
           } catch (error) {
             logger.warn('Failed to fetch dynamic catalog, using static', { error });
+          }
+        }
+      }
+    }
+
+    // Special handling for OpenAI
+    if (providerId === 'openai') {
+      // Check if we have an instance with API key
+      const instances = await this.instanceManager.loadInstances();
+      const openAIInstance = Object.entries(instances.instances).find(
+        ([_, inst]) => inst.catalogProviderId === 'openai'
+      );
+
+      if (openAIInstance) {
+        const [instanceId] = openAIInstance;
+        const credential = this.instanceManager.loadCredential(instanceId);
+
+        if (credential?.apiKey) {
+          const provider = new OpenAIDynamicProvider(instanceId);
+          const staticCatalog = this.catalogManager.getProvider('openai');
+
+          if (staticCatalog) {
+            try {
+              return await provider.getCatalog(credential.apiKey, staticCatalog);
+            } catch (error) {
+              logger.warn('Failed to fetch OpenAI dynamic catalog, using static', { error });
+            }
           }
         }
       }
