@@ -948,7 +948,9 @@ export class Agent extends EventEmitter {
       }
 
       // Process agent response
-      if (response.content) {
+      // Always create AGENT_MESSAGE if there's content OR tool calls
+      // Tool calls must be part of an assistant message per OpenAI API requirements
+      if (response.content || (response.toolCalls && response.toolCalls.length > 0)) {
         // Calculate context window usage from CURRENT response
         let contextUsage: ThreadTokenUsage;
 
