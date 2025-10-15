@@ -1008,7 +1008,17 @@ export class OpenAIProvider extends AIProvider {
                   });
                   return null;
                 }
-                throw error;
+                logger.error('Failed to parse Chat Completions streaming tool call', {
+                  toolName: partial.name,
+                  argumentsLength: partial.arguments.length,
+                  argumentsPreview: partial.arguments.substring(0, 200),
+                  argumentsSuffix: partial.arguments.substring(
+                    Math.max(0, partial.arguments.length - 100)
+                  ),
+                  error: (error as Error).message,
+                });
+                // Don't throw - log and skip the broken tool call to prevent agent crash
+                return null;
               }
             })
             .filter((tc): tc is ToolCall => tc !== null);
@@ -1140,6 +1150,7 @@ export class OpenAIProvider extends AIProvider {
           let content = '';
           const toolCalls: ToolCall[] = [];
           let estimatedOutputTokens = 0;
+          let receivedCompletedEvent = false;
 
           // Track tool calls by output index
           const toolCallsByIndex = new Map<
@@ -1194,10 +1205,21 @@ export class OpenAIProvider extends AIProvider {
                 const toolCall = toolCallsByIndex.get(event.output_index);
                 if (toolCall) {
                   toolCall.arguments += event.delta;
+                  logger.trace('Responses API: Accumulated tool arguments delta', {
+                    outputIndex: event.output_index,
+                    deltaLength: event.delta.length,
+                    totalLength: toolCall.arguments.length,
+                    toolName: toolCall.name,
+                  });
                 }
                 break;
 
               case 'response.completed':
+                receivedCompletedEvent = true;
+                logger.trace('Responses API: Received completion event', {
+                  status: event.response.status,
+                  hasUsage: !!event.response.usage,
+                });
                 // Final event - extract final usage if available
                 if (event.response.usage) {
                   this.emit('token_usage_update', {
@@ -1212,6 +1234,14 @@ export class OpenAIProvider extends AIProvider {
 
               // Ignore other event types (reasoning, etc.) for now
             }
+          }
+
+          // Check if stream ended prematurely
+          if (!receivedCompletedEvent && toolCallsByIndex.size > 0) {
+            logger.warn('Responses API stream ended without completion event', {
+              toolCallCount: toolCallsByIndex.size,
+              toolNames: Array.from(toolCallsByIndex.values()).map((tc) => tc.name),
+            });
           }
 
           // Convert accumulated tool calls to final format
@@ -1234,8 +1264,15 @@ export class OpenAIProvider extends AIProvider {
               }
               logger.error('Failed to parse Responses API streaming tool call', {
                 toolName: buffer.name,
+                argumentsLength: buffer.arguments.length,
+                argumentsPreview: buffer.arguments.substring(0, 200),
+                argumentsSuffix: buffer.arguments.substring(
+                  Math.max(0, buffer.arguments.length - 100)
+                ),
                 error: (error as Error).message,
               });
+              // Don't throw - log and skip the broken tool call to prevent agent crash
+              continue;
             }
           }
 
