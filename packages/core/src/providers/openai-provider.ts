@@ -585,19 +585,55 @@ export class OpenAIProvider extends AIProvider {
     }));
 
     // Convert ProviderMessages to Responses API input format
-    // The Responses API and Chat Completions API use compatible message formats:
-    // - Both support {role: 'assistant', tool_calls: [...]}
-    // - Both support {role: 'tool', tool_call_id: X, content: Y}
-    // However, TypeScript types don't reflect this runtime compatibility, so we cast
-    const convertedOpenAIMessages = convertToOpenAIFormat(messages);
-    const inputMessages = convertedOpenAIMessages.filter((m) => m.role !== 'system');
+    // The Responses API uses a DIFFERENT format than Chat Completions:
+    // - Tool calls are separate {type: 'function_call'} items (not part of assistant message)
+    // - Tool results are separate {type: 'function_call_output'} items (not tool messages)
+    const inputItems: Array<unknown> = [];
+
+    for (const msg of messages.filter((m) => m.role !== 'system')) {
+      if (msg.role === 'user' || msg.role === 'assistant') {
+        // Add text message if it has content
+        if (msg.content && msg.content.trim()) {
+          inputItems.push({
+            role: msg.role,
+            content: msg.content,
+          });
+        }
+
+        // Add tool calls as separate items (assistant messages can have tool calls)
+        if (msg.toolCalls) {
+          for (const toolCall of msg.toolCalls) {
+            // Use sanitized name for API request
+            const sanitizedName =
+              Array.from(mapping.entries()).find(([_, orig]) => orig === toolCall.name)?.[0] ||
+              toolCall.name;
+            inputItems.push({
+              type: 'function_call',
+              call_id: toolCall.id,
+              name: sanitizedName,
+              arguments: JSON.stringify(toolCall.arguments),
+            });
+          }
+        }
+
+        // Add tool results as separate items (user messages can have tool results)
+        if (msg.toolResults) {
+          for (const result of msg.toolResults) {
+            inputItems.push({
+              type: 'function_call_output',
+              call_id: result.id,
+              output: result.content.map((c) => c.text || '').join('\n'),
+            });
+          }
+        }
+      }
+    }
 
     const requestPayload: ResponseCreateParams = {
       model,
       instructions,
-      // Use the full OpenAI format conversion which handles tool calls/results
-      // Runtime compatible but TypeScript doesn't know it - use unknown intermediate cast
-      input: inputMessages as unknown as ResponseCreateParams['input'],
+      // Cast to ResponseCreateParams['input'] - types are complex but runtime compatible
+      input: inputItems as unknown as ResponseCreateParams['input'],
       max_output_tokens: this._config.maxTokens || 4000,
       stream,
       ...(tools.length > 0 && { tools: responsesTools }),

@@ -392,23 +392,6 @@ export class EventStreamManager {
       timestamp: event.timestamp || new Date(),
     };
 
-    // Comprehensive trace logging for event broadcasting
-    logger.debug('[EVENT_STREAM] Broadcasting event', {
-      eventId: fullEvent.id,
-      type: fullEvent.type,
-      contextThreadId: fullEvent.context?.threadId,
-      dataSize:
-        typeof fullEvent.data === 'string'
-          ? fullEvent.data.length
-          : JSON.stringify(fullEvent.data || {}).length,
-      dataPreview: this.truncateEventData(fullEvent.data),
-      contextProjectId: fullEvent.context?.projectId,
-      contextSessionId: fullEvent.context?.sessionId,
-      contextTaskId: fullEvent.context?.taskId,
-      connectionCount: this.connections.size,
-      timestamp: fullEvent.timestamp,
-    });
-
     // Optional: Add debug logging for error events
     if (fullEvent.type === 'AGENT_ERROR') {
       // Runtime guard for safe error data access

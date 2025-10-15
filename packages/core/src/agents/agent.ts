@@ -999,14 +999,6 @@ export class Agent extends EventEmitter {
               context: contextUsage,
             };
 
-        logger.debug('Creating AGENT_MESSAGE event with token usage', {
-          threadId: this._threadId,
-          hasProviderUsage: !!response.usage,
-          providerUsage: response.usage,
-          contextUsage,
-          finalTokenUsage: agentMessageTokenUsage,
-        });
-
         this._addEventAndEmit({
           type: 'AGENT_MESSAGE',
           data: {
@@ -1885,12 +1877,6 @@ export class Agent extends EventEmitter {
         transient: true,
       });
 
-      logger.debug('AGENT: State change', {
-        threadId: this._threadId,
-        from: oldState,
-        to: newState,
-      });
-
       // Process queue when returning to idle
       if (newState === 'idle' && !this._isProcessingQueue) {
         this.processQueuedMessages().catch((error) => {
@@ -2420,11 +2406,6 @@ export class Agent extends EventEmitter {
   replaySessionEvents(): void {
     const events = this._threadManager.getEvents(this._threadId);
 
-    logger.debug('Agent: Replaying session events', {
-      threadId: this._threadId,
-      eventCount: events.length,
-    });
-
     // Emit each historical event for UI rebuilding
     for (const event of events) {
       this.emit('thread_event_added', {
@@ -2432,11 +2413,6 @@ export class Agent extends EventEmitter {
         threadId: event.context?.threadId ?? this._threadId,
       });
     }
-
-    logger.debug('Agent: Session replay complete', {
-      threadId: this._threadId,
-      eventsReplayed: events.length,
-    });
   }
 
   // Thread management API - proxies to ThreadManager
@@ -3291,11 +3267,6 @@ export class Agent extends EventEmitter {
   getTokenUsage(): ThreadTokenUsage {
     const events = this._threadManager.getEvents(this._threadId);
 
-    logger.debug('[Agent.getTokenUsage] Starting', {
-      threadId: this._threadId,
-      totalEvents: events.length,
-    });
-
     // Find last AGENT_MESSAGE with token usage
     let lastAgentMessageIndex = -1;
     for (let i = events.length - 1; i >= 0; i--) {
@@ -3320,12 +3291,6 @@ export class Agent extends EventEmitter {
       }
     }
 
-    logger.debug('[Agent.getTokenUsage] Found events', {
-      lastAgentMessageIndex,
-      lastCompactionIndex,
-      compactionIsNewer: lastCompactionIndex > lastAgentMessageIndex,
-    });
-
     let totalPromptTokens = 0;
     let totalCompletionTokens = 0;
 
@@ -3336,10 +3301,6 @@ export class Agent extends EventEmitter {
       const estimatedTokens = this._estimateConversationTokens(this.buildThreadMessages());
       totalPromptTokens = estimatedTokens;
       totalCompletionTokens = 0; // Can't separate in estimation
-
-      logger.debug('[Agent.getTokenUsage] Using ESTIMATION path', {
-        estimatedTokens,
-      });
     } else if (lastAgentMessageIndex >= 0) {
       // Use last AGENT_MESSAGE tokens (still accurate)
       const lastAgentMessage = events[lastAgentMessageIndex];
@@ -3362,12 +3323,6 @@ export class Agent extends EventEmitter {
         if (tokenUsage.context?.totalPromptTokens !== undefined) {
           totalPromptTokens = tokenUsage.context.totalPromptTokens;
           totalCompletionTokens = tokenUsage.context.totalCompletionTokens ?? 0;
-
-          logger.debug('[Agent.getTokenUsage] Using context field', {
-            totalPromptTokens,
-            totalCompletionTokens,
-            source: 'context',
-          });
         } else if (
           tokenUsage.turn?.inputTokens !== undefined &&
           tokenUsage.turn?.outputTokens !== undefined
@@ -3375,13 +3330,6 @@ export class Agent extends EventEmitter {
           // Fallback: calculate from turn
           totalPromptTokens = tokenUsage.turn.inputTokens + tokenUsage.turn.outputTokens;
           totalCompletionTokens = 0; // Not separated
-
-          logger.debug('[Agent.getTokenUsage] Using turn fields', {
-            inputTokens: tokenUsage.turn.inputTokens,
-            outputTokens: tokenUsage.turn.outputTokens,
-            totalPromptTokens,
-            source: 'turn',
-          });
         } else if (tokenUsage.message) {
           // Legacy format
           totalPromptTokens = tokenUsage.message.promptTokens ?? 0;
@@ -3397,12 +3345,6 @@ export class Agent extends EventEmitter {
     }
 
     const totalTokens = totalPromptTokens + totalCompletionTokens;
-
-    logger.debug('[Agent.getTokenUsage] Calculated totals', {
-      totalPromptTokens,
-      totalCompletionTokens,
-      totalTokens,
-    });
 
     // Get context limit from provider system
     const modelId = this.model;
