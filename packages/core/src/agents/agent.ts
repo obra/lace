@@ -577,7 +577,6 @@ export class Agent extends EventEmitter {
       if (this._abortController) {
         this._abortController.abort();
         this._abortController = null;
-        logger.debug('AGENT: Signaled abort controller', { threadId: this._threadId });
       } else {
         logger.warn('AGENT: Turn metrics exist but no abort controller (race condition)', {
           threadId: this._threadId,
@@ -1892,22 +1891,11 @@ export class Agent extends EventEmitter {
 
       // Process queue when returning to idle
       if (newState === 'idle' && !this._isProcessingQueue) {
-        logger.debug('AGENT: Triggering queue processing on idle state', {
-          threadId: this._threadId,
-          queueLength: this._messageQueue.length,
-        });
         this.processQueuedMessages().catch((error) => {
           logger.error('AGENT: Failed to process queue on state change', {
             threadId: this._threadId,
             error: error instanceof Error ? error.message : String(error),
           });
-        });
-      } else {
-        logger.debug('AGENT: Not triggering queue processing', {
-          threadId: this._threadId,
-          newState,
-          isProcessingQueue: this._isProcessingQueue,
-          queueLength: this._messageQueue.length,
         });
       }
     }

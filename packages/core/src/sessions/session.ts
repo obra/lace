@@ -966,23 +966,11 @@ export class Session {
       : {};
     const sessionConfig = sessionData.configuration || {};
 
-    logger.debug('getEffectiveConfiguration', {
-      sessionId: this._sessionId,
-      projectConfig,
-      sessionConfig,
-      sessionData,
-    });
-
     // Merge configurations with session overriding project
     const merged = ConfigurationValidator.mergeConfigurations(
       projectConfig as SessionConfiguration,
       sessionConfig as Partial<SessionConfiguration>
     );
-
-    logger.debug('Merged configuration', {
-      sessionId: this._sessionId,
-      merged,
-    });
 
     return merged;
   }

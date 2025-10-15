@@ -570,9 +570,6 @@ export class OpenAIProvider extends AIProvider {
     const systemMessages = messages.filter((m) => m.role === 'system');
     const instructions = systemMessages.map((m) => m.content).join('\n') || undefined;
 
-    // Convert remaining messages to input items (exclude system messages)
-    const inputMessages = messages.filter((m) => m.role !== 'system');
-
     // Build tools with sanitized names (same as Chat Completions)
     const { openaiTools, mapping } = this.buildToolsWithMapping(tools);
 
@@ -587,14 +584,20 @@ export class OpenAIProvider extends AIProvider {
       strict: false,
     }));
 
+    // Convert ProviderMessages to Responses API input format
+    // The Responses API and Chat Completions API use compatible message formats:
+    // - Both support {role: 'assistant', tool_calls: [...]}
+    // - Both support {role: 'tool', tool_call_id: X, content: Y}
+    // However, TypeScript types don't reflect this runtime compatibility, so we cast
+    const convertedOpenAIMessages = convertToOpenAIFormat(messages);
+    const inputMessages = convertedOpenAIMessages.filter((m) => m.role !== 'system');
+
     const requestPayload: ResponseCreateParams = {
       model,
       instructions,
-      // Convert messages to Responses API format
-      input: inputMessages.map((msg) => ({
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content,
-      })),
+      // Use the full OpenAI format conversion which handles tool calls/results
+      // Runtime compatible but TypeScript doesn't know it - use unknown intermediate cast
+      input: inputMessages as unknown as ResponseCreateParams['input'],
       max_output_tokens: this._config.maxTokens || 4000,
       stream,
       ...(tools.length > 0 && { tools: responsesTools }),
