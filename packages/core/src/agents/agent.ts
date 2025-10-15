@@ -3372,21 +3372,24 @@ export class Agent extends EventEmitter {
   }
 
   /*
-   * Check if a file has been read in the current conversation (since last compaction).
+   * Check if a file has been read or written in the current conversation (since last compaction).
    * Used by file modification tools to prevent accidental overwrites.
    *
    * @param filePath - The exact path to check (no normalization performed)
-   * @returns true if the file was successfully read, false otherwise
+   * @returns true if the file was successfully read or written, false otherwise
    */
   public hasFileBeenRead(filePath: string): boolean {
     const events = this._threadManager.getEvents(this._threadId);
 
-    // Walk through events looking for successful file_read tool calls
+    // Walk through events looking for successful file_read or file_write tool calls
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
 
-      // Find TOOL_CALL events for file_read
-      if (event.type === 'TOOL_CALL' && event.data.name === 'file_read') {
+      // Find TOOL_CALL events for file_read or file_write
+      if (
+        event.type === 'TOOL_CALL' &&
+        (event.data.name === 'file_read' || event.data.name === 'file_write')
+      ) {
         const toolCallId = event.data.id;
         const args = event.data.arguments;
         const toolPath = args['path'] as string;
