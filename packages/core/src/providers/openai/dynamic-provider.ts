@@ -23,13 +23,15 @@ export class OpenAIDynamicProvider {
   private client: OpenAIClient;
   private cacheDir: string;
   private instanceId: string;
+  private baseUrl?: string;
   // Cache TTL: 24 hours - balances freshness with API rate limits.
   // OpenAI model availability rarely changes, and we gracefully fall back to static catalog on errors.
   private static readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
-  constructor(instanceId: string) {
+  constructor(instanceId: string, baseUrl?: string) {
     this.instanceId = instanceId;
-    this.client = new OpenAIClient();
+    this.baseUrl = baseUrl;
+    this.client = new OpenAIClient(baseUrl);
     this.cacheDir = path.join(getLaceDir(), 'catalogs');
   }
 

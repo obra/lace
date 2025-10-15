@@ -159,11 +159,12 @@ export class ProviderRegistry {
       );
 
       if (openAIInstance) {
-        const [instanceId] = openAIInstance;
+        const [instanceId, instance] = openAIInstance;
         const credential = this.instanceManager.loadCredential(instanceId);
 
         if (credential?.apiKey) {
-          const provider = new OpenAIDynamicProvider(instanceId);
+          // Pass instance endpoint (if configured) to dynamic provider
+          const provider = new OpenAIDynamicProvider(instanceId, instance.endpoint);
           const staticCatalog = this.catalogManager.getProvider('openai');
 
           if (staticCatalog) {

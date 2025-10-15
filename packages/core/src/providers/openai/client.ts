@@ -4,7 +4,11 @@
 import { OpenAIResponse, OpenAIResponseSchema } from './types';
 
 export class OpenAIClient {
-  private baseUrl = 'https://api.openai.com/v1';
+  private baseUrl: string;
+
+  constructor(baseUrl?: string) {
+    this.baseUrl = baseUrl || 'https://api.openai.com/v1';
+  }
 
   async fetchModels(apiKey: string): Promise<OpenAIResponse> {
     const headers: HeadersInit = {
