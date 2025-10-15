@@ -80,25 +80,69 @@ export class OpenAIDynamicProvider {
     staticCatalog: CatalogProvider,
     availableModels: OpenAIModel[]
   ): CatalogProvider {
-    const availableIds = new Set(availableModels.map((m) => m.id));
+    // Create lookup map for static catalog models
+    const staticModelsMap = new Map(staticCatalog.models.map((m) => [m.id, m]));
 
-    // Simple ID-based filtering is sufficient for OpenAI because:
-    // 1. OpenAI's API returns all models available to the account
-    // 2. Model capabilities (vision, reasoning, etc.) are static and defined in our catalog
-    // 3. Unlike OpenRouter which aggregates many providers, OpenAI's model IDs are stable
-    // 4. Access control happens at the API level (models not in /v1/models aren't available)
-    const filteredModels = staticCatalog.models.filter((model) => availableIds.has(model.id));
+    // Discovery design: include all API models
+    // - Use rich metadata from static catalog when available
+    // - Infer metadata for unknown models
+    const discoveredModels = availableModels.map((apiModel) => {
+      const staticModel = staticModelsMap.get(apiModel.id);
 
-    logger.info('Filtered OpenAI catalog by API availability', {
+      if (staticModel) {
+        // Use full metadata from static catalog
+        return staticModel;
+      }
+
+      // Infer metadata for unknown model
+      return this.inferModelMetadata(apiModel);
+    });
+
+    logger.info('Discovered OpenAI models with static catalog enrichment', {
       staticCount: staticCatalog.models.length,
       availableCount: availableModels.length,
-      filteredCount: filteredModels.length,
+      enrichedCount: discoveredModels.filter((m) => staticModelsMap.has(m.id)).length,
+      inferredCount: discoveredModels.filter((m) => !staticModelsMap.has(m.id)).length,
+      totalCount: discoveredModels.length,
     });
 
     return {
       ...staticCatalog,
-      models: filteredModels,
+      models: discoveredModels,
     };
+  }
+
+  private inferModelMetadata(
+    apiModel: OpenAIModel
+  ): import('@lace/core/providers/catalog/types').CatalogModel {
+    const modelId = apiModel.id;
+
+    // Minimal metadata for unknown models - users should check OpenAI docs for pricing details
+    // Omit pricing fields to indicate unknown cost (rather than showing as free)
+    return {
+      id: modelId,
+      name: this.formatModelName(modelId),
+      context_window: 128000, // Conservative default
+      default_max_tokens: 4096, // Conservative default
+    };
+  }
+
+  private formatModelName(modelId: string): string {
+    // Convert model ID to human-readable name with original ID in parens
+    // e.g., "gpt-4o-mini" -> "GPT-4o Mini (gpt-4o-mini)"
+    const formatted = modelId
+      .split('-')
+      .map((part) => {
+        // Keep special prefixes uppercase
+        if (part === 'gpt' || part.startsWith('o')) {
+          return part.toUpperCase();
+        }
+        // Capitalize first letter of other parts
+        return part.charAt(0).toUpperCase() + part.slice(1);
+      })
+      .join(' ');
+
+    return `${formatted} (${modelId})`;
   }
 
   private async loadCache(): Promise<CachedCatalog | null> {

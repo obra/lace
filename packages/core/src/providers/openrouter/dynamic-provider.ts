@@ -140,8 +140,8 @@ export class OpenRouterDynamicProvider {
       name: model.name,
       context_length: model.context_window,
       pricing: {
-        prompt: (model.cost_per_1m_in / 1000000).toString(),
-        completion: (model.cost_per_1m_out / 1000000).toString(),
+        prompt: ((model.cost_per_1m_in ?? 0) / 1000000).toString(),
+        completion: ((model.cost_per_1m_out ?? 0) / 1000000).toString(),
       },
       supported_parameters: [
         ...(model.supports_attachments ? ['vision'] : []),

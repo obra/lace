@@ -6,8 +6,8 @@ interface Model {
   id: string;
   name: string;
   context_window: number;
-  cost_per_1m_in: number;
-  cost_per_1m_out: number;
+  cost_per_1m_in?: number; // Optional for models with unknown pricing
+  cost_per_1m_out?: number; // Optional for models with unknown pricing
   supports_attachments?: boolean;
   can_reason?: boolean;
   supported_parameters?: string[];
@@ -39,7 +39,8 @@ export function ProviderModelGroup({
     return tokens.toString();
   };
 
-  const formatPrice = (price: number): string => {
+  const formatPrice = (price: number | undefined): string => {
+    if (price === undefined) return 'N/A';
     return price === 0 ? 'FREE' : `$${price.toFixed(2)}`;
   };
 
@@ -120,7 +121,7 @@ export function ProviderModelGroup({
                     {/* Model name and badges - left side */}
                     <div className="flex items-center gap-2 flex-1">
                       <span className="font-medium">{model.name}</span>
-                      {model.cost_per_1m_in === 0 && (
+                      {model.cost_per_1m_in === 0 && model.cost_per_1m_out === 0 && (
                         <span className="badge badge-xs badge-ghost text-success">FREE</span>
                       )}
                       {badges.length > 0 && (

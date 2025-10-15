@@ -209,6 +209,17 @@ export class ProviderRegistry {
 
   async getModelFromCatalog(providerId: string, modelId: string): Promise<CatalogModel | null> {
     await this.ensureInitialized();
+
+    // Get dynamic catalog if available (includes discovered models)
+    const catalog = await this.getCatalogProvider(providerId);
+    if (catalog) {
+      const model = catalog.models.find((m) => m.id === modelId);
+      if (model) {
+        return model;
+      }
+    }
+
+    // Fall back to static catalog
     return this.catalogManager.getModel(providerId, modelId);
   }
 

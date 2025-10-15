@@ -2,6 +2,12 @@
 // ABOUTME: Wraps OpenAI SDK in the common provider interface
 
 import OpenAI, { ClientOptions } from 'openai';
+import type {
+  Response,
+  ResponseCreateParams,
+  ResponseStreamEvent,
+  Tool as ResponseTool,
+} from 'openai/resources/responses/responses';
 
 // Import tiktoken WASM for embedding in bun compile (skip in test environment)
 if (process.env.NODE_ENV !== 'test') {
@@ -388,6 +394,50 @@ export class OpenAIProvider extends AIProvider {
   private static readonly MAX_TOOL_NAME_LENGTH = 64;
   private static readonly COLLISION_SUFFIX_RESERVE = 4;
 
+  // Models that REQUIRE the Responses API (cannot use Chat Completions)
+  private static readonly RESPONSES_API_ONLY_MODELS = new Set([
+    // o-series pro/deep-research models
+    'o1-pro',
+    'o1-pro-2025-03-19',
+    'o3-pro',
+    'o3-pro-2025-06-10',
+    'o3-deep-research',
+    'o3-deep-research-2025-06-26',
+    'o4-mini-deep-research',
+    'o4-mini-deep-research-2025-06-26',
+    // Special capabilities models
+    'computer-use-preview',
+    'computer-use-preview-2025-03-11',
+    // gpt-5 specialized models
+    'gpt-5-codex',
+    'gpt-5-pro',
+    'gpt-5-pro-2025-10-06',
+  ]);
+
+  /**
+   * Determines if a model requires the Responses API endpoint
+   * The Responses API is required for newer reasoning models and specialized capabilities
+   */
+  private requiresResponsesAPI(model: string): boolean {
+    // Check exact match first
+    if (OpenAIProvider.RESPONSES_API_ONLY_MODELS.has(model)) {
+      return true;
+    }
+
+    // Check prefix patterns for custom/fine-tuned models
+    const prefixPatterns = [
+      'o1-pro-',
+      'o3-pro-',
+      'o3-deep-research-',
+      'o4-mini-deep-research-',
+      'gpt-5-pro-',
+      'gpt-5-codex-',
+      'computer-use-preview-',
+    ];
+
+    return prefixPatterns.some((prefix) => model.startsWith(prefix));
+  }
+
   /**
    * Builds OpenAI tools with sanitized names and returns mapping
    * Request-scoped to prevent concurrent request interference
@@ -503,9 +553,131 @@ export class OpenAIProvider extends AIProvider {
     return { payload: requestPayload, toolNameMapping: mapping };
   }
 
+  /**
+   * Creates a Responses API request payload
+   * Used for models that require the new /v1/responses endpoint
+   */
+  private _createResponsesAPIPayload(
+    messages: ProviderMessage[],
+    tools: Tool[],
+    model: string,
+    stream: boolean
+  ): {
+    payload: ResponseCreateParams;
+    toolNameMapping: Map<string, string>;
+  } {
+    // Extract system/developer instructions
+    const systemMessages = messages.filter((m) => m.role === 'system');
+    const instructions = systemMessages.map((m) => m.content).join('\n') || undefined;
+
+    // Convert remaining messages to input items (exclude system messages)
+    const inputMessages = messages.filter((m) => m.role !== 'system');
+
+    // Build tools with sanitized names (same as Chat Completions)
+    const { openaiTools, mapping } = this.buildToolsWithMapping(tools);
+
+    // Transform tools to Responses API format (flatter structure, not nested in 'function')
+    const responsesTools: ResponseTool[] = openaiTools.map((tool) => ({
+      type: 'function' as const,
+      name: tool.function.name,
+      description: tool.function.description,
+      parameters: (tool.function.parameters as Record<string, unknown>) || null,
+      // Note: strict mode disabled because our tool schemas have optional parameters
+      // With strict: true, ALL properties must be in required array
+      strict: false,
+    }));
+
+    const requestPayload: ResponseCreateParams = {
+      model,
+      instructions,
+      // Convert messages to Responses API format
+      input: inputMessages.map((msg) => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+      })),
+      max_output_tokens: this._config.maxTokens || 4000,
+      stream,
+      ...(tools.length > 0 && { tools: responsesTools }),
+    };
+
+    return { payload: requestPayload, toolNameMapping: mapping };
+  }
+
+  /**
+   * Parses a Responses API response into our standard format
+   */
+  private _parseResponsesAPIResponse(response: Response): ProviderResponse {
+    let textContent = '';
+    const toolCalls: ToolCall[] = [];
+    const toolNameMapping = new Map<string, string>(); // Will be passed in from caller
+
+    // Process output items
+    for (const item of response.output) {
+      if (item.type === 'message') {
+        // Extract text from message content
+        for (const content of item.content) {
+          if (content.type === 'output_text') {
+            textContent += content.text;
+          }
+        }
+      } else if (item.type === 'function_call') {
+        // Convert function call to our ToolCall format
+        try {
+          toolCalls.push({
+            id: item.call_id,
+            name: item.name,
+            arguments: JSON.parse(item.arguments) as Record<string, unknown>,
+          });
+        } catch (error) {
+          logger.error('Failed to parse Responses API tool call arguments', {
+            toolName: item.name,
+            arguments: item.arguments,
+            error: (error as Error).message,
+          });
+        }
+      }
+      // Note: Reasoning items (type === 'reasoning') are not included in regular content
+      // They could be captured in metadata if needed in the future
+    }
+
+    // Use output_text convenience field as fallback
+    if (!textContent && response.output_text) {
+      textContent = response.output_text;
+    }
+
+    return {
+      content: textContent,
+      toolCalls,
+      stopReason: response.status === 'completed' ? 'stop' : 'error',
+      usage: {
+        promptTokens: response.usage?.input_tokens || 0,
+        completionTokens: response.usage?.output_tokens || 0,
+        totalTokens: response.usage?.total_tokens || 0,
+      },
+    };
+  }
+
   async createResponse(
     messages: ProviderMessage[],
     tools: Tool[] = [],
+    model: string,
+    signal?: AbortSignal
+  ): Promise<ProviderResponse> {
+    // Route to appropriate API based on model
+    if (this.requiresResponsesAPI(model)) {
+      return this._createResponsesAPIResponse(messages, tools, model, signal);
+    }
+
+    // Use Chat Completions API for all other models
+    return this._createChatCompletionsResponse(messages, tools, model, signal);
+  }
+
+  /**
+   * Chat Completions API implementation (original endpoint)
+   */
+  private async _createChatCompletionsResponse(
+    messages: ProviderMessage[],
+    tools: Tool[],
     model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
@@ -591,9 +763,81 @@ export class OpenAIProvider extends AIProvider {
     );
   }
 
+  /**
+   * Responses API implementation (new endpoint for reasoning models)
+   */
+  private async _createResponsesAPIResponse(
+    messages: ProviderMessage[],
+    tools: Tool[],
+    model: string,
+    signal?: AbortSignal
+  ): Promise<ProviderResponse> {
+    return this.withRetry(
+      async () => {
+        const { payload: requestPayload, toolNameMapping } = this._createResponsesAPIPayload(
+          messages,
+          tools,
+          model,
+          false
+        );
+
+        // Log request with pretty formatting
+        logProviderRequest('openai', requestPayload as unknown as Record<string, unknown>);
+
+        const response = (await this.getOpenAIClient().responses.create(requestPayload, {
+          signal,
+        })) as Response;
+
+        // Log response with pretty formatting
+        logProviderResponse('openai', response);
+
+        const parsedResponse = this._parseResponsesAPIResponse(response);
+
+        // Map tool names back from sanitized to original
+        const toolCalls = parsedResponse.toolCalls.map((tc) => ({
+          ...tc,
+          name: toolNameMapping.get(tc.name) || tc.name,
+        }));
+
+        logger.debug('Received response from OpenAI Responses API', {
+          provider: 'openai',
+          api: 'responses',
+          contentLength: parsedResponse.content.length,
+          toolCallCount: toolCalls.length,
+          toolCallNames: toolCalls.map((tc) => tc.name),
+          usage: parsedResponse.usage,
+        });
+
+        return {
+          ...parsedResponse,
+          toolCalls,
+        };
+      },
+      { signal }
+    );
+  }
+
   async createStreamingResponse(
     messages: ProviderMessage[],
     tools: Tool[] = [],
+    model: string,
+    signal?: AbortSignal
+  ): Promise<ProviderResponse> {
+    // Route to appropriate API based on model
+    if (this.requiresResponsesAPI(model)) {
+      return this._createResponsesAPIStreamingResponse(messages, tools, model, signal);
+    }
+
+    // Use Chat Completions streaming for all other models
+    return this._createChatCompletionsStreamingResponse(messages, tools, model, signal);
+  }
+
+  /**
+   * Chat Completions streaming implementation (original endpoint)
+   */
+  private async _createChatCompletionsStreamingResponse(
+    messages: ProviderMessage[],
+    tools: Tool[],
     model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
@@ -706,15 +950,29 @@ export class OpenAIProvider extends AIProvider {
           }
 
           // Convert partial tool calls to final format
-          toolCalls = Array.from(partialToolCalls.values()).map((partial) =>
-            this.parseToolCall(
-              {
-                id: partial.id,
-                function: { name: partial.name, arguments: partial.arguments },
-              },
-              toolNameMapping
-            )
-          );
+          // Handle incomplete tool calls gracefully (can occur if stream is aborted)
+          toolCalls = Array.from(partialToolCalls.values())
+            .map((partial) => {
+              try {
+                return this.parseToolCall(
+                  {
+                    id: partial.id,
+                    function: { name: partial.name, arguments: partial.arguments },
+                  },
+                  toolNameMapping
+                );
+              } catch (error) {
+                // If stream was aborted, incomplete tool calls are expected
+                if (signal?.aborted) {
+                  logger.debug('Incomplete tool call due to aborted stream', {
+                    toolName: partial.name,
+                  });
+                  return null;
+                }
+                throw error;
+              }
+            })
+            .filter((tc): tc is ToolCall => tc !== null);
 
           logger.debug('Received streaming response from OpenAI', {
             provider: 'openai',
@@ -792,6 +1050,201 @@ export class OpenAIProvider extends AIProvider {
             );
             // Fall back to non-streaming mode
             return this.createResponse(messages, tools, model, signal);
+          }
+
+          throw error;
+        }
+      },
+      {
+        signal,
+        isStreaming: true,
+        canRetry: () => !streamCreated && !streamingStarted,
+      }
+    );
+  }
+
+  /**
+   * Responses API streaming implementation (new endpoint for reasoning models)
+   */
+  private async _createResponsesAPIStreamingResponse(
+    messages: ProviderMessage[],
+    tools: Tool[],
+    model: string,
+    signal?: AbortSignal
+  ): Promise<ProviderResponse> {
+    let streamingStarted = false;
+    let streamCreated = false;
+
+    return this.withRetry(
+      async () => {
+        const { payload: requestPayload, toolNameMapping } = this._createResponsesAPIPayload(
+          messages,
+          tools,
+          model,
+          true
+        );
+
+        // Log streaming request with pretty formatting
+        logProviderRequest('openai', requestPayload as unknown as Record<string, unknown>, {
+          streaming: true,
+        });
+
+        try {
+          // Use the Responses API streaming
+          const stream = (await this.getOpenAIClient().responses.create(requestPayload, {
+            signal,
+          })) as AsyncIterable<ResponseStreamEvent>;
+
+          // Mark that stream is created to prevent retries after this point
+          streamCreated = true;
+
+          let content = '';
+          const toolCalls: ToolCall[] = [];
+          let estimatedOutputTokens = 0;
+
+          // Track tool calls by output index
+          const toolCallsByIndex = new Map<
+            number,
+            {
+              id: string;
+              call_id: string;
+              name: string;
+              arguments: string;
+            }
+          >();
+
+          // Process stream events
+          for await (const event of stream) {
+            switch (event.type) {
+              case 'response.output_text.delta':
+                streamingStarted = true;
+                content += event.delta;
+                this.emit('token', { token: event.delta });
+
+                // Estimate progressive tokens
+                estimatedOutputTokens += this.estimateTokens(event.delta);
+                this.emit('token_usage_update', {
+                  usage: {
+                    promptTokens: 0,
+                    completionTokens: estimatedOutputTokens,
+                    totalTokens: estimatedOutputTokens,
+                  },
+                });
+                break;
+
+              case 'response.output_item.added':
+                // Track function call items for later processing
+                if (event.item.type === 'function_call') {
+                  const functionCall = event.item as {
+                    id: string;
+                    call_id: string;
+                    name: string;
+                    type: 'function_call';
+                  };
+                  toolCallsByIndex.set(event.output_index, {
+                    id: functionCall.id,
+                    call_id: functionCall.call_id,
+                    name: functionCall.name,
+                    arguments: '',
+                  });
+                }
+                break;
+
+              case 'response.function_call_arguments.delta':
+                // Accumulate function call arguments
+                const toolCall = toolCallsByIndex.get(event.output_index);
+                if (toolCall) {
+                  toolCall.arguments += event.delta;
+                }
+                break;
+
+              case 'response.completed':
+                // Final event - extract final usage if available
+                if (event.response.usage) {
+                  this.emit('token_usage_update', {
+                    usage: {
+                      promptTokens: event.response.usage.input_tokens,
+                      completionTokens: event.response.usage.output_tokens,
+                      totalTokens: event.response.usage.total_tokens,
+                    },
+                  });
+                }
+                break;
+
+              // Ignore other event types (reasoning, etc.) for now
+            }
+          }
+
+          // Convert accumulated tool calls to final format
+          // Handle incomplete tool calls gracefully (can occur if stream is aborted)
+          for (const buffer of toolCallsByIndex.values()) {
+            try {
+              const originalName = toolNameMapping.get(buffer.name) || buffer.name;
+              toolCalls.push({
+                id: buffer.call_id,
+                name: originalName,
+                arguments: JSON.parse(buffer.arguments) as Record<string, unknown>,
+              });
+            } catch (error) {
+              // If stream was aborted, incomplete tool calls are expected
+              if (signal?.aborted) {
+                logger.debug('Incomplete tool call due to aborted Responses API stream', {
+                  toolName: buffer.name,
+                });
+                continue;
+              }
+              logger.error('Failed to parse Responses API streaming tool call', {
+                toolName: buffer.name,
+                error: (error as Error).message,
+              });
+            }
+          }
+
+          logger.debug('Received streaming response from OpenAI Responses API', {
+            provider: 'openai',
+            api: 'responses',
+            contentLength: content.length,
+            toolCallCount: toolCalls.length,
+            toolCallNames: toolCalls.map((tc) => tc.name),
+          });
+
+          // Estimate usage if not provided in final event
+          const systemPrompt = this.getEffectiveSystemPrompt(messages);
+          const nonSystemMessages = messages.filter((m) => m.role !== 'system');
+          const promptText =
+            systemPrompt + '\n' + nonSystemMessages.map((m) => m.content).join(' ');
+          const toolsText = tools.length > 0 ? JSON.stringify(tools) : '';
+
+          const countedTokens = await this.countTokens(messages, tools, model);
+          const estimatedPromptTokens =
+            countedTokens ?? this.estimateTokens(promptText + toolsText);
+
+          const response = {
+            content,
+            toolCalls,
+            stopReason: 'stop',
+            usage: {
+              promptTokens: estimatedPromptTokens,
+              completionTokens: estimatedOutputTokens,
+              totalTokens: estimatedPromptTokens + estimatedOutputTokens,
+            },
+          };
+
+          this.emit('complete', { response });
+
+          return response;
+        } catch (error) {
+          const errorObj = error as Error;
+          logger.error('Streaming error from OpenAI Responses API', { error: errorObj.message });
+
+          // Check if this is a streaming verification error
+          if (this.isStreamingVerificationError(error)) {
+            logger.warn(
+              'OpenAI Responses API streaming requires organization verification, falling back to non-streaming mode',
+              { model }
+            );
+            // Fall back to non-streaming Responses API
+            return this._createResponsesAPIResponse(messages, tools, model, signal);
           }
 
           throw error;

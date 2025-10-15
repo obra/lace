@@ -22,8 +22,8 @@ export const ModelConfigSchema = z.object({
 export const CatalogModelSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  cost_per_1m_in: z.number().min(0),
-  cost_per_1m_out: z.number().min(0),
+  cost_per_1m_in: z.number().min(0).optional(), // Optional for models with unknown pricing
+  cost_per_1m_out: z.number().min(0).optional(), // Optional for models with unknown pricing
   cost_per_1m_in_cached: z.number().min(0).optional(),
   cost_per_1m_out_cached: z.number().min(0).optional(),
   context_window: z.number().int().positive(),
