@@ -747,7 +747,7 @@ export class Agent extends EventEmitter {
       // Rebuild conversation from thread events
       const conversation = this.buildThreadMessages();
 
-      logger.debug('AGENT: Requesting response from provider', {
+      logger.trace('AGENT: Requesting response from provider', {
         threadId: this._threadId,
         conversationLength: conversation.length,
         availableToolCount: this._toolExecutor.getAllTools().length,
@@ -798,7 +798,7 @@ export class Agent extends EventEmitter {
         : null;
       if (providerCount !== null) {
         promptTokens = providerCount;
-        logger.debug('Using provider-specific token count', {
+        logger.trace('Using provider-specific token count', {
           threadId: this._threadId,
           promptTokens,
           provider: this.providerInstance?.providerName || 'missing',
@@ -814,7 +814,7 @@ export class Agent extends EventEmitter {
       // Note: Context window checks are now handled by the provider
       // Since context windows are model-specific, the provider will handle
       // any context window issues when it actually makes the request
-      logger.debug('Token count for request', {
+      logger.trace('Token count for request', {
         threadId: this._threadId,
         promptTokens,
         model: modelId,
@@ -1375,7 +1375,7 @@ export class Agent extends EventEmitter {
   private _executeToolCalls(toolCalls: ToolCall[]): void {
     this._setState('tool_execution');
 
-    logger.debug('AGENT: Processing tool calls', {
+    logger.trace('AGENT: Processing tool calls', {
       threadId: this._threadId,
       toolCallCount: toolCalls.length,
       toolCalls: toolCalls.map((tc) => ({ id: tc.id, name: tc.name })),
@@ -1392,7 +1392,7 @@ export class Agent extends EventEmitter {
     this._pendingToolCount = toolCalls.length;
 
     for (const providerToolCall of toolCalls) {
-      logger.debug('AGENT: Creating tool call event', {
+      logger.trace('AGENT: Creating tool call event', {
         threadId: this._threadId,
         toolCallId: providerToolCall.id,
         toolName: providerToolCall.name,
@@ -1840,12 +1840,12 @@ export class Agent extends EventEmitter {
         this._threadManager.getThread(this._threadId) &&
         !this._abortedSinceLastTurn
       ) {
-        logger.debug('AGENT: Auto-continuing conversation after successful tool batch', {
+        logger.trace('AGENT: Auto-continuing conversation after successful tool batch', {
           threadId: this._threadId,
         });
         void this._processConversation();
       } else if (this._abortedSinceLastTurn) {
-        logger.debug('AGENT: Skipping auto-continuation due to abort request', {
+        logger.trace('AGENT: Skipping auto-continuation due to abort request', {
           threadId: this._threadId,
           abortedSinceLastTurn: this._abortedSinceLastTurn,
         });
@@ -2901,7 +2901,7 @@ export class Agent extends EventEmitter {
   }
 
   private _getWorkingDirectory(): string | undefined {
-    logger.debug('Agent._getWorkingDirectory() called', {
+    logger.trace('Agent._getWorkingDirectory() called', {
       threadId: this._threadId,
       agentState: this.getCurrentState(),
     });
@@ -2909,7 +2909,7 @@ export class Agent extends EventEmitter {
     try {
       // Get the current thread to find its session and project
       const thread = this._threadManager.getThread(this._threadId);
-      logger.debug('Agent._getWorkingDirectory() - got thread', {
+      logger.trace('Agent._getWorkingDirectory() - got thread', {
         threadId: this._threadId,
         hasThread: !!thread,
         threadSessionId: thread?.sessionId,
@@ -2927,7 +2927,7 @@ export class Agent extends EventEmitter {
       // If thread has a sessionId, get the session's working directory
       // This is important for container workspaces where session uses clone path
       if (thread.sessionId) {
-        logger.debug('Agent._getWorkingDirectory() - thread has sessionId, looking up session', {
+        logger.trace('Agent._getWorkingDirectory() - thread has sessionId, looking up session', {
           threadId: this._threadId,
           sessionId: thread.sessionId,
         });
@@ -2936,7 +2936,7 @@ export class Agent extends EventEmitter {
         const sessionInstance = Session.getByIdSync(thread.sessionId as ThreadId);
         if (sessionInstance) {
           const workingDir = sessionInstance.getWorkingDirectory();
-          logger.debug(
+          logger.trace(
             'Agent._getWorkingDirectory() - got working directory from Session instance',
             {
               threadId: this._threadId,
@@ -2949,7 +2949,7 @@ export class Agent extends EventEmitter {
 
         // Fallback to session data if instance not available
         const session = Session.getSession(thread.sessionId);
-        logger.debug('Agent._getWorkingDirectory() - got session from sessionId', {
+        logger.trace('Agent._getWorkingDirectory() - got session from sessionId', {
           threadId: this._threadId,
           sessionId: thread.sessionId,
           hasSession: !!session,
@@ -2957,7 +2957,7 @@ export class Agent extends EventEmitter {
         });
 
         if (session?.projectId) {
-          logger.debug('Agent._getWorkingDirectory() - session has projectId, looking up project', {
+          logger.trace('Agent._getWorkingDirectory() - session has projectId, looking up project', {
             threadId: this._threadId,
             sessionId: thread.sessionId,
             projectId: session.projectId,
@@ -2965,7 +2965,7 @@ export class Agent extends EventEmitter {
 
           const project = Project.getById(session.projectId);
           const workingDir = project?.getWorkingDirectory();
-          logger.debug(
+          logger.trace(
             'Agent._getWorkingDirectory() - got project and working directory from session path',
             {
               threadId: this._threadId,
@@ -2983,7 +2983,7 @@ export class Agent extends EventEmitter {
 
       // If thread has a direct projectId, use that
       if (thread.projectId) {
-        logger.debug(
+        logger.trace(
           'Agent._getWorkingDirectory() - thread has direct projectId, looking up project',
           {
             threadId: this._threadId,
@@ -2993,7 +2993,7 @@ export class Agent extends EventEmitter {
 
         const project = Project.getById(thread.projectId);
         const workingDir = project?.getWorkingDirectory();
-        logger.debug(
+        logger.trace(
           'Agent._getWorkingDirectory() - got project and working directory from direct thread path',
           {
             threadId: this._threadId,

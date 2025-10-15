@@ -751,7 +751,7 @@ export class OpenAIProvider extends AIProvider {
             this.parseToolCall(toolCall, toolNameMapping)
           ) || [];
 
-        logger.debug('Received response from OpenAI', {
+        logger.trace('Received response from OpenAI', {
           provider: 'openai',
           contentLength: textContent.length,
           toolCallCount: toolCalls.length,
@@ -838,7 +838,7 @@ export class OpenAIProvider extends AIProvider {
           name: toolNameMapping.get(tc.name) || tc.name,
         }));
 
-        logger.debug('Received response from OpenAI Responses API', {
+        logger.trace('Received response from OpenAI Responses API', {
           provider: 'openai',
           api: 'responses',
           contentLength: parsedResponse.content.length,
@@ -1013,7 +1013,7 @@ export class OpenAIProvider extends AIProvider {
             })
             .filter((tc): tc is ToolCall => tc !== null);
 
-          logger.debug('Received streaming response from OpenAI', {
+          logger.trace('Received streaming response from OpenAI', {
             provider: 'openai',
             contentLength: content.length,
             toolCallCount: toolCalls.length,
@@ -1239,7 +1239,7 @@ export class OpenAIProvider extends AIProvider {
             }
           }
 
-          logger.debug('Received streaming response from OpenAI Responses API', {
+          logger.trace('Received streaming response from OpenAI Responses API', {
             provider: 'openai',
             api: 'responses',
             contentLength: content.length,

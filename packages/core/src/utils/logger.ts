@@ -4,13 +4,14 @@
 import { appendFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 
-type LogLevel = 'error' | 'warn' | 'info' | 'debug';
+type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
 const LOG_LEVELS: Record<LogLevel, number> = {
   error: 0,
   warn: 1,
   info: 2,
   debug: 3,
+  trace: 4,
 };
 
 class Logger {
@@ -84,6 +85,9 @@ class Logger {
   debug(message: string, data?: unknown) {
     this._write('debug', message, data);
   }
+  trace(message: string, data?: unknown) {
+    this._write('trace', message, data);
+  }
 }
 
 // Global logger instance using globalThis to work across Next.js bundle isolation
@@ -96,7 +100,13 @@ const getLogger = (): Logger => {
     globalThis.__laceLogger = new Logger();
 
     // Auto-configure from environment variables for multi-process scenarios
-    const logLevel = process.env.LACE_LOG_LEVEL as 'error' | 'warn' | 'info' | 'debug' | undefined;
+    const logLevel = process.env.LACE_LOG_LEVEL as
+      | 'error'
+      | 'warn'
+      | 'info'
+      | 'debug'
+      | 'trace'
+      | undefined;
     const logFile = process.env.LACE_LOG_FILE;
     const useStderr = process.env.LACE_LOG_STDERR === 'true';
 

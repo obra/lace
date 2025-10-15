@@ -83,7 +83,7 @@ export function logProviderRequest(
     : 0;
 
   // Log summary info
-  logger.debug(`${providerName} ${logType}`, {
+  logger.trace(`${providerName} ${logType}`, {
     provider: providerName,
     model: payload.model,
     messageCount,
@@ -108,7 +108,7 @@ export function logProviderRequest(
 
   // Use direct stderr write for structured pretty-printing instead of logger.debug
   // This avoids double JSON.stringify and makes it much more readable
-  if (logger.shouldLog('debug')) {
+  if (logger.shouldLog('trace')) {
     const output = `\n=== ${providerName.toUpperCase()} ${logType.toUpperCase()} PAYLOAD ===\n${JSON.stringify(payloadToLog, null, 2)}\n=== END ${providerName.toUpperCase()} PAYLOAD ===\n\n`;
     process.stderr.write(output);
   }
@@ -144,10 +144,10 @@ export function logProviderResponse(
   }
 
   // Log summary info
-  logger.debug(`${providerName} ${logType}`, responseInfo);
+  logger.trace(`${providerName} ${logType}`, responseInfo);
 
   // Log the full response payload with pretty-printing
-  if (logger.shouldLog('debug')) {
+  if (logger.shouldLog('trace')) {
     const output = `\n=== ${providerName.toUpperCase()} ${logType.toUpperCase()} PAYLOAD ===\n${JSON.stringify(response, null, 2)}\n=== END ${providerName.toUpperCase()} RESPONSE ===\n\n`;
     process.stderr.write(output);
   }
