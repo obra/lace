@@ -115,6 +115,70 @@ export class ProviderRegistry {
     return providers;
   }
 
+  /**
+   * Get dynamic catalog for a specific provider instance
+   * This allows each instance (e.g., real OpenAI vs local Apple FM) to have its own catalog
+   */
+  async getCatalogForInstance(
+    instanceId: string,
+    forceRefresh = false
+  ): Promise<CatalogProvider | null> {
+    await this.ensureInitialized();
+
+    const instances = await this.instanceManager.loadInstances();
+    const instance = instances.instances[instanceId];
+
+    if (!instance) {
+      return null;
+    }
+
+    const credential = this.instanceManager.loadCredential(instanceId);
+    if (!credential?.apiKey) {
+      return null;
+    }
+
+    // Handle different provider types with dynamic catalogs
+    if (instance.catalogProviderId === 'openai') {
+      const provider = new OpenAIDynamicProvider(instanceId, instance.endpoint);
+      const staticCatalog = this.catalogManager.getProvider('openai');
+
+      if (staticCatalog) {
+        try {
+          logger.debug('Fetching dynamic catalog for OpenAI instance', {
+            instanceId,
+            endpoint: instance.endpoint || 'https://api.openai.com/v1',
+          });
+          return await provider.getCatalog(credential.apiKey, staticCatalog, forceRefresh);
+        } catch (error) {
+          logger.warn('Failed to fetch OpenAI dynamic catalog for instance, using static', {
+            instanceId,
+            error,
+          });
+        }
+      }
+    } else if (instance.catalogProviderId === 'openrouter') {
+      const provider = new OpenRouterDynamicProvider(instanceId);
+      const config = instance.modelConfig ?? {
+        enableNewModels: true,
+        disabledModels: [],
+        disabledProviders: [],
+      };
+
+      try {
+        logger.debug('Fetching dynamic catalog for OpenRouter instance', { instanceId });
+        return await provider.getCatalogWithConfig(credential.apiKey, config);
+      } catch (error) {
+        logger.warn('Failed to fetch OpenRouter dynamic catalog for instance, using static', {
+          instanceId,
+          error,
+        });
+      }
+    }
+
+    // Fall back to static catalog
+    return this.catalogManager.getProvider(instance.catalogProviderId);
+  }
+
   async getCatalogProvider(
     providerId: string,
     forceRefresh = false
@@ -284,11 +348,17 @@ export class ProviderRegistry {
       throw new Error(`Catalog provider not found: ${instance.catalogProviderId}`);
     }
 
-    // Verify model exists in catalog
-    const model = await this.getModelFromCatalog(instance.catalogProviderId, modelId);
+    // Fetch dynamic catalog for this specific instance to ensure we have latest models
+    // This triggers catalog discovery for instances like Apple FM that have custom endpoints
+    const instanceCatalog = await this.getCatalogForInstance(instanceId);
+
+    // Verify model exists in instance-specific catalog (or fall back to static)
+    const catalog = instanceCatalog ?? this.catalogManager.getProvider(instance.catalogProviderId);
+    const model = catalog?.models.find((m) => m.id === modelId);
+
     if (!model) {
       throw new Error(
-        `Model not found in catalog: ${modelId} for provider ${instance.catalogProviderId}`
+        `Model not found in catalog: ${modelId} for instance ${instanceId} (provider ${instance.catalogProviderId})`
       );
     }
 
