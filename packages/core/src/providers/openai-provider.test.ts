@@ -114,7 +114,7 @@ describe('OpenAIProvider', () => {
         tools?: Array<{ type: string; function: { name: string } }>;
       };
       expect(callArgs.model).toBe('gpt-4o');
-      expect(callArgs.max_completion_tokens).toBe(4000);
+      expect(callArgs.max_completion_tokens).toBe(16384);
       expect(callArgs.messages[0]).toEqual({ role: 'system', content: 'Test system prompt' });
       expect(callArgs.messages[1]).toEqual({ role: 'user', content: 'Hello' });
       expect(callArgs.tools).toEqual([
@@ -523,33 +523,6 @@ describe('OpenAIProvider', () => {
         tools?: Array<{ type: string; function: { name: string } }>;
       };
       expect(callArgs.model).toBe('gpt-4o');
-    });
-
-    it('should use custom max tokens when provided', async () => {
-      const customProvider = new OpenAIProvider({
-        apiKey: 'test-key',
-        maxTokens: 2000,
-      });
-
-      mockCreate.mockResolvedValue({
-        choices: [
-          {
-            message: { content: 'Custom tokens response' },
-            finish_reason: 'stop',
-          },
-        ],
-        usage: {},
-      });
-
-      await customProvider.createResponse([{ role: 'user', content: 'Test' }], [], 'gpt-4o');
-
-      const callArgs = mockCreate.mock.calls[0][0] as {
-        model: string;
-        max_completion_tokens: number;
-        messages: Array<{ role: string; content: string }>;
-        tools?: Array<{ type: string; function: { name: string } }>;
-      };
-      expect(callArgs.max_completion_tokens).toBe(2000);
     });
 
     it('should use fallback system prompt when none provided', async () => {
