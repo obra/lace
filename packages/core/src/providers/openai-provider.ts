@@ -1091,7 +1091,7 @@ export class OpenAIProvider extends AIProvider {
           const errorObj = error as Error;
           logger.error('Streaming error from OpenAI', { error: errorObj.message });
 
-          // Check if this is a streaming verification error
+          // Check for streaming verification error FIRST (special case fallback)
           if (this.isStreamingVerificationError(error)) {
             logger.warn(
               'OpenAI streaming requires organization verification, falling back to non-streaming mode',
@@ -1099,6 +1099,12 @@ export class OpenAIProvider extends AIProvider {
             );
             // Fall back to non-streaming mode
             return this.createResponse(messages, tools, model, signal);
+          }
+
+          // If stream wasn't created yet, let error bubble up for retry handling
+          // This allows rate limit errors during stream creation to be retried
+          if (!streamCreated) {
+            throw error;
           }
 
           throw error;
@@ -1313,7 +1319,7 @@ export class OpenAIProvider extends AIProvider {
           const errorObj = error as Error;
           logger.error('Streaming error from OpenAI Responses API', { error: errorObj.message });
 
-          // Check if this is a streaming verification error
+          // Check for streaming verification error FIRST (special case fallback)
           if (this.isStreamingVerificationError(error)) {
             logger.warn(
               'OpenAI Responses API streaming requires organization verification, falling back to non-streaming mode',
@@ -1321,6 +1327,12 @@ export class OpenAIProvider extends AIProvider {
             );
             // Fall back to non-streaming Responses API
             return this._createResponsesAPIResponse(messages, tools, model, signal);
+          }
+
+          // If stream wasn't created yet, let error bubble up for retry handling
+          // This allows rate limit errors during stream creation to be retried
+          if (!streamCreated) {
+            throw error;
           }
 
           throw error;
