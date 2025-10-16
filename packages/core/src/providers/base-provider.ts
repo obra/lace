@@ -30,6 +30,7 @@ export interface ProviderResponse {
     timeToFirstToken?: number;
     totalDuration?: number;
   };
+  responseId?: string; // OpenAI Responses API response.id (for conversation chaining)
 }
 
 export interface ModelInfo {
@@ -47,6 +48,10 @@ export interface ProviderInfo {
   displayName: string; // Human-friendly name
   requiresApiKey: boolean; // Needs API key vs local
   configurationHint?: string; // How to configure
+}
+
+export interface ConversationState {
+  openaiResponseId?: string; // Last response.id from OpenAI Responses API (for conversation chaining)
 }
 
 export abstract class AIProvider extends EventEmitter {
@@ -144,7 +149,8 @@ export abstract class AIProvider extends EventEmitter {
     messages: ProviderMessage[],
     tools: Tool[],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    conversationState?: ConversationState
   ): Promise<ProviderResponse>;
 
   // Optional streaming support - providers can override this
@@ -152,10 +158,11 @@ export abstract class AIProvider extends EventEmitter {
     messages: ProviderMessage[],
     tools: Tool[],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    conversationState?: ConversationState
   ): Promise<ProviderResponse> {
     // Default implementation: fall back to non-streaming
-    return this.createResponse(messages, tools, model, signal);
+    return this.createResponse(messages, tools, model, signal, conversationState);
   }
 
   // Check if provider supports streaming

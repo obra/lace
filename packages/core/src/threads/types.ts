@@ -533,6 +533,7 @@ export interface Thread {
     isSession?: boolean;
     provider?: string;
     model?: string;
+    openaiResponseId?: string; // Last response.id from OpenAI Responses API (for conversation chaining)
     [key: string]: unknown;
   };
 }

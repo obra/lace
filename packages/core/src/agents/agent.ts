@@ -1208,11 +1208,18 @@ export class Agent extends EventEmitter {
         throw new Error('Cannot create streaming response with missing provider instance');
       }
 
+      // Get conversation state for Responses API chaining
+      const thread = this._threadManager.getThread(this._threadId);
+      const responseId = thread?.metadata?.openaiResponseId;
+      const conversationState =
+        responseId && typeof responseId === 'string' ? { openaiResponseId: responseId } : undefined;
+
       const response = await this.providerInstance.createStreamingResponse(
         messages,
         tools,
         modelId,
-        signal
+        signal,
+        conversationState
       );
 
       // Apply stop reason handling to filter incomplete tool calls
@@ -1233,6 +1240,15 @@ export class Agent extends EventEmitter {
       // Always emit token usage for UI updates
       if (processedResponse.usage) {
         this.emit('token_usage_update', { usage: processedResponse.usage });
+      }
+
+      // Store response ID for Responses API chaining (streaming)
+      if (response.responseId) {
+        const currentMetadata = this.getThreadMetadata() || {};
+        this.updateThreadMetadata({
+          ...currentMetadata,
+          openaiResponseId: response.responseId,
+        });
       }
 
       return {
@@ -1335,7 +1351,19 @@ export class Agent extends EventEmitter {
         throw new Error('Cannot create response with missing provider instance');
       }
 
-      const response = await this.providerInstance.createResponse(messages, tools, modelId, signal);
+      // Get conversation state for Responses API chaining
+      const thread = this._threadManager.getThread(this._threadId);
+      const responseId = thread?.metadata?.openaiResponseId;
+      const conversationState =
+        responseId && typeof responseId === 'string' ? { openaiResponseId: responseId } : undefined;
+
+      const response = await this.providerInstance.createResponse(
+        messages,
+        tools,
+        modelId,
+        signal,
+        conversationState
+      );
 
       // Apply stop reason handling to filter incomplete tool calls
       const processedResponse = this._stopReasonHandler.handleResponse(response, tools);
@@ -1355,6 +1383,15 @@ export class Agent extends EventEmitter {
       // Always emit token usage for UI updates
       if (processedResponse.usage) {
         this.emit('token_usage_update', { usage: processedResponse.usage });
+      }
+
+      // Store response ID for Responses API chaining (non-streaming)
+      if (response.responseId) {
+        const currentMetadata = this.getThreadMetadata() || {};
+        this.updateThreadMetadata({
+          ...currentMetadata,
+          openaiResponseId: response.responseId,
+        });
       }
 
       return {

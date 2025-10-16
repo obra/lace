@@ -24,7 +24,13 @@ if (process.env.NODE_ENV !== 'test') {
 // Dynamic tiktoken import to handle WASM loading failures gracefully
 type Tiktoken = import('tiktoken').Tiktoken;
 import { AIProvider } from './base-provider';
-import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderInfo } from './base-provider';
+import {
+  ProviderMessage,
+  ProviderResponse,
+  ProviderConfig,
+  ProviderInfo,
+  ConversationState,
+} from './base-provider';
 import { ToolCall } from '@lace/core/tools/types';
 import { Tool } from '@lace/core/tools/tool';
 import { logger } from '@lace/core/utils/logger';
@@ -554,6 +560,59 @@ export class OpenAIProvider extends AIProvider {
   }
 
   /**
+   * Converts ProviderMessages to Responses API input items
+   * Shared helper for both first turn (full history) and chained turns (incremental)
+   */
+  private _convertMessagesToInputItems(
+    messages: ProviderMessage[],
+    toolNameMapping: Map<string, string>
+  ): Array<unknown> {
+    const inputItems: Array<unknown> = [];
+
+    for (const msg of messages) {
+      if (msg.role === 'user' || msg.role === 'assistant') {
+        // Add text message if it has content
+        if (msg.content && msg.content.trim()) {
+          inputItems.push({
+            role: msg.role,
+            content: msg.content,
+          });
+        }
+
+        // Add tool calls as separate items (assistant messages can have tool calls)
+        if (msg.toolCalls) {
+          for (const toolCall of msg.toolCalls) {
+            // Use sanitized name for API request
+            const sanitizedName =
+              Array.from(toolNameMapping.entries()).find(
+                ([_, orig]) => orig === toolCall.name
+              )?.[0] || toolCall.name;
+            inputItems.push({
+              type: 'function_call',
+              call_id: toolCall.id,
+              name: sanitizedName,
+              arguments: JSON.stringify(toolCall.arguments),
+            });
+          }
+        }
+
+        // Add tool results as separate items (user messages can have tool results)
+        if (msg.toolResults) {
+          for (const result of msg.toolResults) {
+            inputItems.push({
+              type: 'function_call_output',
+              call_id: result.id,
+              output: result.content.map((c) => c.text || '').join('\n'),
+            });
+          }
+        }
+      }
+    }
+
+    return inputItems;
+  }
+
+  /**
    * Creates a Responses API request payload
    * Used for models that require the new /v1/responses endpoint
    */
@@ -561,7 +620,8 @@ export class OpenAIProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: Tool[],
     model: string,
-    stream: boolean
+    stream: boolean,
+    previousResponseId?: string
   ): {
     payload: ResponseCreateParams;
     toolNameMapping: Map<string, string>;
@@ -588,45 +648,37 @@ export class OpenAIProvider extends AIProvider {
     // The Responses API uses a DIFFERENT format than Chat Completions:
     // - Tool calls are separate {type: 'function_call'} items (not part of assistant message)
     // - Tool results are separate {type: 'function_call_output'} items (not tool messages)
-    const inputItems: Array<unknown> = [];
+    let inputItems: Array<unknown> = [];
 
-    for (const msg of messages.filter((m) => m.role !== 'system')) {
-      if (msg.role === 'user' || msg.role === 'assistant') {
-        // Add text message if it has content
-        if (msg.content && msg.content.trim()) {
-          inputItems.push({
-            role: msg.role,
-            content: msg.content,
-          });
-        }
+    if (previousResponseId) {
+      // Chained response: Only include messages AFTER the last assistant message
+      // Find the last assistant message (which should have been the previous response)
+      const lastAgentMessageIndex = messages.findLastIndex((m) => m.role === 'assistant');
 
-        // Add tool calls as separate items (assistant messages can have tool calls)
-        if (msg.toolCalls) {
-          for (const toolCall of msg.toolCalls) {
-            // Use sanitized name for API request
-            const sanitizedName =
-              Array.from(mapping.entries()).find(([_, orig]) => orig === toolCall.name)?.[0] ||
-              toolCall.name;
-            inputItems.push({
-              type: 'function_call',
-              call_id: toolCall.id,
-              name: sanitizedName,
-              arguments: JSON.stringify(toolCall.arguments),
-            });
+      if (lastAgentMessageIndex >= 0) {
+        // Take all messages after the last assistant message
+        const newMessages = messages.slice(lastAgentMessageIndex + 1);
+        inputItems = this._convertMessagesToInputItems(newMessages, mapping);
+      } else {
+        // No assistant message found - this shouldn't happen with chaining, but be defensive
+        logger.warn(
+          'Responses API chaining: No assistant message found, falling back to full history',
+          {
+            previousResponseId,
+            messageCount: messages.length,
           }
-        }
-
-        // Add tool results as separate items (user messages can have tool results)
-        if (msg.toolResults) {
-          for (const result of msg.toolResults) {
-            inputItems.push({
-              type: 'function_call_output',
-              call_id: result.id,
-              output: result.content.map((c) => c.text || '').join('\n'),
-            });
-          }
-        }
+        );
+        inputItems = this._convertMessagesToInputItems(
+          messages.filter((m) => m.role !== 'system'),
+          mapping
+        );
       }
+    } else {
+      // First turn: Include all non-system messages
+      inputItems = this._convertMessagesToInputItems(
+        messages.filter((m) => m.role !== 'system'),
+        mapping
+      );
     }
 
     const requestPayload: ResponseCreateParams = {
@@ -636,7 +688,9 @@ export class OpenAIProvider extends AIProvider {
       input: inputItems as unknown as ResponseCreateParams['input'],
       max_output_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 16384),
       stream,
+      ...(previousResponseId && { previous_response_id: previousResponseId }),
       ...(tools.length > 0 && { tools: responsesTools }),
+      store: true, // Enable server-side storage for response chaining
     };
 
     return { payload: requestPayload, toolNameMapping: mapping };
@@ -648,7 +702,6 @@ export class OpenAIProvider extends AIProvider {
   private _parseResponsesAPIResponse(response: Response): ProviderResponse {
     let textContent = '';
     const toolCalls: ToolCall[] = [];
-    const toolNameMapping = new Map<string, string>(); // Will be passed in from caller
 
     // Process output items
     for (const item of response.output) {
@@ -693,6 +746,7 @@ export class OpenAIProvider extends AIProvider {
         completionTokens: response.usage?.output_tokens || 0,
         totalTokens: response.usage?.total_tokens || 0,
       },
+      responseId: response.id, // Store response ID for conversation chaining
     };
   }
 
@@ -700,11 +754,12 @@ export class OpenAIProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: Tool[] = [],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    conversationState?: ConversationState
   ): Promise<ProviderResponse> {
     // Route to appropriate API based on model
     if (this.requiresResponsesAPI(model)) {
-      return this._createResponsesAPIResponse(messages, tools, model, signal);
+      return this._createResponsesAPIResponse(messages, tools, model, signal, conversationState);
     }
 
     // Use Chat Completions API for all other models
@@ -809,7 +864,8 @@ export class OpenAIProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: Tool[],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    conversationState?: ConversationState
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
@@ -817,7 +873,8 @@ export class OpenAIProvider extends AIProvider {
           messages,
           tools,
           model,
-          false
+          false,
+          conversationState?.openaiResponseId
         );
 
         // Log request with pretty formatting
@@ -860,11 +917,18 @@ export class OpenAIProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: Tool[] = [],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    conversationState?: ConversationState
   ): Promise<ProviderResponse> {
     // Route to appropriate API based on model
     if (this.requiresResponsesAPI(model)) {
-      return this._createResponsesAPIStreamingResponse(messages, tools, model, signal);
+      return this._createResponsesAPIStreamingResponse(
+        messages,
+        tools,
+        model,
+        signal,
+        conversationState
+      );
     }
 
     // Use Chat Completions streaming for all other models
@@ -1125,7 +1189,8 @@ export class OpenAIProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: Tool[],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    conversationState?: ConversationState
   ): Promise<ProviderResponse> {
     let streamingStarted = false;
     let streamCreated = false;
@@ -1136,7 +1201,8 @@ export class OpenAIProvider extends AIProvider {
           messages,
           tools,
           model,
-          true
+          true,
+          conversationState?.openaiResponseId
         );
 
         // Log streaming request with pretty formatting
@@ -1157,6 +1223,7 @@ export class OpenAIProvider extends AIProvider {
           const toolCalls: ToolCall[] = [];
           let estimatedOutputTokens = 0;
           let receivedCompletedEvent = false;
+          let responseId: string | undefined;
 
           // Track tool calls by output index
           const toolCallsByIndex = new Map<
@@ -1206,7 +1273,7 @@ export class OpenAIProvider extends AIProvider {
                 }
                 break;
 
-              case 'response.function_call_arguments.delta':
+              case 'response.function_call_arguments.delta': {
                 // Accumulate function call arguments
                 const toolCall = toolCallsByIndex.get(event.output_index);
                 if (toolCall) {
@@ -1219,12 +1286,16 @@ export class OpenAIProvider extends AIProvider {
                   });
                 }
                 break;
+              }
 
               case 'response.completed':
                 receivedCompletedEvent = true;
+                // Capture response ID for conversation chaining
+                responseId = event.response.id;
                 logger.trace('Responses API: Received completion event', {
                   status: event.response.status,
                   hasUsage: !!event.response.usage,
+                  responseId,
                 });
                 // Final event - extract final usage if available
                 if (event.response.usage) {
@@ -1310,6 +1381,7 @@ export class OpenAIProvider extends AIProvider {
               completionTokens: estimatedOutputTokens,
               totalTokens: estimatedPromptTokens + estimatedOutputTokens,
             },
+            responseId, // Include response ID for conversation chaining
           };
 
           this.emit('complete', { response });
