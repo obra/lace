@@ -73,7 +73,7 @@ export class GeminiProvider extends AIProvider {
       systemInstruction,
       tools: geminiTools.length > 0 ? geminiTools : undefined,
       config: {
-        maxOutputTokens: this._config.maxTokens || 4000,
+        maxOutputTokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 8192),
       },
     };
 

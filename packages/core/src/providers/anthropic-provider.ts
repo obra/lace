@@ -181,7 +181,7 @@ export class AnthropicProvider extends AIProvider {
 
     const payload = {
       model,
-      max_tokens: this._config.maxTokens || 4000,
+      max_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 8192),
       messages: anthropicMessages,
       system: systemPrompt,
       tools: anthropicTools,

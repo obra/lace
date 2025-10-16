@@ -545,7 +545,7 @@ export class OpenAIProvider extends AIProvider {
     const requestPayload: OpenAI.Chat.ChatCompletionCreateParams = {
       model,
       messages: messagesWithSystem,
-      max_completion_tokens: 16384,
+      max_completion_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 16384),
       stream,
       ...(tools.length > 0 && { tools: openaiTools }),
     };
@@ -634,7 +634,7 @@ export class OpenAIProvider extends AIProvider {
       instructions,
       // Cast to ResponseCreateParams['input'] - types are complex but runtime compatible
       input: inputItems as unknown as ResponseCreateParams['input'],
-      max_output_tokens: 16384,
+      max_output_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 16384),
       stream,
       ...(tools.length > 0 && { tools: responsesTools }),
     };
