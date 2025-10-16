@@ -374,6 +374,10 @@ export abstract class AIProvider extends EventEmitter {
       if (typeof err.code === 'string' && retryableCodes.includes(err.code)) {
         return true;
       }
+      // Check for rate_limit_exceeded code (OpenAI SDK)
+      if (err.code === 'rate_limit_exceeded') {
+        return true;
+      }
     }
 
     // Check for HTTP status codes
