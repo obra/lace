@@ -5,6 +5,7 @@ import { EventEmitter } from 'events';
 import { ToolResult, ToolCall } from '@lace/core/tools/types';
 import { Tool } from '@lace/core/tools/tool';
 import type { CatalogProvider } from '@lace/core/providers/catalog/types';
+import { logger } from '@lace/core/utils/logger';
 
 export interface ProviderConfig {
   maxTokens?: number;
@@ -392,9 +393,59 @@ export abstract class AIProvider extends EventEmitter {
   }
 
   /**
-   * Calculates exponential backoff delay with jitter
+   * Extracts rate limit delay from error message or headers
+   * Returns delay in milliseconds, or null if not found
    */
-  protected calculateBackoffDelay(attempt: number): number {
+  protected extractRateLimitDelay(error: unknown): number | null {
+    if (!error || typeof error !== 'object') {
+      return null;
+    }
+
+    const err = error as Record<string, unknown>;
+
+    // Check error message for "try again in X.XXXs" pattern (OpenAI format)
+    if (err.message && typeof err.message === 'string') {
+      const match = err.message.match(/try again in ([\d.]+)s/i);
+      if (match && match[1]) {
+        const seconds = parseFloat(match[1]);
+        if (!isNaN(seconds)) {
+          return Math.ceil(seconds * 1000); // Convert to milliseconds
+        }
+      }
+    }
+
+    // Check for Retry-After header in error response
+    if (err.headers && typeof err.headers === 'object') {
+      const headers = err.headers as Record<string, unknown>;
+      const retryAfter = headers['retry-after'] || headers['Retry-After'];
+      if (typeof retryAfter === 'string') {
+        const seconds = parseFloat(retryAfter);
+        if (!isNaN(seconds)) {
+          return Math.ceil(seconds * 1000);
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Calculates exponential backoff delay with jitter
+   * If error contains rate limit delay, uses that instead
+   */
+  protected calculateBackoffDelay(attempt: number, error?: unknown): number {
+    // Check if error specifies a rate limit delay
+    if (error) {
+      const rateLimitDelay = this.extractRateLimitDelay(error);
+      if (rateLimitDelay !== null) {
+        logger.debug('Using provider-specified rate limit delay', {
+          delayMs: rateLimitDelay,
+          delaySeconds: (rateLimitDelay / 1000).toFixed(2),
+        });
+        return rateLimitDelay;
+      }
+    }
+
     const config = this.RETRY_CONFIG;
     // Calculate base delay with exponential backoff
     const baseDelay = Math.min(
@@ -457,8 +508,8 @@ export abstract class AIProvider extends EventEmitter {
           throw error;
         }
 
-        // Calculate delay for next attempt
-        const delay = this.calculateBackoffDelay(attempt);
+        // Calculate delay for next attempt (respects rate limit headers if present)
+        const delay = this.calculateBackoffDelay(attempt, error);
 
         // Emit retry event
         this.emit('retry_attempt', {
