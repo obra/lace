@@ -693,6 +693,18 @@ export class OpenAIProvider extends AIProvider {
       store: true, // Enable server-side storage for response chaining
     };
 
+    // Log request details at INFO level for debugging
+    logger.info('Responses API request details', {
+      model,
+      isChained: !!previousResponseId,
+      previousResponseId: previousResponseId || 'none',
+      inputItemCount: inputItems.length,
+      maxOutputTokens: requestPayload.max_output_tokens,
+      toolCount: tools.length,
+      instructionsLength: instructions?.length || 0,
+      hasStore: requestPayload.store,
+    });
+
     return { payload: requestPayload, toolNameMapping: mapping };
   }
 

@@ -502,10 +502,23 @@ export abstract class AIProvider extends EventEmitter {
         lastError = error;
 
         // Check if we should retry
-        const shouldRetry =
-          attempt < maxAttempts &&
-          this.isRetryableError(error) &&
-          (options?.canRetry ? options.canRetry() : true);
+        const isRetryable = this.isRetryableError(error);
+        const canRetryCheck = options?.canRetry ? options.canRetry() : true;
+        const shouldRetry = attempt < maxAttempts && isRetryable && canRetryCheck;
+
+        // Log retry decision for debugging
+        logger.debug('Retry decision', {
+          attempt,
+          maxAttempts,
+          isRetryable,
+          canRetryCheck,
+          shouldRetry,
+          errorCode: (error as Record<string, unknown>).code,
+          errorMessage:
+            error instanceof Error
+              ? error.message.substring(0, 100)
+              : String(error).substring(0, 100),
+        });
 
         if (!shouldRetry) {
           // If we've exhausted all attempts, emit exhausted event
