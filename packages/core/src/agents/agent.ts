@@ -3,12 +3,12 @@
 
 import { EventEmitter } from 'events';
 import { resolve } from 'path';
-import { AIProvider, ProviderMessage } from '@lace/core/providers/base-provider';
-import { ToolCall, ToolResult } from '@lace/core/tools/types';
-import { Tool } from '@lace/core/tools/tool';
-import { ToolExecutor } from '@lace/core/tools/executor';
-import { ApprovalDecision, ToolPolicy } from '@lace/core/tools/types';
-import { ThreadManager, ThreadSessionInfo } from '@lace/core/threads/thread-manager';
+import { AIProvider, ProviderMessage, ProviderRequestContext } from '~/providers/base-provider';
+import { ToolCall, ToolResult } from '~/tools/types';
+import { Tool } from '~/tools/tool';
+import { ToolExecutor } from '~/tools/executor';
+import { ApprovalDecision, ToolPolicy } from '~/tools/types';
+import { ThreadManager, ThreadSessionInfo } from '~/threads/thread-manager';
 import {
   LaceEvent,
   ToolApprovalResponseData,
@@ -1208,18 +1208,25 @@ export class Agent extends EventEmitter {
         throw new Error('Cannot create streaming response with missing provider instance');
       }
 
-      // Get conversation state for Responses API chaining
-      const thread = this._threadManager.getThread(this._threadId);
-      const responseId = thread?.metadata?.openaiResponseId;
-      const conversationState =
-        responseId && typeof responseId === 'string' ? { openaiResponseId: responseId } : undefined;
+      // Build provider request context
+      const session = await this.getFullSession();
+      const projectId = session?.getProjectId();
+      const context: ProviderRequestContext = {
+        agent: this,
+        toolExecutor: this._toolExecutor,
+        session: session || undefined,
+        workingDirectory: this._getWorkingDirectory(),
+        processEnv: projectId
+          ? this._toolExecutor.getEnvironmentManager().getMergedEnvironment(projectId)
+          : process.env,
+      };
 
       const response = await this.providerInstance.createStreamingResponse(
         messages,
         tools,
         modelId,
         signal,
-        conversationState
+        context
       );
 
       // Apply stop reason handling to filter incomplete tool calls
@@ -1351,18 +1358,25 @@ export class Agent extends EventEmitter {
         throw new Error('Cannot create response with missing provider instance');
       }
 
-      // Get conversation state for Responses API chaining
-      const thread = this._threadManager.getThread(this._threadId);
-      const responseId = thread?.metadata?.openaiResponseId;
-      const conversationState =
-        responseId && typeof responseId === 'string' ? { openaiResponseId: responseId } : undefined;
+      // Build provider request context
+      const session = await this.getFullSession();
+      const projectId = session?.getProjectId();
+      const context: ProviderRequestContext = {
+        agent: this,
+        toolExecutor: this._toolExecutor,
+        session: session || undefined,
+        workingDirectory: this._getWorkingDirectory(),
+        processEnv: projectId
+          ? this._toolExecutor.getEnvironmentManager().getMergedEnvironment(projectId)
+          : process.env,
+      };
 
       const response = await this.providerInstance.createResponse(
         messages,
         tools,
         modelId,
         signal,
-        conversationState
+        context
       );
 
       // Apply stop reason handling to filter incomplete tool calls
@@ -2862,6 +2876,77 @@ export class Agent extends EventEmitter {
     }
 
     return event;
+  }
+
+  /**
+   * Request tool approval and wait for user decision.
+   *
+   * Public API for providers (like Claude SDK) that need to integrate
+   * with Lace's approval system before executing tools.
+   *
+   * Creates TOOL_CALL and TOOL_APPROVAL_REQUEST events, then polls for
+   * TOOL_APPROVAL_RESPONSE from the UI.
+   */
+  async requestToolApproval(toolCall: ToolCall, signal: AbortSignal): Promise<ApprovalDecision> {
+    logger.debug('[requestToolApproval] Creating TOOL_CALL event', { toolCallId: toolCall.id });
+
+    // Create TOOL_CALL event (same pattern as _executeToolCalls)
+    const toolCallEvent = this._addEventAndEmit({
+      type: 'TOOL_CALL',
+      data: toolCall,
+      context: { threadId: this._threadId },
+    });
+
+    logger.debug('[requestToolApproval] TOOL_CALL event created', {
+      eventId: toolCallEvent?.id,
+      toolCallId: toolCall.id,
+    });
+
+    // Create TOOL_APPROVAL_REQUEST event
+    logger.debug('[requestToolApproval] Creating TOOL_APPROVAL_REQUEST event', {
+      toolCallId: toolCall.id,
+    });
+
+    const requestEvent = this.addApprovalRequestEvent(toolCall.id);
+
+    logger.debug('[requestToolApproval] TOOL_APPROVAL_REQUEST event created', {
+      eventId: requestEvent.id,
+      toolCallId: toolCall.id,
+    });
+
+    // Poll for approval response
+    const maxWaitMs = 300000; // 5 minutes
+    const pollIntervalMs = 100;
+    const startTime = Date.now();
+
+    return new Promise((resolve, reject) => {
+      const abortHandler = () => {
+        reject(new Error('Tool approval aborted'));
+      };
+      signal.addEventListener('abort', abortHandler, { once: true });
+
+      const pollInterval = setInterval(() => {
+        if (signal.aborted) {
+          clearInterval(pollInterval);
+          reject(new Error('Tool approval aborted'));
+          return;
+        }
+
+        if (Date.now() - startTime > maxWaitMs) {
+          clearInterval(pollInterval);
+          signal.removeEventListener('abort', abortHandler);
+          reject(new Error(`Tool approval timeout after ${maxWaitMs}ms`));
+          return;
+        }
+
+        const decision = this.checkExistingApprovalResponse(toolCall.id);
+        if (decision !== null) {
+          clearInterval(pollInterval);
+          signal.removeEventListener('abort', abortHandler);
+          resolve(decision);
+        }
+      }, pollIntervalMs);
+    });
   }
 
   /**

@@ -196,21 +196,44 @@ export function AddInstanceModal({
 
           <div>
             <label className="label">
-              <span className="label-text">API Key *</span>
+              <span className="label-text">
+                {selectedProvider?.id === 'claude-agents-sdk' ? 'OAuth Token *' : 'API Key *'}
+              </span>
             </label>
             <input
               type="password"
               className="input input-bordered w-full"
               value={formData.apiKey}
               onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
-              placeholder="sk-..."
+              placeholder={
+                selectedProvider?.id === 'claude-agents-sdk' ? 'sk-ant-oat01-...' : 'sk-...'
+              }
               required
               data-testid="api-key-input"
             />
             <div className="label">
-              <span className="label-text-alt">Your API key will be stored securely</span>
+              <span className="label-text-alt">
+                {selectedProvider?.id === 'claude-agents-sdk'
+                  ? 'Your OAuth token will be stored securely'
+                  : 'Your API key will be stored securely'}
+              </span>
             </div>
           </div>
+
+          {selectedProvider?.id === 'claude-agents-sdk' && (
+            <Alert
+              variant="info"
+              title="Get Your OAuth Token"
+              description={
+                <>
+                  Run <code className="bg-base-200 px-1 rounded">claude setup-token</code> in your
+                  terminal to generate a long-lived OAuth token. Copy the token that starts with{' '}
+                  <code className="bg-base-200 px-1 rounded">sk-ant-oat01-</code> and paste it
+                  above.
+                </>
+              }
+            />
+          )}
 
           <div>
             <label className="label">

@@ -1,0 +1,39 @@
+{
+  "name": "Claude Agent SDK",
+  "id": "claude-agents-sdk",
+  "type": "claude-agents-sdk",
+  "default_large_model_id": "opus",
+  "default_small_model_id": "default",
+  "models": [
+    {
+      "id": "default",
+      "name": "Default (Sonnet 4.5)",
+      "cost_per_1m_in": 0,
+      "cost_per_1m_out": 0,
+      "context_window": 200000,
+      "default_max_tokens": 8192,
+      "can_reason": true,
+      "supports_attachments": true
+    },
+    {
+      "id": "opus",
+      "name": "Opus 4.1",
+      "cost_per_1m_in": 0,
+      "cost_per_1m_out": 0,
+      "context_window": 200000,
+      "default_max_tokens": 8192,
+      "can_reason": true,
+      "supports_attachments": true
+    },
+    {
+      "id": "sonnet[1m]",
+      "name": "Sonnet (1M context)",
+      "cost_per_1m_in": 0,
+      "cost_per_1m_out": 0,
+      "context_window": 1000000,
+      "default_max_tokens": 8192,
+      "can_reason": true,
+      "supports_attachments": true
+    }
+  ]
+}

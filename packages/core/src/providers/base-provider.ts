@@ -2,10 +2,33 @@
 // ABOUTME: Defines the common interface and provides base functionality for providers
 
 import { EventEmitter } from 'events';
-import { ToolResult, ToolCall } from '@lace/core/tools/types';
-import { Tool } from '@lace/core/tools/tool';
-import type { CatalogProvider } from '@lace/core/providers/catalog/types';
-import { logger } from '@lace/core/utils/logger';
+import { ToolResult, ToolCall } from '~/tools/types';
+import { Tool } from '~/tools/tool';
+import type { CatalogProvider } from '~/providers/catalog/types';
+import type { Agent } from '~/agents/agent';
+import type { ToolExecutor } from '~/tools/executor';
+import type { Session } from '~/sessions/session';
+
+/**
+ * Runtime context passed to provider methods
+ * Provides access to agent, executor, session for advanced provider features
+ */
+export interface ProviderRequestContext {
+  /** Agent making the request (for delegation, logging) */
+  agent?: Agent;
+
+  /** Tool executor for proper tool execution with approval flow */
+  toolExecutor?: ToolExecutor;
+
+  /** Session for accessing project config, MCP servers, permissions */
+  session?: Session;
+
+  /** Session's working directory (not project directory) */
+  workingDirectory?: string;
+
+  /** Merged process + project environment variables */
+  processEnv?: NodeJS.ProcessEnv;
+}
 
 export interface ProviderConfig {
   maxTokens?: number;
@@ -150,7 +173,7 @@ export abstract class AIProvider extends EventEmitter {
     tools: Tool[],
     model: string,
     signal?: AbortSignal,
-    conversationState?: ConversationState
+    context?: ProviderRequestContext
   ): Promise<ProviderResponse>;
 
   // Optional streaming support - providers can override this
@@ -159,10 +182,10 @@ export abstract class AIProvider extends EventEmitter {
     tools: Tool[],
     model: string,
     signal?: AbortSignal,
-    conversationState?: ConversationState
+    context?: ProviderRequestContext
   ): Promise<ProviderResponse> {
     // Default implementation: fall back to non-streaming
-    return this.createResponse(messages, tools, model, signal, conversationState);
+    return this.createResponse(messages, tools, model, signal, context);
   }
 
   // Check if provider supports streaming
