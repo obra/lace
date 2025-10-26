@@ -21,9 +21,8 @@ describe('ClaudeSDKProvider Tool Approval', () => {
       },
     });
 
-    // Mock context with minimal ToolExecutor
+    // Mock context with ToolExecutor, Session, and Agent
     const mockToolExecutor = {
-      requestApproval: vi.fn().mockResolvedValue({ decision: ApprovalDecision.ALLOW_ONCE }),
       getTool: vi.fn().mockReturnValue({
         name: 'bash',
         annotations: { readOnlySafe: false },
@@ -38,12 +37,16 @@ describe('ClaudeSDKProvider Tool Approval', () => {
       getPermissionOverrideMode: () => 'default',
     };
 
+    const mockAgent = {
+      requestToolApproval: vi.fn().mockResolvedValue(ApprovalDecision.ALLOW_ONCE),
+    };
+
     const context: ProviderRequestContext = {
       workingDirectory: '/tmp',
       processEnv: process.env,
       toolExecutor: mockToolExecutor as any,
       session: mockSession as any,
-      agent: null,
+      agent: mockAgent as any,
     };
 
     // Build the canUseTool handler
@@ -56,8 +59,8 @@ describe('ClaudeSDKProvider Tool Approval', () => {
       { signal: new AbortController().signal }
     );
 
-    // Should have called requestApproval
-    expect(mockToolExecutor.requestApproval).toHaveBeenCalled();
+    // Should have called Agent's requestToolApproval
+    expect(mockAgent.requestToolApproval).toHaveBeenCalled();
 
     // Should return allow after approval
     expect(result.behavior).toBe('allow');

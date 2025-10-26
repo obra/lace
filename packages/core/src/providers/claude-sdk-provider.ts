@@ -19,7 +19,7 @@ import {
   tool as sdkTool,
   query as sdkQuery,
 } from '@anthropic-ai/claude-agent-sdk';
-import type { ToolResult, PermissionOverrideMode } from '~/tools/types';
+import type { ToolResult, PermissionOverrideMode, ToolCall } from '~/tools/types';
 import { ApprovalDecision } from '~/tools/types';
 import { existsSync } from 'fs';
 import { tmpdir } from 'os';
@@ -382,7 +382,7 @@ export class ClaudeSDKProvider extends AIProvider {
         __lace_tools: laceToolsServer,
         ...projectMcpServers,
       },
-      allowedTools: ['WebSearch'],
+      allowedTools: [], // Empty = all tools available (filtered in canUseTool callback)
       permissionMode,
       canUseTool: this.buildCanUseToolHandler(context),
       // SDK accepts object with signal property, cast to satisfy type
@@ -628,14 +628,25 @@ export class ClaudeSDKProvider extends AIProvider {
    * This is purely for permission checking and approval flow.
    */
   protected buildCanUseToolHandler(context: ProviderRequestContext): CanUseTool {
-    const { toolExecutor, session } = context;
+    const { toolExecutor, session, agent } = context;
 
-    if (!toolExecutor || !session) {
-      throw new Error('ToolExecutor and Session required for approval handler');
+    if (!toolExecutor || !session || !agent) {
+      throw new Error('ToolExecutor, Session, and Agent required for approval handler');
     }
 
     return async (toolName, input, { signal, suggestions: _suggestions }) => {
       try {
+        // Block SDK native tools - only allow MCP-wrapped Lace tools
+        // SDK native tools (Bash, Read, etc.) aren't container-aware
+        if (!toolName.startsWith('mcp__')) {
+          logger.debug('Denying SDK native tool - only MCP-wrapped tools allowed', { toolName });
+          return {
+            behavior: 'deny',
+            message: `SDK native tool '${toolName}' not allowed - use MCP-wrapped version`,
+            interrupt: false,
+          };
+        }
+
         // Check tool allowlist first (fail-closed security)
         const config = session.getEffectiveConfiguration();
         if (config.tools && !config.tools.includes(toolName)) {
@@ -680,16 +691,19 @@ export class ClaudeSDKProvider extends AIProvider {
             };
 
           case 'ask': {
-            // Request approval through ToolExecutor
-            logger.debug('Requesting tool approval', { toolName });
+            // Use Agent's public API to request approval
+            const toolCallId = `sdk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const toolCall: ToolCall = {
+              id: toolCallId,
+              name: toolName,
+              arguments: input,
+            };
 
-            const approvalResult = await toolExecutor.requestApproval({
-              toolName,
-              parameters: input,
-              readOnly: tool?.annotations?.readOnlySafe || false,
-            });
+            logger.debug('Requesting tool approval via Agent API', { toolName, toolCallId });
 
-            logger.debug('Approval received', { toolName, decision: approvalResult.decision });
+            const decision = await agent.requestToolApproval(toolCall, signal);
+
+            logger.debug('Approval received from Agent', { toolName, toolCallId, decision });
 
             // Map Lace approval decision to SDK permission result
             const isAllowed = [
@@ -697,7 +711,7 @@ export class ClaudeSDKProvider extends AIProvider {
               ApprovalDecision.ALLOW_SESSION,
               ApprovalDecision.ALLOW_PROJECT,
               ApprovalDecision.ALLOW_ALWAYS,
-            ].includes(approvalResult.decision);
+            ].includes(decision);
 
             if (isAllowed) {
               return { behavior: 'allow', updatedInput: input };

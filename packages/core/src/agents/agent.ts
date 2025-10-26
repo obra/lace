@@ -2895,6 +2895,77 @@ export class Agent extends EventEmitter {
   }
 
   /**
+   * Request tool approval and wait for user decision.
+   *
+   * Public API for providers (like Claude SDK) that need to integrate
+   * with Lace's approval system before executing tools.
+   *
+   * Creates TOOL_CALL and TOOL_APPROVAL_REQUEST events, then polls for
+   * TOOL_APPROVAL_RESPONSE from the UI.
+   */
+  async requestToolApproval(toolCall: ToolCall, signal: AbortSignal): Promise<ApprovalDecision> {
+    logger.debug('[requestToolApproval] Creating TOOL_CALL event', { toolCallId: toolCall.id });
+
+    // Create TOOL_CALL event (same pattern as _executeToolCalls)
+    const toolCallEvent = this._addEventAndEmit({
+      type: 'TOOL_CALL',
+      data: toolCall,
+      context: { threadId: this._threadId },
+    });
+
+    logger.debug('[requestToolApproval] TOOL_CALL event created', {
+      eventId: toolCallEvent?.id,
+      toolCallId: toolCall.id,
+    });
+
+    // Create TOOL_APPROVAL_REQUEST event
+    logger.debug('[requestToolApproval] Creating TOOL_APPROVAL_REQUEST event', {
+      toolCallId: toolCall.id,
+    });
+
+    const requestEvent = this.addApprovalRequestEvent(toolCall.id);
+
+    logger.debug('[requestToolApproval] TOOL_APPROVAL_REQUEST event created', {
+      eventId: requestEvent.id,
+      toolCallId: toolCall.id,
+    });
+
+    // Poll for approval response
+    const maxWaitMs = 300000; // 5 minutes
+    const pollIntervalMs = 100;
+    const startTime = Date.now();
+
+    return new Promise((resolve, reject) => {
+      const abortHandler = () => {
+        reject(new Error('Tool approval aborted'));
+      };
+      signal.addEventListener('abort', abortHandler, { once: true });
+
+      const pollInterval = setInterval(() => {
+        if (signal.aborted) {
+          clearInterval(pollInterval);
+          reject(new Error('Tool approval aborted'));
+          return;
+        }
+
+        if (Date.now() - startTime > maxWaitMs) {
+          clearInterval(pollInterval);
+          signal.removeEventListener('abort', abortHandler);
+          reject(new Error(`Tool approval timeout after ${maxWaitMs}ms`));
+          return;
+        }
+
+        const decision = this.checkExistingApprovalResponse(toolCall.id);
+        if (decision !== null) {
+          clearInterval(pollInterval);
+          signal.removeEventListener('abort', abortHandler);
+          resolve(decision);
+        }
+      }, pollIntervalMs);
+    });
+  }
+
+  /**
    * Check tool policy and determine if approval is required.
    * Agent owns this logic instead of ToolExecutor.
    */
