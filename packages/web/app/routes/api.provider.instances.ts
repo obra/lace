@@ -34,12 +34,10 @@ const CreateInstanceSchema = z.object({
   endpoint: z.string().url().optional(),
   timeout: z.number().int().positive().optional(),
   retryPolicy: z.string().optional(),
-  credential: z
-    .object({
-      apiKey: z.string().min(1, 'API key is required'),
-      additionalAuth: z.record(z.unknown()).optional(),
-    })
-    .optional(), // Credentials optional for auto-auth providers (claude-agents-sdk)
+  credential: z.object({
+    apiKey: z.string().min(1, 'API key is required'),
+    additionalAuth: z.record(z.unknown()).optional(),
+  }),
 });
 
 export async function loader({ request: _request }: Route.LoaderArgs) {
@@ -103,14 +101,11 @@ export async function action({ request }: Route.ActionArgs) {
     // Save instance configuration
     await instanceManager.saveInstances(config);
 
-    // Save credentials separately (if provided)
-    // SDK provider doesn't need credentials - uses auto-detected Claude authentication
-    if (validatedData.credential) {
-      await instanceManager.saveCredential(validatedData.instanceId, {
-        apiKey: validatedData.credential.apiKey,
-        additionalAuth: validatedData.credential.additionalAuth,
-      });
-    }
+    // Save credentials separately
+    await instanceManager.saveCredential(validatedData.instanceId, {
+      apiKey: validatedData.credential.apiKey,
+      additionalAuth: validatedData.credential.additionalAuth,
+    });
 
     // No need to refresh registry - it reads fresh data on demand
 

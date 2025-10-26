@@ -11,7 +11,6 @@ const __dirname = dirname(__filename);
 export default defineConfig({
   plugins: [reactRouter(), tsconfigPaths()],
   optimizeDeps: {
-    exclude: ['@lace/core'],
     entries: [
       './app/entry.client.tsx',
       './app/root.tsx',
@@ -22,9 +21,6 @@ export default defineConfig({
   server: {
     warmup: {
       clientFiles: ['./app/entry.client.tsx', './app/root.tsx', './app/routes/**/*.tsx'],
-    },
-    watch: {
-      ignored: ['!**/node_modules/@lace/core/**'],
     },
   },
   build: {

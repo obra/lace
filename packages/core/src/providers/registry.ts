@@ -1,18 +1,22 @@
 // ABOUTME: Provider registry for managing available AI providers and their discovery
 // ABOUTME: Handles provider registration and provides providers for agent execution
 
-import { AIProvider, ProviderConfig, ProviderInfo, ModelInfo } from '~/providers/base-provider';
-import { AnthropicProvider } from '~/providers/anthropic-provider';
-import { OpenAIProvider } from '~/providers/openai-provider';
-import { LMStudioProvider } from '~/providers/lmstudio-provider';
-import { OllamaProvider } from '~/providers/ollama-provider';
-import { GeminiProvider } from '~/providers/gemini-provider';
-import { ClaudeSDKProvider } from '~/providers/claude-sdk-provider';
-import { ProviderCatalogManager } from '~/providers/catalog/manager';
-import { ProviderInstanceManager } from '~/providers/instance/manager';
-import type { CatalogProvider, CatalogModel, ModelConfig } from '~/providers/catalog/types';
-import { OpenRouterDynamicProvider } from '~/providers/openrouter/dynamic-provider';
-import { logger } from '~/utils/logger';
+import { AIProvider, ProviderConfig, ProviderInfo, ModelInfo } from './base-provider';
+import { AnthropicProvider } from './anthropic-provider';
+import { OpenAIProvider } from './openai-provider';
+import { LMStudioProvider } from './lmstudio-provider';
+import { OllamaProvider } from './ollama-provider';
+import { GeminiProvider } from './gemini-provider';
+import { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
+import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
+import type {
+  CatalogProvider,
+  CatalogModel,
+  ModelConfig,
+} from '@lace/core/providers/catalog/types';
+import { OpenRouterDynamicProvider } from '@lace/core/providers/openrouter/dynamic-provider';
+import { OpenAIDynamicProvider } from '@lace/core/providers/openai/dynamic-provider';
+import { logger } from '@lace/core/utils/logger';
 
 /**
  * Expand environment variables in provider configuration values
@@ -295,7 +299,6 @@ export class ProviderRegistry {
     }
 
     const credentials = this.instanceManager.loadCredential(instanceId);
-
     if (credentials == null) {
       throw new Error(`No credentials found for instance: ${instanceId}`);
     }
@@ -311,8 +314,8 @@ export class ProviderRegistry {
     const trimmedCatalog = (expandEnvVar(catalogProvider.api_endpoint) ?? '').trim();
     const baseURL = trimmedInstance || trimmedCatalog;
     const providerConfig: ProviderConfig = {
-      apiKey: credentials?.apiKey ?? null,
-      ...(credentials?.additionalAuth || {}),
+      apiKey: credentials.apiKey,
+      ...(credentials.additionalAuth || {}),
       ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
       catalogProvider, // Pass catalog data to provider
@@ -336,7 +339,6 @@ export class ProviderRegistry {
     }
 
     const credentials = this.instanceManager.loadCredential(instanceId);
-
     if (credentials == null) {
       throw new Error(`No credentials found for instance: ${instanceId}`);
     }
@@ -367,8 +369,8 @@ export class ProviderRegistry {
     const baseURL = trimmedInstance || trimmedCatalog;
     const providerConfig: ProviderConfig = {
       model: modelId,
-      apiKey: credentials?.apiKey ?? null,
-      ...(credentials?.additionalAuth || {}),
+      apiKey: credentials.apiKey,
+      ...(credentials.additionalAuth || {}),
       ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
       catalogProvider, // Pass catalog data to provider
@@ -400,7 +402,7 @@ export class ProviderRegistry {
     models: ModelInfo[];
     configured: boolean;
   }> {
-    const providers = ['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama', 'claude-agents-sdk'];
+    const providers = ['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama'];
     const results = [];
 
     for (const providerName of providers) {
@@ -464,12 +466,6 @@ export class ProviderRegistry {
         case 'ollama': {
           return new OllamaProvider({ baseURL: 'http://localhost:11434' });
         }
-        case 'claude-agents-sdk': {
-          return new ClaudeSDKProvider({
-            sessionToken: null,
-            ...(catalogProvider ? { catalogProvider } : {}),
-          });
-        }
         default:
           return null;
       }
@@ -524,15 +520,6 @@ export class ProviderRegistry {
       }
       case 'ollama': {
         return new OllamaProvider(config);
-      }
-      case 'claude-agents-sdk': {
-        logger.debug('Creating ClaudeSDKProvider', {
-          hasSessionToken: !!config.apiKey,
-        });
-        return new ClaudeSDKProvider({
-          ...config,
-          sessionToken: typeof config.apiKey === 'string' ? config.apiKey : null,
-        });
       }
       case 'test-provider': {
         // Mock provider needs to be handled differently for tests

@@ -29,13 +29,13 @@ import {
   ProviderResponse,
   ProviderConfig,
   ProviderInfo,
-  ProviderRequestContext,
-} from '~/providers/base-provider';
-import { ToolCall } from '~/tools/types';
-import { Tool } from '~/tools/tool';
-import { logger } from '~/utils/logger';
-import { logProviderRequest, logProviderResponse } from '~/utils/provider-logging';
-import { convertToOpenAIFormat } from '~/providers/format-converters';
+  ConversationState,
+} from './base-provider';
+import { ToolCall } from '@lace/core/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import { logger } from '@lace/core/utils/logger';
+import { logProviderRequest, logProviderResponse } from '@lace/core/utils/provider-logging';
+import { convertToOpenAIFormat } from './format-converters';
 
 interface OpenAIProviderConfig extends ProviderConfig {
   apiKey: string | null;
@@ -767,7 +767,25 @@ export class OpenAIProvider extends AIProvider {
     tools: Tool[] = [],
     model: string,
     signal?: AbortSignal,
-    context?: ProviderRequestContext
+    conversationState?: ConversationState
+  ): Promise<ProviderResponse> {
+    // Route to appropriate API based on model
+    if (this.requiresResponsesAPI(model)) {
+      return this._createResponsesAPIResponse(messages, tools, model, signal, conversationState);
+    }
+
+    // Use Chat Completions API for all other models
+    return this._createChatCompletionsResponse(messages, tools, model, signal);
+  }
+
+  /**
+   * Chat Completions API implementation (original endpoint)
+   */
+  private async _createChatCompletionsResponse(
+    messages: ProviderMessage[],
+    tools: Tool[],
+    model: string,
+    signal?: AbortSignal
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
@@ -912,7 +930,31 @@ export class OpenAIProvider extends AIProvider {
     tools: Tool[] = [],
     model: string,
     signal?: AbortSignal,
-    context?: ProviderRequestContext
+    conversationState?: ConversationState
+  ): Promise<ProviderResponse> {
+    // Route to appropriate API based on model
+    if (this.requiresResponsesAPI(model)) {
+      return this._createResponsesAPIStreamingResponse(
+        messages,
+        tools,
+        model,
+        signal,
+        conversationState
+      );
+    }
+
+    // Use Chat Completions streaming for all other models
+    return this._createChatCompletionsStreamingResponse(messages, tools, model, signal);
+  }
+
+  /**
+   * Chat Completions streaming implementation (original endpoint)
+   */
+  private async _createChatCompletionsStreamingResponse(
+    messages: ProviderMessage[],
+    tools: Tool[],
+    model: string,
+    signal?: AbortSignal
   ): Promise<ProviderResponse> {
     let streamingStarted = false;
     let streamCreated = false;

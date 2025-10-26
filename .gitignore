@@ -113,7 +113,3 @@ src/vfs/lace-database.ts
 # Build artifacts that get regenerated
 packages/web/server-dependencies.json
 build/temp/
-
-
-
-reference

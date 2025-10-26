@@ -9,12 +9,11 @@ import {
   ProviderConfig,
   ProviderInfo,
   ModelInfo,
-  ProviderRequestContext,
-} from '~/providers/base-provider';
-import { ToolCall } from '~/tools/types';
-import { Tool } from '~/tools/tool';
-import { logger } from '~/utils/logger';
-import { logProviderRequest, logProviderResponse } from '~/utils/provider-logging';
+} from './base-provider';
+import { ToolCall } from '@lace/core/tools/types';
+import { Tool } from '@lace/core/tools/tool';
+import { logger } from '@lace/core/utils/logger';
+import { logProviderRequest, logProviderResponse } from '@lace/core/utils/provider-logging';
 
 interface OllamaProviderConfig extends ProviderConfig {
   host?: string;
@@ -86,8 +85,7 @@ export class OllamaProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: Tool[] = [],
     model: string,
-    signal?: AbortSignal,
-    context?: ProviderRequestContext
+    signal?: AbortSignal
   ): Promise<ProviderResponse> {
     return this.withRetry(
       async () => {
