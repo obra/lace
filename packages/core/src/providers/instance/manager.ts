@@ -134,6 +134,15 @@ export class ProviderInstanceManager {
     await fs.promises.writeFile(credPath, JSON.stringify(credential, null, 2), { mode: 0o600 });
   }
 
+  async clearCredential(instanceId: string): Promise<void> {
+    try {
+      const credPath = path.join(this.credentialsDir, `${instanceId}.json`);
+      await fs.promises.unlink(credPath);
+    } catch {
+      // Ignore if credential file doesn't exist or can't be removed
+    }
+  }
+
   async updateInstance(
     instanceId: string,
     updates: Partial<

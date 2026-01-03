@@ -9,7 +9,7 @@
     "node": ">=20.18.3"
   },
   "scripts": {
-    "build": "tsc && tsc-alias && cp -r src/config/prompts dist/config/ 2>/dev/null || true && cp -r src/providers/catalog/data dist/providers/catalog/ 2>/dev/null || true",
+    "build": "tsc && tsc-alias -f -fe .js && cp -r src/config/prompts dist/config/ 2>/dev/null || true && cp -r src/providers/catalog/data dist/providers/catalog/ 2>/dev/null || true",
     "build:clean": "rm -rf dist && npm run build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
