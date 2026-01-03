@@ -6,7 +6,7 @@ import readline from 'node:readline';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { asSessionId, createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
-import { helpText, parseArgs } from './args';
+import { parseArgs } from './args';
 
 type PermissionRequestParams = {
   sessionId?: string;
@@ -122,6 +122,12 @@ type PendingPermission = {
   resolve: (value: { decision: string }) => void;
 };
 
+type JsonRpcErrorObject = {
+  code?: number;
+  message?: string;
+  data?: unknown;
+};
+
 async function main(): Promise<void> {
   const parsedArgs = parseArgs(process.argv.slice(2));
   if (parsedArgs.kind === 'help') {
@@ -162,6 +168,8 @@ async function main(): Promise<void> {
   const pendingPermissions: PendingPermission[] = [];
   let activePermission: PendingPermission | undefined;
 
+  let pendingQuestionResolve: ((line: string) => void) | null = null;
+
   const showPrompt = () => {
     if (!interactive) return;
     if (promptShown) return;
@@ -180,7 +188,32 @@ async function main(): Promise<void> {
     printBlock([line]);
   };
 
+  const describeError = (err: unknown): { message: string; isMissingProviderConfig: boolean } => {
+    if (err && typeof err === 'object') {
+      const maybe = err as JsonRpcErrorObject;
+      if (typeof maybe.message === 'string' && maybe.message.length > 0) {
+        return {
+          message: maybe.message,
+          isMissingProviderConfig: maybe.message.includes('Missing provider configuration'),
+        };
+      }
+    }
+
+    const message =
+      err instanceof Error ? err.message : typeof err === 'string' ? err : safeJsonStringify(err);
+    return { message, isMissingProviderConfig: message.includes('Missing provider configuration') };
+  };
+
+  const askUser = async (question: string): Promise<string> => {
+    printLine(question);
+    return await new Promise<string>((resolve) => {
+      pendingQuestionResolve = (line) => resolve(line.trim());
+      showPrompt();
+    });
+  };
+
   const startNextPermissionIfNeeded = () => {
+    if (pendingQuestionResolve) return;
     if (activePermission) return;
     const next = pendingPermissions.shift();
     if (!next) return;
@@ -273,7 +306,7 @@ async function main(): Promise<void> {
   conn.peer.onRequest('session/request_permission', async (params) => {
     return await new Promise<{ decision: string }>((resolve) => {
       pendingPermissions.push({ params: params as PermissionRequestParams, resolve });
-      startNextPermissionIfNeeded();
+      if (!pendingQuestionResolve) startNextPermissionIfNeeded();
     });
   });
 
@@ -315,6 +348,7 @@ async function main(): Promise<void> {
       ':help - show commands',
       ':exit - exit',
       ':status - show connection + sessionId',
+      ':configure - configure connection + model (Lace agents)',
       ':new [workDir] - create a new session',
       ':load <sessionId> - load an existing session',
       ':list - list sessions',
@@ -330,6 +364,161 @@ async function main(): Promise<void> {
     rl.close();
     await conn.shutdown();
     process.exit(code);
+  };
+
+  const configureIfSupported = async (): Promise<void> => {
+    const req = async (method: string, params?: unknown) =>
+      await withTimeout(conn.peer.request(method, params), args.timeoutMs, method);
+
+    type ConnectionInfo = {
+      connectionId: string;
+      providerId?: string;
+      name?: string;
+      credentialState?: string;
+    };
+
+    type ProviderInfo = {
+      providerId: string;
+      displayName?: string;
+    };
+
+    let connections: ConnectionInfo[] = [];
+    try {
+      const res = (await req('ent/connections/list', {})) as any;
+      if (res && Array.isArray(res.connections)) connections = res.connections as ConnectionInfo[];
+    } catch (err) {
+      const d = describeError(err);
+      if (d.message.toLowerCase().includes('method not found')) {
+        printLine('error: agent does not support provider configuration');
+        return;
+      }
+      throw err;
+    }
+
+    let connectionId: string | undefined;
+    const readyConnections = connections.filter((c) => c.credentialState === 'ready');
+    if (readyConnections.length === 1) {
+      connectionId = readyConnections[0]!.connectionId;
+    } else if (connections.length === 1) {
+      connectionId = connections[0]!.connectionId;
+    } else if (connections.length > 1) {
+      const lines = ['configure: available connections:'];
+      for (const c of connections) {
+        lines.push(
+          `  ${c.connectionId} ${c.name ? `(${c.name})` : ''} ${c.credentialState ? `[${c.credentialState}]` : ''}`.trimEnd()
+        );
+      }
+      printBlock(lines);
+      connectionId = await askUser('configure: enter connectionId');
+    }
+
+    if (!connectionId) {
+      const providersRes = (await req('ent/providers/list', {})) as any;
+      const providers: ProviderInfo[] = Array.isArray(providersRes?.providers)
+        ? (providersRes.providers as ProviderInfo[])
+        : [];
+
+      if (providers.length === 0) {
+        printLine('error: no providers available');
+        return;
+      }
+
+      let providerId: string;
+      if (providers.length === 1) {
+        providerId = providers[0]!.providerId;
+      } else {
+        printBlock([
+          'configure: available providers:',
+          ...providers.map((p) => `  ${p.providerId}${p.displayName ? ` (${p.displayName})` : ''}`),
+        ]);
+        providerId = await askUser('configure: enter providerId');
+      }
+
+      const upsert = (await req('ent/connections/upsert', {
+        providerId,
+        connection: { name: 'default', config: {} },
+      })) as any;
+      if (!upsert || typeof upsert.connectionId !== 'string') {
+        printLine('error: failed to create connection');
+        return;
+      }
+      connectionId = upsert.connectionId;
+    }
+
+    const credStart = (await req('ent/connections/credentials/start', { connectionId })) as any;
+    if (credStart?.kind === 'needs_input' && Array.isArray(credStart.fields)) {
+      const values: Record<string, string> = {};
+      for (const f of credStart.fields as Array<{
+        name?: string;
+        label?: string;
+        secret?: boolean;
+      }>) {
+        const name = typeof f.name === 'string' ? f.name : '';
+        if (!name) continue;
+
+        if (f.secret) {
+          if (
+            (name === 'apiKey' || name.toLowerCase().includes('apikey')) &&
+            process.env.OPENAI_API_KEY
+          ) {
+            values[name] = process.env.OPENAI_API_KEY;
+            continue;
+          }
+
+          const envName = name.toUpperCase();
+          if (process.env[envName]) {
+            values[name] = process.env[envName];
+            continue;
+          }
+        }
+
+        const label = typeof f.label === 'string' && f.label.length > 0 ? f.label : name;
+        const value = await askUser(`configure: enter ${label}${f.secret ? ' (will echo)' : ''}`);
+        values[name] = value;
+      }
+
+      const submitted = (await req('ent/connections/credentials/submit', {
+        connectionId,
+        values,
+      })) as any;
+      if (!submitted || submitted.ok !== true) {
+        printLine('error: credential submit failed');
+        return;
+      }
+    }
+
+    const modelsRes = (await req('ent/models/list', { connectionId })) as any;
+    const models: Array<{ modelId?: string }> = Array.isArray(modelsRes?.models)
+      ? modelsRes.models
+      : [];
+    if (models.length === 0) {
+      printLine('error: no models available for connection');
+      return;
+    }
+
+    let modelId: string;
+    if (models.length === 1 && typeof models[0]!.modelId === 'string') {
+      modelId = models[0]!.modelId;
+    } else {
+      printBlock([
+        'configure: available models:',
+        ...models.map((m) => `  ${typeof m.modelId === 'string' ? m.modelId : '<unknown>'}`),
+      ]);
+      const chosen = await askUser('configure: enter modelId');
+      modelId = chosen;
+    }
+
+    const configured = (await req('ent/session/configure', { connectionId, modelId })) as any;
+    const effectiveConnectionId =
+      typeof configured?.config?.connectionId === 'string'
+        ? configured.config.connectionId
+        : connectionId;
+    const effectiveModelId =
+      typeof configured?.config?.modelId === 'string' ? configured.config.modelId : modelId;
+
+    printLine(
+      `configured session: connectionId=${effectiveConnectionId} modelId=${effectiveModelId}`
+    );
   };
 
   const handleReplLine = async (line: string) => {
@@ -354,6 +543,10 @@ async function main(): Promise<void> {
           `workDir: ${args.workDir}`,
           `sessionId: ${activeSessionId ?? '<none>'}`,
         ]);
+        return;
+      }
+      if (cmd === 'configure') {
+        await configureIfSupported();
         return;
       }
       if (cmd === 'new') {
@@ -464,14 +657,25 @@ async function main(): Promise<void> {
     promptShown = false;
     void (async () => {
       try {
+        if (pendingQuestionResolve && activePrompt !== 'permission') {
+          const resolve = pendingQuestionResolve;
+          pendingQuestionResolve = null;
+          resolve(line);
+          startNextPermissionIfNeeded();
+          return;
+        }
+
         if (activePrompt === 'permission') {
           handlePermissionLine(line);
         } else {
           await handleReplLine(line);
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : safeJsonStringify(err);
-        printLine(`error: ${msg}`);
+        const d = describeError(err);
+        printLine(`error: ${d.message}`);
+        if (d.isMissingProviderConfig) {
+          printLine('Hint: run :configure');
+        }
       } finally {
         showPrompt();
       }
