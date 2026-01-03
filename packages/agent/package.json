@@ -13,14 +13,16 @@
     "node": ">=20.18.3"
   },
   "scripts": {
+    "prebuild": "cd ../.. && npm run build --workspace=packages/core && npm run build --workspace=packages/ent-protocol",
     "build": "tsc && tsc-alias -p tsconfig.json -f -fe .js",
     "build:clean": "rm -rf dist && npm run build",
-    "pretest": "cd ../.. && npm run build --workspace=packages/ent-protocol && npm run build --workspace=packages/agent",
+    "pretest": "cd ../.. && npm run build --workspace=packages/core && npm run build --workspace=packages/ent-protocol && npm run build --workspace=packages/agent",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@lace/core": "file:../core",
     "@lace/ent-protocol": "file:../ent-protocol"
   },
   "devDependencies": {

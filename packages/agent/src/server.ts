@@ -14,6 +14,62 @@ import {
 import { appendDurableEvent, readDurableEvents } from './storage/event-log';
 import type { PermissionRequest, SessionUpdate, ToolResult } from './protocol/types';
 import { shellExecTool, runShellExec } from './tools/shell-exec';
+import { ProviderCatalogManager } from '@lace/core/providers/catalog/manager';
+import { ProviderInstanceManager } from '@lace/core/providers/instance/manager';
+import type { CatalogModel } from '@lace/core/providers/catalog/types';
+
+const SUPPORTED_PROVIDER_TYPES = new Set(['anthropic', 'openai', 'gemini', 'lmstudio', 'ollama']);
+
+function toNonEmptyString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function toPositiveInt(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const truncated = Math.trunc(value);
+  return truncated > 0 ? truncated : null;
+}
+
+function getEndpointFromConfig(config: Record<string, unknown>): string | undefined {
+  const endpoint =
+    toNonEmptyString(config.endpoint) ??
+    toNonEmptyString(config.baseUrl) ??
+    toNonEmptyString(config.baseURL);
+
+  if (!endpoint) return undefined;
+
+  try {
+    // Require absolute URL, consistent with core ProviderInstanceSchema
+    new URL(endpoint);
+  } catch {
+    throw new Error('endpoint must be a valid absolute URL');
+  }
+
+  return endpoint;
+}
+
+function assertConfigHasNoCredentials(config: Record<string, unknown>): void {
+  const forbiddenKeys = ['apiKey', 'api_key', 'token', 'accessToken', 'authorization'];
+  for (const key of forbiddenKeys) {
+    if (Object.prototype.hasOwnProperty.call(config, key)) {
+      throw new Error(`Connection config MUST NOT include credentials (${key})`);
+    }
+  }
+}
+
+function mapCatalogModelToModelInfo(model: CatalogModel, providerId: string) {
+  return {
+    modelId: model.id,
+    name: model.name,
+    providerId,
+    contextWindow: model.context_window,
+    maxOutput: model.default_max_tokens,
+    supportsThinking: !!model.can_reason || !!model.has_reasoning_effort,
+    supportsImages: !!model.supports_attachments,
+  };
+}
 
 export type AgentServerState = {
   initialized: boolean;
@@ -38,6 +94,9 @@ export type AgentServerState = {
     status: 'running' | 'awaiting_permission';
     abortController: AbortController;
   };
+  providerCatalog: ProviderCatalogManager;
+  providerCatalogLoaded: boolean;
+  providerInstances: ProviderInstanceManager;
 };
 
 export function createAgentServerState(): AgentServerState {
@@ -46,6 +105,9 @@ export function createAgentServerState(): AgentServerState {
     activeSession: null,
     config: { executionMode: 'execute', approvalMode: 'ask' },
     activeTurn: null,
+    providerCatalog: new ProviderCatalogManager(),
+    providerCatalogLoaded: false,
+    providerInstances: new ProviderInstanceManager(),
   };
 }
 
@@ -101,6 +163,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         'ent/backgroundJobs': false,
         'ent/fileCheckpointing': false,
         'ent/structuredOutput': false,
+        'ent/providers': { list: true, connections: true, models: true },
       },
     };
   });
@@ -163,6 +226,296 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         budgetUsedUsd: 0,
       },
     };
+  });
+
+  const ensureProviderCatalogLoaded = async () => {
+    if (!state.providerCatalogLoaded) {
+      await state.providerCatalog.loadCatalogs();
+      state.providerCatalogLoaded = true;
+    }
+  };
+
+  peer.onRequest('ent/providers/list', async (_params: unknown) => {
+    if (!state.initialized) throw new Error('Not initialized');
+
+    await ensureProviderCatalogLoaded();
+
+    const providers = state.providerCatalog
+      .getAvailableProviders()
+      .filter((p) => SUPPORTED_PROVIDER_TYPES.has(p.type.toLowerCase()))
+      .map((p) => ({
+        providerId: p.id,
+        displayName: p.name,
+        supportsConnections: true,
+        supportsCatalogRefresh: false,
+      }));
+
+    return { providers };
+  });
+
+  peer.onRequest('ent/connections/list', async (params: unknown) => {
+    if (!state.initialized) throw new Error('Not initialized');
+
+    const parsed = params as { providerId?: string } | undefined;
+    const providerIdFilter = typeof parsed?.providerId === 'string' ? parsed.providerId : undefined;
+
+    const instances = await state.providerInstances.loadInstances();
+    const connections = Object.entries(instances.instances)
+      .filter(([_id, inst]) =>
+        providerIdFilter ? inst.catalogProviderId === providerIdFilter : true
+      )
+      .map(([connectionId, inst]) => {
+        const credential = state.providerInstances.loadCredential(connectionId);
+        const credentialState = credential?.apiKey ? 'ready' : 'missing';
+        return {
+          connectionId,
+          providerId: inst.catalogProviderId,
+          name: inst.displayName,
+          credentialState,
+        };
+      });
+
+    return { connections };
+  });
+
+  peer.onRequest('ent/connections/upsert', async (params: unknown) => {
+    if (!state.initialized) throw new Error('Not initialized');
+
+    const parsed = params as {
+      providerId?: string;
+      connection: { connectionId?: string; name: string; config: Record<string, unknown> };
+    };
+
+    const name = toNonEmptyString(parsed?.connection?.name);
+    if (!name) throw new Error('connection.name is required');
+
+    const config = parsed?.connection?.config;
+    if (!config || typeof config !== 'object') throw new Error('connection.config is required');
+    assertConfigHasNoCredentials(config);
+
+    const requestedConnectionId = toNonEmptyString(parsed?.connection?.connectionId);
+    const instances = await state.providerInstances.loadInstances();
+
+    const isUpdate = !!requestedConnectionId && !!instances.instances[requestedConnectionId];
+    const created = !isUpdate;
+
+    const connectionId = requestedConnectionId ?? `conn_${randomUUID()}`;
+    const existing = instances.instances[connectionId];
+
+    if (existing) {
+      if (
+        typeof parsed.providerId === 'string' &&
+        parsed.providerId.length > 0 &&
+        parsed.providerId !== existing.catalogProviderId
+      ) {
+        throw new Error('connectionId is already paired to a different providerId');
+      }
+
+      const endpoint = getEndpointFromConfig(config);
+      const timeoutInput = (config as any).timeout;
+      const timeout = timeoutInput === undefined ? undefined : toPositiveInt(timeoutInput);
+      if (timeoutInput !== undefined && timeout === null)
+        throw new Error('timeout must be a positive integer');
+      const retryPolicy = typeof config.retryPolicy === 'string' ? config.retryPolicy : undefined;
+      const modelConfigInput = (config as any).modelConfig;
+      const modelConfig =
+        modelConfigInput === undefined
+          ? undefined
+          : typeof modelConfigInput === 'object' && modelConfigInput
+            ? modelConfigInput
+            : null;
+      if (modelConfigInput !== undefined && modelConfig === null)
+        throw new Error('modelConfig must be an object');
+
+      await state.providerInstances.updateInstance(connectionId, {
+        displayName: name,
+        ...(endpoint ? { endpoint } : {}),
+        ...(timeout ? { timeout } : {}),
+        ...(retryPolicy ? { retryPolicy } : {}),
+        ...(modelConfig ? { modelConfig: modelConfig as any } : {}),
+      });
+
+      return { connectionId, providerId: existing.catalogProviderId, created: false };
+    }
+
+    const providerId = toNonEmptyString(parsed?.providerId);
+    if (!providerId) throw new Error('providerId is required when creating a new connection');
+
+    await ensureProviderCatalogLoaded();
+    const catalogProvider = state.providerCatalog.getProvider(providerId);
+    if (!catalogProvider) throw new Error(`Unknown providerId: ${providerId}`);
+    if (!SUPPORTED_PROVIDER_TYPES.has(catalogProvider.type.toLowerCase())) {
+      throw new Error(`Provider is not supported by this agent: ${providerId}`);
+    }
+
+    const endpoint = getEndpointFromConfig(config);
+    const timeoutInput = (config as any).timeout;
+    const timeout = timeoutInput === undefined ? undefined : toPositiveInt(timeoutInput);
+    if (timeoutInput !== undefined && timeout === null)
+      throw new Error('timeout must be a positive integer');
+    const retryPolicy = typeof config.retryPolicy === 'string' ? config.retryPolicy : undefined;
+    const modelConfigInput = (config as any).modelConfig;
+    const modelConfig =
+      modelConfigInput === undefined
+        ? undefined
+        : typeof modelConfigInput === 'object' && modelConfigInput
+          ? modelConfigInput
+          : null;
+    if (modelConfigInput !== undefined && modelConfig === null)
+      throw new Error('modelConfig must be an object');
+
+    await state.providerInstances.saveInstances({
+      ...instances,
+      instances: {
+        ...instances.instances,
+        [connectionId]: {
+          displayName: name,
+          catalogProviderId: providerId,
+          ...(endpoint ? { endpoint } : {}),
+          ...(timeout ? { timeout } : {}),
+          ...(retryPolicy ? { retryPolicy } : {}),
+          ...(modelConfig ? { modelConfig: modelConfig as any } : {}),
+        },
+      },
+    });
+
+    return { connectionId, providerId, created };
+  });
+
+  peer.onRequest('ent/connections/delete', async (params: unknown) => {
+    if (!state.initialized) throw new Error('Not initialized');
+
+    const parsed = params as { connectionId: string };
+    const connectionId = toNonEmptyString(parsed?.connectionId);
+    if (!connectionId) throw new Error('connectionId is required');
+
+    await state.providerInstances.deleteInstance(connectionId);
+    return { ok: true };
+  });
+
+  peer.onRequest('ent/connections/test', async (params: unknown) => {
+    if (!state.initialized) throw new Error('Not initialized');
+
+    const parsed = params as { connectionId: string; modelId?: string };
+    const connectionId = toNonEmptyString(parsed?.connectionId);
+    if (!connectionId) throw new Error('connectionId is required');
+
+    const instances = await state.providerInstances.loadInstances();
+    const instance = instances.instances[connectionId];
+    if (!instance) return { ok: false, error: 'Connection not found' };
+
+    const credential = state.providerInstances.loadCredential(connectionId);
+    if (!credential?.apiKey) return { ok: false, error: 'Missing credentials' };
+
+    await ensureProviderCatalogLoaded();
+    const provider = state.providerCatalog.getProvider(instance.catalogProviderId);
+    if (!provider) return { ok: false, error: 'Provider not found' };
+
+    const requestedModelId = toNonEmptyString(parsed?.modelId);
+    if (requestedModelId) {
+      const hasModel = provider.models.some((m) => m.id === requestedModelId);
+      if (!hasModel) return { ok: false, error: 'Model not found for provider' };
+    }
+
+    return { ok: true };
+  });
+
+  peer.onRequest('ent/connections/credentials/status', async (params: unknown) => {
+    if (!state.initialized) throw new Error('Not initialized');
+
+    const parsed = params as { connectionId: string };
+    const connectionId = toNonEmptyString(parsed?.connectionId);
+    if (!connectionId) throw new Error('connectionId is required');
+
+    const instances = await state.providerInstances.loadInstances();
+    if (!instances.instances[connectionId]) throw { code: 1, message: 'ConnectionNotFound' };
+
+    const credential = state.providerInstances.loadCredential(connectionId);
+    return {
+      connectionId,
+      state: credential?.apiKey ? 'ready' : 'missing',
+    };
+  });
+
+  peer.onRequest('ent/connections/credentials/start', async (params: unknown) => {
+    if (!state.initialized) throw new Error('Not initialized');
+
+    const parsed = params as { connectionId: string; method?: string };
+    const connectionId = toNonEmptyString(parsed?.connectionId);
+    if (!connectionId) throw new Error('connectionId is required');
+
+    const instances = await state.providerInstances.loadInstances();
+    if (!instances.instances[connectionId]) throw { code: 1, message: 'ConnectionNotFound' };
+
+    const credential = state.providerInstances.loadCredential(connectionId);
+    const requestedMethod = toNonEmptyString(parsed?.method);
+
+    if (!requestedMethod && credential?.apiKey) {
+      return { kind: 'ready' };
+    }
+
+    return {
+      kind: 'needs_input',
+      fields: [{ name: 'apiKey', label: 'API Key', secret: true }],
+    };
+  });
+
+  peer.onRequest('ent/connections/credentials/submit', async (params: unknown) => {
+    if (!state.initialized) throw new Error('Not initialized');
+
+    const parsed = params as { connectionId: string; values: Record<string, string> };
+    const connectionId = toNonEmptyString(parsed?.connectionId);
+    if (!connectionId) throw new Error('connectionId is required');
+
+    const instances = await state.providerInstances.loadInstances();
+    if (!instances.instances[connectionId]) throw { code: 1, message: 'ConnectionNotFound' };
+
+    const values = parsed?.values;
+    if (!values || typeof values !== 'object') return { ok: false, error: 'values is required' };
+
+    const apiKey =
+      toNonEmptyString((values as any).apiKey) ??
+      toNonEmptyString((values as any).api_key) ??
+      toNonEmptyString((values as any).key);
+
+    if (!apiKey) return { ok: false, error: 'apiKey is required' };
+
+    await state.providerInstances.saveCredential(connectionId, { apiKey });
+    return { ok: true };
+  });
+
+  peer.onRequest('ent/connections/credentials/clear', async (params: unknown) => {
+    if (!state.initialized) throw new Error('Not initialized');
+
+    const parsed = params as { connectionId: string };
+    const connectionId = toNonEmptyString(parsed?.connectionId);
+    if (!connectionId) throw new Error('connectionId is required');
+
+    const instances = await state.providerInstances.loadInstances();
+    if (!instances.instances[connectionId]) throw { code: 1, message: 'ConnectionNotFound' };
+
+    await state.providerInstances.clearCredential(connectionId);
+    return { ok: true };
+  });
+
+  peer.onRequest('ent/models/list', async (params: unknown) => {
+    if (!state.initialized) throw new Error('Not initialized');
+
+    const parsed = params as { connectionId: string };
+    const connectionId = toNonEmptyString(parsed?.connectionId);
+    if (!connectionId) throw new Error('connectionId is required');
+
+    const instances = await state.providerInstances.loadInstances();
+    const instance = instances.instances[connectionId];
+    if (!instance) throw { code: 1, message: 'ConnectionNotFound' };
+
+    await ensureProviderCatalogLoaded();
+    const providerId = instance.catalogProviderId;
+    const provider = state.providerCatalog.getProvider(providerId);
+    if (!provider) throw new Error(`Unknown providerId: ${providerId}`);
+
+    const models = provider.models.map((m) => mapCatalogModelToModelInfo(m, providerId));
+    return { providerId, connectionId, models };
   });
 
   peer.onRequest('session/new', async (params: unknown) => {
