@@ -41,7 +41,10 @@ function readOpenAiKeyFromRepoEnv(): string | undefined {
   return undefined;
 }
 
-const openAiApiKey = process.env.OPENAI_API_KEY ?? readOpenAiKeyFromRepoEnv();
+const runOpenAiE2e = process.env.RUN_OPENAI_E2E === '1';
+const openAiApiKey = runOpenAiE2e
+  ? (process.env.OPENAI_API_KEY ?? readOpenAiKeyFromRepoEnv())
+  : undefined;
 const maybeIt = openAiApiKey ? it : it.skip;
 
 type Spawned = {
