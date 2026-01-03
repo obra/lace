@@ -310,7 +310,7 @@ Early versions used `result?: string` for tool results. This causes problems:
 ### The Solution: ToolResult Type
 
 Tool results now use a structured `ToolResult` type:
-- `status`: "success" | "error" | "denied" | "timeout"
+- `outcome`: "completed" | "failed" | "denied" | "timeout" | "cancelled"
 - `content`: Array of typed content blocks (text, json, image, error)
 - `meta`: Optional tool-specific metadata
 

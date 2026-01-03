@@ -69,13 +69,12 @@ Follow ACP naming patterns for maximum compatibility:
 
 | Pattern | Example | Rationale |
 |---------|---------|-----------|
-| `Id` suffix for correlation | `sessionId`, `turnId`, `jobId`, `toolCallId` | ACP convention for event/request correlation |
-| No `Id` for config/selection | `provider`, `model`, `connection` | Configuration fields that select resources |
+| `Id` suffix for identifiers | `sessionId`, `turnId`, `jobId`, `toolCallId`, `providerId`, `modelId`, `connectionId` | ACP convention; prevents "wrong id" wiring bugs |
 | Opaque strings | `sessionId: "sess_abc123"` | Clients treat identifiers as opaque; no parsing |
 | camelCase | `sessionId`, `toolCallId` | Matches JSON/JavaScript conventions |
 | Verb phrases for methods | `session/prompt`, `ent/connections/credentials/start` | Action-oriented naming |
 
-**Identifier opacity**: All identifier fields (`sessionId`, `turnId`, `jobId`, `toolCallId`, `provider`, `model`, `connection`) are opaque strings. Clients MUST NOT parse, validate, or assume structure in these values.
+**Identifier opacity**: All identifier fields (`sessionId`, `turnId`, `jobId`, `toolCallId`, `providerId`, `modelId`, `connectionId`, `checkpointId`, `taskId`, `optionId`, `requestId`) are opaque strings. Clients MUST NOT parse, validate, or assume structure in these values. Note: `eventSeq` is a numeric sequence, not an opaque string.
 
 **Ent extensions**: Methods prefixed with `ent/` are protocol extensions not in ACP. The prefix makes it clear which parts are standard vs extended.
 
@@ -219,9 +218,9 @@ interface SlashCommand {
 
     // Configuration
     config?: {
-      provider?: string,           // Provider family (opaque string, e.g., "anthropic", "openai", "claude-code-wrapper")
-      connection?: string,       // Configured connection (preferred; implies provider)
-      model?: string,              // Model identifier (opaque string)
+      providerId?: string,         // Provider family (opaque string, e.g., "anthropic", "openai", "claude-code-wrapper")
+      connectionId?: string,       // Configured connection (preferred; implies providerId)
+      modelId?: string,            // Model identifier (opaque string)
       executionMode?: string,      // "plan" | "execute" (default: "execute")
       approvalMode?: string,       // "ask" | "approveReads" | "approveEdits" | "approve" | "deny" | "dangerouslySkipPermissions"
       mcpServers?: McpServerConfig[],
@@ -388,7 +387,7 @@ Set the agent's execution mode. This controls what tools are available.
 {
   result: {
     sessions: [{
-      id: string,
+      sessionId: string,
       created: string,
       lastActive: string,
       messageCount: number,
@@ -455,8 +454,8 @@ Dynamic configuration changes. Covers Claude SDK's `setModel()`, `setMaxThinking
   method: "ent/session/configure",
   params: {
     // Connection selection (where supported)
-    connection?: string,     // Switch to a different configured connection
-    model?: string,            // Model identifier (opaque string)
+    connectionId?: string,     // Switch to a different configured connection
+    modelId?: string,          // Model identifier (opaque string)
 
     // Runtime settings
     maxThinkingTokens?: number,
@@ -489,7 +488,7 @@ File checkpointing. Covers Claude SDK's `rewindFiles()`.
 {
   method: "ent/session/rewind",
   params: {
-    toMessageId: string   // Rewind files to state at this message
+    toEventSeq: number    // Rewind files to state at this event (from ent/session/events)
   }
 }
 
@@ -497,7 +496,7 @@ File checkpointing. Covers Claude SDK's `rewindFiles()`.
 {
   result: {
     filesRestored: string[],
-    messageId: string
+    eventSeq: number      // The event we rewound to
   }
 }
 ```
@@ -519,7 +518,7 @@ Create explicit checkpoint.
 {
   result: {
     checkpointId: string,
-    messageId: string,
+    eventSeq: number,     // Current event sequence (use with ent/session/rewind)
     files: string[]
   }
 }
@@ -541,7 +540,8 @@ List background jobs (shells, subagents).
 {
   result: {
     jobs: [{
-      id: string,
+      jobId: string,
+      parentJobId?: string,        // If spawned by another job (nested subagent)
       type: "shell" | "subagent",
       status: "running" | "completed" | "failed" | "cancelled",
       description?: string,
@@ -564,7 +564,11 @@ Get job output. Returns both raw output and a structured report suitable for par
   params: {
     jobId: string,
     block?: boolean,     // Wait for completion
-    timeout?: number     // Max wait ms
+    timeout?: number,    // Max wait ms
+
+    // Output pagination (to prevent DOS on large job output)
+    tailBytes?: number,  // Return only last N bytes of output (default: all)
+    afterOffset?: number // Return output after this byte offset (for streaming)
   }
 }
 
@@ -572,8 +576,16 @@ Get job output. Returns both raw output and a structured report suitable for par
 {
   result: {
     status: "running" | "completed" | "failed" | "cancelled",
-    output: string,      // Raw output (may be large)
+    output: string,      // Raw output (may be truncated; see outputMeta)
     exitCode?: number,
+
+    // Output metadata for pagination
+    outputMeta?: {
+      totalBytes: number,     // Total output size
+      returnedOffset: number, // Byte offset of first returned byte
+      returnedBytes: number,  // Size of returned output
+      truncated: boolean      // True if output was truncated
+    },
 
     // Structured report for parent context (compact)
     report?: {
@@ -678,15 +690,15 @@ Also returns pending permission requests, enabling protocol clients (e.g., super
     mcpServers: McpServerStatus[],
 
     currentSession?: {
-      id: string,
+      sessionId: string,
       messageCount: number,
       tokensUsed: number,
       costUsd: number,
 
       // Active connection/model selection
-      provider?: string,
-      connection?: string,
-      model?: string
+      providerId?: string,
+      connectionId?: string,
+      modelId?: string
     },
 
     // Current turn status (if turn in progress)
@@ -763,17 +775,17 @@ This section defines how agents expose provider families and configured connecti
 
 | Field | Description | Example |
 |-------|-------------|---------|
-| `provider` | Provider family/runtime identifier (opaque string) | `"anthropic"`, `"openai"`, `"openai-compatible"`, `"claude-code-wrapper"` |
-| `model` | Model identifier within a provider (opaque string) | `"claude-sonnet-4-20250514"`, `"gpt-4o"` |
-| `connection` | Configured connection to a provider: endpoint + settings + credentials | `"conn_anthropic_prod"`, `"conn_openai_dev"` |
+| `providerId` | Provider family/runtime identifier (opaque string) | `"anthropic"`, `"openai"`, `"openai-compatible"`, `"claude-code-wrapper"` |
+| `modelId` | Model identifier within a provider (opaque string) | `"claude-sonnet-4-20250514"`, `"gpt-4o"` |
+| `connectionId` | Configured connection to a provider: endpoint + settings + credentials | `"conn_anthropic_prod"`, `"conn_openai_dev"` |
 
 **Invariants**:
-- A `connection` is always paired with exactly one `provider`. This pairing MUST NOT change.
-- Credentials are mutable: agents MUST support updating credentials for an existing `connection` (credential rotation) without changing the connection's identity.
-- Methods operating on a specific connection take `connection` only (not both `provider` and `connection`), except when creating a new connection.
-- Sessions can switch active `connection` via `ent/session/configure`.
+- A `connectionId` is always paired with exactly one `providerId`. This pairing MUST NOT change.
+- Credentials are mutable: agents MUST support updating credentials for an existing `connectionId` (credential rotation) without changing the connection's identity.
+- Methods operating on a specific connection take `connectionId` only (not both `providerId` and `connectionId`), except when creating a new connection.
+- Sessions can switch active `connectionId` via `ent/session/configure`.
 
-**Wrapper guidance**: Agents wrapping single-provider runtimes (e.g., Claude Code, Codex) should expose one `provider`, one `connection`, and set `ProviderInfo.supportsConnections: false`. Credentials may use `{ kind: "ready" }` for ambient auth or implement device_code/browser flows.
+**Wrapper guidance**: Agents wrapping single-provider runtimes (e.g., Claude Code, Codex) should expose one `providerId`, one `connectionId`, and set `ProviderInfo.supportsConnections: false`. Credentials may use `{ kind: "ready" }` for ambient auth or implement device_code/browser flows.
 
 ### 6.14 `ent/providers/list`
 
@@ -807,7 +819,7 @@ List configured connections, optionally filtered by provider.
 {
   method: "ent/connections/list",
   params: {
-    provider?: string   // Optional filter; omit for all connections
+    providerId?: string   // Optional filter; omit for all connections
   }
 }
 
@@ -821,16 +833,16 @@ List configured connections, optionally filtered by provider.
 
 ### 6.16 `ent/connections/upsert`
 
-Create or update a connection. When creating, `provider` is required. When updating, only `connection` is needed.
+Create or update a connection. When creating, `providerId` is required. When updating, only `connectionId` is needed.
 
 ```typescript
 // Request
 {
   method: "ent/connections/upsert",
   params: {
-    provider?: string,         // Required when creating new connection
+    providerId?: string,       // Required when creating new connection
     connection: {
-      id?: string,             // Omit to create new; provide to update existing
+      connectionId?: string,   // Omit to create new; provide to update existing
       name: string,
       config: object           // Provider-specific non-secret configuration (endpoint, baseURL, etc.)
     }
@@ -840,8 +852,8 @@ Create or update a connection. When creating, `provider` is required. When updat
 // Response
 {
   result: {
-    connection: string,
-    provider: string,
+    connectionId: string,
+    providerId: string,
     created: boolean
   }
 }
@@ -858,7 +870,7 @@ Delete a configured connection.
 {
   method: "ent/connections/delete",
   params: {
-    connection: string
+    connectionId: string
   }
 }
 
@@ -877,8 +889,8 @@ Test connectivity for a connection.
 {
   method: "ent/connections/test",
   params: {
-    connection: string,
-    model?: string       // Optional model to test against
+    connectionId: string,
+    modelId?: string     // Optional model to test against
   }
 }
 
@@ -901,14 +913,14 @@ Get credential status for a connection.
 {
   method: "ent/connections/credentials/status",
   params: {
-    connection: string
+    connectionId: string
   }
 }
 
 // Response
 {
   result: {
-    connection: string,
+    connectionId: string,
     state: "ready" | "missing" | "expired" | "invalid" | "unknown",
     accountLabel?: string,   // e.g., email/org, if available
     expiresAt?: string       // ISO 8601, if known
@@ -925,7 +937,7 @@ Begin an interactive credential/login flow for a connection. Supports credential
 {
   method: "ent/connections/credentials/start",
   params: {
-    connection: string,
+    connectionId: string,
     method?: "api_key" | "device_code" | "browser" | "token"
   }
 }
@@ -962,7 +974,7 @@ Submit credentials or flow completion information.
 {
   method: "ent/connections/credentials/submit",
   params: {
-    connection: string,
+    connectionId: string,
     values: Record<string, string>
   }
 }
@@ -984,7 +996,7 @@ Clear credentials for a connection without deleting the connection itself.
 {
   method: "ent/connections/credentials/clear",
   params: {
-    connection: string
+    connectionId: string
   }
 }
 
@@ -1003,15 +1015,15 @@ List available models for a connection. Model catalogs are connection-scoped bec
 {
   method: "ent/models/list",
   params: {
-    connection: string
+    connectionId: string
   }
 }
 
 // Response
 {
   result: {
-    provider: string,
-    connection: string,
+    providerId: string,
+    connectionId: string,
     models: ModelInfo[]
   }
 }
@@ -1026,14 +1038,14 @@ Refresh model catalog from upstream provider.
 {
   method: "ent/models/refresh",
   params: {
-    connection: string
+    connectionId: string
   }
 }
 
 // Response
 {
   result: {
-    connection: string,
+    connectionId: string,
     refreshedAt: string,   // ISO 8601
     ok: boolean,
     error?: string
@@ -1091,7 +1103,7 @@ Stream updates during turn processing. All updates include correlation IDs for o
 // Tool execution
 {
   type: "tool_use",
-  id: string,                // This is the toolCall
+  toolCallId: string,
   name: string,
   kind?: "read" | "edit" | "delete" | "search" | "execute" | "think" | "fetch" | "other",
   input: object,
@@ -1117,7 +1129,7 @@ Stream updates during turn processing. All updates include correlation IDs for o
 {
   type: "plan",
   tasks: [{
-    id: string,
+    taskId: string,
     content: string,
     status: "pending" | "in_progress" | "completed",
     priority?: number
@@ -1131,13 +1143,14 @@ Stream updates during turn processing. All updates include correlation IDs for o
 { type: "context_injected", priority: string, messageCount: number }
 
 // Job lifecycle (top-level only, not valid as inner update types)
-{ type: "job_started", jobId: string, jobType: "shell" | "subagent", description?: string }
-{ type: "job_finished", jobId: string, exitCode?: number, outcome: "completed" | "failed" | "cancelled" }
+{ type: "job_started", jobId: string, parentJobId?: string, jobType: "shell" | "subagent", description?: string }
+{ type: "job_finished", jobId: string, parentJobId?: string, exitCode?: number, outcome: "completed" | "failed" | "cancelled" }
 
 // Job-scoped update wrapper (reuses all update types above)
 {
   type: "job_update",
   jobId: string,
+  parentJobId?: string,                        // If this job was spawned by another job
   jobType?: "shell" | "subagent",
   channel?: "stdout" | "stderr" | "internal",  // Optional output channel hint
   update: SessionUpdateInner  // Any of the update types above (text_delta, tool_use, etc.)
@@ -1147,6 +1160,8 @@ Stream updates during turn processing. All updates include correlation IDs for o
 **Job updates**: The `job_update` wrapper allows job/subagent activity to stream through the same channel using the same update type vocabulary. The inner `update` field contains any of the standard update types (`text_delta`, `tool_use`, `usage`, etc.). This lets client renderers reuse one codepath for both top-level and job updates.
 
 **Recursion restriction**: The following types MUST NOT appear as the inner `update.type`: `job_update`, `job_started`, `job_finished`. These are top-level lifecycle events only.
+
+**Nested jobs**: When a subagent spawns its own subagents, the parent agent MUST forward all descendant jobs as flattened top-level `job_started`/`job_update`/`job_finished` events. Use `parentJobId` to represent the hierarchy. This avoids recursive nesting while still representing arbitrarily deep job trees.
 
 **Backpressure guidance**: Implementations MAY coalesce multiple `text_delta` updates into larger chunks, especially within `job_update`. For verbose jobs (test suites, builds), aggressive coalescing prevents UI lockups and transport buffer growth.
 
@@ -1183,7 +1198,7 @@ Agent requests permission to execute a tool. This is a **request** (has `id`), n
     kind?: string,        // Tool kind
     resource: string,     // What's being accessed
     options: [{
-      id: string,         // "allow", "deny", "allow_session", "allow_always"
+      optionId: string,   // "allow", "deny", "allow_session", "allow_always"
       label: string
     }]
   }
@@ -1219,7 +1234,7 @@ Agent requests permission to execute a tool. This is a **request** (has `id`), n
 type ContentBlock =
   | { type: "text"; text: string }
   | { type: "image"; data: string; mediaType: string }  // base64
-  | { type: "tool_use"; id: string; name: string; input: object }
+  | { type: "tool_use"; toolUseId: string; name: string; input: object }
   | { type: "tool_result"; toolUseId: string; content: string; isError?: boolean }
 ```
 
@@ -1320,9 +1335,9 @@ interface SandboxConfig {
 
 ```typescript
 interface ModelInfo {
-  id: string;
+  modelId: string;
   name: string;
-  provider: string;
+  providerId: string;
   contextWindow: number;
   maxOutput: number;
   supportsThinking?: boolean;
@@ -1417,7 +1432,7 @@ interface McpServerStatus {
 ```typescript
 // Pending permission request (for reconnection scenarios)
 interface PermissionRequest {
-  id: string;              // JSON-RPC request ID
+  requestId: string;       // JSON-RPC request ID
   toolCallId: string;      // MUST be globally unique across session + jobs
   sessionId: string;
   turnId: string;          // SHOULD be UUID
@@ -1426,7 +1441,7 @@ interface PermissionRequest {
   tool: string;
   kind?: string;
   resource: string;
-  options: { id: string; label: string }[];
+  options: { optionId: string; label: string }[];
   requestedAt: string;     // ISO 8601
 }
 ```
@@ -1436,7 +1451,7 @@ interface PermissionRequest {
 ```typescript
 // Provider family descriptor (returned by ent/providers/list)
 interface ProviderInfo {
-  id: string;                       // provider identifier (opaque)
+  providerId: string;               // Provider identifier (opaque)
   displayName: string;
   supportsConnections: boolean;     // Can create multiple connections
   supportsCatalogRefresh?: boolean; // Connections can call ent/models/refresh
@@ -1448,8 +1463,8 @@ interface ProviderInfo {
 ```typescript
 // Configured provider connection (returned by ent/connections/list)
 interface ConnectionInfo {
-  id: string;                        // connection
-  provider: string;                  // Parent provider (immutable)
+  connectionId: string;
+  providerId: string;                // Parent provider (immutable)
   name: string;
   isDefault?: boolean;
   createdAt?: string;                // ISO 8601
