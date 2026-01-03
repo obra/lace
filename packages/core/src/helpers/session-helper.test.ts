@@ -80,7 +80,6 @@ describe('SessionHelper', () => {
       getProjectId: vi.fn().mockReturnValue(undefined),
       getWorkspaceInfo: vi.fn().mockReturnValue(undefined),
       getWorkspaceManager: vi.fn().mockReturnValue(undefined),
-      getTaskManager: vi.fn().mockReturnValue(undefined),
       getTools: vi.fn().mockReturnValue([testTool]),
     };
     mockSession = sessionPartial as Session;

@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFile, rm, stat } from 'fs/promises';
 import { join, dirname } from 'path';
 import { FileWriteTool } from '@lace/core/tools/implementations/file_write';
+import type { ToolContext } from '@lace/core/tools/types';
 
 describe('FileWriteTool with schema validation', () => {
   let tool: FileWriteTool;
@@ -14,6 +15,14 @@ describe('FileWriteTool with schema validation', () => {
   });
 
   const testDir = join(process.cwd(), 'test-temp-file-write-schema');
+
+  function createToolContext(overrides: Partial<ToolContext> = {}): ToolContext {
+    return {
+      signal: new AbortController().signal,
+      hasFileBeenRead: () => true,
+      ...overrides,
+    };
+  }
 
   afterEach(async () => {
     await rm(testDir, { recursive: true, force: true });
@@ -45,10 +54,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
 
   describe('Input validation', () => {
     it('should reject missing path', async () => {
-      const result = await tool.execute(
-        { content: 'test' },
-        { signal: new AbortController().signal }
-      );
+      const result = await tool.execute({ content: 'test' }, createToolContext());
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
@@ -57,10 +63,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
     });
 
     it('should reject empty path', async () => {
-      const result = await tool.execute(
-        { path: '', content: 'test' },
-        { signal: new AbortController().signal }
-      );
+      const result = await tool.execute({ path: '', content: 'test' }, createToolContext());
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
@@ -68,10 +71,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
     });
 
     it('should reject missing content', async () => {
-      const result = await tool.execute(
-        { path: '/tmp/test.txt' },
-        { signal: new AbortController().signal }
-      );
+      const result = await tool.execute({ path: '/tmp/test.txt' }, createToolContext());
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
@@ -85,7 +85,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
           path: '/tmp/test.txt',
           content: 123,
         },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
 
       expect(result.status).toBe('failed');
@@ -100,7 +100,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
           content: 'test',
           createDirs: 'yes',
         },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
 
       expect(result.status).toBe('failed');
@@ -116,7 +116,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
           content: 'test content',
           createDirs: true,
         },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
 
       // Should not fail validation (may fail with file system error in test env)
@@ -132,7 +132,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
           path: testFile,
           content: 'test content',
         },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
 
       // Should create directories by default
@@ -148,10 +148,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const testFile = join(testDir, 'test.txt');
       const content = 'Hello, world!';
 
-      const result = await tool.execute(
-        { path: testFile, content },
-        { signal: new AbortController().signal }
-      );
+      const result = await tool.execute({ path: testFile, content }, createToolContext());
 
       expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully wrote');
@@ -167,15 +164,12 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const newContent = 'New content';
 
       // First write
-      await tool.execute(
-        { path: testFile, content: originalContent },
-        { signal: new AbortController().signal }
-      );
+      await tool.execute({ path: testFile, content: originalContent }, createToolContext());
 
       // Overwrite
       const result = await tool.execute(
         { path: testFile, content: newContent },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
 
       expect(result.status).toBe('completed');
@@ -188,10 +182,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const testFile = join(testDir, 'deep', 'nested', 'file.txt');
       const content = 'Deep file content';
 
-      const result = await tool.execute(
-        { path: testFile, content },
-        { signal: new AbortController().signal }
-      );
+      const result = await tool.execute({ path: testFile, content }, createToolContext());
 
       expect(result.status).toBe('completed');
 
@@ -213,7 +204,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
           content,
           createDirs: false,
         },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
 
       expect(result.status).toBe('failed');
@@ -226,10 +217,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const testFile = join(testDir, 'success.txt');
       const content = 'Success test';
 
-      const result = await tool.execute(
-        { path: testFile, content },
-        { signal: new AbortController().signal }
-      );
+      const result = await tool.execute({ path: testFile, content }, createToolContext());
 
       expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('Successfully wrote');
@@ -238,7 +226,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
     });
 
     it('should use createError for validation failures', async () => {
-      const result = await tool.execute({ path: '' }, { signal: new AbortController().signal });
+      const result = await tool.execute({ path: '' }, createToolContext());
 
       expect(result.status).toBe('failed');
       expect(result.content[0].text).toContain('ValidationError');
@@ -253,7 +241,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
           content: 'test',
           createDirs: false,
         },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
 
       expect(result.status).toBe('failed');
@@ -267,10 +255,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const testFile = join(testDir, 'empty.txt');
       const content = '';
 
-      const result = await tool.execute(
-        { path: testFile, content },
-        { signal: new AbortController().signal }
-      );
+      const result = await tool.execute({ path: testFile, content }, createToolContext());
 
       expect(result.status).toBe('completed');
 
@@ -282,10 +267,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const testFile = join(testDir, 'large.txt');
       const content = 'A'.repeat(10000);
 
-      const result = await tool.execute(
-        { path: testFile, content },
-        { signal: new AbortController().signal }
-      );
+      const result = await tool.execute({ path: testFile, content }, createToolContext());
 
       expect(result.status).toBe('completed');
 
@@ -298,10 +280,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const testFile = join(testDir, 'unicode.txt');
       const content = 'Hello 世界! 🚀 Émojis and spéciål chars';
 
-      const result = await tool.execute(
-        { path: testFile, content },
-        { signal: new AbortController().signal }
-      );
+      const result = await tool.execute({ path: testFile, content }, createToolContext());
 
       expect(result.status).toBe('completed');
 
@@ -313,10 +292,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const testFile = join(testDir, 'sized.txt');
       const content = 'A'.repeat(1500); // > 1KB
 
-      const result = await tool.execute(
-        { path: testFile, content },
-        { signal: new AbortController().signal }
-      );
+      const result = await tool.execute({ path: testFile, content }, createToolContext());
 
       expect(result.status).toBe('completed');
       expect(result.content[0].text).toContain('1.5 KB');
@@ -331,7 +307,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
 
       const result = await tool.execute(
         { path: relativeTestFile, content },
-        { signal: new AbortController().signal, workingDirectory: testDir }
+        createToolContext({ workingDirectory: testDir })
       );
 
       expect(result.status).toBe('completed');
@@ -349,7 +325,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
 
       const result = await tool.execute(
         { path: absoluteTestFile, content },
-        { signal: new AbortController().signal, workingDirectory: '/some/other/dir' }
+        createToolContext({ workingDirectory: '/some/other/dir' })
       );
 
       expect(result.status).toBe('completed');
@@ -366,10 +342,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
       const content = 'CWD test content';
 
       try {
-        const result = await tool.execute(
-          { path: relativeFile, content },
-          { signal: new AbortController().signal }
-        );
+        const result = await tool.execute({ path: relativeFile, content }, createToolContext());
 
         expect(result.status).toBe('completed');
         expect(result.content[0].text).toContain('Successfully wrote');
@@ -390,7 +363,7 @@ Creates parent directories automatically if needed. Returns file size written.`)
 
       const result = await tool.execute(
         { path: relativeNestedFile, content },
-        { signal: new AbortController().signal, workingDirectory: testDir }
+        createToolContext({ workingDirectory: testDir })
       );
 
       expect(result.status).toBe('completed');

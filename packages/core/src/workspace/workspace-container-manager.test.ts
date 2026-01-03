@@ -54,7 +54,7 @@ describe('WorkspaceContainerManager', () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
-  });
+  }, 30000);
 
   describe('createWorkspace', () => {
     it('should create a containerized workspace with cloned repository', async () => {

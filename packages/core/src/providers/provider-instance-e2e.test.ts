@@ -650,11 +650,15 @@ describe('Provider Instance E2E Tests', () => {
       // Try to create provider with wrong model for provider type
       await expect(
         registry.createProviderFromInstanceAndModel('openai-prod', 'claude-3-sonnet-20241022')
-      ).rejects.toThrow('Model not found in catalog: claude-3-sonnet-20241022 for provider openai');
+      ).rejects.toThrow(
+        'Model not found in catalog: claude-3-sonnet-20241022 for instance openai-prod (provider openai)'
+      );
 
       await expect(
         registry.createProviderFromInstanceAndModel('anthropic-test', 'gpt-4')
-      ).rejects.toThrow('Model not found in catalog: gpt-4 for provider anthropic');
+      ).rejects.toThrow(
+        'Model not found in catalog: gpt-4 for instance anthropic-test (provider anthropic)'
+      );
     });
   });
 

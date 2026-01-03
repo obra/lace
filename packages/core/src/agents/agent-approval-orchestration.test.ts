@@ -13,6 +13,9 @@ const mockSession = {
   getToolPolicy: vi.fn(),
   getEffectiveConfiguration: vi.fn().mockReturnValue({ tools: undefined }), // No tool restrictions by default
   getProjectId: vi.fn().mockReturnValue('test-project'),
+  getSessionTempDir: vi.fn().mockReturnValue('/tmp/test-session-temp-dir'),
+  getWorkspaceInfo: vi.fn().mockReturnValue(undefined),
+  getWorkspaceManager: vi.fn().mockReturnValue(undefined),
   getEnvironmentVariables: vi.fn().mockReturnValue({}),
   createToolTempDirectory: vi.fn().mockReturnValue('/tmp/test-tool-dir'),
   getWorkingDirectory: vi.fn().mockReturnValue('/tmp/test-working-dir'),
@@ -46,6 +49,9 @@ describe('Agent Approval Orchestration', () => {
 
     // Mock session for policy checking
     vi.spyOn(agent, 'getFullSession').mockResolvedValue(mockSession as any);
+
+    // The approval pipeline expects the agent to be running; keep tests focused on approval logic
+    (agent as any)._initialized = true;
   });
 
   describe('Tool Permission Checking', () => {
@@ -197,14 +203,16 @@ describe('Agent Approval Orchestration', () => {
         (call) => call[0]?.type === 'TOOL_RESULT'
       );
       expect(toolResultCalls).toHaveLength(1);
-      expect(toolResultCalls[0][0]).toEqual({
-        type: 'TOOL_RESULT',
-        data: expect.objectContaining({
-          id: 'denial-test-1',
-          status: 'denied',
-        }),
-        context: { threadId: agent.threadId },
-      });
+      expect(toolResultCalls[0][0]).toEqual(
+        expect.objectContaining({
+          type: 'TOOL_RESULT',
+          data: expect.objectContaining({
+            id: 'denial-test-1',
+            status: 'denied',
+          }),
+          context: expect.objectContaining({ threadId: agent.threadId }),
+        })
+      );
     });
   });
 

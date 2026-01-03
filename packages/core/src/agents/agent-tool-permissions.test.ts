@@ -267,60 +267,6 @@ describe('Agent Tool Permissions', () => {
     expect(permission).toBe('granted'); // safeInternal takes precedence
   });
 
-  it('should correctly check safeInternal for real task management tools', async () => {
-    // Import real task tools to ensure they work correctly
-    const { TaskCreateTool, TaskListTool } = await import(
-      '@lace/core/tools/implementations/task-manager/index'
-    );
-
-    const taskCreateTool = new TaskCreateTool();
-    const taskListTool = new TaskListTool();
-
-    // Verify task tools have safeInternal annotation
-    expect(taskCreateTool.annotations?.safeInternal).toBe(true);
-    expect(taskListTool.annotations?.safeInternal).toBe(true);
-
-    // Register real task tools
-    toolExecutor.registerTools([taskCreateTool, taskListTool]);
-
-    // Update session config to include task tools
-    const updatedSessionData = {
-      id: sessionId,
-      projectId,
-      name: 'Test Session',
-      description: 'Test session for permission testing',
-      configuration: {
-        tools: ['task_create', 'task_list'],
-      },
-      status: 'active' as const,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    db.saveSession(updatedSessionData);
-    session = new Session(sessionId, updatedSessionData, threadManager);
-
-    const checkPermission = (
-      agent as unknown as {
-        _checkToolPermission: (
-          toolCall: ToolCall
-        ) => Promise<'granted' | 'approval_required' | 'denied'>;
-      }
-    )._checkToolPermission.bind(agent);
-
-    const toolCall: ToolCall = {
-      id: 'tool_call_007',
-      name: 'task_create',
-      arguments: {
-        title: 'Test task',
-        description: 'A test task',
-        prompt: 'Please complete this test task',
-      },
-    };
-
-    const permission = await checkPermission(toolCall);
-    expect(permission).toBe('granted'); // safeInternal task tools are auto-granted
-  });
-
   it('should handle missing session gracefully', async () => {
     // Create agent with non-existent session
     const orphanAgent = new Agent({

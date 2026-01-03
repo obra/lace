@@ -3,7 +3,6 @@
 
 import type { CombinedTokenUsage } from '@lace/core/token-management/types';
 import type { IWorkspaceManager } from '@lace/core/workspace/workspace-manager';
-import type { TaskManager } from '@lace/core/tasks/task-manager';
 
 export interface ToolContext {
   // Execution control - required for cancellation
@@ -39,9 +38,6 @@ export interface ToolContext {
 
   // Implemented by the agent runtime from its history
   hasFileBeenRead?: (path: string) => boolean;
-
-  // Legacy feature support (to be removed when Tasks are removed)
-  taskManager?: TaskManager;
 }
 
 export interface ToolAnnotations {

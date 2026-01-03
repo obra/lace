@@ -6,6 +6,7 @@ import { writeFile, readFile, rm, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { FileEditTool } from '@lace/core/tools/implementations/file_edit';
+import type { ToolContext } from '@lace/core/tools/types';
 
 describe('FileEditTool actual file modification', () => {
   let tool: FileEditTool;
@@ -18,6 +19,13 @@ describe('FileEditTool actual file modification', () => {
     await mkdir(testDir, { recursive: true });
     testFile = join(testDir, 'test.txt');
   });
+
+  function createToolContext(): ToolContext {
+    return {
+      signal: new AbortController().signal,
+      hasFileBeenRead: () => true,
+    };
+  }
 
   afterEach(async () => {
     await rm(testDir, { recursive: true, force: true });
@@ -42,7 +50,7 @@ describe('FileEditTool actual file modification', () => {
           },
         ],
       },
-      { signal: new AbortController().signal }
+      createToolContext()
     );
 
     // Check the tool reports success
@@ -75,7 +83,7 @@ line 5`;
           },
         ],
       },
-      { signal: new AbortController().signal }
+      createToolContext()
     );
 
     // Should error because text appears multiple times
@@ -107,7 +115,7 @@ line 5`;
           },
         ],
       },
-      { signal: new AbortController().signal }
+      createToolContext()
     );
 
     expect(result.status).toBe('completed');
@@ -135,7 +143,7 @@ line 5`;
           },
         ],
       },
-      { signal: new AbortController().signal }
+      createToolContext()
     );
 
     expect(result.status).toBe('completed');
@@ -158,7 +166,7 @@ line 5`;
           },
         ],
       },
-      { signal: new AbortController().signal }
+      createToolContext()
     );
 
     expect(result.status).not.toBe('completed');

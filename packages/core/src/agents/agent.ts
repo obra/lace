@@ -2573,7 +2573,6 @@ export class Agent extends EventEmitter {
       workspaceInfo: session.getWorkspaceInfo(),
       workspaceManager: session.getWorkspaceManager(),
       hasFileBeenRead: (path: string) => this.hasFileBeenRead(path),
-      taskManager: session.getTaskManager(),
     };
   }
 

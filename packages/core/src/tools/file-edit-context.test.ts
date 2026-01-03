@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { FileEditTool } from '@lace/core/tools/implementations/file_edit';
 import type { FileEditDiffContext } from '@lace/core/tools/implementations/file_edit';
+import type { ToolContext } from '@lace/core/tools/types';
 import { promises as fs } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -18,6 +19,13 @@ describe('FileEditTool context extraction', () => {
     testDir = await fs.mkdtemp(join(tmpdir(), 'file_edit-test-'));
     testFile = join(testDir, 'test.txt');
   });
+
+  function createToolContext(): ToolContext {
+    return {
+      signal: new AbortController().signal,
+      hasFileBeenRead: () => true,
+    };
+  }
 
   afterEach(async () => {
     await fs.rm(testDir, { recursive: true, force: true });
@@ -47,7 +55,7 @@ line 10`;
           },
         ],
       },
-      { signal: new AbortController().signal }
+      createToolContext()
     );
 
     expect(result.status).toBe('completed');
@@ -85,7 +93,7 @@ fifth line`;
           },
         ],
       },
-      { signal: new AbortController().signal }
+      createToolContext()
     );
 
     expect(result.status).toBe('completed');
@@ -117,7 +125,7 @@ last line`;
           },
         ],
       },
-      { signal: new AbortController().signal }
+      createToolContext()
     );
 
     expect(result.status).toBe('completed');
@@ -156,7 +164,7 @@ function bar() {
           },
         ],
       },
-      { signal: new AbortController().signal }
+      createToolContext()
     );
 
     expect(result.status).toBe('completed');
@@ -183,7 +191,7 @@ function bar() {
           },
         ],
       },
-      { signal: new AbortController().signal }
+      createToolContext()
     );
 
     expect(result.status).toBe('completed');
@@ -218,7 +226,7 @@ function bar() {
             },
           ],
         },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
 
       expect(result.status).toBe('completed');
@@ -258,7 +266,7 @@ function bar() {
             },
           ],
         },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
 
       expect(result.status).toBe('completed');
@@ -289,7 +297,7 @@ function bar() {
             },
           ],
         },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
 
       expect(result.status).not.toBe('completed');
@@ -317,7 +325,7 @@ function bar() {
             },
           ],
         },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
 
       expect(result.status).toBe('completed');
@@ -344,7 +352,7 @@ function bar() {
             },
           ],
         },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
 
       expect(result.status).toBe('completed');
@@ -372,7 +380,7 @@ function bar() {
             },
           ],
         },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
 
       expect(result.status).not.toBe('completed');
@@ -390,7 +398,7 @@ function bar() {
             },
           ],
         },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
 
       expect(result.status).not.toBe('completed');
@@ -410,7 +418,7 @@ function bar() {
             },
           ],
         },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
 
       expect(result.status).toBe('completed');
@@ -445,7 +453,7 @@ function bar() {
           path: testFile,
           edits,
         },
-        { signal: new AbortController().signal }
+        createToolContext()
       );
       const duration = Date.now() - start;
 

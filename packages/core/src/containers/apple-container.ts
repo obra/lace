@@ -55,6 +55,43 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
     }
   }
 
+  private async listSystemContainers(
+    options: {
+      all?: boolean;
+      timeout?: number;
+    } = {}
+  ): Promise<Array<{ id: string; status: string }>> {
+    const { all = false, timeout = 2000 } = options;
+
+    const args = ['list', ...(all ? ['-a'] : []), '--format', 'json'];
+    const { stdout } = await execFileAsync('container', args, { timeout });
+    const parsed = JSON.parse(stdout || '[]') as unknown;
+
+    if (!Array.isArray(parsed)) return [];
+
+    const containers: Array<{ id: string; status: string }> = [];
+    for (const entry of parsed) {
+      if (!entry || typeof entry !== 'object') continue;
+      const obj = entry as Record<string, unknown>;
+      const configuration = obj.configuration as Record<string, unknown> | undefined;
+
+      const id =
+        (configuration && typeof configuration.id === 'string' && configuration.id) ||
+        (typeof obj.id === 'string' && obj.id) ||
+        null;
+
+      const status =
+        (typeof obj.status === 'string' && obj.status) ||
+        (typeof obj.state === 'string' && obj.state) ||
+        '';
+
+      if (!id) continue;
+      containers.push({ id, status });
+    }
+
+    return containers;
+  }
+
   create(config: ContainerConfig): string {
     // Generate unique container ID if not provided
     const uniqueSuffix = uuidv4().slice(0, 8);
@@ -203,16 +240,16 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
 
         // Container might already be stopped, check by listing
         try {
-          const { stdout } = await execFileAsync('container', ['list', '--format', 'json'], {
-            timeout: 1000,
-          });
-          const containers = JSON.parse(stdout || '[]') as unknown;
-          const found = Array.isArray(containers)
-            ? containers.some((c) => (c as { id?: string }).id === containerId)
-            : false;
+          const containers = await this.listSystemContainers({ timeout: 1000 });
+          const container = containers.find((c) => c.id === containerId);
 
-          if (!found) {
-            // Container is not running, mark as stopped
+          if (!container) {
+            this.updateContainerState(containerId, 'stopped');
+            return;
+          }
+
+          const normalized = container.status.toLowerCase();
+          if (normalized !== 'running') {
             this.updateContainerState(containerId, 'stopped');
             return;
           }
@@ -244,33 +281,39 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
 
     try {
       // Force remove to handle stuck containers
-      await execFileAsync('container', ['rm', '-f', containerId], { timeout: 3000 });
+      await execFileAsync('container', ['rm', '-f', containerId], { timeout: 10000 });
     } catch (error: unknown) {
       // Container might not exist, check if it's really there
+      let containers: Array<{ id: string; status: string }> | null = null;
       try {
-        const { stdout } = await execFileAsync('container', ['list', '-a', '--format', 'json'], {
-          timeout: 1000,
-        });
-        const containers = JSON.parse(stdout || '[]') as unknown;
-        const found = Array.isArray(containers)
-          ? containers.some((c) => (c as { id?: string }).id === containerId)
-          : false;
-
-        if (found) {
-          // Container exists but couldn't be removed
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          logger.error('Container exists but cannot be removed', {
-            containerId,
-            error: errorMessage,
-          });
-        } else {
-          // Container doesn't exist, that's fine
-          logger.debug('Container does not exist in system', { containerId });
-        }
+        containers = await this.listSystemContainers({ all: true, timeout: 1000 });
       } catch {
-        // Can't check, assume it's gone
-        logger.debug('Cannot verify container status, assuming removed', { containerId });
+        // Best effort
       }
+
+      if (containers) {
+        const found = containers.some((c) => c.id === containerId);
+        if (!found) {
+          logger.debug('Container does not exist in system', { containerId });
+          this.containers.delete(containerId);
+          this.unregisterMounts(containerId);
+          return;
+        }
+
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error('Container exists but cannot be removed', {
+          containerId,
+          error: errorMessage,
+        });
+        throw new ContainerError(
+          `Failed to remove container: ${errorMessage}`,
+          containerId,
+          error instanceof Error ? error : undefined
+        );
+      }
+
+      // Can't check, assume it's gone
+      logger.debug('Cannot verify container status, assuming removed', { containerId });
     }
 
     // Always clean up our records
@@ -412,29 +455,11 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
 
     // Sync with actual container system
     try {
-      const { stdout } = await execFileAsync('container', ['list', '--format', 'json']);
-      const systemContainers = JSON.parse(stdout || '[]') as unknown;
-
-      // Update our records with system state
-      if (Array.isArray(systemContainers)) {
-        for (const sc of systemContainers) {
-          // Type guard function to properly narrow the type
-          const isValidContainer = (obj: unknown): obj is { id: string; state: string } => {
-            return (
-              typeof obj === 'object' &&
-              obj !== null &&
-              'id' in obj &&
-              'state' in obj &&
-              typeof (obj as { id: unknown }).id === 'string' &&
-              typeof (obj as { state: unknown }).state === 'string'
-            );
-          };
-
-          if (isValidContainer(sc) && this.containers.has(sc.id)) {
-            const info = this.containers.get(sc.id)!;
-            info.state = sc.state === 'RUNNING' ? 'running' : 'stopped';
-          }
-        }
+      const systemContainers = await this.listSystemContainers();
+      for (const sc of systemContainers) {
+        if (!this.containers.has(sc.id)) continue;
+        const info = this.containers.get(sc.id)!;
+        info.state = sc.status.toLowerCase() === 'running' ? 'running' : 'stopped';
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);

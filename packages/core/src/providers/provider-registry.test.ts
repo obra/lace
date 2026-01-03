@@ -16,12 +16,27 @@ describe('ProviderRegistry', () => {
   let registry: ProviderRegistry;
   let tempDir: string;
   let originalLaceDir: string | undefined;
+  let originalOpenAiApiKey: string | undefined;
+  let originalOpenAiKey: string | undefined;
+  let originalAnthropicKey: string | undefined;
+  let originalAnthropicApiKey: string | undefined;
 
   beforeEach(() => {
     // Create temp directory for testing
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-test-'));
     originalLaceDir = process.env.LACE_DIR;
     process.env.LACE_DIR = tempDir;
+
+    originalOpenAiApiKey = process.env.OPENAI_API_KEY;
+    originalOpenAiKey = process.env.OPENAI_KEY;
+    originalAnthropicKey = process.env.ANTHROPIC_KEY;
+    originalAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
+
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.OPENAI_KEY;
+    delete process.env.ANTHROPIC_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+
     // Clear singleton for tests
     ProviderRegistry.clearInstance();
     registry = ProviderRegistry.getInstance();
@@ -34,6 +49,19 @@ describe('ProviderRegistry', () => {
     } else {
       delete process.env.LACE_DIR;
     }
+
+    if (originalOpenAiApiKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = originalOpenAiApiKey;
+
+    if (originalOpenAiKey === undefined) delete process.env.OPENAI_KEY;
+    else process.env.OPENAI_KEY = originalOpenAiKey;
+
+    if (originalAnthropicKey === undefined) delete process.env.ANTHROPIC_KEY;
+    else process.env.ANTHROPIC_KEY = originalAnthropicKey;
+
+    if (originalAnthropicApiKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = originalAnthropicApiKey;
+
     fs.rmSync(tempDir, { recursive: true, force: true });
     // Clear singleton after test
     ProviderRegistry.clearInstance();

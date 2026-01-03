@@ -5,7 +5,6 @@ import type { ToolCall, ToolResult } from '@lace/core/tools/types';
 import type { CompactionData } from '@lace/core/threads/compaction/types';
 import type { ApprovalDecision } from '@lace/core/tools/types';
 import type { CombinedTokenUsage } from '@lace/core/token-management/types';
-import type { Task, TaskContext } from '@lace/core/tasks/types';
 import type { MCPServerConfig } from '@lace/core/config/mcp-types';
 
 // Single source of truth for all event types
@@ -28,11 +27,6 @@ export const EVENT_TYPES = [
   'TOKEN_USAGE_UPDATE',
   'COMPACTION_START',
   'COMPACTION_COMPLETE',
-  // Task events (transient)
-  'TASK_CREATED',
-  'TASK_UPDATED',
-  'TASK_DELETED',
-  'TASK_NOTE_ADDED',
   // Agent lifecycle events (transient)
   'AGENT_SPAWNED',
   'AGENT_SUMMARY_UPDATED',
@@ -66,11 +60,6 @@ export function isTransientEventType(type: LaceEventType): boolean {
     'TOKEN_USAGE_UPDATE',
     'COMPACTION_START',
     'COMPACTION_COMPLETE',
-    // Task events
-    'TASK_CREATED',
-    'TASK_UPDATED',
-    'TASK_DELETED',
-    'TASK_NOTE_ADDED',
     // Agent lifecycle events
     'AGENT_SPAWNED',
     'AGENT_SUMMARY_UPDATED',
@@ -190,39 +179,6 @@ interface CompactionCompleteData {
   summary?: string;
   originalEventCount?: number;
   compactedEventCount?: number;
-}
-
-// Task event data types
-interface TaskCreatedData {
-  taskId: string;
-  task: Task;
-  context: TaskContext;
-  timestamp: Date;
-  type: 'task:created'; // For compatibility with existing handlers
-}
-
-interface TaskUpdatedData {
-  taskId: string;
-  task: Task;
-  context: TaskContext;
-  timestamp: Date;
-  type: 'task:updated'; // For compatibility
-}
-
-interface TaskDeletedData {
-  taskId: string;
-  task?: Task;
-  context: TaskContext;
-  timestamp: Date;
-  type: 'task:deleted'; // For compatibility
-}
-
-interface TaskNoteAddedData {
-  taskId: string;
-  task: Task;
-  context: TaskContext;
-  timestamp: Date;
-  type: 'task:note_added'; // For compatibility
 }
 
 // Agent lifecycle event data
@@ -459,22 +415,6 @@ export type LaceEvent =
   | (BaseLaceEvent & {
       type: 'COMPACTION_COMPLETE';
       data: CompactionCompleteData;
-    })
-  | (BaseLaceEvent & {
-      type: 'TASK_CREATED';
-      data: TaskCreatedData;
-    })
-  | (BaseLaceEvent & {
-      type: 'TASK_UPDATED';
-      data: TaskUpdatedData;
-    })
-  | (BaseLaceEvent & {
-      type: 'TASK_DELETED';
-      data: TaskDeletedData;
-    })
-  | (BaseLaceEvent & {
-      type: 'TASK_NOTE_ADDED';
-      data: TaskNoteAddedData;
     })
   | (BaseLaceEvent & {
       type: 'AGENT_SPAWNED';

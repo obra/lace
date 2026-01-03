@@ -169,14 +169,6 @@
       "types": "./dist/test-utils/core-test-setup.d.ts",
       "import": "./dist/test-utils/core-test-setup.js"
     },
-    "./tasks/task-status": {
-      "types": "./dist/tasks/task-status.d.ts",
-      "import": "./dist/tasks/task-status.js"
-    },
-    "./tasks/types": {
-      "types": "./dist/tasks/types.d.ts",
-      "import": "./dist/tasks/types.js"
-    },
     "./token-management/types": {
       "types": "./dist/token-management/types.d.ts",
       "import": "./dist/token-management/types.js"

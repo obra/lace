@@ -175,7 +175,6 @@ export class SessionHelper extends BaseHelper {
         workspaceInfo: session?.getWorkspaceInfo?.(),
         workspaceManager: session?.getWorkspaceManager?.(),
         hasFileBeenRead: (path: string) => this.options.parentAgent.hasFileBeenRead(path),
-        taskManager: session?.getTaskManager?.(),
       };
 
       logger.debug('SessionHelper requesting tool permission', {

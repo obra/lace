@@ -12,15 +12,6 @@ import { FileWriteTool } from '@lace/core/tools/implementations/file_write';
 import { FileEditTool } from '@lace/core/tools/implementations/file_edit';
 import { RipgrepSearchTool } from '@lace/core/tools/implementations/ripgrep_search';
 import { FileFindTool } from '@lace/core/tools/implementations/file_find';
-import {
-  TaskCreateTool,
-  TaskListTool,
-  TaskCompleteTool,
-  TaskUpdateTool,
-  TaskAddNoteTool,
-  TaskViewTool,
-} from '@lace/core/tools/implementations/task-manager/index';
-import { DelegateTool } from '@lace/core/tools/implementations/delegate';
 import { UrlFetchTool } from '@lace/core/tools/implementations/url_fetch';
 import { MCPServerManager } from '@lace/core/mcp/server-manager';
 import type { MCPServerConnection } from '@lace/core/config/mcp-types';
@@ -242,13 +233,6 @@ export class ToolExecutor {
       new FileEditTool(),
       new RipgrepSearchTool(),
       new FileFindTool(),
-      new TaskCreateTool(),
-      new TaskListTool(),
-      new TaskCompleteTool(),
-      new TaskUpdateTool(),
-      new TaskAddNoteTool(),
-      new TaskViewTool(),
-      new DelegateTool(),
       new UrlFetchTool(),
     ];
 
