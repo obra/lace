@@ -218,6 +218,7 @@ async function main(): Promise<void> {
   });
 
   conn.proc.on('exit', (code, signal) => {
+    if (shuttingDown) return;
     process.stderr.write(`\n[agent exited] code=${code ?? 'null'} signal=${signal ?? 'null'}\n`);
     process.exit(code ?? 1);
   });
@@ -230,11 +231,14 @@ async function main(): Promise<void> {
   const replPrompt = 'lace> ';
   const permissionPrompt = 'permission> ';
   let promptShown = false;
+  const interactive = process.stdin.isTTY && process.stdout.isTTY;
+  let shuttingDown = false;
 
   const pendingPermissions: PendingPermission[] = [];
   let activePermission: PendingPermission | undefined;
 
   const showPrompt = () => {
+    if (!interactive) return;
     if (promptShown) return;
     promptShown = true;
     process.stdout.write(activePrompt === 'permission' ? permissionPrompt : replPrompt);
@@ -397,6 +401,7 @@ async function main(): Promise<void> {
   };
 
   const exit = async (code: number) => {
+    shuttingDown = true;
     rl.close();
     await conn.shutdown();
     process.exit(code);
@@ -419,9 +424,11 @@ async function main(): Promise<void> {
         return;
       }
       if (cmd === 'status') {
-        printLine(`agent: pid=${conn.proc.pid}`);
-        printLine(`workDir: ${args.workDir}`);
-        printLine(`sessionId: ${activeSessionId ?? '<none>'}`);
+        printBlock([
+          `agent: pid=${conn.proc.pid}`,
+          `workDir: ${args.workDir}`,
+          `sessionId: ${activeSessionId ?? '<none>'}`,
+        ]);
         return;
       }
       if (cmd === 'new') {
@@ -547,6 +554,7 @@ async function main(): Promise<void> {
   });
 
   rl.on('close', () => {
+    if (shuttingDown) return;
     void exit(0);
   });
 
